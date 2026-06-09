@@ -1,0 +1,4 @@
+location_id,location_name,latitude,longitude,region,country,type
+LOC001,Manufacturing Hub A,40.7128,-74.0060,North America,USA,Factory
+LOC002,Distribution Center B,51.5074,-0.1278,Europe,UK,Warehouse
+LOC003,Supplier Site C,35.6762,139.6503,Asia,Japan,Supplier

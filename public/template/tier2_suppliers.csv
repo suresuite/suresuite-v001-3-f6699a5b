@@ -1,0 +1,4 @@
+supplier_id,upstream_supplier_id,material_id,relationship_type,volume,unit_price,lead_time,time_unit
+SUP001,TIER2_001,MAT001,direct,500,15.50,14,days
+SUP002,TIER2_002,MAT002,indirect,300,22.75,21,days
+SUP003,TIER2_003,MAT003,direct,750,8.90,10,days

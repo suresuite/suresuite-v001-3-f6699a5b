@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Prominence Calculation</title>
+</head>
+<body>
+    <h1>Test Prominence Calculation</h1>
+    <button onclick="testProminence()">Test Prominence</button>
+    <div id="result"></div>
+
+    <script>
+        async function testProminence() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('https://wckdrutwkytwcomrlpib.supabase.co/functions/v1/calculate-node-prominence', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // No authorization header - edge function should use service role internally
+                    },
+                    body: JSON.stringify({
+                        project_id: '1f0e0472-1556-4d75-be10-b1af2491d9be'
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Prominence calculation result:', result);
+                resultDiv.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

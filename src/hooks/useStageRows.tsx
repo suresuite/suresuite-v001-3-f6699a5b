@@ -1,0 +1,563 @@
+// @ts-nocheck — RPC + raw tables not in generated types.
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import type { StageKey } from "@/lib/policies/stages";
+
+export interface StageRow {
+  /** Composite key = "<location>::<material_or_product>" — also used as override target_key. */
+  key: string;
+  [k: string]: unknown;
+}
+
+interface Args {
+  projectId: string | null | undefined;
+  plantName: string | undefined | null;
+  stage: StageKey;
+}
+
+interface SCDRow {
+  plant_name?: string;
+  from_location: string;
+  to_location: string;
+  data_source?: string;
+  weighted?: number;
+}
+
+/**
+ * Source of truth = `get_supply_chain_data` RPC (same as /network/product-level),
+ * which returns from_location/to_location keyed by data_source ∈ inbound|bom|outbound.
+ * We then enrich with the real per-row tables (inbound_logistics, outbound_logistics,
+ * bom_multi_level — note plural names) to fill price / lead time / capacity columns.
+ */
+export function useStageRows({ projectId, plantName, stage }: Args) {
+  const { user } = useAuth();
+  const [rows, setRows] = useState<StageRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fallback, setFallback] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!projectId || !user || stage === "run_validate") {
+      setRows([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setFallback(false);
+
+    (async () => {
+      const sb = supabase as any;
+      try {
+        // 1) Canonical edge list from the RPC.
+        const { data: scd, error: scdErr } = await sb.rpc("get_supply_chain_data", {
+          p_project_id: projectId,
+          p_plant_name: null,
+          p_user_id: user.id,
+          p_user_email: user.email,
+        });
+        if (scdErr) throw scdErr;
+        const edges: SCDRow[] = (scd ?? []).filter(
+          (d: SCDRow) => d.data_source && d.data_source !== "multi_tier",
+        );
+
+        // 2) Enrichment tables (best-effort — may be empty).
+        const [inboundQ, outboundQ, bomQ] = await Promise.all([
+          sb
+            .from("inbound_logistics")
+            .select("supplier_id,material_id,unit_price,lead_time,volume,time_unit")
+            .eq("project_id", projectId)
+            .limit(10000),
+          sb
+            .from("outbound_logistics")
+            .select(
+              "customer_id,product_id,unit_price,expected_lead_time,volume,time_unit",
+            )
+            .eq("project_id", projectId)
+            .limit(10000),
+          sb
+            .from("bom_multi_level")
+            .select(
+              "material_id,level,higher_level_component_id,consumption_rate",
+            )
+            .eq("project_id", projectId)
+            .limit(10000),
+        ]);
+
+        const inbound = inboundQ.data ?? [];
+        const outbound = outboundQ.data ?? [];
+        const bom = bomQ.data ?? [];
+
+        // Normalise any value carrying a time_unit (week|month|day) into days.
+        const daysFromUnit = (value: number | null | undefined, unit: string | null | undefined): number | undefined => {
+          if (value === null || value === undefined) return undefined;
+          const n = Number(value);
+          if (!Number.isFinite(n)) return undefined;
+          const mul = unit === "week" ? 7 : unit === "month" ? 30 : 1;
+          return n * mul;
+        };
+
+        const inboundByKey = new Map<string, any>();
+        for (const r of inbound) {
+          inboundByKey.set(`${r.supplier_id}::${r.material_id}`, {
+            ...r,
+            lead_time_days: daysFromUnit(r.lead_time, r.time_unit),
+            volume_per_day:
+              r.time_unit === "week"
+                ? Number(r.volume) / 7
+                : r.time_unit === "month"
+                ? Number(r.volume) / 30
+                : Number(r.volume),
+          });
+        }
+        const outboundByKey = new Map<string, any>();
+        for (const r of outbound) {
+          outboundByKey.set(`${r.customer_id}::${r.product_id}`, {
+            ...r,
+            expected_lead_time_days: daysFromUnit(r.expected_lead_time, r.time_unit),
+            volume_per_day:
+              r.time_unit === "week"
+                ? Number(r.volume) / 7
+                : r.time_unit === "month"
+                ? Number(r.volume) / 30
+                : Number(r.volume),
+          });
+        }
+
+        // ── Smart-average imputation basis ──────────────────────────────────
+        // When a (supplier,material)/(customer,product) pair from the RPC has no
+        // matching uploaded row, we fill the project-backed numeric fields with a
+        // "smart" average: the per-item average first (across the same material /
+        // product), else the project-wide average. Imputed cells are flagged so
+        // the UI can show a red "verify" dot.
+        const avg = (nums: number[]): number | undefined => {
+          const ok = nums.filter((n) => Number.isFinite(n) && n > 0);
+          if (ok.length === 0) return undefined;
+          return ok.reduce((s, n) => s + n, 0) / ok.length;
+        };
+        const pushTo = (map: Map<string, number[]>, k: string, v: any) => {
+          const n = Number(v);
+          if (!Number.isFinite(n)) return;
+          if (!map.has(k)) map.set(k, []);
+          map.get(k)!.push(n);
+        };
+        // Inbound (supplier) bases — keyed by material_id.
+        const inPriceByMaterial = new Map<string, number[]>();
+        const inLeadByMaterial = new Map<string, number[]>();
+        for (const r of inbound) {
+          const mat = String(r.material_id);
+          pushTo(inPriceByMaterial, mat, r.unit_price);
+          pushTo(inLeadByMaterial, mat, (r as any).lead_time_days);
+        }
+        const inPriceGlobal = avg(inbound.map((r: any) => Number(r.unit_price)));
+        const inLeadGlobal = avg(inbound.map((r: any) => Number(r.lead_time_days)));
+        // Outbound (customer) bases — keyed by product_id.
+        const outPriceByProduct = new Map<string, number[]>();
+        const outVolByProduct = new Map<string, number[]>();
+        const outLeadByProduct = new Map<string, number[]>();
+        for (const r of outbound) {
+          const prod = String(r.product_id);
+          pushTo(outPriceByProduct, prod, r.unit_price);
+          pushTo(outVolByProduct, prod, (r as any).volume_per_day);
+          pushTo(outLeadByProduct, prod, (r as any).expected_lead_time_days);
+        }
+        const outPriceGlobal = avg(outbound.map((r: any) => Number(r.unit_price)));
+        const outVolGlobal = avg(outbound.map((r: any) => Number((r as any).volume_per_day)));
+        const outLeadGlobal = avg(outbound.map((r: any) => Number((r as any).expected_lead_time_days)));
+        // Per-item average first, else project-wide average, else undefined.
+        const impute = (
+          perItem: Map<string, number[]>,
+          itemKey: string,
+          globalAvg: number | undefined,
+        ): number | undefined => {
+          const local = avg(perItem.get(itemKey) ?? []);
+          return local ?? globalAvg;
+        };
+        const round2 = (n: number) => Math.round(n * 100) / 100;
+        // Resolve a project-backed field: real value when finite, else imputed
+        // average (flagged). Mutates `prov` with __from_data / __imputed markers.
+        const resolveField = (
+          prov: { __from_data: Record<string, true>; __imputed: Record<string, true> },
+          field: string,
+          real: any,
+          imputedValue: number | undefined,
+        ): number | undefined => {
+          const r = Number(real);
+          if (Number.isFinite(r) && r > 0) {
+            prov.__from_data[field] = true;
+            return r;
+          }
+          if (imputedValue !== undefined) {
+            prov.__imputed[field] = true;
+            return round2(imputedValue);
+          }
+          return undefined;
+        };
+
+        // Determine which BOM nodes are raw materials (= leaf level, never a parent).
+        const isParent = new Set<string>();
+        for (const r of bom) if (r.higher_level_component_id) isParent.add(String(r.higher_level_component_id));
+        const rawMaterials = new Set<string>();
+        for (const r of bom) {
+          if (!r.material_id) continue;
+          if (!isParent.has(String(r.material_id))) rawMaterials.add(String(r.material_id));
+        }
+
+        // Resolve a focal plant name.
+        const focal = (() => {
+          if (plantName && plantName !== "Focal plant") return plantName;
+          for (const e of edges) if (e.plant_name) return e.plant_name;
+          return plantName || "Focal plant";
+        })();
+
+        if (stage === "supplier") {
+          const seen = new Map<string, any>();
+
+          // 1) Build a DEDUPLICATED per-pair volume so the share numerator and
+          //    denominator come from the exact same basis (→ always sums to 100%).
+          //    The RPC can return multiple edges per (supplier, material) pair;
+          //    summing those into the denominator while each row uses the single
+          //    deduped pair volume as numerator is what produced shares like
+          //    2.9% / 1.5% / 0% instead of 100%.
+          const weightedByPair = new Map<string, number>();
+          const suppliersByMaterial = new Map<string, Set<string>>();
+          for (const e of edges) {
+            if (e.data_source !== "inbound") continue;
+            const mat = String(e.to_location);
+            const sup = String(e.from_location);
+            const pair = `${sup}::${mat}`;
+            const w = Number((e as any).weighted ?? 0);
+            weightedByPair.set(
+              pair,
+              (weightedByPair.get(pair) ?? 0) + (Number.isFinite(w) ? w : 0),
+            );
+            const set = suppliersByMaterial.get(mat) ?? new Set<string>();
+            set.add(sup);
+            suppliersByMaterial.set(mat, set);
+          }
+          // One volume per unique pair: deduped inbound volume/day, else summed weighted.
+          const volByPair = new Map<string, number>();
+          for (const [mat, sups] of suppliersByMaterial) {
+            for (const sup of sups) {
+              const pair = `${sup}::${mat}`;
+              const enrich = inboundByKey.get(pair) ?? {};
+              const vpd = Number(enrich.volume_per_day);
+              const v = Number.isFinite(vpd)
+                ? vpd
+                : (weightedByPair.get(pair) ?? 0);
+              volByPair.set(pair, Number.isFinite(v) ? v : 0);
+            }
+          }
+          // Per-material: total volume (over unique suppliers) + suggested primary.
+          const matMeta = new Map<
+            string,
+            { total: number; primary: string; count: number }
+          >();
+          for (const [mat, sups] of suppliersByMaterial) {
+            const supList = [...sups];
+            const total = supList.reduce(
+              (s, sup) => s + (volByPair.get(`${sup}::${mat}`) ?? 0),
+              0,
+            );
+            // Rank unique suppliers: highest volume → lowest price → lowest lead time.
+            const ranked = [...supList].sort((a, b) => {
+              const ea = inboundByKey.get(`${a}::${mat}`) ?? {};
+              const eb = inboundByKey.get(`${b}::${mat}`) ?? {};
+              return (
+                (volByPair.get(`${b}::${mat}`) ?? 0) -
+                  (volByPair.get(`${a}::${mat}`) ?? 0) ||
+                Number(ea.unit_price ?? Number.POSITIVE_INFINITY) -
+                  Number(eb.unit_price ?? Number.POSITIVE_INFINITY) ||
+                Number(ea.lead_time_days ?? Number.POSITIVE_INFINITY) -
+                  Number(eb.lead_time_days ?? Number.POSITIVE_INFINITY)
+              );
+            });
+            matMeta.set(mat, {
+              total,
+              primary: ranked[0] ?? "",
+              count: supList.length,
+            });
+          }
+
+          for (const e of edges) {
+            if (e.data_source !== "inbound") continue;
+            const supplier = e.from_location;
+            const material = e.to_location;
+            const key = `${supplier}::${material}`;
+            if (seen.has(key)) continue;
+            const enrich = inboundByKey.get(key) ?? {};
+            const meta = matMeta.get(String(material));
+            const count = meta?.count ?? 1;
+            const isSuggested = meta?.primary === String(supplier);
+            // Share % per (material, supplier) pair. Single source → 100%.
+            // Numerator and denominator both come from the deduped volByPair map,
+            // so a material's suppliers always sum to 100%.
+            const laneVolume = volByPair.get(key) ?? 0;
+            const totalVolume = meta?.total ?? 0;
+            const sharePct =
+              count <= 1
+                ? 100
+                : totalVolume > 0
+                ? (laneVolume / totalVolume) * 100
+                : 100 / count;
+            const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
+            const material_price = resolveField(
+              prov,
+              "material_price",
+              enrich.unit_price,
+              impute(inPriceByMaterial, String(material), inPriceGlobal),
+            );
+            const lead_time_mean_days = resolveField(
+              prov,
+              "lead_time_mean_days",
+              enrich.lead_time_days,
+              impute(inLeadByMaterial, String(material), inLeadGlobal),
+            );
+            seen.set(key, {
+              key,
+              supplier_id: supplier,
+              material_id: material,
+              // Real uploaded data where available, else smart-average imputed.
+              material_price,
+              lead_time_mean_days,
+              lead_time_distribution: "normal",
+              // No capacity exists in uploads → unlimited (documented default).
+              supplier_capacity_per_day: 999_999_999,
+              ordering_cost: 0,
+              moq: 0,
+              safety_stock_days: 0,
+              // Read-only allocation share for this material/supplier pair.
+              share_pct: Math.round(sharePct * 10) / 10,
+              // Single source → auto-lock. Multi-source → auto-enable the
+              // suggested supplier, leave the rest off (user can still change).
+              primary_source: count === 1 ? true : isSuggested,
+              __suggested_primary: isSuggested,
+              __needs_primary: count > 1,
+              __lane_count: count,
+              __supplier_count: count,
+              __from_data: prov.__from_data,
+              __imputed: prov.__imputed,
+            });
+          }
+
+          for (const mat of rawMaterials) {
+            const key = `(unassigned supplier)::${mat}`;
+            if (seen.has(key)) continue;
+            const alreadyPaired = [...seen.values()].some((r) => r.material_id === mat);
+            if (alreadyPaired) continue;
+            seen.set(key, {
+              key,
+              supplier_id: "(unassigned supplier)",
+              material_id: mat,
+              __needs_supplier: true,
+              __supplier_count: 0,
+              __lane_count: 0,
+            });
+          }
+
+          if (!cancelled)
+            setRows(
+              [...seen.values()].sort(
+                (a, b) =>
+                  String(a.material_id ?? "").localeCompare(String(b.material_id ?? "")) ||
+                  String(a.supplier_id ?? "").localeCompare(String(b.supplier_id ?? "")),
+              ),
+            );
+          return;
+        }
+
+        if (stage === "plant") {
+          const bomTargets = new Set<string>();
+          const outboundSources = new Set<string>();
+          // Per-product outbound demand totals (units/day) → capacity hint.
+          const outboundDemandByProduct = new Map<string, number>();
+          // Per-product BOM components count (depth-1 children).
+          const componentsByProduct = new Map<string, number>();
+          // Median inbound lead time across components feeding this product
+          // (rough proxy for production lead time when no explicit data exists).
+          const inboundLeadTimesByProduct = new Map<string, number[]>();
+
+          // BOM children per parent product
+          for (const r of bom) {
+            const parent = String(r.higher_level_component_id ?? "");
+            if (!parent) continue;
+            componentsByProduct.set(parent, (componentsByProduct.get(parent) ?? 0) + 1);
+          }
+          // outbound demand → product
+          for (const o of outbound) {
+            const p = String(o.product_id);
+            const v = (o as any).volume_per_day ?? 0;
+            outboundDemandByProduct.set(p, (outboundDemandByProduct.get(p) ?? 0) + (Number.isFinite(v) ? v : 0));
+          }
+          // inbound lead times grouped by parent product via BOM
+          const inboundLeadByMaterial = new Map<string, number[]>();
+          for (const i of inbound) {
+            const mat = String(i.material_id);
+            const lt = (i as any).lead_time_days;
+            if (lt !== undefined) {
+              if (!inboundLeadByMaterial.has(mat)) inboundLeadByMaterial.set(mat, []);
+              inboundLeadByMaterial.get(mat)!.push(lt);
+            }
+          }
+          for (const r of bom) {
+            const parent = String(r.higher_level_component_id ?? "");
+            const mat = String(r.material_id ?? "");
+            if (!parent || !mat) continue;
+            const lts = inboundLeadByMaterial.get(mat) ?? [];
+            if (lts.length === 0) continue;
+            if (!inboundLeadTimesByProduct.has(parent)) inboundLeadTimesByProduct.set(parent, []);
+            inboundLeadTimesByProduct.get(parent)!.push(...lts);
+          }
+
+          for (const e of edges) {
+            if (e.data_source === "bom") bomTargets.add(e.to_location);
+            if (e.data_source === "outbound") outboundSources.add(e.from_location);
+          }
+          const products = new Set<string>();
+          for (const p of bomTargets) if (outboundSources.has(p)) products.add(p);
+          if (products.size === 0) for (const p of outboundSources) products.add(p);
+
+          const median = (xs: number[]): number | undefined => {
+            if (xs.length === 0) return undefined;
+            const sorted = [...xs].sort((a, b) => a - b);
+            const m = Math.floor(sorted.length / 2);
+            return sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+          };
+
+          const seen = new Map<string, any>();
+          for (const prod of products) {
+            const key = `${focal}::${prod}`;
+            const demand = outboundDemandByProduct.get(prod);
+            const lt = median(inboundLeadTimesByProduct.get(prod) ?? []);
+            const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
+            const production_lead_time_mean_days = resolveField(
+              prov,
+              "production_lead_time_mean_days",
+              lt,
+              impute(inLeadByMaterial, String(prod), inLeadGlobal),
+            );
+            seen.set(key, {
+              key,
+              item_id: focal,
+              product_id: prod,
+              // No capacity exists in uploads → unlimited (documented default).
+              capacity_machine_per_day: 999_999_999,
+              capacity_labor_per_day: 999_999_999,
+              production_cost_per_unit: 0,
+              // Real signal: median inbound lead time of feeding components,
+              // else smart-average imputed.
+              production_lead_time_mean_days,
+              lead_time_distribution: "normal",
+              __components_count: componentsByProduct.get(prod) ?? 0,
+              __demand_per_day: demand,
+              __from_data: prov.__from_data,
+              __imputed: prov.__imputed,
+            });
+          }
+
+          if (!cancelled)
+            setRows([...seen.values()].sort((a, b) => a.key.localeCompare(b.key)));
+          return;
+        }
+
+        if (stage === "customer") {
+          const bomProducts = new Set<string>();
+          for (const e of edges) if (e.data_source === "bom") bomProducts.add(e.to_location);
+
+          // Build per-product firm volumes (firm = plant_name, fallback focal).
+          // firmVolByProduct.get(product).get(firm) = Σ weighted
+          const firmVolByProduct = new Map<string, Map<string, number>>();
+          for (const e of edges) {
+            if (e.data_source !== "outbound") continue;
+            const product = String(e.from_location);
+            const firm = String(e.plant_name ?? focal);
+            const v = Number((e as any).weighted ?? 0) || 0;
+            const inner = firmVolByProduct.get(product) ?? new Map<string, number>();
+            inner.set(firm, (inner.get(firm) ?? 0) + (Number.isFinite(v) ? v : 0));
+            firmVolByProduct.set(product, inner);
+          }
+          // Suggested firm per product = highest volume; tie-break alphabetical.
+          const suggestedFirmByProduct = new Map<string, { firm: string; firms: string[] }>();
+          for (const [product, inner] of firmVolByProduct) {
+            const firms = [...inner.keys()].sort();
+            const ranked = [...inner.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+            const firm = ranked[0]?.[0] ?? "";
+            suggestedFirmByProduct.set(product, { firm, firms });
+          }
+
+          const seen = new Map<string, any>();
+          for (const e of edges) {
+            if (e.data_source !== "outbound") continue;
+            const customer = e.to_location;
+            const product = e.from_location;
+            const key = `${customer}::${product}`;
+            if (seen.has(key)) continue;
+            const enrich = outboundByKey.get(key) ?? {};
+            const meta = suggestedFirmByProduct.get(String(product));
+            const firms = meta?.firms ?? [];
+            const suggestedFirm = meta?.firm ?? "";
+            const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
+            const price = resolveField(
+              prov,
+              "price",
+              enrich.unit_price,
+              impute(outPriceByProduct, String(product), outPriceGlobal),
+            );
+            const mean_per_day = resolveField(
+              prov,
+              "mean_per_day",
+              enrich.volume_per_day,
+              impute(outVolByProduct, String(product), outVolGlobal),
+            );
+            const delivery_window_days = resolveField(
+              prov,
+              "delivery_window_days",
+              enrich.expected_lead_time_days,
+              impute(outLeadByProduct, String(product), outLeadGlobal),
+            );
+            seen.set(key, {
+              key,
+              customer_id: customer,
+              product_id: product,
+              // Real uploaded data where available, else smart-average imputed.
+              price,
+              mean_per_day,
+              delivery_window_days,
+              backorder_cost_per_day: 0,
+              // Prefill the suggested sourcing firm; single firm → only option.
+              sourcing_firm: suggestedFirm || undefined,
+              // Single firm → lock primary. Multi-firm → auto-enable the
+              // suggested firm (user can still change).
+              primary_source: suggestedFirm ? true : undefined,
+              __suggested_primary: !!suggestedFirm,
+              __needs_primary: firms.length > 1,
+              __lane_count: firms.length,
+              __sourcing_firm_count: firms.length,
+              __firms_available: firms,
+              __unknown_product: bomProducts.size > 0 && !bomProducts.has(product),
+              __from_data: prov.__from_data,
+              __imputed: prov.__imputed,
+            });
+          }
+
+          if (!cancelled)
+            setRows([...seen.values()].sort((a, b) => a.key.localeCompare(b.key)));
+          return;
+        }
+      } catch (err) {
+        console.warn("[useStageRows] failed", err);
+        if (!cancelled) {
+          setRows([]);
+          setFallback(true);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, plantName, stage, user]);
+
+  return { rows, loading, fallback };
+}

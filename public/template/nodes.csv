@@ -1,0 +1,665 @@
+uid,depth,name,country,industry,website,traded_as,number_of_employees,revenue,lat,long,is_seed
+a6552c54-688d-59bb-a564-5a3bd33bfa76,0,"Continental AG (Germany, Fed. Rep.) (NBB: CTTA Y)",Germany,Auto Parts,www.continental.com,CON,200888.0,39408900000.0,52.4107,9.7376,True
+0727c9f6-a50b-5fd5-b495-58be4894069d,1,HeadHunter Group PLC,Cyprus,Business Training and Employment Agencies,hh.ru,HHRUDR,1515.0,17621966000.0,55.7644,37.6543,False
+092f6c4b-3f33-51e5-9d44-2fc3fda1754e,1,TUS International Ltd (HSE: 0872),Cayman Islands,Auto Parts,http://www.tus-i.com,,78.0,781801363.0,22.2809269,114.157726,False
+0b7e2ac3-3c70-556f-85d7-b630d3f517b5,1,"Ningbo Tianlong Electronics Co., Ltd.",China,Automobiles,http://www.ptianlong.com/,603266,1430.0,214500000.0,29.918468,121.774017,False
+0b8c6571-ec17-5081-aa01-3d225e1361e8,1,Progress-Werk Oberkirch AG (Germany),Germany,Automobiles,www.pwo-group.com,PWO,3112.0,,48.476567,8.074703,False
+0bfd545f-5c01-5461-b184-e532d7ab2357,1,"Woosu AMS Co., Ltd.",South Korea,Automobiles,www.woosu.co.kr,066590,399.0,,35.241805,128.689888,False
+0c8526fb-b43c-5a4d-bfb5-3293e05860ac,1,"Earth-Panda Advanced Magnetic Material Co., Ltd.",China,General Mining,http://earth-panda.com/,688077,1440.0,212938848.0,31.2586,116.4876,False
+0e9c3923-6e3c-57f8-b4c0-e501e48051fd,1,"Longxing Chemical Stock Co., Ltd.",China,Automobiles,www.hb-lx.com.cn,002442,1428.0,,39.7251,116.3069,False
+0eaf94bf-2414-5be0-95b9-93416848014d,1,Vimi Fasteners SpA,Italy,Transaction Processing Services,http://www.vimifasteners.com/,VIM:MIL,273.0,65021476.0,44.9212,10.7411,False
+0f1b68c7-7d3a-57e5-bd26-27f138bded2c,1,Enero Group Ltd (AUS: EGG),Australia,Media Agencies,https://www.enero.com/,EGG,700.0,268741000.0,-33.8696,151.1944,False
+1013427e-f17d-53c9-8940-282377ab5912,1,Minda Corp. Ltd.,India,Automobiles,https://sparkminda.com/,MINDACORP,2940.0,710000000.0,28.5355,77.391,False
+1235e393-0ea2-54b8-b316-7c7fc9b9b7c4,1,Wejo Group Ltd (NBB: WEJO F),Bermuda,Transaction Processing Services,www.wejo.com,WEJOF,251.0,8396000.0,53.48671,-2.25949,False
+14e89da5-28df-5a69-9154-4fdac55d03f5,1,"Nanjing Chervon Auto Precision Technology Co., Ltd.",China,Automobiles,http://www.chervonauto.com/,603982,3470.0,334283000.0,32.0185,118.7655,False
+19f1c551-d50b-5d80-b7ac-b74f597bb831,1,"JD.com, Inc. (NMS: JD)",Cayman Islands,Diversified Retailers,https://corporate.jd.com/,JD,517124.0,153400000000.0,39.778678,116.277889,False
+19fc67a3-6333-5f4e-93af-59b412947183,1,Notion Vtec Bhd (NL: ),Malaysia,Diversified Industrials,http://www.notionvtec.com/,NOTION,2440.0,242747000.0,3.0369,101.4431,False
+1a53e200-6891-596d-8d9f-5ebaf560837b,1,Rajratan Global Wire Ltd.,India,General Mining,https://rajratan.co.in/,RAJRATAN,650.0,133239500.0,22.723027,75.882418,False
+1a5fabf9-8af6-5992-8017-0b8a8e514e4c,1,Valens Semiconductor Ltd (NYS: VLN),Israel,Semiconductors,http://www.valens.com,VLN,241.0,84161000.0,32.1502,34.8886,False
+1d272dff-84dc-5bf2-9c21-e656b0979227,1,Johnson Electric Holdings Ltd. (NBB: JEHL Y),Bermuda,Electrical Components,https://www.johnsonelectric.com/,179,30000.0,3156163000.0,22.420579,114.207302,False
+1f1f6180-f098-50f7-982a-cfcda7b60eb9,1,Memtech International Ltd.,Singapore,Computer Hardware,www.memtechchina.com,MEMT,5000.0,,1.300716,103.849527,False
+2709f95c-0abc-5812-8265-ccafe4ffc084,1,"Suzhou Harmontronics Automation Technology Co., Ltd.",China,Transaction Processing Services,https://www.harmontronics.com/,688022,1530.0,214949395.0,31.298974,120.585289,False
+27d8dfc8-10f2-5c83-a13f-d6fe4f5df9a3,1,Aumann AG,Germany,Machinery: Specialty,https://www.aumann.com/,AAGX:GER,958.0,172171000.0,51.8745,8.129,False
+2c0271a2-25aa-59d1-b7c7-9074f43f812e,1,"KB Autosys Co., Ltd.",South Korea,Automobiles,www.kbautosys.com,024120,209.0,,36.7831,127.0046,False
+2d7ad443-925c-5651-b806-b809e973b9b4,1,PT Kirana Megatara Tbk,Indonesia,Automobiles,https://www.kiranamegatara.com/,KMTR,4220.0,652102400.0,-6.2297,106.6806,False
+31736e2f-175c-52b1-b6eb-c8105c2f96d0,1,Altran Technologies SA,France,Computer Services,www.altran.com/,ALTT,48555.0,3015527000.0,48.8846,2.2697,False
+320d1db3-208c-553e-8613-18d2a9cc7879,1,"Nanjing Kangni Mechanical & Electrical Co., Ltd.",China,Commercial Vehicles and Parts,http://www.kn-nanjing.com,603111,3210.0,558800000.0,32.043841,118.778766,False
+34099cf9-d867-59ab-9e7c-c09c11cbcd2f,1,"Dongguan Eontec Co., Ltd.",China,General Mining,www.e-ande.com,300328,2179.0,,22.714199,113.674986,False
+346bbf0a-6725-5b73-9284-ed39e3e04095,1,"Shanghai Yongmaotai Automotive Technology Co., Ltd.",China,Automobiles,http://www.ymtauto.com/,605208,1350.0,560000000.0,31.1517,121.1142,False
+34937a45-b3d7-5513-9767-4f399d14d89d,1,VIA optronics AG (NYS: VIAO),Germany,Electronic Components,www.via-optronics.com/en,VIAOY,849.0,210002496.0,49.4457,11.0795,False
+356e9662-e0de-58a3-8b90-23d96dcc5cfd,1,"Vishay Intertechnology, Inc. (NYS: VSH)",United States,Semiconductors,https://www.vishay.com/,VSH,23500.0,3402045000.0,40.0341389,-75.514287,False
+3d896625-b0b3-5975-9d90-45433f1d66e3,1,"Red Avenue New Materials Group Co., Ltd.",China,Chemicals: Diversified,https://www.rachem.com/,603650,1150.0,467087509.0,31.2336533,121.47572,False
+42df3e5e-75cd-52d2-a281-9d71a11dfcd2,1,"Ambarella, Inc. (NMS: AMBA)",Cayman Islands,Semiconductors,www.ambarella.com,AMBA,915.0,258179000.0,37.3917269,-121.9608641,False
+44ca9034-7354-5d0b-9e65-64e8200eb4a9,1,Yujin Robot Co Ltd (KOS: 056080),South Korea,Toys,www.yujinrobot.com,056080,153.0,81747626423.0,37.418382,126.737868,False
+468f88a7-be9a-500a-9c0b-a1e260bcd364,1,Wilson Sons Holdings Brasil SA,Brazil,Commercial Vehicles and Parts,https://www.wilsonsons.com.br/pt-br/,PORT3,3800.0,250000000.0,-22.954645,-43.179891,False
+47338927-3567-5b75-bebf-b714246c51b1,1,Infineon Technologies AG (NBB: IFNN Y),Germany,Semiconductors,https://www.infineon.com/,IFXX,59360.0,14218000000.0,48.094542,11.638083,False
+48fcac26-6e32-55c7-a495-44fb9234ff11,1,IMV Corp (NBB: IMVC F),Japan,Electronic Equipment: Gauges and Meters,https://we-are-imv.com/,7760,327.0,11888459000.0,34.719522,135.448037,False
+4d4f13fe-2d55-589f-a517-c76f28008b16,1,Xcerra Corp (NMS: XCRA) (inactive),United States,Semiconductors,www.xcerra.com,XCRA,1640.0,473205000.0,42.1829858,-71.2098149,False
+4e155483-f03d-5e0c-a473-f33210909c82,1,"Hangzhou Lion Electronics Co., Ltd.",China,Computer Hardware,http://www.li-on.com,605358,2890.0,420000000.0,30.287459,120.161159,False
+4e6660a7-b76b-5387-9fe8-31274b43419a,1,"Suzhou Chunxing Precision Mechanical Co., Ltd.",China,Automobiles,www.chunxing-group.com,002547,2899.0,,31.378532,120.610997,False
+4ef4c0be-6d83-52e8-b082-c73128db781b,1,"Guangdong Ellington Electronics Technology Co., Ltd.",China,Computer Hardware,http://www.ellingtonpcb.com/,603328,4400.0,4812940000.0,22.744528,113.267924,False
+51f8b3bc-cb26-5807-a827-eebcffcc62bd,1,"China Hainan Rubber Industry Group Co., Ltd.",China,Food Products,http://www.hirub.cn,601118,27430.0,6218461557.0,20.0055,110.3157,False
+53e5d1fa-abd2-5463-8f6f-7333364dcce7,1,BEST Inc (NYS: BEST),Cayman Islands,Delivery Services,http://www.best-inc.com/en/,BEST,3570.0,3499730000.0,30.232946,120.125267,False
+54e00cc0-e528-5227-b4ca-64896a548f3d,1,Nix Inc,Japan,Specialty Chemicals,nix.co.jp,4243,165.0,4068678000.0,35.45401,139.629778,False
+553b5f88-607a-5af7-aee9-9c9a1a840d6f,1,NVIDIA Corp (NMS: NVDA),United States,Semiconductors,www.nvidia.com,NVDA,29600.0,60922000000.0,37.3424,-121.9795,False
+57d89896-0af2-5416-89ba-8103bfac55e1,1,Immersion Corp,United States,Transaction Processing Services,https://www.immersion.com/,IMMR,14.0,32703000.0,25.947723,-80.336078,False
+58dca2a3-aa3a-56ca-8393-dc1a11a06717,1,AKASOL AG,Germany,Auto Parts,https://www.borgwarner.com/home,,10001.0,68332000.0,42.664278,-83.282646,False
+59b50389-b4bb-52eb-af3a-757d80f9f061,1,Kolon Corp (KOR: 002020),South Korea,Diversified Industrials,www.kolonindustries.com,120110,3767.0,4324491258038.0,37.5612,126.8106,False
+5b2818cf-0015-5e04-b84e-6707ca8df6cf,1,Balyo SA (NBB: BYYL F),France,Machinery: Industrial,https://www.balyo.fr,BALYO,144.0,16409200.0,48.81585,2.38388,False
+5dd766c5-9664-5b72-bb8e-bf3639e501b4,1,Castings PLC  ,United Kingdom,General Mining,https://castings.plc.uk/,CGS,1240.0,287345640.0,52.644227,-1.927085,False
+5de372c3-98d0-5dbb-b45e-af9321a82139,1,"UJU ELECTRONICS Co., Ltd.",South Korea,Electrical Components,www.uju.co.kr,065680,359.0,,37.2131,126.8551,False
+60ba9cac-c66a-556e-879b-801dcca3f0f9,1,Nextchip Co. Ltd.,South Korea,Semiconductors,www.nextchip.com,396270,169.0,,37.4094502,127.1512998,False
+60ee5258-7ac0-5c16-b429-37266afa5999,1,"Jiangsu Bojun Industrial Technology Co., Ltd.",China,Machinery: Industrial,www.sh-bojun.com,300926,1703.0,,31.2136,120.9737,False
+6131a210-f184-5fcd-b775-b554fc46b145,1,AEye Inc (NAS: LIDR),United States,Electronic Equipment: Gauges and Meters,www.aeye.ai,LIDR,60.0,2487000.0,37.7022,-121.9344,False
+629885ed-0829-5b85-a423-470b40725aa6,1,"JiangSu Changling Hydraulic Co., Ltd.",China,Transaction Processing Services,https://www.changlingmach.cn/,605389,893.0,127240000.0,31.91116,120.26104,False
+63a9a307-fd9b-542e-b51d-aa48baf9ebec,1,"China Metal Products Co., Ltd. (TAI: 1532)",Taiwan,Iron and Steel,http://www.cmp.com.tw,1532,4710.0,15424342000.0,25.0328,121.5339,False
+67eb24ce-8969-5161-a5d4-70e544ecd218,1,"Shenzhen Liande Automatic Equipment Co., Ltd.",China,Electrical Components,www.liande-china.com,300545,1706.0,,22.589718,114.022013,False
+6cfb7f40-a99c-5fc1-a899-f341d4ea37dc,1,Kendrion NV,Netherlands,Auto Parts,www.kendrion.com,SVEL,2459.0,396400000.0,52.3144,4.9363,False
+702661fb-33f4-5385-a9e5-720808e5774b,1,"Jiangyin PIVOT Automotive Products Co., Ltd.",China,Automobiles,www.pivotautomotive.com,301181,445.0,,31.888,120.295,False
+72dbf663-1682-5f32-b025-c49bd945c294,1,Equinix Inc,United States,Diversified REITs,https://www.equinix.com/,EQIX,13150.0,8188136000.0,37.5246,-122.2585,False
+7434209a-5181-52e4-b5f4-15b3d072d9a9,1,Sanoh Industrial Co Ltd,Japan,Auto Parts,https://www.sanoh.com/,6584,7920.0,115940000000.0,35.659079,139.703816,False
+765b8a4d-7285-5e3c-87ce-9dea0ce0b455,1,Sri Trang Agro-Industry Public Co Ltd (Thailand) (NBB: SRGP F),Thailand,,,,,75478744621.0,,,False
+767b40bd-2190-5ccc-ada7-ffea93a0efd2,1,"MDS Tech, Inc.",South Korea,Transaction Processing Services,www.mdstech.co.kr,086960,127.0,,37.3811,127.1189,False
+78c17a61-6559-507c-8e29-fd5f79577119,1,Zalaris ASA (NL: ),Norway,Computer Services,www.zalaris.com,ZAL,1007.0,776792000.0,59.916911,10.724901,False
+79f9ca12-38c5-57ca-b5e8-503f42855246,1,EQS Group AG,Germany,Transaction Processing Services,www.eqs.com,EQSn,522.0,,48.141073,11.566646,False
+7c9aba3a-b14e-5164-ab8e-af4873f47ab1,1,WPT Industrial Real Estate Investment Trust (NBB: WPTI F) (inactive),Canada,Industrial REITs,www.wptreit.com,WIRu,22.0,,43.648586,-79.379791,False
+7cfa6ed1-bf0b-537d-9a35-4d9f0bfdccef,1,"Shanxi Huaxiang Group Co., Ltd.",China,General Mining,http://www.huaxianggroup.cn/,603112,5610.0,529570000.0,36.087797,111.518976,False
+7ddadf4d-04a0-551f-b218-163108f8e03b,1,"Shanghai W-Ibeda High Tech.Group Co., Ltd.",China,Computer Hardware,http://www.w-ibeda.com/,688071,674.0,56785000.0,31.215586,121.61106,False
+7eb40861-55f5-5f65-acbd-1c40c25db58f,1,Kolon Industries Inc (KOR: 120110),South Korea,Textile Products,www.kolonindustries.com,120110,3767.0,4752579929855.0,37.55748,126.79528,False
+8240d264-1e8f-5ee5-946b-056ddeb7b939,1,Gosuncn Technology Group Co Ltd (NL: ),China,Computer Services,www.gosuncn.com,300098,2783.0,254300000.0,23.128592,113.39552,False
+8383e8a1-39e8-549a-ad99-49f4d1661785,1,Vitesco Technologies Group AG,Germany,Automobiles,https://www.vitesco-technologies.com/,VTSC,35370.0,10328817.0,49.000545,12.055385,False
+83acbe2f-18f1-5d96-b6f0-ae985ab6da5f,1,Tatneft PJSC (NBB: OAOF Y),Russia,Integrated Oil and Gas,www.tatneft.ru,TATN,10001.0,738763000000.0,54.9044,52.3146,False
+8723d90a-668f-5be4-8eae-98b26beed69a,1,"Jiangsu Olive Sensors High-Tech Co., Ltd.",China,Automobiles,www.yos.net.cn,300507,524.0,955640000.0,32.377703,119.41422,False
+88925dcb-631d-5f03-8e49-b4a8ff86959d,1,Moovly Media Inc (TVX: MVY),Canada,Transaction Processing Services,https://www.moovly.com/,0PV2,8.0,1401174.0,49.288719,-123.119771,False
+8c6c6e46-dc43-5f45-971b-d707101448be,1,USU Software AG (NL: ),Germany,Transaction Processing Services,www.usu.de,OSP2,806.0,107327000.0,48.8716,9.168,False
+908f5d8a-88b4-5f19-b908-69b35edff52f,1,Ningbo PIA Automation Holding Corp.,China,Transaction Processing Services,https://cn.piagroup.com/index.html,688306,1890.0,355342530.0,29.8587,121.5363,False
+91b8a1f5-cf78-54b4-b4a6-3e0897d7a719,1,KEMET Corp. (NYS: KEM) (inactive),United States,Electronic Components,www.kemet.com,KEM,15000.0,1260554000.0,26.121884,-80.142314,False
+9240e548-43fa-5e26-a333-88e64394fe3c,1,"Chiyoda Integre Co., Ltd.",Japan,Electronic Equipment: Other,https://www.chiyoda-i.co.jp/,6915,3010.0,37544000000.0,35.709,139.7536,False
+93a53c46-1fde-50ce-bb27-6507c710c54f,1,Data I/O Corp. (NAS: DAIO),United States,Machinery: Industrial,http://www.dataio.com,DAIO,100.0,28461000.0,47.6738,-122.1215,False
+945b9a36-a46d-55ae-8c38-5829bae2af15,1,"Jiangsu Asia-Pacific Light Alloy Technology Co., Ltd.",China,General Mining,www.apalt.com,002540,2901.0,,31.491169,120.31191,False
+950d1ccf-0f37-599a-9c19-3d3bf63260d1,1,Desktop Metal Inc (NYS: DM),United States,Machinery: Specialty,https://www.desktopmetal.com/,DM,950.0,197909000.0,42.5049,-71.1965,False
+95d4764a-c7bd-54fe-ad10-42967b6630dc,1,JG Chemicals Ltd.,India,Pharmaceuticals,www.jgchem.com,JGCH,64.0,,22.5712,88.4511,False
+9807a941-7995-5fc9-bc7c-18ce03140adc,1,"Shanghai Kaytune Industrial Co., Ltd.",China,Transaction Processing Services,www.kaytune.com.cn,301001,1209.0,,31.1798,121.4846,False
+996ecbdc-61e4-536d-94f3-b5f9ca32407e,1,Wencan Group Co. Ltd.,China,Automobiles,http://www.wencan.com/,603348,5960.0,849000000.0,23.028775,113.134026,False
+9a6a9536-bd2d-570a-bafb-9d1bcec86cd0,1,Maxwell Technologies Inc (NMS: MXWL) (inactive),United States,Electrical Components,www.maxwell.com,MXWL,368.0,77481000.0,,,False
+9b8ee564-3aaa-5714-95c1-27065d724a04,1,Hexpol AB ,Sweden,Diversified Industrials,https://www.hexpol.com/,HPOL,5080.0,2097000000.0,55.6096,13.0007,False
+9defbe18-0158-5933-976e-01a5060173a6,1,Mikuni Corp. (Japan),Japan,Automobiles,https://www.mikuni.co.jp/,7247,5000.0,944000000.0,35.699511,139.77124,False
+9ea95f73-a223-5b4a-b9b8-637b2f5c922e,1,Dotz SA,Brazil,Professional Business Support Services,https://www.dotz.com.br/,DOTZ3,226.0,25028900.0,-23.589348,-46.68339,False
+9fe62878-496d-5874-8dfe-344a344ba0ec,1,Cerence Inc (NMS: CRNC),United States,Transaction Processing Services,www.cerence.com,CRNC,1700.0,349152000.0,42.503533,-71.193771,False
+a02851a7-bc07-53a5-b248-a4ff86ba1f65,1,"SEKONIX Co., Ltd.",South Korea,Computer Hardware,www.sekonix.com,053450,684.0,,37.904701,127.072837,False
+a323f47f-7a85-55b8-b2f6-cd5d8bd8b012,1,Viavi Solutions Inc (NMS: VIAV),United States,Telecommunications Equipment,www.viavisolutions.com,VIAV,3600.0,1013800000.0,33.2693,-111.8983,False
+a357f193-8e2b-510c-aa7b-c038e9108379,1,IPE Group Ltd.,Hong Kong,Electrical Components,https://www.ipegroup.com/,929,2070.0,115895500.0,22.31196,114.22442,False
+a4d66718-26cb-584e-8f36-714b18633a5d,1,"Xilinx, Inc.   (NMS: XLNX) (inactive)",United States,Semiconductors,www.xilinx.com,XLNX,4890.0,3676422000.0,37.257741,-121.920622,False
+a5156b95-97c5-5520-97b2-a5a6ff188905,1,Fidia SpA,Italy,Transaction Processing Services,http://www.fidia.it,FDA,193.0,32343885.0,45.104207,7.783659,False
+a5d33f4e-25cc-58e7-a9a6-1dfdd266ca3c,1,AAPICO Hitech Public Co. Ltd.,Thailand,Automobiles,https://www.aapico.com/,AH,5900.0,916200000.0,14.1829,100.6727,False
+a809bbd1-1abb-51b3-bd15-ae6b072431b8,1,Glow Energy Public Co Ltd (NL: ),Thailand,Conventional Electricity,www.glow.co.th/en,GLOW,750.0,50878482438.0,,,False
+a90f87ab-0373-5960-b73b-8534d8caf546,1,Everbridge Inc (NMS: EVBG),United States,Transaction Processing Services,www.everbridge.com,EVBG,1577.0,448788000.0,42.4851,-71.2085,False
+ae41c544-399d-5d39-9c22-bec6c4779996,1,Deutsche Telekom AG  (NBB: DTEG Y),Germany,Telecommunications Services,https://www.telekom.com/,DTEX,201250.0,111970000000.0,50.732704,7.095975,False
+aea3b175-f63b-5a3d-8633-9d1c92834c34,1,Far Eastern New Century Corp (NBB: FREY F),Taiwan,Diversified Industrials,www.fenc.com,1402,28557.0,238806217000.0,25.042408,121.565956,False
+afb6c7b8-15a8-5bfa-88bd-9f8fad610a65,1,Trilogiq (PAR: ALTR I),France,Machinery: Industrial,http://trilogiq.com,,125.0,10121313.0,49.051432,2.131324,False
+b276680a-98c5-5beb-adb5-1c8586c60a6b,1,UCAL Ltd.,India,Automobiles,http://www.ucalfuel.com/,UCAL,728.0,108110000.0,13.097217,80.165286,False
+b66eaaa0-0517-5f15-a574-4c7f359422dd,1,NXP Semiconductors NV (NMS: NXPI),Netherlands,Semiconductors,www.nxp.com,NXPI,34200.0,13276000000.0,51.419402,5.449569,False
+b707e6d7-651b-51d1-88ce-a73de7f3ddea,1,"SAMBO MOTORS Co., Ltd.",South Korea,Automobiles,www.sambomotors.co.kr,053700,492.0,,35.8510384,128.5507627,False
+b914f883-0289-50f2-a490-2b55d0bcbfce,1,"PCS Machine Group Holding Public Co., Ltd.",Thailand,Automobiles,https://www.pcsgh.com/en/home,PCSGH,2310.0,119806425.0,14.999822,102.100834,False
+b9b1fd21-4891-5710-8c5f-c17ac164850e,1,"Jiangxi Black Cat Carbon Black Co., Ltd. (SHZ: 002068)",China,Specialty Chemicals,www.blackcat.com.cn,002068,4164.0,,29.2697,117.1802,False
+bca970f6-0636-5da6-851d-1abd8500528e,1,"Ningbo Hengshuai Co., Ltd.",China,Automobiles,www.motorpump.com/cn/index.php,300969,866.0,,29.878388,121.549686,False
+bf4691fd-b9d0-53a7-996a-c9e62e12cddc,1,Yasho Industries Ltd.,India,Chemicals: Diversified,www.yashoindustries.com,YASO,659.0,,19.120915,72.845371,False
+bf5e30ed-7053-5650-a68d-f2f59623d1b4,1,Hirata Corp (TOK: 6258),Japan,Machinery: Industrial,https://www.hirata.co.jp/,6258,1970.0,67087433000.0,32.8183,130.776299,False
+c0cdcef4-f065-5c9c-81e2-a48ff31abb7a,1,Lumax Industries Ltd.,India,Automobiles,www.lumaxworld.in/lumaxindustries,LUMA,2281.0,,28.4684,77.0604,False
+c11ffe47-263d-5b7e-b627-000fbc07b3d7,1,Synthos SA (NBB: SYNY Y) (inactive),Poland,Chemicals: Diversified,www.synthosgroup.com,SNS,3600.0,7153000000.0,50.0383,19.2097,False
+c1904afe-2d92-5963-bedc-3a4bea3b3442,1,"CWB Automotive Electronics Co., Ltd.",China,Automobiles,https://www.cwb.com.cn/,605005,2150.0,274149420.0,28.1166,120.9597,False
+c3ceb5d6-5c3f-5a2b-9701-80672cb15e4e,1,"Dalian Demaishi Precision Technology Co., Ltd.",China,Automobiles,www.cdms-china.com,301007,1237.0,,38.811978,121.155968,False
+c52b8073-c4d4-5d6f-95ca-f662fca50228,1,Amazon.com Inc,United States,Diversified Retailers,www.amazon.com,AMZN,1521000.0,574785000000.0,47.623064,-122.335891,False
+c5590a59-1d9b-59f6-94ea-f15bacaab570,1,"TUHU Car, Inc.",China,Automobiles,http://www.tuhu.cn/,9690,4730.0,1890000000.0,31.15999,121.348083,False
+c5617a00-5647-51c3-b591-e2e9fff443e6,1,Castex Technologies Ltd.,India,Automobiles,www.amtek.com/ail.php,CASE,587.0,,28.531789,77.239398,False
+c81dacc2-2f02-5c7d-bc58-60259240b1a0,1,ITT Inc (NYS: ITT),United States,Diversified Industrials,www.itt.com,ITT,10600.0,3283000000.0,41.0455246,-73.5321733,False
+ca137a45-4c4a-5cf5-a8d0-8314fa670766,1,"Zhuhai Enpower Electric Co., Ltd.",China,Automobiles,www.enpower.com,300681,1973.0,,22.203106,113.541125,False
+ca3f886c-37f8-5894-887c-e7756a09ceb9,1,Delfingen Industry SA (NL: ),France,Automobiles,https://www.delfingen.com,ALDEL,4210.0,214640000.0,47.483238,6.292456,False
+ce46d7a3-83f8-500a-b3ca-5b10e2929f9a,1,Alten Boulogne-Billancourt,France,Computer Services,www.alten.fr,ATE,57000.0,2269885000.0,48.834724,2.235539,False
+cfb64b9c-d551-5315-921d-75d28d52e1e2,1,"Dover Motorsports, Inc.   (NYS: DVD) (inactive)",United States,Recreational Services,www.dovermotorsports.com,DVD,56.0,51476000.0,39.163921,-75.52075,False
+cfdfc190-d300-5593-a1a9-556427096321,1,"Global PMX Co., Ltd.",Taiwan,Automobiles,https://www.global.com.tw/,4551,1980.0,225270000.0,25.072257,121.654581,False
+d0c09529-644e-5e20-9fe1-dcfa4e176c55,1,Amtek Auto Ltd (NL: ),India,Auto Parts,http://www.reventengineering.com,,3000.0,48158725000.0,28.4595,77.0266,False
+d3049640-4d60-5e29-aca2-978d530a2973,1,"Shanghai Sinotec Co., Ltd.",China,Automobiles,http://www.sinotec.cn/,603121,1270.0,210714285.0,31.144186,121.134029,False
+d3ea9177-32b9-5143-b4c0-3f94c6da9be1,1,The Bombay Burmah Trading Corp. Ltd.,India,Automobiles,https://bbtcl.com/,BBTC,3740.0,2302391000.0,18.9369,72.8375,False
+d580b949-c444-5daa-88c3-d10967d86896,1,STMicroelectronics NV (NYS: STM),Netherlands,Semiconductors,www.st.com,STMPA,51323.0,17428000000.0,52.309183,4.760845,False
+d5bcf789-da0a-55bf-8c2f-421edf3b9c28,1,Nolato AB,Sweden,Machinery: Industrial,www.nolato.com,NOLA B,5552.0,899900000.0,,,False
+dc9ffe39-4a12-54c4-afe5-e10b1bb58650,1,Bittnet Systems SA,Romania,Transaction Processing Services,www.bittnet.ro,BNET,400.0,,44.42799,26.102997,False
+dcf03705-390b-5138-84b6-b24a5b866eac,1,DXC Technology Co (NYS: DXC),United States,Computer Services,www.dxc.com,DXC,130000.0,13872000000.0,39.0436,-77.4875,False
+de0ecc1f-0d0b-5547-90ae-51764d6fea3b,1,AutoStore Holdings Ltd.,Norway,Transaction Processing Services,https://www.autostoresystem.com/,AUTO,973.0,788570000.0,59.896293,10.789135,False
+e4e14775-9bfc-59a3-9da3-a09d47a376b1,1,"Shenzhen Longli Technology Co., Ltd.",China,Semiconductors,www.blbgy.com,300752,1327.0,,22.6266,114.0425,False
+e8ed3cbb-bfcb-5f29-b2d5-2938490638ec,1,"Dynamic Design Co., Ltd.",South Korea,Automobiles,dynamicdesign.co.kr,145210,330.0,,35.1676,126.853,False
+eb1d2f0a-853c-5f76-9d48-7733797da6ac,1,Transense Technologies Plc (LON: TRT),United Kingdom,Electronic Equipment: Control and Filter,https://www.transense.com/,TRT,20.0,2632000.0,51.9031,-1.1506,False
+eb3e0007-78a8-5297-9ce3-66a74de57cc1,1,Erste Group Bank AG (NBB: EBKD Y),Austria,Banks,www.erstegroup.com,EBS,45537.0,13921800000.0,48.19186,16.36886,False
+ec283a3f-4885-5032-9908-72255b2edfc5,1,"Taekyung Industrial Co., Ltd.",South Korea,Chemicals: Diversified,www.taekyung.co.kr,015890,233.0,,,,False
+f0d80ec6-4e04-51a3-9e53-2195dd275991,1,"IKD Co., Ltd.",China,Automobiles,http://www.ikd-china.com/,600933,8120.0,1006193.0,29.90497,121.525467,False
+f8e14ab8-75c3-5d82-af72-9756552d622a,1,"Truwin Co., Ltd.",South Korea,Automobiles,truwin.co.kr,105550,108.0,,36.364056,127.356839,False
+fb83dd90-0e0c-56c9-a49e-3fd3faa31da0,1,"Suzhou Jin Hong Shun Auto Parts Co., Ltd.",China,Automobiles,http://www.jinhs.com/,603922,645.0,93535300.0,31.995187,120.556482,False
+fd1d34f5-e102-5ac6-80a8-a9d903183819,1,Agencias Universales S.A. (Chile) (NL: ),Chile,Transportation Services,www.agunsa.com,AGUNSA,6822.0,445278000.0,-33.41311,-70.56988,False
+000b4334-30a5-5db0-aa23-c22c9af4f2c4,2,"Benchmark Electronics, Inc. (NYS: BHE)",United States,Electronic Components,https://www.bench.com/,BHE,12700.0,2838976000.0,33.4142,-111.9099,False
+003330b3-bd56-5d1d-b91a-cb008dbe3600,2,SoundHound AI Inc (NMS: SOUN),United States,Transaction Processing Services,www.soundhound.com,SOUN,260.0,45873000.0,37.371577,-121.97856,False
+0033a13d-c95e-58b9-9eae-1669f8611205,2,ON24 Inc,United States,Consumer Digital Services,http://www.on24.com,ONTF,462.0,170938000.0,37.793482,-122.395673,False
+00534628-1734-5c75-8ea0-889b519d3c4a,2,Shandong Xinhua Pharmaceutical Co Ltd (NBB: SHNX Y),China,Pharmaceuticals,http://www.xhzy.com,719,7100.0,1100000000.0,36.6534,117.1299,False
+00bc194a-c225-533f-a5c4-f8c6e05bc373,2,Wyld Networks AB,Sweden,Telecommunications Equipment,https://wyldnetworks.com/,WYLD,37.0,42847.0,55.6073,13.0011,False
+018cbdc3-f4b1-5c1e-b657-8b1978753f66,2,Mapletree Logistics Trust (NBB: MAPG F),Singapore,Industrial REITs,www.mapletreelogisticstrust.com,M44U,285.0,643948000.0,1.2734,103.789,False
+01a97b18-d831-5886-aa5d-7df555e83291,2,"National Silicon Industry Group Co., Ltd.",China,Computer Hardware,http://www.nsig.com/,688126,2380.0,481323420.0,31.2234,121.4191,False
+0235c66b-05cf-59b1-8483-3ef5c5eb7a7f,2,Citrix Systems Inc (NMS: CTXS) (inactive),United States,Transaction Processing Services,www.citrix.com,,9700.0,3314153000.0,26.1914,-80.1833,False
+02531409-05df-5201-b8f7-960c328144df,2,Temenos AG (NBB: TMSN Y),Switzerland,Transaction Processing Services,https://www.temenos.com/,TEMN,6770.0,972168.0,46.2074,6.1555,False
+025efbd8-0542-5086-8375-876ba3fcb27a,2,Volvo Car AB,Sweden,Automobiles,https://www.volvocars.com/,VOLCAR B,42000.0,47157200000.0,57.7089,11.9746,False
+029ed7b9-a3d2-5c41-88b4-2be1db66ebf8,2,Aspen Group Ltd. (Israel),Israel,Real Estate Services,https://www.aspen.co.il/,ASGR:TLV,30.0,65943214.0,32.068424,34.824785,False
+038e0893-98f2-537a-bc10-543d9366a52e,2,MariaDB plc (NYS: MRDB),Ireland,Computer Services,https://mariadb.com/,MRDB,303.0,53920000.0,37.480198,-122.229086,False
+039c356b-cbc6-5441-bd2f-21573b9eb364,2,Gansu Huangtai Wine-Marketing Industry Co Ltd (SHZ: 995),China,,,,,,,,False
+03dd84bd-ccbd-5789-b4ac-c0d4a3246c71,2,"Guangdong Huate Gas Co., Ltd.",China,Chemicals: Diversified,http://www.huategas.com/,688268,1190.0,230000000.0,23.008462,113.20051,False
+03fe5467-ff4c-585e-a021-cb2aa88c3b26,2,VSTECS Holdings Ltd,Cayman Islands,Computer Hardware,http://www.vstecs.com/,856,4320.0,69961881000.0,22.284066,114.156524,False
+047159ff-5c81-592f-9263-a74f301620bd,2,Alphabet Inc,United States,Consumer Digital Services,abc.xyz,GOOGL,180895.0,307394000000.0,37.4234135,-122.0865462,False
+04e2c173-9aee-5901-b6c8-ffe11965733f,2,Simm Tech Company Ltd (KOS: 036710),South Korea,Semiconductors,http://www.simmtech.com/,,7500.0,1007097364622.0,,,False
+04fa132b-c401-59ad-a52d-ddf64b23d24e,2,Sea Sonic Electronics Co. Ltd.,Taiwan,Machinery: Industrial,seasonic.com,6203,125.0,,25.068,121.611,False
+05e982f5-c54e-58ac-9424-8d8e5f7e08e6,2,Precious Dragon Technology Holdings Ltd.,China,Home Construction,http://www.botny.com/,1861:HKG,459.0,71918777.0,23.5401,113.3535,False
+05f40cf4-55a7-59db-857a-34e2497d96ae,2,"TI Cloud, Inc.",China,Transaction Processing Services,https://www.ti-net.com.cn/,2167,588.0,62012500.0,39.9042,116.4074,False
+0657d458-42ef-51b6-b35f-4aeb6e22d9ef,2,Fingerprint Cards AB (Sweden) (NBB: FGRR F),Sweden,Electronic Components,https://www.fingerprints.com/,0RGY,145.0,1255700000.0,57.7077,11.9746,False
+0683aef8-5821-5409-9466-5a46079ead2c,2,Securize IT Solutions AG,Germany,Transaction Processing Services,https://securize.de/,M14K,1.0,0.0,48.1346661,11.5675785,False
+068b0117-a738-523d-b0c8-bddf32624beb,2,Kolon Plastics Inc (KOR: 138490),South Korea,Containers and Packaging,www.kolonenp.com,138490,387.0,222889697895.0,36.1217,128.1194,False
+076b96ff-d671-5dc0-93be-5c443ffcbcb7,2,Blue Prism Group Ltd.,United Kingdom,Telecommunications Services,www.blueprism.com,PRSMB,3.0,,53.397604,-2.560826,False
+07909485-bf62-5d5e-a802-472d7890146e,2,CNG Vietnam JSC,Vietnam,Gas Distribution,www.cngvietnam.com,CNG,281.0,,10.346399,107.084158,False
+07b23555-5bf7-5226-9b45-62a98ef5dc08,2,CSP Inc (NMS: CSPI),United States,Computer Services,https://www.cspi.com/,CSPI,112.0,61678000.0,42.375699,-71.060174,False
+07ca74a0-dcff-5b2c-97ea-3b1f7f65249f,2,Goodman Group (Sydney) NSW (NBB: GMGS F),Australia,Diversified REITs,www.goodman.com,GMG,971.0,1510900000.0,-33.9206,151.2016,False
+0891313b-a9cf-592f-80c9-0962e5071beb,2,"Mellanox Technologies, Ltd. (NMS: MLNX) (inactive)",Israel,Semiconductors,www.mellanox.com,MLNX,2719.0,1330576000.0,37.378957,-122.017604,False
+0987ff98-990d-58b4-9352-6a305b47da68,2,"Chengdu Galaxy Magnets Co., Ltd.",China,Machinery: Industrial,www.galaxymagnets.com,300127,1364.0,,30.508048,104.069394,False
+09a46c67-e03d-5276-894f-8907c1bcb4dc,2,"System Information Co., Ltd. (TOK: 3677)",Japan,Computer Services,www.sysj.co.jp,3677,1080.0,13004600000.0,35.6641,139.7827,False
+0a00bc59-36ac-5944-8f29-a511f84a1691,2,Keyence Corp. (Japan) (NBB: KYCC F),Japan,Electronic Equipment: Gauges and Meters,www.keyence.co.jp,6861,10580.0,922422000000.0,34.733029,135.528448,False
+0a71fc16-0397-54c2-83e2-5b1ca3b6a4be,2,"Zhejiang Dahua Technology Co., Ltd. (SHZ: 002236)",China,Computer Services,www.dahuatech.com,002236,23452.0,4600000000.0,30.1715,120.1734,False
+0bdbc47e-b270-58db-8dd1-85a1c5dd2015,2,Zscaler Inc (NMS: ZS),United States,Transaction Processing Services,www.zscaler.com,ZS,5962.0,1895508000.0,37.40936,-121.98602,False
+0c4c6e48-7ce6-5b16-9b15-d2c8cdbe0588,2,"HAXC Holdings (Beijing) Co., Ltd.",China,Electrical Components,www.haxc.com.cn,300928,170.0,,39.8852,116.5143,False
+0cb5548c-a938-5e34-8573-07e633d670e7,2,E & M Computing Ltd.,Israel,Computer Hardware,https://www.emet.co.il,EMCO,1310.0,406000000.0,32.08088,34.81416,False
+0d2c7d91-12ca-5a20-931f-3227e846c7fd,2,Qualcomm Inc (NMS: QCOM),United States,Semiconductors,www.qualcomm.com,QCOM,50000.0,36292000000.0,32.892001,-117.20892,False
+0da2e51a-442b-5012-a2a9-4d504af8aa79,2,"JWIPC Technology Co., Ltd.",China,Computer Hardware,www.jwipc.net,001339,3000.0,,22.547,114.063,False
+0e6ec3e6-d56a-57fc-be4d-6c91cbdaa27f,2,"Wisebirds, Inc.",South Korea,Entertainment,www.wisebirds.co,273060,125.0,,37.5019854,127.0376151,False
+0ebab8db-4cf2-5d0e-94b8-9159b450510e,2,"Hylink Digital Solution Co., Ltd.",China,Entertainment,https://www.hylink.com/,603825,1230.0,642857142.0,39.9193,116.3883,False
+0ed28c56-6065-5297-b6a2-333c1dc0b96b,2,Parade Technologies Ltd. (NBB: PTCY Y),Cayman Islands,Semiconductors,www.paradetech.com,4966,1576.0,15279588000.0,19.2879,-81.3694,False
+0ed3d16a-8f2b-5d96-9d2d-eb17b96babd6,2,mVISE AG,Germany,Telecommunications Services,https://www.mvise.de/,C1VX:GER,71.0,15647150.0,51.20927,6.77349,False
+0f1ef500-f322-56a1-b203-b1402121dc17,2,"SPS Commerce, Inc. (NMS: SPSC)",United States,Transaction Processing Services,www.spscommerce.com,SPSC,2489.0,536910000.0,44.9750304,-93.2677851,False
+1024f79d-065d-5406-a856-9d496b7e61f7,2,"Suzhou TZTEK Technology Co., Ltd.",China,Machinery: Industrial,www.tztek.com,688003,2023.0,,31.314997,120.645163,False
+1031ce10-c65d-5970-b801-2a1a1e0a248d,2,Siltronic AG (NBB: SSLL F),Germany,Semiconductors,www.siltronic.com,WAF,4500.0,1207000000.0,48.110033,11.613297,False
+106ff51c-90c1-5304-98ca-42ecfddb1939,2,Tower Semiconductor Ltd.   (NMS: TSEM),Israel,Semiconductors,towersemi.com,TSEM,5215.0,1474196000.0,32.6783,35.2392,False
+10797bd1-6983-5587-b20e-80174a93501c,2,Sri Trang Gloves (Thailand) Public Co. Ltd.,Thailand,Medical Equipment,https://www.sritranggloves.com/,STG:SES,9400.0,626203670.0,13.732395,100.560583,False
+1124d776-1b62-5821-a8f1-2fe6f7681211,2,"Super Telecom Co., Ltd.",China,Telecommunications Services,http://www.sts.cn/,603322:SHH,785.0,4545000000.0,23.1291,113.2644,False
+113a46b1-9704-5631-9cab-a0770d21b133,2,MapsPeople A/S,Denmark,,https://www.mapspeople.com/,MAPS:CPH,87.0,6849716.0,57.059684,9.922994,False
+115940eb-dbe3-532f-8623-fae4674fe849,2,"Protec Co., Ltd.",South Korea,Semiconductors,www.protec21.co.kr,053610,286.0,,,,False
+115fab24-2519-5b50-9394-c78c4dd073f6,2,AsiaInfo Technologies Ltd.,China,Transaction Processing Services,https://www.asiainfo.com/zh_cn/index.html,1675,13580.0,1095254245.0,40.058318,116.303145,False
+121ce252-8ad5-5056-8cc3-2e57c85c912e,2,Xybion Digital Inc,Canada,Open End and Miscellaneous Investment Vehicles,www.xybion.com,XYBN,138.0,16767397.0,40.3487,-74.6593,False
+1264d4ae-fd9b-5d22-94ce-0f9d8b4bfb89,2,Unipetrol AS (NL: ),Czech Republic,Oil Equipment and Services,http://www.orlenunipetrol.cz,,3000.0,87813000000.0,50.0676,14.4283,False
+12b1b18f-6ac0-5de8-ad3f-bd1a0e7636ff,2,GDS Holdings Ltd (NMS: GDS),Cayman Islands,Computer Services,https://www.gds-services.com/zh_cn/,GDS,2350.0,9804045000.0,31.237742,121.587726,False
+13b604b4-94bf-5987-b423-3d1916907934,2,"Lumine Group, Inc.",Canada,Professional Business Support Services,https://www.luminegroup.com/,LMN,3000.0,569923.0,43.642347,-79.614201,False
+16791cb0-7a9d-5b6c-aa2b-f74dadb694e7,2,Verimatrix (NBB: ISDC F),France,Transaction Processing Services,http://www.verimatrix.com,VMX,246.0,42080000.0,43.515272,5.482797,False
+16bd27a8-870e-5d5a-bb01-fa7a3414c3d6,2,Sanan Optoelectronics Co Ltd (SHA: 600703),China,Semiconductors,https://www.sanan-e.com/,600703,15440.0,2346404.0,24.46224,118.00094,False
+17429131-edf8-5cb4-be38-ed5abde43716,2,Ribbon Communications Inc (NMS: RBBN),United States,Telecommunications Equipment,https://ribboncommunications.com/,RBBN,3110.0,826339000.0,33.0610872,-96.7424686,False
+17bb2c5c-97a4-5d39-81f3-0ed85fb20401,2,Broadpeak SA,France,Computer Hardware,https://broadpeak.tv/,ALBPK,218.0,43185942.0,48.116457,-1.615662,False
+18895945-32d8-5fe3-9679-dc19a88a4d5b,2,"Guangxi Beisheng Pharmaceutical Co., Ltd.",China,Media Agencies,http://www.bsyy.com.cn,,1.0,,21.4818,109.1166,False
+191af2e4-d9d1-5e8c-9288-d8e0c46c4c85,2,Fabasoft AG Puchenau,Austria,Transaction Processing Services,,,,55090000.0,,,False
+1932bf46-dc5e-53e2-98f0-646fff3fff56,2,"Tonghua Grape Wine Co., Ltd.",China,Brewers,https://www.tonhwa.com/,600365,543.0,1376445688.0,41.723712,125.939697,False
+19ca89cd-2ddb-57f8-98ae-44fb3dd136dc,2,Oriental Union Chemical Corp (NL: ),Taiwan,Chemicals: Diversified,https://www.oucc.com.tw/,1710,506.0,19531054000.0,25.051884,121.546381,False
+1b8934de-b5fa-534b-b4de-ab6da1d68b01,2,"China Logistics Property Holdings Co., Ltd.",China,Real Estate Holding and Development,www.cnlpholdings.com,1589,194.0,,31.239441,121.497611,False
+1bbb54b6-e228-55d1-a2b3-f1d8d35fd838,2,"EFORT Intelligent Equipment Co., Ltd.",China,Transaction Processing Services,https://www.efort.com.cn/,688165,1110.0,276000000.0,31.3456,118.3911,False
+1bc9dc46-2681-5318-95e5-413ad2c0f245,2,Chongqing Hongjiu Fruit Co. Ltd.,China,Food Products,https://www.hjfruit.com/,6689:HKG,2700.0,2282000000.0,,,False
+1c1cf39d-ddec-5a9d-aa4e-9903872a6aee,2,Hightech Payment Systems SA,Morocco,Professional Business Support Services,https://www.hps-worldwide.com,HPS:CAS,920.0,105000000.0,33.5731,-7.5898,False
+1c3ae116-121d-5a72-ac88-bb59dbd83579,2,"Guangdong Insight Brand Marketing Group Co., Ltd.",China,Entertainment,www.gdinsight.com,300781,631.0,,23.12781,113.648959,False
+1cb5f941-4ae6-58c3-8254-b2831583caff,2,CrowdStrike Holdings Inc,United States,Transaction Processing Services,https://ir.crowdstrike.com/,CRWD,8430.0,2847587000.0,30.2711,-97.7437,False
+1cd4ec09-35b4-52c9-a45c-50b252007674,2,HP Inc (NYS: HPQ),United States,Computer Hardware,www.hp.com,HPQ,58000.0,53111000000.0,37.3754946,-122.1600738,False
+1d001ad8-b8e0-5886-b680-c239ae1a82f0,2,Aixtron SE (NBB: AIXX F),Germany,Machinery: Industrial,www.aixtron.com,AIXA,1132.0,463167000.0,50.868513,6.097798,False
+1d86d82b-6b72-574f-a459-8ef6cbe59007,2,Digi International Inc (NMS: DGII),United States,Telecommunications Equipment,www.digi.com,DGII,822.0,441632000.0,44.9222,-93.3908,False
+1e15f721-3845-5549-a475-c6d96d93807b,2,Mersen,France,Electrical Components,https://www.mersen.com/fr,,7500.0,847200000.0,48.8921,2.2514,False
+1e3f97f9-a6c6-5bf7-bf87-95e02605f108,2,Ciena Corp (NYS: CIEN),United States,Telecommunications Equipment,https://www.ciena.com/,CIEN,8630.0,4386549000.0,39.1635,-76.7388,False
+1e4ed52f-1bbc-5abb-9062-3385d1a36212,2,Arm Holdings Plc,United Kingdom,Semiconductors,www.arm.com,ARM,7096.0,2680000000.0,52.169581,0.156284,False
+1eb01ebe-99e1-5dbf-9d3d-6d12b7803be0,2,Salesforce Inc,United States,Transaction Processing Services,www.salesforce.com,CRM,72682.0,33954000000.0,37.789468,-122.397984,False
+1f558d34-ec23-5af2-9ba7-d395de7525c9,2,ZAGG Inc (NMS: ZAGG) (inactive),United States,Consumer Electronics,www.zagg.com,ZAGG,628.0,473442000.0,40.624129,-111.881555,False
+1fc371dc-1a9b-5cb6-99d3-551c9b4af6d1,2,Intermap Technologies Corp   (TSX: IMP),Canada,Electronic Equipment: Gauges and Meters,https://www.intermap.com/,I9T1,72.0,7994000.0,,,False
+20d78305-db6d-5936-9410-b25d2da364dd,2,Beijing InHand Networks Technology Co. Ltd.,China,Telecommunications Equipment,https://www.inhand.com.cn/,688080,385.0,82156100.0,39.988856,116.416657,False
+20f94929-ac13-537c-8ef1-03052a201f45,2,"Der Future Science & Technology Holding Group Co., Ltd.",China,"Building, Roofing/Wallboard and Plumbing",http://www.der.com.cn,002631,2016.0,,31.093954,120.560717,False
+21475b77-c724-5b24-a1ee-fa060f3a6142,2,"Shenzhen Aoni Electronic Co., Ltd.",China,Computer Hardware,www.aoni.cc,301189,1012.0,,22.5632,113.9904,False
+21df57ea-39ba-529e-a60a-ac0bfb37aaab,2,Nuance Communications Inc (NMS: NUAN) (inactive),United States,Transaction Processing Services,www.nuance.com,,10000.0,1338061000.0,42.504852,-71.19598,False
+2250bbdd-309a-553d-a30b-9835a2d330c9,2,ServiceNow Inc (NYS: NOW),United States,Transaction Processing Services,www.servicenow.com,NOW,22668.0,8971000000.0,37.380282,-121.975916,False
+236521ac-a625-5ab9-a61d-9ca9909ee25d,2,"Xiamen Hexing Packaging Printing Co., Ltd.",China,Containers and Packaging,www.hxpp.com.cn,002228,11420.0,1520000000.0,24.474081,118.103637,False
+24548b25-5ff7-5113-b387-877301f0a1a6,2,"DK&D Co., Ltd.",South Korea,Clothing and Accessories,www.dknd.co.kr,263020,74.0,,37.3113,126.8253,False
+24e667c5-658a-5a2c-a22d-248f8d421d02,2,PTC Inc (NMS: PTC),United States,Transaction Processing Services,www.ptc.com,PTC,7231.0,2181357000.0,42.3515209,-71.0461194,False
+25547c90-f041-5110-ae35-f266a738c5a3,2,SkyWater Technology Inc (NAS: SKYT),United States,Semiconductors,www.skywatertechnology.com,SKYT,731.0,272616000.0,44.858663,-93.240074,False
+257f130b-de2d-57a0-9a57-b6799cab5d75,2,Integrated Micro-Electronics Inc (Laguna) (NL: ),Philippines,Electronic Components,https://www.global-imi.com,,10001.0,1135840593.0,14.2942,121.0801,False
+258cc2a6-5e0a-5669-b464-3cb55d2ec1c1,2,Weibo Corp (NMS: WB),Cayman Islands,Consumer Digital Services,http://ir.weibo.com,WB,5270.0,1740000000.0,39.989785,116.30997,False
+2610a88a-02d9-542c-82f3-b6eca263e774,2,Hengli Petrochemical Co Ltd (SHA: 600346),China,Chemicals: Diversified,https://www.hengliinc.com/,600346,39620.0,36982375.0,38.922,121.677,False
+264d0aee-3719-5bce-9981-f5b815d9c894,2,"Jiangxi Hengda Hi-tech Co., Ltd.",China,Professional Business Support Services,www.heng-da.com,002591,602.0,,28.6654,115.8535,False
+29ab0629-2547-592c-90b1-2d75bd10232f,2,"Check Point Software Technologies, Ltd. (Israel) (NMS: CHKP)",Israel,Transaction Processing Services,https://www.checkpoint.com,CHKP,6450.0,2389700000.0,32.06588,34.77504,False
+2a12b863-c116-5c71-b288-e9d5629d500c,2,Cisco Systems Inc (NMS: CSCO),United States,Telecommunications Equipment,www.cisco.com,CSCO,84900.0,57233000000.0,37.4131,-121.9808,False
+2ac4d0eb-6335-5d2b-bf64-2355190a2768,2,Inphi Corp (NMS: IPHI) (inactive),United States,Semiconductors,www.inphi.com,IPHI,1086.0,682954000.0,37.394105,-121.93197,False
+2bf33ba6-f575-51a8-9968-a61be3936fa9,2,"Hong Yi Fiber Industry Co., Ltd.",Taiwan,Chemicals: Diversified,https://www.hongyilon.com.tw/,1452:TAI,246.0,45000000.0,25.0244,121.5335,False
+2c2fd85d-8cf9-505a-bcc2-9cf5fec19ee0,2,Wonik QnC Corp.,South Korea,Semiconductors,www.wonikquartz.com,074600,1133.0,,36.1026,128.32,False
+2d517fca-a9d4-5888-a042-721e15dd607d,2,"Arrow Electronics, Inc.",United States,Electronic Components,www.arrow.com,ARW,22100.0,33107120000.0,39.594747,-104.904953,False
+2d6b1299-dca8-5748-8b47-67bd0b310ed6,2,SAP SE (NYS: SAP),Germany,Transaction Processing Services,https://www.sap.com/,SAPX,108130.0,36891670.0,49.301776,8.643002,False
+2e385727-4642-5318-811a-7be3a5ee4430,2,Gemdale Properties & Investment Corp Ltd (HSE: 535),Bermuda,Real Estate Services,,,,11710186000.0,,,False
+2eaacdca-45f4-5e9a-881f-1053330abf51,2,QualiTau Ltd.,Israel,Computer Hardware,https://qualitau.com/,QLTU,53.0,41325000.0,31.878163,34.813877,False
+2ec440cb-d6ce-59f0-a27d-d44b2183769a,2,"Jiangsu Kangliyuan Sports Tech. Co., Ltd.",China,Recreational Services,https://www.junxia.net,,,,34.306437,117.928282,False
+2f3f435e-86b4-5a64-b962-2e1d6552377a,2,Pareteum Corp (NBB: TEUM),United States,Telecommunications Services,www.pareteum.com,,199.0,65048000.0,40.758896,-73.981506,False
+2fcf8fad-cdc2-57ad-89d2-ef6c8d97cb33,2,3M Co (NYS: MMM),United States,Diversified Industrials,https://www.3m.com/,MMM,85000.0,32681000000.0,44.954006,-93.196911,False
+30075363-e6ae-5736-8ec8-88a14b8c65bb,2,Soitec SA (NBB: SLOI F),France,Semiconductors,https://www.soitec.com,SOI,2180.0,597549000.0,45.2653,5.8662,False
+306569ef-2f10-5122-b04a-075ec4d6d237,2,MIND CTI Ltd (Israel),Israel,Transaction Processing Services,https://mindcti.com/,MNDO,144.0,21890000.0,32.636521,35.1038,False
+312948eb-e74a-5854-80de-b229058e1925,2,"Model Solution Co., Ltd.",South Korea,Machinery: Industrial,www.model-solution.com,417970,322.0,,37.486834,126.9057,False
+31e86d39-0ae5-5956-9b0b-16c1caf5b7de,2,Saudi Basic Industries Corp - SABIC (Saudi Arabia) (SAU: 2010),Saudi Arabia,Chemicals: Diversified,www.sabic.com,2010,33000.0,116949287000.0,24.7136,46.6753,False
+3227a14d-acfb-5748-8281-1f1967d3f3f1,2,"Shenzhen ESUN Display Co., Ltd.",China,Entertainment,www.es-display.com,002751,547.0,,22.548469,114.055016,False
+324987fd-5ccc-527d-b6cf-65f0622d3510,2,"Taiwan Semiconductor Manufacturing Co., Ltd. (NYS: TSM)",Taiwan,Semiconductors,https://www.tsmc.com/,2330,52050.0,2161735841000.0,24.7938,121.0068,False
+333701de-f797-5d38-ac97-d2c1fc73ceeb,2,Transneft (NL: ),Russia,Gas Distribution,http://druzhba.transneft.ru,,3000.0,1063829000000.0,53.2651,34.3675,False
+33c70f0a-c403-5bf3-8249-6d01825917c4,2,Dada Nexus Ltd (NMS: DADA),Cayman Islands,Consumer Digital Services,https://about.imdada.cn/,DADA,2380.0,1430000000.0,31.257029,121.522373,False
+344f1492-9d21-5bec-bf93-634710d3eff7,2,Global Logistic Properties Ltd (NBB: GBTZ Y) (inactive),Singapore,Real Estate Services,www.glp.com/global,GLPL,3757.0,879587000.0,1.2781,103.8518,False
+3475c034-ea15-5e65-a0d2-0025b4fa3a35,2,"Beijing Dynamic Power Co., Ltd.",China,Electrical Components,http://www.dpc.com.cn,600405,2050.0,123456000.0,39.865996,116.321066,False
+34a90992-d0ae-5206-aed8-1f936014a093,2,"Faes Farma SA, Bilbao   (NL: )",Spain,Pharmaceuticals,https://www.faesfarma.com,,3000.0,411487000.0,43.309741,-3.007413,False
+34cdd296-7744-586b-9882-0f6cb0ed7cc7,2,Wistron Corp (NBB: WICO F),Taiwan,Computer Hardware,https://www.wistron.com,3231,82960.0,862082848000.0,24.8044,120.9715,False
+3506e272-f2c2-53c2-8756-1b504d3ce41b,2,"Raymond James Financial, Inc. (NYS: RJF)",United States,Investment Services,www.raymondjames.com,RJF,18000.0,12978000000.0,27.88419,-82.660442,False
+35882b86-1131-5885-9cfb-98b354faecfb,2,"Genesem, Inc.",South Korea,Semiconductors,www.genesem.com,217190,141.0,,37.4438,126.6816,False
+3598047b-a301-53be-86d8-aa183febaaec,2,Advanced Micro Devices Inc (NMS: AMD),United States,Semiconductors,https://www.amd.com/en,AMD,26000.0,22680000000.0,37.3790173,-121.9153165,False
+35c2376f-44c6-57ea-bdd8-135fa289f337,2,Imagination Technologies Group Ltd.,United Kingdom,Semiconductors,www.imgtec.com,IMG,1057.0,,51.7289,-0.4443,False
+361c7c36-5743-50fe-aecd-7425d3689699,2,"Wuxi Online Offline Communication Information Tech Co., Ltd.",China,Telecommunications Services,www.wxxsxx.cn,300959,207.0,194000000.0,31.482569,120.276579,False
+373900aa-1a17-5ee4-87ca-0ed039d46fbf,2,Dolby Laboratories Inc,United States,Transaction Processing Services,www.dolby.com,DLB,2246.0,1280397000.0,37.7752,-122.4191,False
+37cec593-f30d-587a-b90e-afd684952024,2,A10 Networks Inc  (NYS: ATEN),United States,Transaction Processing Services,www.a10networks.com,ATEN,525.0,258917000.0,37.4139,-121.918,False
+3822efa0-4f80-5a81-a742-cfda02fcab4e,2,Signetics Corp (KOS: 033170),South Korea,Semiconductors,www.signetics.com,033170,124.0,250232556120.0,37.622713,126.667395,False
+38c36da4-4167-5143-a5da-d4845f868dc1,2,"Universal Scientific Industrial (Shanghai) Co., Ltd. (NL: )",China,Electronic Components,https://www.usiglobal.com/cn,601231,23010.0,9612000000.0,31.207693,121.583404,False
+39fb6522-8239-53b9-96a6-4d556c6ef966,2,Mood Media Corp (Canada) (TSX: MM) (inactive),Canada,Media Agencies,us.moodmedia.com,MM,2000.0,,30.273136,-97.765426,False
+3a0dc1e8-d8e5-57d4-8490-fb886c9284f7,2,FingerMotion Inc (NAS: FNGR),United States,Real Estate Services,https://fingermotion.com/,FNGR,64.0,40401593.0,1.30069,103.838548,False
+3a81270d-0323-5fe0-8af4-9925099021ab,2,CA Immobilien Anlagen Aktiengesellschaft (NBB: CAIA F),Austria,Real Estate Services,https://www.caimmo.com/,CAI,348.0,326092000.0,48.198518,16.388935,False
+3a9c43c3-3a64-579a-a5bf-bbf8ddbed714,2,dormakaba Holding AG (NBB: DRMK Y),Switzerland,Electronic Equipment: Control and Filter,https://www.dormakaba.com/,DOKA,15270.0,2756900000.0,47.454341,8.538265,False
+3bd7e4fb-2734-59e7-92df-e99aec12ad4b,2,Identiv Inc (NAS: INVE),United States,Computer Hardware,http://www.identiv.com,INVE,394.0,116383000.0,37.5285,-122.0377,False
+3c3088de-d028-5b73-83e8-3eb197d57a8c,2,Proofpoint Inc (NMS: PFPT) (inactive),United States,Transaction Processing Services,www.proofpoint.com,PFPT,3658.0,1138282000.0,37.378855,-122.015989,False
+3c39ac08-efa9-5c19-b1a4-e5888bffbde6,2,CyberTech Systems & Software Ltd.,India,Transaction Processing Services,https://cybertech.com/,CYBERTECH,485.0,32264944.0,19.119219,72.846439,False
+3c802ca5-694b-5dee-8548-6c81755a4805,2,Artemis Medicare Services Ltd.,India,Health Care Management Services,https://www.artemishospitals.com/,ARTEMISMED,1940.0,131230000.0,28.429687,77.069386,False
+3d0da822-6bb6-5083-81eb-40dc3f5afe09,2,Thine Electronics Inc (JAS: 6769),Japan,Semiconductors,https://www.thine.co.jp/,6769,133.0,2879686000.0,35.6922,139.7531,False
+3e4a887a-9ed3-539e-9ed8-0abc3ee8dc3c,2,Eugene Corp (KOS: 023410),South Korea,Cement,www.eugenecorp.co.kr,023410,663.0,1451043142582.0,37.525588,126.924134,False
+3eb3e152-7172-58ef-9a44-640edc8ba307,2,LX Technology Group Ltd.,China,Computer Hardware,https://www.bearrental.com/,2436,1140.0,250000000.0,,,False
+3fa3cfe0-0249-5cc2-8b96-1e4e602bec5e,2,"Zhejiang CF Moto Power Co., Ltd.",China,Recreational Products,https://www.cfmoto.com/,603129:SHH,5070.0,1893468928.0,30.37532,120.037776,False
+3fad2d1e-9b9d-5e6c-8f18-4540f4f7256e,2,B+S Banksysteme AG,Germany,Investment Services,https://www.bs-ag.com,0NVU:LSE,74.0,13122441.0,48.1493,11.5459,False
+3ffbe759-274a-596d-8858-e793a715c69a,2,Gav-Yam Lands Corp. Ltd.,Israel,Real Estate Services,https://www.gav-yam.co.il/,GVYM,68.0,316000000.0,32.8184,34.9885,False
+40ddd0d3-f0a4-59a5-91a1-bb5c1651f7cd,2,"Coveo Solutions, Inc.",Canada,Transaction Processing Services,https://www.coveo.com/,CVO,720.0,131233497.0,46.7578264,-71.2825356,False
+421bb25d-9b48-534f-ab08-33abf8595288,2,"Noblelift Intelligent Equipment Co., Ltd.",China,Transaction Processing Services,http://www.noblelift.cn/,603611,4500.0,1102752000.0,30.948065,119.722525,False
+4297a5a1-7f9d-5832-9fa6-b04c7b661608,2,Qorvo Inc (NMS: QRVO),United States,Semiconductors,www.qorvo.com,QRVO,8700.0,3461221000.0,36.10239,-79.93974,False
+434e02fd-899d-5794-bb9b-b376cebd23b2,2,Pan-Pacific Co Ltd (KOR: 007980),South Korea,Clothing and Accessories,www.tp-inc.com,007980,305.0,798871319454.0,37.482538,126.898304,False
+435fb5cc-4fc4-5113-8232-16f76970997d,2,Jabil Inc (NYS: JBL),United States,Electronic Components,https://www.jabil.com/,JBL,236000.0,33454000000.0,27.833722,-82.660929,False
+4401153c-9e0c-57f7-987a-f46814226578,2,"Qi An Xin Technology Group, Inc.",China,Transaction Processing Services,https://www.qianxin.com/,688561,9350.0,951297597.0,39.916095,116.374936,False
+4412d28e-0552-5871-9312-78074d869c09,2,McAfee Corp (NMS: MCFE) (inactive),United States,Transaction Processing Services,www.mcafee.com,MCFE,1800.0,1920000000.0,37.370447,-121.923061,False
+4550454a-24f8-5c5c-ba15-010209e95cb1,2,TalkPool AG,Switzerland,Telecommunications Services,https://talkpool.com/,TALK:STO,1140.0,21077059.0,46.8503,9.5291,False
+45e7aa2c-c37e-55f4-9766-3df0ae9fb87a,2,Dell Technologies Inc (NYS: DELL),United States,Computer Hardware,www.delltechnologies.com,DELL,120000.0,91146000000.0,30.416354,-97.876363,False
+46367284-f086-54df-b988-f436e7f59808,2,"Simei Media Co., Ltd.",China,Entertainment,www.simei.cc,002712,670.0,,30.28,120.16,False
+464ea8f7-a2cf-585f-94e0-919e4bf49864,2,Han's Laser Technology Co Ltd (SHZ: 2008),China,Machinery: Specialty,,,,,,,False
+470caecf-0e17-560a-b6e2-778c8c5d5c9c,2,EMNET Inc.,South Korea,Entertainment,www.emnet.co.kr,123570,330.0,,37.491731,126.887487,False
+47b2bacc-3cfa-55a0-bd27-f8bcd9e51b15,2,Goodyear Tire & Rubber Co. (NMS: GT),United States,Auto Parts,,,,20066000000.0,,,False
+47ff3b9e-6ef2-5a98-aa22-eaa093aeef77,2,Corsair Gaming Inc (NMS: CRSR),United States,Electronic Entertainment,https://www.corsair.com/,CRSR,2390.0,1441319000.0,37.451923,-121.923061,False
+48332bda-02b0-5866-aa4b-7a5d5f5185c2,2,Nutanix Inc (NMS: NTNX),United States,Transaction Processing Services,www.nutanix.com,NTNX,6450.0,1940340000.0,37.3646956,-121.9248759,False
+4852bdce-9fc1-55b0-a4ff-d7a39c056676,2,Ceva Inc,United States,Semiconductors,https://www.ceva-ip.com,CEVA,450.0,112382000.0,39.094778,-77.181911,False
+4a2e07db-3cd1-572a-8e4b-d9915bf28842,2,"INFOMARK Co., Ltd",South Korea,Telecommunications Services,www.infomark.co.kr,175140,17.0,,37.389085,127.111163,False
+4b07521f-666e-5772-9538-3f54aac3a5f6,2,Broadcom Inc (DE) (NMS: AVGO),United States,Semiconductors,www.broadcom.com,AVGO,20000.0,35819000000.0,37.410436,-122.146132,False
+4b5f8baf-d6d3-5c4c-a184-d90afdedf142,2,Lotte Chemical Corp (KOR: 011170),South Korea,Containers and Packaging,https://www.lottechem.com,011170,2741.0,16545013876662.0,37.513203,127.101605,False
+4ba2654a-6b21-5f1a-baf0-afd05fb6cab7,2,"Optivision Technology, Inc.",Taiwan,Machinery: Industrial,www.optivtech.com,3666,320.0,,24.78448,121.01227,False
+4bc36368-a524-594e-9f3c-91e560e400d3,2,AUDI AG (NL: ),Germany,Automobiles,www.audi.com,NSUG,87000.0,55680000000.0,48.75896,11.42123,False
+4be16e95-b7d5-5835-a6d5-d4de513c3b6c,2,Qualtrics International Inc (NMS: XM) (inactive),United States,Transaction Processing Services,www.qualtrics.com,XM,5300.0,1532751000.0,40.2594148,-111.6614507,False
+4c650158-9921-5543-bb92-7db99a9af0e5,2,Aedes SIIQ SpA,Italy,Real Estate Services,www.aedes-siiq.com,AED,35.0,,45.451897,9.165157,False
+4ce6de91-8462-54fc-9888-10c104399760,2,Austriacard Holdings AG,Austria,Computer Hardware,https://www.austriacard.com/,ACAG,2700.0,412042500.0,48.184169,16.312536,False
+4d2a0755-75ab-5a50-808d-eba8c871cfb3,2,Oriental Rail Infrastructure Ltd.,India,Paper,www.orientalrail.com,ORIF,154.0,,18.9701,72.8442,False
+4e5bcdd2-6916-5560-9fe4-a8455fe4a44c,2,MH Development Ltd (NL: ),Cayman Islands,Electrical Components,www.mhdlhk.com,2662,16.0,9732000.0,22.297184,114.172579,False
+4ec40bb4-0b3d-5aed-976a-b89f42d9f448,2,Baijiayun Group Ltd,Cayman Islands,Containers and Packaging,www.baijiayun.com,RTC,361.0,82249571.0,32.0116,118.7625,False
+4f5ffddd-d486-5e17-af4d-9af33c56f2af,2,Micron Technology Inc. (NMS: MU),United States,Semiconductors,www.micron.com,MU,43000.0,16181000000.0,43.5461,-116.1745,False
+4f8d8c7a-3da3-5844-858f-9755ae939032,2,Compagnie Generale des Etablissements Michelin SCA (NBB: MGDD Y),France,Auto Parts,https://www.michelin.fr/,ML,132500.0,28590000000.0,45.7798,3.0868,False
+4f9ce590-2b25-532d-80e9-b8d64493bdd5,2,"Pinlive Foods Co., Ltd.",China,Drug Retailers,www.pinlive.com,300892,472.0,,31.2407,121.4294,False
+4fc03988-f7d6-5cf8-a875-e2db33f28e8b,2,HLA Group Corp. Ltd.,China,Clothing and Accessories,http://www.hla.com,600398:SHH,23980.0,3359917732.0,31.906914,120.133845,False
+50d61a96-bde9-50d7-95f5-4e8d02349b70,2,"ASR Microelectronics Co., Ltd.",China,Computer Hardware,http://www.asrmicro.com/,688220,1260.0,466258573.0,31.1818,121.5946,False
+51788abf-ad05-5d80-ba6c-e315ca913127,2,Far East Industrial Stock Co Ltd (SHZ: 681),China,Clothing and Accessories,https://www.fehorizon.com/,3360,19340.0,5252240000.0,22.277078,114.172496,False
+5229c368-0188-59b1-a354-6d4e195bc25e,2,"Maxim Integrated Products, Inc. (NMS: MXIM) (inactive)",United States,Semiconductors,www.maximintegrated.com/en.html,,7100.0,2632529000.0,37.413172,-121.896448,False
+529bbabd-c8f0-5984-b39b-964c417aafa0,2,"Techwing, Inc.",South Korea,Semiconductors,www.techwing.co.kr,089030,578.0,,37.133583,127.055616,False
+5302436c-d2bc-55e5-a63f-d10da0da880f,2,Fabrinet (NYS: FN),Cayman Islands,Electronic Components,fabrinet.com,FN,14663.0,2719323000.0,19.3619,-81.7339,False
+530a9c24-0245-5521-bcb0-d4de2fa61058,2,Airgain Inc,United States,Telecommunications Equipment,https://www.airgain.com/,AIRG,122.0,65859000.0,32.940854,-117.228234,False
+536a36a7-d3d1-5ad5-bb3b-d61fa9460f6a,2,"Beijing Asiacom Information Technology Co., Ltd.",China,Computer Hardware,www.asiacom.net.cn,301085,1774.0,153000000.0,39.985453,116.307249,False
+55516fce-8137-51fa-a5b5-32427c4f1e72,2,"Cellfie Global Co., Ltd.",South Korea,Semiconductors,www.cardnsoft.com,068940,90.0,,35.8647775,128.6044605,False
+5588d562-e579-55ff-b859-4947eb8a0d3a,2,Compal Electronics Inc,Taiwan,Computer Hardware,https://www.compal.com/,2324,67160.0,1235682015000.0,25.073692,121.588798,False
+56008b67-18ca-5a82-acc0-0f513e583070,2,BYD Co Ltd (NBB: BYDD Y),China,Automobiles,https://www.bydglobal.com/,1211,703500.0,84072000000.0,22.7046,114.2941,False
+5691e4e4-0667-5690-a7f7-3af88ff244bd,2,"Koryo Electronics Co., Ltd.",Taiwan,Semiconductors,www.koryo.com.tw,8032,100.0,,25.088909,121.652236,False
+56e75848-0f93-54af-bbdd-b4e1ca7c6e23,2,"JCET Group Co., Ltd.",China,Computer Hardware,https://www.jcetglobal.com,600584,19810.0,4600000000.0,31.906397,120.274673,False
+583b9f90-1f02-5e5c-b482-e89363967bd0,2,Splunk Inc (NMS: SPLK),United States,Transaction Processing Services,www.splunk.com,SPLK,8000.0,3980553000.0,37.782169,-122.391802,False
+5902c364-aa12-57a2-88b2-aff2cafda7ac,2,"YCCHEM Co., Ltd.",South Korea,Chemicals: Diversified,www.ycchem.co.kr,112290,49.0,,36.050917,128.420647,False
+592b0682-6c27-51bb-8cc8-084b5fc4926c,2,Vantiva S A (NBB: TCLR Y),France,Telecommunications Equipment,https://www.vantiva.com/,VANTI,4330.0,2898000000.0,48.8593591,2.3423981,False
+59f48a4a-4fb7-551e-8fc7-68551fca5104,2,CTS International Logistics Corp. Ltd.,China,Commercial Vehicles and Parts,https://www.ctsfreight.com/,603128,4240.0,2358966000.0,31.2297,121.4763,False
+5a1c3d3c-51a0-54b9-94ed-60e6ca2f3a99,2,Hellenic Telecommunications Organization SA (NBB: HLTO Y),Greece,Telecommunications Services,https://www.cosmote.gr/,HTO,10590.0,3455300000.0,38.054088,23.815504,False
+5a79baaf-c137-5356-a00f-24ba5bd1b5a8,2,Workday Inc (NMS: WDAY),United States,Transaction Processing Services,www.workday.com,WDAY,19415.0,6983013000.0,37.692976,-121.894005,False
+5b080965-56fc-598b-8273-7636c115acc6,2,Meta Platforms Inc (NMS: META),United States,Consumer Digital Services,www.meta.com,META,69329.0,134902000000.0,37.469685,-122.209935,False
+5b6f2c64-720d-5416-bf84-d137ebcf8092,2,Kinsus Interconnect Technology Corp (TAI: 3189),Taiwan,Semiconductors,https://www.kinsus.com.tw/en-global/Home/Index,TAI,7210.0,23165066000.0,24.9932,121.297,False
+5b9a7912-ddb6-5944-a38b-aa1a8d97a3c6,2,IT Competence Group SE (NL: ),Netherlands,Computer Services,http://www.itcg.de,3IT,610.0,21957270.0,48.170184,11.548287,False
+5c1be85d-cd8d-51f7-a8ac-229b5c5d2aa6,2,KoMiCo Ltd.,South Korea,Semiconductors,www.komico.com,183300,707.0,,37.007144,127.261842,False
+5cc2ac86-f67f-5658-b6e7-f5d360c5f670,2,Toppan Inc (NBB: TOPP Y),Japan,Forms and Bulk Printing Services,https://www.holdings.toppan.com/ja/,7911,53710.0,1638833000000.0,35.7112687,139.7527256,False
+5d4bcecb-63f9-57fa-a1a5-c94ca11f88d3,2,Sprinklr Inc (NYS: CXM),United States,Transaction Processing Services,https://www.sprinklr.com/,CXM,3870.0,703484000.0,40.750496,-73.986391,False
+5e709c45-9706-5e31-bf09-791720895509,2,NICE Ltd (NMS: NICE),Israel,Telecommunications Equipment,www.nice.com,NICE,8384.0,2322877000.0,32.1833,34.8666,False
+6092bb47-7b90-5928-ac63-f52bc9029330,2,"Runben Biotechnology Co., Ltd.",China,Drug Retailers,https://www.runben.com/,603193:SHH,917.0,159736720.0,23.0607,113.3808,False
+616fb2b5-9e63-5119-9735-62253521c023,2,"Rongxin Power Electronic Co., Ltd. (SHZ: 002123)",China,Telecommunications Services,http://www.rxpe.com,,1.0,,,,False
+62313b85-edce-552c-96d0-f34e87a37acb,2,Sidetrade SA,France,Transaction Processing Services,https://www.sidetrade.com/,ALBFR,313.0,49013000.0,48.8373,2.2513,False
+6303544a-3a6e-5ef7-beb7-697dd4b1b3c6,2,GitLab Inc (NMS: GTLB),United States,Transaction Processing Services,https://about.gitlab.com/,GTLB,2130.0,539034000.0,37.7900596,-122.4051637,False
+63246aad-6ddb-5b64-acaf-e1724bc7695c,2,TechTarget Inc (NMS: TTGT),United States,Consumer Digital Services,https://www.techtarget.com/,TTGT,960.0,245706000.0,42.337311,-71.192703,False
+63beb9d8-18e8-5c74-9558-ed54e0f9d9ae,2,"Zig Sheng Industrial Co., Ltd. (NL: )",Taiwan,Textile Products,http://www.zigsheng.com/,TAI,1310.0,13045384000.0,25.065628,121.526981,False
+63db6980-05fa-5d09-a612-d1761239d58e,2,"OMH SCIENCE Group Co., Ltd.",China,Machinery: Industrial,www.omhgroup.com,300486,602.0,114000000.0,37.7315,112.5472,False
+63e3c43a-44b6-59a0-bfdf-438fcaec6446,2,"Kale Environment Technology (Shanghai) Co., Ltd.",China,Machinery: Industrial,www.kalefans.com,301070,505.0,,31.020369,121.303276,False
+6435b98e-5c4f-5d0d-bc6f-0b5da8f0f2e9,2,Charge Enterprises Inc (NBB: CRGE),United States,Telecommunications Services,www.charge.us,CRGEQ,332.0,641369369.0,40.7536337,-73.9693598,False
+649de54d-ac36-5390-972f-737549f5867c,2,Cloudera Inc (NYS: CLDR) (inactive),United States,Transaction Processing Services,www.cloudera.com,CLDR,3084.0,904802000.0,37.404546,-121.977192,False
+65596111-0499-5f01-bfb8-6f41a5f83e3d,2,B Riley Financial Inc (NMS: RILY),United States,Diversified Financial Services,brileyfin.com,RILY,2383.0,1792698000.0,34.042,-118.3956,False
+65bf4c6e-b062-5852-beab-c2964711cafa,2,"RealNetworks, Inc. (NAS: RNWK) (inactive)",United States,Transaction Processing Services,https://www.realnetworks.com/,,350.0,50242000.0,47.5881,-122.3372,False
+664fb275-9ed6-5ee0-bea3-9d01fddca4ec,2,"Hangzhou Raycloud Technology Co., Ltd.",China,Transaction Processing Services,http://www.raycloud.com/,688365:SHH,1850.0,76706102.0,30.188,120.125,False
+6664b2a6-f5c4-5d37-8cdc-e785fc58b036,2,Flex Ltd (NMS: FLEX),Singapore,Electronic Components,www.flex.com,FLEX,148115.0,29387000000.0,1.3416,103.9611,False
+6679752c-4e0d-5aba-881d-282fdf619797,2,Xiamen Kingdomway Group Co.,China,Food Products,www.kingdomway.com,002626,2907.0,,24.555089,118.081895,False
+6684ad19-908c-53a6-9884-0b0c9bbbc1a2,2,TTM Technologies Inc (NMS: TTMI),United States,Electronic Components,https://www.ttm.com/,TTMI,15800.0,2232567000.0,33.7149,-117.8333,False
+6706f9fd-f138-5faa-aeda-c926030efe2b,2,All Winner Technology Co Ltd (NL: ),China,Semiconductors,www.allwinnertech.com,300458,831.0,,22.284411,113.573031,False
+696ca102-b5b5-58c9-be2a-855f2818fae9,2,Intel Corp  (NMS: INTC),United States,Semiconductors,www.intel.com,INTC,124800.0,54228000000.0,37.387447,-121.963166,False
+69942072-1e13-5b7d-a638-910a3e5d45c5,2,Shanghai 2345 Network Holding Group Co Ltd (NL: ),China,Transaction Processing Services,www.2345.net,002195,353.0,,31.20412,121.638956,False
+6b84c803-c493-518d-83b2-86ea391a359e,2,Health & Happiness (H&H) International Holdings Ltd (NBB: BTSD F),Cayman Islands,Food Products,,,,10925217000.0,,,False
+6baf4327-f17c-53bc-9272-dcf925753922,2,Caldwell Partners International Inc. (The) (TSX: CWL),Canada,Professional Business Support Services,https://www.caldwell.com/,CWL,150.0,67016477.0,43.646866,-79.382314,False
+6c5f5a8b-115b-5e0c-854b-e1ef11e5a8f2,2,EuroLand Corporate SA,France,Investment Services,https://www.elcorp.com/,MLERO,21.0,0.0,48.868983,2.299469,False
+6c638ce3-9b52-560c-a757-35288dd3f8a2,2,"AURAS Technology Co., Ltd.",Taiwan,Computer Hardware,www.auras.com.tw,3324,120.0,,25.034868,121.448208,False
+6cacfcce-55ca-5c52-b68a-cd945a0d19ad,2,Dawning Information Industry Co Ltd (NL: ),China,Computer Hardware,https://www.sugon.com/,603019,5440.0,2283000000.0,39.979247,116.294342,False
+6cb5511f-7100-58d9-ad77-dbd767d932ec,2,"SIMMTECH Co., Ltd.",South Korea,Semiconductors,www.simmtech.com,222800,2572.0,,36.635709,127.491009,False
+6cec7f35-0439-5cab-9d75-b61b7240ac4c,2,Wild Bunch AG,Germany,Entertainment,https://wildbunch.eu/,WBAH,132.0,83600000.0,52.51499,13.41053,False
+6dcdfa1c-a105-50ca-bbae-cd74f7f32dea,2,SNP Schneider-Neureither & Partner AG (NBB: SNPX F),Germany,Transaction Processing Services,,,,143900000.0,,,False
+6ea5ca14-fd5e-5820-bffe-2148eed75715,2,Asetek A/S (NBB: ASKT F),Denmark,Computer Hardware,,,,72750000.0,,,False
+6ec1c8f1-ea5a-5072-bc35-1428991c597a,2,"Beijing Zhidemai Technology Co., Ltd.",China,Transaction Processing Services,www.smzdm.com,300785,2118.0,,39.8636,116.3268,False
+6eda6862-da9e-5acb-8662-8ec14f50f799,2,"Dongguan Aohai Technology Co., Ltd.",China,Machinery: Industrial,www.aohaichina.com,002993,5579.0,,22.91452,113.99037,False
+70816405-c14b-53cf-9a19-3d25234cff49,2,Giant Biogene Holding Co. Ltd.,China,Household Furnishings,http://www.xajuzi.com/,2367:HKG.HZ,1160.0,488987000.0,34.341574,108.93977,False
+72155e73-139b-5e21-a232-52eacda1b622,2,"Morpho, Inc.",Japan,Transaction Processing Services,https://www.morphoinc.com/,3653,151.0,2073000000.0,35.697944,139.768379,False
+7257c012-9f23-5d6a-86a5-aea2f0ed251a,2,GlobalFoundries Inc (NMS: GFS),Cayman Islands,Semiconductors,https://gf.com/,GFS,12000.0,7100000000.0,42.9756,-73.7787,False
+730d361d-a734-5621-a9a2-8c505310e8b6,2,GoPro Inc (NMS: GPRO),United States,Photography,gopro.com,GPRO,930.0,1005459000.0,37.547879,-122.313125,False
+73895707-9961-5c16-88a7-c0acb5b46604,2,Sejoong Co Ltd (KOS: 039310),South Korea,Transaction Processing Services,www.sejoong.com,039310,165.0,127812095113.0,37.57574,126.981687,False
+73c01792-38b7-5c2d-9fa7-9371fde602cf,2,"APACT Co., Ltd.",South Korea,Semiconductors,www.apact.co.kr,200470,134.0,,37.015681,127.248914,False
+749944e2-e756-5683-8a01-bf3e0d41fe07,2,Hyundai Steel Co (KOR: 004020),South Korea,Iron and Steel,www.hyundai-steel.com,004020,11499.0,20780381550301.0,37.4631,126.6407,False
+74e72dda-8f2f-5f88-b970-0c7cd1acdf3c,2,"RDC Semiconductor Co., Ltd.",Taiwan,Semiconductors,http://www.rdc.com.tw,,6.0,,24.804301,120.971634,False
+74ff6c5c-3c4c-57f2-885e-61a77ba0f85a,2,Blue Star Ltd (NL: ) (inactive),India,Building: Climate Control,www.bluestarindia.com,BLUS,2866.0,31904289000.0,19.015793,72.832256,False
+7581d2ea-77ee-5670-a6ca-a1510f96d545,2,"Taekwang Industrial Co., Ltd. (South Korea) (NL: )",South Korea,Chemicals: Diversified,http://www.taekwang.co.kr,003240,957.0,3108761624314.0,37.568915,126.982752,False
+75ccd326-aa5a-5abc-8bb9-b723a8c5ee39,2,RingCentral Inc (NYS: RNG),United States,Transaction Processing Services,www.ringcentral.com,RNG,4084.0,2202429000.0,37.525001,-122.264707,False
+770a1b32-cefd-54d3-8efe-5e8dfe94feca,2,"Qualys, Inc.",United States,Computer Services,https://www.qualys.com/,QLYS,2210.0,554458000.0,37.5549,-122.2741,False
+77ea13ba-a414-524c-88c6-66d8a8d1808e,2,cyber_Folks SA,Poland,Transaction Processing Services,https://investors.cyberfolks.pl/,CBF,456.0,135121044.0,52.408266,16.933519,False
+77f8884a-dc02-58ed-a8a8-189e1bcc095c,2,"Andon Health Co., Ltd.",China,Medical Equipment,www.jiuan.com,002432,1655.0,,39.084158,117.200983,False
+78433285-7e41-5ef8-96e4-109e09cadab3,2,"Shenzhen Fenda Technology Co., Ltd.",China,Computer Hardware,www.fenda.com,002681,5158.0,,22.60829,113.948748,False
+792cb6ab-7f6d-57ea-bbb9-928ae85dfa5d,2,Netlinkz Ltd (AUS: NET),Australia,Computer Services,https://netlinkz.com/,NET,20.0,5253284.0,-33.8688,151.2093,False
+7972985e-ef3b-510a-9dd4-38b714f74941,2,IMImobile PLC,United Kingdom,Transaction Processing Services,http://www.imimobile.com,IMOI,1100.0,171187000.0,51.5194,-0.0998,False
+7a25c58f-575c-5695-a989-f99f0be809f0,2,Atoss Software AG (Germany) (NL: ),Germany,Transaction Processing Services,https://www.atoss.com/,AOFX,775.0,86053411.0,48.1271,11.6157,False
+7b22b493-b096-530c-817b-56769eb04d3a,2,Ever-Clear Environmental Eng. Corp.,Taiwan,Gas Distribution,www.ever-clear.com.tw,6624,73.0,,24.151282,120.647857,False
+7b6d8756-54b5-5663-8464-275640ed8218,2,Arteris Inc (NMS: AIP),United States,Machinery: Industrial,https://www.arteris.com/,AIP,255.0,53666000.0,37.283255,-121.950554,False
+7bab3107-a71a-5263-a625-8716d4503219,2,BOE Technology Group Co Ltd (NL: ),China,Electronic Components,www.boe.com,000725,90563.0,24700000000.0,39.80086,116.33854,False
+7c3f2692-c9f9-5759-8a77-41eaeea050d3,2,ASTJETEC Co Ltd (KOS: 090470),South Korea,Machinery: Industrial,www.jettech.co.kr,090470,260.0,29464450161.0,36.714846,127.140984,False
+7d1b6eff-84ba-56d0-82e4-0cfd6fde65a2,2,Huarui Electrical Appliance Co. Ltd.,China,Machinery: Industrial,www.china-commutator.com,300626,1225.0,,29.839884,121.529471,False
+7da502b4-35a2-5d4a-80a2-6397196f8c48,2,RTL Group SA (NBB: RGLX Y),Luxembourg,Radio and TV Broadcasters,company.rtl.com/en,RTLL,12095.0,6651000000.0,49.612492,6.131102,False
+825a9210-57d5-527e-88b5-fdaaf63b4fb9,2,AT&T Inc (NYS: T),United States,Telecommunications Services,https://www.att.com/,T,149900.0,122428000000.0,32.778651,-96.79988,False
+840c6cae-4c88-5d5b-91fc-a654072e57e0,2,Siemens AG (Germany) (NBB: SIEG Y),Germany,Diversified Industrials,www.siemens.com,SIEGn,320000.0,78110000000.0,48.1351,11.582,False
+84dd956e-0172-51de-b08b-ab9182b6fbcc,2,Abbott Laboratories (NYS: ABT),United States,Medical Equipment,www.abbott.com,ABT,114000.0,40109000000.0,42.278016,-87.88486,False
+85036a3a-4044-563c-ab5f-be0861894122,2,United Microelectronics Corp (NYS: UMC),Taiwan,Semiconductors,www.umc.com,2303,20000.0,269969137000.0,24.807617,120.965263,False
+8524ad48-5c84-5833-a8f6-8bd03d713dcd,2,"Joyvio Food Co., Ltd.",China,Food Products,www.joyviofood.com,300268,,,44.31598,86.04152,False
+8535135c-1e7c-551e-844c-256f96446cba,2,iQSTEL Inc (NBB: IQST),United States,Telecommunications Services,https://www.iqstel.com,IQST,70.0,93203532.0,25.7486778,-80.2582652,False
+858d0f8c-9d45-5acd-9d4c-068ae0e9eb56,2,Allgeier SE,Germany,Computer Services,www.allgeier.com,AEIN,3590.0,404603000.0,48.126933,11.600805,False
+85e4160c-0b5a-5cbf-9659-8687c2a52794,2,"Guangdong Songfa Ceramics Co., Ltd.",China,Home Construction,http://www.songfa.com/,603268,1010.0,32981367.0,23.6561,116.6229,False
+860cf04b-ee66-5a32-98ea-0ba7396857ed,2,"Chunghsin Technology Group Co., Ltd.",China,Household Furnishings,http://www.cncoptronics.cn,603996,9.0,,28.6575,121.4208,False
+86244f93-8252-5809-95fe-d3dfab233b11,2,"Peric Special Gases Co., Ltd.",China,Chemicals: Diversified,http://www.pericsg.com/,688146,687.0,250112500.0,36.615177,114.538961,False
+866fa55e-0712-5a8f-811e-5c40a46f6e1e,2,"Shandong Kaisheng New Materials Co., Ltd.",China,Chemicals: Diversified,www.ksxc.cn,301069,833.0,,36.7846,118.0441,False
+874a8377-1d19-58b1-aa4a-0e86149d6326,2,Cascade Microtech Inc (NMS: CSCD) (inactive),United States,Semiconductors,http://www.formfactor.com,,3000.0,147039000.0,45.539864,-122.850229,False
+883899e2-a41c-5bf9-8b7d-9306becc03ac,2,InterXion Holding NV (NYS: INXN) (inactive),Netherlands,Computer Services,www.interxion.com,INXN,844.0,561752000.0,52.3040628,4.6907856,False
+88512348-d6f6-528e-8fc7-f53a3dfd5129,2,"Beijing Roborock Technology Co., Ltd.",China,Home Construction,https://www.roborock.com,688169,1590.0,1446000000.0,39.9747,116.3541,False
+886a04be-1c6d-54ab-abaa-50f37aa684c8,2,Disney (Walt) Co. (The) (NYS: DIS),United States,Entertainment,,,,88935000000.0,,,False
+88766e18-e3ef-5a6d-81b6-2d49ec142624,2,"KOLON LIFE SCIENCE, Inc.",South Korea,Pharmaceuticals,www.kolonls.co.kr,102940,421.0,,37.566535,126.9779692,False
+88da2cca-949a-587e-9fb1-6139a50c6159,2,mBank SA (NBB: BREJ Y),Poland,Banks,https://www.mbank.pl/,MBK,7380.0,7559634000.0,52.235474,20.988079,False
+896be0e1-27ec-5758-952a-97d12a8b1db3,2,"Model N, Inc (NYS: MODN)",United States,Transaction Processing Services,www.modeln.com,MODN,1089.0,253800000.0,37.544579,-122.280575,False
+8a37ae40-4842-5699-8255-3210d83ae8a6,2,Red Hat Inc (NYS: RHT) (inactive),United States,Transaction Processing Services,www.redhat.com,,19000.0,3482650000.0,35.7788,-78.6387,False
+8a6ea111-6116-54a9-bd08-b6f5a0a305f0,2,Hangzhou Zhongya Machinery Co. Ltd.,China,Machinery: Industrial,www.zhongyagroup.com,300512,1477.0,,30.287322,120.142269,False
+8a7f12c9-f653-554b-aa00-78066d49d51d,2,"eMemory Technology, Inc.",Taiwan,Semiconductors,www.ememory.com.tw,3529,295.0,,24.8385,121.0077,False
+8c13af6a-dea6-5b1a-a324-2bba1fd79605,2,"Elensys Co., Ltd.",South Korea,Machinery: Industrial,www.elensys.co.kr,264850,132.0,,37.480264,126.647411,False
+8c8c6e59-14c2-55bd-b840-7fdae6d0bfa9,2,Cyber Security 1 AB (NL: ),Sweden,Computer Services,https://cyber1.com/,CYB1,146.0,27356100.0,59.331,18.063,False
+8d6862ba-23d3-5d86-86d4-378e336c454c,2,HMS Networks AB (NBB: HMNK F),Sweden,Telecommunications Equipment,https://www.hms-networks.com/,0RPZ,817.0,1466822000.0,56.6746,12.8568,False
+8dbd585c-6269-5d46-8414-2987aea9d963,2,Daido Group Ltd.,Hong Kong,Professional Business Support Services,http://www.daidohk.com/,544,200.0,38448100.0,22.3193,114.1694,False
+8e8f2971-3ed2-5f2b-bf02-09d4c93b533a,2,Xplora Technologies AS,Norway,Recreational Products,www.myxplora.com,XPLRA,107.0,86209393.0,59.9111019,10.738135,False
+8eabfa5f-4952-516c-ac74-92c4fae8586f,2,Veeva Systems Inc (NYS: VEEV),United States,Health Care Services,www.veeva.com/medtech,VEEV,7172.0,2296444000.0,37.689619,-121.869121,False
+8ecb12b6-69ff-5351-9f56-cbdec215b19b,2,Magic Software Enterprises Ltd (NMS: MGIC),Israel,Computer Services,https://www.magicsoftware.com,MGIC,3630.0,523330000.0,32.030305,34.887265,False
+8ed1e43a-c128-5af5-8575-10d6de82dd53,2,ASE Technology Holding Co Ltd (NYS: ASX),Taiwan,Machinery: Industrial,https://www.aseglobal.com/,3711,101980.0,666392133000.0,22.7703,120.361971,False
+8f6cd00d-8620-52d2-a41d-04e28a4bc9e1,2,CyberArk Software Ltd (NMS: CYBR),Israel,Transaction Processing Services,https://www.cyberark.com/,CYBR,3020.0,697935000.0,32.08635,34.889332,False
+8f83f111-f086-554b-87be-2ea881d246ae,2,"Feitian Technologies Co., Ltd.",China,Computer Hardware,www.ftsafe.com,300386,900.0,,40.032948,116.324389,False
+90349e5c-43f0-560e-90a6-e86c481aa4e5,2,"ISC Co., Ltd.",South Korea,Semiconductors,www.isc21.kr,095340,204.0,,37.38295,127.11484,False
+905239a9-327f-5421-a41f-9038bceaf484,2,Open Text Corp   (NMS: OTEX),Canada,Transaction Processing Services,https://www.opentext.com/,OTEX,24100.0,5695801000.0,43.472285,-80.544858,False
+90996efd-bfbd-59c2-bf3d-7312349e1842,2,Bayerische Motoren Werke AG ,Germany,Automobiles,https://www.bmwgroup.com/,BMWX,154950.0,181295000000.0,48.178743,11.588246,False
+90ed394e-c1c1-58d8-aa19-25d5789021ff,2,"Guangzhou Ruoyuchen Technology Co., Ltd.",China,Transaction Processing Services,www.gzruoyuchen.com,003010,1097.0,121000000.0,23.135552,113.342153,False
+915d199f-41e9-59ce-85a6-465105a974f8,2,"Tradeshift Holdings, Inc.",United States,Telecommunications Services,www.tradeshift.com,,800.0,,37.789881,-122.407466,False
+91885a9b-6185-5711-9d2a-b6799dde8f5f,2,Coherent Inc,United States,Electronic Equipment: Other,www.coherent.com,,10001.0,1542144000.0,37.396243,-121.961953,False
+919e29df-41fe-5a75-afdd-c1aa71704106,2,"Palo Alto Networks, Inc (NMS: PANW)",United States,Transaction Processing Services,www.paloaltonetworks.com,PANW,15166.0,7527400000.0,37.3981558,-121.9778999,False
+91ec0bf8-eb59-5b3d-abca-f4d1a20d274b,2,Advantest Corp (NBB: ATEY Y),Japan,Machinery: Industrial,https://www.advantest.com/en/,6857,6770.0,560191000000.0,35.68251,139.76398,False
+9234b953-5ba5-5918-b147-d692e757e073,2,"SICC Co., Ltd.",China,Computer Hardware,https://www.sicc.cc/,688234:SHH,1330.0,226319376.0,36.6508,117.1266,False
+931a9917-a0e0-5889-934e-bdb81698564c,2,SS&C Technologies Holdings Inc (NMS: SSNC),United States,Transaction Processing Services,,,,5502800000.0,,,False
+9339a7a9-4f00-50e9-8852-7c70374dc40c,2,eFuture Holding Inc (NAS: EFUT) (inactive),Cayman Islands,Transaction Processing Services,www.e-future.com.cn,EFUT,706.0,225010796.0,39.9703,116.3758,False
+933dc7d7-b47f-57e3-aac2-f95f877b76e9,2,Beijing Jingkelong Co. Ltd.,China,Drug Retailers,https://www.jkl.com.cn,814,4370.0,1300000000.0,39.9087,116.3975,False
+93909ac1-a9f6-5428-8c88-465106619c1b,2,6D Global Technologies Inc (NL: ),United States,Computer Services,www.6DGlobal.com,SIXD,104.0,12789892.0,40.7586,-73.9855,False
+93be0090-a583-58cc-9f54-4b1f290426ee,2,Ermenegildo Zegna NV (NYS: ZGN),Netherlands,Clothing and Accessories,https://www.zegnagroup.com/,ZGN,6930.0,1300662000.0,45.620598,8.079034,False
+94eeec26-0249-542e-be80-f7d30c2ad2f6,2,Chin Yang Chemical Corp (NL: ),South Korea,Containers and Packaging,http://www.chinyang.co.kr/eng,051630,37.0,49730593594.0,35.542778,129.313333,False
+954b7a54-69bd-5f40-b695-3f8e354b01ee,2,"TSE Co., Ltd.",South Korea,Semiconductors,www.tse21.com,131290,636.0,,36.8536,127.1315,False
+960cdffa-bf5b-5d9e-a75d-358cffb7f824,2,"People.cn Co., Ltd. (NL: )",China,Consumer Digital Services,http://www.people.cn,603000,3140.0,317213000.0,39.9268,116.4194,False
+9634f31e-87d0-5cc5-a422-288ab434fc63,2,Onto Innovation Inc (NYS: ONTO),United States,Machinery: Industrial,ontoinnovation.com,ONTO,1497.0,815868000.0,42.548415,-71.173229,False
+963be96c-0290-50a3-add8-f75c5ac71658,2,Ovato Ltd (NL: ),Australia,Professional Business Support Services,www.ovato.com.au,OVT,1608.0,563230000.0,-33.8688,151.1941,False
+979392c3-99b1-5b0e-902f-f81d3d411309,2,"Liveplex Co., Ltd. (KOS: 050120)",South Korea,Recreational Vehicles and Boats,www.escube.co.kr,050120,33.0,58597361361.0,37.5090227,127.0401286,False
+9797591d-d0da-5bf2-aacd-85d2bf57a229,2,"Harbin Fuerjia Technology Co., Ltd.",China,Medical Equipment,www.voolga.net,301371,,,45.80377,126.53497,False
+9802b844-faf3-5e55-95a9-f6a76d146d40,2,Comcast Corp (NMS: CMCS A),United States,Cable Television Services,https://corporate.comcast.com/,CMCSA,186000.0,121572000000.0,39.954,-75.173,False
+98640200-9418-5d83-a0b9-5ff4b76e6ee0,2,Switch Inc (NYS: SWCH) (inactive),United States,Computer Hardware,www.switch.com,SWCH,829.0,668646000.0,36.056599,-115.209398,False
+9947daf9-6e18-5f17-97d1-6b8e16de7f26,2,"Chengdu Qushui Science & Technology Co., Ltd.",China,Household Furnishings,www.8hsleep.com,301336,148.0,,30.57392,104.06657,False
+994d098c-7b3b-5269-85ae-135425717691,2,Kolon Fashion Material Inc (KOR: 144620),South Korea,Clothing and Accessories,http://www.kolonmaterials.com,,154.0,546898861771.0,37.437506,127.062912,False
+99d9ef37-5418-5870-b1b4-ed8678605c30,2,Shenzhen Kaifa Technology Co Ltd (SHZ: 21),China,Computer Hardware,www.kaifa.cn,000021,17421.0,2000000000.0,22.532239,114.059563,False
+9ab26d94-d373-54c7-8081-16f7a11abcb2,2,Shenzhen Jpt Opto-Electronics Co. Ltd.,China,Computer Hardware,https://www.jptoe.com/,688025,1580.0,180000000.0,22.803226,114.133191,False
+9afcd1fe-08c3-5496-9797-77eaebe036b0,2,QuickLogic Corp (NAS: QUIK),United States,Semiconductors,https://www.quicklogic.com/,QUIK,49.0,17803000.0,37.3643531,-121.9017065,False
+9b2a1159-6f4b-56ab-a1ad-2bedb4784f15,2,King Yuan Electronics Co. Ltd (TAI: 2449),Taiwan,Machinery: Industrial,https://www.kyec.com.tw/,2449,5260.0,20081683000.0,24.788391,120.976346,False
+9b45d3b4-fed6-5813-850c-78d9a0ab7f69,2,Xiamen Anne Corporation Ltd (SHZ: 002235),China,Paper,www.anne.com.cn,002235,308.0,3480000.0,24.598765,118.123456,False
+9bcba0cf-268a-5b7e-ab61-9c1970d94f46,2,"BusinessOn Communication Co., Ltd.",South Korea,Transaction Processing Services,www.businesson.co.kr,138580,73.0,,37.5172363,127.0473259,False
+9c742776-5103-5111-955b-5503a29055ec,2,ESR Cayman Ltd (NBB: ESRC F),Cayman Islands,Real Estate Services,www.esr.com,1821,2201.0,357369000.0,22.2869,114.1581,False
+9d03a489-0f00-5540-99a2-022c2b85fbac,2,Kaimei Electronic Corp.,Taiwan,Computer Hardware,https://jamicon.teapo.com/,2375,955.0,166654800.0,25.003316,121.509453,False
+9d4fcb82-1e25-50b0-9aa4-05f759391a7f,2,"KENGIC Intelligent Technology Co., Ltd.",China,Transaction Processing Services,https://www.kengic.com/,688455,900.0,200000000.0,36.067,120.382,False
+9d6206c7-77bd-561a-abec-e276c22c7fac,2,"HLB innoVation Co., Ltd.",South Korea,Electrical Components,www.psmc.co.kr,024850,192.0,,37.1765,126.858352,False
+9db28823-ac54-5f6e-9979-3d11311eea3a,2,"NetApp, Inc. (NMS: NTAP)",United States,Computer Hardware,www.netapp.com,NTAP,11800.0,6101000000.0,37.319765,-121.992114,False
+9e164b5f-980b-58a0-ad6e-39862c56153a,2,"SUNGDO ENGINEERING & CONSTRUCTION Co., Ltd.",South Korea,Engineering and Contracting Services,www.sungdokorea.com,037350,528.0,589751670.0,37.500383,127.034831,False
+9f06a9f0-e7cf-5099-a0cc-831d342f57f1,2,"Value Valves Co., Ltd.",Taiwan,Machinery: Industrial,www.valuevalves.com,4580,399.0,,24.99257,121.459576,False
+a0bdea2c-e1cb-530c-a97d-9a1e0e340f5a,2,Beryl 8 Plus PCL,Thailand,Transaction Processing Services,beryl8.com,BE8m,,78926883.0,13.059444,100.652778,False
+a13e321d-5d97-582d-ba47-149f5db8aa0a,2,Aehr Test Systems (NAS: AEHR),United States,Machinery: Industrial,www.aehr.com,AEHR,104.0,81530000.0,37.5061,-122.0423,False
+a201ebff-9526-52a8-bed6-720d77e85812,2,Dynatrace Inc (NYS: DT),United States,Consumer Digital Services,ir.dynatrace.com,DT,4700.0,1364157000.0,42.414432,-71.280062,False
+a20e29a8-2ecb-5756-aa75-6d3dffb97775,2,PVA TePla AG (NBB: TPLK F),Germany,Semiconductors,http://www.pvateplaamerica.com,,30.0,96783000.0,33.875294,-117.566439,False
+a21b9e59-9935-5758-9a8f-9eef7fa33627,2,"Zhejiang Jiemei Electronic & Technology Co., Ltd.",China,Electrical Components,www.jmkj.com,002859,2466.0,,30.5896,119.1194,False
+a23f2b38-49b7-5460-9703-47081dc462f3,2,Globalworth Real Estate Investments Ltd (LON: GWI),Guernsey,Real Estate Services,https://www.globalworth.com/,GWI,269.0,219350000.0,49.259106,-2.201022,False
+a2a58f54-b9a8-5610-a23f-bf8b17297fbd,2,Yealink Network Technology Corp. Ltd.,China,Telecommunications Services,www.yealink.com,300628,2104.0,,24.474805,118.080413,False
+a2db4e7e-f11c-50c9-b78d-f97cec1761e4,2,eMan AS,Czech Republic,Biotechnology,https://www.eman.cz/,EMAN,61.0,,50.097219,14.433674,False
+a2ea37a0-4f4a-5dd0-bb06-c7958d8d172b,2,MingZhu Logistics Holdings Ltd (NAS: YGMZ),Cayman Islands,Transportation Services,https://ir.szygmz.com/,YGMZ,195.0,114073803.0,22.6213,114.0479,False
+a33096b2-866c-506f-9030-bf1eb10e968a,2,"Shanghai CDXJ Digital Technology Co., Ltd.",China,Construction,http://www.shcd.cc/,603887,989.0,321000000.0,31.170516,121.438456,False
+a35ccb02-efb8-5e46-9d27-1d5e628b46f1,2,Nippon Building Fund Inc (NBB: NBFJ F),Japan,Diversified REITs,https://www.nbf-m.com/nbf/,8951,39.0,893000000.0,35.679294,139.760045,False
+a399df47-bee5-5f85-9d67-c45c8f4a06c9,2,"Hitachi, Ltd.  (NBB: HTHI Y)",Japan,Diversified Industrials,https://www.hitachi.co.jp/,6501,268660.0,10881150000000.0,35.680399,139.763244,False
+a3e1c776-2da9-59e4-b541-d683d632a030,2,GenCell Ltd.,Israel,Alternative Fuels,https://www.gencellenergy.com/,GNCL,157.0,6662000.0,32.088545,34.887347,False
+a479b718-6184-5767-ba7f-defdea4763f2,2,"Beijing Yuanlong Yato Culture Dissemination Co., Ltd.",China,Entertainment,www.ylyato.com,002878,1044.0,,39.8964569,116.3653327,False
+a48ba95b-5313-5143-bed8-00ac8428ba8b,2,Circle Property PLC (NBB: CPPT),United Kingdom,Real Estate Services,www.circleproperty.co.uk,CRC,,9040009.0,49.1835,-2.1054,False
+a4dbe5b7-20af-5c77-9f5d-5c4b1345de76,2,Kaltura Inc (NMS: KLTR),United States,Telecommunications Equipment,corp.kaltura.com,KLTR,580.0,175172000.0,40.73956,-73.987857,False
+a503bb0d-af85-5621-8cbe-41ae3ab7cb49,2,Slate Grocery REIT (TSX: SGR UN),Canada,Office REITs,www.slategroceryreit.com,SGR,,177485000.0,43.6487,-79.38544,False
+a597566e-19f4-5e0d-b121-81ac9a5565f4,2,Amdocs Ltd.   (NMS: DOX),Guernsey,Transaction Processing Services,https://www.amdocs.com/,DOX,30700.0,4887550000.0,38.656345,-90.482978,False
+a5cee93c-9679-59af-adc8-fc1fcb470290,2,Samsung Electronics Co Ltd (NBB: SSNL F),South Korea,Telecommunications Equipment,www.samsung.com,005930,98557.0,279604799000000.0,37.266099,127.028926,False
+a6d0c168-f503-5e6b-869b-28baa1b2eb7c,2,Appen Ltd (NBB: APPE F),Australia,Computer Services,www.appen.com,APX,1431.0,606706000.0,-33.7968,151.1831,False
+a73dbce4-d5cd-512b-bd2f-67124f4739e4,2,Oracle Corp. (Japan) (TOK: 4716),Japan,Transaction Processing Services,https://www.oracle.com/,ORCL,159000.0,214691000000.0,30.228031,-97.696579,False
+a7c3c5c1-237f-5e02-b7f9-362dbbc99a33,2,IG Seismic Services Plc (LON: IGSS),Cyprus,Oil Equipment and Services,http://www.igseis.com,IGSS,12160.0,18804942000.0,35.1487,33.3528,False
+a84f924f-029a-504f-8c50-97339daa24e5,2,Realtek Semiconductor Corp. (NL: ),Taiwan,Semiconductors,https://www.realtek.com/,2379,2770.0,38914031000.0,24.7997,120.9763,False
+a93544af-9630-528a-b6e1-e2538fbf0664,2,"KAISA JiaYun Technology, Inc.",China,Entertainment,www.kaisacloud.com,300242,604.0,226000000.0,22.5335,114.0696,False
+a9e77eb9-c3ce-5a60-8da0-f874486e9c41,2,"Sinopec Shanghai Petrochemical Co., Ltd. (NBB: SPTJ F)",China,Oil Equipment and Services,http://spc.sinopec.com/spc/,338,7530.0,11080000000.0,31.022406,121.331516,False
+aa207bef-ae49-5169-ac4c-7d262b104ab3,2,Comptel Oyj (Finland) (NL: ),Finland,Transaction Processing Services,www.comptel.com,CTL1V,821.0,97728000.0,60.163757,24.907385,False
+aa47a9e7-36ab-5a91-b4f6-7be6bfab934a,2,DEMIRE Deutsche Mittelstand Real Estate AG (NL: ),Germany,Real Estate Services,https://www.demire.ag/,DMRE,36.0,197723000.0,49.9846562,8.6881666,False
+ab2ee451-55a1-595a-9573-d7ec414c1468,2,Quirin Privatbank AG,Germany,Banks,https://www.quirinprivatbank.de/,QB7X,263.0,16886836.0,52.5034,13.3286,False
+ab3bae59-5fe5-5e34-abc2-a9b1e6962db1,2,Dubber Corp Ltd (NBB: DUBR F),Australia,Transaction Processing Services,https://www.dubber.net/,DUB,240.0,11844226.0,-37.8136,144.9631,False
+ab42a81c-ef3f-5b45-b8a3-bbe2a4a2d55f,2,IGD SIIQ SpA,Italy,Diversified REITs,https://www.gruppoigd.it/,IGD,169.0,179922000.0,44.4949,11.3426,False
+abf35082-270c-5e48-aa3e-c38a25508347,2,C-LAB Ltd.,Israel,Computer Hardware,https://www.compulab.com/,CLAB:TLV,114.0,35935000.0,32.6542,35.0849,False
+ac4bd2a0-b7a3-50c6-8a14-cf4457f4630d,2,Interactive Intelligence Group Inc (NMS: ININ) (inactive),United States,Transaction Processing Services,www.inin.com,ININ,2309.0,426166000.0,39.9035,86.2894,False
+acb87673-be20-5247-9076-27fcd554058e,2,Cyan AG (NL: ),Germany,Computer Services,https://www.cyansecurity.com/,CYRX,52.0,21293000.0,48.1402282,11.5819806,False
+aeb033b3-fc94-5b39-9acf-fe0e01fa26e2,2,OMV AG (Austria) (NBB: OMVK Y),Austria,Integrated Oil and Gas,https://www.omv.com/,OMV,21090.0,35555000000.0,48.217824,16.415303,False
+aed69b5d-4947-5535-9bb5-f75694387530,2,Apple Inc (NMS: AAPL),United States,Computer Hardware,www.apple.com,AAPL,161000.0,385706000000.0,37.33207,-122.02944,False
+af14b86e-8eb3-57e5-8daf-ac13c81af0a4,2,Chroma ATE Inc (TAI: 2360),Taiwan,Electronic Equipment: Gauges and Meters,https://www.chromaate.com,,3000.0,11624369000.0,25.028543,121.41315,False
+afaa056b-702e-527e-9a42-22ecef4dbe22,2,CCS Abwicklungs AG,Germany,Machinery: Industrial,https://www.compleo-charging.com/,C0M,611.0,118537153.0,51.5128,7.4416,False
+b011adaa-9c50-5f1e-9715-940b3e31ffa3,2,Amkor Technology Inc. (NMS: AMKR),United States,Machinery: Industrial,https://www.amkor.com/,AMKR,28700.0,6503065000.0,33.379135,-111.929746,False
+b01c734e-d5cb-5b6c-93b7-2dc75a58712a,2,MOL Magyar Olaj es Gazipari Reszvenytar (NBB: MGYO Y),Hungary,Integrated Oil and Gas,https://mol.hu/,MOL,25130.0,5959307000000.0,47.451425,19.051144,False
+b02db7fc-ac51-574b-8375-97ecac9465ad,2,"BlueSword Intelligent Technology Co., Ltd.",China,Machinery: Industrial,www.blueswords.com,688557,1358.0,,36.6553,116.9971,False
+b07ca7e6-6568-5bb1-8f67-9f472375688f,2,"Wangli Security & Surveillance Product Co., Ltd.",China,Construction,http://www.wanglianfang.com/,605268,4280.0,477413950.0,29.120954,119.652575,False
+b0dba669-de80-5bff-a87e-3bcf608bd65d,2,Cadence Design Systems Inc   (NMS: CDNS),United States,Transaction Processing Services,www.cadence.com,CDNS,11200.0,4089986000.0,37.412311,-121.939524,False
+b1a92747-bc61-5a9d-93c9-352a503ab3b5,2,"Guangdong Vanward New Electric Co., Ltd.",China,Household Furnishings,www.vanward.com,002543,4447.0,,22.8008,113.7873,False
+b1b54020-76aa-5359-8670-e6ede8d64d00,2,Alstria Office AG,Germany,Diversified REITs,https://alstria.de/,AOX:BER,184.0,215430000.0,53.5503,10.0007,False
+b1bd056f-8a8d-5d77-ba7f-30d2ec2dc9b2,2,Fairchild Semiconductor International Inc (NMS: FCS) (inactive),United States,Semiconductors,www.fairchildsemi.com,FCS,6379.0,1336300000.0,37.4032886,-122.0324773,False
+b1ede9a4-987f-5637-96b8-776c2e891172,2,Yext Inc (NYS: YEXT),United States,Computer Services,www.yext.com,YEXT,1100.0,405114000.0,40.74004,-74.004266,False
+b21c1ea3-4da4-5074-aab2-d59b48e67362,2,Henan Star Hi-Tech Co Ltd (SHZ: 676),China,Consumer Digital Services,,,,,,,False
+b2456ce1-1fde-5fb5-a594-97d0ac5861a3,2,"Ningbo Joy Intelligent Logistics Technology Co., Ltd.",China,Containers and Packaging,www.joy-nb.com,301198,364.0,,30.219,121.236,False
+b3b2efba-c568-5975-960c-8f4edbefb69b,2,"ZJBC Information Technology Co., Ltd.",China,Telecommunications Services,www.hlsc.com.cn,000889,3855.0,,39.935705,119.601713,False
+b44b99a9-6acc-51d1-8764-c7bdac9fa766,2,Sedania Innovator Bhd (NL: ),Malaysia,Transaction Processing Services,http://www.sedaniainnovator.com/,SEDANIA,84.0,8338543.0,3.104189,101.592206,False
+b46194b3-f355-5164-914d-02f54b47182b,2,Wacker Chemie AG Muenchen,Germany,Chemicals: Diversified,,,,6207500000.0,,,False
+b4688879-ec8e-5baf-b836-50f312ec103a,2,Highlight Communications AG,Switzerland,Entertainment,https://www.highlight-communications.ch/,HLGX,1520.0,500031.0,47.527059,7.684935,False
+b4c90b87-34c6-5fb5-a1d2-6e733b3f09c8,2,Veom Group,France,Computer Hardware,https://diohome.com/,2AW1,86.0,27739510.0,43.6098,3.8778,False
+b565bf7d-dbc0-58c1-b144-855b2477176b,2,Walmart Inc (NYS: WMT),United States,Diversified Retailers,www.corporate.walmart.com,WMT,2100000.0,638785000000.0,36.3506,-94.2024,False
+b582caa1-65bf-54b6-8dce-93f3e2cff3be,2,SPEL Semiconductor Ltd.,India,Semiconductors,www.natronix.net/spel.htm,SPEL,134.0,,12.7814,80.0678,False
+b5c457c7-afce-57fb-b975-ecd0359b0e79,2,Valid Solucoes SA,Brazil,Professional Business Support Services,https://valid.com/,VLID3,5000.0,421900000.0,-23.5880689,-47.4289633,False
+b6106a2d-0211-5f51-9599-7478f73eebd6,2,"Huapont Life Sciences Co., Ltd.",China,Pharmaceuticals,www.huapont.com.cn,002004,12476.0,,29.720527,106.713478,False
+b6f41d7f-05cf-5ae4-ad66-2dece518f089,2,CapitaLand China Trust (NBB: CLDH F),Singapore,Office REITs,www.clct.com.sg,CAPA,,210525000.0,1.2804,103.8501,False
+b7982555-e7a5-5db9-9b56-5b4304e2d384,2,Flexera Software LLC,United States,Telecommunications Services,www.flexera.com,,1300.0,,41.975882,-88.007957,False
+b7be45fa-caa8-5baa-a166-d745cfc6ce2e,2,Altium Ltd (NBB: ALMF F),Australia,Transaction Processing Services,https://www.altium.com/,ALU,791.0,180223000.0,-33.795176,151.189569,False
+b88b2a73-2e3d-5705-a8c5-23d7ea381195,2,"Beijing Hanyi Innovation Technology Co., Ltd.",China,Professional Business Support Services,www.hanyi.com.cn,301270,360.0,,39.978031,116.290462,False
+b8a3f9d5-c3a7-520e-a2cd-e99465eb127d,2,Intron Technology Holdings Ltd.,Hong Kong,Automobiles,https://www.intron-tech.com/,1760,1540.0,799743941.0,22.380402,114.201801,False
+b8bf7b4b-0fe6-5b73-a5a0-d0c9124808e8,2,JFrog Ltd (NMS: FROG),Israel,Transaction Processing Services,https://www.jfrog.com/,FROG,1400.0,349886000.0,,,False
+b90643bb-51ff-5aec-9d38-a45e75be4442,2,Cellnex Telecom SA (NBB: CLLN Y),Spain,Telecommunications Services,https://www.cellnextelecom.com,CLNX,2850.0,3495180000.0,,,False
+b938f15f-5247-5a23-b624-2007646c1e11,2,Bally's Corp (NYS: BALY),United States,Casinos and Gambling,https://www.ballys.com/,BALY,10500.0,2414092000.0,41.8292272,-71.4127755,False
+b949c627-197b-5769-8874-94ede46410dc,2,Mandiant Inc (NMS: MNDT) (inactive),United States,Transaction Processing Services,www.mandiant.com,MNDT,2335.0,522921000.0,38.958755,-77.357564,False
+ba0b0988-0121-56e0-a907-0ebb03641ae5,2,Rambus Inc. (DE),United States,Telecommunications Services,www.rambus.com,RMBS,623.0,461100000.0,37.4089833,-121.9755796,False
+ba5a6801-925d-5db6-b75a-ef65774eda52,2,Tesec Corp (NBB: TSCB F),Japan,Semiconductors,https://www.tesec.co.jp/,6337,212.0,7512000000.0,35.7584,139.4004,False
+bb572d50-047e-5dbf-ad4d-0706f9a2e811,2,Elan Microelectronics Corp (TAI: 2458),Taiwan,Semiconductors,http://www.emc.com.tw,2458,1064.0,6558933000.0,24.803398,120.967536,False
+bbf277e3-40e2-51ba-874b-37d66be57c10,2,CA Immobilien Anlagen AG,Austria,Real Estate Services,www.caimmo.com,CAIV,370.0,,48.187242,16.389059,False
+bc019251-b15c-537f-9b2b-d28cb4ef419a,2,Ibiden Co Ltd (NBB: IBID F),Japan,Electronic Components,https://www.ibiden.co.jp/,TYO,11380.0,417549000000.0,35.355821,136.61627,False
+bdd8275e-a4d5-5915-b38c-f20799197f92,2,Reply SpA (Italy) (NBB: RPYT F),Italy,Consumer Digital Services,https://www.reply.com/,REY,15090.0,1483803000.0,45.0687,7.6846,False
+be94113c-940b-5f58-a97c-406ba63c0c07,2,Materialise NV (NMS: MTLS),Belgium,Transaction Processing Services,www.materialise.com/en,MTLS,2437.0,277000000.0,50.858047,4.697042,False
+beba1001-5eb5-5c35-9b0a-82eb2666e0ab,2,Hewlett Packard Enterprise Co,United States,Computer Services,https://investors.hpe.com/,HPE,62000.0,29135000000.0,,,False
+bff23647-a83a-57a3-b7cc-582c4225daab,2,Chang Wah Electromaterials Inc (TAI: 8070),Taiwan,Semiconductors,https://www.cwei.com.tw/,8070,2700.0,10941726000.0,22.635852,120.281996,False
+c1828f89-403d-5a9f-897a-e3d4e223b8d7,2,Cohu Inc (NMS: COHU),United States,Machinery: Industrial,www.cohu.com,COHU,3259.0,636322000.0,32.9629,-117.0359,False
+c189d715-420d-5852-a6f9-5c29a3a330f8,2,"Inly Media Co., Ltd.",China,Entertainment,http://www.yinlimedia.com/,603598,697.0,773000000.0,39.9075,116.3975,False
+c1a2037d-3aba-5804-8e00-76cc7483a80c,2,"NDFOS Co., Ltd.",South Korea,Chemicals: Diversified,www.ndfos.com,238090,126.0,,36.934398,127.802626,False
+c1bfc852-c449-527e-88cd-e746a2a97855,2,"By-health Co., Ltd.",China,Personal Products,www.by-health.com,300146,3745.0,1300000000.0,23.135769,113.280821,False
+c21b84f9-2cac-5114-8dd4-5e8b1bd38a86,2,Callidus Software Inc,United States,Transaction Processing Services,www.calliduscloud.com,CALD,1300.0,253091000.0,37.697021,-121.925451,False
+c2d97e8f-b1a3-5eaf-ac0f-f0e0a88ef25c,2,Luminar Technologies Inc,United States,Auto Parts,https://www.luminartech.com/,LAZR,800.0,58791000.0,28.604474,-81.198871,False
+c31850c7-28f3-5c37-b2e0-f80f54306c55,2,Prysmian SpA (NBB: PRYM Y),Italy,Electrical Components,https://www.prysmiangroup.com/,PRY,30350.0,11599000000.0,45.457009,9.192025,False
+c33ad4ef-1a5f-597a-a40b-e4534e0fba6a,2,Microsoft Corp.,United States,Transaction Processing Services,https://www.microsoft.com/en-us,MSFT,221000.0,236580000000.0,47.639402,-122.1276,False
+c3a0209f-75b3-51f1-85eb-b5702a5fad01,2,Mead Johnson Nutrition Co (NYS: MJN) (inactive),United States,Food Products,http://www.meadjohnson.com,MJN,7600.0,3664100000.0,42.078018,-87.822853,False
+c3f6d6ac-4dc9-5c25-a993-ebbad97ea848,2,Doxee SpA,Italy,Transaction Processing Services,https://www.doxee.com/,DOX,183.0,28889233.0,44.647128,10.925877,False
+c43bc361-0e20-5486-9e02-7e416272e32b,2,IDEX Biometrics ASA (NBB: IDXA D),Norway,Electronic Equipment: Control and Filter,https://www.idexbiometrics.com/,IDEX,63.0,3766260.0,59.908575,10.752849,False
+c45e0bed-eb6d-5ec5-b5aa-fc63c30100a6,2,Korea Circuit Co Ltd (NL: ),South Korea,Semiconductors,https://www.kcg.co.kr,007810,1089.0,553161676223.0,37.322224,126.828708,False
+c4f7188f-35bb-5508-80e5-1f231d80d4bc,2,Sigurd Microelectronics Corp.,Taiwan,Computer Hardware,https://www.sigurd.com.tw/,6257,1980.0,533400000.0,24.8666,121.0225,False
+c6102f61-77c2-50f1-9aa9-9e2ec216e8e5,2,"Shenzhen Etmade Automatic Equipment Co., Ltd.",China,Machinery: Industrial,www.etmade.com,300812,1024.0,,22.7102,114.0415,False
+c690c302-aca3-5daf-89f8-523df62d122e,2,Akamai Technologies Inc ,United States,Transaction Processing Services,https://www.akamai.com/,AKAM,10250.0,3880000000.0,42.3654,-71.1035,False
+c7684a2e-4856-5174-b75d-f0f54dbbcb38,2,Advanced Semiconductor Manufacturing Corporation Limited (NL: ),China,Semiconductors,http://www.asmcs.com,,1360.0,741079000.0,31.171595,121.344556,False
+c7ecf94e-876f-5353-bc2b-64f8d219f45f,2,"Zhuhai Bojay Electronics Co., Ltd.",China,Machinery: Industrial,www.zhbojay.com,002975,2454.0,,22.255979,113.537027,False
+c857cf8f-871e-505d-b7f2-12afea7afe40,2,JTP Co Ltd,Japan,Computer Services,https://www.jtp.co.jp/,2488,446.0,6310435000.0,35.6189,139.7304,False
+c8e2a6c5-3f5b-5bb8-b184-4d1f3b89994b,2,Merit Interactive Co. Ltd.,China,Professional Business Support Services,www.getui.com,300766,786.0,5015685.0,30.204783,120.127181,False
+c91c67ed-9029-58ee-b88d-2712d371d85e,2,Central European Media Enterprises Ltd. (NMS: CETV) (inactive),Bermuda,Radio and TV Broadcasters,www.cme.net,CETV,2550.0,644007000.0,50.076979,14.438375,False
+c9b911d0-eeec-5e8f-b83e-1a5780dc7527,2,Resonac Holdings Corp (TOK: 4004),Japan,Chemicals: Diversified,https://www.resonac.com/,4004,23840.0,1392621000000.0,35.657213,139.760628,False
+ca1ebf19-525c-5db3-8524-09224aefa9db,2,MongoDB Inc (NMS: MDB),United States,Transaction Processing Services,https://www.mongodb.com/,MDB,5040.0,1586321000.0,40.760289,-73.985815,False
+caa3c9f2-bee8-502f-9a85-5cabe5e81021,2,Eternal Asia Supply Chain Management Ltd. (SHZ: 002183),China,Industrial Suppliers,www.eascs.com,002183,7307.0,,22.627278,114.108273,False
+caf9cfe3-e1e1-51ae-b677-5314a7867f81,2,"Hangzhou Jizhi Mechatronic Co., Ltd.",China,Machinery: Industrial,www.jz-balancing.com,300553,391.0,,30.32535,120.154479,False
+cafc1171-ddc2-518b-b0a5-3653a78e82c4,2,Vodafone Group Plc (NMS: VOD),United Kingdom,Telecommunications Services,https://www.vodafone.com/,VOD,85890.0,45706000000.0,51.40298,-1.32369,False
+cb014600-be31-51de-8a39-1e5101b9d303,2,"Nanjing Inform Storage Equipment (Group) Co., Ltd.",China,Home Construction,http://www.informrack.com,603066,1410.0,226480000.0,32.049056,118.772847,False
+cb08d2d3-04db-50ed-a204-b93c16a55706,2,Trip.com Group Ltd (NMS: TCOM),Cayman Islands,Travel and Tourism,https://group.trip.com/,TCOM,36250.0,6490000000.0,1.2832,103.8515,False
+cb3df95d-c711-5fc1-9114-227446354121,2,CLS Holdings plc (NBB: CLIH F),United Kingdom,Real Estate Services,https://www.clsholdings.com/,CLI,118.0,139800000.0,51.48993,-0.10778,False
+cb4a9dd6-38cc-5532-9595-b3dc40ef2389,2,Amelia US LLC,United States,Telecommunications Services,www.amelia.ai,,1001.0,,40.7033,-74.0122,False
+cb99e94b-2b29-5858-9bf0-8b7015819cad,2,"Kostecsys Co., Ltd.",South Korea,Semiconductors,http://www.kostec.net,355150,58.0,,37.527788,126.895909,False
+cc073ee2-56c4-562a-9459-c55fe1174c05,2,SK Hynix Inc (KOR: 000660),South Korea,Semiconductors,www.skhynix.com,000660,22139.0,40445066000000.0,37.261503,127.483091,False
+cc28d86a-9708-5ba7-a09d-c6d2e2b8ca07,2,International Business Machines Corp (NYS: IBM),United States,Computer Services,https://www.ibm.com/,IBM,305300.0,61860000000.0,41.108104,-73.714492,False
+ccb54c8d-4c69-5e99-a885-222ac8dbe4e0,2,Manchester United Plc (NYS: MANU),Cayman Islands,Recreational Services,https://www.manutd.com/,MANU,1110.0,600394000.0,53.463071,-2.29134,False
+cd481cdc-b619-5f13-8a06-19339fb44f42,2,Adobe Inc (NMS: ADBE),United States,Transaction Processing Services,www.adobe.com,ADBE,29945.0,19409000000.0,37.333642,-121.895205,False
+cd71cf62-8119-5848-b40b-39c7ab59f4a5,2,Pegasystems Inc,United States,Transaction Processing Services,www.pega.com,PEGA,5406.0,1432616000.0,42.3626,-71.0843,False
+cd88b93c-dcb6-59af-a0df-5636ce32bc09,2,Arteria SA,Poland,Professional Business Support Services,www.arteria.pl,ARRP,827.0,,52.24351,20.97855,False
+ce7c08c0-618b-57af-be2f-cb5ab8b382e7,2,Origin Materials Inc (NAS: ORGN),Cayman Islands,Specialty Chemicals,https://www.originmaterials.com/,ORGN,162.0,33930000.0,38.5639555,-121.5583464,False
+cf902c3b-3fc3-588a-a1d2-166322d79199,2,RadiSys Corp. (NMS: RSYS) (inactive),United States,Computer Hardware,www.radisys.com,RSYS,647.0,109918000.0,45.53893,-122.82406,False
+d0322e59-512c-53c3-b9d7-3bd97b890409,2,"Foxconn Industrial Internet Co., Ltd.",China,Telecommunications Equipment,https://www.fii-foxconn.com/,601138:SHH,191520.0,75827000000.0,22.636176,114.043653,False
+d0398e1d-df30-51ec-8a90-adb9572fc340,2,SignUp Software AB,Sweden,Transaction Processing Services,www.signupsoftware.com,SIGNUP,119.0,,59.3729,17.9975,False
+d03c9ceb-e18d-5b17-b7dd-54f8396f5fae,2,Malam-Team Ltd.,Israel,Transaction Processing Services,https://www.malamteam.com/,MLTM,4800.0,973010000.0,32.0876,34.8875,False
+d05128cd-98be-5553-8d01-458e13b7c07a,2,M-tron Industries Inc (ASE: MPTI),United States,Electrical Components,https://www.mtronpti.com/,MPTI,188.0,39068000.0,28.573779,-81.396526,False
+d0fdb310-e0ff-5da4-8c23-e83cd22cc96c,2,Nokia Oyj,Finland,Telecommunications Services,https://www.nokia.com/,NOA3X,86690.0,25300000000.0,60.205053,24.652009,False
+d22eedbd-249c-503d-b761-8f1bfdf85de5,2,Verisk Analytics Inc (NMS: VRSK),United States,Professional Business Support Services,https://www.verisk.com,VRSK,7500.0,2681400000.0,40.7315,-74.0367,False
+d2c1dbb8-27e3-5899-be12-2493db2b206d,2,Pennant International Group Plc,United Kingdom,Transaction Processing Services,http://www.pennantplc.co.uk/,PEN,140.0,15965000.0,51.8935,-2.15391,False
+d3fb4f31-54ed-57f2-b35d-dbd5284667d2,2,Guangdong Orient Zirconic Industry Science and Technology Co. (SHZ: 002167),China,General Mining,http://www.orientzr.com,002167,1116.0,136000000.0,23.298954,116.59218,False
+d56d56b2-a94a-5981-9a16-9cf7640704a3,2,"FAW Car Co., Ltd. (SHZ: 000800)",China,Automobiles,www.fawjiefang.com.cn,000800,20004.0,,43.8171,125.3235,False
+d5a7a661-bc43-5bdb-bca2-5bfec77f9035,2,Unimicron Technology Corp.,Taiwan,Semiconductors,www.unimicron.com,3037,28584.0,,25.037817,121.395358,False
+d607e7fe-e8ef-51ad-86a5-8f9a2f1abdb2,2,SunEdison Semiconductor Ltd (NMS: SEMI) (inactive),Singapore,Semiconductors,www.gw-semi.com,SEMI,4400.0,747400000.0,1.2797,103.8537,False
+d60a9a70-7668-5142-801c-7e429a132873,2,Rimoni Industries Ltd.,Israel,Diversified Industrials,https://www.rimoni-ind.com,RIMO,334.0,54938282.0,31.942951,35.928371,False
+d66a8c2b-cdf5-545b-a6ae-1676d6c319f6,2,Far Eastone Telecommunications Co Ltd (NL: ),Taiwan,Telecommunications Services,https://corporate.fetnet.net/,4904,7480.0,85320008000.0,25.082372,121.562019,False
+d83b8d38-bc0d-5be0-a748-5db058ecfd7f,2,Orange Polska SA (NBB: PTTW F),Poland,Telecommunications Services,www.orange.pl,OPL,8635.0,11406000000.0,52.2236,20.9921,False
+d8b32b2e-4027-5fcc-b86e-c06016eaf010,2,Microsoft Corporation ,United States,Transaction Processing Services,https://news.microsoft.com/,,10001.0,,47.642455,-122.136732,False
+d8cc4656-b8a1-5150-8098-90b46540cde6,2,IONOS Group SE,Germany,Transaction Processing Services,https://www.ionos-group.com/,IOSX.N:GER,4350.0,1720800000.0,50.4388,7.8269,False
+d8f7fb29-d3bb-5bb2-b71d-e50428ea48b6,2,"Qingmu Digital Technology Co., Ltd.",China,Transaction Processing Services,www.qingmutec.com,301110,2046.0,,23.098959,113.286759,False
+d936f855-152b-50f4-9170-317a3cba4691,2,"Jiangsu Yunyong Electronics & Technology Co., Ltd.",China,Telecommunications Services,www.yytek.com,688060,369.0,,32.465825,119.920426,False
+db11f461-c9f0-5af8-87fa-b83543b68a4b,2,Sealmatic India Ltd.,India,Machinery: Industrial,www.sealmaticindia.com,SEAL,125.0,,19.2653,72.8707,False
+dc276fca-15ad-53ef-b446-75410405bfac,2,Phoenix New Media Ltd (ARC: FENG),Cayman Islands,Media Agencies,www.ifeng.com,FENG,743.0,,39.9907,116.4763,False
+dc3eee8f-1f71-53d6-bc3d-e602e71a20ba,2,AvePoint Inc (NMS: AVPT),United States,Computer Services,apexacquisitioncorp.com,AVPT,2543.0,271825000.0,40.7260798,-74.0362045,False
+dd9c95d7-2af5-549a-a418-b3fc0150405d,2,"Haesung DS Co., Ltd.",South Korea,Semiconductors,www.haesungds.co.kr,195870,1025.0,,37.496251,127.038948,False
+ddf38a5b-bfe8-5d2b-9997-c02165b42fc5,2,Synopsys Inc   (NMS: SNPS),United States,Transaction Processing Services,www.synopsys.com,SNPS,20300.0,6130509000.0,37.396678,-122.0205,False
+de5b1fe2-d3b1-51ce-8bbf-607a55f4b24d,2,Chinasoft International Ltd (NBB: CFTL F),Cayman Islands,Computer Services,https://www.chinasofti.com/,354,69980.0,20005171000.0,40.002021,116.332207,False
+de89cf9b-ac89-5268-a258-260e9e76e620,2,F5 Inc (NMS: FFIV),United States,Computer Services,www.f5.com,FFIV,6524.0,2805388000.0,47.605227,-122.331581,False
+dee75749-90b6-5187-ba3c-322962f420b8,2,TXT e-solutions SpA,Italy,Transaction Processing Services,https://www.txtgroup.com/,TXT,2730.0,277983000.0,45.5316,9.2836,False
+df165615-aaef-5805-beda-a4010f61d723,2,Ruckus Wireless Inc (NYS: RKUS) (inactive),United States,Telecommunications Equipment,https://www.ruckusnetworks.com/,,750.0,391871000.0,37.398144,-122.026371,False
+dfa7251b-cd23-58e0-a546-a40ac012fec2,2,Netflix Inc (NMS: NFLX),United States,Entertainment,www.netflix.com,NFLX,13000.0,33723297000.0,37.235808,-121.973698,False
+e06efce3-ff3f-550e-b1e8-28aa1b49ff70,2,"Russell Co., Ltd.",South Korea,Semiconductors,www.erussell.co.kr,217500,30.0,,36.6215,127.4714,False
+e073211c-215a-5fe7-b6b1-519167297a42,2,"Hangzhou Hikvision Digital Technology Co., Ltd.",China,Telecommunications Services,www.hikvision.com,002415,58544.0,12600000000.0,30.205144,120.168812,False
+e0cc54f7-a4c5-5a5c-b4a3-9293895e7d93,2,Methanex Corp (NMS: MEOH),Canada,Specialty Chemicals,https://www.methanex.com/,MX,1450.0,3787173000.0,49.287545,-123.123096,False
+e15477a3-8145-59e0-9990-84007e103af3,2,Hon Hai Precision Industry Co Ltd (NBB: HNHP F),Taiwan,Computer Hardware,https://www.honhai.com/,2317,1290000.0,5994173882000.0,25.013152,121.444666,False
+e17101f5-34b2-53c9-83c3-925557d7da9c,2,DTS Corp.,Japan,Transaction Processing Services,https://www.dts.co.jp/,9682,5700.0,1067850000.0,35.6730219,139.7704916,False
+e1c58fd4-73a0-56b9-822e-a5ea7371f247,2,Juniper Networks Inc (NYS: JNPR),United States,Telecommunications Equipment,https://www.juniper.net/,JNPR,11140.0,5564500000.0,37.406248,-122.026762,False
+e26e46fe-75cc-5609-af2a-f7a05f5aac7f,2,Glimpse Group Inc (The) (NAS: VRAR),United States,Transaction Processing Services,www.theglimpsegroup.com,VRAR,200.0,11762098.0,40.752351,-73.984434,False
+e322e059-3979-50cb-b52d-89e72da4bc5d,2,Vuzix Corp (NAS: VUZI),United States,Consumer Electronics,https://www.vuzix.com/,VUZI,94.0,13960452.0,43.0581,-77.6238,False
+e323c562-ff9b-5e7e-be37-ef6033ef0643,2,"Wayz Intelligent Manufacturing Technology Co., Ltd.",China,Transaction Processing Services,https://www.wayzim.com/,688211,1760.0,315020000.0,31.57075,120.27722,False
+e387e3db-e404-53e0-a7b4-f6335a2b1090,2,"Enwei Pharmaceutical Co., Ltd.",China,Pharmaceuticals,www.enwei.com.cn,301331,1610.0,,30.58766,104.255667,False
+e4600166-8993-51f3-aa4b-7cf1267e85b9,2,Kopin Corp.,United States,Semiconductors,https://www.kopin.com/,KOPN,144.0,44000901.0,42.2694,-71.6162,False
+e49fdb90-cc25-536a-8d14-bdf602e0dc33,2,SoftBank Group Corp (NBB: SFTB Y),Japan,Telecommunications Services,https://group.softbank/,9984,65350.0,6570439000000.0,35.6586,139.7454,False
+e4c5622d-76fe-552c-bc21-dd80e6013acb,2,Prodea Real Estate Investment Co. SA,Greece,Diversified REITs,https://prodea.gr/,0RDR:LSE,55.0,186778603.0,37.97945,23.71622,False
+e550a031-6682-5ba8-a9ec-2db874ebba9e,2,Huakang Biomedical Holdings Co. Ltd.,Hong Kong,Biotechnology,http://www.huakangbiomedical.com/,8622:HKG,96.0,3426000.0,22.2844,114.1577,False
+e5575bb4-e94c-5975-a9e6-7f8f40cf8078,2,Changlin Co Ltd (SHA: 600710),China,Machinery: Industrial,http://www.changlin.com.cn,,1.0,,,,False
+e590c349-730d-515a-898a-ba3b0aaf6d4e,2,Memiontec Holdings Ltd.,Singapore,Engineering and Contracting Services,http://memiontec.com/,8900,252.0,47738600.0,1.440161,103.797314,False
+e5de7df1-48e0-5415-83ec-3a4fbefcfd43,2,VNET Group Inc (NMS: VNET),Cayman Islands,Computer Services,https://ir.21vianet.com/,VNET,3040.0,7395123000.0,39.948095,116.488474,False
+e6539a0f-04ef-5e1e-b42a-78ea110bc722,2,Tencent Holdings Ltd. (NBB: TCEH Y),Cayman Islands,Consumer Digital Services,https://www.tencent.com/,700,104790.0,554552000000.0,22.5362,113.9454,False
+e66c0b50-6260-54d4-9702-21fd9ec98ca1,2,"Retelit Spa, Milano (NL: )",Italy,Telecommunications Services,,,,82990000.0,,,False
+e670adcc-0332-55b9-a5be-272057941164,2,AMC Networks Inc (NMS: AMCX),United States,Entertainment,www.amcnetworks.com,AMCX,1900.0,2711877000.0,40.7516499,-73.9936142,False
+e6d84a32-86c7-564b-821b-51e70e1d101b,2,"ShanDong Longhua New Material Co., Ltd.",China,Chemicals: Diversified,en.longhuapu.com.cn,301149,358.0,,36.20871,117.53607,False
+e705de2f-380e-5b92-a761-91e72cbc69a0,2,Prinx Chengshan Holdings Ltd.,Hong Kong,Automobiles,http://www.prinxchengshan.com/,1809:HKG,6530.0,1380552150.0,22.2796,114.1595,False
+e7382bce-8398-5824-993f-544130afe691,2,"Zhejiang Wazam New Material Co., Ltd.",China,Computer Hardware,http://www.wazam.com.cn/,603186:SHH,2340.0,529460000.0,30.2741,120.1551,False
+e74a0f45-f487-5dc9-b52e-d9ffd8312003,2,BE Semiconductor Industries NV (NBB: BESI Y),Netherlands,Semiconductors,https://www.besi.com,BESI,1760.0,578862000.0,51.946,6.0033,False
+e8cf70b2-aa1e-5db0-a536-705d23eb4397,2,"Shandong Xiantan Co., Ltd.",China,Food Products,www.sdxiantan.com,002746,7373.0,,37.974368,121.375802,False
+e8d20dae-1174-5b1d-a5ec-820dc61f75c5,2,Triveni Turbine Ltd.,India,Transaction Processing Services,https://www.triveniturbines.com/,TRITURBINE,722.0,235000000.0,28.5672,77.326,False
+e8f78cfd-d42c-5603-9d53-f78819f2cb70,2,Daesung Group Partners Co Ltd (KOR: 005620),South Korea,Gas Distribution,www.daesung.co.kr,005620,37.0,1010077054566.0,37.48496,126.867686,False
+e90becc0-510c-528e-b28a-d209e0df00f7,2,Nielsen Holdings PLC (NYS: NLSN) (inactive),United Kingdom,Media Agencies,www.nielsen.com,NLSN,14500.0,3541000000.0,40.741534,-73.990804,False
+e92a62df-b0a6-5f50-a52d-01eeb58fd04d,2,"TaiSol Electronics Co., Ltd.",Taiwan,Electrical Components,www.taisol.com,3338,3000.0,,25.06773,121.59076,False
+e9f5d372-a2f7-5fe7-bf5f-2054ca54c0bb,2,Strax AB (NL: ),Sweden,Consumer Electronics,https://www.strax.com/,STRAX,67.0,111790000.0,59.332272,18.066029,False
+ea98842e-0580-57f4-af71-a043e9d07493,2,iQIYI Inc (NMS: IQ),Cayman Islands,Entertainment,https://www.iqiyi.com/,IQ,4790.0,4330000000.0,40.079165,116.289118,False
+eb31cb9d-52e8-5e0e-8d88-9a5d9e30402a,2,Rolls-Royce Holdings Plc  (NBB: RYCE Y),United Kingdom,Aerospace,,,,13520000000.0,,,False
+ebd82c1b-a6cb-542e-9cfd-30064725db29,2,Lenovo Group Ltd (NBB: LNVG Y),Hong Kong,Computer Hardware,https://www.lenovo.com,992,69500.0,61946854000.0,39.996415,116.336008,False
+ec10d144-2749-5d99-bf23-412b32e7fb12,2,Hilan Tech Ltd (Israel) (NBB: HLTE F),Israel,Transaction Processing Services,https://www.hilan.co.il/,HLAN,5250.0,828043000.0,32.0853,34.7818,False
+ec346281-2ce7-584a-84a9-32038e64e7db,2,Everspin Technologies Inc,United States,Semiconductors,https://www.everspin.com/,MRAM,74.0,63350000.0,33.30616,-111.964694,False
+ecae8f2c-da60-561e-82ac-2fb1bac67bc7,2,"Shanghai Yongguan Adhesive Products Corp., Ltd.",China,Chemicals: Diversified,http://www.ygtape.com/,603681:SHH,3350.0,893659717.0,,,False
+ed002ad2-c162-5322-9303-76782a6721f4,2,"Encourage Technologies Co., Ltd.",Japan,Transaction Processing Services,https://www.et-x.jp/,3682,122.0,23500000.0,35.678624,139.775146,False
+ed23a4d1-a288-5ccc-b6d6-8e1adf2b937c,2,action press AG,Germany,,https://www.actionpress-ir.de/,AQP1,2.0,0.0,50.153271,8.686127,False
+ee18d673-90c3-5734-8e90-a74220efed63,2,Coherent Corp,United States,Machinery: Industrial,http://www.coherent.com,COHR,27000.0,4629762000.0,40.7464552,-79.8138631,False
+ee9d16d8-ede2-5ebc-b712-6d3b3ab6db28,2,Crown Electrokinetics Corp (NMS: CRKN),United States,Electronic Components,www.crownek.com,CRKN,42.0,,44.586,-123.2895,False
+efb860c0-476c-572a-a4b0-fce2810fc6b9,2,"Fuwei Films (Holdings) Co., Ltd.",China,Paper,www.baijiayun.com,RTC,361.0,82200000.0,32.0617,118.7778,False
+f00da1a1-f8a4-5b26-ab51-0675293af2fd,2,Taiwan Paiho Co Ltd (TAI: 9938),Taiwan,Textile Products,https://www.paiho.com/,9938,4840.0,10629533000.0,24.686338,120.938974,False
+f01bdda9-c51a-5d8f-bb15-6ce65dcf4bd7,2,"Workiva, Inc.",United States,Transaction Processing Services,https://www.workiva.com/,WK,2530.0,655520000.0,42.0215,-93.6465,False
+f06b0eeb-bc89-54cd-8bf8-26bee10f3aac,2,Imagination Technologies Group Plc (LON: IMG) (inactive),United Kingdom,Semiconductors,www.imgtec.com,IMG,3000.0,145213000.0,51.7042,-0.4435,False
+f06eba5d-d32b-56a5-9144-6cefb665e593,2,Almirall SA (NBB: LBTS F),Spain,Pharmaceuticals,www.almirall.es,ALM,1904.0,814489000.0,41.4049661,2.1359241,False
+f24bd95c-6878-5c4b-b17d-0ec5b81834b3,2,"DSP Group, Inc.",United States,Semiconductors,www.dspg.com,DSPG,352.0,138095000.0,37.3688,-121.9234,False
+f2795b52-3198-559e-8cef-ab5253432f3c,2,ADVA Optical Networking SE (NBB: ADVO F),Germany,Telecommunications Equipment,www.adva.com,ADV,2101.0,564958000.0,48.1156,11.5322,False
+f2be22ce-a5b0-5a89-be1a-80ab83251d81,2,Quantenna Communications Inc (NMS: QTNA) (inactive),United States,Semiconductors,www.quantenna.com,QTNA,410.0,233021000.0,37.401782,-121.926256,False
+f34712ae-6fd7-5293-818e-ee5fddc310da,2,TeamViewer SE,Germany,Transaction Processing Services,https://www.teamviewer.com/,TMVX,1550.0,390191000.0,48.6968,9.6551,False
+f6418dc8-05d0-534e-93bf-5538b9967117,2,Orlen SA (NBB: PSKO F),Poland,Oil Equipment and Services,www.orlen.pl,PKN,66554.0,109706000000.0,52.549587,19.706857,False
+f6b7da9d-8532-5db7-878d-9b87b345e948,2,SailPoint Technologies Holdings Inc (NYS: SAIL) (inactive),United States,Transaction Processing Services,www.sailpoint.com,SAIL,1676.0,495409000.0,30.43317,-97.84379,False
+f6c99621-bc2b-5bc6-bfaa-25153238c1bd,2,edyoutec AB,Sweden,Electronic Entertainment,https://www.edyoutec.com,,,,59.824343,17.653033,False
+f7fbdf3c-e3a7-5e63-b01a-b9dcdfcbfe8e,2,Estic Corp (TOK: 6161),Japan,Machinery: Industrial,https://www.estic.co.jp/,6161,215.0,5294631000.0,34.734815,135.560623,False
+f9c21f2d-95e9-51c8-ba97-98dccdc44165,2,Sinch AB (NBB: CLCM F),Sweden,Transaction Processing Services,https://www.sinch.com/,SINCH,3660.0,5035553000.0,59.3256,18.0471,False
+f9e41880-eae3-580b-8dd7-c882ba101f2b,2,WeTrade Group Inc (NAS: WETG),United States,Transaction Processing Services,www.wetradegroup.net,NXTT,35.0,4710833.0,,,False
+fa205d59-282e-537e-aacb-2c34af79fc07,2,Alibaba Group Holding Ltd (NYS: BABA),Cayman Islands,Diversified Retailers,https://www.alibabagroup.com/,BABA,204890.0,927494000000.0,30.30933,120.086823,False
+faa30d43-d098-5ebb-9afd-a698fd699862,2,Atlassian Corp (NMS: TEAM),United Kingdom,Transaction Processing Services,www.atlassian.com,TEAM,10726.0,3892436000.0,37.790802,-122.401944,False
+faf92b9e-c384-5d17-9d07-fbc3c1c725bc,2,Velodyne Lidar Inc (NMS: VLDR) (inactive),United States,Electronic Equipment: Gauges and Meters,velodynelidar.com,VLDR,187.0,44870000.0,37.28128,-121.76919,False
+fb6642fa-1d7a-543e-a050-62c45bea245b,2,"Guangdong Shenling Environmental Systems Co., Ltd.",China,Machinery: Industrial,www.shenling.cn,301018,2404.0,,22.817,113.252,False
+fb687575-6650-57bf-b592-f7bdc87080e9,2,Del Monte Pacific Ltd (Virgin Islands) (NBB: DMPL F),British Virgin Islands,Food Products,https://www.delmontepacific.com,D03,5600.0,2128343000.0,1.2765,103.8435,False
+fbe239e1-e1dc-5f21-bafa-b128b6ddb826,2,ESGL Holdings Ltd (NMS: ESGL),United States,Waste and Disposal Services,esgl.asia,ESGL,125.0,0.0,1.2647,103.6476,False
+fc594c3e-781d-5a7c-a9fc-fb496b788265,2,"Bonree Data Technology Co., Ltd.",China,Transaction Processing Services,https://www.bonree.com/,688229,429.0,20411775.0,39.927996,116.414377,False
+fd0e09ac-0eb1-5c52-8178-fa2099f33e38,2,Tenable Holdings Inc (NMS: TENB),United States,Computer Services,https://www.tenable.com/,TENB,2000.0,798710000.0,39.2078,-76.8544,False
+fdbd7fb4-2fc0-5f64-aa44-54a73280fdcb,2,IREIT Global (NL: ),Singapore,Diversified REITs,www.ireitglobal.com,IREI,10.0,34808000.0,1.275173,103.849184,False
+fdfc7816-6651-5cca-bf2b-a1a58d500a0d,2,DocuSign Inc (NMS: DOCU),United States,Transaction Processing Services,https://www.docusign.com,DOCU,6840.0,2709072000.0,37.7905685,-122.4008688,False
+fe688ecf-a9da-5cb3-a7ec-86539fffcd43,2,ForgeRock Inc,United States,Transaction Processing Services,www.forgerock.com,FORG,923.0,243170000.0,37.7926,-122.3955,False
+fe7a1597-5640-56da-ac31-d531c12bb0c3,2,SportTotal AG (LON: 0NMT),Germany,Radio and TV Broadcasters,https://www.sporttotal.com/,WIG1X,102.0,55500000.0,50.941707,6.969447,False
+fe925bc6-c613-5648-a576-ca5592db2d94,2,"CTC Bio, Inc.",South Korea,Pharmaceuticals,www.ctcbio.com,060590,233.0,,37.183333,126.816667,False
+ff4fb684-d5ac-56c6-8acb-3fec03347bf0,2,KTG Agrar SE (NL: ),Germany,"Farming, Fishing, Ranching and Plantations",www.ktg-agrar.de,7KTG,800.0,377875963.0,52.743103,13.236693,False
+ff791478-3bce-56ef-a0c5-65bc2521e4ef,2,"MYS Group Co., Ltd.",China,Paper,https://www.szmys.com/,002303,4068.0,,22.566217,113.897263,False
+ff85bb3d-ee9a-58b1-ae4a-49e9c124544f,2,Ascential Plc (NBB: AIAP F),United Kingdom,Consumer Digital Services,https://www.ascential.com/,ASCL,703.0,349300000.0,51.517744,-0.117206,False

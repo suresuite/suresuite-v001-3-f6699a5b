@@ -1,0 +1,19 @@
+# Fly.io configuration for sim-worker.
+# Run `fly launch --no-deploy --copy-config` to register the app, then `fly deploy`.
+
+app = "sim-worker"
+primary_region = "iad"   # set this close to your Supabase region
+
+[build]
+
+[env]
+  LOG_LEVEL = "INFO"
+  IDLE_TTL_SECONDS = "600"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
+
+# No public HTTP service — this is a background worker.
+# Health check via a tiny TCP listener inside the worker (optional).

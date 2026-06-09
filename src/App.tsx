@@ -1,0 +1,166 @@
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
+import { AuthProvider } from '@/hooks/useAuth';
+import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
+import { ThemeProvider } from 'next-themes';
+import { Toaster } from '@/components/ui/sonner';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import RoleGuard from '@/components/RoleGuard';
+
+// Import pages
+import Auth from './pages/Auth';
+import DataManager from './pages/DataManager';
+import ProductLevelNetwork from './pages/ProductLevelNetwork';
+import ProcessLevelNetwork from './pages/ProcessLevelNetwork';
+import FirmLevelNetwork from './pages/FirmLevelNetwork';
+import InteractiveNetworkSpace from './pages/InteractiveNetworkSpace';
+import GettingStarted from './pages/GettingStarted';
+import Simulation from './pages/Simulation';
+import ProjectPolicies from './pages/ProjectPolicies';
+import SimulationLab from './pages/SimulationLab';
+import TestProminence from './pages/TestProminence';
+import ProjectIntelligence from './pages/ProjectIntelligence';
+import Profile from './pages/Profile';
+import Forbidden from './pages/Forbidden';
+import About from './pages/About';
+
+const queryClient = new QueryClient();
+
+function App() {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <AuthProvider>
+          <GlobalProjectProvider>
+            <Router>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+              <Route path="/forbidden" element={<Forbidden />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><GettingStarted 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/project-manager"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><DataManager 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/network/firm-level"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><FirmLevelNetwork 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/network/product-level"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><ProductLevelNetwork 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/network/process-level"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><ProcessLevelNetwork 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/network/interactive-space"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><InteractiveNetworkSpace 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/simulation"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><Simulation 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/policies"
+                  element={
+                    <ProtectedRoute>
+                      <RoleGuard><ProjectPolicies isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/simulation-lab"
+                  element={
+                    <ProtectedRoute>
+                      <RoleGuard><SimulationLab isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/project-intelligence"
+                  element={
+                    <ProtectedRoute>
+                    <RoleGuard><ProjectIntelligence 
+                        isCollapsed={isCollapsed} 
+                        setIsCollapsed={setIsCollapsed} 
+                    /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <RoleGuard><Profile isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard>
+                  </ProtectedRoute>
+                }
+              />
+                <Route path="/about" element={<About isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />} />
+                <Route path="/test-prominence" element={<TestProminence />} />
+              </Routes>
+            </Router>
+          </GlobalProjectProvider>
+        </AuthProvider>
+      </ThemeProvider>
+      <Toaster />
+    </QueryClientProvider>
+  );
+}
+
+export default App;

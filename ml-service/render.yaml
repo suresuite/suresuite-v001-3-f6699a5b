@@ -1,0 +1,58 @@
+services:
+  - type: web
+    name: ml-simulation-service
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app.main:app --bind 0.0.0.0:$PORT --worker-class uvicorn.workers.UvicornWorker --workers 2 --timeout 300
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        value: https://wckdrutwkytwcomrlpib.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false  # Set this manually in Render dashboard
+      - key: SERVICE_NAME
+        value: simulation-service
+      - key: SERVICE_VERSION
+        value: 1.0.0
+      - key: DEBUG
+        value: false
+      - key: DEFAULT_SIMULATION_HORIZON_DAYS
+        value: 30
+      - key: DEFAULT_MONTE_CARLO_RUNS
+        value: 1000
+      - key: MAX_MONTE_CARLO_RUNS
+        value: 10000
+      - key: CACHE_TTL_HOURS
+        value: 24
+      - key: MAX_WORKERS
+        value: 4
+      - key: JOB_TIMEOUT_MINUTES
+        value: 30
+      - key: BATCH_SIZE
+        value: 100
+      - key: LOG_LEVEL
+        value: INFO
+      - key: STRUCTURED_LOGGING
+        value: true
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: PYTHONDONTWRITEBYTECODE
+        value: 1
+      - key: SIMULATION_API_KEY
+        sync: false  # Set this manually in Render dashboard
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      # Redis will be automatically configured if you add Redis add-on
+      - key: REDIS_HOST
+        value: localhost
+      - key: REDIS_PORT
+        value: 6379
+      - key: REDIS_DB
+        value: 0
+
+databases:
+  # Optional: Add Redis for caching and job queue
+  - name: redis-cache
+    plan: starter
+    # This will automatically set REDIS_URL environment variable

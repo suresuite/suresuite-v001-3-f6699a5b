@@ -1,0 +1,46 @@
+project_id = "wckdrutwkytwcomrlpib"
+
+[functions.calculate-node-prominence]
+verify_jwt = false
+
+[functions.combine-project]
+verify_jwt = true
+
+[functions.combine-project-into-supply-chain]
+verify_jwt = true
+
+[functions.delete-project]
+verify_jwt = true
+
+[functions.external-simulation-processor]
+verify_jwt = false
+
+[functions.get-multi-tier-network-data]
+verify_jwt = true
+
+[functions.ingest-outbound-logistics]
+verify_jwt = true
+
+[functions.ingest-bom-multi-level]
+verify_jwt = true
+
+[functions.ingest-inbound-logistics]
+verify_jwt = true
+
+[functions.project-ai-chat]
+verify_jwt = false
+
+[functions.project-ai-health]
+verify_jwt = false
+
+[functions.simulation-availability-checker]
+verify_jwt = false
+
+[functions.simulation-runner]
+verify_jwt = false
+
+[functions.simulation-status]
+verify_jwt = false
+
+[functions.delete-simulation-job]
+verify_jwt = false
