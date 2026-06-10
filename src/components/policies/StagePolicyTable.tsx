@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -425,6 +425,17 @@ export function StagePolicyTable({
   const [confirmPrefill, setConfirmPrefill] = useState(false);
   const [applying, setApplying] = useState(false);
 
+  // Whether any row has at least one field backed by real uploaded data.
+  const hasRealProjectData = useMemo(
+    () => dataRows.some((r) => Object.keys((r as any).__from_data ?? {}).length > 0),
+    [dataRows],
+  );
+  // Whether any override already targets a row in this stage.
+  const hasOverridesForStage = useMemo(
+    () => overrides.some((o) => dataRows.some((r) => r.key === o.target_key)),
+    [overrides, dataRows],
+  );
+
   /**
    * Persist the project-data prefill (+ any unsaved edits) as saved override
    * rows for every resolved row in the current stage. Rows still missing a
@@ -477,6 +488,26 @@ export function StagePolicyTable({
       setConfirmPrefill(false);
     }
   };
+
+  // Auto-seed: project data loaded for the first time with no existing overrides.
+  const autoSeedMarkerRef = useRef<string | null>(null);
+  useEffect(() => {
+    const marker = `${projectId}::${stageKey}`;
+    if (autoSeedMarkerRef.current === marker) return;
+    if (loading || applying || dataRows.length === 0) return;
+    if (!hasRealProjectData || hasOverridesForStage) return;
+    autoSeedMarkerRef.current = marker;
+    applyPrefill();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, applying, dataRows, hasRealProjectData, hasOverridesForStage]);
+
+  // Banner state: derived from project data presence + override existence.
+  const dataBannerState = useMemo((): "no_data" | "seeding" | "seeded" | "pending" => {
+    if (!hasRealProjectData) return "no_data";
+    if (applying) return "seeding";
+    if (hasOverridesForStage) return "seeded";
+    return "pending";
+  }, [hasRealProjectData, applying, hasOverridesForStage]);
 
   /** Reset one row: drop drafts + delete all saved overrides on that row. */
   const resetRow = async (rowKey: string) => {
@@ -552,6 +583,39 @@ export function StagePolicyTable({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Project data status banner */}
+      {dataBannerState === "seeded" && (
+        <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+          Policies seeded from your uploaded project data.
+        </div>
+      )}
+      {dataBannerState === "pending" && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/8 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+          <span className="flex-1">Uploaded data has not been applied to policies yet.</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[11px] border-amber-500/40 hover:bg-amber-500/10"
+            onClick={() => setConfirmPrefill(true)}
+          >
+            Apply now
+          </Button>
+        </div>
+      )}
+      {dataBannerState === "seeding" && (
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 animate-pulse" />
+          Seeding policies from project data…
+        </div>
+      )}
+      {dataBannerState === "no_data" && !loading && (
+        <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+          No uploaded project data found — using default values.
+        </div>
+      )}
       {/* GitHub-style toolbar: dense, single line, sticky-feeling chrome. */}
       <div className="flex items-center gap-2 flex-wrap rounded-md border bg-muted/30 px-3 py-2">
         <span className="text-[11px] text-muted-foreground">
