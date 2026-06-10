@@ -3,13 +3,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2 } from "lucide-react";
 import type { Scenario } from "@/hooks/useScenarios";
+import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
 
 interface Props {
   value: Scenario["disruption_schedule"];
   onChange: (next: Scenario["disruption_schedule"]) => void;
+  projectId?: string | null;
 }
 
-export function DisruptionScheduleEditor({ value, onChange }: Props) {
+export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) {
+  const { unit, fromDays, toDays } = useTimeUnit(projectId);
+  const unitPlural = UNIT_LABEL_PLURAL[unit ?? "day"];
+
   const add = () =>
     onChange([
       ...value,
@@ -50,21 +55,21 @@ export function DisruptionScheduleEditor({ value, onChange }: Props) {
             </select>
           </div>
           <div className="col-span-2 flex flex-col gap-1">
-            <Label className="text-[10px]">Start (day)</Label>
+            <Label className="text-[10px]">Start ({unitPlural})</Label>
             <Input
               className="h-8"
               type="number"
-              value={d.start_day}
-              onChange={(e) => update(i, { start_day: +e.target.value })}
+              value={Math.round(fromDays(d.start_day))}
+              onChange={(e) => update(i, { start_day: Math.round(toDays(+e.target.value)) })}
             />
           </div>
           <div className="col-span-2 flex flex-col gap-1">
-            <Label className="text-[10px]">Duration (d)</Label>
+            <Label className="text-[10px]">Duration ({unitPlural})</Label>
             <Input
               className="h-8"
               type="number"
-              value={d.duration_days}
-              onChange={(e) => update(i, { duration_days: +e.target.value })}
+              value={Math.round(fromDays(d.duration_days))}
+              onChange={(e) => update(i, { duration_days: Math.round(toDays(+e.target.value)) })}
             />
           </div>
           <div className="col-span-2 flex flex-col gap-1">

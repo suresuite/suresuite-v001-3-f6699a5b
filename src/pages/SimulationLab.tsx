@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { ProjectSelector } from "@/components/shared";
-import { BookOpen, Play, Zap } from "lucide-react";
+import { BookOpen, Play } from "lucide-react";
 import { toast } from "sonner";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjects } from "@/hooks/useProjects";
@@ -20,9 +20,7 @@ import { ScenarioLibraryPanel } from "@/components/sim/ScenarioLibraryPanel";
 import { RunProgressPanel } from "@/components/sim/RunProgressPanel";
 import { ResultsDashboard } from "@/components/sim/ResultsDashboard";
 import { CompareScenariosPanel } from "@/components/sim/CompareScenariosPanel";
-import { ExperimentDesigner } from "@/components/sim/ExperimentDesigner";
 import { DisruptionRecoveryPane } from "@/components/sim/DisruptionRecoveryPane";
-import { DisruptionDialog } from "@/components/DisruptionDialog";
 import type { RecoveryConfig } from "@/lib/sim/recoveryScore";
 
 interface Props {
@@ -30,7 +28,7 @@ interface Props {
   setIsCollapsed: (c: boolean) => void;
 }
 
-type Pane = "setup" | "recovery" | "run" | "results" | "compare" | "experiments";
+type Pane = "setup" | "recovery" | "run" | "results" | "compare";
 
 export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [searchParams] = useSearchParams();
@@ -43,7 +41,6 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>("setup");
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [disruptionOpen, setDisruptionOpen] = useState(false);
 
   // If navigated from a network page with ?scenario_id=XYZ, auto-select that scenario
   // and jump to the recovery pane so the user sees the pre-filled disruption.
@@ -59,7 +56,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // Auto-select first scenario when list loads (if nothing pre-selected from URL)
   useEffect(() => {
     const paramId = searchParams.get("scenario_id");
-    if (paramId) return; // URL param takes precedence
+    if (paramId) return;
     if (!selectedId && scenarios.length > 0) setSelectedId(scenarios[0].id);
     if (selectedId && !scenarios.find((s) => s.id === selectedId)) {
       setSelectedId(scenarios[0]?.id ?? null);
@@ -108,17 +105,39 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className="px-12 py-8">
         <PageHeader
           title="Simulation Lab"
           subtitle="Scenarios, replications, warm-up auto-detection, and utilization-first KPIs."
           rightContent={
-            <ProjectSelector
-              projects={projects as any}
-              selectedProjectId={projectId}
-              onProjectSelect={setGlobalSelectedProjectId}
-              className="w-[260px] h-8"
-            />
+            <div className="flex items-center gap-2">
+              {selected && (
+                <Button
+                  size="sm"
+                  className="h-9 gap-1.5 text-xs"
+                  onClick={handleRun}
+                >
+                  <Play className="h-3 w-3" />
+                  Run
+                </Button>
+              )}
+              <Select
+                value={projectId || ""}
+                onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
+              >
+                <SelectTrigger className="w-[200px] h-9">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {projects.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           }
         />
 
@@ -157,22 +176,11 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   className="justify-start flex-1"
                 >
                   <ToggleGroupItem value="setup" className="text-xs">Setup</ToggleGroupItem>
-                  <ToggleGroupItem value="recovery" className="text-xs">Disruptions &amp; Recovery</ToggleGroupItem>
+                  <ToggleGroupItem value="recovery" className="text-xs">Recovery playbook</ToggleGroupItem>
                   <ToggleGroupItem value="run" className="text-xs">Run</ToggleGroupItem>
                   <ToggleGroupItem value="results" className="text-xs">Results</ToggleGroupItem>
                   <ToggleGroupItem value="compare" className="text-xs">Compare</ToggleGroupItem>
-                  <ToggleGroupItem value="experiments" className="text-xs">Experiments</ToggleGroupItem>
                 </ToggleGroup>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 text-xs"
-                  onClick={() => setDisruptionOpen(true)}
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  Add disruption
-                </Button>
 
                 <Button
                   variant="outline"
@@ -183,18 +191,6 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   <BookOpen className="h-3.5 w-3.5" />
                   Browse library
                 </Button>
-
-                {selected && (
-                  <Button
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs"
-                    onClick={handleRun}
-                    disabled={!selected}
-                  >
-                    <Play className="h-3 w-3" />
-                    Run
-                  </Button>
-                )}
               </div>
 
               {/* From-network badge */}
@@ -218,6 +214,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
               ) : pane === "setup" ? (
                 <ScenarioSetupForm
                   scenario={selected}
+                  projectId={projectId}
                   onSave={(patch) => update(selected.id, patch)}
                 />
               ) : pane === "recovery" ? (
@@ -235,10 +232,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                 />
               ) : pane === "results" ? (
                 <ResultsDashboard run={latestRun} reps={reps} primaryKpi={selected.primary_kpi} scenario={selected} />
-              ) : pane === "compare" ? (
-                <CompareScenariosPanel />
               ) : (
-                <ExperimentDesigner />
+                <CompareScenariosPanel />
               )}
             </div>
           </div>
@@ -254,18 +249,6 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
             setSelectedId(id);
             setPane("recovery");
           }}
-        />
-      )}
-
-      {projectId && (
-        <DisruptionDialog
-          open={disruptionOpen}
-          onOpenChange={setDisruptionOpen}
-          nodeId={null}
-          projectId={projectId}
-          plantName={projects.find((p: any) => p.id === projectId)?.plant_name ?? "Project"}
-          connectedEdges={[]}
-          onSuccess={() => setPane("recovery")}
         />
       )}
     </PageLayout>

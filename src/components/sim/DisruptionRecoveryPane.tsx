@@ -7,19 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { DisruptionScheduleEditor } from "./DisruptionScheduleEditor";
-import { RecoveryImpactCard } from "./RecoveryImpactCard";
 import { PlaybookPicker } from "./PlaybookPicker";
 import { RecoveryResponse } from "@/lib/policies/schemas";
 import {
   RESPONSE_LABELS,
   RESPONSE_WEIGHTS,
   type RecoveryConfig,
-  type DisruptionEvent,
   type RecoveryResponseKey,
 } from "@/lib/sim/recoveryScore";
 import type { Scenario } from "@/hooks/useScenarios";
 import { useRecoveryPlaybooks, type RecoveryPlaybook } from "@/hooks/useRecoveryPlaybooks";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
+import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { supabase } from "@/integrations/supabase/client";
 import { ShieldCheck } from "lucide-react";
 
@@ -32,7 +31,16 @@ interface Props {
   onSave: (patch: Partial<ScenarioWithPlaybook>) => void;
 }
 
-const FIELD_DEFS: Array<{
+const STRATEGY_FIELDS: Partial<Record<RecoveryResponseKey, (keyof RecoveryConfig)[]>> = {
+  reroute: ["detection_lag_days", "recovery_target_days"],
+  mode_shift: ["detection_lag_days", "cost_cap"],
+  safety_stock_drawdown: ["trigger_magnitude_pct", "recovery_target_days"],
+  dual_source_activate: ["trigger_magnitude_pct", "trigger_duration_days", "cost_cap"],
+  capacity_flex: ["trigger_magnitude_pct", "recovery_target_days", "cost_cap"],
+  demand_shaping: ["trigger_magnitude_pct", "recovery_target_days"],
+};
+
+const ALL_FIELD_DEFS: Array<{
   key: keyof RecoveryConfig;
   label: string;
   step?: string;
@@ -85,6 +93,7 @@ function shallowEqualConfig(a: Record<string, unknown>, b: Record<string, unknow
 
 export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Props) {
   const { globalSelectedProjectId: projectId } = useGlobalProject();
+  const { adaptLabel } = useTimeUnit(projectId);
   const { playbooks, create: createPlaybook, update: updatePlaybook, remove: removePlaybook } =
     useRecoveryPlaybooks(projectId);
   const overrides = (scenario.recovery_overrides ?? {}) as Record<string, unknown>;
@@ -106,7 +115,6 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
     );
   }, [selectedPlaybook, overrides]);
 
-
   const patchOverride = (key: keyof RecoveryConfig, val: unknown) => {
     onSave({ recovery_overrides: { ...overrides, [key]: val } });
   };
@@ -122,6 +130,15 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
   const activeResponses = new Set<string>(
     (overrides.response as string[]) ?? effective.response ?? [],
   );
+
+  const visibleFields = useMemo(() => {
+    const responses = ((overrides.response as string[]) ?? effective.response ?? []) as RecoveryResponseKey[];
+    const seen = new Set<keyof RecoveryConfig>();
+    for (const opt of responses) {
+      for (const f of STRATEGY_FIELDS[opt] ?? []) seen.add(f);
+    }
+    return ALL_FIELD_DEFS.filter((f) => seen.has(f.key));
+  }, [overrides.response, effective.response]);
 
   const overriddenFields = Object.entries(overrides).filter(
     ([, v]) => v !== undefined && v !== null,
@@ -179,7 +196,6 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
     }
   };
 
-  // Determine if signed-in user owns the selected playbook (for "Save changes"/Delete)
   const [uid, setUid] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -204,95 +220,100 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
           <DisruptionScheduleEditor
             value={scenario.disruption_schedule}
             onChange={(v) => onSave({ disruption_schedule: v })}
+            projectId={projectId}
           />
         </CardContent>
       </Card>
 
-      {/* Split: playbook editor | live preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-primary" />
-                  Recovery playbook
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Overrides project defaults for this scenario only.
-                </CardDescription>
-              </div>
-              {overriddenFields > 0 && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {overriddenFields} override{overriddenFields > 1 ? "s" : ""}
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <PlaybookPicker
-              playbooks={playbooks}
-              selectedId={scenario.recovery_playbook_id ?? null}
-              modified={modified}
-              onSelect={handleSelectPlaybook}
-              onSaveAs={handleSaveAs}
-              onSaveChanges={handleSaveChanges}
-              onResetToPlaybook={handleReset}
-              onDelete={handleDelete}
-              canEditSelected={canEditSelected}
-            />
-
-            {/* enable switch */}
-            <div className="flex items-center justify-between rounded-sm border border-border/60 bg-muted/20 px-3 py-2">
-              <div>
-                <div className="text-xs font-medium">Recovery enabled</div>
-                <div className="text-[10px] text-muted-foreground">
-                  When off, disruptions hit raw — no mitigation runs.
-                </div>
-              </div>
-              <Switch
-                checked={effective.enabled}
-                onCheckedChange={(v) => patchOverride("enabled", v)}
-              />
-            </div>
-
-            {/* response mix */}
+      {/* Recovery playbook — single column */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-2">
             <div>
-              <Label className="text-xs mb-2 block">Response actions</Label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {RecoveryResponse.options.map((opt) => {
-                  const active = activeResponses.has(opt);
-                  const weight = RESPONSE_WEIGHTS[opt as RecoveryResponseKey];
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => toggleResponse(opt as RecoveryResponseKey)}
-                      className={
-                        "flex items-center justify-between text-left text-xs border px-2 py-1.5 rounded-sm transition-colors " +
-                        (active
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border hover:border-foreground/40 text-muted-foreground")
-                      }
-                    >
-                      <span>{RESPONSE_LABELS[opt as RecoveryResponseKey]}</span>
-                      <span className="font-mono text-[10px] opacity-70">
-                        +{weight.toFixed(2)}
-                      </span>
-                    </button>
-                  );
-                })}
+              <CardTitle className="text-sm flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                Recovery playbook
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Overrides project defaults for this scenario only.
+              </CardDescription>
+            </div>
+            {overriddenFields > 0 && (
+              <Badge variant="secondary" className="text-[10px]">
+                {overriddenFields} override{overriddenFields > 1 ? "s" : ""}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <PlaybookPicker
+            playbooks={playbooks}
+            selectedId={scenario.recovery_playbook_id ?? null}
+            modified={modified}
+            onSelect={handleSelectPlaybook}
+            onSaveAs={handleSaveAs}
+            onSaveChanges={handleSaveChanges}
+            onResetToPlaybook={handleReset}
+            onDelete={handleDelete}
+            canEditSelected={canEditSelected}
+          />
+
+          {/* enable switch */}
+          <div className="flex items-center justify-between rounded-sm border border-border/60 bg-muted/20 px-3 py-2">
+            <div>
+              <div className="text-xs font-medium">Recovery enabled</div>
+              <div className="text-[10px] text-muted-foreground">
+                When off, disruptions hit raw — no mitigation runs.
               </div>
             </div>
+            <Switch
+              checked={effective.enabled}
+              onCheckedChange={(v) => patchOverride("enabled", v)}
+            />
+          </div>
 
-            <Separator />
+          {/* response mix */}
+          <div>
+            <Label className="text-xs mb-2 block">Response actions</Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {RecoveryResponse.options.map((opt) => {
+                const active = activeResponses.has(opt);
+                const weight = RESPONSE_WEIGHTS[opt as RecoveryResponseKey];
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => toggleResponse(opt as RecoveryResponseKey)}
+                    className={
+                      "flex items-center justify-between text-left text-xs border px-2 py-1.5 rounded-sm transition-colors " +
+                      (active
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border hover:border-foreground/40 text-muted-foreground")
+                    }
+                  >
+                    <span>{RESPONSE_LABELS[opt as RecoveryResponseKey]}</span>
+                    <span className="font-mono text-[10px] opacity-70">
+                      +{weight.toFixed(2)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            {/* numeric params */}
+          <Separator />
+
+          {/* strategy-gated parameters */}
+          {visibleFields.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Pick one or more response strategies above to configure their parameters.
+            </p>
+          ) : (
             <div className="grid grid-cols-2 gap-3">
-              {FIELD_DEFS.map((f) => (
+              {visibleFields.map((f) => (
                 <div key={f.key} className="flex flex-col gap-1">
                   <Label className="text-[11px]" title={f.hint}>
-                    {f.label}
+                    {adaptLabel(f.label)}
                   </Label>
                   <Input
                     type="number"
@@ -304,29 +325,17 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
                 </div>
               ))}
             </div>
+          )}
 
-            <p className="text-[10px] text-muted-foreground">
-              Tip: project-wide defaults live in{" "}
-              <a href="/policies" className="underline hover:text-foreground">
-                Supply chain policies
-              </a>
-              . Empty fields here fall back to those defaults.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Live impact preview — uses the same scoring function as the actual run */}
-        <div className="flex flex-col gap-2">
-          <RecoveryImpactCard
-            recovery={effective}
-            disruptions={(scenario.disruption_schedule ?? []) as DisruptionEvent[]}
-            horizonDays={scenario.horizon_days ?? 90}
-          />
-          <p className="text-[10px] text-muted-foreground px-1">
-            Preview computed from a closed-form model. Actual run will refine these numbers with full replications.
+          <p className="text-[10px] text-muted-foreground">
+            Tip: project-wide defaults live in{" "}
+            <a href="/policies" className="underline hover:text-foreground">
+              Supply chain policies
+            </a>
+            . Empty fields here fall back to those defaults.
           </p>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
