@@ -14,187 +14,167 @@ export type Database = {
   }
   public: {
     Tables: {
-      asset_assignments: {
+      comments: {
         Row: {
-          asset_id: string
-          assigned_date: string
           created_at: string
-          employee_id: string
           id: string
-          notes: string | null
-          returned_date: string | null
+          request_id: string
+          text: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          asset_id: string
-          assigned_date?: string
           created_at?: string
-          employee_id: string
           id?: string
-          notes?: string | null
-          returned_date?: string | null
+          request_id: string
+          text: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          asset_id?: string
-          assigned_date?: string
           created_at?: string
-          employee_id?: string
           id?: string
-          notes?: string | null
-          returned_date?: string | null
+          request_id?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "asset_assignments_asset_id_fkey"
-            columns: ["asset_id"]
+            foreignKeyName: "comments_request_id_fkey"
+            columns: ["request_id"]
             isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asset_assignments_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
+            referencedRelation: "feature_requests"
             referencedColumns: ["id"]
           },
         ]
       }
-      asset_categories: {
+      feature_requests: {
         Row: {
+          category: string | null
           created_at: string
-          default_useful_life_years: number
+          description: string
           id: string
-          name: string
-          residual_value_percent: number
+          status: string
+          submitter_id: string
+          title: string
+          updated_at: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
-          default_useful_life_years?: number
+          description: string
           id?: string
-          name: string
-          residual_value_percent?: number
+          status?: string
+          submitter_id: string
+          title: string
+          updated_at?: string
         }
         Update: {
+          category?: string | null
           created_at?: string
-          default_useful_life_years?: number
+          description?: string
           id?: string
-          name?: string
-          residual_value_percent?: number
+          status?: string
+          submitter_id?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
-      assets: {
+      profiles: {
         Row: {
-          category_id: string | null
-          condition: Database["public"]["Enums"]["asset_condition"]
+          avatar_url: string | null
           created_at: string
-          created_by: string | null
-          id: string
-          is_archived: boolean
-          location: string | null
-          name: string
-          notes: string | null
-          purchase_cost: number
-          purchase_date: string
-          residual_value_percent: number
-          serial_number: string | null
-          updated_at: string
-          useful_life_years: number
-        }
-        Insert: {
-          category_id?: string | null
-          condition?: Database["public"]["Enums"]["asset_condition"]
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_archived?: boolean
-          location?: string | null
-          name: string
-          notes?: string | null
-          purchase_cost?: number
-          purchase_date: string
-          residual_value_percent?: number
-          serial_number?: string | null
-          updated_at?: string
-          useful_life_years?: number
-        }
-        Update: {
-          category_id?: string | null
-          condition?: Database["public"]["Enums"]["asset_condition"]
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_archived?: boolean
-          location?: string | null
-          name?: string
-          notes?: string | null
-          purchase_cost?: number
-          purchase_date?: string
-          residual_value_percent?: number
-          serial_number?: string | null
-          updated_at?: string
-          useful_life_years?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "assets_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "asset_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      employees: {
-        Row: {
-          created_at: string
-          department: string | null
           email: string | null
           id: string
-          name: string
+          name: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
-          department?: string | null
           email?: string | null
           id?: string
-          name: string
+          name?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
-          department?: string | null
           email?: string | null
           id?: string
-          name?: string
+          name?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       user_roles: {
         Row: {
-          created_at: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
-          created_at?: string | null
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
-          created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
       }
+      votes: {
+        Row: {
+          created_at: string
+          id: string
+          request_id: string
+          user_id: string
+          vote_type: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          request_id: string
+          user_id: string
+          vote_type?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          request_id?: string
+          user_id?: string
+          vote_type?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "feature_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_vote_counts: {
+        Args: never
+        Returns: {
+          down_count: number
+          request_id: string
+          up_count: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -205,7 +185,6 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
-      asset_condition: "excellent" | "good" | "fair" | "poor" | "retired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -334,7 +313,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
-      asset_condition: ["excellent", "good", "fair", "poor", "retired"],
     },
   },
 } as const
