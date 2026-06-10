@@ -86,6 +86,18 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
         message: `Supplier "${r.supplier_id}" has no positive lead time.`,
       });
     }
+    const price = (eff.sourcing as any).material_price ?? 0;
+    if (!has(price) || price <= 0) {
+      out.push({
+        id: `s-price-${r.key}`,
+        severity: "warn",
+        stage: "supplier",
+        rowKey: String(r.key),
+        field: "material_price",
+        message: `Material "${r.material_id}" has no unit price — cost calculations will be zero.`,
+        hint: "Set a material price so the simulation can compute total supply cost.",
+      });
+    }
     const sigma = (eff.transport as any).lead_time_std_days ?? 0;
     if (has(lt) && lt > 0 && sigma >= lt * 3) {
       out.push({
@@ -213,6 +225,16 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
         rowKey: String(r.key),
         field: "price",
         message: `Negative price for "${r.product_id}".`,
+      });
+    } else if (price === 0 && mean > 0) {
+      out.push({
+        id: `c-price-zero-${r.key}`,
+        severity: "warn",
+        stage: "customer",
+        rowKey: String(r.key),
+        field: "price",
+        message: `Customer "${r.customer_id}" has demand but zero selling price — revenue will be zero.`,
+        hint: "Set a unit price so the simulation can compute revenue and profit KPIs.",
       });
     }
     const cp = `${r.customer_id}::${r.product_id}`;
