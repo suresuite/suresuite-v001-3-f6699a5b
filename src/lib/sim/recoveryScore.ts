@@ -13,11 +13,19 @@ export type RecoveryResponseKey =
 export interface RecoveryConfig {
   enabled: boolean;
   response: RecoveryResponseKey[];
-  detection_lag_days: number;
-  trigger_magnitude_pct: number;
-  trigger_duration_days: number;
-  recovery_target_days: number;
-  cost_cap: number;
+  // legacy generic fields (kept for backward compat with scoring function)
+  detection_lag_days?: number;
+  trigger_magnitude_pct?: number;
+  trigger_duration_days?: number;
+  recovery_target_days?: number;
+  cost_cap?: number;
+  // per-strategy params (from research model)
+  backup_lead_time_weeks?: number;    // dual_source_activate: Ts' default 6
+  holding_cost_pct?: number;          // safety_stock_drawdown: hm default 20%
+  overtime_cost_pct?: number;         // capacity_flex: Cop default 5%
+  allocation_horizon_weeks?: number;  // demand_shaping: W default 4
+  annual_labor_cost?: number;         // demand_shaping: Calc default 6240
+  expedite_cost_pct?: number;         // mode_shift: Cexp default 3%
 }
 
 export interface DisruptionEvent {
@@ -37,12 +45,12 @@ export const RESPONSE_WEIGHTS: Record<RecoveryResponseKey, number> = {
 };
 
 export const RESPONSE_LABELS: Record<RecoveryResponseKey, string> = {
-  reroute: "Reroute",
-  dual_source_activate: "Activate dual source",
-  safety_stock_drawdown: "Safety-stock drawdown",
-  mode_shift: "Mode shift",
-  capacity_flex: "Capacity flex",
-  demand_shaping: "Demand shaping",
+  dual_source_activate: "Backup supplier",
+  safety_stock_drawdown: "Safety stock",
+  capacity_flex: "Overtime production",
+  demand_shaping: "Material reallocation",
+  mode_shift: "Expedite shipments",
+  reroute: "Network rerouting",
 };
 
 // per-class utilization deltas when recovery is active

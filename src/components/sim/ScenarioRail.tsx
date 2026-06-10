@@ -29,8 +29,14 @@ export function ScenarioRail({
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Scenarios
         </span>
-        <Button size="sm" variant="ghost" className="h-7 px-2 gap-1" onClick={onCreate}>
-          <Plus className="h-3.5 w-3.5" /> New
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          onClick={onCreate}
+          title="New scenario"
+        >
+          <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
       <ScrollArea className="flex-1">
