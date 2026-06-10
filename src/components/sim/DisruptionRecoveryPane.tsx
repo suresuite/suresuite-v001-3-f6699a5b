@@ -4,21 +4,19 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { DisruptionScheduleEditor } from "./DisruptionScheduleEditor";
 import { PlaybookPicker } from "./PlaybookPicker";
 import { RecoveryResponse } from "@/lib/policies/schemas";
 import {
   RESPONSE_LABELS,
-  RESPONSE_WEIGHTS,
   type RecoveryConfig,
   type RecoveryResponseKey,
 } from "@/lib/sim/recoveryScore";
 import type { Scenario } from "@/hooks/useScenarios";
 import { useRecoveryPlaybooks, type RecoveryPlaybook } from "@/hooks/useRecoveryPlaybooks";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
-import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { supabase } from "@/integrations/supabase/client";
 import { ShieldCheck } from "lucide-react";
 
@@ -31,36 +29,83 @@ interface Props {
   onSave: (patch: Partial<ScenarioWithPlaybook>) => void;
 }
 
-const STRATEGY_FIELDS: Partial<Record<RecoveryResponseKey, (keyof RecoveryConfig)[]>> = {
-  reroute: ["detection_lag_days", "recovery_target_days"],
-  mode_shift: ["detection_lag_days", "cost_cap"],
-  safety_stock_drawdown: ["trigger_magnitude_pct", "recovery_target_days"],
-  dual_source_activate: ["trigger_magnitude_pct", "trigger_duration_days", "cost_cap"],
-  capacity_flex: ["trigger_magnitude_pct", "recovery_target_days", "cost_cap"],
-  demand_shaping: ["trigger_magnitude_pct", "recovery_target_days"],
-};
-
-const ALL_FIELD_DEFS: Array<{
+interface StrategyParamDef {
   key: keyof RecoveryConfig;
   label: string;
+  unit: string;
+  default: number;
   step?: string;
   hint?: string;
-}> = [
-  { key: "trigger_magnitude_pct", label: "Trigger magnitude (%)", hint: "Disruption severity needed to activate the playbook" },
-  { key: "trigger_duration_days", label: "Trigger duration (days)", hint: "How long the disruption must persist before activating" },
-  { key: "detection_lag_days", label: "Detection lag (days)", step: "0.5", hint: "Days between disruption start and response kick-off" },
-  { key: "recovery_target_days", label: "Recovery target (days)", hint: "Ramp-back window after the disruption clears" },
-  { key: "cost_cap", label: "Cost cap ($)", hint: "Maximum spend on recovery actions per disruption" },
-];
+}
+
+const STRATEGY_PARAMS: Partial<Record<RecoveryResponseKey, StrategyParamDef[]>> = {
+  dual_source_activate: [
+    {
+      key: "backup_lead_time_weeks",
+      label: "Backup supplier lead time",
+      unit: "weeks",
+      default: 6,
+      hint: "Standard lead time assumed for all backup suppliers (Ts')",
+    },
+  ],
+  safety_stock_drawdown: [
+    {
+      key: "holding_cost_pct",
+      label: "Annual holding cost",
+      unit: "% of material cost",
+      default: 20,
+      hint: "Inventory carrying cost as a percentage of material value per year (hm)",
+    },
+  ],
+  capacity_flex: [
+    {
+      key: "overtime_cost_pct",
+      label: "Overtime cost",
+      unit: "% of product price",
+      default: 5,
+      hint: "Additional cost per unit produced during overtime shifts (Cop)",
+    },
+  ],
+  demand_shaping: [
+    {
+      key: "allocation_horizon_weeks",
+      label: "Planning horizon",
+      unit: "weeks",
+      default: 4,
+      hint: "Rolling window for the material-allocation LP (W)",
+    },
+    {
+      key: "annual_labor_cost",
+      label: "Annual planning labor cost",
+      unit: "€",
+      default: 6240,
+      hint: "Indirect labor cost for supply chain allocation team — 208 h/yr (Calc)",
+    },
+  ],
+  mode_shift: [
+    {
+      key: "expedite_cost_pct",
+      label: "Expedite cost",
+      unit: "% of material cost per order",
+      default: 3,
+      hint: "Premium to accelerate in-transit materials to the current week (Cexp)",
+    },
+  ],
+  reroute: [],
+};
+
+const STRATEGY_DESCRIPTIONS: Record<RecoveryResponseKey, string> = {
+  dual_source_activate: "Release orders to a predefined backup supplier when the primary is disrupted",
+  safety_stock_drawdown: "ABC-XYZ classified buffer stock protects against deep disruptions; incurs annual holding cost",
+  capacity_flex: "Activate overtime shifts when the revenue gain exceeds the overtime cost",
+  demand_shaping: "Revenue-maximising material allocation LP over a rolling planning horizon",
+  mode_shift: "Accelerate in-transit shipments when expedite revenue exceeds expedite cost",
+  reroute: "Redirect flows through alternative network paths",
+};
 
 const DEFAULT_RECOVERY: RecoveryConfig = {
   enabled: true,
   response: [],
-  detection_lag_days: 1,
-  trigger_magnitude_pct: 25,
-  trigger_duration_days: 2,
-  recovery_target_days: 21,
-  cost_cap: 25000,
 };
 
 function mergeRecovery(
@@ -93,7 +138,6 @@ function shallowEqualConfig(a: Record<string, unknown>, b: Record<string, unknow
 
 export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Props) {
   const { globalSelectedProjectId: projectId } = useGlobalProject();
-  const { adaptLabel } = useTimeUnit(projectId);
   const { playbooks, create: createPlaybook, update: updatePlaybook, remove: removePlaybook } =
     useRecoveryPlaybooks(projectId);
   const overrides = (scenario.recovery_overrides ?? {}) as Record<string, unknown>;
@@ -130,15 +174,6 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
   const activeResponses = new Set<string>(
     (overrides.response as string[]) ?? effective.response ?? [],
   );
-
-  const visibleFields = useMemo(() => {
-    const responses = ((overrides.response as string[]) ?? effective.response ?? []) as RecoveryResponseKey[];
-    const seen = new Set<keyof RecoveryConfig>();
-    for (const opt of responses) {
-      for (const f of STRATEGY_FIELDS[opt] ?? []) seen.add(f);
-    }
-    return ALL_FIELD_DEFS.filter((f) => seen.has(f.key));
-  }, [overrides.response, effective.response]);
 
   const overriddenFields = Object.entries(overrides).filter(
     ([, v]) => v !== undefined && v !== null,
@@ -206,14 +241,24 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
   }, []);
   const canEditSelected = !!selectedPlaybook && !selectedPlaybook.is_system && selectedPlaybook.created_by === uid;
 
+  // Ordered list: paper strategies first, then reroute
+  const strategyOrder: RecoveryResponseKey[] = [
+    "dual_source_activate",
+    "safety_stock_drawdown",
+    "capacity_flex",
+    "demand_shaping",
+    "mode_shift",
+    "reroute",
+  ];
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Disruption timeline — full width */}
+      {/* Disruption timeline */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Disruption schedule</CardTitle>
           <CardDescription className="text-xs">
-            Schedule shocks across the horizon. The Recovery playbook below decides how the network responds.
+            Schedule shocks across the horizon. The recovery strategies below decide how the network responds.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -225,7 +270,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
         </CardContent>
       </Card>
 
-      {/* Recovery playbook — single column */}
+      {/* Recovery playbook */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
@@ -235,7 +280,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
                 Recovery playbook
               </CardTitle>
               <CardDescription className="text-xs">
-                Overrides project defaults for this scenario only.
+                Select response strategies and configure their parameters for this scenario.
               </CardDescription>
             </div>
             {overriddenFields > 0 && (
@@ -258,7 +303,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
             canEditSelected={canEditSelected}
           />
 
-          {/* enable switch */}
+          {/* Recovery enabled switch */}
           <div className="flex items-center justify-between rounded-sm border border-border/60 bg-muted/20 px-3 py-2">
             <div>
               <div className="text-xs font-medium">Recovery enabled</div>
@@ -272,68 +317,76 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
             />
           </div>
 
-          {/* response mix */}
-          <div>
-            <Label className="text-xs mb-2 block">Response actions</Label>
-            <div className="grid grid-cols-2 gap-1.5">
-              {RecoveryResponse.options.map((opt) => {
+          {/* Per-strategy cards */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs">Response strategies</Label>
+            {strategyOrder
+              .filter((opt) => RecoveryResponse.options.includes(opt))
+              .map((opt) => {
                 const active = activeResponses.has(opt);
-                const weight = RESPONSE_WEIGHTS[opt as RecoveryResponseKey];
+                const params = STRATEGY_PARAMS[opt] ?? [];
                 return (
-                  <button
+                  <div
                     key={opt}
-                    type="button"
-                    onClick={() => toggleResponse(opt as RecoveryResponseKey)}
-                    className={
-                      "flex items-center justify-between text-left text-xs border px-2 py-1.5 rounded-sm transition-colors " +
-                      (active
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border hover:border-foreground/40 text-muted-foreground")
-                    }
+                    className={cn(
+                      "rounded-sm border transition-colors",
+                      active ? "border-primary/50 bg-primary/5" : "border-border",
+                    )}
                   >
-                    <span>{RESPONSE_LABELS[opt as RecoveryResponseKey]}</span>
-                    <span className="font-mono text-[10px] opacity-70">
-                      +{weight.toFixed(2)}
-                    </span>
-                  </button>
+                    {/* Strategy header — clickable to toggle */}
+                    <button
+                      type="button"
+                      className="w-full flex items-start gap-3 px-3 py-2.5 text-left"
+                      onClick={() => toggleResponse(opt)}
+                    >
+                      <div
+                        className={cn(
+                          "mt-0.5 h-3.5 w-3.5 shrink-0 rounded-sm border transition-colors",
+                          active ? "border-primary bg-primary" : "border-muted-foreground/40",
+                        )}
+                      />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className={cn("text-xs font-medium", active ? "text-foreground" : "text-muted-foreground")}>
+                          {RESPONSE_LABELS[opt]}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground leading-snug">
+                          {STRATEGY_DESCRIPTIONS[opt]}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Strategy params — only when active and params exist */}
+                    {active && params.length > 0 && (
+                      <div className="border-t border-border/60 px-3 py-3 grid grid-cols-2 gap-3">
+                        {params.map((f) => {
+                          const stored = overrides[f.key as string];
+                          const displayVal = stored !== undefined && stored !== null
+                            ? Number(stored)
+                            : ((effective[f.key] as number | undefined) ?? f.default);
+                          return (
+                            <div key={f.key} className="flex flex-col gap-1">
+                              <Label className="text-[11px]" title={f.hint}>
+                                {f.label}
+                                <span className="text-muted-foreground font-normal ml-1">({f.unit})</span>
+                              </Label>
+                              <Input
+                                type="number"
+                                step={f.step ?? "1"}
+                                value={displayVal}
+                                onChange={(e) =>
+                                  patchOverride(f.key, parseFloat(e.target.value) || f.default)
+                                }
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </div>
           </div>
-
-          <Separator />
-
-          {/* strategy-gated parameters */}
-          {visibleFields.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Pick one or more response strategies above to configure their parameters.
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {visibleFields.map((f) => (
-                <div key={f.key} className="flex flex-col gap-1">
-                  <Label className="text-[11px]" title={f.hint}>
-                    {adaptLabel(f.label)}
-                  </Label>
-                  <Input
-                    type="number"
-                    step={f.step ?? "1"}
-                    value={Number(effective[f.key] ?? 0)}
-                    onChange={(e) => patchOverride(f.key, parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <p className="text-[10px] text-muted-foreground">
-            Tip: project-wide defaults live in{" "}
-            <a href="/policies" className="underline hover:text-foreground">
-              Supply chain policies
-            </a>
-            . Empty fields here fall back to those defaults.
-          </p>
         </CardContent>
       </Card>
     </div>

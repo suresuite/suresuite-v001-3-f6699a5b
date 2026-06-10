@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { BookOpen, Play } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjects } from "@/hooks/useProjects";
@@ -111,16 +111,6 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           subtitle="Scenarios, replications, warm-up auto-detection, and utilization-first KPIs."
           rightContent={
             <div className="flex items-center gap-2">
-              {selected && (
-                <Button
-                  size="sm"
-                  className="h-9 gap-1.5 text-xs"
-                  onClick={handleRun}
-                >
-                  <Play className="h-3 w-3" />
-                  Run
-                </Button>
-              )}
               <Select
                 value={projectId || ""}
                 onValueChange={(v) => setGlobalSelectedProjectId(v || null)}

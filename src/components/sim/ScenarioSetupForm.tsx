@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { Scenario } from "@/hooks/useScenarios";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
 
@@ -14,7 +14,13 @@ interface Props {
   onSave: (patch: Partial<Scenario>) => void;
 }
 
-const KPI_OPTIONS = ["fill_rate", "otif", "lead_time_days", "profit", "utilization"];
+const KPI_OPTIONS = [
+  { key: "fill_rate", label: "Fill rate" },
+  { key: "otif", label: "OTIF" },
+  { key: "lead_time_days", label: "Lead time" },
+  { key: "profit", label: "Profit" },
+  { key: "utilization", label: "Utilization" },
+];
 
 export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
   const [local, setLocal] = useState<Scenario>(scenario);
@@ -90,24 +96,28 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
           </div>
 
           {/* Primary KPI */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <Label className="text-xs">Primary KPI</Label>
-            <Select
-              value={local.primary_kpi}
-              onValueChange={(v) => {
-                patch("primary_kpi", v);
-                setTimeout(commit, 0);
-              }}
-            >
-              <SelectTrigger className="max-w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {KPI_OPTIONS.map((k) => (
-                  <SelectItem key={k} value={k}>{k}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-3 gap-1.5">
+              {KPI_OPTIONS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    patch("primary_kpi", local.primary_kpi === key ? "" : key);
+                    setTimeout(commit, 0);
+                  }}
+                  className={cn(
+                    "text-xs border px-2 py-1.5 rounded-sm transition-colors text-left",
+                    local.primary_kpi === key
+                      ? "border-primary bg-primary/10 text-foreground font-medium"
+                      : "border-border hover:border-foreground/40 text-muted-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

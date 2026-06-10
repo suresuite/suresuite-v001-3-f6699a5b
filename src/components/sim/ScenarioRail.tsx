@@ -25,17 +25,18 @@ export function ScenarioRail({
 }: Props) {
   return (
     <div className="flex flex-col border border-border bg-card h-full min-h-[60vh] w-64 shrink-0">
-      <div className="flex flex-col gap-2 px-3 py-2 border-b border-border">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Scenarios
         </span>
         <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 text-xs w-full"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
           onClick={onCreate}
+          title="New scenario"
         >
-          <Plus className="h-3.5 w-3.5" /> New scenario
+          <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
       <ScrollArea className="flex-1">
