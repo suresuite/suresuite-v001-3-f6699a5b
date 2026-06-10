@@ -164,11 +164,19 @@ function baseLoss(disruptions: Array<Record<string, unknown>>): number {
 
 function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
 
+function toPerDay(volume: number, unit: string | null | undefined): number {
+  if (unit === "week") return volume / 7;
+  if (unit === "month") return volume / 30;
+  return volume;
+}
+
 function stubReplicationKpis(
   scenario: Record<string, unknown>,
   repIndex: number,
   seed: number,
   recovery: ResolvedRecovery,
+  projectDailyRevenue?: number,
+  projectDailyCost?: number,
 ) {
   const rr = ((seed >>> 0) ^ (repIndex * 2654435761)) >>> 0;
   const noise = ((rr % 1000) / 1000 - 0.5) * 0.04;
@@ -203,8 +211,13 @@ function stubReplicationKpis(
     ? +Math.min(0.99, 0.82 + 0.15 * effect + noise).toFixed(3)
     : +Math.max(0.4, 0.85 - 0.2 * pressure + noise).toFixed(3);
 
-  const revenueBase = 1_000_000 * horizonScale;
-  const costBase = 720_000 * horizonScale;
+  // Use real project financials when available, otherwise fall back to canonical stubs.
+  const revenueBase = (projectDailyRevenue && projectDailyRevenue > 0)
+    ? projectDailyRevenue * horizon
+    : 1_000_000 * horizonScale;
+  const costBase = (projectDailyCost && projectDailyCost > 0)
+    ? projectDailyCost * horizon
+    : 720_000 * horizonScale;
   const costUsed = Math.min(recovery.cost_cap, loss * 1000 * mit);
   const revenue = Math.round(revenueBase * (1 - 0.05 * pressure * reliefP) * (1 + noise));
   const cost = Math.round(costBase + (active ? costUsed : loss * 800));
@@ -298,17 +311,32 @@ async function handleExperimentRun(
     .maybeSingle();
   if (scErr || !scenario) throw new Error("scenario not found");
 
-  // Load project recovery defaults and merge scenario overrides
+  // Load project recovery defaults + financial data in parallel
   // deno-lint-ignore no-explicit-any
-  const { data: defaults } = await (sb as any)
-    .from("policy_defaults")
-    .select("recovery")
-    .eq("project_id", scenario.project_id)
-    .maybeSingle();
+  const [{ data: defaults }, { data: inbound }, { data: outbound }] = await Promise.all([
+    (sb as any).from("policy_defaults").select("recovery").eq("project_id", scenario.project_id).maybeSingle(),
+    (sb as any).from("inbound_logistics").select("unit_price,volume,time_unit").eq("project_id", scenario.project_id),
+    (sb as any).from("outbound_logistics").select("unit_price,volume,time_unit").eq("project_id", scenario.project_id),
+  ]);
+
   const recovery = resolveRecovery(
     (defaults?.recovery as Record<string, unknown> | null) ?? null,
     (scenario.recovery_overrides as Record<string, unknown> | null) ?? null,
   );
+
+  // Compute daily revenue and cost from actual project data (unit_price × volume_per_day).
+  // These ground the stub KPIs in real numbers instead of hardcoded $1M/$720k.
+  // deno-lint-ignore no-explicit-any
+  const projectDailyRevenue = ((outbound ?? []) as any[]).reduce((sum: number, r: any) => {
+    const vpd = toPerDay(Number(r.volume ?? 0), r.time_unit);
+    return sum + vpd * Number(r.unit_price ?? 0);
+  }, 0);
+  // deno-lint-ignore no-explicit-any
+  const projectDailyCost = ((inbound ?? []) as any[]).reduce((sum: number, r: any) => {
+    const vpd = toPerDay(Number(r.volume ?? 0), r.time_unit);
+    return sum + vpd * Number(r.unit_price ?? 0);
+  }, 0);
+
   const meta = {
     recovery,
     disruption_count: ((scenario.disruption_schedule as unknown[]) ?? []).length,
@@ -351,7 +379,7 @@ async function handleExperimentRun(
   // these rows or insert additional ones.
   const repsToInsert = Array.from({ length: replications }).map((_, i) => {
     const repSeed = (seed + i * 2654435761) >>> 0;
-    const kpis = stubReplicationKpis(scenario, i, repSeed, recovery);
+    const kpis = stubReplicationKpis(scenario, i, repSeed, recovery, projectDailyRevenue, projectDailyCost);
     return {
       run_id: run.id,
       project_id: scenario.project_id,
