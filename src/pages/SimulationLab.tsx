@@ -21,6 +21,7 @@ import { RunProgressPanel } from "@/components/sim/RunProgressPanel";
 import { ResultsDashboard } from "@/components/sim/ResultsDashboard";
 import { CompareScenariosPanel } from "@/components/sim/CompareScenariosPanel";
 import { DisruptionRecoveryPane } from "@/components/sim/DisruptionRecoveryPane";
+import { StressTestCard, type StressTestPreset } from "@/components/sim/StressTestCard";
 import type { RecoveryConfig } from "@/lib/sim/recoveryScore";
 
 interface Props {
@@ -137,24 +138,40 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           </Alert>
         ) : (
           <div className="flex gap-4 items-start">
-            <ScenarioRail
-              scenarios={scenarios}
-              selectedId={selectedId}
-              loading={loading}
-              onSelect={setSelectedId}
-              onCreate={async () => {
-                const s = await create(`Scenario ${scenarios.length + 1}`);
-                if (s) setSelectedId(s.id);
-              }}
-              onDuplicate={async (s) => {
-                const d = await duplicate(s);
-                if (d) setSelectedId(d.id);
-              }}
-              onDelete={async (id) => {
-                await remove(id);
-                if (selectedId === id) setSelectedId(null);
-              }}
-            />
+            <aside className="flex flex-col gap-3 shrink-0">
+              <StressTestCard
+                onLaunch={async (preset: StressTestPreset) => {
+                  const s = await create(preset.name);
+                  if (!s) return;
+                  await update(s.id, {
+                    description: preset.description,
+                    disruption_schedule: preset.disruption_schedule,
+                  });
+                  setSelectedId(s.id);
+                  setPane("recovery");
+                  toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
+                }}
+              />
+              <ScenarioRail
+                scenarios={scenarios}
+                selectedId={selectedId}
+                loading={loading}
+                onSelect={setSelectedId}
+                onCreate={async () => {
+                  const s = await create(`Scenario ${scenarios.length + 1}`);
+                  if (s) setSelectedId(s.id);
+                }}
+                onDuplicate={async (s) => {
+                  const d = await duplicate(s);
+                  if (d) setSelectedId(d.id);
+                }}
+                onDelete={async (id) => {
+                  await remove(id);
+                  if (selectedId === id) setSelectedId(null);
+                }}
+              />
+            </aside>
+
 
             <div className="flex-1 min-w-0 flex flex-col gap-3">
               {/* Toolbar row: pane tabs + Browse library button */}

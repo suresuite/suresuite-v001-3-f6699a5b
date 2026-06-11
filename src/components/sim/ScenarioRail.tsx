@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Copy, Trash2 } from "lucide-react";
+import { Plus, Copy, Trash2, AlertTriangle, CircleDot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Scenario } from "@/hooks/useScenarios";
 
@@ -14,6 +14,17 @@ interface Props {
   loading?: boolean;
 }
 
+function formatRelative(iso: string | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const day = 86_400_000;
+  if (diff < day) return "today";
+  if (diff < 2 * day) return "yesterday";
+  if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`;
+  return d.toLocaleDateString();
+}
+
 export function ScenarioRail({
   scenarios,
   selectedId,
@@ -24,7 +35,7 @@ export function ScenarioRail({
   loading,
 }: Props) {
   return (
-    <div className="flex flex-col border border-border bg-card h-full min-h-[60vh] w-64 shrink-0">
+    <div className="flex flex-col border border-border bg-card w-64 shrink-0">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Scenarios
@@ -39,59 +50,91 @@ export function ScenarioRail({
           <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="max-h-[55vh]">
         <div className="flex flex-col">
           {loading && (
             <p className="px-3 py-2 text-xs text-muted-foreground">Loading…</p>
           )}
           {!loading && scenarios.length === 0 && (
-            <p className="px-3 py-4 text-xs text-muted-foreground">
-              No scenarios yet. Create one to get started.
+            <p className="px-3 py-4 text-xs text-muted-foreground leading-snug">
+              No scenarios yet. Create one or launch a stress test above.
             </p>
           )}
-          {scenarios.map((s) => (
-            <div
-              key={s.id}
-              className={cn(
-                "group flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50 border-l-2",
-                selectedId === s.id
-                  ? "bg-muted border-l-primary"
-                  : "border-l-transparent",
-              )}
-              onClick={() => onSelect(s.id)}
-            >
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm truncate">{s.name}</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {s.replications}× · {s.horizon_days}d · seed {s.seed}
-                </span>
+          {scenarios.map((s) => {
+            const disruptions = s.disruption_schedule?.length ?? 0;
+            const isSelected = selectedId === s.id;
+            return (
+              <div
+                key={s.id}
+                className={cn(
+                  "group flex items-start justify-between gap-2 px-3 py-2.5 cursor-pointer border-l-2 transition-colors",
+                  isSelected
+                    ? "bg-muted border-l-primary"
+                    : "border-l-transparent hover:bg-muted/40",
+                )}
+                onClick={() => onSelect(s.id)}
+              >
+                <div className="flex flex-col min-w-0 gap-1 flex-1">
+                  <span
+                    className={cn(
+                      "text-sm leading-tight truncate",
+                      isSelected
+                        ? "font-semibold text-foreground"
+                        : "font-medium text-foreground/90",
+                    )}
+                  >
+                    {s.name || "Untitled scenario"}
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {disruptions > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        {disruptions} disruption{disruptions > 1 ? "s" : ""}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <CircleDot className="h-2.5 w-2.5" />
+                        Steady-state
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">·</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {s.replications} reps · {s.horizon_days}d
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground/70">
+                    {formatRelative(s.updated_at || s.created_at)}
+                  </span>
+                </div>
+                <div className="hidden group-hover:flex gap-0.5 shrink-0">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDuplicate(s);
+                    }}
+                    title="Duplicate"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete scenario "${s.name}"?`)) onDelete(s.id);
+                    }}
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
-              <div className="hidden group-hover:flex gap-0.5">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDuplicate(s);
-                  }}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`Delete scenario "${s.name}"?`)) onDelete(s.id);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
