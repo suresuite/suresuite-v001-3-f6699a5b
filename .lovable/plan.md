@@ -1,52 +1,62 @@
-## Goal
+# Simulation Lab — UI refresh
 
-When a project-backed value can't be mapped to a specific row, fill it with a **smart average** (per-item, then project-wide) instead of the silent `0`, and mark that cell with a **red provenance dot** so users know it's an estimate to verify. Imputed values persist through "Apply prefill" exactly like real prefill. Also fix the misleading sky-blue dot that currently appears on sentinel `0` fallbacks.
+Three contained changes. No backend, no data-model edits, no behaviour changes outside the left column and the rail card.
 
-## Background (what we have & why it misses)
+## 1. New `StressTestCard` above the Scenarios rail
 
-Uploads land in `inbound_logistics` (`supplier_id, material_id, unit_price, lead_time, volume, time_unit`), `outbound_logistics` (`customer_id, product_id, unit_price, expected_lead_time, volume, time_unit`), and `bom_multi_level`. `useStageRows.tsx` joins the `get_supply_chain_data` RPC edges to those tables by exact string key (`from_location::to_location` vs `supplier_id::material_id` / `customer_id::product_id`). Any mismatch (ID vs name, casing/whitespace, multi-tier aggregated edge, or a pair missing from the logistics upload) makes the lookup miss → the field falls back to `0`/`undefined`. That's why prices we "have" show as `0`.
+New file `src/components/sim/StressTestCard.tsx`. Same width as the rail (`w-64`), same card chrome, lives directly above it in the left column.
 
-## Project-backed fields that get imputation
+Contents: header "Built-in stress tests" + six canonical one-click tests, each a row with a small icon, label, and tooltip blurb.
 
-Only fields genuinely sourced from uploads (hardcoded documented defaults like capacity/ordering_cost stay as-is, no red dot):
-- **Supplier:** `material_price` (inbound `unit_price`), `lead_time_mean_days` (inbound `lead_time`).
-- **Customer:** `price` (outbound `unit_price`), `mean_per_day` (outbound volume/day), `delivery_window_days` (outbound `expected_lead_time`).
-- **Plant:** `production_lead_time_mean_days` (median inbound lead of feeding components).
+| Test | What it sets |
+|---|---|
+| Single-supplier outage | Primary supplier offline 14d from day 30, 100% |
+| Material shortage | Critical material inbound −50% for 21d |
+| Lead-time shock | Inbound lane lead time +200% for 28d |
+| Demand surge | Aggregate demand +40% for 21d |
+| Multi-hit (compound) | Supplier outage day 30 + demand surge day 45 |
+| Nexus-node attack | Highest-prominence node offline 14d |
 
-## 1. `src/hooks/useStageRows.tsx`
+Each click calls `create()` (the existing `useScenarios` hook) with the preset name, description, and `disruption_schedule` filled in, then selects the new scenario and switches the pane to **Recovery playbook** so the user lands on the configured disruption.
 
-**Compute averages once per load (from the already-fetched `inbound`/`outbound` arrays):**
-- Helper `avg(nums)` = mean of finite, positive values (ignore missing/0 sentinels).
-- Inbound: `priceByMaterial`, `leadByMaterial` (per `material_id`) + global `priceGlobal`, `leadGlobal`.
-- Outbound: `priceByProduct`, `volByProduct`, `leadByProduct` (per `product_id`) + global equivalents.
-- "Smart" resolver: `impute(perItemMap, key, globalAvg)` → per-item average if available, else global average, else `undefined` (nothing to average → leave blank).
+A disabled footer reads "Resilience Index · coming soon" to telegraph the composite-score direction without building it yet.
 
-**Tag provenance per row** with two plain maps written onto each row object:
-- `__from_data: Record<field, true>` — set when the value came from a real matched enrichment row.
-- `__imputed: Record<field, true>` — set when the value was filled from an average.
+## 2. Cleaner scenario cards in `ScenarioRail`
 
-**Per stage**, for each project-backed field: if the enrichment lookup has a finite value → use it and set `__from_data[field]`. Else compute the smart average; if defined → set the value (rounded: prices 2dp, volume/lead 2dp) and set `__imputed[field]`; else leave undefined. (Supplier `material_price` stops defaulting to `0`; customer `price`/`mean_per_day`/`delivery_window_days` and plant `production_lead_time_mean_days` get the same treatment.)
+Drop the cramped one-liner `30× · 90d · seed 42`. New stacked layout per card:
 
-No change to capacity/cost/MOQ documented defaults, share logic, or primary-source logic.
+- **Line 1**: scenario name, bolder when selected, truncates cleanly.
+- **Line 2**: a status chip — amber `⚠ N disruptions` when the schedule is non-empty, muted `● Steady-state` otherwise — followed by `· 10 reps · 90d`. Seed is removed (it belongs in Setup, not in the rail).
+- **Line 3**: relative timestamp (`today`, `yesterday`, `3d ago`) in muted micro-text.
 
-## 2. `src/components/policies/StagePolicyTable.tsx` (provenance dots ~lines 865–897)
+Hover still reveals Duplicate / Delete. Selected state keeps the left primary bar but adds a subtle background.
 
-Replace the dot resolution with an explicit, 4-state priority chain:
-- `edited` (draft) → **primary** dot, "Edited".
-- `__imputed[field]` → **red** dot (`bg-destructive`), "Imputed project average — verify".
-- real data: `__from_data[field]` is true, OR (field untracked by the new maps AND `r[field] != null`, preserving current behavior for non-imputed fields) → **sky** dot, "From project data".
-- saved override → **emerald** dot.
-- else no dot (bundle default).
+Empty-state copy nudges toward the new card: *"No scenarios yet. Create one or launch a stress test above."*
 
-This both adds the red alert dot and fixes the bug where a `0` fallback showed the sky "from project data" dot.
+## 3. Tighter left column + workspace focus
 
-Add the red dot to the provenance legend (if a legend is rendered near the toolbar; otherwise rely on the cell tooltip).
+In `SimulationLab.tsx` the existing `<ScenarioRail …/>` becomes a small `<aside>` stack:
 
-## 3. Persistence
+```text
+┌──────────────┐  ┌──────────────────────────────┐
+│ Stress tests │  │ Setup / Recovery / Run / …   │
+├──────────────┤  │                              │
+│  Scenarios   │  │   (workspace gets the focus) │
+│              │  │                              │
+└──────────────┘  └──────────────────────────────┘
+```
 
-No new code needed: imputed values live on the row (`r[field]`), so `getEffective` returns them and the existing **Apply prefill** path writes them as overrides like any other prefill value (still shown red until the user edits, since `__imputed` is row metadata, not an override flag). Plain "Save changes" continues to save only edited cells.
+The rail loses its forced `min-h-[60vh]` so it sizes to its content; the workspace column gets the visual weight. Toolbar (pane tabs + Browse library) is unchanged — those already work well.
 
-## Notes / non-goals
+## Files touched
 
-- Root-cause key normalization (RPC name-vs-ID matching) is out of scope here; imputation is the agreed mitigation so the simulation always has reasonable numbers with a clear "verify" signal.
-- `@ts-nocheck` files stay as-is; new fields are dynamic on the row object.
+- **New**: `src/components/sim/StressTestCard.tsx`
+- **Edited**: `src/components/sim/ScenarioRail.tsx` — card markup + height rules only.
+- **Edited**: `src/pages/SimulationLab.tsx` — wrap rail + new card in a left-column `<aside>`, wire `onLaunch` to `create()` + `setSelectedId` + `setPane("recovery")`.
+
+## Out of scope (call out separately if you want them)
+
+- Real Resilience Index calculation / scorecard panel.
+- Stress-test runner that auto-launches the simulation (current plan only *creates* the pre-configured scenario; user still clicks Run).
+- Any change to Setup, Recovery, Run, Results, Compare panes.
+- Backend table for stress-test results.
