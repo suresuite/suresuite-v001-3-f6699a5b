@@ -21,29 +21,38 @@ import numpy as np
 from scipy import sparse
 
 from scsim.core.phases import (
+    FG_FULFILLMENT,
     FULFILLMENT,
     INVENTORY_LEVELS,
     OVERTIME_CAPACITY,
     PRODUCTION_PLAN,
     PURCHASE_ORDERS,
     ST_BACKLOG,
+    ST_FG_TARGET,
     ST_PIPELINE,
     BoundHook,
 )
-from scsim.entities.enums import DemandModel, EffectType, OverflowRule, RampProfile
+from scsim.entities.enums import (
+    DemandModel,
+    EffectType,
+    FulfillmentMode,
+    OverflowRule,
+    RampProfile,
+)
 from scsim.entities.scenario import Scenario
 from scsim.stats.seeds import ReplicationStreams
 
 # C^res components — Part V cost_of_resilience.
 COST_COMPONENTS: tuple[str, ...] = (
-    "ss_holding",        # P-P.3 incremental material safety-stock holding
-    "backup_premium",    # P-S.1 premium on rerouted orders
-    "expediting",        # P-T.2 premium freight
-    "overtime",          # P-P.5 short-term capacity
-    "lost_sales",        # Σ u_p · L_p
-    "allocation_labor",  # P-P.9 planner time
-    "fg_ss_holding",     # P-P.4 (MTS, M7)
-    "backorder_penalty", # P-C.1 backorder variant
+    "ss_holding",             # P-P.3 incremental material safety-stock holding
+    "backup_premium",         # P-S.1 premium on rerouted orders
+    "multi_sourcing_premium", # P-S.2 pay-always premium on non-primary slices
+    "expediting",             # P-T.2 premium freight
+    "overtime",               # P-P.5 short-term capacity
+    "lost_sales",             # Σ u_p · L_p
+    "allocation_labor",       # P-P.9 planner time
+    "fg_ss_holding",          # P-P.4 FG safety stock at full COGS (MTS)
+    "backorder_penalty",      # P-C.1 backorder variant
 )
 COST_INDEX = {name: i for i, name in enumerate(COST_COMPONENTS)}
 
@@ -177,6 +186,19 @@ class CompiledModel:
             if idx.size:
                 self.demand_groups.append((dm, idx))
 
+        # Fulfillment mode split (CODP, §3.3). MTO stays the no-op PH-30 path.
+        self.mts_mask = np.array(
+            [p.fulfillment_mode == FulfillmentMode.MTS for p in net.products]
+        )
+        self.forecast_model_of = [p.forecast_model for p in net.products]
+        self.forecast_window = np.array([p.forecast_window for p in net.products], dtype=int)
+        self.forecast_bias = np.array([p.forecast_bias for p in net.products]) / 100.0
+        self.fg_base_stock_override = np.array(
+            [-1.0 if p.fg_base_stock is None else p.fg_base_stock for p in net.products]
+        )
+        # Full COGS per FG unit (P-P.4 holding basis): Σ_m r_{p,m} · c_m.
+        self.fg_unit_cogs = np.asarray(self.bom @ self.mat_cost).ravel()
+
         # Ring width: longest quoted arrival distance is max(T_link, deferral≤52)
         # plus the recovery ramp; +4 slack (§10.2.2).
         self.ring_width = int(self.link_lt.max()) + 52 + 8 + 4
@@ -231,6 +253,7 @@ class WeeklyTrace:
     fill_rate: np.ndarray = field(init=False)
     inbound_rejected: np.ndarray = field(init=False)
     on_hand_value: np.ndarray = field(init=False)
+    fg_value: np.ndarray = field(init=False)
     D: Optional[np.ndarray] = None
     Q: Optional[np.ndarray] = None
     F: Optional[np.ndarray] = None
@@ -242,7 +265,7 @@ class WeeklyTrace:
         T = self.horizon
         for name in (
             "demand_value", "fulfilled_value", "revenue_value", "lost_value", "lost_units",
-            "backlog_units", "fill_rate", "inbound_rejected", "on_hand_value",
+            "backlog_units", "fill_rate", "inbound_rejected", "on_hand_value", "fg_value",
         ):
             setattr(self, name, np.zeros(T))
         if self.keep_matrices:
@@ -281,13 +304,22 @@ class SimContext:
         self.queue = np.zeros(model.n_links)
         self.backlog = np.zeros(model.n_prods)
         self.fg_on_hand = np.zeros(model.n_prods)
+        self.fg_target = np.zeros(model.n_prods)        # S^FG_p (ADR 0001)
         self.cost = CostLedger(T)
         self.policy_state: dict[str, dict] = {}
         self.policy_rng_created_week: dict[str, int] = {}
+        # Forecast machinery (PH-10 mechanic state; no contract key needed for
+        # the raw history — only the `forecast` transient is contractual).
+        self.demand_history = np.zeros((model.n_prods, 26))  # ring, max window
+        self.demand_history_n = 0
+        self.forecast_smooth = model.mean_demand_p.copy()
 
         # Weekly transients (rebound each week by the engine/mechanics).
         self.week: int = 0
         self.demand = np.zeros(model.n_prods)
+        self.forecast = model.mean_demand_p.copy()
+        self.fg_served_backlog = np.zeros(model.n_prods)  # PH-30 (MTS)
+        self.fg_served_new = np.zeros(model.n_prods)
         self.production_plan = np.zeros(model.n_prods)
         self.overtime_extra = np.zeros(model.n_prods)
         self.production_output = np.zeros(model.n_prods)
@@ -396,6 +428,16 @@ class SimContext:
     def set_backlog(self, backlog: np.ndarray) -> None:
         self._check_write(ST_BACKLOG)
         self.backlog = np.maximum(backlog, 0.0)
+
+    def write_fg_target(self, target: np.ndarray) -> None:
+        """S^FG_p — MTS stock target, consumed by next week's PH-40 (ADR 0001)."""
+        self._check_write(ST_FG_TARGET)
+        self.fg_target = np.where(self.model.mts_mask, np.maximum(target, 0.0), 0.0)
+
+    def write_fg_fulfillment(self, served_backlog: np.ndarray, served_new: np.ndarray) -> None:
+        self._check_write(FG_FULFILLMENT)
+        self.fg_served_backlog = np.maximum(served_backlog, 0.0)
+        self.fg_served_new = np.maximum(served_new, 0.0)
 
     def write_fulfillment(
         self, fulfilled: np.ndarray, served_new: np.ndarray, lost_units: np.ndarray

@@ -40,7 +40,7 @@ npm run dev
 
 The resilience-grade 3-echelon supply chain simulator lives under
 [`scsim/`](scsim/README.md) — a phase-pipeline weekly DES with a 22-policy
-catalog (7 manuscript-validated strategies implemented), a generalized
+catalog (9 strategies implemented, MTO + MTS fulfillment modes), a generalized
 disruption injector, ST-1/ST-2 stress-test batteries with a Resilience
 Index, CRN portfolio studies with synergy decomposition, and a statistical
 engine (keyed RNG tree, MSER-5/Conway warm-up, percentile bootstrap).

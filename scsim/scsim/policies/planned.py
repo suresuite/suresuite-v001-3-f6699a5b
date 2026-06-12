@@ -39,56 +39,8 @@ register_planned(
 
 
 # --------------------------------------------------------------------- 4.2
-
-class FgSafetyStockParams(PolicyParams):
-    sizing: Literal["service_level", "fixed_days", "fixed_units"] = Field(
-        "service_level", json_schema_extra={"unit": "enum", "scope": "P"})
-    service_level_pct: float = Field(
-        95.0, ge=80.0, le=99.9, json_schema_extra={"unit": "%", "scope": "P", "notes": "z^FG_p."})
-    fixed_days_cover: float = Field(
-        2.0, ge=0.0, le=12.0, json_schema_extra={"unit": "days", "scope": "P"})
-    fixed_units: Optional[float] = Field(
-        None, ge=0, json_schema_extra={"unit": "units", "scope": "P"})
-    holding_cost_rate: float = Field(
-        20.0, ge=5.0, le=50.0, json_schema_extra={"unit": "%/yr of COGS", "scope": "P", "notes": "h^FG_p."})
-    segmentation: Literal["uniform", "abc_by_revenue"] = Field(
-        "uniform", json_schema_extra={"unit": "enum", "scope": "G"})
-
-
-register_planned(
-    id="fg_safety_stock", catalog_ref="P-P.4", stage=Stage.PLANT,
-    strategy_class=StrategyClass.STRATEGIC,
-    constraint_targeted=ConstraintTag.DEMAND_SIDE,
-    requires_predeployment=True, params_model=FgSafetyStockParams, milestone="M7 (with MTS)",
-    summary="The only buffer DOWNSTREAM of production (MTS only): keeps serving customers "
-            "during plant disruptions and is the only feasible buffer when suppliers are "
-            "single-sourced. Costs full COGS per unit held. Hooks: PH-30/PH-70.",
-)
-
-
-class ProactiveMultiSourcingParams(PolicyParams):
-    weights: dict[str, dict[str, float]] = Field(
-        default_factory=dict,
-        json_schema_extra={"unit": "share per (material → supplier)", "scope": "SM",
-                           "notes": "w_{m,s}; each material's shares sum to 100."})
-    min_share_pct: float = Field(
-        20.0, ge=5.0, le=50.0, json_schema_extra={"unit": "%", "scope": "G"})
-    rebalance_trigger: Literal["none", "reliability_drop", "disruption"] = Field(
-        "none", json_schema_extra={"unit": "enum", "scope": "G"})
-    secondary_premium: float = Field(
-        0.0, ge=0, json_schema_extra={"unit": "€/unit", "scope": "SM"})
-
-
-register_planned(
-    id="proactive_multi_sourcing", catalog_ref="P-S.2", stage=Stage.SUPPLIER,
-    strategy_class=StrategyClass.STRATEGIC,
-    constraint_targeted=ConstraintTag.MATERIAL_AVAILABILITY,
-    requires_predeployment=True, params_model=ProactiveMultiSourcingParams, milestone="M7",
-    summary="Split orders across warm sources in NORMAL operations — no activation delay, "
-            "permanent premium; the structural answer to capacity-cut events. Pay-always vs "
-            "P-S.1's pay-on-activation. Hook: PH-80.",
-)
-
+# (P-P.4 fg_safety_stock and P-S.2 proactive_multi_sourcing graduated to
+#  implemented plugins in 0.2.0 — see policies/strategic/.)
 
 class CapacityReservationParams(PolicyParams):
     reserved_capacity: float = Field(

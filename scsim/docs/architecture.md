@@ -22,21 +22,22 @@ P-P.3 rewrites `inventory_levels` after P-P.1, P-S.1 rewrites
 [policy catalog](reference/policies.md) shows every rule.
 
 MTO and MTS are the SAME pipeline: PH-30 (`fulfill_from_stock`) is a no-op
-for MTO products and becomes the FG-serving phase when MTS lands (M7).
+for MTO products and serves MTS demand from finished-goods stock (active
+since 0.2.0 — ADR 0001). Networks may mix modes per product.
 
 ## One week in detail (MTO core)
 
 | Phase | What happens |
 |---|---|
 | PH-00 | Reset weekly transients; compose physical disruption state per supplier (max severity across events: min capacity factor, max deferral end). |
-| PH-10 | Draw `D_p[t]` from the world demand stream (per-model vectorized groups; order fixed → CRN-stable). |
+| PH-10 | Update the demand forecast from history (§3.3 models: naive/ma/exp_smoothing/perfect + bias lever; no RNG), then draw `D_p[t]` from the world demand stream (per-model vectorized groups; order fixed → CRN-stable). |
 | PH-20 | Firm knowledge = events with `t ≥ start + detection_lag` (lag 0 by default; P-S.4 will govern it). |
-| PH-30 | MTO: no-op. |
-| PH-40 | Default plan `min(D_p + B_p, O_p + δ^o)`. P-P.5 grants overtime headroom δ^o (priority 40); P-P.9 replaces the plan with the rolling LP when active (priority 60). |
-| PH-50 | Eq. 8 executed greedily in fixed product (declaration) order against on-hand materials; consumption via the sparse BoM. |
-| PH-60 | P-C.1 allocates output FIFO (backlog first), then applies the lost-sales / backorder / partial rule; backorders age in weekly buckets and expire to lost sales. |
-| PH-70 | `D_m` projection (Eq. 1, stationary expectation); P-P.1 sets `s_m = E·T`, `S_m = E·(T+κ)` (Eqs. 2–3, κ mode strip nominal→crisis under a visible event); P-P.3 adds `z·σ·√T` / `z·σ·√(T+κ)` (Eqs. 20–21). |
-| PH-80 | P-P.1 releases orders (Eqs. 4–6: `max(S − position, MOQ)` when `position < s`, on the primary = min-cost link); P-S.1 reroutes orders of firm-visibly disrupted primaries to the selected backup; orders enter the supplier queue. |
+| PH-30 | MTO: no-op. MTS (§3.3 step ①): serve `min(D_p + B_p, I^FG_p)` from FG stock, backlog first; the shortfall flows to P-C.1. |
+| PH-40 | Default plan — MTO: `min(D_p + B_p, O_p + δ^o)`; MTS (step ②): replenish `max(0, S^FG − I^FG) + unserved backlog`, capacity-capped. P-P.5 grants overtime headroom δ^o (priority 40); P-P.9 replaces the plan with the rolling LP when active (priority 60). |
+| PH-50 | Eq. 8 executed greedily in fixed product (declaration) order against on-hand materials; consumption via the sparse BoM. MTS output credits `I^FG` (Eq. 9; same-week completion, W^FG = 0 in v1). |
+| PH-60 | P-C.1 applies the lost-sales / backorder / partial rule, CODP-aware: MTO ships production output, MTS shipped from FG at PH-30. Backorders age in weekly buckets and expire to lost sales. |
+| PH-70 | `D_m` projection (Eq. 1 — stationary for MTO, forecast for MTS); FG cycle target base (mechanic, priority 45) + P-P.4 FG safety stock (priority 55) → `state.fg_target` for next week's PH-40; P-P.1 sets `s_m = E·T`, `S_m = E·(T+κ)` (Eqs. 2–3, κ mode strip nominal→crisis under a visible event); P-P.3 adds `z·σ·√T` / `z·σ·√(T+κ)` (Eqs. 20–21). |
+| PH-80 | P-P.1 releases orders (Eqs. 4–6: `max(S − position, MOQ)` when `position < s`, on the primary = min-cost link); P-S.2 splits releases across warm sources (priority 55); P-S.1 reroutes firm-visibly disrupted slices to the selected backup (priority 60); orders enter the supplier queue. |
 | PH-90 | Deferral mechanic → queue shipping under capacity gating → P-T.2 expediting → arrivals land. Details below. |
 | PH-99 | KPI row, lost-sales cost, policy `cost_contribution`s into the C^res ledger, optional full-debug matrices. |
 

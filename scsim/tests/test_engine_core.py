@@ -192,12 +192,12 @@ def _resolve_n(sc: Scenario, t_w: int):
 
 # --------------------------------------------------------------- engine guards
 
-def test_mts_products_rejected_with_milestone_pointer():
+def test_ato_products_rejected_as_reserved():
     from scsim.entities.enums import FulfillmentMode
 
     net = single_chain_network()
-    net.products[0].fulfillment_mode = FulfillmentMode.MTS
-    with pytest.raises(CompileError, match="M7"):
+    net.products[0].fulfillment_mode = FulfillmentMode.ATO
+    with pytest.raises(CompileError, match="reserved"):
         compile_scenario(scenario(net))
 
 
@@ -205,8 +205,9 @@ def test_planned_policy_rejected_with_milestone_pointer():
     from scsim.policies.registry import PolicyNotImplementedError
 
     sc = scenario(single_chain_network(),
-                  policies={"proactive_multi_sourcing": {}})
-    with pytest.raises(PolicyNotImplementedError, match="M7"):
+                  policies={"capacity_reservation": {"reserved_capacity": 10,
+                                                     "reservation_fee": 1.0}})
+    with pytest.raises(PolicyNotImplementedError, match="M8"):
         compile_scenario(sc)
 
 

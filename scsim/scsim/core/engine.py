@@ -32,6 +32,7 @@ from scsim.core.phases import (
     DISRUPTION_STATE,
     FG_FULFILLMENT,
     FIRM_KNOWLEDGE,
+    FORECAST,
     KPI_ROWS,
     MATERIAL_DEMAND,
     OVERTIME_CAPACITY,
@@ -41,6 +42,7 @@ from scsim.core.phases import (
     ST_BACKLOG,
     ST_COST_LEDGER,
     ST_FG_ON_HAND,
+    ST_FG_TARGET,
     ST_ON_HAND,
     ST_PIPELINE,
     ST_QUEUE,
@@ -84,6 +86,8 @@ def _mech_week_start(model: CompiledModel, ctx: SimContext) -> None:
     ctx.cost.set_week(t)
     # Reset weekly transients.
     ctx.demand[:] = 0.0
+    ctx.fg_served_backlog[:] = 0.0
+    ctx.fg_served_new[:] = 0.0
     ctx.production_plan[:] = 0.0
     ctx.overtime_extra[:] = 0.0
     ctx.production_output[:] = 0.0
@@ -107,6 +111,9 @@ def _mech_week_start(model: CompiledModel, ctx: SimContext) -> None:
 
 
 def _mech_demand(model: CompiledModel, ctx: SimContext) -> None:
+    # Forecast BEFORE drawing the week (information timing, ADR 0001):
+    # forecast_t = f(D_{t-window..t-1}); falls back to the model mean cold.
+    _update_forecast(model, ctx)
     rng = ctx.streams.demand
     D = ctx.demand
     for model_type, idx in model.demand_groups:
@@ -128,6 +135,33 @@ def _mech_demand(model: CompiledModel, ctx: SimContext) -> None:
         else:  # BOOTSTRAP
             for j in idx:
                 D[j] = float(rng.choice(model.demand_history[j]))
+    # Append the realization to the history ring (consumed by next week's forecast).
+    ctx.demand_history[:, ctx.demand_history_n % 26] = D
+    ctx.demand_history_n += 1
+
+
+def _update_forecast(model: CompiledModel, ctx: SimContext) -> None:
+    from scsim.entities.enums import ForecastModel
+
+    n = ctx.demand_history_n
+    fc = model.mean_demand_p.copy()
+    if n > 0:
+        last = ctx.demand_history[:, (n - 1) % 26]
+        for j in range(model.n_prods):
+            fm = model.forecast_model_of[j]
+            if fm == ForecastModel.PERFECT:
+                continue  # true model mean
+            if fm == ForecastModel.NAIVE:
+                fc[j] = last[j]
+            elif fm == ForecastModel.MA:
+                w = min(int(model.forecast_window[j]), n, 26)
+                idx = [(n - 1 - k) % 26 for k in range(w)]
+                fc[j] = float(ctx.demand_history[j, idx].mean())
+            else:  # EXP_SMOOTHING: s_t = α·D_{t−1} + (1−α)·s_{t−1}
+                alpha = 2.0 / (model.forecast_window[j] + 1.0)
+                ctx.forecast_smooth[j] = alpha * last[j] + (1 - alpha) * ctx.forecast_smooth[j]
+                fc[j] = float(ctx.forecast_smooth[j])
+    ctx.forecast = np.maximum(fc * (1.0 + model.forecast_bias), 0.0)
 
 
 def _mech_detection(model: CompiledModel, ctx: SimContext) -> None:
@@ -137,11 +171,30 @@ def _mech_detection(model: CompiledModel, ctx: SimContext) -> None:
 
 
 def _mech_fulfill_from_stock(model: CompiledModel, ctx: SimContext) -> None:
-    return  # MTO: no-op. MTS (M7) serves D_p from I^FG here.
+    """§3.3 MTS step ①: F_p = min(D_p + B_p, I^FG_p), backlog served first.
+    The shortfall flows to P-C.1 at PH-60. No-op for MTO products."""
+    mts = model.mts_mask
+    if not mts.any():
+        return
+    want = np.where(mts, ctx.demand + ctx.backlog, 0.0)
+    served = np.minimum(want, ctx.fg_on_hand)
+    served_backlog = np.minimum(served, ctx.backlog)
+    served_new = served - served_backlog
+    ctx.fg_on_hand = ctx.fg_on_hand - served
+    ctx.fg_served_backlog = served_backlog
+    ctx.fg_served_new = served_new
 
 
 def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
-    want = ctx.demand + ctx.backlog
+    # MTO: produce to order (D + backlog). MTS step ②: replenish toward last
+    # week's S^FG plus any backlog PH-30 could not serve from stock.
+    want_mto = ctx.demand + ctx.backlog
+    if model.mts_mask.any():
+        backlog_unserved = ctx.backlog - ctx.fg_served_backlog
+        gap = np.maximum(ctx.fg_target - ctx.fg_on_hand, 0.0) + backlog_unserved
+        want = np.where(model.mts_mask, gap, want_mto)
+    else:
+        want = want_mto
     ctx.production_plan = np.minimum(want, model.capacity + ctx.overtime_extra)
 
 
@@ -151,11 +204,28 @@ def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
     Q, remaining = greedy_feasible(model, plan, ctx.on_hand)
     ctx.production_output = Q
     ctx.on_hand = remaining
+    if model.mts_mask.any():
+        # Eq. 9: MTS output replenishes FG (same-week completion, W^FG = 0 in v1).
+        ctx.fg_on_hand = ctx.fg_on_hand + np.where(model.mts_mask, Q, 0.0)
 
 
 def _mech_material_demand(model: CompiledModel, ctx: SimContext) -> None:
-    # Eq. 1 — stationary expectation; forecast-driven projection lands with MTS.
-    ctx.material_demand = model.exp_demand_m.copy()
+    # Eq. 1 — stationary expectation for MTO; forecast projection for MTS (§3.3).
+    if model.mts_mask.any():
+        exp_p = np.where(model.mts_mask, ctx.forecast, model.mean_demand_p)
+        ctx.material_demand = np.asarray(model.bom.T @ exp_p).ravel()
+    else:
+        ctx.material_demand = model.exp_demand_m.copy()
+
+
+def _mech_fg_target_base(model: CompiledModel, ctx: SimContext) -> None:
+    """Base S^FG = forecast over the production cycle (1 week, v1) — the thin
+    cycle stock. P-P.4 adds the real FG safety stock on top (priority 55)."""
+    if not model.mts_mask.any():
+        return
+    base = np.where(model.fg_base_stock_override >= 0,
+                    model.fg_base_stock_override, ctx.forecast)
+    ctx.fg_target = np.where(model.mts_mask, base, 0.0)
 
 
 def _mech_orders_to_queue(model: CompiledModel, ctx: SimContext) -> None:
@@ -265,6 +335,7 @@ def _mech_accounting(model: CompiledModel, ctx: SimContext, policies: list[Polic
     tr.fill_rate[t] = tr.fulfilled_value[t] / dv if dv > 0 else 1.0
     tr.inbound_rejected[t] = ctx.lost_inbound_this_week
     tr.on_hand_value[t] = float((ctx.on_hand * model.mat_cost).sum())
+    tr.fg_value[t] = float((ctx.fg_on_hand * model.fg_unit_cogs).sum())
     if lost_v > 0:
         ctx.cost.add("lost_sales", lost_v)
     for pol in policies:
@@ -284,24 +355,31 @@ def _mech_accounting(model: CompiledModel, ctx: SimContext, policies: list[Polic
 _MECHANIC_HOOKS: list[tuple[str, Hook, Callable]] = [
     ("mech.week_start", Hook(phase=PhaseId.PH00, priority=50, writes={DISRUPTION_STATE}),
      _mech_week_start),
-    ("mech.demand_realization", Hook(phase=PhaseId.PH10, priority=50, writes={DEMAND}),
+    ("mech.demand_realization", Hook(phase=PhaseId.PH10, priority=50,
+                                     writes={DEMAND, FORECAST}),
      _mech_demand),
     ("mech.detection", Hook(phase=PhaseId.PH20, priority=50,
                             reads={DISRUPTION_STATE}, writes={FIRM_KNOWLEDGE}),
      _mech_detection),
     ("mech.fulfill_from_stock", Hook(phase=PhaseId.PH30, priority=50,
-                                     reads={DEMAND}, writes={FG_FULFILLMENT, ST_FG_ON_HAND}),
+                                     reads={DEMAND, ST_BACKLOG, ST_FG_TARGET},
+                                     writes={FG_FULFILLMENT, ST_FG_ON_HAND}),
      _mech_fulfill_from_stock),
     ("mech.default_plan", Hook(phase=PhaseId.PH40, priority=50,
-                               reads={DEMAND, OVERTIME_CAPACITY, ST_BACKLOG},
+                               reads={DEMAND, FG_FULFILLMENT, OVERTIME_CAPACITY,
+                                      ST_BACKLOG, ST_FG_TARGET},
                                writes={PRODUCTION_PLAN}),
      _mech_default_plan),
     ("mech.production_execute", Hook(phase=PhaseId.PH50, priority=50,
                                      reads={PRODUCTION_PLAN, OVERTIME_CAPACITY},
                                      writes={PRODUCTION_OUTPUT, ST_ON_HAND, ST_FG_ON_HAND}),
      _mech_production_execute),
-    ("mech.material_demand", Hook(phase=PhaseId.PH70, priority=40, writes={MATERIAL_DEMAND}),
+    ("mech.material_demand", Hook(phase=PhaseId.PH70, priority=40,
+                                  reads={FORECAST}, writes={MATERIAL_DEMAND}),
      _mech_material_demand),
+    ("mech.fg_target_base", Hook(phase=PhaseId.PH70, priority=45,
+                                 reads={FORECAST}, writes={ST_FG_TARGET}),
+     _mech_fg_target_base),
     ("mech.orders_to_queue", Hook(phase=PhaseId.PH80, priority=90,
                                   reads={PURCHASE_ORDERS}, writes={ST_QUEUE}),
      _mech_orders_to_queue),
@@ -335,11 +413,10 @@ class CompiledScenario:
 
 def compile_scenario(scenario: Scenario, debug: bool = True) -> CompiledScenario:
     for p in scenario.network.products:
-        if p.fulfillment_mode != FulfillmentMode.MTO:
+        if p.fulfillment_mode == FulfillmentMode.ATO:
             raise CompileError(
-                f"product {p.id!r}: fulfillment_mode={p.fulfillment_mode.value} is not "
-                f"available in engine {ENGINE_VERSION} — MTS + P-P.4 land in M7 (PH-30 "
-                f"is reserved for it); ATO is a reserved enum value"
+                f"product {p.id!r}: fulfillment_mode=ato is a reserved enum value "
+                f"(not scheduled); use mto or mts"
             )
 
     model = CompiledModel(scenario)
@@ -473,8 +550,8 @@ def run_replication(
 
 
 def _initialize_state(compiled: CompiledScenario, ctx: SimContext) -> None:
-    """Warm start: run the PH-70 chain once to get levels, set I_m(0), prime
-    the in-transit pipeline with one expected week per lead-time slot."""
+    """Warm start: run the PH-70 chain once to get levels and FG targets, set
+    I_m(0), prime the in-transit pipeline with one expected week per slot."""
     model = compiled.model
     ctx.week = 0
     for _prio, bh, fn in compiled.dispatch[PhaseId.PH70]:
@@ -482,6 +559,8 @@ def _initialize_state(compiled: CompiledScenario, ctx: SimContext) -> None:
     init = np.where(model.mat_initial >= 0, model.mat_initial,
                     np.maximum(ctx.level_S - model.exp_demand_m * model.link_lt[model.primary_link], 0.0))
     ctx.on_hand = init.astype(float)
+    if model.mts_mask.any():
+        ctx.fg_on_hand = ctx.fg_target.copy()  # MTS starts at its stock target
     W = model.ring_width
     for m in range(model.n_mats):
         link = model.primary_link[m]

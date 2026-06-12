@@ -47,6 +47,7 @@ class PhaseId(str, Enum):
 # Transient keys — owned by exactly one phase, recomputed weekly.
 DISRUPTION_STATE = "disruption_state"
 DEMAND = "demand"
+FORECAST = "forecast"  # ADR 0001: produced at PH-10, consumed by PH-40/PH-70 (MTS)
 FIRM_KNOWLEDGE = "firm_knowledge"
 FG_FULFILLMENT = "fg_fulfillment"
 PRODUCTION_PLAN = "production_plan"
@@ -67,6 +68,7 @@ ST_LOST_SALES = "state.lost_sales"
 ST_PIPELINE = "state.pipeline"
 ST_QUEUE = "state.queue"
 ST_FG_ON_HAND = "state.fg_on_hand"
+ST_FG_TARGET = "state.fg_target"  # ADR 0001: S^FG_p, set at PH-70, read next week at PH-40
 ST_COST_LEDGER = "state.cost_ledger"
 
 
@@ -81,8 +83,9 @@ class PhaseSpec:
 PIPELINE: tuple[PhaseSpec, ...] = (
     PhaseSpec(PhaseId.PH00, "week_start", (DISRUPTION_STATE,),
               "Onset/recovery profiles → physical disruption state for the week."),
-    PhaseSpec(PhaseId.PH10, "demand_realization", (DEMAND,),
-              "Draw D_p[t] from the world demand stream."),
+    PhaseSpec(PhaseId.PH10, "demand_realization", (DEMAND, FORECAST),
+              "Update the demand forecast from history (§3.3 models), then draw D_p[t] "
+              "from the world demand stream."),
     PhaseSpec(PhaseId.PH20, "detection", (FIRM_KNOWLEDGE,),
               "Firm-visible events (t ≥ start + detection_lag). P-S.4 / P-X.1 evaluate here."),
     PhaseSpec(PhaseId.PH30, "fulfill_from_stock", (FG_FULFILLMENT,),
@@ -117,6 +120,7 @@ PERSISTENT_WRITERS: dict[str, tuple[PhaseId, ...]] = {
     ST_PIPELINE: (PhaseId.PH80, PhaseId.PH90),
     ST_QUEUE: (PhaseId.PH80, PhaseId.PH90),
     ST_FG_ON_HAND: (PhaseId.PH30, PhaseId.PH50),
+    ST_FG_TARGET: (PhaseId.PH70,),
     # The cost ledger is an append-only sink: any phase may add a contribution.
     ST_COST_LEDGER: tuple(PhaseId),
 }
@@ -193,18 +197,20 @@ def validate_hooks(bound: list[BoundHook]) -> None:
                     f"{bh.owner}: reads {key!r} in {bh.hook.phase.value} before its owning phase "
                     f"{owner_phase.value} has run"
                 )
-            # Same phase: every writer must be ordered strictly before this reader.
+            # Same phase: some writer must run strictly before this reader —
+            # later writers are fine, they are the next link of an ordered
+            # read-modify-write chain (declared-resolution pattern).
             writers = [
                 o for o in bound
                 if o.hook.phase == bh.hook.phase and key in o.hook.writes and o is not bh
             ]
-            for w in writers:
-                if w.hook.priority >= bh.hook.priority:
-                    raise PipelineValidationError(
-                        f"{bh.owner}: reads {key!r} in {bh.hook.phase.value} at priority "
-                        f"{bh.hook.priority}, but {w.owner} writes it at priority "
-                        f"{w.hook.priority} (must be strictly earlier)"
-                    )
+            if writers and not any(w.hook.priority < bh.hook.priority for w in writers):
+                earliest = min(w.hook.priority for w in writers)
+                raise PipelineValidationError(
+                    f"{bh.owner}: reads {key!r} in {bh.hook.phase.value} at priority "
+                    f"{bh.hook.priority}, before any writer has produced it (earliest "
+                    f"writer runs at priority {earliest})"
+                )
 
     # Same-phase same-key write conflicts: distinct priorities + declared resolution.
     by_phase_key: dict[tuple[PhaseId, str], list[BoundHook]] = {}

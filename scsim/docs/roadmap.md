@@ -1,7 +1,7 @@
 # Roadmap & milestone status (Part XI)
 
-Engine version: **0.1.0**. ✅ = shipped in this version · 🔜 = next ·
-🧩 = scheduled.
+Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
+🔜 = next · 🧩 = scheduled.
 
 | M | Deliverable | Status |
 |---|---|---|
@@ -11,7 +11,7 @@ Engine version: **0.1.0**. ✅ = shipped in this version · 🔜 = next ·
 | M4 | ST-1 end-to-end + scorecard + RI; fast_scan | ✅ engine-side (`run_st1`, badges, snapshot reuse); job sharding to workers is orchestration-layer work |
 | M5 | Portfolio study + synergy decomposition (CRN, bootstrap stars, overlap diagnostics, breadth ladder) | ✅ engine-side; Portfolio Builder / Synergy Explorer UI pending |
 | M6 | Docs auto-generation + docs CI gate; validation suite | ✅ — `scripts/gen_docs.py --check` gates CI; 90+ tests including golden traces |
-| M7 | capacity_reduction ✅ (shipped early) + ST-2 ✅; plant/edge targets, edge split, MTS + P-P.4, P-S.2, P-S.4, P-C.2, golden #6, ST-3/4/5 | 🔜 — capacity events and ST-2 already shipped; the rest scheduled |
+| M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant/edge targets, edge split, P-S.4, P-C.2, ST-3/4/5 | 🔜 — most of M7 shipped; plant targets / edge split / remaining batteries scheduled |
 | M8 | Remaining 🧩 policies; P-X.1 playbook; LLM diff proposer (flagged) | 🧩 — full parameter schemas already in the registry |
 
 ## Shipped ahead of plan
@@ -20,13 +20,18 @@ Engine version: **0.1.0**. ✅ = shipped in this version · 🔜 = next ·
   conservation tests (planned M7) — needed for the ST-1 vs ST-2 contrast.
 * `edge:lane` targets in behavior-neutral mode (golden #5 equivalence).
 * ST-2 capacity-cut battery with skip-with-reason semantics.
+* MTS mode + P-P.4 + P-S.2 + golden #6 (M7 items, landed in 0.2.0): the
+  CODP is live — networks may mix MTO and MTS products; the M5 positive-
+  synergy exit criterion ({P-P.3, P-P.5} on complementary constraints) is
+  validated in the test suite.
 
 ## Known gaps before M7 closes
 
-* MTS mode (PH-30 + forecast + P-P.4) — engine rejects MTS products with a
-  clear error today.
+* `node:plant` disruption targets (P-P.4's "uniquely protective" case).
 * Edge lead-time split (`Lane.lead_time_weeks > 0` is schema-valid but the
   engine still folds transport into `T_s`).
+* P-S.4 early-warning (the global `detection_lag_weeks` lever already
+  exists in settings; the policy packages it with monitoring cost), P-C.2.
 * ST-3..7 batteries; demand-surge events need a demand-side effect type
   (Tier-3: new event target class).
 * Worker-pool sharding / resumable sweeps (orchestration; the seed tree and

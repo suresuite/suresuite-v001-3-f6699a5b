@@ -19,6 +19,7 @@ from pydantic import Field
 from scsim.core.context import SimContext
 from scsim.core.phases import (
     DEMAND,
+    FG_FULFILLMENT,
     FULFILLMENT,
     PRODUCTION_OUTPUT,
     ST_BACKLOG,
@@ -72,7 +73,7 @@ class UnmetDemandHandling(PolicyPlugin):
         return [
             Hook(
                 phase=PhaseId.PH60, priority=50,
-                reads={DEMAND, PRODUCTION_OUTPUT},
+                reads={DEMAND, PRODUCTION_OUTPUT, FG_FULFILLMENT},
                 writes={FULFILLMENT, ST_BACKLOG, ST_LOST_SALES, ST_COST_LEDGER},
             ),
         ]
@@ -89,10 +90,15 @@ class UnmetDemandHandling(PolicyPlugin):
         p: UnmetDemandParams = self.params
         Q = ctx.production_output
         D = ctx.demand
+        mts = ctx.model.mts_mask
 
         # FIFO: clear existing backlog first, then serve this week's demand.
-        served_backlog = np.minimum(Q, ctx.backlog)
-        served_new = np.minimum(Q - served_backlog, D)
+        # CODP-aware availability: MTO ships production output; MTS shipped
+        # from FG stock at PH-30 (fg_served_*), production went to stock.
+        served_backlog_mto = np.minimum(Q, ctx.backlog)
+        served_new_mto = np.minimum(Q - served_backlog_mto, D)
+        served_backlog = np.where(mts, ctx.fg_served_backlog, served_backlog_mto)
+        served_new = np.where(mts, ctx.fg_served_new, served_new_mto)
         unmet_new = D - served_new
         fulfilled = served_backlog + served_new
 

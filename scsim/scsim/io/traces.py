@@ -41,6 +41,7 @@ def trace_frame(ctx: SimContext) -> dict[str, np.ndarray]:
         "fill_rate": tr.fill_rate,
         "inbound_rejected": tr.inbound_rejected,
         "on_hand_value": tr.on_hand_value,
+        "fg_value": tr.fg_value,
     }
     for i, name in enumerate(COST_COMPONENTS):
         cols[f"cost_{name}"] = ctx.cost.weekly[i]

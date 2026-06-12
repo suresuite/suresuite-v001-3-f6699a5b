@@ -1,5 +1,5 @@
 {
-  "engine_version": "0.1.0",
+  "engine_version": "0.2.0",
   "persistent_state": {
     "state.backlog": [
       "PH-60"
@@ -20,6 +20,9 @@
     "state.fg_on_hand": [
       "PH-30",
       "PH-50"
+    ],
+    "state.fg_target": [
+      "PH-70"
     ],
     "state.lost_sales": [
       "PH-60"
@@ -47,11 +50,12 @@
       ]
     },
     {
-      "description": "Draw D_p[t] from the world demand stream.",
+      "description": "Update the demand forecast from history (\u00a73.3 models), then draw D_p[t] from the world demand stream.",
       "id": "PH-10",
       "name": "demand_realization",
       "owns": [
-        "demand"
+        "demand",
+        "forecast"
       ]
     },
     {

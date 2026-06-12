@@ -46,6 +46,10 @@ class WarmState:
     queue: np.ndarray
     backlog: np.ndarray
     fg_on_hand: np.ndarray
+    fg_target: np.ndarray
+    demand_history: np.ndarray
+    demand_history_n: int
+    forecast_smooth: np.ndarray
     demand_rng_state: dict
     leadtime_rng_state: dict
     policy_state: dict
@@ -78,6 +82,10 @@ class SnapshotStore:
             queue=ctx.queue.copy(),
             backlog=ctx.backlog.copy(),
             fg_on_hand=ctx.fg_on_hand.copy(),
+            fg_target=ctx.fg_target.copy(),
+            demand_history=ctx.demand_history.copy(),
+            demand_history_n=ctx.demand_history_n,
+            forecast_smooth=ctx.forecast_smooth.copy(),
             demand_rng_state=copy.deepcopy(ctx.streams.demand.bit_generator.state),
             leadtime_rng_state=copy.deepcopy(ctx.streams.leadtime.bit_generator.state),
             policy_state=copy.deepcopy(ctx.policy_state),
@@ -91,6 +99,7 @@ class SnapshotStore:
                 "fill_rate": tr.fill_rate[:t_w].copy(),
                 "inbound_rejected": tr.inbound_rejected[:t_w].copy(),
                 "on_hand_value": tr.on_hand_value[:t_w].copy(),
+                "fg_value": tr.fg_value[:t_w].copy(),
             },
             cost_weekly=ctx.cost.weekly[:, :t_w].copy(),
         )
@@ -105,6 +114,10 @@ class SnapshotStore:
         ctx.queue = ws.queue.copy()
         ctx.backlog = ws.backlog.copy()
         ctx.fg_on_hand = ws.fg_on_hand.copy()
+        ctx.fg_target = ws.fg_target.copy()
+        ctx.demand_history = ws.demand_history.copy()
+        ctx.demand_history_n = ws.demand_history_n
+        ctx.forecast_smooth = ws.forecast_smooth.copy()
         ctx.streams.demand.bit_generator.state = copy.deepcopy(ws.demand_rng_state)
         ctx.streams.leadtime.bit_generator.state = copy.deepcopy(ws.leadtime_rng_state)
         ctx.policy_state = copy.deepcopy(ws.policy_state)

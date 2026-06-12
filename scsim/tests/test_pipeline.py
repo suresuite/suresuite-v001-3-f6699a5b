@@ -59,11 +59,24 @@ def test_read_before_write_rejected():
         validate_hooks([_bh("x", phase=PhaseId.PH40, reads={PRODUCTION_OUTPUT})])
 
 
-def test_same_phase_reader_must_follow_writer():
+def test_same_phase_reader_needs_an_earlier_writer():
     writer = _bh("w", phase=PhaseId.PH80, priority=60, writes={PURCHASE_ORDERS})
     reader = _bh("r", phase=PhaseId.PH80, priority=50, reads={PURCHASE_ORDERS})
-    with pytest.raises(PipelineValidationError, match="must be strictly earlier"):
+    with pytest.raises(PipelineValidationError, match="before any writer"):
         validate_hooks([writer, reader])
+
+
+def test_same_phase_read_modify_write_chain_is_valid():
+    """The declared-resolution pattern: release (50) → split (55) → reroute (60),
+    each reading the previous version — must validate (P-P.1/P-S.2/P-S.1)."""
+    a = _bh("a", phase=PhaseId.PH80, priority=50, writes={PURCHASE_ORDERS})
+    b = BoundHook(owner="b", hook=Hook(
+        phase=PhaseId.PH80, priority=55, reads={PURCHASE_ORDERS},
+        writes={PURCHASE_ORDERS}, resolution="splits a's orders"))
+    c = BoundHook(owner="c", hook=Hook(
+        phase=PhaseId.PH80, priority=60, reads={PURCHASE_ORDERS},
+        writes={PURCHASE_ORDERS}, resolution="reroutes b's slices"))
+    validate_hooks([a, b, c])  # no raise
 
 
 def test_write_conflict_needs_distinct_priorities():

@@ -18,8 +18,9 @@ KPI_DICTIONARY: tuple[KpiSpec, ...] = (
             "window (Eq. 10); weekly FR[t] recorded in the trace.", "%"),
     KpiSpec("lost_sales_value", "—", "Σ u_p · L_p over the window.", "€"),
     KpiSpec("cost_of_resilience", "C^res",
-            "mat-SS holding + backup premiums + expediting + overtime + lost sales + "
-            "allocation labor + FG-SS holding (MTS) + backorder penalties (Eq. 23).", "€"),
+            "mat-SS holding + backup premiums + multi-sourcing premiums + expediting + "
+            "overtime + lost sales + allocation labor + FG-SS holding (MTS) + backorder "
+            "penalties (Eq. 23).", "€"),
     KpiSpec("delta_cost", "ΔC^res_i", "1 − C^res_i / C^res_S0, CRN-paired per replication "
             "(Eq. 24-style); positive = cheaper than do-nothing.", "%"),
     KpiSpec("delta_revenue", "ΔR_i", "Σu_p(Q_i − Q_S0) / Σu_p(D − Q_S0), CRN-paired "

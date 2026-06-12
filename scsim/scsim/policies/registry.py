@@ -128,7 +128,9 @@ def _ensure_loaded() -> None:
     import scsim.policies.builtin.p_p1_inventory_control  # noqa: F401
     import scsim.policies.builtin.p_c1_unmet_demand  # noqa: F401
     import scsim.policies.strategic.p_s1_backup_supplier  # noqa: F401
+    import scsim.policies.strategic.p_s2_proactive_multi_sourcing  # noqa: F401
     import scsim.policies.strategic.p_p3_safety_stock  # noqa: F401
+    import scsim.policies.strategic.p_p4_fg_safety_stock  # noqa: F401
     import scsim.policies.anticipation.p_p5_short_term_capacity  # noqa: F401
     import scsim.policies.improvisation.p_p9_material_allocation  # noqa: F401
     import scsim.policies.improvisation.p_t2_expedited_shipments  # noqa: F401

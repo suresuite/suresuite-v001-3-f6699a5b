@@ -18,7 +18,7 @@ Combining Resilience Strategies in Supply Chains."*
 scsim/
   entities/    Part III variable dictionary (Pydantic-canonical)
   core/        phase pipeline (PH-00..PH-99), SimContext, engine
-  policies/    plugin registry — 22-policy catalog, 7 implemented ✅
+  policies/    plugin registry — 22-policy catalog, 9 implemented ✅
   disruption/  generalized event injector (LT-extension ✅, capacity cuts)
   stats/       keyed SeedSequence tree, MSER-5 + Conway, bootstrap
   kpi/         Part V dictionary + Resilience Index
@@ -29,11 +29,14 @@ scsim/
 ```
 
 Implemented (✅) policies: P-P.1 `inventory_control`, P-C.1
-`unmet_demand_handling`, P-S.1 `backup_supplier`, P-P.3
-`safety_stock_materials`, P-P.5 `short_term_capacity`, P-P.9
+`unmet_demand_handling`, P-S.1 `backup_supplier`, P-S.2
+`proactive_multi_sourcing`, P-P.3 `safety_stock_materials`, P-P.4
+`fg_safety_stock` (MTS), P-P.5 `short_term_capacity`, P-P.9
 `material_allocation` (rolling HiGHS LP), P-T.2 `expedited_shipments`.
-The 15 planned (🧩) policies register full parameter schemas and raise a
-milestone-pointing error if enabled — never a silent no-op.
+Both fulfillment modes of the CODP run on the same pipeline: MTO and MTS
+(ADR 0001), mixable per product. The 13 planned (🧩) policies register
+full parameter schemas and raise a milestone-pointing error if enabled —
+never a silent no-op.
 
 ## Install & test
 
