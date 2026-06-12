@@ -145,7 +145,7 @@ BEGIN
     p_user_name,
     p_parent_version_id,
     v_prev,
-    encode(digest(v_snapshot::text, 'sha256'), 'hex')
+    encode(extensions.digest(v_snapshot::text, 'sha256'), 'hex')
   )
   RETURNING id INTO v_id;
 
@@ -161,7 +161,7 @@ CREATE OR REPLACE FUNCTION public.current_policy_hash(p_project_id uuid)
 RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
 AS $$
-  SELECT encode(digest(public._build_policy_snapshot(p_project_id)::text, 'sha256'), 'hex');
+  SELECT encode(extensions.digest(public._build_policy_snapshot(p_project_id)::text, 'sha256'), 'hex');
 $$;
 
 GRANT EXECUTE ON FUNCTION public.current_policy_hash(uuid) TO anon, authenticated;
