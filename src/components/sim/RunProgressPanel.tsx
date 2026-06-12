@@ -8,18 +8,19 @@ import type { SimulationRun, Replication } from "@/hooks/useSimulationRun";
 interface Props {
   run: SimulationRun | null;
   reps: Replication[];
+  versionLabel?: string | null;
   onCancel: () => void;
   onAddReps: (n: number) => void;
 }
 
-export function RunProgressPanel({ run, reps, onCancel, onAddReps }: Props) {
+export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps }: Props) {
   if (!run) {
     return (
       <Card>
         <CardContent className="pt-6 flex flex-col items-center gap-2 text-center">
           <Play className="h-8 w-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            No runs yet. Click <strong>Run</strong> in the header to launch this scenario.
+            No runs yet. Click <strong>Run</strong> above to launch this scenario.
           </p>
         </CardContent>
       </Card>
@@ -47,6 +48,11 @@ export function RunProgressPanel({ run, reps, onCancel, onAddReps }: Props) {
               <Badge variant={statusColor} className="text-[10px] uppercase">
                 {run.status}
               </Badge>
+              {versionLabel && (
+                <Badge variant="outline" className="text-[10px]">
+                  {versionLabel}
+                </Badge>
+              )}
             </CardTitle>
             <div className="flex gap-2">
               {(run.status === "running" || run.status === "queued") && (

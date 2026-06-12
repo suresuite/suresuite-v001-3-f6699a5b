@@ -49,6 +49,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     activePreset,
     presetAppliedAt,
     versions,
+    isDirty,
     selectedVersionId,
     setSelectedVersionId,
     restoreVersion,
@@ -112,6 +113,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                 <PolicyVersionBar
                   versions={versions}
                   selectedVersionId={selectedVersionId}
+                  isDirty={isDirty}
                   onSelect={setSelectedVersionId}
                   onSave={saveSnapshot}
                   onRestore={restoreVersion}

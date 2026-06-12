@@ -14,6 +14,8 @@ export interface SimulationRun {
   rep_count_target: number;
   rep_count_done: number;
   error_message: string | null;
+  policy_version_id: string | null;
+  policy_hash: string | null;
   created_at: string;
 }
 
@@ -88,14 +90,14 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
   }, [scenarioId, loadLatest]);
 
   const runExperiment = useCallback(
-    async (projectId: string) => {
+    async (projectId: string, policyVersionId: string) => {
       if (!scenarioId) return;
       const { error } = await supabase.functions.invoke("sim-command", {
         body: {
           project_id: projectId,
           scenario_id: scenarioId,
           kind: "experiment.run",
-          payload: {},
+          payload: { policy_version_id: policyVersionId },
           client_ts: Date.now(),
         },
       });

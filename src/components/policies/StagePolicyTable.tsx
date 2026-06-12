@@ -25,7 +25,7 @@ import {
   type ColSpec,
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
-import { ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
+import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
@@ -125,7 +125,7 @@ function ValueCell({
       </Select>
     );
   }
-  const opts = ENUM_OPTIONS[spec.field];
+  const opts = SCSIM_ENUM_OPTIONS[spec.field] ?? ENUM_OPTIONS[spec.field];
   if (opts) {
     return (
       <Select value={String(value ?? defaultValue ?? "")} onValueChange={onChange}>

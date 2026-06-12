@@ -14,9 +14,9 @@ export const STAGES: StageDef[] = [
   {
     key: "supplier",
     title: "Supplier",
-    role: "Per supplier × material: sourcing, inbound transport & MOQ.",
-    families: ["sourcing", "transport", "inventory", "production"],
-    overrideFamilies: ["sourcing", "transport", "inventory"],
+    role: "Per supplier × material: sourcing strategy & safety stock. Transport comes from network edge data.",
+    families: ["sourcing", "inventory", "production"],
+    overrideFamilies: ["sourcing", "inventory"],
   },
   {
     key: "plant",
@@ -28,9 +28,9 @@ export const STAGES: StageDef[] = [
   {
     key: "customer",
     title: "Customer",
-    role: "Per customer × product: demand, sourcing firm, price, service level.",
-    families: ["demand", "fulfillment"],
-    overrideFamilies: ["demand", "fulfillment"],
+    role: "Per customer × product: sourcing firm, price, backorder handling. Demand comes from product data.",
+    families: ["fulfillment"],
+    overrideFamilies: ["fulfillment"],
   },
   {
     key: "run_validate",

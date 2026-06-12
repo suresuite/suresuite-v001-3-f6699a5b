@@ -14,6 +14,7 @@ import redis.asyncio as redis
 from .engine import apply_delta, compute_kpis
 from .graph_cache import GraphCache
 from .network_metrics import compute_network_metrics
+from .policy_snapshot import snapshot_to_policies
 from .schemas import Command
 from .scsim_bridge import compute_kpis_scsim, scsim_enabled
 
@@ -155,7 +156,17 @@ class SimWorker:
                     seed = int(scenario_data.get("seed", 42))
                     n_reps = min(200, max(1, int(scenario_data.get("replications", 30))))
 
-                    policies = await self._cache.get_effective_policies(cmd.project_id)
+                    # Runs are bound to a saved policy version: prefer the snapshot
+                    # embedded in the envelope, fetch it by id if it was too large
+                    # to embed, and only fall back to live tables for legacy
+                    # commands that predate version-bound runs.
+                    snapshot: dict | None = raw.get("policy_snapshot")
+                    if snapshot is None and raw.get("policy_version_id"):
+                        snapshot = await self._fetch_version_snapshot(raw["policy_version_id"])
+                    if snapshot is not None:
+                        policies = snapshot_to_policies(snapshot)
+                    else:
+                        policies = await self._cache.get_effective_policies(cmd.project_id)
                     # Merge scenario-level recovery_overrides into policies so the engine
                     # applies the chosen playbook's responses during inventory review.
                     if recovery_data:
@@ -205,6 +216,24 @@ class SimWorker:
         finally:
             await self._redis.xack(stream, CONSUMER_GROUP, msg_id)
             log.debug("handled %s in %.1f ms", cmd.kind, (time.perf_counter() - t0) * 1000)
+
+    async def _fetch_version_snapshot(self, version_id: str) -> dict[str, Any] | None:
+        """Fetch an immutable policy_versions.snapshot via PostgREST (service role)."""
+        try:
+            r = await self._http.get(
+                f"{self._supabase_url}/rest/v1/policy_versions",
+                params={"id": f"eq.{version_id}", "select": "snapshot"},
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                },
+            )
+            r.raise_for_status()
+            rows = r.json()
+            return rows[0]["snapshot"] if rows else None
+        except Exception:
+            log.exception("failed to fetch policy version %s", version_id)
+            return None
 
     async def _broadcast(self, project_id: str, event: str, payload: dict[str, Any]) -> None:
         try:
