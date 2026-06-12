@@ -15,6 +15,7 @@ from .engine import apply_delta, compute_kpis
 from .graph_cache import GraphCache
 from .network_metrics import compute_network_metrics
 from .schemas import Command
+from .scsim_bridge import compute_kpis_scsim, scsim_enabled
 
 log = logging.getLogger(__name__)
 
@@ -163,10 +164,25 @@ class SimWorker:
                             **recovery_data,
                         }
 
-                    kpis = await asyncio.to_thread(
-                        compute_kpis, cg.graph, set(cg.graph.nodes), policies,
-                        n_weeks, seed, n_reps, disruption_schedule,
-                    )
+                    if scsim_enabled():
+                        # Opt-in phase-pipeline engine (SCSIM_ENGINE=1); falls
+                        # back to the legacy engine on any conversion failure.
+                        try:
+                            kpis = await asyncio.to_thread(
+                                compute_kpis_scsim, cg.graph, policies,
+                                n_weeks, seed, n_reps, disruption_schedule,
+                            )
+                        except Exception:
+                            log.exception("scsim bridge failed; falling back to legacy engine")
+                            kpis = await asyncio.to_thread(
+                                compute_kpis, cg.graph, set(cg.graph.nodes), policies,
+                                n_weeks, seed, n_reps, disruption_schedule,
+                            )
+                    else:
+                        kpis = await asyncio.to_thread(
+                            compute_kpis, cg.graph, set(cg.graph.nodes), policies,
+                            n_weeks, seed, n_reps, disruption_schedule,
+                        )
                     # Attach run_id so the broadcast payload links to the DB run row
                     kpis["run_id"] = raw.get("run_id")
 

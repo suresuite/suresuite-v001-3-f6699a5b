@@ -1,0 +1,137 @@
+{
+  "engine_version": "0.2.0",
+  "persistent_state": {
+    "state.backlog": [
+      "PH-60"
+    ],
+    "state.cost_ledger": [
+      "PH-00",
+      "PH-10",
+      "PH-20",
+      "PH-30",
+      "PH-40",
+      "PH-50",
+      "PH-60",
+      "PH-70",
+      "PH-80",
+      "PH-90",
+      "PH-99"
+    ],
+    "state.fg_on_hand": [
+      "PH-30",
+      "PH-50"
+    ],
+    "state.fg_target": [
+      "PH-70"
+    ],
+    "state.lost_sales": [
+      "PH-60"
+    ],
+    "state.on_hand": [
+      "PH-50",
+      "PH-90"
+    ],
+    "state.pipeline": [
+      "PH-80",
+      "PH-90"
+    ],
+    "state.queue": [
+      "PH-80",
+      "PH-90"
+    ]
+  },
+  "phases": [
+    {
+      "description": "Onset/recovery profiles \u2192 physical disruption state for the week.",
+      "id": "PH-00",
+      "name": "week_start",
+      "owns": [
+        "disruption_state"
+      ]
+    },
+    {
+      "description": "Update the demand forecast from history (\u00a73.3 models), then draw D_p[t] from the world demand stream.",
+      "id": "PH-10",
+      "name": "demand_realization",
+      "owns": [
+        "demand",
+        "forecast"
+      ]
+    },
+    {
+      "description": "Firm-visible events (t \u2265 start + detection_lag). P-S.4 / P-X.1 evaluate here.",
+      "id": "PH-20",
+      "name": "detection",
+      "owns": [
+        "firm_knowledge"
+      ]
+    },
+    {
+      "description": "MTS serves D_p from I^FG; no-op for MTO products.",
+      "id": "PH-30",
+      "name": "fulfill_from_stock",
+      "owns": [
+        "fg_fulfillment"
+      ]
+    },
+    {
+      "description": "Plan production: default greedy plan; P-P.5/P-P.9 et al. adjust here.",
+      "id": "PH-40",
+      "name": "production_planning",
+      "owns": [
+        "production_plan",
+        "overtime_capacity",
+        "substitutions"
+      ]
+    },
+    {
+      "description": "Pure mechanics (Eqs. 8/9): produce Q_p, consume materials.",
+      "id": "PH-50",
+      "name": "production_execute",
+      "owns": [
+        "production_output"
+      ]
+    },
+    {
+      "description": "F_p, B_p, L_p \u2014 P-C.1/P-C.2/P-C.3 resident.",
+      "id": "PH-60",
+      "name": "fulfillment",
+      "owns": [
+        "fulfillment"
+      ]
+    },
+    {
+      "description": "D_m projection (Eq. 1); s_m/S_m levels (Eqs. 2\u20133) + safety stock.",
+      "id": "PH-70",
+      "name": "material_planning",
+      "owns": [
+        "material_demand",
+        "inventory_levels"
+      ]
+    },
+    {
+      "description": "Order release (Eqs. 4\u20136) and sourcing decisions; orders enter the supplier queue.",
+      "id": "PH-80",
+      "name": "procurement",
+      "owns": [
+        "purchase_orders"
+      ]
+    },
+    {
+      "description": "Ship queue under capacity gating, defer in-window arrivals (Eqs. 11\u201312), expedite (Eqs. 18\u201319), land arrivals.",
+      "id": "PH-90",
+      "name": "logistics",
+      "owns": [
+        "arrivals"
+      ]
+    },
+    {
+      "description": "Read-only KPI rows, cost rollup, trace.",
+      "id": "PH-99",
+      "name": "accounting",
+      "owns": [
+        "kpi_rows"
+      ]
+    }
+  ]
+}

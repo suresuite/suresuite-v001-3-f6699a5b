@@ -29,6 +29,24 @@ the edge function (or filter `source==='stub'` client-side).
 - `networkx` + `simpy` — graph + DES (reuse logic from the existing `ml-service`)
 - `pydantic` — shared command/event schemas
 
+## SCSIM engine bridge (opt-in)
+
+`experiment.run` workloads can execute on the new phase-pipeline engine in
+[`../scsim`](../scsim/README.md) instead of the legacy dict-based engine:
+
+```bash
+pip install -e ../scsim        # alongside requirements.txt
+SCSIM_ENGINE=1 python -m sim_worker
+```
+
+`sim_worker/scsim_bridge.py` converts the project graph + effective policy
+dict via `scsim.io.legacy_graph.from_legacy_graph` (a structural mapping —
+every approximation is listed in the returned `scsim_notes`) and reshapes
+the results into the existing `mean_*/ci_*` broadcast format, adding
+`engine_version`, replication badges, and portfolio feasibility warnings.
+Any bridge failure falls back to the legacy engine, so the flag is safe to
+flip per deployment.
+
 ## Local run
 
 ```bash
