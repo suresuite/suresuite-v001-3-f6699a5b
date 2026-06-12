@@ -1,0 +1,147 @@
+"""Per-replication KPI extraction + the Resilience Index (Part V).
+
+All KPIs are computed over the analysis window [t_w, window_end). TTR/TTS
+use the replication's own pre-disruption fill-rate band (baseline − 2 pp by
+default); SLA and the deltas are study-level (CRN-paired) and live in
+``core.engine.run_portfolio_study`` / ``stress``.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from scsim.core.context import COST_COMPONENTS, ResolvedEvent, SimContext
+
+FR_BAND_PP = 0.02          # band half-width below the pre-disruption baseline
+TTR_SUSTAIN_WEEKS = 3      # recovery must hold this long
+
+
+def compute_replication_kpis(
+    ctx: SimContext,
+    t_w: int,
+    window_end: int,
+    events: list[ResolvedEvent],
+) -> dict[str, float]:
+    tr = ctx.trace
+    w = slice(t_w, window_end)
+    window_len = window_end - t_w
+
+    demand_value = float(tr.demand_value[w].sum())
+    fulfilled_value = float(tr.fulfilled_value[w].sum())
+    produced_value = float(tr.revenue_value[w].sum())
+    fill_rate = fulfilled_value / demand_value if demand_value > 0 else 1.0
+
+    costs = ctx.cost.total_by_component(t_w, window_end)
+    c_res = float(sum(costs.values()))
+
+    row: dict[str, float] = {
+        "fill_rate": fill_rate,
+        "demand_value": demand_value,
+        "produced_value": produced_value,
+        "revenue": produced_value,
+        "lost_sales_value": float(tr.lost_value[w].sum()),
+        "lost_units": float(tr.lost_units[w].sum()),
+        "max_backlog": float(tr.backlog_units[w].max()) if window_len else 0.0,
+        "lost_inbound_units": float(tr.inbound_rejected[w].sum()),
+        "avg_on_hand_value": float(tr.on_hand_value[w].mean()) if window_len else 0.0,
+        "capacity_utilization": _utilization(ctx, t_w, window_end),
+        "cost_of_resilience": c_res,
+    }
+    for name in COST_COMPONENTS:
+        row[f"cost_{name}"] = costs[name]
+
+    if events:
+        ttr, tts, baseline = _ttr_tts(tr.fill_rate, t_w, window_end, events)
+        row["ttr_weeks"] = ttr
+        row["tts_weeks"] = tts
+        row["pre_disruption_fill_rate"] = baseline
+    return row
+
+
+def _utilization(ctx: SimContext, t_w: int, window_end: int) -> float:
+    if ctx.trace.Q is None:
+        return float("nan")  # needs full_debug matrices; diagnostic only
+    q = ctx.trace.Q[:, t_w:window_end]
+    cap = ctx.model.capacity[:, None]
+    return float((q / cap).mean())
+
+
+def _ttr_tts(
+    fr: np.ndarray, t_w: int, window_end: int, events: list[ResolvedEvent]
+) -> tuple[float, float, float]:
+    t_star = min(e.start for e in events)
+    t_star = max(t_star, t_w)
+    pre = fr[t_w:t_star]
+    baseline = float(pre.mean()) if pre.size else 1.0
+    band = baseline - FR_BAND_PP
+
+    post = fr[t_star:window_end]
+    if post.size == 0:
+        return 0.0, 0.0, baseline
+    below = post < band
+    if not below.any():
+        return 0.0, float(post.size), baseline  # never left the band: TTS censored at window
+
+    tts = float(np.argmax(below))  # first week below the band
+    first_below = int(np.argmax(below))
+    ttr = float(post.size)  # censored default
+    for k in range(first_below, post.size):
+        seg = post[k:k + TTR_SUSTAIN_WEEKS]
+        if seg.size and (seg >= band).all():
+            ttr = float(k)
+            break
+    return ttr, tts, baseline
+
+
+# ---------------------------------------------------------------------------
+# Resilience Index (Part V) — components always shown
+# ---------------------------------------------------------------------------
+
+DEFAULT_RI_WEIGHTS = (0.35, 0.25, 0.15, 0.25)  # (SLA, TTR, TTS, cost)
+
+
+@dataclass(frozen=True)
+class ResilienceIndex:
+    ri: float
+    sla_norm: float    # ŠLA — service loss share of the window [0, 1]
+    ttr_norm: float    # ŤTR — recovery time share of the window [0, 1]
+    tts_norm: float    # ŤTS — survival share of the window [0, 1]
+    cost_norm: float   # Č — C^res share of clean revenue [0, 1]
+    weights: tuple[float, float, float, float]
+
+    def as_dict(self) -> dict[str, float]:
+        return {
+            "resilience_index": self.ri,
+            "sla_norm": self.sla_norm,
+            "ttr_norm": self.ttr_norm,
+            "tts_norm": self.tts_norm,
+            "cost_norm": self.cost_norm,
+        }
+
+
+def resilience_index(
+    service_loss_area: float,
+    ttr_weeks: float,
+    tts_weeks: float,
+    cost_of_resilience: float,
+    window_weeks: int,
+    clean_revenue: float,
+    weights: tuple[float, float, float, float] = DEFAULT_RI_WEIGHTS,
+) -> ResilienceIndex:
+    """RI = 100·[w1(1−ŠLA) + w2(1−ŤTR) + w3·ŤTS + w4(1−Č)].
+
+    Normalizations (documented in docs/kpis.md): ŠLA = SLA / window (FR is in
+    [0,1] so the window length bounds the area); ŤTR = TTR / window;
+    ŤTS = TTS / window; Č = C^res / clean-baseline revenue, clipped to [0,1].
+    """
+    if abs(sum(weights) - 1.0) > 1e-9:
+        raise ValueError("RI weights must sum to 1")
+    win = max(window_weeks, 1)
+    sla_n = float(np.clip(service_loss_area / win, 0.0, 1.0))
+    ttr_n = float(np.clip(ttr_weeks / win, 0.0, 1.0))
+    tts_n = float(np.clip(tts_weeks / win, 0.0, 1.0))
+    cost_n = float(np.clip(cost_of_resilience / max(clean_revenue, 1e-9), 0.0, 1.0))
+    w1, w2, w3, w4 = weights
+    ri = 100.0 * (w1 * (1 - sla_n) + w2 * (1 - ttr_n) + w3 * tts_n + w4 * (1 - cost_n))
+    return ResilienceIndex(ri, sla_n, ttr_n, tts_n, cost_n, weights)

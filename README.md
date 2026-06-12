@@ -36,6 +36,28 @@ npm i
 npm run dev
 ```
 
+## SCSIM simulation engine
+
+The resilience-grade 3-echelon supply chain simulator lives under
+[`scsim/`](scsim/README.md) — a phase-pipeline weekly DES with a 22-policy
+catalog (7 manuscript-validated strategies implemented), a generalized
+disruption injector, ST-1/ST-2 stress-test batteries with a Resilience
+Index, CRN portfolio studies with synergy decomposition, and a statistical
+engine (keyed RNG tree, MSER-5/Conway warm-up, percentile bootstrap).
+
+```bash
+pip install -e "./scsim[dev]"
+python -m pytest scsim/tests -q          # golden traces, G-RNG, perf guard
+python scsim/scripts/gen_docs.py --check # docs CI gate
+python -m scsim.io.registry_export       # the /scsim/registry payload
+```
+
+Documentation: [`scsim/docs/`](scsim/docs/index.md) (MkDocs; the policy
+catalog / variable dictionary / pipeline contract pages are generated from
+the code registry). The existing Fly.io worker can run experiments on this
+engine behind the `SCSIM_ENGINE=1` flag — see
+[`sim-worker/README.md`](sim-worker/README.md#scsim-engine-bridge-opt-in).
+
 ## Backend API
 
 The FastAPI backend now lives under `services/api`.

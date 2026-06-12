@@ -1,0 +1,55 @@
+name: scsim engine tests
+
+on:
+  push:
+    paths:
+      - "scsim/**"
+      - "sim-worker/**"
+      - ".github/workflows/scsim-tests.yml"
+  pull_request:
+    paths:
+      - "scsim/**"
+      - "sim-worker/**"
+  workflow_dispatch:
+
+jobs:
+  scsim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install scsim
+        run: pip install -e "./scsim[dev]"
+
+      - name: Engine test suite (incl. golden traces, G-RNG, perf guard)
+        run: python -m pytest scsim/tests -q
+
+      - name: Docs CI gate — generated reference pages must match the registry
+        run: python scsim/scripts/gen_docs.py --check
+        working-directory: .
+
+      - name: Registry payload builds
+        run: python -m scsim.io.registry_export > /tmp/registry.json
+
+  sim-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install worker deps + scsim (bridge)
+        run: |
+          pip install -r sim-worker/requirements.txt pytest
+          pip install -e ./scsim
+
+      - name: Worker test suite (legacy engine + scsim bridge)
+        run: python -m pytest sim-worker/tests -q

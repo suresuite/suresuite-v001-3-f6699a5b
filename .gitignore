@@ -29,3 +29,9 @@ __pycache__/
 *.py[cod]
 *.pyo
 .pytest_cache/
+
+# Python build/test artifacts
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
