@@ -24,6 +24,7 @@ import ProjectIntelligence from './pages/ProjectIntelligence';
 import Profile from './pages/Profile';
 import Forbidden from './pages/Forbidden';
 import About from './pages/About';
+import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
 
 const queryClient = new QueryClient();
 
@@ -154,6 +155,7 @@ function App() {
                 <Route path="/about" element={<About isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />} />
                 <Route path="/test-prominence" element={<TestProminence />} />
               </Routes>
+              <FloatingChatBubble />
             </Router>
           </GlobalProjectProvider>
         </AuthProvider>
