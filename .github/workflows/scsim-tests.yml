@@ -12,6 +12,12 @@ on:
       - "sim-worker/**"
   workflow_dispatch:
 
+# The repo-root `scsim/` SERVICE directory shadows the installed `scsim`
+# PACKAGE as a PEP-420 namespace package when Python runs with the repo root
+# as cwd. Two defenses below: a non-editable install (a regular package in
+# site-packages beats any cwd namespace portion) and `working-directory` on
+# every Python step so each suite also picks up its own pytest config.
+
 jobs:
   scsim:
     runs-on: ubuntu-latest
@@ -24,17 +30,19 @@ jobs:
           cache: pip
 
       - name: Install scsim
-        run: pip install -e "./scsim[dev]"
+        run: pip install "./scsim[dev]"
 
       - name: Engine test suite (incl. golden traces, G-RNG, perf guard)
-        run: python -m pytest scsim/tests -q
+        run: python -m pytest tests -q
+        working-directory: scsim
 
       - name: Docs CI gate — generated reference pages must match the registry
-        run: python scsim/scripts/gen_docs.py --check
-        working-directory: .
+        run: python scripts/gen_docs.py --check
+        working-directory: scsim
 
       - name: Registry payload builds
         run: python -m scsim.io.registry_export > /tmp/registry.json
+        working-directory: scsim
 
   sim-worker:
     runs-on: ubuntu-latest
@@ -49,7 +57,8 @@ jobs:
       - name: Install worker deps + scsim (bridge)
         run: |
           pip install -r sim-worker/requirements.txt pytest
-          pip install -e ./scsim
+          pip install ./scsim
 
       - name: Worker test suite (legacy engine + scsim bridge)
-        run: python -m pytest sim-worker/tests -q
+        run: python -m pytest tests -q
+        working-directory: sim-worker
