@@ -1,7 +1,9 @@
 # Fly.io configuration for sim-worker.
 # Run `fly launch --no-deploy --copy-config` to register the app, then `fly deploy`.
+# CI (.github/workflows/deploy-sim-worker.yml) overrides `app` with the
+# FLY_APP_NAME Actions variable, so keep that variable and this value in sync.
 
-app = "sim-worker"
+app = "suresuite-sim-worker"   # globally-unique Fly app name — change if taken
 primary_region = "iad"   # set this close to your Supabase region
 
 [build]

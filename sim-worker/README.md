@@ -73,6 +73,26 @@ Use the native Redis URL (`rediss://`) from Upstash, **not** the REST URL
 that the edge function uses. The native protocol gives you `XREAD BLOCK`
 which is essential for sub-50 ms command pickup.
 
+### Automated deploy (CI)
+
+`.github/workflows/deploy-sim-worker.yml` deploys this worker to Fly on every
+push that touches `sim-worker/**` (and on manual `workflow_dispatch`). It
+creates the app if missing, syncs the Fly secrets, and runs
+`flyctl deploy --remote-only`. Configure once in **GitHub repo → Settings →
+Secrets and variables → Actions**:
+
+| Kind | Name | Value |
+|---|---|---|
+| Variable | `FLY_APP_NAME` | globally-unique Fly app name (must match `fly.toml`'s `app`) |
+| Secret | `FLY_API_TOKEN` | output of `flyctl auth token` |
+| Secret | `UPSTASH_REDIS_URL` | native `rediss://default:<token>@<host>:6379` (same DB as the edge function's REST URL) |
+| Secret | `SUPABASE_URL` | `https://<ref>.supabase.co` |
+| Secret | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key |
+
+Once it's live, a scenario **Run** in the app flips from the yellow
+"preliminary (stub)" badge to a green "worker engine" badge with real KPIs —
+that flip confirms the engine is actually running.
+
 ## Latency budget (target)
 
 | Stage | Budget |
