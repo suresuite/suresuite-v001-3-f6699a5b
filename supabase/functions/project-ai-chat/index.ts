@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { runChatWithTools, type ChatTurn } from "./gemini.ts";
+import { runChat, type ChatTurn } from "./providers.ts";
 import { makeToolContext } from "./tools.ts";
 
 const corsHeaders = {
@@ -51,21 +51,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    const { projectId, message, conversationHistory, userId, userEmail, mode } = await req.json();
+    const { projectId, message, conversationHistory, userId, userEmail, mode, model } = await req.json();
 
     if (!projectId || !message || !userId || !userEmail) {
       throw new Error('Missing required parameters: projectId, message, userId, userEmail');
     }
 
-    // === NEW: tool-calling chat mode (Gemini + function calls) ===
+    // === Tool-calling chat mode (multi-provider: Gemini, OpenAI, DeepSeek) ===
     if (mode === 'tools') {
-      const geminiKey = Deno.env.get('GEMINI_API_KEY');
-      if (!geminiKey) {
-        return new Response(JSON.stringify({
-          error: 'AI service is not configured (missing GEMINI_API_KEY).',
-          type: 'SERVICE_UNAVAILABLE',
-        }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
       try {
         const history = Array.isArray(conversationHistory)
           ? (conversationHistory as ChatTurn[]).filter(
@@ -73,19 +66,21 @@ serve(async (req) => {
             )
           : [];
         const ctx = makeToolContext(projectId, userId);
-        const result = await runChatWithTools(geminiKey, String(message).slice(0, 4000), history, ctx);
+        const result = await runChat(model, String(message).slice(0, 4000), history, ctx);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       } catch (err) {
         console.error('tools-mode error:', err);
+        const msg = err instanceof Error ? err.message : 'AI request failed.';
+        const isConfig = /not configured/i.test(msg);
         return new Response(JSON.stringify({
-          error: 'AI request failed. Please try again.',
-          type: 'AI_ERROR',
-        }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          error: isConfig ? msg : 'AI request failed. Please try again.',
+          type: isConfig ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR',
+        }), { status: isConfig ? 503 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
-    // === END new branch ===
+    // === END tools branch ===
 
     console.log('Request received for project:', projectId, 'user:', userId);
 
