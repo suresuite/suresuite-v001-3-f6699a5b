@@ -74,10 +74,13 @@ serve(async (req) => {
         console.error('tools-mode error:', err);
         const msg = err instanceof Error ? err.message : 'AI request failed.';
         const isConfig = /not configured/i.test(msg);
+        // Return 200 with the real message in `error`: supabase-js `invoke` discards the
+        // body of non-2xx responses, which would hide the cause behind a generic
+        // "Edge Function returned a non-2xx status code". The client throws on `error`.
         return new Response(JSON.stringify({
-          error: isConfig ? msg : 'AI request failed. Please try again.',
+          error: msg,
           type: isConfig ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR',
-        }), { status: isConfig ? 503 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
     // === END tools branch ===
