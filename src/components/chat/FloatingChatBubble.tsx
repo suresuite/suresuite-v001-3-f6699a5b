@@ -17,13 +17,15 @@ const SUGGESTIONS = [
 
 const LAUNCHER_POS_KEY = "projectChat.launcherPos";
 const LAUNCHER_SIZE = { w: 60, h: 60 };
+const PANEL_POS_KEY = "projectChat.panelPos";
+const PANEL_SIZE = { w: 480, h: 760 };
 
 interface Pos { x: number; y: number }
 
-function loadPos(): Pos | null {
+function loadPosFrom(key: string): Pos | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(LAUNCHER_POS_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (typeof p?.x === "number" && typeof p?.y === "number") return p;
@@ -31,9 +33,28 @@ function loadPos(): Pos | null {
   return null;
 }
 
+function loadPos(): Pos | null {
+  return loadPosFrom(LAUNCHER_POS_KEY);
+}
+
 function defaultPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
   return { x: window.innerWidth - LAUNCHER_SIZE.w - 20, y: window.innerHeight - LAUNCHER_SIZE.h - 20 };
+}
+
+// Effective panel size, capped to the viewport so it always fits.
+function panelSize(): { w: number; h: number } {
+  if (typeof window === "undefined") return { w: PANEL_SIZE.w, h: PANEL_SIZE.h };
+  return {
+    w: Math.min(PANEL_SIZE.w, window.innerWidth - 16),
+    h: Math.min(PANEL_SIZE.h, window.innerHeight - 24),
+  };
+}
+
+function defaultPanelPos(): Pos {
+  if (typeof window === "undefined") return { x: 20, y: 20 };
+  const s = panelSize();
+  return { x: window.innerWidth - s.w - 12, y: window.innerHeight - s.h - 12 };
 }
 
 export function FloatingChatBubble() {
@@ -47,6 +68,9 @@ export function FloatingChatBubble() {
   const [pos, setPos] = useState<Pos>(() => loadPos() ?? defaultPos());
   const [dragging, setDragging] = useState(false);
   const dragState = useRef<{ ox: number; oy: number; moved: boolean } | null>(null);
+  const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos());
+  const [panelDragging, setPanelDragging] = useState(false);
+  const panelDragState = useRef<{ ox: number; oy: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,12 +86,17 @@ export function FloatingChatBubble() {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
-  // Keep launcher in viewport on resize.
+  // Keep launcher and panel in viewport on resize.
   useEffect(() => {
     const onResize = () => {
       setPos((p) => ({
         x: Math.min(Math.max(0, p.x), window.innerWidth - LAUNCHER_SIZE.w),
         y: Math.min(Math.max(0, p.y), window.innerHeight - LAUNCHER_SIZE.h),
+      }));
+      const s = panelSize();
+      setPanelPos((p) => ({
+        x: Math.min(Math.max(8, p.x), window.innerWidth - s.w),
+        y: Math.min(Math.max(8, p.y), window.innerHeight - s.h),
       }));
     };
     window.addEventListener("resize", onResize);
@@ -101,6 +130,33 @@ export function FloatingChatBubble() {
     };
   }, [dragging, pos]);
 
+  // Panel drag handlers
+  useEffect(() => {
+    if (!panelDragging) return;
+    const onMove = (e: PointerEvent) => {
+      if (!panelDragState.current) return;
+      const s = panelSize();
+      const nx = e.clientX - panelDragState.current.ox;
+      const ny = e.clientY - panelDragState.current.oy;
+      setPanelPos({
+        x: Math.min(Math.max(8, nx), window.innerWidth - s.w),
+        y: Math.min(Math.max(8, ny), window.innerHeight - s.h),
+      });
+    };
+    const onUp = () => {
+      setPanelDragging(false);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(PANEL_POS_KEY, JSON.stringify(panelPos));
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [panelDragging, panelPos]);
+
   if (hidden) return null;
 
   const onSubmit = async (e?: React.FormEvent) => {
@@ -123,6 +179,11 @@ export function FloatingChatBubble() {
     setDragging(true);
   };
 
+  const startPanelDrag = (e: React.PointerEvent) => {
+    panelDragState.current = { ox: e.clientX - panelPos.x, oy: e.clientY - panelPos.y };
+    setPanelDragging(true);
+  };
+
   return (
     <>
       {/* Launcher (draggable round button) */}
@@ -139,9 +200,27 @@ export function FloatingChatBubble() {
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
-          {/* Orbiting glow dot */}
-          <span className="pointer-events-none absolute inset-0 animate-spin" style={{ animationDuration: "3s" }}>
-            <span className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 shadow-[0_0_8px_2px_rgba(239,68,68,0.9)]" />
+          {/* Orbiting comet: bright head + fading, shrinking trail */}
+          <span className="pointer-events-none absolute inset-0">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={i}
+                className="absolute inset-0 animate-spin"
+                style={{ animationDuration: "2.6s" }}
+              >
+                <span className="absolute inset-0" style={{ transform: `rotate(${-13 * i}deg)` }}>
+                  <span
+                    className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
+                    style={{
+                      height: `${5 - i * 0.7}px`,
+                      width: `${5 - i * 0.7}px`,
+                      opacity: 1 - i * 0.2,
+                      boxShadow: i === 0 ? "0 0 8px 2px rgba(239,68,68,0.9)" : "none",
+                    }}
+                  />
+                </span>
+              </span>
+            ))}
           </span>
           <MessageSquare className="h-6 w-6" />
         </button>
@@ -150,19 +229,31 @@ export function FloatingChatBubble() {
       {/* Panel */}
       {open && (
         <div
-          className="fixed inset-x-2 bottom-2 z-50 flex h-[min(80vh,640px)] flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[640px] sm:w-[420px]"
+          style={{
+            left: panelPos.x,
+            top: panelPos.y,
+            width: "min(480px, calc(100vw - 16px))",
+            height: "min(760px, calc(100vh - 24px))",
+          }}
+          className="fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
           role="dialog"
           aria-label="Supply Chain assistant"
         >
           {/* Header */}
           <div className="flex items-center gap-2 border-b border-border bg-gradient-to-r from-emerald-500/10 to-transparent px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 text-white">
-              <MessageSquare className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold leading-tight">SC assistant</div>
-              <div className="truncate text-[11px] text-muted-foreground">
-                {projectLabel ? `Project: ${projectLabel}` : "No project selected"}
+            <div
+              onPointerDown={startPanelDrag}
+              className="flex min-w-0 flex-1 cursor-move select-none items-center gap-2"
+              title="Drag to move"
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-white">
+                <MessageSquare className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold leading-tight">SC assistant</div>
+                <div className="truncate text-[11px] text-muted-foreground">
+                  {projectLabel ? `Project: ${projectLabel}` : "No project selected"}
+                </div>
               </div>
             </div>
             <ModelPicker value={model} onChange={onModelChange} />
