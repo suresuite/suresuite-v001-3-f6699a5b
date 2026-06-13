@@ -49,19 +49,19 @@ export function AssistantMascot({ className }: Props) {
 
         {/* eyes (round, glowing) — shown by default, hidden on hover */}
         <g className="mascot-glance mascot-eyes-open" filter="url(#mascotGlow)">
-          <circle className="mascot-blink" cx="16" cy="20" r="2.2" fill="#ff0033" />
-          <circle className="mascot-blink" cx="24" cy="20" r="2.2" fill="#ff0033" />
+          <circle className="mascot-blink" cx="16" cy="20" r="2.2" fill="#22d3ee" />
+          <circle className="mascot-blink" cx="24" cy="20" r="2.2" fill="#22d3ee" />
         </g>
 
         {/* happy eyes (arcs) — shown on hover */}
-        <g className="mascot-eyes-happy" filter="url(#mascotGlow)" stroke="#ff0033" strokeWidth="2" strokeLinecap="round" fill="none">
+        <g className="mascot-eyes-happy" filter="url(#mascotGlow)" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" fill="none">
           <path d="M13.5 21 q2.5 -3 5 0" />
           <path d="M21.5 21 q2.5 -3 5 0" />
         </g>
 
         {/* mouth: straight by default, smile on hover */}
         <path className="mascot-mouth-idle" d="M16.5 29 h7" stroke="#a1a1aa" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-        <path className="mascot-mouth-smile" d="M16 28.5 q4 3.5 8 0" stroke="#ff0033" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+        <path className="mascot-mouth-smile" d="M16 28.5 q4 3.5 8 0" stroke="#22d3ee" strokeWidth="1.6" strokeLinecap="round" fill="none" />
       </g>
     </svg>
   );
