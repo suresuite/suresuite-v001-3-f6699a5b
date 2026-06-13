@@ -196,33 +196,21 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             setOpen(true);
           }}
-          className="fixed z-50 flex cursor-grab select-none items-center justify-center rounded-full border-2 border-red-500 bg-black text-white shadow-lg shadow-[0_0_12px_2px_rgba(239,68,68,0.45)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="fixed z-50 flex cursor-grab select-none items-center justify-center overflow-hidden rounded-full border border-red-500/25 bg-black text-white shadow-lg shadow-[0_0_12px_2px_rgba(239,68,68,0.45)] transition hover:bg-neutral-900 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
-          {/* Orbiting comet: bright head + fading, shrinking trail */}
-          <span className="pointer-events-none absolute inset-0">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <span
-                key={i}
-                className="absolute inset-0 animate-spin"
-                style={{ animationDuration: "2.6s" }}
-              >
-                <span className="absolute inset-0" style={{ transform: `rotate(${-13 * i}deg)` }}>
-                  <span
-                    className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
-                    style={{
-                      height: `${5 - i * 0.7}px`,
-                      width: `${5 - i * 0.7}px`,
-                      opacity: 1 - i * 0.2,
-                      boxShadow: i === 0 ? "0 0 8px 2px rgba(239,68,68,0.9)" : "none",
-                    }}
-                  />
-                </span>
-              </span>
-            ))}
-          </span>
-          <MessageSquare className="h-6 w-6" />
+          {/* Rotating light: a soft light-red glow with a fading tail glides around the rim */}
+          <span
+            className="pointer-events-none absolute -inset-px animate-spin rounded-full"
+            style={{
+              animationDuration: "2.4s",
+              background:
+                "conic-gradient(from 0deg, rgba(239,68,68,0) 0deg, rgba(239,68,68,0) 230deg, rgba(239,68,68,0.55) 320deg, rgba(254,202,202,1) 356deg, rgba(239,68,68,0) 360deg)",
+            }}
+          />
+          <span className="pointer-events-none absolute inset-[2px] rounded-full bg-black" />
+          <MessageSquare className="relative h-6 w-6" />
         </button>
       )}
 
