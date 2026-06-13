@@ -196,13 +196,13 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             setOpen(true);
           }}
-          className="fixed z-50 flex cursor-grab select-none items-center justify-center overflow-hidden rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="fixed z-50 flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
-          {/* Rotating light: a neon-red glow with a fading tail glides around the rim */}
+          {/* Rotating light: a neon-red glow with a fading tail rides on top of the border */}
           <span
-            className="pointer-events-none absolute -inset-px animate-spin rounded-full"
+            className="pointer-events-none absolute -inset-[2px] animate-spin rounded-full"
             style={{
               animationDuration: "2.4s",
               background:
