@@ -17,9 +17,28 @@ jobs:
         with:
           version: latest
 
+      # Push provider API keys from GitHub Actions secrets into the Supabase
+      # function environment. Each key is set only when present, so a partially
+      # configured repo still deploys. GitHub masks the values in logs.
+      - name: Set function secrets
+        run: |
+          args=()
+          [ -n "$GEMINI_API_KEY" ]   && args+=("GEMINI_API_KEY=$GEMINI_API_KEY")
+          [ -n "$OPENAI_API_KEY" ]   && args+=("OPENAI_API_KEY=$OPENAI_API_KEY")
+          [ -n "$DEEPSEEK_API_KEY" ] && args+=("DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY")
+          if [ ${#args[@]} -gt 0 ]; then
+            supabase secrets set --project-ref wckdrutwkytwcomrlpib "${args[@]}"
+          else
+            echo "No provider API keys found in GitHub secrets; skipping (function will report 'not configured')."
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+
       # Deploy the AI chat edge function. verify_jwt is configured in
-      # supabase/config.toml, which the deploy reads. Function secrets
-      # (GEMINI/OPENAI/DEEPSEEK keys) are managed separately and untouched here.
+      # supabase/config.toml, which the deploy reads.
       - name: Deploy project-ai-chat
         run: supabase functions deploy project-ai-chat --project-ref wckdrutwkytwcomrlpib
         env:
