@@ -29,6 +29,23 @@ def _meta(unit: str, scope: str, notes: str = "") -> dict:
     return {"unit": unit, "scope": scope, "notes": notes}
 
 
+def triangular_av(average: float, variability: float) -> tuple[float, float, float]:
+    """AnyLogic-style ``triangularAV`` — a symmetric triangular distribution
+    expressed as "average ± variability" rather than explicit (min, mode, max).
+
+    ``AV`` stands for *Average & Variability*. The mode is the average and the
+    half-range is ``variability`` (a fraction in [0, 1]) of the average::
+
+        triangularAV(avg, v) = triangular(avg·(1−v), avg, avg·(1+v))
+
+    The lower bound is floored at 0 (demand cannot be negative), so for v > 1 the
+    left tail clamps to 0 while the mode stays at the average.
+
+    Returns the ``(a, b, c)`` triple consumed by the triangular demand sampler.
+    """
+    return (max(0.0, average * (1.0 - variability)), average, average * (1.0 + variability))
+
+
 class Supplier(BaseModel):
     """Supplier echelon — §3.5."""
 
@@ -135,7 +152,11 @@ class Product(BaseModel):
         DemandModel.TRIANGULAR, json_schema_extra=_meta("enum", "P"),
     )
     demand_mode: float = Field(
-        ..., ge=0, json_schema_extra=_meta("units/wk", "P", "b_p — historical median."),
+        ..., ge=0,
+        json_schema_extra=_meta(
+            "units/wk", "P",
+            "b_p — historical median; the average (mode) of the triangularAV demand form.",
+        ),
     )
     demand_min: Optional[float] = Field(
         None, ge=0,
@@ -147,7 +168,11 @@ class Product(BaseModel):
     )
     demand_floor_factor: Optional[float] = Field(
         None, ge=0.0, le=1.0,
-        json_schema_extra=_meta("-", "P", "ν override; falls back to the global setting."),
+        json_schema_extra=_meta(
+            "-", "P",
+            "ν override; falls back to the global setting. Acts as the variability of the "
+            "triangularAV demand form: triangular(b·(1−ν), b, b·(1+ν)).",
+        ),
     )
     demand_history: list[float] = Field(
         default_factory=list,
@@ -196,12 +221,32 @@ class Product(BaseModel):
             raise ValueError(f"product {self.id}: bootstrap demand requires demand_history")
         return self
 
+    @classmethod
+    def with_triangular_av(
+        cls, *, average: float, variability: float, **kwargs: object
+    ) -> "Product":
+        """Build a product whose demand is the triangularAV form — "average ±
+        variability" — instead of explicit (min, mode, max). Equivalent to
+        ``triangular(average·(1−v), average, average·(1+v))`` (see
+        :func:`triangular_av`)."""
+        a, b, c = triangular_av(average, variability)
+        return cls(
+            demand_model=DemandModel.TRIANGULAR,
+            demand_mode=b, demand_min=a, demand_max=c,
+            **kwargs,  # type: ignore[arg-type]
+        )
+
     def triangular_params(self, global_floor_factor: float) -> tuple[float, float, float]:
-        """(a, b, c) with the ν floor correction applied."""
+        """(a, b, c) with the ν floor correction applied.
+
+        With ``demand_min``/``demand_max`` left at their defaults this is exactly
+        the triangularAV form ``triangular_av(demand_mode, ν)``; explicit bounds
+        override the symmetric default.
+        """
         nu = self.demand_floor_factor if self.demand_floor_factor is not None else global_floor_factor
-        b = self.demand_mode
-        a = self.demand_min if self.demand_min is not None else max(0.0, (1.0 - nu) * b)
-        c = self.demand_max if self.demand_max is not None else (1.0 + nu) * b
+        a_av, b, c_av = triangular_av(self.demand_mode, nu)
+        a = self.demand_min if self.demand_min is not None else a_av
+        c = self.demand_max if self.demand_max is not None else c_av
         return a, b, max(c, b)
 
     def mean_demand(self, global_floor_factor: float) -> float:

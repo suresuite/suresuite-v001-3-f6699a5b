@@ -30,6 +30,7 @@ from scsim.entities.network import (  # noqa: E402,F401
     Product,
     Supplier,
     SupplierLink,
+    triangular_av,
 )
 from scsim.entities.disruption import DisruptionEvent  # noqa: E402,F401
 from scsim.entities.scenario import Scenario  # noqa: E402,F401
