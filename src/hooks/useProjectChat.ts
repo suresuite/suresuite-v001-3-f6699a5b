@@ -57,7 +57,7 @@ export function useProjectChat(projectId: string | null) {
   }, []);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, model?: string) => {
       const trimmed = text.trim();
       if (!trimmed || loading) return;
       if (!projectId) {
@@ -92,6 +92,7 @@ export function useProjectChat(projectId: string | null) {
               conversationHistory: history,
               userId: user.id,
               userEmail: user.email,
+              model: model ?? "gemini-2.5-flash",
             },
           },
         );
