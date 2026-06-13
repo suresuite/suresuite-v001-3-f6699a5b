@@ -39,6 +39,7 @@ interface Props {
   deleteOverride?: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
   applyResolvedPreset: (slug: string, families: PolicyFamily[], bundle: PolicyBundle) => Promise<void>;
   clearActivePreset: () => Promise<void>;
+  saveSnapshot: (label?: string) => Promise<string | null>;
 }
 
 export function FocusedStage({
@@ -56,6 +57,7 @@ export function FocusedStage({
   deleteOverride,
   applyResolvedPreset,
   clearActivePreset,
+  saveSnapshot,
 }: Props) {
   const stage = getStage(stageKey);
   const presets = useMemo(() => getStagePresets(stageKey), [stageKey]);
@@ -136,6 +138,7 @@ export function FocusedStage({
           defaults={defaults}
           overrides={overrides}
           fulfillmentStrategy={fulfillmentStrategy}
+          saveSnapshot={saveSnapshot}
         />
       </div>
     );

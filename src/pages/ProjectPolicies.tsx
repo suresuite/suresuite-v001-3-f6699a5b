@@ -145,6 +145,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                   deleteOverride={deleteOverride}
                   applyResolvedPreset={applyResolvedPreset}
                   clearActivePreset={clearActivePreset}
+                  saveSnapshot={saveSnapshot}
                 />
 
                 {loading && <p className="text-xs text-muted-foreground">Loading policies…</p>}

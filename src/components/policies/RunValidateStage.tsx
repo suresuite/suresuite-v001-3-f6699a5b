@@ -43,11 +43,18 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
+import { useScenarios } from "@/hooks/useScenarios";
+import { useSimulationRun } from "@/hooks/useSimulationRun";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
 import type { PolicyBundle, FulfillmentStrategy } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import { PolicyRunStepper } from "./PolicyRunStepper";
 import { MaterialFlowAnimated } from "./MaterialFlowAnimated";
+import { RunProgressPanel } from "@/components/sim/RunProgressPanel";
+
+// Runs launched from the policies stage all reuse this single auto-managed
+// scenario so the Lab's scenario list doesn't fill up with validation runs.
+const VALIDATION_SCENARIO_NAME = "Policy validation (auto)";
 
 interface Props {
   projectId: string | null | undefined;
@@ -55,6 +62,7 @@ interface Props {
   defaults: PolicyBundle;
   overrides: OverrideRow[];
   fulfillmentStrategy: FulfillmentStrategy;
+  saveSnapshot: (label?: string) => Promise<string | null>;
 }
 
 const KPI_OPTIONS = [
@@ -164,11 +172,18 @@ export function RunValidateStage({
   defaults,
   overrides,
   fulfillmentStrategy,
+  saveSnapshot,
 }: Props) {
   const supRows = useStageRows({ projectId, plantName, stage: "supplier" });
   const plantRowsQ = useStageRows({ projectId, plantName, stage: "plant" });
   const custRows = useStageRows({ projectId, plantName, stage: "customer" });
   const { unit: timeUnit } = useTimeUnit(projectId);
+
+  // Reuse the working experiment.run pipeline (same as Simulation Lab): a saved
+  // policy version + a scenario bound to the run, dispatched to the Fly worker.
+  const { scenarios, create: createScenario, update: updateScenario } = useScenarios(projectId);
+  const [validationScenarioId, setValidationScenarioId] = useState<string | null>(null);
+  const { latestRun, reps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
 
   const [step, setStep] = useState(0);
   const [findings, setFindings] = useState<Finding[] | null>(null);
@@ -250,10 +265,35 @@ export function RunValidateStage({
     else toast.error(`Verification found ${blockers} blocker(s).`);
   };
 
-  const dispatchSim = async (kind: string, payload: Record<string, unknown>) => {
-    if (!projectId) return;
+  // Find-or-create the reusable validation scenario, patch it with this run's
+  // config (no disruptions = baseline), and return its id.
+  const ensureValidationScenario = async (
+    patch: { replications: number; seed: number; horizon_days: number; primary_kpi: string },
+  ): Promise<string | null> => {
+    if (!projectId) return null;
+    let scen = scenarios.find((s) => s.name === VALIDATION_SCENARIO_NAME);
+    if (!scen) scen = await createScenario(VALIDATION_SCENARIO_NAME);
+    if (!scen) return null;
+    await updateScenario(scen.id, {
+      ...patch,
+      disruption_schedule: [],
+      recovery_overrides: {},
+    });
+    return scen.id;
+  };
+
+  // Dispatch the same experiment.run command the Simulation Lab uses. We invoke
+  // directly (rather than the hook's runExperiment) so the freshly-resolved
+  // scenario id is used immediately instead of a stale closure value.
+  const dispatchRun = async (scenarioId: string, policyVersionId: string) => {
     const { error } = await supabase.functions.invoke("sim-command", {
-      body: { project_id: projectId, kind, payload, client_ts: Date.now() },
+      body: {
+        project_id: projectId,
+        scenario_id: scenarioId,
+        kind: "experiment.run",
+        payload: { policy_version_id: policyVersionId },
+        client_ts: Date.now(),
+      },
     });
     if (error) throw error;
   };
@@ -265,18 +305,25 @@ export function RunValidateStage({
     }
     setSubmitting("single");
     try {
-      await dispatchSim("policy.run.single", {
-        policy_defaults: defaults,
-        policy_overrides: overrides,
-        fulfillment_strategy: fulfillmentStrategy,
+      const versionId = await saveSnapshot(`Validate single — ${new Date().toLocaleString()}`);
+      if (!versionId) return; // saveSnapshot already surfaced the error
+      const scenarioId = await ensureValidationScenario({
+        replications: 1,
         seed: singleCfg.seed,
         horizon_days: singleCfg.horizon_days,
+        primary_kpi: "fill_rate",
       });
+      if (!scenarioId) {
+        toast.error("Could not prepare a validation scenario.");
+        return;
+      }
+      setValidationScenarioId(scenarioId);
+      await dispatchRun(scenarioId, versionId);
       setSingleQueuedAt(new Date());
-      toast.success("Single-seed run queued.");
+      toast.success("Single-seed run queued — watch the engine badge below.");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to queue single run.");
+      toast.error(`Failed to queue single run: ${(err as Error).message ?? err}`);
     } finally {
       setSubmitting(null);
     }
@@ -297,20 +344,29 @@ export function RunValidateStage({
         multiCfg.seeds_mode === "auto"
           ? Array.from({ length: multiCfg.replications }, (_, i) => i + 1)
           : multiCfg.seeds_list.split(/[\s,]+/).map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
-      await dispatchSim("policy.run.multi", {
-        policy_defaults: defaults,
-        policy_overrides: overrides,
-        fulfillment_strategy: fulfillmentStrategy,
-        seeds,
+      if (seeds.length === 0) {
+        toast.warning("Provide at least one seed.");
+        return;
+      }
+      const versionId = await saveSnapshot(`Validate ×${seeds.length} — ${new Date().toLocaleString()}`);
+      if (!versionId) return;
+      const scenarioId = await ensureValidationScenario({
+        replications: seeds.length,
+        seed: seeds[0],
         horizon_days: multiCfg.horizon_days,
-        kpis: multiCfg.kpis,
-        confidence: multiCfg.confidence,
+        primary_kpi: multiCfg.kpis[0],
       });
+      if (!scenarioId) {
+        toast.error("Could not prepare a validation scenario.");
+        return;
+      }
+      setValidationScenarioId(scenarioId);
+      await dispatchRun(scenarioId, versionId);
       setMultiQueuedAt(new Date());
-      toast.success(`Queued ${seeds.length} replications.`);
+      toast.success(`Queued ${seeds.length} replications — watch the engine badge below.`);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to queue replications.");
+      toast.error(`Failed to queue replications: ${(err as Error).message ?? err}`);
     } finally {
       setSubmitting(null);
     }
@@ -616,6 +672,26 @@ export function RunValidateStage({
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* Live run status — the queued experiment.run flows to the Fly
+                worker; the badge goes preliminary (stub) → worker engine when
+                the real Monte Carlo result lands. */}
+            {validationScenarioId && (
+              <div className="mt-5 border-t pt-4">
+                <h4 className="text-xs font-semibold mb-2">Run status</h4>
+                <RunProgressPanel
+                  run={latestRun}
+                  reps={reps}
+                  versionLabel={null}
+                  onCancel={() => {
+                    if (projectId && latestRun) void cancelRun(projectId, latestRun.id);
+                  }}
+                  onAddReps={(n) => {
+                    if (projectId && latestRun) void addReps(projectId, latestRun.id, n);
+                  }}
+                />
+              </div>
+            )}
           </StepShell>
         )}
 
