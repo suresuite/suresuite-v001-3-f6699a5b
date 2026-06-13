@@ -45,6 +45,34 @@ def _merged_policy(policies: dict, node_id: str, family: str) -> dict:
     return {**default, **override}
 
 
+# Per-target override fields the conversion actually applies. scsim policy
+# parameters are global (scope "G"), so only fields materialised onto
+# per-entity objects (Material, Product) can vary by node; everything else
+# falls back to the project default and is reported in ``notes``.
+_SUPPORTED_OVERRIDE_FIELDS: set[tuple[str, str]] = {
+    ("inventory", "holding_cost_pct"),
+    ("production", "capacity_units_per_day"),
+    ("production", "utilization_cap_pct"),
+}
+
+
+def _note_unsupported_overrides(policies: dict, notes: list[str]) -> None:
+    for key, families in policies.items():
+        if not (key.startswith("node:") or key.startswith("edge:")):
+            continue
+        if not isinstance(families, dict):
+            continue
+        for family, patch in families.items():
+            if not isinstance(patch, dict):
+                continue
+            for fld in patch:
+                if key.startswith("edge:") or (family, fld) not in _SUPPORTED_OVERRIDE_FIELDS:
+                    notes.append(
+                        f"override {key}.{family}.{fld} not supported by scsim — "
+                        f"project default used"
+                    )
+
+
 def from_legacy_graph(
     graph: Any,
     policies: dict | None = None,
@@ -140,6 +168,7 @@ def from_legacy_graph(
         notes.append(f"horizon raised from {horizon_weeks} to 52 weeks (engine floor)")
 
     scenario_policies = _map_policies(policies, notes)
+    _note_unsupported_overrides(policies, notes)
     events = _map_events(disruption_schedule or [], network, warmup, notes)
 
     return ConversionResult(

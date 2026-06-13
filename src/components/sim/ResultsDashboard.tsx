@@ -18,6 +18,8 @@ interface RunMeta {
   recovery?: RecoveryConfig;
   disruption_count?: number;
   horizon_days?: number;
+  engine?: string;
+  scsim_notes?: string[];
 }
 
 function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | null {
@@ -40,7 +42,7 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario }: Props) {
     );
   }
   const meta = extractMeta(run, reps);
-  const codeVersion = (run as unknown as { code_version?: string } | null)?.code_version ?? "";
+  const codeVersion = run.code_version ?? "";
   const isStub = codeVersion.startsWith("stub") || !codeVersion;
   const disruptions: DisruptionEvent[] =
     scenario?.disruption_schedule && scenario.disruption_schedule.length > 0
@@ -65,6 +67,19 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario }: Props) {
           </Badge>
         )}
       </div>
+
+      {meta?.scsim_notes && meta.scsim_notes.length > 0 && (
+        <details className="text-xs text-muted-foreground border border-border rounded-md px-3 py-2">
+          <summary className="cursor-pointer select-none">
+            Engine conversion notes ({meta.scsim_notes.length})
+          </summary>
+          <ul className="list-disc pl-4 pt-1 space-y-0.5">
+            {meta.scsim_notes.map((n, i) => (
+              <li key={i}>{n}</li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {meta?.recovery && (
         <RecoveryImpactCard

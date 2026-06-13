@@ -17,6 +17,7 @@ export interface PolicyVersion {
   author_email: string | null;
   author_name: string | null;
   parent_version_id: string | null;
+  policy_hash: string | null;
   created_at: string;
 }
 
@@ -28,6 +29,8 @@ interface UsePoliciesResult {
   activePreset: string | null;
   presetAppliedAt: Date | null;
   versions: PolicyVersion[];
+  currentHash: string | null;
+  isDirty: boolean;
   selectedVersionId: string | null;
   setSelectedVersionId: (id: string | null) => void;
   refreshVersions: () => Promise<void>;
@@ -61,6 +64,19 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   const [presetAppliedAt, setPresetAppliedAt] = useState<Date | null>(null);
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [currentHash, setCurrentHash] = useState<string | null>(null);
+
+  const refreshCurrentHash = useCallback(async () => {
+    if (!projectId) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    const { data, error } = await sb.rpc("current_policy_hash", { p_project_id: projectId });
+    if (error) {
+      console.error("current_policy_hash failed", error);
+      return;
+    }
+    setCurrentHash((data as string | null) ?? null);
+  }, [projectId]);
 
   const dispatchSim = useCallback(
     async (payload: Record<string, unknown>) => {
@@ -116,11 +132,12 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       }
       setOverrides((ovRes.data ?? []) as OverrideRow[]);
       setLoading(false);
+      void refreshCurrentHash();
     })();
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, refreshCurrentHash]);
 
   // realtime
   useEffect(() => {
@@ -142,6 +159,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
             recovery: parseFamily("recovery", row.recovery),
             demand: parseFamily("demand", row.demand),
           });
+          void refreshCurrentHash();
         },
       )
       .on(
@@ -169,13 +187,14 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
             else next.push(row);
             return next;
           });
+          void refreshCurrentHash();
         },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId]);
+  }, [projectId, refreshCurrentHash]);
 
   const saveDefault = useCallback(
     async <F extends PolicyFamily>(family: F, value: PolicyBundle[F]) => {
@@ -195,8 +214,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         throw error;
       }
       await dispatchSim({ family, scope: "default", patch: value });
+      void refreshCurrentHash();
     },
-    [projectId, dispatchSim],
+    [projectId, dispatchSim, refreshCurrentHash],
   );
 
   const upsertOverride = useCallback(
@@ -219,8 +239,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         target_key: row.target_key,
         patch: row.patch,
       });
+      void refreshCurrentHash();
     },
-    [projectId, dispatchSim],
+    [projectId, dispatchSim, refreshCurrentHash],
   );
 
   const bulkUpsertOverrides = useCallback(
@@ -260,8 +281,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
           }),
         ),
       );
+      void refreshCurrentHash();
     },
-    [projectId, dispatchSim],
+    [projectId, dispatchSim, refreshCurrentHash],
   );
 
   const deleteOverride = useCallback(
@@ -280,8 +302,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         return;
       }
       await dispatchSim({ family, scope, target_key: targetKey, patch: {} });
+      void refreshCurrentHash();
     },
-    [projectId, dispatchSim],
+    [projectId, dispatchSim, refreshCurrentHash],
   );
 
   const saveStrategy = useCallback(
@@ -301,8 +324,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         return;
       }
       await dispatchSim({ family: "fulfillment", scope: "strategy", patch: { strategy } });
+      void refreshCurrentHash();
     },
-    [projectId, defaults.fulfillment, dispatchSim],
+    [projectId, defaults.fulfillment, dispatchSim, refreshCurrentHash],
   );
 
   const applyResolvedPreset = useCallback(
@@ -350,8 +374,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
           dispatchSim({ family, scope: "preset", preset: slug, patch: bundle[family] }),
         ),
       );
+      void refreshCurrentHash();
     },
-    [projectId, dispatchSim],
+    [projectId, dispatchSim, refreshCurrentHash],
   );
 
   const clearActivePreset = useCallback(async () => {
@@ -378,7 +403,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     }
     const { data, error } = await sb
       .from("policy_versions")
-      .select("id,label,author_email,author_name,parent_version_id,created_at")
+      .select("id,label,author_email,author_name,parent_version_id,policy_hash,created_at")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
     if (error) {
@@ -414,9 +439,10 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       const newId = data as string;
       setSelectedVersionId(newId);
       void refreshVersions();
+      void refreshCurrentHash();
       return newId;
     },
-    [projectId, user, selectedVersionId, refreshVersions],
+    [projectId, user, selectedVersionId, refreshVersions, refreshCurrentHash],
   );
 
   const restoreVersion = useCallback(
@@ -449,9 +475,22 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
           demand: parseFamily("demand", data.demand),
         });
       }
+      const { data: ovData } = await sb
+        .from("policy_overrides")
+        .select("*")
+        .eq("project_id", projectId);
+      setOverrides((ovData ?? []) as OverrideRow[]);
+      void refreshCurrentHash();
     },
-    [projectId],
+    [projectId, refreshCurrentHash],
   );
+
+  const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? null;
+  const isDirty =
+    !selectedVersion ||
+    !selectedVersion.policy_hash ||
+    !currentHash ||
+    selectedVersion.policy_hash !== currentHash;
 
   return {
     defaults,
@@ -461,6 +500,8 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     activePreset,
     presetAppliedAt,
     versions,
+    currentHash,
+    isDirty,
     selectedVersionId,
     setSelectedVersionId,
     refreshVersions,

@@ -9,11 +9,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   PolicySchemas,
-  FIELD_GROUPS,
   FIELD_LABELS,
   ENUM_OPTIONS,
+  SCSIM_ENUM_OPTIONS,
   MULTI_SELECT_FIELDS,
   MULTI_SELECT_OPTIONS,
+  RESPONSE_ENGINE_EFFECTS,
+  visibleFieldGroups,
   type PolicyBundle,
   type PolicyFamily,
 } from "@/lib/policies/schemas";
@@ -34,9 +36,26 @@ const FAMILY_META: Record<PolicyFamily, { title: string; description: string }> 
   demand: { title: "Demand", description: "Pattern, forecast & service tier." },
 };
 
+const optionsFor = (key: string): readonly string[] | undefined =>
+  SCSIM_ENUM_OPTIONS[key] ?? ENUM_OPTIONS[key];
+
+/** Fields only meaningful given another field's value. */
+const fieldVisible = (key: string, draft: Record<string, unknown>): boolean => {
+  if (key === "service_level_target") return draft.safety_stock_method === "service_level";
+  if (key === "max_backorder_days" || key === "backorder_cost_per_day") {
+    return draft.backorder_allowed === true;
+  }
+  return true;
+};
+
 function hintFor(key: string, value: unknown): string {
+  if (key === "response") {
+    return Object.entries(RESPONSE_ENGINE_EFFECTS)
+      .map(([k, v]) => `${k} → ${v}`)
+      .join(" · ");
+  }
   if (MULTI_SELECT_FIELDS.has(key)) return "multi";
-  const opts = ENUM_OPTIONS[key];
+  const opts = optionsFor(key);
   if (opts) return opts.join(" | ");
   if (typeof value === "boolean") return "true / false";
   if (typeof value === "number") {
@@ -83,12 +102,13 @@ function ValueCell({
     );
   }
 
-  if (ENUM_OPTIONS[fieldKey]) {
+  const enumOpts = optionsFor(fieldKey);
+  if (enumOpts) {
     return (
       <Select value={String(value ?? "")} onValueChange={onChange}>
         <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
         <SelectContent>
-          {ENUM_OPTIONS[fieldKey].map((opt) => (
+          {enumOpts.map((opt) => (
             <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
           ))}
         </SelectContent>
@@ -138,7 +158,7 @@ export function PolicyDefaultsCard({ family, value, onSave }: Props) {
   }, [value, family]);
 
   const meta = FAMILY_META[family];
-  const groups = FIELD_GROUPS[family];
+  const groups = visibleFieldGroups(family);
 
   const dirty = useMemo(
     () => Object.keys(draft).some((k) => !isEqual(draft[k], saved[k])),
@@ -154,6 +174,9 @@ export function PolicyDefaultsCard({ family, value, onSave }: Props) {
       toast.error(`Invalid: ${String(err)}`);
     }
   };
+
+  // Families with no scsim-consumed fields (transport, demand) are not editable.
+  if (Object.keys(groups).length === 0) return null;
 
   return (
     <Card>
@@ -179,7 +202,7 @@ export function PolicyDefaultsCard({ family, value, onSave }: Props) {
                       {groupName}
                     </td>
                   </tr>
-                  {fields.map((k) => {
+                  {fields.filter((k) => fieldVisible(k, draft)).map((k) => {
                     const changed = !isEqual(draft[k], saved[k]);
                     return (
                       <tr

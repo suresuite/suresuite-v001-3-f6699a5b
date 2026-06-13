@@ -295,12 +295,39 @@ function stubUtilizationSeries(
   return out;
 }
 
+/** Recursively key-sorted JSON, approximating Postgres jsonb::text ordering.
+ * Only used as a fallback hash for legacy versions without a stored policy_hash. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, v]) => `${JSON.stringify(k)}: ${canonicalJson(v)}`);
+    return `{${entries.join(", ")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 async function handleExperimentRun(
   sb: ReturnType<typeof createClient>,
   cmd: Command,
   userId: string,
 ) {
   if (!cmd.scenario_id) throw new Error("experiment.run requires scenario_id");
+
+  const policyVersionId = String(
+    (cmd.payload as Record<string, unknown>).policy_version_id ?? "",
+  );
+  if (!policyVersionId) {
+    throw new Error("experiment.run requires a saved policy version (policy_version_id)");
+  }
 
   // Load scenario
   // deno-lint-ignore no-explicit-any
@@ -311,16 +338,30 @@ async function handleExperimentRun(
     .maybeSingle();
   if (scErr || !scenario) throw new Error("scenario not found");
 
-  // Load project recovery defaults + financial data in parallel
+  // Load the immutable policy version + financial data in parallel.
+  // Policies come from the saved version, never from the live tables, so a run
+  // is fully reproducible against its version (the graph itself is not versioned).
   // deno-lint-ignore no-explicit-any
-  const [{ data: defaults }, { data: inbound }, { data: outbound }] = await Promise.all([
-    (sb as any).from("policy_defaults").select("recovery").eq("project_id", scenario.project_id).maybeSingle(),
+  const [{ data: version, error: verErr }, { data: inbound }, { data: outbound }] = await Promise.all([
+    (sb as any).from("policy_versions").select("id,project_id,snapshot,policy_hash").eq("id", policyVersionId).maybeSingle(),
     (sb as any).from("inbound_logistics").select("unit_price,volume,time_unit").eq("project_id", scenario.project_id),
     (sb as any).from("outbound_logistics").select("unit_price,volume,time_unit").eq("project_id", scenario.project_id),
   ]);
+  if (verErr || !version) throw new Error("policy version not found");
+  if (version.project_id !== scenario.project_id) {
+    throw new Error("policy version does not belong to this project");
+  }
+
+  const snapshot = (version.snapshot ?? {}) as Record<string, unknown>;
+  // v2 snapshots nest families under "defaults"; v1 snapshots are flat.
+  const snapshotDefaults = (
+    "defaults" in snapshot ? snapshot.defaults : snapshot
+  ) as Record<string, unknown>;
+  const policyHash: string =
+    (version.policy_hash as string | null) ?? (await sha256Hex(canonicalJson(snapshot)));
 
   const recovery = resolveRecovery(
-    (defaults?.recovery as Record<string, unknown> | null) ?? null,
+    (snapshotDefaults?.recovery as Record<string, unknown> | null) ?? null,
     (scenario.recovery_overrides as Record<string, unknown> | null) ?? null,
   );
 
@@ -357,21 +398,38 @@ async function handleExperimentRun(
       started_at: new Date().toISOString(),
       rep_count_target: replications,
       rep_count_done: 0,
-      code_version: "stub-recovery-1",
+      code_version: "stub-recovery-2",
+      policy_version_id: policyVersionId,
+      policy_hash: policyHash,
       created_by: userId,
     })
     .select()
     .single();
   if (runErr || !run) throw new Error(`run insert failed: ${runErr?.message}`);
 
-  // Push command to worker queue for the real engine
+  // Push command to worker queue for the real engine. The policy snapshot is
+  // embedded so the worker runs the saved version, not the live tables; if the
+  // envelope would exceed Upstash limits, the worker fetches it by version id.
+  const workerEnvelope: Record<string, unknown> = {
+    ...cmd,
+    run_id: run.id,
+    scenario,
+    recovery,
+    policy_version_id: policyVersionId,
+    policy_hash: policyHash,
+    policy_snapshot: snapshot,
+    server_ts: Date.now(),
+  };
+  if (JSON.stringify(workerEnvelope).length > 700_000) {
+    delete workerEnvelope.policy_snapshot;
+  }
   await upstash([
     "XADD",
     `sim.cmd.${cmd.project_id}`,
     "MAXLEN", "~", "1000",
     "*",
     "data",
-    JSON.stringify({ ...cmd, run_id: run.id, scenario, recovery, server_ts: Date.now() }),
+    JSON.stringify(workerEnvelope),
   ]).catch((e) => console.error("xadd failed", e));
 
   // STUB MODE: synthesize all replications immediately so the lab UI is alive

@@ -30,6 +30,7 @@ import type { PolicyVersion } from "@/hooks/usePolicies";
 interface Props {
   versions: PolicyVersion[];
   selectedVersionId: string | null;
+  isDirty?: boolean;
   onSelect: (id: string | null) => void;
   onSave: (label?: string) => Promise<string | null>;
   onRestore: (id: string) => Promise<void>;
@@ -48,6 +49,7 @@ function formatWhen(iso: string) {
 export function PolicyVersionBar({
   versions,
   selectedVersionId,
+  isDirty,
   onSelect,
   onSave,
   onRestore,
@@ -92,6 +94,14 @@ export function PolicyVersionBar({
         {current && (
           <span className="text-[11px] text-muted-foreground truncate hidden md:inline">
             · {meta}
+          </span>
+        )}
+        {isDirty && (
+          <span className="flex items-center gap-1 shrink-0" title="Simulation runs require a saved, unchanged version">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            <span className="text-[11px] text-amber-600">
+              {current ? `unsaved changes vs ${current.label || current.id.slice(0, 8)}` : "unsaved changes"}
+            </span>
           </span>
         )}
       </div>

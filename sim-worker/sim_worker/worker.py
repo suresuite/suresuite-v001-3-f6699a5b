@@ -14,10 +14,33 @@ import redis.asyncio as redis
 from .engine import apply_delta, compute_kpis
 from .graph_cache import GraphCache
 from .network_metrics import compute_network_metrics
+from .policy_snapshot import snapshot_to_policies
 from .schemas import Command
 from .scsim_bridge import compute_kpis_scsim, scsim_enabled
 
 log = logging.getLogger(__name__)
+
+
+def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
+    """Translate an engine KPI dict (mean_*/ci_* shape) into the
+    simulation_runs row update persisted after an experiment.run."""
+    aggregate = {k[len("mean_"):]: v for k, v in kpis.items() if k.startswith("mean_")}
+    aggregate["_meta"] = {
+        "engine": kpis.get("source", "worker"),
+        **({"scsim_notes": kpis["scsim_notes"]} if kpis.get("scsim_notes") else {}),
+    }
+    if kpis.get("source") == "scsim":
+        code_version = f"scsim-{kpis.get('engine_version', 'unknown')}"
+    else:
+        code_version = "worker-legacy"
+    return {
+        "status": "done",
+        "ended_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "aggregate_kpis": aggregate,
+        "ci_half_widths": {k[len("ci_"):]: v for k, v in kpis.items() if k.startswith("ci_")},
+        "code_version": code_version,
+        "rep_count_done": n_reps,
+    }
 
 STREAM_PREFIX = "sim.cmd."
 CONSUMER_GROUP = "sim-workers"
@@ -147,6 +170,7 @@ class SimWorker:
 
                 elif cmd.kind == "experiment.run":
                     # sim-command embeds the full scenario + resolved recovery at top level
+                    run_id: str | None = raw.get("run_id")
                     scenario_data: dict = raw.get("scenario") or {}
                     recovery_data: dict = raw.get("recovery") or {}
 
@@ -155,7 +179,17 @@ class SimWorker:
                     seed = int(scenario_data.get("seed", 42))
                     n_reps = min(200, max(1, int(scenario_data.get("replications", 30))))
 
-                    policies = await self._cache.get_effective_policies(cmd.project_id)
+                    # Runs are bound to a saved policy version: prefer the snapshot
+                    # embedded in the envelope, fetch it by id if it was too large
+                    # to embed, and only fall back to live tables for legacy
+                    # commands that predate version-bound runs.
+                    snapshot: dict | None = raw.get("policy_snapshot")
+                    if snapshot is None and raw.get("policy_version_id"):
+                        snapshot = await self._fetch_version_snapshot(raw["policy_version_id"])
+                    if snapshot is not None:
+                        policies = snapshot_to_policies(snapshot)
+                    else:
+                        policies = await self._cache.get_effective_policies(cmd.project_id)
                     # Merge scenario-level recovery_overrides into policies so the engine
                     # applies the chosen playbook's responses during inventory review.
                     if recovery_data:
@@ -164,27 +198,39 @@ class SimWorker:
                             **recovery_data,
                         }
 
-                    if scsim_enabled():
-                        # Opt-in phase-pipeline engine (SCSIM_ENGINE=1); falls
-                        # back to the legacy engine on any conversion failure.
-                        try:
-                            kpis = await asyncio.to_thread(
-                                compute_kpis_scsim, cg.graph, policies,
-                                n_weeks, seed, n_reps, disruption_schedule,
-                            )
-                        except Exception:
-                            log.exception("scsim bridge failed; falling back to legacy engine")
+                    try:
+                        if scsim_enabled():
+                            # Opt-in phase-pipeline engine (SCSIM_ENGINE=1); falls
+                            # back to the legacy engine on any conversion failure.
+                            try:
+                                kpis = await asyncio.to_thread(
+                                    compute_kpis_scsim, cg.graph, policies,
+                                    n_weeks, seed, n_reps, disruption_schedule,
+                                )
+                            except Exception:
+                                log.exception("scsim bridge failed; falling back to legacy engine")
+                                kpis = await asyncio.to_thread(
+                                    compute_kpis, cg.graph, set(cg.graph.nodes), policies,
+                                    n_weeks, seed, n_reps, disruption_schedule,
+                                )
+                        else:
                             kpis = await asyncio.to_thread(
                                 compute_kpis, cg.graph, set(cg.graph.nodes), policies,
                                 n_weeks, seed, n_reps, disruption_schedule,
                             )
-                    else:
-                        kpis = await asyncio.to_thread(
-                            compute_kpis, cg.graph, set(cg.graph.nodes), policies,
-                            n_weeks, seed, n_reps, disruption_schedule,
-                        )
+                    except Exception as exc:
+                        if run_id:
+                            await self._update_run(run_id, {
+                                "status": "failed",
+                                "error_message": str(exc)[:500],
+                            })
+                        raise
                     # Attach run_id so the broadcast payload links to the DB run row
-                    kpis["run_id"] = raw.get("run_id")
+                    kpis["run_id"] = run_id
+                    # Persist real results so the UI replaces the edge-function
+                    # stub KPIs and the run is attributable to this engine.
+                    if run_id:
+                        await self._update_run(run_id, build_run_update(kpis, n_reps))
 
                 else:
                     policies = await self._cache.get_effective_policies(cmd.project_id)
@@ -205,6 +251,43 @@ class SimWorker:
         finally:
             await self._redis.xack(stream, CONSUMER_GROUP, msg_id)
             log.debug("handled %s in %.1f ms", cmd.kind, (time.perf_counter() - t0) * 1000)
+
+    async def _fetch_version_snapshot(self, version_id: str) -> dict[str, Any] | None:
+        """Fetch an immutable policy_versions.snapshot via PostgREST (service role)."""
+        try:
+            r = await self._http.get(
+                f"{self._supabase_url}/rest/v1/policy_versions",
+                params={"id": f"eq.{version_id}", "select": "snapshot"},
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                },
+            )
+            r.raise_for_status()
+            rows = r.json()
+            return rows[0]["snapshot"] if rows else None
+        except Exception:
+            log.exception("failed to fetch policy version %s", version_id)
+            return None
+
+    async def _update_run(self, run_id: str, patch: dict[str, Any]) -> None:
+        """PATCH a simulation_runs row via PostgREST (service role)."""
+        try:
+            r = await self._http.patch(
+                f"{self._supabase_url}/rest/v1/simulation_runs",
+                params={"id": f"eq.{run_id}"},
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json=patch,
+            )
+            if r.status_code >= 300:
+                log.warning("run update failed %s %s", r.status_code, r.text)
+        except Exception:
+            log.exception("failed to update run %s", run_id)
 
     async def _broadcast(self, project_id: str, event: str, payload: dict[str, Any]) -> None:
         try:

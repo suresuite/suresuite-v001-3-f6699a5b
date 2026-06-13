@@ -376,7 +376,68 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
 
 export const MULTI_SELECT_FIELDS = new Set(["response"]);
 export const MULTI_SELECT_OPTIONS: Record<string, readonly string[]> = {
-  response: RecoveryResponse.options,
+  // Restricted to the responses the scsim engine maps to policies:
+  // dual_source_activate → backup_supplier, mode_shift/reroute → expedited_shipments,
+  // capacity_flex → short_term_capacity.
+  response: ["reroute", "dual_source_activate", "mode_shift", "capacity_flex"],
+};
+
+/**
+ * scsim alignment — the simulation engine (scsim) is the source of truth for
+ * which policy settings have effect. Only the fields below are consumed by the
+ * engine; everything else is hidden from the GUI (stored values are preserved
+ * in the database, just not editable). Families absent from this map
+ * (transport, demand) are hidden entirely: transport is driven by network edge
+ * attributes, demand by product/graph data.
+ */
+export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<string>>> = {
+  sourcing: new Set(["strategy"]),
+  inventory: new Set([
+    "type",
+    "safety_stock_method",
+    "safety_stock_days",
+    "service_level_target",
+    "holding_cost_pct",
+  ]),
+  fulfillment: new Set([
+    "allocation",
+    "backorder_allowed",
+    "max_backorder_days",
+    "backorder_cost_per_day",
+  ]),
+  production: new Set(["capacity_units_per_day"]),
+  recovery: new Set(["response"]),
+};
+
+/** True when a default-level field is exposed in the GUI (consumed by scsim). */
+export function isScsimVisible(family: PolicyFamily, field: string): boolean {
+  return SCSIM_VISIBLE_FIELDS[family]?.has(field) ?? false;
+}
+
+/** FIELD_GROUPS filtered to scsim-consumed fields; empty groups are dropped. */
+export function visibleFieldGroups(family: PolicyFamily): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [group, fields] of Object.entries(FIELD_GROUPS[family] ?? {})) {
+    const kept = fields.filter((f) => isScsimVisible(family, f));
+    if (kept.length > 0) out[group] = kept;
+  }
+  return out;
+}
+
+/** Enum options narrowed to the values the scsim conversion maps. */
+export const SCSIM_ENUM_OPTIONS: Record<string, readonly string[]> = {
+  // s_S / continuous_review collapse to min_max in scsim; offer the four real types.
+  type: ["min_max", "base_stock", "rop", "periodic_review"],
+  // demand_variability is approximated as uniform in scsim; not offered.
+  safety_stock_method: ["fixed_days", "service_level", "king_method"],
+};
+
+/** Helper text shown next to recovery responses, naming the engine effect. */
+export const RESPONSE_ENGINE_EFFECTS: Record<string, string> = {
+  reroute: "expedited shipments (P-T.2)",
+  dual_source_activate: "backup supplier (P-S.1)",
+  mode_shift: "expedited shipments (P-T.2)",
+  capacity_flex: "short-term capacity (P-P.5)",
 };
 
 /** Human-friendly labels + units for fields. */
@@ -399,7 +460,7 @@ export const FIELD_LABELS: Record<string, string> = {
   max_stock: "Max stock",
   min_stock: "Min stock",
   safety_stock_method: "Safety stock method",
-  safety_stock_days: "Safety stock (days)",
+  safety_stock_days: "Safety stock (days, 0–84)",
   service_level_target: "Service level (0-1)",
   review_period_days: "Review period (days)",
   abc_class: "ABC class",
@@ -422,7 +483,7 @@ export const FIELD_LABELS: Record<string, string> = {
   fixed_dispatch_cost: "Fixed dispatch cost",
   routing: "Routing",
   carbon_intensity_kg_per_tkm: "Carbon (kg/t-km)",
-  allocation: "Allocation rule",
+  allocation: "Material allocation",
   backorder_allowed: "Backorder allowed",
   max_backorder_days: "Max backorder (days)",
   backorder_cost_per_day: "Backorder cost / day",

@@ -37,7 +37,13 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const projectId = globalSelectedProjectId;
   const { projects } = useProjects();
   const { scenarios, loading, create, update, remove, duplicate } = useScenarios(projectId);
-  const { defaults: policyDefaults } = usePolicies(projectId);
+  const {
+    defaults: policyDefaults,
+    versions: policyVersions,
+    selectedVersionId: policyVersionId,
+    isDirty: policyDirty,
+    saveSnapshot: savePolicySnapshot,
+  } = usePolicies(projectId);
   const projectRecovery = (policyDefaults?.recovery ?? null) as RecoveryConfig | null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>("setup");
@@ -71,9 +77,24 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const { latestRun, reps, runExperiment, cancelRun, addReps } = useSimulationRun(selectedId);
 
   const handleRun = async () => {
+    if (!projectId || !selected || !policyVersionId || policyDirty) return;
+    try {
+      await runExperiment(projectId, policyVersionId);
+      toast.success(`Queued: ${selected.name}`);
+      setPane("run");
+    } catch (e) {
+      toast.error(`Failed to queue run: ${(e as Error).message}`);
+    }
+  };
+
+  const handleSaveVersionAndRun = async () => {
     if (!projectId || !selected) return;
     try {
-      await runExperiment(projectId);
+      const versionId = await savePolicySnapshot(
+        `Run: ${selected.name} — ${new Date().toLocaleString()}`,
+      );
+      if (!versionId) return;
+      await runExperiment(projectId, versionId);
       toast.success(`Queued: ${selected.name}`);
       setPane("run");
     } catch (e) {
@@ -231,12 +252,49 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onSave={(patch) => update(selected.id, patch)}
                 />
               ) : pane === "run" ? (
-                <RunProgressPanel
-                  run={latestRun}
-                  reps={reps}
-                  onCancel={handleCancel}
-                  onAddReps={handleAddReps}
-                />
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3 flex-wrap rounded-md border bg-card px-3 py-2.5">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="text-xs font-medium">
+                        {policyDirty
+                          ? policyVersionId
+                            ? `Policy settings changed since version "${
+                                policyVersions.find((v) => v.id === policyVersionId)?.label ??
+                                policyVersionId.slice(0, 8)
+                              }"`
+                            : "No saved model version — runs require a saved policy version"
+                          : `Model version: ${
+                              policyVersions.find((v) => v.id === policyVersionId)?.label ??
+                              policyVersionId?.slice(0, 8)
+                            }`}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Policies are versioned; network data is current.
+                      </span>
+                    </div>
+                    {policyDirty ? (
+                      <Button size="sm" className="h-8 text-xs" onClick={handleSaveVersionAndRun}>
+                        Save version &amp; run
+                      </Button>
+                    ) : (
+                      <Button size="sm" className="h-8 text-xs" onClick={handleRun}>
+                        Run
+                      </Button>
+                    )}
+                  </div>
+                  <RunProgressPanel
+                    run={latestRun}
+                    reps={reps}
+                    versionLabel={
+                      latestRun?.policy_version_id
+                        ? policyVersions.find((v) => v.id === latestRun.policy_version_id)?.label ??
+                          latestRun.policy_version_id.slice(0, 8)
+                        : null
+                    }
+                    onCancel={handleCancel}
+                    onAddReps={handleAddReps}
+                  />
+                </div>
               ) : pane === "results" ? (
                 <ResultsDashboard run={latestRun} reps={reps} primaryKpi={selected.primary_kpi} scenario={selected} />
               ) : (
