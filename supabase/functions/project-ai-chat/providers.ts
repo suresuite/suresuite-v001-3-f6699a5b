@@ -36,6 +36,15 @@ export interface ChatRunResult {
 
 const MAX_HOPS = 5;
 
+// Friendly stand-in when a provider returns no visible text. If a tool already
+// produced data, the UI renders it — so just introduce it instead of orphaning it
+// under a confusing "(no response)" label.
+function emptyReply(parts: ChatRunResult["parts"]): string {
+  return parts.length > 0
+    ? "Here's what I found:"
+    : "I didn't get a usable answer back — try rephrasing, or switch models in the header.";
+}
+
 export function buildSystemPrompt(modelLabel: string): string {
   return `You are the Supply Chain assistant — a sharp, friendly colleague embedded in this app. You're currently running on ${modelLabel}.
 
@@ -99,7 +108,9 @@ async function runGemini(
         systemInstruction: { role: "system", parts: [{ text: system }] },
         contents,
         tools: [{ functionDeclarations: toolDeclarations }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+        // Disable hidden "thinking" so the token budget goes to the visible answer,
+        // and give the model room to produce a full reply.
+        generationConfig: { temperature: 0.4, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
       }),
     });
     if (!res.ok) {
@@ -116,8 +127,9 @@ async function runGemini(
     const fnCalls = responseParts.filter((p) => p.functionCall);
     const text = responseParts.filter((p) => p.text).map((p) => p.text).join("");
 
-    if (fnCalls.length === 0) {
-      return { reply: text.trim() || "(no response)", parts: collectedParts, toolCalls, model: model.label };
+    // No tool calls (or the response was truncated): finish with the best text we have.
+    if (fnCalls.length === 0 || candidate?.finishReason === "MAX_TOKENS") {
+      return { reply: text.trim() || emptyReply(collectedParts), parts: collectedParts, toolCalls, model: model.label };
     }
     contents.push({ role: "model", parts: responseParts });
     for (const fc of fnCalls) {
@@ -160,11 +172,14 @@ async function runOpenAICompatible(
       tool_choice: "auto",
     };
     // gpt-5 family uses max_completion_tokens and rejects temperature; others use the classic params.
+    // For gpt-5, reasoning tokens count against max_completion_tokens, so keep reasoning low and
+    // give a generous cap — otherwise the visible answer comes back empty.
     if (model.provider === "openai" && model.apiModel.startsWith("gpt-5")) {
-      body.max_completion_tokens = 1200;
+      body.max_completion_tokens = 4096;
+      body.reasoning_effort = "low";
     } else {
       body.temperature = 0.4;
-      body.max_tokens = 1200;
+      body.max_tokens = 2048;
     }
 
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -183,7 +198,7 @@ async function runOpenAICompatible(
     const calls = msg?.tool_calls ?? [];
 
     if (!calls.length) {
-      const reply = (msg?.content ?? "").trim() || "(no response)";
+      const reply = (msg?.content ?? "").trim() || emptyReply(collectedParts);
       return { reply, parts: collectedParts, toolCalls, model: model.label };
     }
 

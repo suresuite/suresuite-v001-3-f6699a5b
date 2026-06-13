@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { GripVertical, Loader2, MessageSquare, Send, Trash2, X } from "lucide-react";
+import { Loader2, MessageSquare, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
@@ -16,7 +16,7 @@ const SUGGESTIONS = [
 ];
 
 const LAUNCHER_POS_KEY = "projectChat.launcherPos";
-const LAUNCHER_SIZE = { w: 168, h: 44 };
+const LAUNCHER_SIZE = { w: 60, h: 60 };
 
 interface Pos { x: number; y: number }
 
@@ -125,38 +125,26 @@ export function FloatingChatBubble() {
 
   return (
     <>
-      {/* Launcher (draggable) */}
+      {/* Launcher (draggable round button) */}
       {!open && (
-        <div
-          style={{ left: pos.x, top: pos.y, width: LAUNCHER_SIZE.w }}
-          className="fixed z-50 flex select-none items-stretch overflow-hidden rounded-lg border-2 border-red-500/70 bg-emerald-500 text-white shadow-lg shadow-emerald-500/40"
-          aria-label="Supply Chain assistant launcher"
+        <button
+          type="button"
+          style={{ left: pos.x, top: pos.y, height: LAUNCHER_SIZE.h, width: LAUNCHER_SIZE.w }}
+          onPointerDown={startDrag}
+          onClick={() => {
+            if (dragState.current?.moved) { dragState.current.moved = false; return; }
+            setOpen(true);
+          }}
+          className="fixed z-50 flex cursor-grab select-none items-center justify-center rounded-full border-2 border-red-500 bg-black text-white shadow-lg shadow-[0_0_12px_2px_rgba(239,68,68,0.45)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          aria-label="Ask SC assistant"
+          title="Ask SC assistant"
         >
-          <button
-            type="button"
-            onPointerDown={startDrag}
-            className="flex cursor-grab items-center justify-center bg-emerald-600/80 px-1.5 active:cursor-grabbing"
-            aria-label="Drag to reposition"
-            title="Drag to reposition"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical className="h-4 w-4 opacity-90" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (dragState.current?.moved) { dragState.current.moved = false; return; }
-              setOpen(true);
-            }}
-            className="flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-semibold transition hover:bg-emerald-600"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-80" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-            </span>
-            Ask SC assistant
-          </button>
-        </div>
+          {/* Orbiting glow dot */}
+          <span className="pointer-events-none absolute inset-0 animate-spin" style={{ animationDuration: "3s" }}>
+            <span className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 shadow-[0_0_8px_2px_rgba(239,68,68,0.9)]" />
+          </span>
+          <MessageSquare className="h-6 w-6" />
+        </button>
       )}
 
       {/* Panel */}
