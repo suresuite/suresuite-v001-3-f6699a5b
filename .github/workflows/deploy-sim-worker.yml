@@ -1,0 +1,57 @@
+name: Deploy sim-worker to Fly
+
+# The sim-worker is the REAL Monte Carlo engine: it consumes scenario/experiment
+# commands from the Upstash Redis stream that sim-command enqueues and PATCHes
+# simulation_runs with real KPIs (code_version "worker-legacy"/"scsim-*").
+# Without this deploy, runs only ever show the edge function's "stub-recovery-2"
+# preliminary results.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sim-worker/**"
+      - ".github/workflows/deploy-sim-worker.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency: deploy-sim-worker   # never run two deploys at once
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Idempotent: create the app on the first run, ignore "already exists".
+      - name: Ensure Fly app exists
+        run: flyctl apps create "$FLY_APP" || true
+        working-directory: sim-worker
+        env:
+          FLY_APP: ${{ vars.FLY_APP_NAME }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Push runtime secrets to Fly, staged so they apply on the deploy below.
+      # Note the worker uses the NATIVE redis URL (rediss://...), which is a
+      # different variable than the edge function's UPSTASH_REDIS_REST_URL —
+      # both must point at the same Upstash database.
+      - name: Sync Fly secrets
+        run: |
+          flyctl secrets set --app "$FLY_APP" --stage \
+            UPSTASH_REDIS_URL="$UPSTASH_REDIS_URL" \
+            SUPABASE_URL="$SUPABASE_URL" \
+            SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+        working-directory: sim-worker
+        env:
+          FLY_APP: ${{ vars.FLY_APP_NAME }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Deploy
+        run: flyctl deploy --remote-only --app "$FLY_APP"
+        working-directory: sim-worker
+        env:
+          FLY_APP: ${{ vars.FLY_APP_NAME }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
