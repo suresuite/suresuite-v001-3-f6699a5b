@@ -116,7 +116,7 @@ async function runGemini(
     if (!res.ok) {
       const t = await res.text();
       console.error("Gemini error", res.status, t);
-      throw new Error(`Gemini request failed: ${res.status}`);
+      throw new Error(`Gemini request failed (${res.status}): ${t.slice(0, 400)}`);
     }
     const data = await res.json();
     const candidate = data?.candidates?.[0];
@@ -190,7 +190,7 @@ async function runOpenAICompatible(
     if (!res.ok) {
       const t = await res.text();
       console.error(`${model.provider} error`, res.status, t);
-      throw new Error(`${model.provider} request failed: ${res.status}`);
+      throw new Error(`${model.provider} request failed (${res.status}): ${t.slice(0, 400)}`);
     }
     const data = await res.json();
     const choice = data?.choices?.[0];

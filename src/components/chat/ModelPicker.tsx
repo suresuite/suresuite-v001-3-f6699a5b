@@ -39,7 +39,6 @@ export function ModelPicker({ value, onChange }: Props) {
         {CHAT_MODELS.map((m) => (
           <SelectItem key={m.id} value={m.id} className="text-xs">
             <span className="font-medium">{m.label}</span>
-            <span className="ml-1 text-muted-foreground">· {m.hint}</span>
           </SelectItem>
         ))}
       </SelectContent>
