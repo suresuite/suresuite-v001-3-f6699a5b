@@ -38,6 +38,13 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
     failed: "destructive",
   }[run.status] as "secondary" | "default" | "outline" | "destructive";
 
+  const cv = run.code_version ?? "";
+  const engine = cv.startsWith("scsim-")
+    ? { label: `scsim engine ${cv.slice("scsim-".length)}`, cls: "border-green-500 text-green-700" }
+    : cv.startsWith("worker")
+    ? { label: "worker engine", cls: "border-green-500 text-green-700" }
+    : { label: "preliminary (stub)", cls: "border-yellow-400 text-yellow-700" };
+
   return (
     <div className="flex flex-col gap-3">
       <Card>
@@ -53,6 +60,9 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
                   {versionLabel}
                 </Badge>
               )}
+              <Badge variant="outline" className={`text-[10px] ${engine.cls}`}>
+                {engine.label}
+              </Badge>
             </CardTitle>
             <div className="flex gap-2">
               {(run.status === "running" || run.status === "queued") && (

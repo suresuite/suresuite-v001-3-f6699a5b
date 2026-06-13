@@ -14,6 +14,7 @@ export interface SimulationRun {
   rep_count_target: number;
   rep_count_done: number;
   error_message: string | null;
+  code_version: string | null;
   policy_version_id: string | null;
   policy_hash: string | null;
   created_at: string;
