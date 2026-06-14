@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjectChat } from "@/hooks/useProjectChat";
+import { useProjects } from "@/hooks/useProjects";
+import { ProjectSelector } from "@/components/shared/ProjectSelector";
 import { MessageBubble } from "./MessageBubble";
 import { AssistantMascot } from "./AssistantMascot";
 import { ModelPicker, getModelLabel, getStoredModel, setStoredModel } from "./ModelPicker";
@@ -61,8 +63,9 @@ function defaultPanelPos(): Pos {
 export function FloatingChatBubble() {
   const location = useLocation();
   const { user } = useAuth();
-  const { selectedProject, globalSelectedProjectId } = useGlobalProject();
+  const { selectedProject, globalSelectedProjectId, setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const projectId = selectedProject?.id ?? globalSelectedProjectId ?? null;
+  const { projects, loading: projectsLoading } = useProjects();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [model, setModel] = useState<string>(() => getStoredModel());
@@ -174,6 +177,18 @@ export function FloatingChatBubble() {
 
   const projectLabel = selectedProject?.name ?? (projectId ? "Project" : null);
 
+  // Keep the full selectedProject in sync with the active id (e.g. after a cross-page pick).
+  useEffect(() => {
+    if (!projectId) return;
+    const match = projects.find((p) => p.id === projectId);
+    if (match && match.id !== selectedProject?.id) setSelectedProject(match as any);
+  }, [projectId, projects, selectedProject?.id, setSelectedProject]);
+
+  const chooseProject = (id: string) => {
+    setGlobalSelectedProjectId(id);
+    setSelectedProject((projects.find((p) => p.id === id) ?? null) as any);
+  };
+
   const startDrag = (e: React.PointerEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     dragState.current = { ox: e.clientX - rect.left, oy: e.clientY - rect.top, moved: false };
@@ -229,57 +244,98 @@ export function FloatingChatBubble() {
           aria-label="Supply Chain assistant"
         >
           {/* Header */}
-          <div className="flex items-center gap-2 border-b border-border bg-gradient-to-r from-emerald-500/10 to-transparent px-3 py-2.5">
-            <div
-              onPointerDown={startPanelDrag}
-              className="flex min-w-0 flex-1 cursor-move select-none items-center gap-2"
-              title="Drag to move"
-            >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-white">
-                <MessageSquare className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold leading-tight">SC assistant</div>
-                <div className="truncate text-[11px] text-muted-foreground">
-                  {projectLabel ? `Project: ${projectLabel}` : "No project selected"}
+          <div className="border-b border-border bg-gradient-to-r from-muted/40 to-transparent">
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              <div
+                onPointerDown={startPanelDrag}
+                className="flex min-w-0 flex-1 cursor-move select-none items-center gap-2"
+                title="Drag to move"
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <MessageSquare className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold leading-tight">SC assistant</div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {projectLabel ? `Project: ${projectLabel}` : "No project selected"}
+                  </div>
                 </div>
               </div>
-            </div>
-            <ModelPicker value={model} onChange={onModelChange} />
-            {messages.length > 0 && (
+              <ModelPicker value={model} onChange={onModelChange} />
+              {messages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={clear}
+                  aria-label="Clear chat"
+                  title="Clear chat"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                onClick={clear}
-                aria-label="Clear chat"
-                title="Clear chat"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setOpen(false)}
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            </div>
+            {/* Active-project switcher (always available) */}
+            <div className="flex items-center gap-2 px-3 pb-2">
+              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Project</span>
+              <ProjectSelector
+                projects={projects as any}
+                selectedProjectId={projectId}
+                onProjectSelect={chooseProject}
+                placeholder="Select a project…"
+                className="h-7 flex-1 text-xs"
+              />
+            </div>
           </div>
 
           {/* Body */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
             {!projectId && (
-              <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                Select a project from the sidebar to start asking questions about its supply chain.
+              <div className="space-y-3">
+                <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                  👋 I'm your Supply Chain assistant. Which project should we dig into?
+                </div>
+                {projectsLoading ? (
+                  <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading your projects…
+                  </div>
+                ) : projects.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                    You don't have any projects yet.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {projects.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => chooseProject(p.id)}
+                        className="block w-full rounded-md border border-border px-2.5 py-2 text-left transition hover:bg-muted"
+                      >
+                        <div className="text-xs font-medium text-foreground">{p.name}</div>
+                        {p.plant_name && (
+                          <div className="truncate text-[11px] text-muted-foreground">{p.plant_name}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {projectId && messages.length === 0 && (
               <div className="space-y-3">
                 <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
-                  I'm your Supply Chain assistant, currently running on <span className="font-medium text-foreground">{getModelLabel(model)}</span>. I help you understand your network, spot risks, and decide what to do next.
+                  Working on <span className="font-medium text-foreground">{projectLabel}</span> with <span className="font-medium text-foreground">{getModelLabel(model)}</span>. Ask about your network, risks, or what to do next — or switch projects from the selector above.
                 </div>
                 <div className="space-y-1.5">
                   {SUGGESTIONS.map((s) => (
