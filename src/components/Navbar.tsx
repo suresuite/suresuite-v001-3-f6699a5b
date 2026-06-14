@@ -115,7 +115,7 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
     title: "About",
     items: [
       {
-        to: "/about",
+        to: "/help",
         icon: Info,
         label: "About & Help",
         tooltip: "About & Help",

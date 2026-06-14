@@ -34,6 +34,9 @@ import {
   Layers,
   SlidersHorizontal,
   Gauge,
+  Dices,
+  Sigma,
+  Microscope,
 } from "lucide-react";
 
 const SUPABASE_FUNCTIONS_BASE =
@@ -247,7 +250,7 @@ const GROUP_ACCENT: Record<string, GroupAccent> = {
 const SECTION_GROUP_BY_ID: Record<string, string> = {
   overview: "Overview", "user-stories": "Overview", accurate: "Overview",
   workflow: "For Users", "use-cases": "For Users", pilots: "For Users",
-  "des-model": "For Modelers", "sim-params": "For Modelers", policies: "For Modelers", "network-sci": "For Modelers", stats: "For Modelers", kpis: "For Modelers",
+  "des-model": "For Modelers", "sim-params": "For Modelers", distributions: "For Modelers", policies: "For Modelers", "network-sci": "For Modelers", stats: "For Modelers", kpis: "For Modelers", experiments: "For Modelers",
   tldr: "For IT", boundary: "For IT", flow: "For IT", contract: "For IT",
   persistence: "For IT", security: "For IT", state: "For IT",
   glossary: "Reference",
@@ -939,6 +942,8 @@ type Policy = {
   status: "✅" | "🧩";
   milestone?: string;
   logic: string;
+  /** Decision rule / formula block (implemented policies). Plain text, rendered monospace. */
+  math?: string;
   hooks?: Hook5[];
   params: Row6[];
 };
@@ -964,6 +969,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-C.1", id: "unmet_demand_handling", stage: "customer", cls: "built_in",
     constraint: "demand_side", status: "✅",
     logic: "What happens to an unservable order: it dies (lost_sales — competitive markets), waits (backorder — contractual B2B), or splits (partial_backorder). Backorders convert lost revenue into delay cost, changing the economics of every strategy.",
+    math: "FIFO: clear existing backlog first, then serve this week's demand. unmet = D_p − served_new. lost_sales ⇒ lost = unmet, no backlog. backorder ⇒ all unmet waits; partial_backorder ⇒ unmet·partial_accept_prob waits, the rest is lost. Waiting units age in FIFO buckets; a bucket older than backorder_horizon expires to lost; backorder_penalty (€/unit/wk) charged on aged backlog.",
     hooks: [["PH-60", "50", "demand, fg_fulfillment, production_output", "fulfillment, state.backlog, state.cost_ledger, state.lost_sales", "—"]],
     params: [
       ["rule", "enum", "P", "lost_sales", "{lost_sales, backorder, partial_backorder}", "lost_sales ✅ (manuscript)."],
@@ -999,6 +1005,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-P.1", id: "inventory_control", stage: "plant", cls: "built_in",
     constraint: "material_availability", status: "✅",
     logic: "Everyday replenishment rule (min-max / base-stock / (R,Q) / periodic). The baseline shock absorber every chain already has; quantifying it prevents over-buying dedicated resilience.",
+    math: "Levels (Eqs. 2–3): s_m = E[D_m]·T_s,  S_m = E[D_m]·(T_s + κ).  position = on_hand + in_transit + supplier queue. Release (each ≥ MOQ): min_max → if position < s_m, order S_m − position every review_cadence_weeks; base_stock → order S_m − position whenever short; rop_q → fixed rop_q_quantity when position < s_m; periodic → order S_m − position every periodic_review_weeks.",
     hooks: [
       ["PH-70", "50", "material_demand", "inventory_levels", "—"],
       ["PH-80", "50", "inventory_levels, state.on_hand, state.pipeline, state.queue", "purchase_orders", "—"],
@@ -1025,6 +1032,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-P.3", id: "safety_stock_materials", stage: "plant", cls: "strategic",
     constraint: "material_availability", status: "✅",
     logic: "ABC-XYZ-differentiated material safety stock (Eqs. 20–21). Dominates short disruptions; depletes — beyond ~7–9 weeks expediting wins (run the crossover sweep). Requires pre-deployment.",
+    math: "Eqs. 20–21: ss_s = z_m·σ_{D_m}·√T_s ,  ss_S = z_m·σ_{D_m}·√(T_s + κ), added on top of P-P.1's base levels. z_m = Φ⁻¹(SL_m/100) (normal quantile) from the ABC-XYZ z-matrix: AX 99.5% … CZ 80%. ABC by cumulative value share (80/95), XYZ by demand CV (0.13/0.25). king variant: z·σ_D·√T + z·μ_D·σ_LT. Weekly holding cost h_m·c_m·ss.",
     hooks: [["PH-70", "60", "inventory_levels, material_demand", "inventory_levels, state.cost_ledger", "Adds the safety-stock buffer on top of inventory_control's levels (priority 50) — Eqs. 20–21."]],
     params: [
       ["classification", "enum", "G", "abc_xyz", "{abc_xyz, uniform, fixed_days, king}", "abc_xyz ✅."],
@@ -1039,6 +1047,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-P.4", id: "fg_safety_stock", stage: "plant", cls: "strategic",
     constraint: "demand_side", status: "✅",
     logic: "The only buffer DOWNSTREAM of production (MTS only): keeps serving customers while production is blocked, and the only feasible buffer when suppliers are single-sourced. Costs full COGS per unit held. Requires pre-deployment.",
+    math: "MTS only. service_level: SS^FG_p = z^FG_p·σ_{D_p} (one-week production cycle); fixed_days: forecast_p·days/7; fixed_units: constant. z^FG = Φ⁻¹(SL/100); abc_by_revenue trims B −2pp, C −5pp (floor 80). Added on the cycle-stock base FG target. Holding cost (h^FG/52)·COGS_p·SS.",
     hooks: [["PH-70", "55", "forecast, state.fg_target", "state.cost_ledger, state.fg_target", "Adds FG safety stock on top of the cycle-stock base target (priority 45) — ADR 0001."]],
     params: [
       ["sizing", "enum", "P", "service_level", "{service_level, fixed_days, fixed_units}", ""],
@@ -1053,6 +1062,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-P.5", id: "short_term_capacity", stage: "plant", cls: "anticipation",
     constraint: "production_capacity", status: "✅",
     logic: "Overtime: pay-per-use plant headroom (Eq. 22). Bites only when production capacity binds — in material-constrained networks that is rare; check utilization first.",
+    math: "Eq. 22: feasible output is computed at base capacity O_p and at O_p·max_overtime_factor; extra = Q^o − Q^base. revenue_positive ⇒ activate only if (Q^o − Q^base)·u_p > C^o, where C^o = extra·u_p·(premium/100). Premium charged on units produced above O_p.",
     hooks: [["PH-40", "40", "demand, firm_knowledge, state.backlog, state.on_hand", "overtime_capacity", "—"]],
     params: [
       ["overtime_premium_pct_of_price", "% of u_p / OT unit", "P", "5.0", "[1.0, 25.0]", "C^o."],
@@ -1094,6 +1104,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-P.9", id: "material_allocation", stage: "plant", cls: "improvisation",
     constraint: "allocation_efficiency", status: "✅",
     logic: "The weekly war-room as a rolling LP (Eqs. 13–17): reassign shared materials across products to protect revenue during scarcity. Costs planner time only; value scales with the shared-material index.",
+    math: "Eqs. 13–17: rolling LP over W = window_weeks. max Σ_p w_p·x[p,τ] subject to cumulative shared-material balance Σ_p r_{p,m}·Σ_{τ'≤τ} x[p,τ'] ≤ I_m + arrivals(≤τ), plus per-week capacity and demand caps. objective sets w_p (max_revenue ⇒ w_p = u_p). Solved with HiGHS; weeks with no binding shared material skip the solve; on solver failure it falls back to a revenue-ranked greedy plan (counted in lp_fallbacks).",
     hooks: [["PH-40", "60", "demand, firm_knowledge, overtime_capacity, state.backlog, state.on_hand, state.pipeline", "production_plan, state.cost_ledger", "Replaces the default greedy plan (priority 50) with the rolling-LP allocation when active."]],
     params: [
       ["window_weeks", "weeks", "G", "4", "[1, 13]", "W — rolling horizon."],
@@ -1119,6 +1130,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-S.1", id: "backup_supplier", stage: "supplier", cls: "strategic",
     constraint: "material_availability", status: "✅",
     logic: "Contingent rerouting to a qualified backup source — premium paid only on rerouted orders. Slower than warm dual-sourcing, and useless when a BoM peer is single-sourced: one missing material still blocks the product. Requires pre-deployment.",
+    math: "While the firm SEES a disruption on a material's primary source, this week's released order reroutes to a backup s′ chosen by selection_rule (min_cost | min_leadtime | reliability). Premium (c_{m,s′} − c_{m,s})·qty → backup_premium. activation_trigger=coverage_threshold skips rerouting while position covers ≥ threshold weeks; rerouting persists cooldown_weeks after the event clears (anti-flap). Single-sourced materials are skipped.",
     hooks: [["PH-80", "60", "firm_knowledge, purchase_orders, state.on_hand, state.pipeline, state.queue", "purchase_orders, state.cost_ledger", "Reroutes orders released by inventory_control (priority 50) away from firm-visibly disrupted primary suppliers."]],
     params: [
       ["enabled_materials", "ids", "M", "all_multi_sourced", "see schema", "Materials covered; single-sourced ones are skipped."],
@@ -1133,6 +1145,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-S.2", id: "proactive_multi_sourcing", stage: "supplier", cls: "strategic",
     constraint: "material_availability", status: "✅",
     logic: "Split orders across warm sources in NORMAL operations — no activation delay, permanent premium; the structural answer to capacity-cut events. Pay-always vs P-S.1's pay-on-activation; each slice carries its own source's lead time, so a disruption hits only its slice. Requires pre-deployment.",
+    math: "Always-on split of each released order across qualified links by shares w_{m,s} (sum 100; default = equal over the cheapest k where 100/k ≥ min_share_pct). Premium on non-primary slices = Σ (c_{m,s} − c_{m,primary} + secondary_premium)·slice. rebalance_trigger=disruption renormalizes shares onto healthy sources. Each slice carries its own source's lead time, so a disruption hits only its slice.",
     hooks: [["PH-80", "55", "firm_knowledge, purchase_orders", "purchase_orders, state.cost_ledger", "Splits orders released by inventory_control (priority 50) across qualified links; P-S.1 (priority 60) may still reroute a disrupted slice afterwards."]],
     params: [
       ["weights", "share % per (material → supplier)", "SM", "—", "—", "w_{m,s}; each material's shares sum to 100. Absent materials use the default equal split."],
@@ -1174,6 +1187,7 @@ const POLICY_CATALOG: Policy[] = [
     ref: "P-T.2", id: "expedited_shipments", stage: "transport", cls: "improvisation",
     constraint: "response_time", status: "✅",
     logic: "Premium freight pulls existing in-transit forward (Eqs. 18–19) — repeatable every week, hence the strongest long-disruption strategy. Cannot conjure units a capacity cut never shipped (the supplier queue is out of reach).",
+    math: "Eqs. 18–19: coverage gap need_m = E[D_m] + backlog_m − on_hand_m − arrivals[t+1,t+2). revenue_positive ⇒ expedite only if marginal value max_p(u_p / r_{p,m}) > premium_unit = c_m·premium/100. Pull up to the gap forward from the earliest future pipeline slots into next week's landing; cost = pulled·c_m·premium/100. Touches in-transit only — never the supplier queue.",
     hooks: [["PH-90", "40", "firm_knowledge, material_demand, state.backlog, state.on_hand, state.pipeline", "state.cost_ledger, state.pipeline", "Runs after the deferral mechanic (priority 10) and before landing (priority 90): expedited quantities land this week at a premium."]],
     params: [
       ["premium_pct_of_cost", "% of c_m / unit", "M", "3.0", "[1.0, 50.0]", "C^exp_m."],
@@ -1238,6 +1252,12 @@ function PolicyCard({ p }: { p: Policy }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">{p.logic}</p>
+        {p.math && (
+          <div className="space-y-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Formula / decision rule</div>
+            <pre className="rounded-md border bg-muted/40 p-3 text-[11.5px] leading-5 whitespace-pre-wrap break-words">{p.math}</pre>
+          </div>
+        )}
         {p.hooks && (
           <div className="space-y-1">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Engine hooks — where the logic fires</div>
@@ -1337,6 +1357,315 @@ function KpiDictionary() {
   );
 }
 
+// ── Generic two-column reference table ────────────────────────────────────────
+
+function TwoColTable({ head, rows }: { head: [string, string]; rows: [string, string][] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border rounded-md">
+        <thead className="bg-muted/40 text-left">
+          <tr>
+            {head.map((h) => (
+              <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
+          {rows.map((r) => (
+            <tr key={r[0]}>
+              <td className="font-mono text-[12px] whitespace-nowrap">{r[0]}</td>
+              <td className="text-muted-foreground text-[13px]">{r[1]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Engine mechanics (always-on, non-optional) ────────────────────────────────
+
+const MECHANICS: [string, string][] = [
+  ["mech.demand · PH-10", "Update the forecast from history, then draw D_p[t] from the world demand stream."],
+  ["mech.fulfill_from_stock · PH-30", "MTS serves D_p from finished-goods stock (no-op for MTO)."],
+  ["mech.default_plan · PH-40", "Greedy feasible production plan, capacity-gated."],
+  ["mech.production_execute · PH-50", "Produce Q_p and consume materials (Eqs. 8–9)."],
+  ["mech.material_demand · PH-70", "Project material demand D_m (Eq. 1)."],
+  ["mech.fg_target_base · PH-70", "Cycle-stock base FG target (MTS, ADR 0001, priority 45)."],
+  ["mech.orders_to_queue · PH-80", "Released purchase orders enter the supplier queue (priority 90)."],
+  ["mech.defer / ship_queue / land · PH-90", "Capacity gating, LT-extension deferral (Eqs. 11–12), arrivals landing."],
+  ["mech.accounting · PH-99", "Cost rollup, KPI rows, trace (read-only)."],
+];
+
+// ── Probability distributions (Part III / engine sampling) ────────────────────
+
+type DistRow = { name: string; form: string; notes: string };
+
+const DEMAND_DISTS: DistRow[] = [
+  { name: "triangular ✅", form: "Tri(a, b, c) — inverse-CDF", notes: "Manuscript core. E=(a+b+c)/3; Var=(a²+b²+c²−ab−ac−bc)/18. Default a=max{0,(1−ν)·b}, c=(1+ν)·b." },
+  { name: "triangularAV", form: "triangular(avg·(1−v), avg, avg·(1+v))", notes: "'Average & Variability' form: mode = avg, symmetric ±v range (a floored at 0). In scsim: demand_mode = avg, demand_floor_factor (ν) = v. e.g. avg 100, v 0.30 → Tri(70, 100, 130). Use Product.with_triangular_av(average, variability)." },
+  { name: "deterministic", form: "D = b", notes: "No randomness; Var = 0." },
+  { name: "poisson", form: "Pois(λ), λ = b", notes: "Counts; E = Var = b." },
+  { name: "negbin", form: "NB(k, p), p = k/(k+b)", notes: "Over-dispersed counts. E = b; Var = b + b²/k. Larger k → closer to Poisson." },
+  { name: "bootstrap", form: "uniform resample of demand_history", notes: "Empirical. E, Var from the sample (ddof = 1). Requires demand_history." },
+];
+
+const LEADTIME_DISTS: DistRow[] = [
+  { name: "deterministic ✅", form: "T = lead_time_weeks", notes: "No randomness (manuscript)." },
+  { name: "lognormal", form: "σ²=ln(1+CV²), μ=ln(T)−σ²/2; round", notes: "E[X] = T, Var = T²·CV²." },
+  { name: "gamma", form: "α=1/CV², β=T·CV²; round", notes: "E[X] = T, Var = T²·CV²." },
+  { name: "empirical", form: "— (M7)", notes: "Lands with the data-import path; compiling one today raises a clear error." },
+];
+
+const DISRUPTION_DRAWS: [string, string][] = [
+  ["start (t*)", "U{t_w … t_w+2} from the hazard_start stream (manuscript U{85..87}); fixed when start is given."],
+  ["duration (Δt)", "U{min … max} from the hazard_duration stream; fixed when an int is given (default range 5–10)."],
+  ["magnitude (φ)", "capacity_reduction factor, drawn from the hazard_magnitude stream when ranged (0 = full outage)."],
+];
+
+const ENUM_GROUPS: [string, string][] = [
+  ["DemandModel", "deterministic · triangular ✅ · poisson · negbin · bootstrap"],
+  ["LeadTimeDist", "deterministic ✅ · lognormal · gamma · empirical (M7)"],
+  ["FulfillmentMode (CODP)", "mto ✅ · mts (M7) · ato (reserved)"],
+  ["ForecastModel", "naive · ma ✅ · exp_smoothing · perfect"],
+  ["EffectType", "lead_time_extension ✅ · capacity_reduction"],
+  ["TargetType", "node:supplier ✅ · node:plant (M7) · edge:lane (behavior-neutral)"],
+  ["OverflowRule", "queue · reject (→ lost_inbound_units)"],
+  ["Onset / RecoveryProfile", "step · ramp_linear"],
+  ["TransportMode", "default · sea · air · road · rail"],
+  ["WarmupMethod", "conway · mser5 · manual · most_conservative ✅"],
+  ["RunMode", "full ✅ · fast_scan"],
+  ["ReplicationStopping", "fixed ✅ · sequential_ci"],
+];
+
+function DistTable({ caption, rows }: { caption: string; rows: DistRow[] }) {
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-semibold">{caption}</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border rounded-md">
+          <thead className="bg-muted/40 text-left">
+            <tr>
+              {["Distribution", "Form / sampling", "Moments & notes"].map((h) => (
+                <th key={h} className="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="[&_td]:px-2.5 [&_td]:py-2 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
+            {rows.map((r) => (
+              <tr key={r.name}>
+                <td className="font-mono text-[11px] font-medium whitespace-nowrap">{r.name}</td>
+                <td className="font-mono text-[11px]">{r.form}</td>
+                <td className="text-muted-foreground text-[12px]">{r.notes}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── KPI cost components & Resilience Index normalization ──────────────────────
+
+const COST_COMPONENTS: [string, string][] = [
+  ["mat-SS holding", "h_m·c_m on safety-stock inventory (P-P.3)."],
+  ["backup premium", "(c_{m,s′} − c_{m,s})·qty on rerouted orders (P-S.1)."],
+  ["multi-sourcing premium", "non-primary slice premium + secondary_premium (P-S.2)."],
+  ["expediting", "c_m·premium on pulled-forward units (P-T.2)."],
+  ["overtime", "u_p·premium on units above O_p (P-P.5)."],
+  ["lost sales", "u_p·L_p — unmet demand valued at price."],
+  ["allocation labor", "annual planner cost amortized weekly (P-P.9)."],
+  ["FG-SS holding", "(h^FG/52)·COGS on FG safety stock (P-P.4, MTS)."],
+  ["backorder penalty", "backorder_penalty on aged backlog (P-C.1)."],
+];
+
+const RI_COMPONENTS: { comp: string; weight: string; norm: string; note: string }[] = [
+  { comp: "ŠLA — service loss", weight: "w₁ = .35", norm: "SLA / window_weeks", note: "FR ∈ [0,1] bounds the loss area by window length." },
+  { comp: "ŤTR — time-to-recover", weight: "w₂ = .25", norm: "TTR / window_weeks", note: "Censored at window ⇒ 1 (never recovered)." },
+  { comp: "ŤTS — time-to-survive", weight: "w₃ = .15", norm: "TTS / window_weeks", note: "Entered as +ŤTS (more survival = better); censored ⇒ 1." },
+  { comp: "Č — cost", weight: "w₄ = .25", norm: "C^res / clean-baseline revenue", note: "Cost in units of healthy revenue, clipped to [0,1]." },
+];
+
+function ResilienceIndexTable() {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border rounded-md">
+        <thead className="bg-muted/40 text-left">
+          <tr>
+            {["Component", "Weight", "Normalization", "Rationale"].map((h) => (
+              <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
+          {RI_COMPONENTS.map((r) => (
+            <tr key={r.comp}>
+              <td className="font-medium text-[13px] whitespace-nowrap">{r.comp}</td>
+              <td className="font-mono text-xs whitespace-nowrap">{r.weight}</td>
+              <td className="font-mono text-[11px] whitespace-nowrap">{r.norm}</td>
+              <td className="text-muted-foreground text-[12px]">{r.note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Experiments: synergy · stress tests · performance · roadmap ───────────────
+
+const STRESS_TESTS: { id: string; status: string; desc: string }[] = [
+  { id: "ST-1", status: "✅", desc: "Supplier outage sweep — each supplier × lead-time extension × Δt {5, 8, 10} weeks (manuscript)." },
+  { id: "ST-2", status: "✅", desc: "Supplier capacity-cut sweep — supplier × φ {0.75, 0.5, 0.25, 0} × {4, 8} weeks; cells without finite capacity are skipped with a reason." },
+  { id: "ST-3", status: "🧩 M7", desc: "Material shortage sweep." },
+  { id: "ST-4", status: "🧩 M7", desc: "Edge / lane shock (needs the edge split)." },
+  { id: "ST-5", status: "🧩 M7", desc: "Demand surge." },
+  { id: "ST-6", status: "🧩 M7", desc: "Compound shock (ST-1 ∩ ST-5)." },
+  { id: "ST-7", status: "🧩 M7", desc: "Nexus-node attack — top-k ML-critical nodes (ml-service integration)." },
+];
+
+const PERF_TARGETS: { workload: string; target: string; measured: string }[] = [
+  { workload: "Single rep, manuscript scale (15 P × 556 M × 58 S × 156 wk)", target: "≤ 0.5 s", measured: "~0.33 s" },
+  { workload: "Large instance (200 P × 5,000 M × 300 S × 156 wk)", target: "≤ 5 s/rep", measured: "~2.5 s" },
+  { workload: "One experiment cell (540 reps)", target: "≤ 90 s / 8 cores", measured: "embarrassingly parallel" },
+];
+
+const PERF_TECHNIQUES: string[] = [
+  "Phase-sweep vectorization — inventory math is NumPy over material vectors; production walks the sparse BoM (CSR) once.",
+  "Ring-buffer pipeline — in-transit is a circular [links × W] array; LT-extension deferral and expediting are slot moves.",
+  "Parallelism across runs only — replications and stress cells are embarrassingly parallel; within a run stays single-threaded and deterministic.",
+  "Warm-state snapshots — stress batteries restore the post-warm-up world per model seed (bit-identity tested).",
+  "LP discipline (P-P.9) — active-products × binding-shared-materials prefilter, 4-week horizon, HiGHS; non-binding weeks skip the solve.",
+  "IO discipline — traces buffer in NumPy, one Parquet (zstd) file per replication; verbosity kpi_only / weekly / full_debug.",
+];
+
+const ROADMAP: { m: string; deliverable: string; status: string }[] = [
+  { m: "M1", deliverable: "Entities + Part III dictionary; registry; phase-pipeline skeleton.", status: "✅" },
+  { m: "M2", deliverable: "MTO core loop (PH-10..99); LT-extension injector; warm-up detection; ring-buffer pipeline.", status: "✅" },
+  { m: "M3", deliverable: "Policies as plugins; keyed policy RNG; warm-state snapshots.", status: "✅" },
+  { m: "M4", deliverable: "ST-1 end-to-end + scorecard + Resilience Index; fast_scan.", status: "✅ engine" },
+  { m: "M5", deliverable: "Portfolio study + synergy decomposition (CRN, bootstrap stars, breadth ladder).", status: "✅ engine" },
+  { m: "M6", deliverable: "Docs auto-generation + docs CI gate; validation suite.", status: "✅" },
+  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅; plant/edge targets, edge split, P-S.4, P-C.2, ST-3/4/5.", status: "🔜 most shipped" },
+  { m: "M8", deliverable: "Remaining policies; P-X.1 recovery playbook; LLM diff proposer.", status: "🧩" },
+];
+
+function Experiments() {
+  return (
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold">Portfolio synergy</h3>
+        <Prose>
+          <p>
+            A portfolio study runs S0 (built-ins only) and each strategy portfolio under one shared
+            world (CRN by construction), with one warm-up detected on S0 and reused across all
+            portfolios. Per replication it records ΔR, ΔC, and SLA, then decomposes the combination
+            effect:
+          </p>
+        </Prose>
+        <pre className="rounded-md border bg-muted/40 p-4 text-[12.5px] leading-6 overflow-x-auto">
+{`synergy_X(AB…) = Δ_X(combo) − Σ Δ_X(components)      (X ∈ {R, C})
+
+  > 0  complementary  — the combination unlocks more than the parts
+  < 0  submodular     — the strategies overlap on the same bottleneck`}
+        </pre>
+        <Prose>
+          <p>
+            Synergy is CRN-paired per replication and percentile-bootstrapped (two-sided, stars at
+            .05/.01/.001). A breadth ladder reports mean ΔR/ΔC by portfolio breadth (the inverted-U);
+            portfolios with breadth ≥ 4, or ≥ 2 pre-deployed strategies on one constraint tag, carry
+            structured feasibility warnings.
+          </p>
+        </Prose>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold">Stress-test battery</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border rounded-md">
+            <thead className="bg-muted/40 text-left">
+              <tr>
+                {["Test", "Status", "What it sweeps"].map((h) => (
+                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
+              {STRESS_TESTS.map((s) => (
+                <tr key={s.id}>
+                  <td className="font-mono text-xs whitespace-nowrap">{s.id}</td>
+                  <td className="text-xs whitespace-nowrap">{s.status}</td>
+                  <td className="text-muted-foreground text-[13px]">{s.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Prose>
+          <p className="text-sm text-muted-foreground">
+            All cells share one clean reference run (SLA series, RI cost normalization) and one
+            warm-state snapshot per model seed — cells restore at t_w and simulate only post-warm-up
+            weeks under the same world streams (paired). ST-1 ranks suppliers under delay; ST-2 ranks
+            them under volume loss — the same supplier can rank differently across the two.
+          </p>
+        </Prose>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold">Performance</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border rounded-md">
+            <thead className="bg-muted/40 text-left">
+              <tr>
+                {["Workload", "Target", "Measured"].map((h) => (
+                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
+              {PERF_TARGETS.map((p) => (
+                <tr key={p.workload}>
+                  <td className="text-[13px]">{p.workload}</td>
+                  <td className="font-mono text-xs whitespace-nowrap">{p.target}</td>
+                  <td className="font-mono text-xs whitespace-nowrap">{p.measured}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+          {PERF_TECHNIQUES.map((t) => <li key={t}>{t}</li>)}
+        </ul>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold">Roadmap (M1–M8)</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border rounded-md">
+            <thead className="bg-muted/40 text-left">
+              <tr>
+                {["Milestone", "Deliverable", "Status"].map((h) => (
+                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
+              {ROADMAP.map((r) => (
+                <tr key={r.m}>
+                  <td className="font-mono text-xs whitespace-nowrap">{r.m}</td>
+                  <td className="text-muted-foreground text-[13px]">{r.deliverable}</td>
+                  <td className="text-xs whitespace-nowrap">{r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Sections registry & TOC ──────────────────────────────────────────────────
 
 const sections = [
@@ -1348,10 +1677,12 @@ const sections = [
   { id: "pilots",       label: "Pilot scenarios",       group: "For Users" },
   { id: "des-model",    label: "Engine & phase pipeline", group: "For Modelers" },
   { id: "sim-params",   label: "Simulation parameters", group: "For Modelers" },
+  { id: "distributions", label: "Probability distributions", group: "For Modelers" },
   { id: "policies",     label: "Supply chain policies", group: "For Modelers" },
   { id: "network-sci",  label: "Network science",       group: "For Modelers" },
   { id: "stats",        label: "Statistical methods",   group: "For Modelers" },
-  { id: "kpis",         label: "KPI dictionary",        group: "For Modelers" },
+  { id: "kpis",         label: "KPIs & Resilience Index", group: "For Modelers" },
+  { id: "experiments",  label: "Synergy, stress & performance", group: "For Modelers" },
   { id: "tldr",         label: "TL;DR",                 group: "For IT" },
   { id: "boundary",     label: "System boundary",       group: "For IT" },
   { id: "flow",         label: "Realtime flow",         group: "For IT" },
@@ -1445,134 +1776,12 @@ interface AboutProps {
   setIsCollapsed?: (v: boolean) => void;
 }
 
-export default function About({ isCollapsed = true, setIsCollapsed = () => {} }: AboutProps) {
-  const sectionsByGroup = useMemo(
-    () =>
-      GROUP_ORDER.reduce<Record<string, typeof sections>>((acc, g) => {
-        acc[g] = sections.filter((s) => s.group === g);
-        return acc;
-      }, {}),
-    []
-  );
-  const ids = useMemo(() => sections.map((s) => s.id), []);
-  const active = useActiveSection(ids);
-
-  // Map id → group eyebrow shown above the first section of each group.
-  const firstIdOfGroup = useMemo(() => {
-    const map = new Map<string, string>();
-    GROUP_ORDER.forEach((g) => {
-      const first = sectionsByGroup[g]?.[0];
-      if (first) map.set(first.id, g.toUpperCase());
-    });
-    return map;
-  }, [sectionsByGroup]);
-
-  return (
-    <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
-        <PageHeader
-          title="Digital SC Twin · Platform Reference"
-          subtitle="Overview, user workflows, modelling internals, and IT architecture"
-          rightContent={
-            <Button asChild variant="outline" size="sm" className="h-8 px-2.5">
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4 mr-1.5" />
-                Back to app
-              </Link>
-            </Button>
-          }
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-[220px_1px_1fr] gap-x-10 gap-y-14 max-w-6xl mx-auto">
-
-          {/* TOC — scrollable, with scroll progress + active-section indicator */}
-          <nav className="hidden lg:block sticky top-20 h-fit">
-            <div className="flex gap-3">
-              <div className="sticky top-20 h-[calc(100vh-6rem)] flex flex-col items-center pt-1 pb-1">
-                <ScrollProgress />
-                <button
-                  type="button"
-                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                  className="mt-3 h-6 w-6 rounded-full border bg-background hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Scroll to top"
-                  title="Scroll to top"
-                >
-                  <ArrowUp className="h-3 w-3" />
-                </button>
-              </div>
-              <ScrollArea className="max-h-[calc(100vh-6rem)] pr-2 flex-1">
-                <ul className="space-y-0.5 text-sm">
-                  {GROUP_ORDER.map((group) => {
-                    const accent = GROUP_ACCENT[group];
-                    return (
-                      <li key={group}>
-                        <div className={cn(
-                          "text-[10px] font-semibold uppercase tracking-[0.14em] mt-5 mb-1.5 first:mt-0 px-2 py-0.5 rounded inline-block",
-                          accent.chip,
-                        )}>
-                          {group}
-                        </div>
-                        <ul className="space-y-0.5">
-                          {sectionsByGroup[group].map((s) => (
-                            <TocItem
-                              key={s.id}
-                              id={s.id}
-                              label={s.label}
-                              active={active === s.id}
-                              accent={accent}
-                            />
-                          ))}
-                        </ul>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </ScrollArea>
-            </div>
-          </nav>
-
-          {/* Vertical divider between TOC and content */}
-          <div className="hidden lg:block sticky top-20 h-[calc(100vh-6rem)] w-px bg-border" aria-hidden />
-
-          <div className="space-y-28 min-w-0">
-
-
-            {/* Hero */}
-            <div className="space-y-5 max-w-[760px]">
-              <Badge variant="secondary">Platform reference · v1</Badge>
-              <h1 className="text-4xl font-bold tracking-tight">
-                Digital Supply Chain Twin
-              </h1>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                A decision-support system that unifies supply chain network modelling with
-                discrete-event simulation — built for planners, validated on industrial pilots,
-                and grounded in peer-reviewed research.
-              </p>
-
-              {/* Audience quick-jump */}
-              <div className="flex flex-wrap gap-2 pt-1">
-                {[
-                  { label: "Overview", href: "#overview", icon: BookOpen },
-                  { label: "For Users", href: "#workflow", icon: Users },
-                  { label: "For Modelers", href: "#des-model", icon: FlaskConical },
-                  { label: "For IT", href: "#tldr", icon: Cpu },
-                  { label: "Glossary", href: "#glossary", icon: Library },
-                ].map(({ label, href, icon: Icon }) => (
-                  <a key={href} href={href}>
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <Icon className="h-3.5 w-3.5" />
-                      {label}
-                    </Button>
-                  </a>
-                ))}
-              </div>
-
-              <LiveStatus />
-            </div>
-
-            {/* ── OVERVIEW ── */}
-
-            <Section id="overview" icon={BookOpen} title="What is this tool" eyebrow={firstIdOfGroup.get("overview")}>
+// Per-page documentation bodies, keyed by slug. Rendered by the /help docs site
+// (src/pages/help/HelpPage.tsx) inside the dedicated DocsLayout chrome. Each body
+// returns one titled <Section>; sub-headings (h3) feed the right-hand rail.
+export const DOC_BODIES: Record<string, () => JSX.Element> = {
+  overview: () => (
+            <Section id="overview" icon={BookOpen} title="What is this tool">
               <Prose>
                 <p>
                   A supply chain planner opens a project — their <strong>digital twin</strong>: nodes
@@ -1626,7 +1835,8 @@ export default function About({ isCollapsed = true, setIsCollapsed = () => {} }:
                 </p>
               </Prose>
             </Section>
-
+  ),
+  "user-stories": () => (
             <Section id="user-stories" icon={Users} title="User stories">
               <Prose>
                 <p className="text-muted-foreground">
@@ -1635,7 +1845,8 @@ export default function About({ isCollapsed = true, setIsCollapsed = () => {} }:
               </Prose>
               <UserStoryList />
             </Section>
-
+  ),
+  accurate: () => (
             <Section id="accurate" icon={Store} title="ACCURATE project & MaaS">
               <Prose>
                 <p>
@@ -1649,10 +1860,9 @@ export default function About({ isCollapsed = true, setIsCollapsed = () => {} }:
               </Prose>
               <AccurateCallout />
             </Section>
-
-            {/* ── FOR USERS ── */}
-
-            <Section id="workflow" icon={ListChecks} title="Planner workflow" eyebrow={firstIdOfGroup.get("workflow")}>
+  ),
+  workflow: () => (
+            <Section id="workflow" icon={ListChecks} title="Planner workflow">
               <Prose>
                 <p>
                   The typical end-to-end workflow follows six steps. Each step corresponds to a
@@ -1661,7 +1871,8 @@ export default function About({ isCollapsed = true, setIsCollapsed = () => {} }:
               </Prose>
               <WorkflowSteps />
             </Section>
-
+  ),
+  "use-cases": () => (
             <Section id="use-cases" icon={BarChart3} title="Use cases by page">
               <Prose>
                 <p>
@@ -1670,7 +1881,8 @@ export default function About({ isCollapsed = true, setIsCollapsed = () => {} }:
               </Prose>
               <UseCaseCards />
             </Section>
-
+  ),
+  pilots: () => (
             <Section id="pilots" icon={Globe} title="Pilot scenarios">
               <Prose>
                 <p>
@@ -1749,10 +1961,9 @@ export default function About({ isCollapsed = true, setIsCollapsed = () => {} }:
                 ))}
               </div>
             </Section>
-
-            {/* ── FOR MODELERS ── */}
-
-            <Section id="des-model" icon={FlaskConical} title="Engine & phase pipeline" eyebrow={firstIdOfGroup.get("des-model")}>
+  ),
+  "des-model": () => (
+            <Section id="des-model" icon={FlaskConical} title="Engine & phase pipeline">
               <Prose>
                 <p>
                   The simulation engine is <strong>scsim</strong> (engine 0.2.0) — a discrete-time
@@ -1765,13 +1976,46 @@ export default function About({ isCollapsed = true, setIsCollapsed = () => {} }:
                 </p>
                 <p>
                   The weekly cycle is <strong>data, not code</strong>: each tick runs a fixed sequence
-                  of eleven phases, and policies attach to phases by priority. This is what lets the
-                  twenty-two policies compose without rewriting the engine — every policy declares which
-                  phase it hooks, what state it reads, and what it writes.
+                  of eleven phases (PH-00 … PH-99). Two kinds of code attach to a phase —
+                  <strong> mechanics</strong> and <strong>policies</strong>:
+                </p>
+                <ul className="list-disc pl-5 space-y-1.5">
+                  <li>
+                    <strong>Mechanics</strong> are the always-on conservation math (demand draw,
+                    production, material balance, logistics, accounting). They cannot be disabled and
+                    do not read policy parameters — they are the physics of the chain.
+                  </li>
+                  <li>
+                    <strong>Policies</strong> are optional, configurable decision modules that adjust
+                    choices <em>within</em> that physics (how much to order, where to source, whether to
+                    expedite). The twenty-two policies compose without rewriting the engine.
+                  </li>
+                </ul>
+                <p>
+                  Both register as phase hooks with declared <code>reads</code>/<code>writes</code> and a
+                  <strong> priority</strong>. Load-time validation rejects an illegal read or write; when
+                  two hooks write the same key in the same phase they must declare distinct priorities and
+                  a resolution rule (e.g. P-P.3 adds safety stock <em>after</em> P-P.1 sets base levels;
+                  P-P.9 replaces the default plan).
                 </p>
               </Prose>
               <PhasePipeline />
               <Prose>
+                <p className="text-sm text-muted-foreground pt-1">
+                  The always-on mechanics behind those phases:
+                </p>
+              </Prose>
+              <TwoColTable head={["Mechanic · phase", "Role"]} rows={MECHANICS} />
+              <Prose>
+                <h3 className="text-base font-semibold pt-2">Warm start (t = 0)</h3>
+                <p>
+                  An empty chain is not steady state, so the engine runs the PH-70 planning chain once to
+                  obtain levels, then seeds on-hand inventory at{" "}
+                  <code>I_m(0) = max(S_m − E[D_m]·T_s, 0)</code> (position starts exactly at the order-up-to
+                  level <code>S_m</code>, in saw-tooth phase) and primes the in-transit pipeline with one
+                  expected week of demand per slot. <code>initial_on_hand</code> overrides per material;
+                  MTS products start at their finished-goods target.
+                </p>
                 <p>
                   The three manuscript processes — demand management, material procurement, and
                   production &amp; fulfillment — map onto these phases. Their core equations follow.
@@ -1835,12 +2079,25 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
               </pre>
               <Prose>
                 <p>
-                  In the study, disruption duration is uniform over [5, 10] weeks; start time is
-                  uniform over weeks 85–87.
+                  This is the <code>lead_time_extension</code> effect (✅ Eqs. 11–12): units are{" "}
+                  <em>delayed, never destroyed</em>. The second effect, <code>capacity_reduction</code>,
+                  throttles a supplier's weekly outbound flow to <code>φ · capacity_per_week</code> (φ = 0
+                  is a full outage). Under <code>overflow_rule = queue</code> nothing is lost — the cut
+                  volume waits in the supplier queue; under <code>reject</code> the excess is dropped and
+                  logged as <code>lost_inbound_units</code>. Both onset and recovery can be a{" "}
+                  <code>step</code> or a <code>ramp_linear</code> over <code>ramp_weeks</code>. Detection
+                  is gated: a firm only sees an event at <code>t ≥ start + detection_lag_weeks</code>.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  In the manuscript study, disruption duration is uniform over [5, 10] weeks and start
+                  time is uniform over weeks 85–87 (steady state). See{" "}
+                  <a href="#distributions" className="underline">Probability distributions</a> for how
+                  every random quantity is drawn.
                 </p>
               </Prose>
             </Section>
-
+  ),
+  "sim-params": () => (
             <Section id="sim-params" icon={SlidersHorizontal} title="Simulation parameters">
               <Prose>
                 <p>
@@ -1854,17 +2111,84 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
               </Prose>
               <SimParameters />
             </Section>
+  ),
+  distributions: () => (
+            <Section id="distributions" icon={Dices} title="Probability distributions">
+              <Prose>
+                <p>
+                  The simulation is stochastic: demand, lead times, and disruption timing are drawn from
+                  named distributions, each seeded from the project's <a href="#stats" className="underline">seed
+                  tree</a> so runs are reproducible and configurations are comparable on identical draws.
+                  Below is every distribution the engine can sample, with its exact form.
+                </p>
+              </Prose>
+              <DistTable caption="Demand models (per product · demand_model)" rows={DEMAND_DISTS} />
+              <Prose>
+                <p>
+                  <strong>triangularAV</strong> ("Average &amp; Variability") is the convenience form most
+                  pilots use: instead of giving an explicit (min, mode, max), you give an{" "}
+                  <em>average</em> and a <em>± variability</em> fraction, and the engine builds a symmetric
+                  triangular around it:
+                </p>
+              </Prose>
+              <pre className="rounded-md border bg-muted/40 p-4 text-[12.5px] leading-6 overflow-x-auto">
+{`triangularAV(average, variability)
+    = triangular( average·(1 − variability),  average,  average·(1 + variability) )
 
+example:  triangularAV(100, 0.30)  =  triangular(70, 100, 130)
+
+In scsim:  demand_mode = average,  demand_floor_factor (ν) = variability
+           Product.with_triangular_av(average=100, variability=0.30, …)`}
+              </pre>
+              <DistTable caption="Lead-time distributions (per supplier link · lead_time_dist, lead_time_cv)" rows={LEADTIME_DISTS} />
+              <Prose>
+                <p className="text-sm text-muted-foreground">
+                  Stochastic lead times consume the world <code>leadtime</code> stream only when an order
+                  actually ships — a documented CRN caveat (different ordering patterns consume different
+                  numbers of draws). The manuscript uses deterministic lead times, so it is unaffected.
+                </p>
+                <h3 className="text-base font-semibold pt-2">Disruption draws</h3>
+              </Prose>
+              <TwoColTable head={["Quantity", "Sampling"]} rows={DISRUPTION_DRAWS} />
+              <Prose>
+                <h3 className="text-base font-semibold pt-2">Normal distribution</h3>
+                <p>
+                  The normal (Gaussian) distribution is not used to generate demand — it appears as the
+                  service-level <strong>z-score</strong> for safety stock: <code>z = Φ⁻¹(SL%)</code> (the
+                  inverse normal CDF), computed once at policy setup for P-P.3 and P-P.4. A 95% service
+                  level gives <code>z ≈ 1.645</code>; the ABC-XYZ matrix assigns a different SL (hence z)
+                  to each material class.
+                </p>
+                <h3 className="text-base font-semibold pt-2">Allowed values (enums)</h3>
+                <p className="text-sm text-muted-foreground">
+                  The full set of accepted values for the categorical parameters above (✅ = validated /
+                  default-selected today).
+                </p>
+              </Prose>
+              <TwoColTable head={["Enum", "Allowed values"]} rows={ENUM_GROUPS} />
+            </Section>
+  ),
+  policies: () => (
             <Section id="policies" icon={Layers} title="Supply chain policies">
               <Prose>
                 <p>
-                  Resilience levers are modelled as <strong>policies</strong>: twenty-two of them across
-                  five classes, each declaring its own typed parameters and the engine hook where its
-                  logic fires. They run individually or in any combination; the do-nothing baseline
-                  (<strong>S0</strong>) uses built-in buffers only.
+                  Policies in scsim are <strong>operational supply-chain policies</strong> — the everyday
+                  rules a chain runs every week: <strong>inventory</strong> (min-max, base-stock, (R,Q),
+                  safety stock), <strong>production</strong> (lot sizing, overtime, material allocation),
+                  <strong> sourcing</strong> (backup, multi-sourcing), <strong>transport</strong>
+                  {" "}(expediting, lane choice), and <strong>demand</strong> (lost-sales / backorder).
+                  They are <em>not</em> merely "resilience strategies": the everyday rules are the
+                  operational baseline, and the resilience levers are a subset layered on top. Each is a
+                  module that hooks a phase — distinct from the always-on{" "}
+                  <a href="#des-model" className="underline">mechanics</a>.
+                </p>
+                <p>
+                  Twenty-two policies span five <em>classes</em> (the second axis, orthogonal to the
+                  network stage they act on). The do-nothing baseline (<strong>S0</strong>) runs the
+                  built-in policies only:
                 </p>
                 <ul className="list-disc pl-5 space-y-1 text-sm">
-                  <li><strong>built_in</strong> — everyday rules every chain already runs (inventory, lot sizing, unmet-demand handling).</li>
+                  <li><strong>built_in</strong> — everyday operational baseline (inventory control, lot sizing, unmet-demand handling). NOT resilience levers — they are what resilience is measured against.</li>
                   <li><strong>strategic</strong> — pre-positioned structural choices; require pre-deployment before the shock (safety stock, dual-sourcing, backup, reservation).</li>
                   <li><strong>anticipation</strong> — capabilities readied ahead of time and triggered on detection (overtime, flexibility, early-warning failover).</li>
                   <li><strong>improvisation</strong> — in-crisis reactions that need no pre-build (material allocation, expediting, demand shaping).</li>
@@ -1874,7 +2198,8 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                   Status: <strong>✅ implemented</strong> = validated manuscript core, runnable today;{" "}
                   <strong>🧩 planned</strong> = full parameter schema lives in the registry, with the
                   engine landing at the listed milestone (compiling one raises a clear error, never a
-                  silent no-op). Each card lists the policy logic, the engine hook(s) it fires in (phase,
+                  silent no-op). Cards are grouped by network stage; each lists the policy logic, its
+                  formula / decision rule (implemented policies), the engine hook(s) it fires in (phase,
                   priority, reads, writes, conflict resolution), and its complete parameter set.
                 </p>
               </Prose>
@@ -1911,7 +2236,8 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
            Σ u_p (D_p − Q_{p,S0})`}
               </pre>
             </Section>
-
+  ),
+  "network-sci": () => (
             <Section id="network-sci" icon={Share2} title="Network science methods">
               <Prose>
                 <p>
@@ -1980,61 +2306,89 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 </ul>
               </Prose>
             </Section>
-
-            <Section id="stats" icon={Activity} title="Statistical methods">
+  ),
+  stats: () => (
+            <Section id="stats" icon={Sigma} title="Statistical methods">
               <Prose>
                 <p>
-                  Simulation results are reported as statistical estimates, not point values. Each
-                  experiment runs <code>model_seeds</code> independent replications (default 30, the
-                  study-grade floor) over world random streams seeded from a single{" "}
-                  <code>project_seed</code> via a <strong>SeedSequence tree</strong>, so every run is
-                  reproducible and any two configurations can be compared on identical draws.
+                  Results are statistical estimates, not point values. Every random draw descends from a
+                  single <code>project_seed</code> through a keyed <strong>SeedSequence tree</strong> with
+                  three realms, so stream identity is structural (independent of creation order) and fully
+                  reproducible:
+                </p>
+              </Prose>
+              <pre className="rounded-md border bg-muted/40 p-4 text-[12.5px] leading-6 overflow-x-auto">
+{`project_seed
+ ├─ WORLD  (realm, model_rep, stream_id)      demand, leadtime
+ │      keyed by model_rep ONLY → identical world across every portfolio
+ │      and event seed of a project  ⇒  Common Random Numbers (CRN)
+ ├─ HAZARD (realm, event_rep, event_idx, draw) start, duration, magnitude
+ └─ POLICY (realm, model_rep, event_rep, policy_key)   one stream per policy
+        policy_key = SHA-256(policy_id) → adding policy #22 cannot perturb
+        the draws of policies #1–21 or of the world streams (G-RNG guarantee)`}
+              </pre>
+              <Prose>
+                <h3 className="text-base font-semibold pt-1">Replications &amp; CRN</h3>
+                <p>
+                  The replication grid is <code>model_seeds × disruption_event_seeds</code> (default
+                  30 × 18); the event axis collapses to 1 when every event is fixed. The study-grade floor
+                  is 30 model seeds — below 10 carries a <code>below_replication_floor</code> badge.
+                  Because world streams are keyed by <code>model_rep</code> alone, every portfolio and
+                  stress cell sees the <em>same</em> demand and lead-time trajectory — the pairing that
+                  makes strategy deltas and synergy measurable.
                 </p>
                 <h3 className="text-base font-semibold pt-2">Warmup detection</h3>
                 <p>
-                  An empty supply chain is not representative of steady-state operations, so an initial
-                  warmup window is discarded. <code>warmup_method</code> defaults to{" "}
-                  <code>most_conservative</code>: the engine runs both detectors and adopts the later week.
+                  An empty chain is not steady state, so an initial window is discarded. Both detectors
+                  run on the clean (no-event) fill-rate series and <code>warmup_method</code> defaults to{" "}
+                  <code>most_conservative</code> — the later (max) of the two:
                 </p>
-                <ul className="list-disc pl-5 space-y-1.5">
-                  <li>
-                    <strong>Conway's rule:</strong> inspects the fill-rate time series for visual
-                    stabilisation (the more conservative estimate — manuscript <code>warmup_end ≈ 85</code>).
-                  </li>
-                  <li>
-                    <strong>MSER-5</strong> (Marginal Standard Error Rule, batch size 5): minimises the
-                    marginal standard error of the grand mean — typically a much earlier week.
-                  </li>
-                </ul>
+              </Prose>
+              <pre className="rounded-md border bg-muted/40 p-4 text-[12.5px] leading-6 overflow-x-auto">
+{`MSER-5 : batch the series into means of width 5; pick the truncation d*
+         that minimizes  z(d) = Var(batch_means[d:]) / (n_b − d)²
+         (search restricted to the first half of the batches)
+
+Conway : first index k such that x[k] is NEITHER the max NOR the min
+         of the remaining tail x[k:]
+
+adopted = max(Conway, MSER-5)        # most_conservative (default)`}
+              </pre>
+              <Prose>
                 <p>
                   KPI statistics are computed only over the <code>analysis_window</code> (default 52
-                  weeks) starting at <code>warmup_end</code>.
+                  weeks) starting at the adopted <code>warmup_end</code> (manuscript ≈ 85).
                 </p>
-                <h3 className="text-base font-semibold pt-2">Common random numbers &amp; synergy</h3>
+                <h3 className="text-base font-semibold pt-2">Bootstrap &amp; significance</h3>
                 <p>
-                  <code>crn_enabled</code> (default on) pairs every portfolio against the same disruption
-                  draws, so a strategy's effect is measured as a paired difference rather than across
-                  independent noise. This is what makes <strong>synergy</strong> measurable:{" "}
-                  <code>synergy = Δ_portfolio − Σ Δ_components</code>, with significance stars from a
-                  percentile bootstrap (<code>bootstrap_resamples</code>, default 10 000).
+                  Δ and synergy metrics are summarized by a <strong>percentile bootstrap</strong>
+                  {" "}(<code>bootstrap_resamples</code>, default 10 000): resample the <em>replication
+                  indices</em> with replacement (which preserves CRN pairing), recompute the mean, and take
+                  the <code>ci_level</code> percentile bounds. The two-sided p-value is{" "}
+                  <code>2·min(frac≤0, frac≥0)</code>, with stars at .05 / .01 / .001. The bootstrap RNG is
+                  analysis-time only — separate from the simulation seed tree, so CIs are themselves
+                  deterministic.
                 </p>
-                <h3 className="text-base font-semibold pt-2">Confidence intervals and stopping</h3>
+                <p className="text-sm text-muted-foreground">
+                  Note: the only variance-reduction techniques in the engine are <strong>CRN</strong> and
+                  the <strong>bootstrap</strong> — there are no antithetic variates. (triangularAV is a{" "}
+                  <a href="#distributions" className="underline">distribution form</a>, not a
+                  variance-reduction method.)
+                </p>
+                <h3 className="text-base font-semibold pt-2">Confidence intervals &amp; stopping</h3>
                 <p>
                   Intervals are reported at <code>ci_level</code> (default 95%).{" "}
                   <code>replication_stopping</code> is <code>fixed</code> by default; setting{" "}
                   <code>sequential_ci</code> adds replications until the fill-rate CI half-width meets{" "}
-                  <code>ci_halfwidth_target</code> (ε, default 0.05) or the replication cap is reached.
-                </p>
-                <h3 className="text-base font-semibold pt-2">Strategy comparison</h3>
-                <p>
-                  Portfolio <em>i</em> is reported as <code>ΔC^res_i</code> (cost-of-resilience reduction)
-                  and <code>ΔR_i</code> (revenue-recovery share), both CRN-paired against the do-nothing
-                  baseline S0 under identical disruption scenarios and seeds.
+                  <code>ci_halfwidth_target</code> (ε, default 0.05) or the cap is reached. Portfolio
+                  comparison reports <code>ΔC^res_i</code> and <code>ΔR_i</code>, CRN-paired against the
+                  do-nothing baseline S0.
                 </p>
               </Prose>
             </Section>
-
-            <Section id="kpis" icon={Gauge} title="KPI dictionary">
+  ),
+  kpis: () => (
+            <Section id="kpis" icon={Gauge} title="KPIs & Resilience Index">
               <Prose>
                 <p>
                   The engine emits a fixed-shape KPI vector each run. <code>fill_rate</code> is the
@@ -2044,11 +2398,48 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 </p>
               </Prose>
               <KpiDictionary />
+              <Prose>
+                <h3 className="text-base font-semibold pt-2">Cost of resilience — components</h3>
+                <p>
+                  <code>cost_of_resilience</code> sums these components over the analysis window; each is
+                  attributed to the policy that incurs it.
+                </p>
+              </Prose>
+              <TwoColTable head={["Component", "Definition"]} rows={COST_COMPONENTS} />
+              <Prose>
+                <h3 className="text-base font-semibold pt-2">Recovery band (TTR / TTS)</h3>
+                <p>
+                  TTR and TTS use each replication's own pre-disruption fill-rate band: the mean over
+                  [t_w, t*) minus 2 pp (<code>FR_BAND_PP = 0.02</code>). TTS = weeks the fill rate survives
+                  inside the band; TTR = weeks until it re-enters the band and holds for 3 sustained weeks
+                  (<code>TTR_SUSTAIN_WEEKS = 3</code>); both are censored at the window.
+                </p>
+                <h3 className="text-base font-semibold pt-2">Resilience Index</h3>
+                <p>
+                  A single 0–100 score blends four normalized components (weights editable, must sum to 1);
+                  the components are always shown alongside it.
+                </p>
+              </Prose>
+              <pre className="rounded-md border bg-muted/40 p-4 text-[12.5px] leading-6 overflow-x-auto">
+{`RI = 100 · [ w₁(1 − ŠLA) + w₂(1 − ŤTR) + w₃·ŤTS + w₄(1 − Č) ]      w = (.35, .25, .15, .25)`}
+              </pre>
+              <ResilienceIndexTable />
             </Section>
-
-            {/* ── FOR IT ── */}
-
-            <Section id="tldr" icon={Activity} title="TL;DR" eyebrow={firstIdOfGroup.get("tldr")}>
+  ),
+  experiments: () => (
+            <Section id="experiments" icon={Microscope} title="Synergy, stress tests & performance">
+              <Prose>
+                <p>
+                  Beyond a single run, scsim answers portfolio-level questions: do strategies reinforce or
+                  cannibalize each other (synergy), which supplier hurts most under delay vs volume loss
+                  (stress tests), and does it all run fast enough to be interactive (performance).
+                </p>
+              </Prose>
+              <Experiments />
+            </Section>
+  ),
+  tldr: () => (
+            <Section id="tldr" icon={Activity} title="TL;DR">
               <Prose>
                 <p>
                   <strong>Supabase stores. Fly.io computes. Realtime delivers.</strong>{" "}
@@ -2067,7 +2458,66 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 <Stat label="Result store" value="Postgres + RLS" />
               </div>
             </Section>
-
+  ),
+  "data-flow": () => (
+            <Section id="data-flow" icon={Workflow} title="Data → simulation mapping">
+              <Prose>
+                <p>
+                  Stored project data is turned into a simulation run by <strong>one canonical
+                  mapper</strong> — <code>scsim/scsim/io/project_map.py</code>
+                  {" "}(<code>ProjectData → from_project_data → Scenario</code>). The full, authoritative
+                  contract lives in <code>docs/data-simulation-mapping.md</code>; this page is the
+                  summary. The economics that drive KPIs come from the <strong>item-master</strong>
+                  tables first (materials · products · suppliers); logistics and policy values are only
+                  fallbacks, and <em>every</em> fallback is recorded as a warning so nothing is silently
+                  wrong.
+                </p>
+                <h3 className="text-base font-semibold pt-1">Pipeline</h3>
+              </Prose>
+              <pre className="rounded-md border bg-muted/40 p-4 text-[12.5px] leading-6 overflow-x-auto">
+{`item masters ─┐
+logistics/BOM ├─ datamap.py ─► ProjectData ─► from_project_data ─► Scenario + MappingWarnings
+policies      │   (service       (typed,        (reducers · units ·
+scenario      ┘    role read)     pure)          defaults · warnings)
+                                        └─► run_scenario ─► ScenarioResult ─► save (worker)`}
+              </pre>
+              <Prose>
+                <h3 className="text-base font-semibold pt-1">Key field rules</h3>
+                <p>
+                  All time is normalized to <strong>weeks</strong>. First non-null wins; a ⚠ default is
+                  surfaced to the planner.
+                </p>
+              </Prose>
+              <TwoColTable
+                head={["scsim parameter", "Source · reducer · default"]}
+                rows={[
+                  ["Material.cost c_m", "materials.cost → cheapest supplier link → 1.0 ⚠"],
+                  ["Product.unit_price u_p", "products.sell_price → demand-weighted avg outbound price → 1.0 ⚠"],
+                  ["Product.demand_mode b_p", "products.demand_mean → Σ weekly outbound volume (all units normalized)"],
+                  ["Product.demand_model", "scenarios.demand_model → products.demand_distribution → triangularAV(mean, cv)"],
+                  ["Product.production_capacity O_p", "products.production_capacity → policy cap×7×util → default ⚠"],
+                  ["Product.fulfillment_mode", "products.fulfillment_mode → projects.supply_chain_model (MTS/MTO/ATO)"],
+                  ["SupplierLink.cost / lead_time", "inbound_logistics.unit_price / lead_time → weeks"],
+                  ["DisruptionEvent", "scenarios.disruption_schedule; magnitude<100 + finite capacity → capacity_reduction"],
+                ]}
+              />
+              <Prose>
+                <h3 className="text-base font-semibold pt-2">Run → save → persist</h3>
+                <p>
+                  The <strong>worker is the sole authoritative writer</strong> of results. The edge
+                  function only inserts a <code>queued</code> <code>simulation_runs</code> row and
+                  enqueues the command (no stub KPIs). The worker then owns the lifecycle{" "}
+                  <code>queued → running → done|failed|cancelled</code>, idempotent by <code>run_id</code>:
+                  it UPSERTs <code>run_replications</code> on <code>(run_id, rep_index)</code> with per-rep
+                  KPIs + time series, then writes <code>aggregate_kpis</code>, <code>ci_half_widths</code>,
+                  <code> warmup_detected_at</code>, <code>code_version="scsim-&lt;ver&gt;"</code>, and the{" "}
+                  <code>mapping_warnings</code>. The Simulation Lab reads the real rows live via
+                  Realtime — no more fabricated numbers.
+                </p>
+              </Prose>
+            </Section>
+  ),
+  boundary: () => (
             <Section id="boundary" icon={Boxes} title="System boundary">
               <Prose>
                 <p>
@@ -2095,7 +2545,8 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 </table>
               </div>
             </Section>
-
+  ),
+  flow: () => (
             <Section id="flow" icon={Workflow} title="Realtime simulation flow">
               <Prose>
                 <p>
@@ -2105,7 +2556,8 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
               </Prose>
               <ArchitectureDiagram />
             </Section>
-
+  ),
+  contract: () => (
             <Section id="contract" icon={Radio} title="Command contract">
               <Prose>
                 <p>
@@ -2152,7 +2604,8 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 </table>
               </div>
             </Section>
-
+  ),
+  persistence: () => (
             <Section id="persistence" icon={DbIcon} title="Persistence model">
               <Prose>
                 <p>
@@ -2232,7 +2685,8 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 ))}
               </div>
             </Section>
-
+  ),
+  security: () => (
             <Section id="security" icon={ShieldCheck} title="Security model">
               <Prose>
                 <ul className="list-disc pl-5 space-y-1.5">
@@ -2244,7 +2698,8 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 </ul>
               </Prose>
             </Section>
-
+  ),
+  state: () => (
             <Section id="state" icon={AlertTriangle} title="Honest current state">
               <Prose>
                 <ul className="list-disc pl-5 space-y-1.5">
@@ -2275,25 +2730,10 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
                 </ul>
               </Prose>
             </Section>
-
-            {/* ── REFERENCE ── */}
-
-            <Section id="glossary" icon={Library} title="Glossary" eyebrow={firstIdOfGroup.get("glossary")}>
+  ),
+  glossary: () => (
+            <Section id="glossary" icon={Library} title="Glossary">
               <Glossary />
             </Section>
-
-            <footer className="pt-8 border-t text-xs text-muted-foreground">
-              Source of truth for this document:{" "}
-              <code>scsim/docs/reference/&#123;variables,policies,kpis,pipeline&#125;.md</code> (generated
-              from the scsim Pydantic registry, engine 0.2.0),{" "}
-              <code>supabase/functions/sim-command/index.ts</code>,{" "}
-              <code>sim-worker/README.md</code>, dissertation Article 2 (DES model), Article 3 (DSCT architecture).
-              Keep the parameter, policy, and KPI tables in sync when the scsim registry changes.
-            </footer>
-
-          </div>
-        </div>
-      </div>
-    </PageLayout>
-  );
-}
+  ),
+};

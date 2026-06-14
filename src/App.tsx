@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProvider } from '@/hooks/useAuth';
@@ -23,7 +23,8 @@ import TestProminence from './pages/TestProminence';
 import ProjectIntelligence from './pages/ProjectIntelligence';
 import Profile from './pages/Profile';
 import Forbidden from './pages/Forbidden';
-import About from './pages/About';
+import DocsLayout from '@/components/docs/DocsLayout';
+import HelpPage from './pages/help/HelpPage';
 import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
 
 const queryClient = new QueryClient();
@@ -152,7 +153,11 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                <Route path="/about" element={<About isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />} />
+                <Route path="/help" element={<DocsLayout />}>
+                  <Route index element={<HelpPage slug="overview" />} />
+                  <Route path=":slug" element={<HelpPage />} />
+                </Route>
+                <Route path="/about" element={<Navigate to="/help" replace />} />
                 <Route path="/test-prominence" element={<TestProminence />} />
               </Routes>
               <FloatingChatBubble />

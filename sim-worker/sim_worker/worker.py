@@ -11,14 +11,24 @@ from typing import Any
 import httpx
 import redis.asyncio as redis
 
+from .datamap import load_project_data
 from .engine import apply_delta, compute_kpis
 from .graph_cache import GraphCache
 from .network_metrics import compute_network_metrics
 from .policy_snapshot import snapshot_to_policies
 from .schemas import Command
-from .scsim_bridge import compute_kpis_scsim, scsim_enabled
+from .scsim_bridge import compute_kpis_scsim, compute_run_from_project, scsim_enabled
 
 log = logging.getLogger(__name__)
+
+# Non-scalar KPI keys that must never be broadcast as a KPI delta.
+_NON_BROADCAST_KEYS = {
+    "replications", "mapping_warnings", "feasibility_warnings", "scsim_notes", "run_id",
+}
+
+
+def _now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
@@ -33,14 +43,19 @@ def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
         code_version = f"scsim-{kpis.get('engine_version', 'unknown')}"
     else:
         code_version = "worker-legacy"
-    return {
+    patch: dict[str, Any] = {
         "status": "done",
-        "ended_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "ended_at": _now(),
         "aggregate_kpis": aggregate,
         "ci_half_widths": {k[len("ci_"):]: v for k, v in kpis.items() if k.startswith("ci_")},
         "code_version": code_version,
         "rep_count_done": n_reps,
     }
+    if kpis.get("mapping_warnings") is not None:
+        patch["mapping_warnings"] = kpis["mapping_warnings"]
+    if kpis.get("warmup_detected_at") is not None:
+        patch["warmup_detected_at"] = kpis["warmup_detected_at"]
+    return patch
 
 STREAM_PREFIX = "sim.cmd."
 CONSUMER_GROUP = "sim-workers"
@@ -198,39 +213,46 @@ class SimWorker:
                             **recovery_data,
                         }
 
-                    try:
-                        if scsim_enabled():
-                            # Opt-in phase-pipeline engine (SCSIM_ENGINE=1); falls
-                            # back to the legacy engine on any conversion failure.
-                            try:
-                                kpis = await asyncio.to_thread(
-                                    compute_kpis_scsim, cg.graph, policies,
-                                    n_weeks, seed, n_reps, disruption_schedule,
-                                )
-                            except Exception:
-                                log.exception("scsim bridge failed; falling back to legacy engine")
-                                kpis = await asyncio.to_thread(
-                                    compute_kpis, cg.graph, set(cg.graph.nodes), policies,
-                                    n_weeks, seed, n_reps, disruption_schedule,
-                                )
-                        else:
+                    if scsim_enabled() and run_id:
+                        # Canonical path: the worker is the SOLE authoritative
+                        # writer. Map the project's stored data (item masters +
+                        # logistics + policies + scenario) → scsim, run it, and
+                        # persist runs + per-rep replications idempotently.
+                        await self._update_run(run_id, {"status": "running", "started_at": _now()})
+                        try:
+                            project_model = await self._fetch_project_model(cmd.project_id)
+                            data = await load_project_data(
+                                self._http, self._supabase_url, self._service_role_key,
+                                cmd.project_id, scenario=scenario_data, policies=policies,
+                                project_model=project_model,
+                            )
+                            kpis = await asyncio.to_thread(compute_run_from_project, data)
+                        except Exception as exc:
+                            await self._update_run(run_id, {
+                                "status": "failed", "error_message": str(exc)[:500],
+                            })
+                            raise
+                        kpis["run_id"] = run_id
+                        await self._write_replications(
+                            run_id, cmd.project_id, kpis.get("replications") or [])
+                        await self._update_run(
+                            run_id, build_run_update(kpis, int(kpis.get("n_reps", n_reps))))
+                    else:
+                        # Legacy analytical path (no scsim / no run_id).
+                        try:
                             kpis = await asyncio.to_thread(
                                 compute_kpis, cg.graph, set(cg.graph.nodes), policies,
                                 n_weeks, seed, n_reps, disruption_schedule,
                             )
-                    except Exception as exc:
+                        except Exception as exc:
+                            if run_id:
+                                await self._update_run(run_id, {
+                                    "status": "failed", "error_message": str(exc)[:500],
+                                })
+                            raise
+                        kpis["run_id"] = run_id
                         if run_id:
-                            await self._update_run(run_id, {
-                                "status": "failed",
-                                "error_message": str(exc)[:500],
-                            })
-                        raise
-                    # Attach run_id so the broadcast payload links to the DB run row
-                    kpis["run_id"] = run_id
-                    # Persist real results so the UI replaces the edge-function
-                    # stub KPIs and the run is attributable to this engine.
-                    if run_id:
-                        await self._update_run(run_id, build_run_update(kpis, n_reps))
+                            await self._update_run(run_id, build_run_update(kpis, n_reps))
 
                 else:
                     policies = await self._cache.get_effective_policies(cmd.project_id)
@@ -238,8 +260,12 @@ class SimWorker:
                         compute_kpis, cg.graph, set(), policies
                     )
 
-                # Broadcast only changed fields for bandwidth efficiency
-                delta = {k: v for k, v in kpis.items() if cg.last_kpis.get(k) != v}
+                # Broadcast only changed scalar fields for bandwidth efficiency
+                # (never the bulky replications / warnings payloads).
+                delta = {
+                    k: v for k, v in kpis.items()
+                    if k not in _NON_BROADCAST_KEYS and cg.last_kpis.get(k) != v
+                }
                 cg.last_kpis = kpis
 
             if delta:
@@ -269,6 +295,51 @@ class SimWorker:
         except Exception:
             log.exception("failed to fetch policy version %s", version_id)
             return None
+
+    async def _fetch_project_model(self, project_id: str) -> str | None:
+        """projects.supply_chain_model → fulfillment mode default."""
+        try:
+            r = await self._http.get(
+                f"{self._supabase_url}/rest/v1/projects",
+                params={"id": f"eq.{project_id}", "select": "supply_chain_model"},
+                headers={"apikey": self._service_role_key,
+                         "Authorization": f"Bearer {self._service_role_key}"},
+            )
+            r.raise_for_status()
+            rows = r.json()
+            return rows[0].get("supply_chain_model") if rows else None
+        except Exception:
+            return None
+
+    async def _write_replications(
+        self, run_id: str, project_id: str, reps: list[dict[str, Any]]
+    ) -> None:
+        """Idempotently UPSERT per-replication rows on (run_id, rep_index)."""
+        if not reps:
+            return
+        rows = [{
+            "run_id": run_id, "project_id": project_id,
+            "rep_index": r["rep_index"], "seed_used": r["seed_used"],
+            "status": "done", "kpis": r.get("kpis", {}),
+            "time_series": r.get("time_series", {}), "warmup_at": r.get("warmup_at"),
+            "ended_at": _now(),
+        } for r in reps]
+        try:
+            resp = await self._http.post(
+                f"{self._supabase_url}/rest/v1/run_replications",
+                params={"on_conflict": "run_id,rep_index"},
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-duplicates,return=minimal",
+                },
+                json=rows,
+            )
+            if resp.status_code >= 300:
+                log.warning("replication upsert failed %s %s", resp.status_code, resp.text[:200])
+        except Exception:
+            log.exception("failed to upsert replications for run %s", run_id)
 
     async def _update_run(self, run_id: str, patch: dict[str, Any]) -> None:
         """PATCH a simulation_runs row via PostgREST (service role)."""

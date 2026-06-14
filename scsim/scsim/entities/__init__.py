@@ -9,6 +9,7 @@ from scsim.entities.network import (
     Product,
     Supplier,
     SupplierLink,
+    triangular_av,
 )
 from scsim.entities.scenario import BUILT_IN_POLICY_IDS, Scenario
 
@@ -28,4 +29,5 @@ __all__ = [
     "Supplier",
     "SupplierLink",
     "WarmupReport",
+    "triangular_av",
 ]

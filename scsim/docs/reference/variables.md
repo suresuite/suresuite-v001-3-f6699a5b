@@ -40,10 +40,10 @@ Product + demand model + fulfillment mode (CODP) — §3.1–3.3.
 | `name` | - | P | '' | — |  |
 | `unit_price` | €/unit | P | required | [0, ∞] | u_p |
 | `demand_model` | enum | P | 'triangular' | {deterministic, triangular, poisson, negbin, bootstrap} |  |
-| `demand_mode` | units/wk | P | required | [0, ∞] | b_p — historical median. |
+| `demand_mode` | units/wk | P | required | [0, ∞] | b_p — historical median; the average (mode) of the triangularAV demand form. |
 | `demand_min` | units/wk | P | — | see schema | a_p; default max{0,(1−ν)·b_p}. |
 | `demand_max` | units/wk | P | — | see schema | c_p — historical max; default (1+ν)·b_p. |
-| `demand_floor_factor` | - | P | — | see schema | ν override; falls back to the global setting. |
+| `demand_floor_factor` | - | P | — | see schema | ν override; falls back to the global setting. Acts as the variability of the triangularAV demand form: triangular(b·(1−ν), b, b·(1+ν)). |
 | `demand_history` | units/wk | P | — | — | Required for demand_model=bootstrap. |
 | `negbin_dispersion` | - | P | 1.0 | [0, ∞] | k for negbin (variance = b + b²/k). |
 | `production_capacity` | units/wk | P | required | [0, ∞] | O_p |
