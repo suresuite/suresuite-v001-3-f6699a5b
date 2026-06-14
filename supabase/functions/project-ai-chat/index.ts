@@ -60,6 +60,23 @@ serve(async (req) => {
     // === Tool-calling chat mode (multi-provider: Gemini, OpenAI, DeepSeek) ===
     if (mode === 'tools') {
       try {
+        // Authorize: verify the caller can actually access this project before any tool runs.
+        // The tool client uses the service-role key (which bypasses RLS), so this explicit
+        // check — mirroring the projects SELECT policy — is the gate that prevents reading a
+        // project the user has no access to.
+        const { data: allowed, error: accessErr } = await supabaseClient.rpc('ai_can_access_project', {
+          p_user_id: userId,
+          p_user_email: userEmail,
+          p_project_id: projectId,
+        });
+        if (accessErr) throw new Error('Could not verify project access.');
+        if (allowed !== true) {
+          return new Response(JSON.stringify({
+            error: "You don't have access to this project.",
+            type: 'FORBIDDEN',
+          }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
         const history = Array.isArray(conversationHistory)
           ? (conversationHistory as ChatTurn[]).filter(
               (m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string',
