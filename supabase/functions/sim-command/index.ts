@@ -394,11 +394,10 @@ async function handleExperimentRun(
     .insert({
       scenario_id: scenario.id,
       project_id: scenario.project_id,
-      status: "running",
-      started_at: new Date().toISOString(),
+      status: "queued",
       rep_count_target: replications,
       rep_count_done: 0,
-      code_version: "stub-recovery-2",
+      code_version: "",
       policy_version_id: policyVersionId,
       policy_hash: policyHash,
       created_by: userId,
@@ -432,58 +431,10 @@ async function handleExperimentRun(
     JSON.stringify(workerEnvelope),
   ]).catch((e) => console.error("xadd failed", e));
 
-  // STUB MODE: synthesize all replications immediately so the lab UI is alive
-  // even before the Fly worker is online. The real worker will upsert over
-  // these rows or insert additional ones.
-  const repsToInsert = Array.from({ length: replications }).map((_, i) => {
-    const repSeed = (seed + i * 2654435761) >>> 0;
-    const kpis = stubReplicationKpis(scenario, i, repSeed, recovery, projectDailyRevenue, projectDailyCost);
-    return {
-      run_id: run.id,
-      project_id: scenario.project_id,
-      rep_index: i,
-      seed_used: repSeed,
-      status: "done",
-      kpis: { ...kpis, _meta: meta },
-      time_series: { utilization: stubUtilizationSeries(scenario, i, repSeed, recovery) },
-      warmup_at: scenario.warmup_mode === "auto" ? 8 + (i % 6) : scenario.warmup_days,
-      started_at: new Date().toISOString(),
-      ended_at: new Date().toISOString(),
-    };
-  });
-
-  // deno-lint-ignore no-explicit-any
-  await (sb as any).from("run_replications").insert(repsToInsert);
-
-  // Aggregate KPIs (skip _meta)
-  const numericKeys = Object.keys(repsToInsert[0].kpis).filter(
-    (k) => k !== "_meta" && typeof (repsToInsert[0].kpis as Record<string, unknown>)[k] === "number",
-  );
-  const agg: Record<string, number> = {};
-  const hw: Record<string, number> = {};
-  for (const k of numericKeys) {
-    const xs = repsToInsert.map((r) => (r.kpis as Record<string, number>)[k]);
-    const m = xs.reduce((a, b) => a + b, 0) / xs.length;
-    const v = xs.length > 1 ? xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1) : 0;
-    const stdv = Math.sqrt(v);
-    const t = xs.length > 1 ? 2.045 : 0; // approx t_0.025,30
-    agg[k] = +m.toFixed(4);
-    hw[k] = +((t * stdv) / Math.sqrt(xs.length)).toFixed(4);
-  }
-
-  // deno-lint-ignore no-explicit-any
-  await (sb as any)
-    .from("simulation_runs")
-    .update({
-      status: "done",
-      ended_at: new Date().toISOString(),
-      rep_count_done: replications,
-      aggregate_kpis: { ...agg, _meta: meta },
-      ci_half_widths: hw,
-      warmup_detected_at: scenario.warmup_mode === "auto" ? 10 : scenario.warmup_days,
-    })
-    .eq("id", run.id);
-
+  // The worker is the SOLE authoritative writer of results: it sets the run to
+  // running, upserts per-replication rows, and writes the aggregates + mapping
+  // warnings. The edge function only creates the queued row and enqueues the
+  // command — no stub KPIs (which previously masked bad data with fake numbers).
   return { run_id: run.id };
 }
 

@@ -79,3 +79,54 @@ def compute_kpis_scsim(
     out["otif"] = out.get("mean_fill_rate", 0.0)
     out["revenue"] = out.get("mean_revenue", 0.0)
     return out
+
+
+def compute_run_from_project(data: Any) -> dict[str, Any]:
+    """Canonical experiment path: map a ProjectData (item masters + logistics +
+    policies + scenario) into an scsim Scenario, run it, and return both the
+    aggregate broadcast shape AND per-replication rows + mapping warnings, ready
+    for the worker to persist as the sole writer."""
+    from scsim import ENGINE_VERSION
+    from scsim.core.engine import run_scenario
+    from scsim.io import from_project_data
+
+    mapping = from_project_data(data)
+    result = run_scenario(mapping.scenario)
+
+    out: dict[str, Any] = {
+        "source": "scsim",
+        "engine_version": ENGINE_VERSION,
+        "n_reps": result.stats.n_replications,
+        "below_replication_floor": result.stats.below_replication_floor,
+        "mapping_warnings": mapping.warning_dicts,
+        "warmup_detected_at": (result.warmup.adopted_week if result.warmup else None),
+        "feasibility_warnings": [
+            {"code": w.code, "message": w.message} for w in result.feasibility_warnings
+        ],
+    }
+    for key in _BRIDGE_KEYS:
+        agg = result.aggregates.get(key)
+        if agg is None:
+            continue
+        out[f"mean_{key}"] = round(agg["mean"], 4)
+        out[f"ci_{key}"] = round(agg["ci_halfwidth"], 4)
+        out[f"min_{key}"] = round(agg["min"], 4)
+        out[f"max_{key}"] = round(agg["max"], 4)
+    out["fill_rate"] = out.get("mean_fill_rate", 0.0)
+    out["otif"] = out.get("mean_fill_rate", 0.0)
+    out["revenue"] = out.get("mean_revenue", 0.0)
+
+    seed = int(mapping.scenario.settings.project_seed)
+    cells = result.rep_cells or [(i, 0) for i in range(len(result.kpis))]
+    out["replications"] = [
+        {
+            "rep_index": i,
+            "seed_used": seed * 1000 + int(cells[i][0]) if i < len(cells) else seed,
+            "kpis": {k: round(float(v), 6) for k, v in row.items()},
+            "time_series": {"fill_rate": [round(float(x), 5) for x in result.fr_series[i].tolist()]}
+            if i < len(result.fr_series) else {},
+            "warmup_at": out["warmup_detected_at"],
+        }
+        for i, row in enumerate(result.kpis)
+    ]
+    return out

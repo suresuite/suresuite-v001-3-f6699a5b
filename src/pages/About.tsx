@@ -2459,6 +2459,64 @@ adopted = max(Conway, MSER-5)        # most_conservative (default)`}
               </div>
             </Section>
   ),
+  "data-flow": () => (
+            <Section id="data-flow" icon={Workflow} title="Data → simulation mapping">
+              <Prose>
+                <p>
+                  Stored project data is turned into a simulation run by <strong>one canonical
+                  mapper</strong> — <code>scsim/scsim/io/project_map.py</code>
+                  {" "}(<code>ProjectData → from_project_data → Scenario</code>). The full, authoritative
+                  contract lives in <code>docs/data-simulation-mapping.md</code>; this page is the
+                  summary. The economics that drive KPIs come from the <strong>item-master</strong>
+                  tables first (materials · products · suppliers); logistics and policy values are only
+                  fallbacks, and <em>every</em> fallback is recorded as a warning so nothing is silently
+                  wrong.
+                </p>
+                <h3 className="text-base font-semibold pt-1">Pipeline</h3>
+              </Prose>
+              <pre className="rounded-md border bg-muted/40 p-4 text-[12.5px] leading-6 overflow-x-auto">
+{`item masters ─┐
+logistics/BOM ├─ datamap.py ─► ProjectData ─► from_project_data ─► Scenario + MappingWarnings
+policies      │   (service       (typed,        (reducers · units ·
+scenario      ┘    role read)     pure)          defaults · warnings)
+                                        └─► run_scenario ─► ScenarioResult ─► save (worker)`}
+              </pre>
+              <Prose>
+                <h3 className="text-base font-semibold pt-1">Key field rules</h3>
+                <p>
+                  All time is normalized to <strong>weeks</strong>. First non-null wins; a ⚠ default is
+                  surfaced to the planner.
+                </p>
+              </Prose>
+              <TwoColTable
+                head={["scsim parameter", "Source · reducer · default"]}
+                rows={[
+                  ["Material.cost c_m", "materials.cost → cheapest supplier link → 1.0 ⚠"],
+                  ["Product.unit_price u_p", "products.sell_price → demand-weighted avg outbound price → 1.0 ⚠"],
+                  ["Product.demand_mode b_p", "products.demand_mean → Σ weekly outbound volume (all units normalized)"],
+                  ["Product.demand_model", "scenarios.demand_model → products.demand_distribution → triangularAV(mean, cv)"],
+                  ["Product.production_capacity O_p", "products.production_capacity → policy cap×7×util → default ⚠"],
+                  ["Product.fulfillment_mode", "products.fulfillment_mode → projects.supply_chain_model (MTS/MTO/ATO)"],
+                  ["SupplierLink.cost / lead_time", "inbound_logistics.unit_price / lead_time → weeks"],
+                  ["DisruptionEvent", "scenarios.disruption_schedule; magnitude<100 + finite capacity → capacity_reduction"],
+                ]}
+              />
+              <Prose>
+                <h3 className="text-base font-semibold pt-2">Run → save → persist</h3>
+                <p>
+                  The <strong>worker is the sole authoritative writer</strong> of results. The edge
+                  function only inserts a <code>queued</code> <code>simulation_runs</code> row and
+                  enqueues the command (no stub KPIs). The worker then owns the lifecycle{" "}
+                  <code>queued → running → done|failed|cancelled</code>, idempotent by <code>run_id</code>:
+                  it UPSERTs <code>run_replications</code> on <code>(run_id, rep_index)</code> with per-rep
+                  KPIs + time series, then writes <code>aggregate_kpis</code>, <code>ci_half_widths</code>,
+                  <code> warmup_detected_at</code>, <code>code_version="scsim-&lt;ver&gt;"</code>, and the{" "}
+                  <code>mapping_warnings</code>. The Simulation Lab reads the real rows live via
+                  Realtime — no more fabricated numbers.
+                </p>
+              </Prose>
+            </Section>
+  ),
   boundary: () => (
             <Section id="boundary" icon={Boxes} title="System boundary">
               <Prose>

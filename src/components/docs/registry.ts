@@ -51,7 +51,8 @@ export const DOC_GROUPS: DocGroup[] = [
   {
     group: "For IT",
     pages: [
-      { slug: "tldr", title: "TL;DR", summary: "Supabase stores, Fly.io computes, Realtime delivers.", keywords: "supabase fly realtime architecture", related: ["boundary", "flow"] },
+      { slug: "tldr", title: "TL;DR", summary: "Supabase stores, Fly.io computes, Realtime delivers.", keywords: "supabase fly realtime architecture", related: ["boundary", "flow", "data-flow"] },
+      { slug: "data-flow", title: "Data → simulation mapping", summary: "How stored data maps to scsim parameters and how runs are saved.", keywords: "mapping data model price cost demand item master reducer units results save run replications", related: ["sim-params", "policies", "persistence"] },
       { slug: "boundary", title: "System boundary", summary: "System 1 (realtime) vs System 2 (legacy).", keywords: "system boundary legacy", related: ["tldr", "flow"] },
       { slug: "flow", title: "Realtime flow", summary: "The realtime simulation architecture diagram.", keywords: "architecture diagram redis worker", related: ["tldr", "contract"] },
       { slug: "contract", title: "Command contract", summary: "The sim-command request schema and command kinds.", keywords: "command contract zod schema", related: ["flow", "persistence"] },
