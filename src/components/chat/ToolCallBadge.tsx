@@ -20,7 +20,7 @@ export function ToolCallBadge({ calls }: { calls: ChatToolCall[] }) {
         <div className="border-t border-border px-2 py-1.5 font-mono text-[10px] leading-snug">
           {calls.map((c, i) => (
             <div key={i} className="truncate">
-              <span className={c.ok ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>●</span>{" "}
+              <span className={c.ok ? "text-foreground" : "text-destructive"}>●</span>{" "}
               <span className="text-foreground">{c.name}</span>
               <span className="text-muted-foreground"> ({c.row_count} rows)</span>
             </div>
