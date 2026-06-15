@@ -62,18 +62,26 @@ serve(async (req) => {
       try {
         // Authorize: verify the caller can actually access this project before any tool runs.
         // The tool client uses the service-role key (which bypasses RLS), so this explicit
-        // check — mirroring the projects SELECT policy — is the gate that prevents reading a
-        // project the user has no access to.
-        const { data: allowed, error: accessErr } = await supabaseClient.rpc('ai_can_access_project', {
+        // check is the gate. get_project_dataset_counts is SECURITY DEFINER and validates the
+        // user's org against the project (raising 'forbidden'/'project_not_found'); this matches
+        // the org-level visibility of list_projects, which populates the project picker.
+        const { error: accessErr } = await supabaseClient.rpc('get_project_dataset_counts', {
+          p_project_id: projectId,
           p_user_id: userId,
           p_user_email: userEmail,
-          p_project_id: projectId,
         });
-        if (accessErr) throw new Error('Could not verify project access.');
-        if (allowed !== true) {
+        if (accessErr) {
+          const m = (accessErr.message || '').toLowerCase();
+          if (m.includes('forbidden') || m.includes('project_not_found')) {
+            return new Response(JSON.stringify({
+              error: "You don't have access to this project.",
+              type: 'FORBIDDEN',
+            }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+          console.error('access check error:', accessErr);
           return new Response(JSON.stringify({
-            error: "You don't have access to this project.",
-            type: 'FORBIDDEN',
+            error: `Access check failed: ${accessErr.message}`,
+            type: 'AI_ERROR',
           }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 

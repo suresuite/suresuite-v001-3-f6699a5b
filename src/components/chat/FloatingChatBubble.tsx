@@ -21,9 +21,12 @@ const SUGGESTIONS = [
 const LAUNCHER_POS_KEY = "projectChat.launcherPos";
 const LAUNCHER_SIZE = { w: 60, h: 60 };
 const PANEL_POS_KEY = "projectChat.panelPos";
+const PANEL_DIMS_KEY = "projectChat.panelSize";
 const PANEL_SIZE = { w: 480, h: 760 };
+const PANEL_MIN = { w: 340, h: 380 };
 
 interface Pos { x: number; y: number }
+interface Dims { w: number; h: number }
 
 function loadPosFrom(key: string): Pos | null {
   if (typeof window === "undefined") return null;
@@ -45,18 +48,33 @@ function defaultPos(): Pos {
   return { x: window.innerWidth - LAUNCHER_SIZE.w - 20, y: window.innerHeight - LAUNCHER_SIZE.h - 20 };
 }
 
-// Effective panel size, capped to the viewport so it always fits.
-function panelSize(): { w: number; h: number } {
-  if (typeof window === "undefined") return { w: PANEL_SIZE.w, h: PANEL_SIZE.h };
+// Clamp panel size to the viewport (and a sensible minimum) so it always fits.
+function clampDims(w: number, h: number): Dims {
+  if (typeof window === "undefined") return { w, h };
   return {
-    w: Math.min(PANEL_SIZE.w, window.innerWidth - 16),
-    h: Math.min(PANEL_SIZE.h, window.innerHeight - 24),
+    w: Math.min(Math.max(PANEL_MIN.w, w), window.innerWidth - 16),
+    h: Math.min(Math.max(PANEL_MIN.h, h), window.innerHeight - 24),
   };
+}
+
+function loadDims(): Dims | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PANEL_DIMS_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (typeof d?.w === "number" && typeof d?.h === "number") return clampDims(d.w, d.h);
+  } catch { /* ignore */ }
+  return null;
+}
+
+function defaultDims(): Dims {
+  return clampDims(PANEL_SIZE.w, PANEL_SIZE.h);
 }
 
 function defaultPanelPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
-  const s = panelSize();
+  const s = defaultDims();
   return { x: window.innerWidth - s.w - 12, y: window.innerHeight - s.h - 12 };
 }
 
@@ -75,8 +93,13 @@ export function FloatingChatBubble() {
   const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos());
   const [panelDragging, setPanelDragging] = useState(false);
   const panelDragState = useRef<{ ox: number; oy: number } | null>(null);
+  const [panelDims, setPanelDims] = useState<Dims>(() => loadDims() ?? defaultDims());
+  const [resizing, setResizing] = useState(false);
+  const resizeState = useRef<{ sx: number; sy: number; sw: number; sh: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const panelDimsRef = useRef<Dims>(panelDims);
+  panelDimsRef.current = panelDims;
 
   const { messages, loading, error, send, clear } = useProjectChat(projectId);
 
@@ -90,14 +113,15 @@ export function FloatingChatBubble() {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
-  // Keep launcher and panel in viewport on resize.
+  // Keep launcher and panel (position + size) in viewport on window resize.
   useEffect(() => {
     const onResize = () => {
       setPos((p) => ({
         x: Math.min(Math.max(0, p.x), window.innerWidth - LAUNCHER_SIZE.w),
         y: Math.min(Math.max(0, p.y), window.innerHeight - LAUNCHER_SIZE.h),
       }));
-      const s = panelSize();
+      const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
+      setPanelDims(s);
       setPanelPos((p) => ({
         x: Math.min(Math.max(8, p.x), window.innerWidth - s.w),
         y: Math.min(Math.max(8, p.y), window.innerHeight - s.h),
@@ -139,7 +163,7 @@ export function FloatingChatBubble() {
     if (!panelDragging) return;
     const onMove = (e: PointerEvent) => {
       if (!panelDragState.current) return;
-      const s = panelSize();
+      const s = panelDimsRef.current;
       const nx = e.clientX - panelDragState.current.ox;
       const ny = e.clientY - panelDragState.current.oy;
       setPanelPos({
@@ -160,6 +184,28 @@ export function FloatingChatBubble() {
       window.removeEventListener("pointerup", onUp);
     };
   }, [panelDragging, panelPos]);
+
+  // Panel resize handlers (bottom-right grip)
+  useEffect(() => {
+    if (!resizing) return;
+    const onMove = (e: PointerEvent) => {
+      if (!resizeState.current) return;
+      const { sx, sy, sw, sh } = resizeState.current;
+      setPanelDims(clampDims(sw + (e.clientX - sx), sh + (e.clientY - sy)));
+    };
+    const onUp = () => {
+      setResizing(false);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(PANEL_DIMS_KEY, JSON.stringify(panelDimsRef.current));
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [resizing]);
 
   if (hidden) return null;
 
@@ -200,6 +246,12 @@ export function FloatingChatBubble() {
     setPanelDragging(true);
   };
 
+  const startResize = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    resizeState.current = { sx: e.clientX, sy: e.clientY, sw: panelDims.w, sh: panelDims.h };
+    setResizing(true);
+  };
+
   return (
     <>
       {/* Launcher (draggable round button) */}
@@ -212,7 +264,7 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             setOpen(true);
           }}
-          className="group fixed z-50 flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
@@ -233,13 +285,8 @@ export function FloatingChatBubble() {
       {/* Panel */}
       {open && (
         <div
-          style={{
-            left: panelPos.x,
-            top: panelPos.y,
-            width: "min(480px, calc(100vw - 16px))",
-            height: "min(760px, calc(100vh - 24px))",
-          }}
-          className="fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+          style={{ left: panelPos.x, top: panelPos.y, width: panelDims.w, height: panelDims.h }}
+          className="fixed z-[80] flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
           role="dialog"
           aria-label="Supply Chain assistant"
         >
@@ -387,6 +434,16 @@ export function FloatingChatBubble() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>
+
+          {/* Resize grip (bottom-right) */}
+          <div
+            onPointerDown={startResize}
+            className="absolute bottom-0 right-0 z-10 h-4 w-4 cursor-se-resize touch-none"
+            title="Drag to resize"
+            aria-label="Resize chat"
+          >
+            <div className="absolute bottom-1 right-1 h-2 w-2 border-b-2 border-r-2 border-muted-foreground/50" />
+          </div>
         </div>
       )}
     </>
