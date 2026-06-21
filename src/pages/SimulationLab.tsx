@@ -127,7 +127,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-8">
+      <div className="px-12 py-6">
         <PageHeader
           title="Simulation Lab"
           subtitle="Scenarios, replications, warm-up auto-detection, and utilization-first KPIs."

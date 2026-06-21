@@ -68,7 +68,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-8">
+      <div className="px-12 py-6">
         <PageHeader
           title="Supply chain policies"
           subtitle={<ProjectContextStrip project={selectedProject} projectId={projectId} ctx={ctx} />}
