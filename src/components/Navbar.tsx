@@ -55,7 +55,6 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
     ],
   },
   {
-    title: "Networks",
     items: [
       {
         to: "/network/product-level",
@@ -78,7 +77,6 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
     ],
   },
   {
-    title: "Simulation",
     items: [
       {
         to: "/policies",
@@ -101,7 +99,6 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
     ],
   },
   {
-    title: "AI Assistant",
     items: [
       {
         to: "/project-intelligence",
@@ -112,7 +109,6 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
     ],
   },
   {
-    title: "About",
     items: [
       {
         to: "/help",
