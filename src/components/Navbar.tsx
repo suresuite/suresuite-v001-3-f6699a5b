@@ -236,61 +236,36 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
           ))}
         </div>
 
-        {/* Bottom area */}
+        {/* Bottom area — unified account menu */}
         <div className="absolute bottom-3 left-3 right-3">
-          {isCollapsed ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button aria-label="Account menu (collapsed)" title="Account" className="w-full flex justify-center">
-                  <Avatar className="h-7 w-7">
-                    {user?.avatar_url ? <AvatarImage src={user.avatar_url} alt="Avatar" /> : null}
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs leading-none">
-                      {user?.name ? (
-                        user.name.charAt(0).toUpperCase()
-                      ) : (
-                        <User className="h-3 w-3" />
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="start" className="w-44 z-[70]">
-                <DropdownMenuLabel>{user?.name || "User"}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/profile">
-                    <User className="mr-2 h-4.5 w-4.5" /> My Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/help">
-                    <HelpCircle className="mr-2 h-4.5 w-4.5" /> Help
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} title="Log out">
-                  <LogOut className="mr-2 h-4.5 w-4.5" /> Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  aria-label="Account menu"
-                  className="flex items-center space-x-2"
-                  title="Account"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                aria-label="Account menu"
+                title="Account"
+                className={cn(
+                  "group w-full flex items-center rounded-md outline-none transition-all duration-200",
+                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+                  "hover:bg-accent active:scale-[0.98]",
+                  isCollapsed ? "justify-center p-1.5" : "gap-2 p-1.5"
+                )}
+              >
+                <Avatar
+                  className={cn(
+                    "h-7 w-7 ring-1 ring-border transition-shadow duration-200",
+                    "group-hover:ring-primary/40 group-focus-visible:ring-primary"
+                  )}
                 >
-                  <Avatar className="h-7 w-7">
-                    {user?.avatar_url ? <AvatarImage src={user.avatar_url} alt="Avatar" /> : null}
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs leading-none">
-                      {user?.name ? (
-                        user.name.charAt(0).toUpperCase()
-                      ) : (
-                        <User className="h-3 w-3" />
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
+                  {user?.avatar_url ? <AvatarImage src={user.avatar_url} alt="Avatar" /> : null}
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs leading-none">
+                    {user?.name ? (
+                      user.name.charAt(0).toUpperCase()
+                    ) : (
+                      <User className="h-3 w-3" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                {!isCollapsed && (
                   <div className="flex-1 min-w-0 text-left">
                     <p className="text-[11px] font-medium text-foreground truncate">
                       {user?.display_name || user?.name || "User"}
@@ -299,28 +274,40 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                       {user?.role || "user"}
                     </p>
                   </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="w-52 z-[70]">
-                <DropdownMenuLabel>Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/profile">
-                    <User className="mr-2 h-4.5 w-4.5" /> My Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/help">
-                    <HelpCircle className="mr-2 h-4.5 w-4.5" /> Help
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} title="Log out">
-                  <LogOut className="mr-2 h-4.5 w-4.5" /> Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side={isCollapsed ? "right" : "top"}
+              align={isCollapsed ? "end" : "start"}
+              sideOffset={8}
+              className="w-52 z-[70]"
+            >
+              <DropdownMenuLabel className="flex flex-col gap-0.5">
+                <span className="text-xs font-medium truncate">
+                  {user?.display_name || user?.name || "Account"}
+                </span>
+                <span className="text-[10px] font-normal text-muted-foreground truncate">
+                  {user?.role || "user"}
+                </span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/profile">
+                  <User className="mr-2 h-4 w-4" /> My Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/help">
+                  <HelpCircle className="mr-2 h-4 w-4" /> Help
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} title="Log out">
+                <LogOut className="mr-2 h-4 w-4" /> Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </nav>
       <Separator orientation="vertical" className="h-full" />

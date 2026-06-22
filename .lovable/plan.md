@@ -1,19 +1,24 @@
-## Problem
+## Goal
+Polish the sidebar profile avatar dropdown so it behaves consistently and pleasantly when the navigation bar is collapsed or expanded.
 
-`PageHeader` is sticky and uses `-mx-12 -mt-6` to bleed into its parent wrapper. It assumes the wrapper is `px-12 py-6` (the standard used by Firm/Process/Product Network, Interactive Network Space, Data Manager, Project Intelligence, etc.).
+## Current state
+- `src/components/Navbar.tsx` renders two separate `DropdownMenu` implementations: one for `isCollapsed` and one for expanded.
+- They differ in width, anchor side, label, and hit area. The collapsed version is just a 28×28 avatar; the expanded one is a full-width row.
+- Both use unstyled trigger buttons and bare avatars, with no focus ring / hover state.
 
-Two pages break that contract:
+## Changes
+1. **Unified account trigger** — extract a single `AccountTrigger` component that accepts `isCollapsed` and renders either the compact avatar or the expanded row.
+   - Add hover/focus ring, press scale, and tooltip/aria clarity.
+2. **Single dropdown menu** — use one `DropdownMenuContent` definition with:
+   - `side={isCollapsed ? "right" : "top"}` and `align="start"`.
+   - Consistent width (`w-52`), same items, and a clear account label.
+3. **Visual polish** — consistent padding, rounded avatar ring matching the app accent, and keyboard-friendly focus states.
+4. **No behavior change** — items stay: My Profile, Help, Logout.
 
-- `src/pages/ProjectPolicies.tsx` line 71 → `<div className="px-12 py-8">`
-- `src/pages/SimulationLab.tsx` line 130 → `<div className="px-12 py-8">`
+## Files
+- `src/components/Navbar.tsx` only. No backend, no new dependencies.
 
-The extra `py-8` (vs the header's `-mt-6`) leaves an 8px gap above the sticky header band, so the title bar visually sits lower than on every other page.
-
-## Fix
-
-Change the wrapper padding on both pages from `py-8` to `py-6` so they match the standard PageHeader contract.
-
-- `src/pages/ProjectPolicies.tsx`: `px-12 py-8` → `px-12 py-6`
-- `src/pages/SimulationLab.tsx`: `px-12 py-8` → `px-12 py-6`
-
-No changes to `PageHeader`, `PageLayout`, or any other page. Pure presentation tweak — two-character edit per file.
+## Verification
+- Build and preview the sidebar in collapsed and expanded states.
+- Click the profile icon to confirm the dropdown opens on the correct side with consistent content.
+- Verify keyboard focus and hover states.
