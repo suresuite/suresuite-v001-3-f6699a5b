@@ -292,16 +292,14 @@ export function FloatingChatBubble() {
         >
           {/* Header */}
           <div className="border-b border-border">
-            <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-muted/40 to-transparent">
+            <div className="flex items-center gap-2 px-3 py-2">
               <div
                 onPointerDown={startPanelDrag}
                 className="flex min-w-0 flex-1 cursor-move select-none items-center gap-2"
                 title="Drag to move"
               >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <MessageSquare className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1 text-sm font-semibold leading-tight">SC assistant</div>
+                <AssistantMascot className="h-6 w-6 shrink-0" />
+                <div className="min-w-0 flex-1 text-sm font-semibold leading-tight">Agent</div>
               </div>
               {messages.length > 0 && (
                 <Button
@@ -326,7 +324,7 @@ export function FloatingChatBubble() {
               </Button>
             </div>
             {/* Subheader filter row: project + model */}
-            <div className="flex items-center gap-2 border-t border-border bg-muted/30 px-3 py-1.5">
+            <div className="flex items-center gap-2 border-t border-border bg-muted/20 px-3 py-1.5">
               <ProjectSelector
                 projects={projects as any}
                 selectedProjectId={projectId}
@@ -337,6 +335,7 @@ export function FloatingChatBubble() {
               <ModelPicker value={model} onChange={onModelChange} />
             </div>
           </div>
+
 
 
           {/* Body */}
