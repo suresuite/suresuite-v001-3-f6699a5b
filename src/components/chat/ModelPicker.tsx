@@ -27,6 +27,7 @@ export function getModelLabel(id: string): string {
 interface Props {
   value: string;
   onChange: (id: string) => void;
+  className?: string;
 }
 
 export function ModelPicker({ value, onChange, className }: Props) {
