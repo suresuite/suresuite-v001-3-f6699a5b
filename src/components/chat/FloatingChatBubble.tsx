@@ -290,51 +290,48 @@ export function FloatingChatBubble() {
           role="dialog"
           aria-label="Supply Chain assistant"
         >
-          {/* Header */}
-          <div className="border-b border-border">
-            <div className="flex items-center gap-2 px-3 py-2">
-              <div
-                onPointerDown={startPanelDrag}
-                className="flex min-w-0 flex-1 cursor-move select-none items-center gap-2"
-                title="Drag to move"
-              >
-                <AssistantMascot className="h-6 w-6 shrink-0" />
-                <div className="min-w-0 flex-1 text-sm font-semibold leading-tight">Agent</div>
-              </div>
-              {messages.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={clear}
-                  aria-label="Clear chat"
-                  title="Clear chat"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
+          {/* Header — single clean row: drag handle (mascot) + project filter + model + actions */}
+          <div className="flex items-center gap-2 border-b border-border bg-background px-2.5 py-2">
+            <button
+              type="button"
+              onPointerDown={startPanelDrag}
+              className="flex h-8 w-8 shrink-0 cursor-move items-center justify-center rounded-md hover:bg-muted"
+              aria-label="Drag to move"
+              title="Drag to move"
+            >
+              <AssistantMascot className="h-5 w-5" />
+            </button>
+            <ProjectSelector
+              projects={projects as any}
+              selectedProjectId={projectId}
+              onProjectSelect={chooseProject}
+              placeholder="Select a project…"
+              className="h-8 flex-1 text-xs"
+            />
+            <ModelPicker value={model} onChange={onModelChange} />
+            {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
+                className="h-8 w-8 shrink-0"
+                onClick={clear}
+                aria-label="Clear chat"
+                title="Clear chat"
               >
-                <X className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" />
               </Button>
-            </div>
-            {/* Subheader filter row: project + model */}
-            <div className="flex items-center gap-2 border-t border-border bg-muted/20 px-3 py-1.5">
-              <ProjectSelector
-                projects={projects as any}
-                selectedProjectId={projectId}
-                onProjectSelect={chooseProject}
-                placeholder="Select a project…"
-                className="h-8 flex-1 text-xs"
-              />
-              <ModelPicker value={model} onChange={onModelChange} />
-            </div>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
+
 
 
 
