@@ -1,24 +1,30 @@
 ## Goal
-Polish the sidebar profile avatar dropdown so it behaves consistently and pleasantly when the navigation bar is collapsed or expanded.
+Tighten the floating AI chatbox header so the project and model selectors live in a single compact subheader row — matching the simple filter style used elsewhere — and free up vertical space.
 
-## Current state
-- `src/components/Navbar.tsx` renders two separate `DropdownMenu` implementations: one for `isCollapsed` and one for expanded.
-- They differ in width, anchor side, label, and hit area. The collapsed version is just a 28×28 avatar; the expanded one is a full-width row.
-- Both use unstyled trigger buttons and bare avatars, with no focus ring / hover state.
+## Changes (scope: `src/components/chat/FloatingChatBubble.tsx` + `src/components/chat/ModelPicker.tsx` only)
 
-## Changes
-1. **Unified account trigger** — extract a single `AccountTrigger` component that accepts `isCollapsed` and renders either the compact avatar or the expanded row.
-   - Add hover/focus ring, press scale, and tooltip/aria clarity.
-2. **Single dropdown menu** — use one `DropdownMenuContent` definition with:
-   - `side={isCollapsed ? "right" : "top"}` and `align="start"`.
-   - Consistent width (`w-52`), same items, and a clear account label.
-3. **Visual polish** — consistent padding, rounded avatar ring matching the app accent, and keyboard-friendly focus states.
-4. **No behavior change** — items stay: My Profile, Help, Logout.
+### 1. New compact subheader row
+Replace today's two-row header (title block + separate "Project" row with `ProjectSelector`) with:
 
-## Files
-- `src/components/Navbar.tsx` only. No backend, no new dependencies.
+- **Row 1 (title bar)** — drag handle area: mascot/icon, "SC assistant" title, and the right-side action buttons (Clear, Close). Remove `ModelPicker` from this row. Remove the truncated "Project: …" subtitle (now redundant).
+- **Row 2 (subheader filter bar)** — a single thin strip directly under the title, visually similar to page subheaders:
+  - Left: standard `ProjectSelector` (h-8, flex-1, same trigger style as other pages — no custom label prefix).
+  - Right: `ModelPicker` (h-8, compact, aligned).
+  - Both controls share the same height/typography and sit on a subtle `bg-muted/30` strip with a bottom border, so it reads as a unified subheader.
 
-## Verification
-- Build and preview the sidebar in collapsed and expanded states.
-- Click the profile icon to confirm the dropdown opens on the correct side with consistent content.
-- Verify keyboard focus and hover states.
+### 2. Simplify `ModelPicker`
+- Drop the bespoke `h-7` / `text-[11px]` styling; align to `h-8 text-xs` to match `ProjectSelector` and other page filters.
+- Keep the same models list + storage helpers; no behavior change.
+
+### 3. Remove redundancy
+- Delete the standalone "Project" label + selector block (old lines ~335–344).
+- Empty-state body copy stays, but the "switch projects from the selector above" wording remains accurate (selector is still above).
+
+### 4. No behavior changes
+- Drag/resize, model persistence, project sync, messages, suggestions, composer — all unchanged.
+- No new dependencies, no backend work.
+
+## Result
+- Chatbox gains ~28–36px of vertical space.
+- Filter row matches the rest of the app's subheader pattern (single clean row, no label prefix, consistent control sizing).
+- Model + Project selectors sit side-by-side in one predictable place.

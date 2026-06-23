@@ -29,13 +29,13 @@ interface Props {
   onChange: (id: string) => void;
 }
 
-export function ModelPicker({ value, onChange }: Props) {
+export function ModelPicker({ value, onChange, className }: Props) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-7 w-auto gap-1 border-border/60 bg-background/80 px-2 text-[11px] font-medium">
+      <SelectTrigger className={`h-8 w-auto gap-1 px-2 text-xs font-medium ${className ?? ""}`}>
         <SelectValue />
       </SelectTrigger>
-      <SelectContent align="end" className="min-w-[220px]">
+      <SelectContent align="end" className="min-w-[200px]">
         {CHAT_MODELS.map((m) => (
           <SelectItem key={m.id} value={m.id} className="text-xs">
             <span className="font-medium">{m.label}</span>
