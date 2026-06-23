@@ -30,7 +30,7 @@ export function ProjectSelector({
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="z-[100]">
         {projects.map((project) => (
           <SelectItem key={project.id} value={project.id}>
             <div className="flex items-center justify-between w-full">
