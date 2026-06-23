@@ -291,8 +291,8 @@ export function FloatingChatBubble() {
           aria-label="Supply Chain assistant"
         >
           {/* Header */}
-          <div className="border-b border-border bg-gradient-to-r from-muted/40 to-transparent">
-            <div className="flex items-center gap-2 px-3 py-2.5">
+          <div className="border-b border-border">
+            <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-muted/40 to-transparent">
               <div
                 onPointerDown={startPanelDrag}
                 className="flex min-w-0 flex-1 cursor-move select-none items-center gap-2"
@@ -301,14 +301,8 @@ export function FloatingChatBubble() {
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <MessageSquare className="h-4 w-4" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold leading-tight">SC assistant</div>
-                  <div className="truncate text-[11px] text-muted-foreground">
-                    {projectLabel ? `Project: ${projectLabel}` : "No project selected"}
-                  </div>
-                </div>
+                <div className="min-w-0 flex-1 text-sm font-semibold leading-tight">SC assistant</div>
               </div>
-              <ModelPicker value={model} onChange={onModelChange} />
               {messages.length > 0 && (
                 <Button
                   variant="ghost"
@@ -331,18 +325,19 @@ export function FloatingChatBubble() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            {/* Active-project switcher (always available) */}
-            <div className="flex items-center gap-2 px-3 pb-2">
-              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Project</span>
+            {/* Subheader filter row: project + model */}
+            <div className="flex items-center gap-2 border-t border-border bg-muted/30 px-3 py-1.5">
               <ProjectSelector
                 projects={projects as any}
                 selectedProjectId={projectId}
                 onProjectSelect={chooseProject}
                 placeholder="Select a project…"
-                className="h-7 flex-1 text-xs"
+                className="h-8 flex-1 text-xs"
               />
+              <ModelPicker value={model} onChange={onModelChange} />
             </div>
           </div>
+
 
           {/* Body */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
