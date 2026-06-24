@@ -40,7 +40,12 @@ function loadPosFrom(key: string): Pos | null {
 }
 
 function loadPos(): Pos | null {
-  return loadPosFrom(LAUNCHER_POS_KEY);
+  const p = loadPosFrom(LAUNCHER_POS_KEY);
+  if (!p || typeof window === "undefined") return p;
+  // Clamp stale positions back into the current viewport so the launcher is never offscreen.
+  const x = Math.min(Math.max(0, p.x), window.innerWidth - LAUNCHER_SIZE.w);
+  const y = Math.min(Math.max(0, p.y), window.innerHeight - LAUNCHER_SIZE.h);
+  return { x, y };
 }
 
 function defaultPos(): Pos {
