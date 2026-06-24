@@ -287,12 +287,11 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             openPanel();
           }}
-          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center gap-2 rounded-lg border border-border bg-primary px-3 text-primary-foreground shadow-lg transition hover:bg-primary/90 active:cursor-grabbing"
+          className="chat-launcher-comet group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-primary/30 bg-background shadow-xl transition hover:scale-105 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
-          <MessageSquare className="pointer-events-none h-5 w-5" />
-          <span className="pointer-events-none text-sm font-semibold">AI Chat</span>
+          <AssistantMascot className="pointer-events-none h-8 w-8" />
         </button>
       )}
 
