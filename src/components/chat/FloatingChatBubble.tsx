@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Loader2, MessageSquare, Send, Trash2, X } from "lucide-react";
+import { Loader2, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
@@ -19,7 +19,7 @@ const SUGGESTIONS = [
 ];
 
 const LAUNCHER_POS_KEY = "projectChat.launcherPos";
-const LAUNCHER_SIZE = { w: 116, h: 52 };
+const LAUNCHER_SIZE = { w: 60, h: 60 };
 const PANEL_POS_KEY = "projectChat.panelPos";
 const PANEL_DIMS_KEY = "projectChat.panelSize";
 const PANEL_SIZE = { w: 480, h: 760 };
@@ -287,12 +287,11 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             openPanel();
           }}
-          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center gap-2 rounded-lg border border-border bg-primary px-3 text-primary-foreground shadow-lg transition hover:bg-primary/90 active:cursor-grabbing"
+          className="chat-launcher-comet group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-primary/30 bg-background shadow-xl transition hover:scale-105 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
-          <MessageSquare className="pointer-events-none h-5 w-5" />
-          <span className="pointer-events-none text-sm font-semibold">AI Chat</span>
+          <AssistantMascot className="pointer-events-none h-8 w-8" />
         </button>
       )}
 
@@ -304,44 +303,55 @@ export function FloatingChatBubble() {
           role="dialog"
           aria-label="Supply Chain assistant"
         >
-          {/* Header — standard PageHeader pattern */}
-          <div className="flex items-center justify-between gap-4 border-b border-header-border bg-header-background px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onPointerDown={startPanelDrag}
-                className="flex h-8 w-8 shrink-0 cursor-move items-center justify-center rounded-md hover:bg-muted"
-                aria-label="Drag to move"
-                title="Drag to move"
-              >
-                <AssistantMascot className="h-5 w-5" />
-              </button>
-              <div className="min-w-0">
-                <h2 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-foreground">
-                  Agent
-                </h2>
-                <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                  {selectedProject?.name
-                    ? `Analyzing ${selectedProject.name}`
-                    : "Ask anything about your supply chain"}
-                </p>
+          {/* Header — two rows: identity + context controls */}
+          <div className="border-b border-header-border bg-header-background">
+            <div
+              onPointerDown={startPanelDrag}
+              className="flex cursor-move items-center justify-between gap-3 px-4 pt-3 pb-2"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
+                  <AssistantMascot className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-foreground">
+                    SC Assistant
+                  </h2>
+                  <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                    {selectedProject?.name
+                      ? `Analyzing ${selectedProject.name}`
+                      : "Ask anything about your supply chain"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Close"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex items-center gap-2 border-t border-header-border/60 px-3 py-2">
               <ProjectSelector
                 projects={projects as any}
                 selectedProjectId={projectId}
                 onProjectSelect={chooseProject}
                 placeholder="Select a project..."
-                className="min-w-[200px]"
+                className="min-w-0 flex-1"
               />
               <ModelPicker value={model} onChange={onModelChange} />
               {messages.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2.5"
+                  className="h-8 w-8 shrink-0 p-0"
                   onClick={clear}
                   aria-label="Clear chat"
                   title="Clear chat"
@@ -349,15 +359,6 @@ export function FloatingChatBubble() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2.5"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
@@ -434,26 +435,37 @@ export function FloatingChatBubble() {
           </div>
 
           {/* Composer */}
-          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border bg-background p-2">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  onSubmit();
-                }
-              }}
-              placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
-              disabled={!projectId || loading}
-              rows={1}
-              className="flex-1 resize-none rounded-md border border-input bg-background px-2.5 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ maxHeight: 120 }}
-            />
-            <Button type="submit" size="icon" disabled={!projectId || !input.trim() || loading} aria-label="Send">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
+          <form
+            onSubmit={onSubmit}
+            className="border-t border-border bg-background p-3"
+          >
+            <div className="flex items-end gap-2 rounded-xl border border-border bg-muted/30 px-2.5 py-1.5 transition focus-within:border-primary focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/15">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onSubmit();
+                  }
+                }}
+                placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
+                disabled={!projectId || loading}
+                rows={1}
+                className="flex-1 resize-none border-0 bg-transparent py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ maxHeight: 160, minHeight: 28 }}
+              />
+              <Button
+                type="submit"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-lg"
+                disabled={!projectId || !input.trim() || loading}
+                aria-label="Send"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
           </form>
 
           {/* Resize grip (bottom-right) */}

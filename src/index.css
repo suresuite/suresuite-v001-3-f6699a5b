@@ -221,8 +221,45 @@
     .mascot-bob,
     .mascot-antenna,
     .mascot-glance,
-    .mascot-blink {
+    .mascot-blink,
+    .chat-launcher-comet::before,
+    .chat-launcher-comet::after {
       animation: none !important;
     }
+  }
+
+  /* Floating chat launcher — comet trail + soft halo around the mascot */
+  .chat-launcher-comet { position: relative; isolation: isolate; }
+  .chat-launcher-comet::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 9999px;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      hsl(var(--primary) / 0) 200deg,
+      hsl(var(--primary) / 0.5) 320deg,
+      hsl(var(--primary) / 0.95) 355deg,
+      transparent 360deg
+    );
+    filter: blur(2px);
+    animation: chat-comet-spin 2.4s linear infinite;
+    z-index: -1;
+  }
+  .chat-launcher-comet::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border-radius: 9999px;
+    background: radial-gradient(circle, hsl(var(--primary) / 0.35) 0%, transparent 65%);
+    filter: blur(10px);
+    animation: chat-halo-pulse 2.8s ease-in-out infinite;
+    z-index: -2;
+  }
+  @keyframes chat-comet-spin { to { transform: rotate(360deg); } }
+  @keyframes chat-halo-pulse {
+    0%, 100% { opacity: 0.55; transform: scale(0.96); }
+    50% { opacity: 1; transform: scale(1.08); }
   }
 }
