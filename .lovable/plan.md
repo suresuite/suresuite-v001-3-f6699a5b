@@ -1,35 +1,62 @@
-## Fix chatbox header to match the app's standard PageHeader pattern
+## Goal
 
-The chatbox is missing a real header and uses non-standard, shrunken (`h-8 text-xs`) controls that look nothing like the rest of the app. We will rebuild the chat panel header so it mirrors the standard `PageHeader` used on every page (e.g. `ProjectIntelligence.tsx`): clear title + subtitle on the left, standard-sized `ProjectSelector` + `ModelPicker` + actions on the right, on the same `bg-header-background` / `border-header-border` surface.
+Bring back the mascot launcher with comet trail and rebuild the floating chat panel so the header, message bubbles, and composer all look intentional — not the current cluttered single-row header with generic styling.
 
-### File to edit
-`src/components/chat/FloatingChatBubble.tsx` — only the header block (lines ~293–337).
+Scope: `src/components/chat/FloatingChatBubble.tsx`, `src/components/chat/AssistantMascot.tsx` (already exists), `src/components/chat/MessageBubble.tsx`, plus a new `CometTrail` styling. No backend or business-logic changes.
 
-### New header structure (single block, replaces lines 293–337)
+## 1. Restore the mascot launcher (with comet)
+
+- Replace the current `MessageSquare + "AI Chat"` pill button with a round 60×60 launcher.
+- Inside: `AssistantMascot` centered, with a comet/glow trail behind it (animated CSS halo + trailing particle arc, respects `prefers-reduced-motion`).
+- Keep drag-to-move and stale-position clamping (don't regress the offscreen fix).
+- `LAUNCHER_SIZE` back to `{w: 60, h: 60}`; clamping math updated accordingly.
+
+## 2. Rebuild the chat panel header (declutter + add identity)
+
+Two rows instead of one crammed row:
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│  [mascot]  Agent                          [Project ▾] [Model ▾] [⟲] [✕] │
-│            Ask anything about your supply chain                          │
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│ [mascot]  SC Assistant            [⚙] [✕]      │  row 1: identity + window controls
+│           Analyzing {project name}             │
+├────────────────────────────────────────────────┤
+│ [Project selector ▾]    [Model ▾]      [🗑]    │  row 2: context controls
+└────────────────────────────────────────────────┘
 ```
 
-- Container: `flex items-center justify-between gap-4 border-b border-header-border bg-header-background px-4 py-3`.
-- Left side (`min-w-0`):
-  - Drag handle button (`h-8 w-8 rounded-md hover:bg-muted cursor-move`) wrapping `<AssistantMascot className="h-5 w-5" />`. Keeps `onPointerDown={startPanelDrag}`.
-  - Text block:
-    - Title: `<h2 className="text-[15px] font-semibold tracking-tight text-foreground leading-tight truncate">Agent</h2>`
-    - Subtitle: `<p className="text-[12px] text-muted-foreground mt-0.5 truncate">Ask anything about your supply chain</p>` (or current project name when one is selected).
-- Right side (`flex items-center gap-2 shrink-0`):
-  - `ProjectSelector` with **standard sizing** — drop `h-8 text-xs`, use `className="min-w-[200px]"` exactly like `ProjectIntelligence.tsx`.
-  - `ModelPicker` — same default sizing (no shrunken overrides; if `ModelPicker` currently forces `h-7 text-[11px]`, remove those overrides so it matches the `ProjectSelector` trigger height).
-  - Clear button: `variant="outline" size="sm" className="h-8 px-2.5"` with `Trash2 h-4 w-4`, only when `messages.length > 0`.
-  - Close button: `variant="ghost" size="sm" className="h-8 px-2.5"` with `X h-4 w-4`.
+- Row 1: mascot avatar (drag handle), title "SC Assistant", subtitle = project name or "Ask anything about your supply chain". Right side: settings (future) + close.
+- Row 2: project selector + model picker (left), clear-chat (right). Separated by a subtle border. Uses `header-background` / `header-border` tokens.
+- Title uses `text-foreground` semibold; subtitle `text-muted-foreground text-xs`.
 
-### Why this fixes the complaints
-- **Missing header / no contrast** → restored real `PageHeader`-style bar with title + subtitle on `bg-header-background border-header-border`, the same surface every page uses, so the chatbox visually reads as a proper panel against the page.
-- **Non-standard project filter** → `ProjectSelector` rendered with the exact same props/classes as the rest of the app (`min-w-[200px]`, default trigger height), not the shrunken `h-8 text-xs` variant.
-- **Inconsistent controls** → all right-side controls share `h-8` sizing and standard shadcn variants (`outline` / `ghost`, `size="sm"`), matching `PageHeader`'s action row.
+## 3. Restyle message bubbles
 
-### Out of scope
-No changes to chat body, message bubbles, composer, streaming logic, model list, or backend. Pure header re-skin in one file.
+In `MessageBubble.tsx`:
+
+- Assistant: no background (transparent), `text-foreground`, full width minus avatar gutter, with small mascot avatar on the left of the first message in a run.
+- User: right-aligned, `bg-primary text-primary-foreground` rounded-2xl bubble, max-width 80%, comfortable padding (`px-3.5 py-2`).
+- Timestamp/meta in `text-[11px] text-muted-foreground` under bubble, only on hover.
+- Markdown via existing renderer; ensure code blocks, links, lists inherit readable contrast.
+
+## 4. Rebuild composer
+
+- Wrapper: `border-t border-border bg-background p-3` with a rounded inner container (`rounded-xl border border-border bg-muted/30 focus-within:border-primary`).
+- Textarea: borderless, transparent, `min-h-[44px] max-h-40`, auto-grow, placeholder uses `text-muted-foreground`.
+- Send button: fixed 36×36 icon button (`Send` icon), `bg-primary text-primary-foreground`, disabled state when empty/loading. Never stretches to textarea height.
+- Suggestions: render as horizontally-scrollable chip row directly above the composer (only when `messages.length === 0`), pill-shaped, `border border-border hover:bg-muted`.
+
+## 5. Preserve existing behavior
+
+- Keep drag + resize for the panel, viewport clamping, localStorage persistence.
+- Keep auth/route hiding (`hidden` check).
+- Keep `useProjectChat`, `useGlobalProject`, `ModelPicker` integrations unchanged.
+
+## Technical notes
+
+- Comet trail: pure CSS — a rotating `conic-gradient` ring + a trailing pseudo-element with `filter: blur(6px)` and `animation: comet 2.4s linear infinite`. Add keyframes in `src/index.css` under a `.chat-launcher-comet` class. Disable animation under `@media (prefers-reduced-motion: reduce)`.
+- All colors via semantic tokens (`--primary`, `--header-background`, `--header-border`, `--muted`, `--foreground`, `--primary-foreground`). No hardcoded hex.
+- Verify with Playwright: launcher visible bottom-right with mascot + animated halo, click opens panel, header shows two rows with mascot/title/subtitle, bubbles render with correct contrast, composer send button is square and not stretched.
+
+## Out of scope
+
+- No changes to `useProjectChat`, edge functions, or model routing.
+- No project-filter changes (separate complaint, handle in a follow-up).
