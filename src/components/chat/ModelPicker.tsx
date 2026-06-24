@@ -33,7 +33,7 @@ interface Props {
 export function ModelPicker({ value, onChange, className }: Props) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={`min-w-[160px] ${className ?? ""}`}>
+      <SelectTrigger className={`h-8 w-auto gap-1 px-2 text-xs font-medium ${className ?? ""}`}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="end" className="z-[100] min-w-[200px]">

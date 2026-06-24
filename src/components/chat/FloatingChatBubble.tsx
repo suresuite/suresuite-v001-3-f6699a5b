@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Loader2, Send, Trash2, X } from "lucide-react";
+import { Loader2, MessageSquare, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
@@ -40,20 +40,12 @@ function loadPosFrom(key: string): Pos | null {
 }
 
 function loadPos(): Pos | null {
-  const p = loadPosFrom(LAUNCHER_POS_KEY);
-  if (!p || typeof window === "undefined") return p;
-  // Clamp stale positions back into the current viewport so the launcher is never offscreen.
-  const x = Math.min(Math.max(0, p.x), window.innerWidth - LAUNCHER_SIZE.w);
-  const y = Math.min(Math.max(0, p.y), window.innerHeight - LAUNCHER_SIZE.h);
-  return { x, y };
+  return loadPosFrom(LAUNCHER_POS_KEY);
 }
 
 function defaultPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
-  return {
-    x: Math.max(12, window.innerWidth - LAUNCHER_SIZE.w - 20),
-    y: Math.max(12, window.innerHeight - LAUNCHER_SIZE.h - 20),
-  };
+  return { x: window.innerWidth - LAUNCHER_SIZE.w - 20, y: window.innerHeight - LAUNCHER_SIZE.h - 20 };
 }
 
 // Clamp panel size to the viewport (and a sensible minimum) so it always fits.
@@ -83,21 +75,7 @@ function defaultDims(): Dims {
 function defaultPanelPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
   const s = defaultDims();
-  return clampPanelPos({ x: window.innerWidth - s.w - 12, y: window.innerHeight - s.h - 12 }, s);
-}
-
-function clampPanelPos(p: Pos, s: Dims): Pos {
-  if (typeof window === "undefined") return p;
-  const maxX = Math.max(8, window.innerWidth - s.w - 8);
-  const maxY = Math.max(8, window.innerHeight - s.h - 8);
-  return {
-    x: Math.min(Math.max(8, p.x), maxX),
-    y: Math.min(Math.max(8, p.y), maxY),
-  };
-}
-
-function loadPanelPos(s: Dims): Pos {
-  return clampPanelPos(loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos(), s);
+  return { x: window.innerWidth - s.w - 12, y: window.innerHeight - s.h - 12 };
 }
 
 export function FloatingChatBubble() {
@@ -112,10 +90,10 @@ export function FloatingChatBubble() {
   const [pos, setPos] = useState<Pos>(() => loadPos() ?? defaultPos());
   const [dragging, setDragging] = useState(false);
   const dragState = useRef<{ ox: number; oy: number; moved: boolean } | null>(null);
-  const [panelDims, setPanelDims] = useState<Dims>(() => loadDims() ?? defaultDims());
-  const [panelPos, setPanelPos] = useState<Pos>(() => loadPanelPos(loadDims() ?? defaultDims()));
+  const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos());
   const [panelDragging, setPanelDragging] = useState(false);
   const panelDragState = useRef<{ ox: number; oy: number } | null>(null);
+  const [panelDims, setPanelDims] = useState<Dims>(() => loadDims() ?? defaultDims());
   const [resizing, setResizing] = useState(false);
   const resizeState = useRef<{ sx: number; sy: number; sw: number; sh: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -144,7 +122,10 @@ export function FloatingChatBubble() {
       }));
       const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
       setPanelDims(s);
-      setPanelPos((p) => clampPanelPos(p, s));
+      setPanelPos((p) => ({
+        x: Math.min(Math.max(8, p.x), window.innerWidth - s.w),
+        y: Math.min(Math.max(8, p.y), window.innerHeight - s.h),
+      }));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -185,7 +166,10 @@ export function FloatingChatBubble() {
       const s = panelDimsRef.current;
       const nx = e.clientX - panelDragState.current.ox;
       const ny = e.clientY - panelDragState.current.oy;
-      setPanelPos(clampPanelPos({ x: nx, y: ny }, s));
+      setPanelPos({
+        x: Math.min(Math.max(8, nx), window.innerWidth - s.w),
+        y: Math.min(Math.max(8, ny), window.innerHeight - s.h),
+      });
     };
     const onUp = () => {
       setPanelDragging(false);
@@ -223,6 +207,8 @@ export function FloatingChatBubble() {
     };
   }, [resizing]);
 
+  if (hidden) return null;
+
   const onSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const text = input;
@@ -248,15 +234,6 @@ export function FloatingChatBubble() {
     setGlobalSelectedProjectId(id);
     setSelectedProject((projects.find((p) => p.id === id) ?? null) as any);
   };
-
-  const openPanel = () => {
-    const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
-    setPanelDims(s);
-    setPanelPos((p) => clampPanelPos(p, s));
-    setOpen(true);
-  };
-
-  if (hidden) return null;
 
   const startDrag = (e: React.PointerEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -285,13 +262,23 @@ export function FloatingChatBubble() {
           onPointerDown={startDrag}
           onClick={() => {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
-            openPanel();
+            setOpen(true);
           }}
-          className="chat-launcher-comet group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-primary/30 bg-background shadow-xl transition hover:scale-105 active:cursor-grabbing"
+          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
-          <AssistantMascot className="pointer-events-none h-8 w-8" />
+          {/* Rotating light: a neon-red glow with a fading tail rides on top of the border */}
+          <span
+            className="pointer-events-none absolute -inset-[2px] animate-spin rounded-full"
+            style={{
+              animationDuration: "2.4s",
+              background:
+                "conic-gradient(from 0deg, rgba(255,0,51,0) 0deg, rgba(255,0,51,0) 225deg, rgba(255,0,51,0.7) 315deg, rgba(255,45,75,1) 352deg, rgba(255,0,51,1) 358deg, rgba(255,0,51,0) 360deg)",
+            }}
+          />
+          <span className="pointer-events-none absolute inset-[2px] rounded-full bg-black" />
+          <AssistantMascot className="pointer-events-none relative h-[34px] w-[34px]" />
         </button>
       )}
 
@@ -303,65 +290,47 @@ export function FloatingChatBubble() {
           role="dialog"
           aria-label="Supply Chain assistant"
         >
-          {/* Header — two rows: identity + context controls */}
-          <div className="border-b border-header-border bg-header-background">
-            <div
+          {/* Header — single clean row: drag handle (mascot) + project filter + model + actions */}
+          <div className="flex items-center gap-2 border-b border-border bg-background px-2.5 py-2">
+            <button
+              type="button"
               onPointerDown={startPanelDrag}
-              className="flex cursor-move items-center justify-between gap-3 px-4 pt-3 pb-2"
+              className="flex h-8 w-8 shrink-0 cursor-move items-center justify-center rounded-md hover:bg-muted"
+              aria-label="Drag to move"
+              title="Drag to move"
             >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
-                  <AssistantMascot className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-foreground">
-                    SC Assistant
-                  </h2>
-                  <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                    {selectedProject?.name
-                      ? `Analyzing ${selectedProject.name}`
-                      : "Ask anything about your supply chain"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={(e) => { e.stopPropagation(); setOpen(false); }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label="Close"
-                  title="Close"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 border-t border-header-border/60 px-3 py-2">
-              <ProjectSelector
-                projects={projects as any}
-                selectedProjectId={projectId}
-                onProjectSelect={chooseProject}
-                placeholder="Select a project..."
-                className="min-w-0 flex-1"
-              />
-              <ModelPicker value={model} onChange={onModelChange} />
-              {messages.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 shrink-0 p-0"
-                  onClick={clear}
-                  aria-label="Clear chat"
-                  title="Clear chat"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+              <AssistantMascot className="h-5 w-5" />
+            </button>
+            <ProjectSelector
+              projects={projects as any}
+              selectedProjectId={projectId}
+              onProjectSelect={chooseProject}
+              placeholder="Select a project…"
+              className="h-8 flex-1 text-xs"
+            />
+            <ModelPicker value={model} onChange={onModelChange} />
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={clear}
+                aria-label="Clear chat"
+                title="Clear chat"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-
 
 
 
@@ -435,37 +404,26 @@ export function FloatingChatBubble() {
           </div>
 
           {/* Composer */}
-          <form
-            onSubmit={onSubmit}
-            className="border-t border-border bg-background p-3"
-          >
-            <div className="flex items-end gap-2 rounded-xl border border-border bg-muted/30 px-2.5 py-1.5 transition focus-within:border-primary focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/15">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onSubmit();
-                  }
-                }}
-                placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
-                disabled={!projectId || loading}
-                rows={1}
-                className="flex-1 resize-none border-0 bg-transparent py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ maxHeight: 160, minHeight: 28 }}
-              />
-              <Button
-                type="submit"
-                size="icon"
-                className="h-9 w-9 shrink-0 rounded-lg"
-                disabled={!projectId || !input.trim() || loading}
-                aria-label="Send"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
-            </div>
+          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border bg-background p-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }}
+              placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
+              disabled={!projectId || loading}
+              rows={1}
+              className="flex-1 resize-none rounded-md border border-input bg-background px-2.5 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ maxHeight: 120 }}
+            />
+            <Button type="submit" size="icon" disabled={!projectId || !input.trim() || loading} aria-label="Send">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
           </form>
 
           {/* Resize grip (bottom-right) */}
