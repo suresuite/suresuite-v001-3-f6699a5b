@@ -19,7 +19,7 @@ const SUGGESTIONS = [
 ];
 
 const LAUNCHER_POS_KEY = "projectChat.launcherPos";
-const LAUNCHER_SIZE = { w: 60, h: 60 };
+const LAUNCHER_SIZE = { w: 116, h: 52 };
 const PANEL_POS_KEY = "projectChat.panelPos";
 const PANEL_DIMS_KEY = "projectChat.panelSize";
 const PANEL_SIZE = { w: 480, h: 760 };
@@ -50,7 +50,10 @@ function loadPos(): Pos | null {
 
 function defaultPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
-  return { x: window.innerWidth - LAUNCHER_SIZE.w - 20, y: window.innerHeight - LAUNCHER_SIZE.h - 20 };
+  return {
+    x: Math.max(12, window.innerWidth - LAUNCHER_SIZE.w - 20),
+    y: Math.max(12, window.innerHeight - LAUNCHER_SIZE.h - 20),
+  };
 }
 
 // Clamp panel size to the viewport (and a sensible minimum) so it always fits.
@@ -80,7 +83,21 @@ function defaultDims(): Dims {
 function defaultPanelPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
   const s = defaultDims();
-  return { x: window.innerWidth - s.w - 12, y: window.innerHeight - s.h - 12 };
+  return clampPanelPos({ x: window.innerWidth - s.w - 12, y: window.innerHeight - s.h - 12 }, s);
+}
+
+function clampPanelPos(p: Pos, s: Dims): Pos {
+  if (typeof window === "undefined") return p;
+  const maxX = Math.max(8, window.innerWidth - s.w - 8);
+  const maxY = Math.max(8, window.innerHeight - s.h - 8);
+  return {
+    x: Math.min(Math.max(8, p.x), maxX),
+    y: Math.min(Math.max(8, p.y), maxY),
+  };
+}
+
+function loadPanelPos(s: Dims): Pos {
+  return clampPanelPos(loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos(), s);
 }
 
 export function FloatingChatBubble() {
@@ -95,10 +112,10 @@ export function FloatingChatBubble() {
   const [pos, setPos] = useState<Pos>(() => loadPos() ?? defaultPos());
   const [dragging, setDragging] = useState(false);
   const dragState = useRef<{ ox: number; oy: number; moved: boolean } | null>(null);
-  const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos());
+  const [panelDims, setPanelDims] = useState<Dims>(() => loadDims() ?? defaultDims());
+  const [panelPos, setPanelPos] = useState<Pos>(() => loadPanelPos(loadDims() ?? defaultDims()));
   const [panelDragging, setPanelDragging] = useState(false);
   const panelDragState = useRef<{ ox: number; oy: number } | null>(null);
-  const [panelDims, setPanelDims] = useState<Dims>(() => loadDims() ?? defaultDims());
   const [resizing, setResizing] = useState(false);
   const resizeState = useRef<{ sx: number; sy: number; sw: number; sh: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,10 +144,7 @@ export function FloatingChatBubble() {
       }));
       const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
       setPanelDims(s);
-      setPanelPos((p) => ({
-        x: Math.min(Math.max(8, p.x), window.innerWidth - s.w),
-        y: Math.min(Math.max(8, p.y), window.innerHeight - s.h),
-      }));
+      setPanelPos((p) => clampPanelPos(p, s));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -171,10 +185,7 @@ export function FloatingChatBubble() {
       const s = panelDimsRef.current;
       const nx = e.clientX - panelDragState.current.ox;
       const ny = e.clientY - panelDragState.current.oy;
-      setPanelPos({
-        x: Math.min(Math.max(8, nx), window.innerWidth - s.w),
-        y: Math.min(Math.max(8, ny), window.innerHeight - s.h),
-      });
+      setPanelPos(clampPanelPos({ x: nx, y: ny }, s));
     };
     const onUp = () => {
       setPanelDragging(false);
@@ -212,8 +223,6 @@ export function FloatingChatBubble() {
     };
   }, [resizing]);
 
-  if (hidden) return null;
-
   const onSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const text = input;
@@ -239,6 +248,15 @@ export function FloatingChatBubble() {
     setGlobalSelectedProjectId(id);
     setSelectedProject((projects.find((p) => p.id === id) ?? null) as any);
   };
+
+  const openPanel = () => {
+    const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
+    setPanelDims(s);
+    setPanelPos((p) => clampPanelPos(p, s));
+    setOpen(true);
+  };
+
+  if (hidden) return null;
 
   const startDrag = (e: React.PointerEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -267,23 +285,14 @@ export function FloatingChatBubble() {
           onPointerDown={startDrag}
           onClick={() => {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
-            setOpen(true);
+            openPanel();
           }}
-          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center gap-2 rounded-lg border border-border bg-primary px-3 text-primary-foreground shadow-lg transition hover:bg-primary/90 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
-          {/* Rotating light: a neon-red glow with a fading tail rides on top of the border */}
-          <span
-            className="pointer-events-none absolute -inset-[2px] animate-spin rounded-full"
-            style={{
-              animationDuration: "2.4s",
-              background:
-                "conic-gradient(from 0deg, rgba(255,0,51,0) 0deg, rgba(255,0,51,0) 225deg, rgba(255,0,51,0.7) 315deg, rgba(255,45,75,1) 352deg, rgba(255,0,51,1) 358deg, rgba(255,0,51,0) 360deg)",
-            }}
-          />
-          <span className="pointer-events-none absolute inset-[2px] rounded-full bg-black" />
-          <AssistantMascot className="pointer-events-none relative h-[34px] w-[34px]" />
+          <MessageSquare className="pointer-events-none h-5 w-5" />
+          <span className="pointer-events-none text-sm font-semibold">AI Chat</span>
         </button>
       )}
 
