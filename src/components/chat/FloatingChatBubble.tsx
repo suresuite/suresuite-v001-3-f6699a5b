@@ -435,26 +435,37 @@ export function FloatingChatBubble() {
           </div>
 
           {/* Composer */}
-          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border bg-background p-2">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  onSubmit();
-                }
-              }}
-              placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
-              disabled={!projectId || loading}
-              rows={1}
-              className="flex-1 resize-none rounded-md border border-input bg-background px-2.5 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ maxHeight: 120 }}
-            />
-            <Button type="submit" size="icon" disabled={!projectId || !input.trim() || loading} aria-label="Send">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
+          <form
+            onSubmit={onSubmit}
+            className="border-t border-border bg-background p-3"
+          >
+            <div className="flex items-end gap-2 rounded-xl border border-border bg-muted/30 px-2.5 py-1.5 transition focus-within:border-primary focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/15">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onSubmit();
+                  }
+                }}
+                placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
+                disabled={!projectId || loading}
+                rows={1}
+                className="flex-1 resize-none border-0 bg-transparent py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ maxHeight: 160, minHeight: 28 }}
+              />
+              <Button
+                type="submit"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-lg"
+                disabled={!projectId || !input.trim() || loading}
+                aria-label="Send"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
           </form>
 
           {/* Resize grip (bottom-right) */}
