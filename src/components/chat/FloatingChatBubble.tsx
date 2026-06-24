@@ -19,7 +19,7 @@ const SUGGESTIONS = [
 ];
 
 const LAUNCHER_POS_KEY = "projectChat.launcherPos";
-const LAUNCHER_SIZE = { w: 116, h: 52 };
+const LAUNCHER_SIZE = { w: 60, h: 60 };
 const PANEL_POS_KEY = "projectChat.panelPos";
 const PANEL_DIMS_KEY = "projectChat.panelSize";
 const PANEL_SIZE = { w: 480, h: 760 };
