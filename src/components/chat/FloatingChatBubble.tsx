@@ -303,44 +303,55 @@ export function FloatingChatBubble() {
           role="dialog"
           aria-label="Supply Chain assistant"
         >
-          {/* Header — standard PageHeader pattern */}
-          <div className="flex items-center justify-between gap-4 border-b border-header-border bg-header-background px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onPointerDown={startPanelDrag}
-                className="flex h-8 w-8 shrink-0 cursor-move items-center justify-center rounded-md hover:bg-muted"
-                aria-label="Drag to move"
-                title="Drag to move"
-              >
-                <AssistantMascot className="h-5 w-5" />
-              </button>
-              <div className="min-w-0">
-                <h2 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-foreground">
-                  Agent
-                </h2>
-                <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                  {selectedProject?.name
-                    ? `Analyzing ${selectedProject.name}`
-                    : "Ask anything about your supply chain"}
-                </p>
+          {/* Header — two rows: identity + context controls */}
+          <div className="border-b border-header-border bg-header-background">
+            <div
+              onPointerDown={startPanelDrag}
+              className="flex cursor-move items-center justify-between gap-3 px-4 pt-3 pb-2"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
+                  <AssistantMascot className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-foreground">
+                    SC Assistant
+                  </h2>
+                  <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                    {selectedProject?.name
+                      ? `Analyzing ${selectedProject.name}`
+                      : "Ask anything about your supply chain"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Close"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex items-center gap-2 border-t border-header-border/60 px-3 py-2">
               <ProjectSelector
                 projects={projects as any}
                 selectedProjectId={projectId}
                 onProjectSelect={chooseProject}
                 placeholder="Select a project..."
-                className="min-w-[200px]"
+                className="min-w-0 flex-1"
               />
               <ModelPicker value={model} onChange={onModelChange} />
               {messages.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2.5"
+                  className="h-8 w-8 shrink-0 p-0"
                   onClick={clear}
                   aria-label="Clear chat"
                   title="Clear chat"
@@ -348,15 +359,6 @@ export function FloatingChatBubble() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2.5"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
