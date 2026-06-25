@@ -264,7 +264,7 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             setOpen(true);
           }}
-          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="group fixed z-[90] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
@@ -286,12 +286,12 @@ export function FloatingChatBubble() {
       {open && (
         <div
           style={{ left: panelPos.x, top: panelPos.y, width: panelDims.w, height: panelDims.h }}
-          className="fixed z-[80] flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
           role="dialog"
           aria-label="Supply Chain assistant"
         >
-          {/* Header — single clean row: drag handle (mascot) + project filter + model + actions */}
-          <div className="flex items-center gap-2 border-b border-border bg-background px-2.5 py-2">
+          {/* Header — single clean row: drag handle + project filter + model + actions */}
+          <div className="flex h-12 items-center gap-2 border-b border-border bg-card px-3">
             <button
               type="button"
               onPointerDown={startPanelDrag}
@@ -301,19 +301,24 @@ export function FloatingChatBubble() {
             >
               <AssistantMascot className="h-5 w-5" />
             </button>
-            <ProjectSelector
-              projects={projects as any}
-              selectedProjectId={projectId}
-              onProjectSelect={chooseProject}
-              placeholder="Select a project…"
-              className="h-8 flex-1 text-xs"
-            />
+            <Select value={projectId || ""} onValueChange={chooseProject}>
+              <SelectTrigger className="h-9 flex-1 min-w-0 text-sm">
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent className="z-[110]">
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <ModelPicker value={model} onChange={onModelChange} />
             {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-9 w-9 shrink-0"
                 onClick={clear}
                 aria-label="Clear chat"
                 title="Clear chat"
@@ -324,13 +329,14 @@ export function FloatingChatBubble() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="h-9 w-9 shrink-0"
               onClick={() => setOpen(false)}
               aria-label="Close"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
+
 
 
 
