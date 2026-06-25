@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Loader2, MessageSquare, Send, Trash2, X } from "lucide-react";
+import { Loader2, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjectChat } from "@/hooks/useProjectChat";
 import { useProjects } from "@/hooks/useProjects";
-import { ProjectSelector } from "@/components/shared/ProjectSelector";
 import { MessageBubble } from "./MessageBubble";
 import { AssistantMascot } from "./AssistantMascot";
 import { ModelPicker, getModelLabel, getStoredModel, setStoredModel } from "./ModelPicker";
@@ -264,7 +264,7 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             setOpen(true);
           }}
-          className="group fixed z-[80] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="group fixed z-[90] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
@@ -286,12 +286,12 @@ export function FloatingChatBubble() {
       {open && (
         <div
           style={{ left: panelPos.x, top: panelPos.y, width: panelDims.w, height: panelDims.h }}
-          className="fixed z-[80] flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
           role="dialog"
           aria-label="Supply Chain assistant"
         >
-          {/* Header — single clean row: drag handle (mascot) + project filter + model + actions */}
-          <div className="flex items-center gap-2 border-b border-border bg-background px-2.5 py-2">
+          {/* Header — single clean row: drag handle + project filter + model + actions */}
+          <div className="flex h-12 items-center gap-2 border-b border-border bg-card px-3">
             <button
               type="button"
               onPointerDown={startPanelDrag}
@@ -301,19 +301,24 @@ export function FloatingChatBubble() {
             >
               <AssistantMascot className="h-5 w-5" />
             </button>
-            <ProjectSelector
-              projects={projects as any}
-              selectedProjectId={projectId}
-              onProjectSelect={chooseProject}
-              placeholder="Select a project…"
-              className="h-8 flex-1 text-xs"
-            />
+            <Select value={projectId || ""} onValueChange={chooseProject}>
+              <SelectTrigger className="h-9 flex-1 min-w-0 text-sm">
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent className="z-[110]">
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <ModelPicker value={model} onChange={onModelChange} />
             {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-9 w-9 shrink-0"
                 onClick={clear}
                 aria-label="Clear chat"
                 title="Clear chat"
@@ -324,7 +329,7 @@ export function FloatingChatBubble() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="h-9 w-9 shrink-0"
               onClick={() => setOpen(false)}
               aria-label="Close"
             >
@@ -333,13 +338,11 @@ export function FloatingChatBubble() {
           </div>
 
 
-
-
           {/* Body */}
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto bg-background px-4 py-4">
             {!projectId && (
               <div className="space-y-3">
-                <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
                   👋 I'm your Supply Chain assistant. Which project should we dig into?
                 </div>
                 {projectsLoading ? (
@@ -358,11 +361,11 @@ export function FloatingChatBubble() {
                         key={p.id}
                         type="button"
                         onClick={() => chooseProject(p.id)}
-                        className="block w-full rounded-md border border-border px-2.5 py-2 text-left transition hover:bg-muted"
+                        className="block w-full rounded-md border border-border px-2.5 py-2 text-left transition hover:bg-accent hover:text-accent-foreground"
                       >
-                        <div className="text-xs font-medium text-foreground">{p.name}</div>
+                        <div className="text-sm font-medium text-foreground">{p.name}</div>
                         {p.plant_name && (
-                          <div className="truncate text-[11px] text-muted-foreground">{p.plant_name}</div>
+                          <div className="truncate text-xs text-muted-foreground">{p.plant_name}</div>
                         )}
                       </button>
                     ))}
@@ -372,7 +375,7 @@ export function FloatingChatBubble() {
             )}
             {projectId && messages.length === 0 && (
               <div className="space-y-3">
-                <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
                   Working on <span className="font-medium text-foreground">{projectLabel}</span> with <span className="font-medium text-foreground">{getModelLabel(model)}</span>. Ask about your network, risks, or what to do next — or switch projects from the selector above.
                 </div>
                 <div className="space-y-1.5">
@@ -381,7 +384,7 @@ export function FloatingChatBubble() {
                       key={s}
                       type="button"
                       onClick={() => send(s, model)}
-                      className="block w-full rounded-md border border-border px-2.5 py-1.5 text-left text-xs text-foreground transition hover:bg-muted"
+                      className="block w-full rounded-md border border-border px-3 py-2 text-left text-sm text-foreground transition hover:bg-accent hover:text-accent-foreground"
                     >
                       {s}
                     </button>
@@ -404,7 +407,7 @@ export function FloatingChatBubble() {
           </div>
 
           {/* Composer */}
-          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border bg-background p-2">
+          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border bg-card p-3">
             <textarea
               ref={inputRef}
               value={input}
@@ -418,13 +421,14 @@ export function FloatingChatBubble() {
               placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
               disabled={!projectId || loading}
               rows={1}
-              className="flex-1 resize-none rounded-md border border-input bg-background px-2.5 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               style={{ maxHeight: 120 }}
             />
-            <Button type="submit" size="icon" disabled={!projectId || !input.trim() || loading} aria-label="Send">
+            <Button type="submit" size="icon" className="h-9 w-9" disabled={!projectId || !input.trim() || loading} aria-label="Send">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>
+
 
           {/* Resize grip (bottom-right) */}
           <div
