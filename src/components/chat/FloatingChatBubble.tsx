@@ -338,14 +338,11 @@ export function FloatingChatBubble() {
           </div>
 
 
-
-
-
           {/* Body */}
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto bg-background px-4 py-4">
             {!projectId && (
               <div className="space-y-3">
-                <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
                   👋 I'm your Supply Chain assistant. Which project should we dig into?
                 </div>
                 {projectsLoading ? (
@@ -364,11 +361,11 @@ export function FloatingChatBubble() {
                         key={p.id}
                         type="button"
                         onClick={() => chooseProject(p.id)}
-                        className="block w-full rounded-md border border-border px-2.5 py-2 text-left transition hover:bg-muted"
+                        className="block w-full rounded-md border border-border px-2.5 py-2 text-left transition hover:bg-accent hover:text-accent-foreground"
                       >
-                        <div className="text-xs font-medium text-foreground">{p.name}</div>
+                        <div className="text-sm font-medium text-foreground">{p.name}</div>
                         {p.plant_name && (
-                          <div className="truncate text-[11px] text-muted-foreground">{p.plant_name}</div>
+                          <div className="truncate text-xs text-muted-foreground">{p.plant_name}</div>
                         )}
                       </button>
                     ))}
@@ -378,7 +375,7 @@ export function FloatingChatBubble() {
             )}
             {projectId && messages.length === 0 && (
               <div className="space-y-3">
-                <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
                   Working on <span className="font-medium text-foreground">{projectLabel}</span> with <span className="font-medium text-foreground">{getModelLabel(model)}</span>. Ask about your network, risks, or what to do next — or switch projects from the selector above.
                 </div>
                 <div className="space-y-1.5">
@@ -387,7 +384,7 @@ export function FloatingChatBubble() {
                       key={s}
                       type="button"
                       onClick={() => send(s, model)}
-                      className="block w-full rounded-md border border-border px-2.5 py-1.5 text-left text-xs text-foreground transition hover:bg-muted"
+                      className="block w-full rounded-md border border-border px-3 py-2 text-left text-sm text-foreground transition hover:bg-accent hover:text-accent-foreground"
                     >
                       {s}
                     </button>
@@ -410,7 +407,7 @@ export function FloatingChatBubble() {
           </div>
 
           {/* Composer */}
-          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border bg-background p-2">
+          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border bg-card p-3">
             <textarea
               ref={inputRef}
               value={input}
@@ -424,13 +421,14 @@ export function FloatingChatBubble() {
               placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
               disabled={!projectId || loading}
               rows={1}
-              className="flex-1 resize-none rounded-md border border-input bg-background px-2.5 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               style={{ maxHeight: 120 }}
             />
-            <Button type="submit" size="icon" disabled={!projectId || !input.trim() || loading} aria-label="Send">
+            <Button type="submit" size="icon" className="h-9 w-9" disabled={!projectId || !input.trim() || loading} aria-label="Send">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>
+
 
           {/* Resize grip (bottom-right) */}
           <div
