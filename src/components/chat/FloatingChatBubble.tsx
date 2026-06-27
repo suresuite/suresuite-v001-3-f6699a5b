@@ -290,19 +290,46 @@ export function FloatingChatBubble() {
           role="dialog"
           aria-label="Supply Chain assistant"
         >
-          {/* Header — single clean row: drag handle + project filter + model + actions */}
-          <div className="flex h-12 items-center gap-2 border-b border-border bg-card px-3">
-            <button
-              type="button"
-              onPointerDown={startPanelDrag}
-              className="flex h-8 w-8 shrink-0 cursor-move items-center justify-center rounded-md hover:bg-muted"
-              aria-label="Drag to move"
-              title="Drag to move"
-            >
+          {/* Row 1 — Title header (drag region) */}
+          <div
+            onPointerDown={startPanelDrag}
+            className="flex h-14 shrink-0 cursor-move items-center gap-3 border-b border-border bg-gradient-to-r from-card to-muted/60 px-4 select-none"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md ring-1 ring-border bg-background">
               <AssistantMascot className="h-5 w-5" />
-            </button>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-foreground">SC Assistant</div>
+            </div>
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={clear}
+                aria-label="Clear chat"
+                title="Clear chat"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Row 2 — Filter bar */}
+          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-muted/40 px-3">
             <Select value={projectId || ""} onValueChange={chooseProject}>
-              <SelectTrigger className="h-9 flex-1 min-w-0 text-sm">
+              <SelectTrigger className="h-8 flex-1 min-w-0 text-xs bg-background">
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent className="z-[110]">
@@ -314,35 +341,13 @@ export function FloatingChatBubble() {
               </SelectContent>
             </Select>
             <ModelPicker value={model} onChange={onModelChange} />
-            {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 shrink-0"
-                onClick={clear}
-                aria-label="Clear chat"
-                title="Clear chat"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 shrink-0"
-              onClick={() => setOpen(false)}
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
 
-
           {/* Body */}
-          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto bg-background px-4 py-4">
+          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-background px-4 py-4">
             {!projectId && (
               <div className="space-y-3">
-                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-border bg-card/60 p-3 text-sm text-muted-foreground">
                   👋 I'm your Supply Chain assistant. Which project should we dig into?
                 </div>
                 {projectsLoading ? (
@@ -361,7 +366,7 @@ export function FloatingChatBubble() {
                         key={p.id}
                         type="button"
                         onClick={() => chooseProject(p.id)}
-                        className="block w-full rounded-md border border-border px-2.5 py-2 text-left transition hover:bg-accent hover:text-accent-foreground"
+                        className="block w-full rounded-lg border border-border bg-card px-3 py-2 text-left transition hover:bg-accent hover:text-accent-foreground"
                       >
                         <div className="text-sm font-medium text-foreground">{p.name}</div>
                         {p.plant_name && (
@@ -375,8 +380,13 @@ export function FloatingChatBubble() {
             )}
             {projectId && messages.length === 0 && (
               <div className="space-y-3">
-                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
-                  Working on <span className="font-medium text-foreground">{projectLabel}</span> with <span className="font-medium text-foreground">{getModelLabel(model)}</span>. Ask about your network, risks, or what to do next — or switch projects from the selector above.
+                <div className="rounded-lg border border-border bg-card/60 p-3 text-sm">
+                  <div className="font-medium text-foreground">
+                    Working on {projectLabel}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    Using {getModelLabel(model)} · ask about your network, risks, or what to do next.
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   {SUGGESTIONS.map((s) => (
@@ -384,7 +394,7 @@ export function FloatingChatBubble() {
                       key={s}
                       type="button"
                       onClick={() => send(s, model)}
-                      className="block w-full rounded-md border border-border px-3 py-2 text-left text-sm text-foreground transition hover:bg-accent hover:text-accent-foreground"
+                      className="block w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground transition hover:bg-accent hover:text-accent-foreground"
                     >
                       {s}
                     </button>
@@ -421,10 +431,10 @@ export function FloatingChatBubble() {
               placeholder={projectId ? "Ask about this project…" : "Select a project to start chatting"}
               disabled={!projectId || loading}
               rows={1}
-              className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ maxHeight: 120 }}
+              className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ minHeight: 40, maxHeight: 120 }}
             />
-            <Button type="submit" size="icon" className="h-9 w-9" disabled={!projectId || !input.trim() || loading} aria-label="Send">
+            <Button type="submit" size="icon" className="h-9 w-9 rounded-lg" disabled={!projectId || !input.trim() || loading} aria-label="Send">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>
