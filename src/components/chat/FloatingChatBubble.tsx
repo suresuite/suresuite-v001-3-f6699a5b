@@ -286,26 +286,24 @@ export function FloatingChatBubble() {
       {open && (
         <div
           style={{ left: panelPos.x, top: panelPos.y, width: panelDims.w, height: panelDims.h }}
-          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-2xl border border-black bg-background shadow-2xl"
           role="dialog"
           aria-label="Supply Chain assistant"
         >
           {/* Row 1 — Title header (drag region) */}
           <div
             onPointerDown={startPanelDrag}
-            className="flex h-14 shrink-0 cursor-move items-center gap-3 border-b border-border bg-gradient-to-r from-card to-muted/60 px-4 select-none"
+            className="flex h-14 shrink-0 cursor-move items-center gap-3 border-b border-white/10 bg-black px-4 select-none"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md ring-1 ring-border bg-background">
-              <AssistantMascot className="h-5 w-5" />
-            </div>
+            <AssistantMascot className="h-9 w-9 shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-foreground">SC Assistant</div>
+              <div className="truncate text-sm font-semibold text-white">SC Assistant</div>
             </div>
             {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={clear}
                 aria-label="Clear chat"
@@ -317,7 +315,7 @@ export function FloatingChatBubble() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setOpen(false)}
               aria-label="Close"
