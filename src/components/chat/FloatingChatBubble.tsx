@@ -103,7 +103,7 @@ export function FloatingChatBubble() {
   const panelDimsRef = useRef<Dims>(panelDims);
   panelDimsRef.current = panelDims;
 
-  const { messages, loading, error, send, clear } = useProjectChat(projectId, QUICK_THREAD_ID);
+  const { messages, loading, error, send, clear } = useProjectChat(QUICK_THREAD_ID);
 
   const hidden = !user || location.pathname.startsWith("/auth");
 
