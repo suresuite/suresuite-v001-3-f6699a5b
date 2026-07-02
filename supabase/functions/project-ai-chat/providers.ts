@@ -2,6 +2,7 @@
 // Supports Gemini, OpenAI (gpt-5 family), and DeepSeek (OpenAI-compatible).
 
 import { executeTool, ToolContext, toolDeclarations, ToolEnvelope } from "./tools.ts";
+import { resolveAgent } from "./agents.ts";
 
 export type ProviderId = "gemini" | "openai" | "deepseek";
 
