@@ -44,18 +44,35 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Parse the request body up-front so any parse/validation failure can return a
+  // structured 200 (supabase-js `invoke` discards the body of non-2xx responses,
+  // which would collapse the real reason into the generic "Edge Function returned
+  // a non-2xx status code" string).
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch (_e) {
+    return new Response(JSON.stringify({
+      error: 'Invalid JSON body.',
+      type: 'BAD_REQUEST',
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  const { projectId, message, conversationHistory, userId, userEmail, mode, model, agentId } = body;
+  const isToolsMode = mode === 'tools';
+
+  if (!message || !userId || !userEmail) {
+    return new Response(JSON.stringify({
+      error: 'Missing required parameters: message, userId, userEmail',
+      type: 'BAD_REQUEST',
+    }), { status: isToolsMode ? 200 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
   try {
     // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
-
-    const { projectId, message, conversationHistory, userId, userEmail, mode, model, agentId } = await req.json();
-
-    if (!message || !userId || !userEmail) {
-      throw new Error('Missing required parameters: message, userId, userEmail');
-    }
 
     // === Tool-calling chat mode (multi-provider: Gemini, OpenAI, DeepSeek) ===
     if (mode === 'tools') {
