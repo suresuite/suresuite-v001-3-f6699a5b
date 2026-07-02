@@ -1,0 +1,5 @@
+material_id,name,cost,holding_cost_pct,moq,initial_on_hand,lead_time_dist,lead_time_cv
+M0001,Resistor pack,0.12,0.2,1000,5000,deterministic,
+M0002,Copper wire,0.45,0.2,500,2000,lognormal,0.3
+M0003,Housing shell,2.8,0.25,,1200,gamma,0.5
+M0004,Connector,0.9,0.2,250,,deterministic,

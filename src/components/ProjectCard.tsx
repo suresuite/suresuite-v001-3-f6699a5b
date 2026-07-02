@@ -23,6 +23,7 @@ import {
   Info,
   Network,
   Workflow,
+  Coins,
 } from 'lucide-react';
 import { getCombineStatusStyle, getCombineStatusIcon, getCombineStatusText } from '@/utils/combineStatus';
 import { getFallbackSimulationDates } from '@/utils/dateHelpers';
@@ -78,6 +79,7 @@ interface ProjectCardProps {
   onGenerateNodeList: (project: Project) => void;
   onViewData: (project: Project) => void;
   onUploadData: (project: Project) => void;
+  onEditItemMaster: (project: Project) => void;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
   onCombine: (project: Project) => void;
@@ -116,6 +118,7 @@ export function ProjectCard({
   onGenerateNodeList,
   onViewData,
   onUploadData,
+  onEditItemMaster,
   onEdit,
   onDelete,
   onCombine,
@@ -511,6 +514,25 @@ export function ProjectCard({
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Upload data</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-muted"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditItemMaster(project);
+                          }}
+                        >
+                          <Coins className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit item master (costs &amp; capacities)</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
 
