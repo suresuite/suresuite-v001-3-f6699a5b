@@ -319,6 +319,20 @@ export function FloatingChatBubble() {
               size="icon"
               className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
               onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                setOpen(false);
+                navigate(`/project-intelligence?thread=${QUICK_THREAD_ID}`);
+              }}
+              aria-label="Open in Project Intelligence"
+              title="Open in Project Intelligence"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setOpen(false)}
               aria-label="Close"
             >
