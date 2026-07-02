@@ -215,7 +215,7 @@ export function FloatingChatBubble() {
     e?.preventDefault();
     const text = input;
     setInput("");
-    await send(text, model);
+    await send(text, { model, projectId });
   };
 
   const onModelChange = (id: string) => {
