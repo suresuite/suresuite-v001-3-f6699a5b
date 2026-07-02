@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Loader2, Send, Trash2, X } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Loader2, Maximize2, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { QUICK_THREAD_ID } from "@/hooks/useChatThreads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
@@ -80,6 +81,7 @@ function defaultPanelPos(): Pos {
 
 export function FloatingChatBubble() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { selectedProject, globalSelectedProjectId, setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const projectId = selectedProject?.id ?? globalSelectedProjectId ?? null;
@@ -101,7 +103,7 @@ export function FloatingChatBubble() {
   const panelDimsRef = useRef<Dims>(panelDims);
   panelDimsRef.current = panelDims;
 
-  const { messages, loading, error, send, clear } = useProjectChat(projectId);
+  const { messages, loading, error, send, clear } = useProjectChat(projectId, QUICK_THREAD_ID);
 
   const hidden = !user || location.pathname.startsWith("/auth");
 
@@ -312,6 +314,20 @@ export function FloatingChatBubble() {
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                setOpen(false);
+                navigate(`/project-intelligence?thread=${QUICK_THREAD_ID}`);
+              }}
+              aria-label="Open in Project Intelligence"
+              title="Open in Project Intelligence"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"

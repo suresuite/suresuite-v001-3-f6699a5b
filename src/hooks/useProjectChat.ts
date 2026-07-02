@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChatThreads } from "@/hooks/useChatThreads";
 
 export type ChatRole = "user" | "assistant";
 
@@ -35,26 +36,56 @@ interface ChatApiResponse {
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
-export function useProjectChat(projectId: string | null) {
+/**
+ * Project-scoped chat hook.
+ *
+ * When `threadId` is provided the message list is hydrated from and persisted
+ * to the shared per-project thread store (localStorage) so the floating
+ * bubble and the full Project Intelligence page stay in sync.
+ * When omitted, the hook falls back to in-memory session state.
+ */
+export function useProjectChat(projectId: string | null, threadId?: string | null) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lastProject = useRef<string | null>(null);
+  const lastKey = useRef<string | null>(null);
 
-  // Reset thread when the active project changes.
+  const threads = useChatThreads(projectId);
+  const boundThreadId = threadId ?? null;
+
+  // Hydrate messages when project or thread changes.
   useEffect(() => {
-    if (lastProject.current !== projectId) {
-      lastProject.current = projectId;
+    const key = `${projectId ?? ""}::${boundThreadId ?? ""}`;
+    if (lastKey.current === key) return;
+    lastKey.current = key;
+
+    setError(null);
+    if (!projectId || !boundThreadId) {
       setMessages([]);
-      setError(null);
+      return;
     }
-  }, [projectId]);
+    const t = threads.threads.find((x) => x.id === boundThreadId);
+    setMessages(t?.messages ?? []);
+    // We intentionally depend only on identity of project/thread, not on the
+    // threads array — updates within the active thread come from this hook.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, boundThreadId]);
+
+  const persist = useCallback(
+    (next: ChatMessage[]) => {
+      if (projectId && boundThreadId) {
+        threads.setThreadMessages(boundThreadId, next);
+      }
+    },
+    [projectId, boundThreadId, threads],
+  );
 
   const clear = useCallback(() => {
     setMessages([]);
     setError(null);
-  }, []);
+    if (projectId && boundThreadId) threads.clearThread(boundThreadId);
+  }, [projectId, boundThreadId, threads]);
 
   const send = useCallback(
     async (text: string, model?: string) => {
@@ -75,7 +106,9 @@ export function useProjectChat(projectId: string | null) {
         content: trimmed,
         createdAt: Date.now(),
       };
-      setMessages((m) => [...m, userMsg]);
+      const withUser = [...messages, userMsg];
+      setMessages(withUser);
+      persist(withUser);
       setLoading(true);
       setError(null);
 
@@ -109,7 +142,9 @@ export function useProjectChat(projectId: string | null) {
           toolCalls: data.toolCalls,
           createdAt: Date.now(),
         };
-        setMessages((m) => [...m, assistant]);
+        const withAssistant = [...withUser, assistant];
+        setMessages(withAssistant);
+        persist(withAssistant);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Something went wrong.";
         setError(msg);
@@ -117,7 +152,7 @@ export function useProjectChat(projectId: string | null) {
         setLoading(false);
       }
     },
-    [loading, messages, projectId, user],
+    [loading, messages, projectId, user, persist],
   );
 
   return { messages, loading, error, send, clear };
