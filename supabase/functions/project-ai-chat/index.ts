@@ -319,12 +319,15 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in project-ai-chat function:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Failed to process chat request',
-      details: error.message
+    console.error('Error in project-ai-chat function:', error, 'mode=', mode, 'model=', model);
+    // Tools-mode callers rely on 200 + {error} so supabase-js `invoke` can surface
+    // the real message. Legacy non-tools callers keep 500 for backward compatibility.
+    return new Response(JSON.stringify({
+      error: error?.message ?? 'Failed to process chat request',
+      details: error?.message,
+      type: 'AI_ERROR',
     }), {
-      status: 500,
+      status: isToolsMode ? 200 : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
