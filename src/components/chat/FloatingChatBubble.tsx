@@ -407,7 +407,7 @@ export function FloatingChatBubble() {
                     <button
                       key={s}
                       type="button"
-                      onClick={() => send(s, model)}
+                      onClick={() => send(s, { model, projectId })}
                       className="block w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground transition hover:bg-accent hover:text-accent-foreground"
                     >
                       {s}
