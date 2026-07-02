@@ -214,6 +214,10 @@ async function runOpenAICompatible(
       const name = c.function?.name;
       let args: Record<string, unknown> = {};
       try { args = c.function?.arguments ? JSON.parse(c.function.arguments) : {}; } catch { args = {}; }
+      if (!ctx) {
+        messages.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({ error: "no_project_attached" }) });
+        continue;
+      }
       const result: ToolEnvelope = await executeTool(name, args, ctx);
       toolCalls.push({ name, args, ok: result.meta.note !== "error", row_count: result.meta.row_count });
       if (result.meta.row_count > 0 || result.kind === "bullets") collectedParts.push({ kind: result.kind, data: result.data });
