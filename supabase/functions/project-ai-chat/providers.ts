@@ -139,6 +139,10 @@ async function runGemini(
     for (const fc of fnCalls) {
       const name = fc.functionCall!.name;
       const args = fc.functionCall!.args ?? {};
+      if (!ctx) {
+        contents.push({ role: "function", parts: [{ functionResponse: { name, response: { error: "no_project_attached" } } }] });
+        continue;
+      }
       const result: ToolEnvelope = await executeTool(name, args, ctx);
       toolCalls.push({ name, args, ok: result.meta.note !== "error", row_count: result.meta.row_count });
       if (result.meta.row_count > 0 || result.kind === "bullets") collectedParts.push({ kind: result.kind, data: result.data });
