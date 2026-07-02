@@ -12,7 +12,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/network/product-level': ['admin', 'modeler', 'user'],
   '/network/process-level': ['admin', 'modeler', 'user'],
   '/network/interactive-space': ['admin', 'modeler', 'user'],
-  '/simulation': ['admin', 'modeler'],
   '/project-intelligence': ['admin', 'modeler', 'user'],
   '/profile': ['admin', 'modeler', 'user'],
   '/admin': ['admin'],
