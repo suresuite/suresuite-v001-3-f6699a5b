@@ -100,25 +100,52 @@ export function useProjectChat(threadId: string | null) {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
       try {
+        const payload = {
+          mode: "tools",
+          projectId,
+          agentId,
+          message: trimmed,
+          conversationHistory: history,
+          userId: user.id,
+          userEmail: user.email,
+          model: opts.model ?? "gemini-2.5-flash",
+        };
+
         const { data, error: invokeError } = await supabase.functions.invoke<ChatApiResponse>(
           "project-ai-chat",
-          {
-            body: {
-              mode: "tools",
-              projectId,
-              agentId,
-              message: trimmed,
-              conversationHistory: history,
-              userId: user.id,
-              userEmail: user.email,
-              model: opts.model ?? "gemini-2.5-flash",
-            },
-          },
+          { body: payload },
         );
 
-        if (invokeError) throw invokeError;
-        if (!data) throw new Error("Empty response from AI service.");
-        if (data.error) throw new Error(data.error);
+        // supabase-js swallows response bodies on non-2xx. Fall back to a plain
+        // fetch so we can surface the real reason instead of the generic
+        // "Edge Function returned a non-2xx status code" string.
+        let resolved: ChatApiResponse | null = data ?? null;
+        if (invokeError) {
+          try {
+            const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-ai-chat`;
+            const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+            const res = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                apikey: anon,
+                Authorization: `Bearer ${anon}`,
+              },
+              body: JSON.stringify(payload),
+            });
+            const body = await res.json().catch(() => null);
+            if (body?.error) throw new Error(body.error);
+            if (!res.ok) throw new Error(`Chat service error (${res.status}).`);
+            resolved = body as ChatApiResponse;
+          } catch (fetchErr) {
+            if (fetchErr instanceof Error && fetchErr.message) throw fetchErr;
+            throw invokeError;
+          }
+        }
+
+        if (!resolved) throw new Error("Empty response from AI service.");
+        if (resolved.error) throw new Error(resolved.error);
+        const data2 = resolved;
 
         const assistant: ChatMessage = {
           id: newId(),
