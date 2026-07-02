@@ -163,7 +163,7 @@ function toOpenAITools() {
 
 async function runOpenAICompatible(
   baseUrl: string, apiKey: string, model: ModelSpec, system: string,
-  userMessage: string, history: ChatTurn[], ctx: ToolContext,
+  userMessage: string, history: ChatTurn[], ctx: ToolContext | null,
 ): Promise<ChatRunResult> {
   const messages: any[] = [{ role: "system", content: system }];
   for (const h of history.slice(-8)) messages.push({ role: h.role, content: h.content.slice(0, 2000) });
