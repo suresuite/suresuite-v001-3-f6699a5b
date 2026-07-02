@@ -150,9 +150,9 @@ export function useProjectChat(threadId: string | null) {
         const assistant: ChatMessage = {
           id: newId(),
           role: "assistant",
-          content: data.reply ?? "",
-          parts: data.parts,
-          toolCalls: data.toolCalls,
+          content: data2.reply ?? "",
+          parts: data2.parts,
+          toolCalls: data2.toolCalls,
           createdAt: Date.now(),
         };
         const withAssistant = [...withUser, assistant];
