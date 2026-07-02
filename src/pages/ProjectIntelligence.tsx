@@ -21,9 +21,8 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
   isCollapsed,
   setIsCollapsed,
 }) => {
-  const { globalSelectedProjectId, selectedProject, setGlobalSelectedProjectId, setSelectedProject } =
-    useGlobalProject();
   const { user } = useAuth();
+  const { setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const [projects, setProjects] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState(() => getStoredModel());
@@ -31,13 +30,14 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
 
   const {
     threads,
+    activeThread,
     activeThreadId,
     setActiveThread,
     newThread,
     deleteThread,
-  } = useChatThreads(globalSelectedProjectId);
+    updateThread,
+  } = useChatThreads();
 
-  // Load projects
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -55,16 +55,8 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
     })();
   }, [user]);
 
-  // Sync selectedProject metadata when active project id changes.
+  // Route ↔ active thread sync.
   useEffect(() => {
-    if (!globalSelectedProjectId || projects.length === 0) return;
-    const match = projects.find((p) => p.id === globalSelectedProjectId);
-    if (match && match.id !== selectedProject?.id) setSelectedProject(match);
-  }, [globalSelectedProjectId, projects, selectedProject?.id, setSelectedProject]);
-
-  // Read ?thread= from the URL on mount / when project changes; default to Quick.
-  useEffect(() => {
-    if (!globalSelectedProjectId) return;
     const urlThread = searchParams.get("thread");
     if (urlThread) {
       if (urlThread !== activeThreadId) setActiveThread(urlThread);
@@ -72,7 +64,17 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
       setActiveThread(QUICK_THREAD_ID);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalSelectedProjectId, searchParams]);
+  }, [searchParams]);
+
+  // Keep global project selector in sync with the active thread's project.
+  useEffect(() => {
+    if (!activeThread?.projectId) return;
+    const match = projects.find((p) => p.id === activeThread.projectId);
+    if (match) {
+      setGlobalSelectedProjectId(activeThread.projectId);
+      setSelectedProject(match);
+    }
+  }, [activeThread?.projectId, projects, setGlobalSelectedProjectId, setSelectedProject]);
 
   const handleSelectThread = (id: string) => {
     setActiveThread(id);
@@ -89,6 +91,16 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
     setStoredModel(id);
   };
 
+  const handleAgentChange = (agentId: string) => {
+    if (!activeThreadId) return;
+    updateThread(activeThreadId, { agentId: agentId || null });
+  };
+
+  const handleProjectChange = (projectId: string | null) => {
+    if (!activeThreadId) return;
+    updateThread(activeThreadId, { projectId });
+  };
+
   const firstName = (user?.user_metadata?.full_name ?? user?.email ?? "").split(/[ @]/)[0];
 
   return (
@@ -96,28 +108,27 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
       <div className="px-12 py-6">
         <PageHeader
           title="Project Intelligence"
-          subtitle={
-            selectedProject
-              ? `Chatting about ${selectedProject.name}${selectedProject.plant_name ? ` · ${selectedProject.plant_name}` : ""}`
-              : "AI-powered insights for your supply chain project"
-          }
+          subtitle="Your on-demand supply-chain colleague"
         />
 
         <div className="grid h-[calc(100vh-190px)] min-h-[560px] grid-cols-[280px_1fr] overflow-hidden rounded-lg border border-border bg-card">
           <ChatSidebar
             projects={projects}
-            selectedProjectId={globalSelectedProjectId}
-            onSelectProject={(id) => setGlobalSelectedProjectId(id)}
             threads={threads}
             activeThreadId={activeThreadId}
             onSelectThread={handleSelectThread}
             onNewThread={handleNewThread}
             onDeleteThread={deleteThread}
+            onRenameThread={(id, title) => updateThread(id, { title })}
+            onAttachProject={(id, projectId) => updateThread(id, { projectId })}
           />
           <ChatWorkspace
-            projectId={globalSelectedProjectId}
             threadId={activeThreadId}
-            projectLabel={selectedProject?.name ?? null}
+            projectId={activeThread?.projectId ?? null}
+            agentId={activeThread?.agentId ?? null}
+            onAgentChange={handleAgentChange}
+            onProjectChange={handleProjectChange}
+            projects={projects}
             userName={firstName}
             input={input}
             onInputChange={setInput}
