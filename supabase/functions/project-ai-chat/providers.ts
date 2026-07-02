@@ -176,8 +176,7 @@ async function runOpenAICompatible(
     const body: any = {
       model: model.apiModel,
       messages,
-      tools: toOpenAITools(),
-      tool_choice: "auto",
+      ...(ctx ? { tools: toOpenAITools(), tool_choice: "auto" } : {}),
     };
     // gpt-5 family uses max_completion_tokens and rejects temperature; others use the classic params.
     // For gpt-5, reasoning tokens count against max_completion_tokens, so keep reasoning low and
