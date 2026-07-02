@@ -36,76 +36,61 @@ interface ChatApiResponse {
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
+interface SendOptions {
+  model?: string;
+  projectId?: string | null;
+  agentId?: string | null;
+}
+
 /**
- * Project-scoped chat hook.
- *
- * When `threadId` is provided the message list is hydrated from and persisted
- * to the shared per-project thread store (localStorage) so the floating
- * bubble and the full Project Intelligence page stay in sync.
- * When omitted, the hook falls back to in-memory session state.
+ * Thread-bound chat hook. Reads/writes messages from the global thread store.
+ * `send()` accepts optional per-call overrides for model, projectId and agentId
+ * so surfaces like the floating bubble can pass an ephemeral project without
+ * mutating the thread record.
  */
-export function useProjectChat(projectId: string | null, threadId?: string | null) {
+export function useProjectChat(threadId: string | null) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const threads = useChatThreads();
+  const thread = threads.threads.find((t) => t.id === threadId) ?? null;
+
+  const [messages, setMessages] = useState<ChatMessage[]>(thread?.messages ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastKey = useRef<string | null>(null);
 
-  const threads = useChatThreads(projectId);
-  const boundThreadId = threadId ?? null;
-
-  // Hydrate messages when project or thread changes.
+  // Hydrate when thread changes.
   useEffect(() => {
-    const key = `${projectId ?? ""}::${boundThreadId ?? ""}`;
+    const key = threadId ?? "";
     if (lastKey.current === key) return;
     lastKey.current = key;
-
     setError(null);
-    if (!projectId || !boundThreadId) {
-      setMessages([]);
-      return;
-    }
-    const t = threads.threads.find((x) => x.id === boundThreadId);
-    setMessages(t?.messages ?? []);
-    // We intentionally depend only on identity of project/thread, not on the
-    // threads array — updates within the active thread come from this hook.
+    setMessages(thread?.messages ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, boundThreadId]);
+  }, [threadId]);
 
   const persist = useCallback(
     (next: ChatMessage[]) => {
-      if (projectId && boundThreadId) {
-        threads.setThreadMessages(boundThreadId, next);
-      }
+      if (threadId) threads.setThreadMessages(threadId, next);
     },
-    [projectId, boundThreadId, threads],
+    [threadId, threads],
   );
 
   const clear = useCallback(() => {
     setMessages([]);
     setError(null);
-    if (projectId && boundThreadId) threads.clearThread(boundThreadId);
-  }, [projectId, boundThreadId, threads]);
+    if (threadId) threads.clearThread(threadId);
+  }, [threadId, threads]);
 
   const send = useCallback(
-    async (text: string, model?: string) => {
+    async (text: string, opts: SendOptions = {}) => {
       const trimmed = text.trim();
       if (!trimmed || loading) return;
-      if (!projectId) {
-        setError("Select a project first.");
-        return;
-      }
-      if (!user) {
-        setError("You must be signed in.");
-        return;
-      }
+      if (!user) { setError("You must be signed in."); return; }
 
-      const userMsg: ChatMessage = {
-        id: newId(),
-        role: "user",
-        content: trimmed,
-        createdAt: Date.now(),
-      };
+      const projectId = opts.projectId !== undefined ? opts.projectId : (thread?.projectId ?? null);
+      const agentId = opts.agentId ?? thread?.agentId ?? null;
+
+      const userMsg: ChatMessage = { id: newId(), role: "user", content: trimmed, createdAt: Date.now() };
       const withUser = [...messages, userMsg];
       setMessages(withUser);
       persist(withUser);
@@ -121,11 +106,12 @@ export function useProjectChat(projectId: string | null, threadId?: string | nul
             body: {
               mode: "tools",
               projectId,
+              agentId,
               message: trimmed,
               conversationHistory: history,
               userId: user.id,
               userEmail: user.email,
-              model: model ?? "gemini-2.5-flash",
+              model: opts.model ?? "gemini-2.5-flash",
             },
           },
         );
@@ -152,7 +138,7 @@ export function useProjectChat(projectId: string | null, threadId?: string | nul
         setLoading(false);
       }
     },
-    [loading, messages, projectId, user, persist],
+    [loading, messages, user, thread, persist],
   );
 
   return { messages, loading, error, send, clear };
