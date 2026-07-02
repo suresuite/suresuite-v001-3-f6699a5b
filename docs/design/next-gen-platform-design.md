@@ -30,6 +30,8 @@ Section map against the design brief:
 
 Companion documents: `docs/data-simulation-mapping.md` (current field-mapping contract), `docs/simulation-data-lifecycle.md` (current state tiers), `scsim/docs/architecture.md`, `scsim/docs/roadmap.md`, `scsim/docs/stress-tests.md`, `scsim/docs/synergy.md`, `scsim/docs/adr/0001-mts-fulfillment-mode.md`.
 
+**Working agreement.** This document governs all platform work: before starting a task, locate it in the gap catalog (§2.3) and roadmap (§13); commits and PRs reference the section, gap, and phase they serve (e.g. `Phase A / G4 / §8.3`). If implementation must deviate from this blueprint, the blueprint is updated **in the same PR** — the document and the code move together and this file is never allowed to go stale. The same rules are stated for tooling sessions in the repository-root `CLAUDE.md`.
+
 ---
 
 ## 1. Vision and design pillars
