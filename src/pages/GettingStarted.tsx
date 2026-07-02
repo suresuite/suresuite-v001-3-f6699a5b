@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
+import { YouTubeEmbed } from "@/components/shared";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -218,8 +219,33 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
           </div>
         </div>
 
+        {/* Introduction video */}
+        <Section
+          title={<span className="text-foreground font-bold">See SuReSuite in action</span>}
+          subtitle={
+            <div className="max-w-3xl mx-auto">
+              <span>
+                A two-minute walkthrough of how to map your supply chain, detect nexus materials, and stress-test resilience strategies.
+              </span>
+            </div>
+          }
+        >
+          <div className="max-w-[900px] mx-auto">
+            {/* Replace VIDEO_ID with your home page intro video ID */}
+            <YouTubeEmbed videoId="VIDEO_ID" title="SuReSuite introduction" />
+            <div className="mt-4 flex justify-center">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/help/network-sci">
+                  View the full network view tutorial
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </Section>
+
         {/* Core Features */}
-        <Section 
+        <Section
           title={
             <div className="text-center">
               <span className="text-foreground font-bold">Core Capabilities</span>

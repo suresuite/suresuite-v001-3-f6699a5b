@@ -3,7 +3,7 @@
 // No auth required, no business logic, purely presentational.
 
 import { Link } from "react-router-dom";
-import { PageLayout, PageHeader } from "@/components/shared";
+import { PageLayout, PageHeader, YouTubeEmbed } from "@/components/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -2247,6 +2247,14 @@ In scsim:  demand_mode = average,  demand_floor_factor (ν) = variability
                   metrics at the material node level to predict resilience impact without requiring
                   disruption probability estimates or TTR data from suppliers.
                 </p>
+                <h3 className="text-base font-semibold pt-2">Video walkthrough: exploring the network view</h3>
+                <p>
+                  Watch the tutorial below to see how the three network levels, nexus detection, and structural metrics work together in the app.
+                </p>
+              </Prose>
+              {/* Replace VIDEO_ID with your network view tutorial video ID */}
+              <YouTubeEmbed videoId="VIDEO_ID" title="Network view tutorial" className="max-w-[760px]" />
+              <Prose>
                 <h3 className="text-base font-semibold pt-2">Structural metrics computed per node</h3>
               </Prose>
               <div className="overflow-x-auto">

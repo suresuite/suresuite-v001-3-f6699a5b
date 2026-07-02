@@ -1,24 +1,80 @@
-## Chatbox UI refinements
+# Plan: Add YouTube video embeds to home page and network view tutorial
 
-### Goal
-Tighten the visual hierarchy of the floating assistant panel so the header owns attention, the mascot feels alive, and the panel frame reads as one crisp box.
+## Goal
+Add clean, professional YouTube video embeds to:
+1. The home page (`/`) — a new full-width introduction video section.
+2. The Network view tutorial help page (`/help/network-sci`) — a video tutorial embedded in the article.
 
-### Changes
-1. **Header background black**
-   - In `src/components/chat/FloatingChatBubble.tsx`, set the title header row to `bg-black` and the title text to `text-white` so it remains readable.
-   - Keep the existing drag cursor and close/clear actions; make their icons `text-white/90` to match.
+Both will use the privacy-enhanced `youtube-nocookie.com` embed with placeholder IDs that you can replace.
 
-2. **Panel border black**
-   - Set the outer panel container to `border border-black` (replacing the subtle `border-border`) so the chatbox edges are sharp and consistent with the user's other black-border cards.
+## Design direction
 
-3. **Mascot bigger and unboxed**
-   - Remove the rounded `ring-1 ring-border bg-background` box currently wrapping the mascot in the header.
-   - Render the `AssistantMascot` directly in the header with a larger size (e.g., `h-9 w-9`) so it becomes the focal mark.
-   - Leave the existing bob/blink/antenna CSS animations untouched — they already provide liveliness — but make the element itself more prominent through scale.
+- Reusable `YouTubeEmbed` component: responsive 16:9 aspect ratio, lazy-loaded iframe, rounded border, subtle shadow, and a title prop for accessibility.
+- No external dependencies; use the existing shadcn card and aspect-ratio utilities.
+- Keep the UI consistent with the current SuReSuite style: restrained borders, high contrast, and generous spacing.
 
-### Files modified
-- `src/components/chat/FloatingChatBubble.tsx`
-- (optionally) `src/components/chat/AssistantMascot.tsx` only if we need to scale the SVG viewBox cleanly; likely the className size change is enough.
+## What will change
 
-### Verification
-- Open the assistant in the preview and confirm the header is black, the title is white, the mascot is unboxed and larger, and the panel has a visible black border.
+### 1. New component: `src/components/shared/YouTubeEmbed.tsx`
+
+A thin wrapper around an iframe with:
+
+- `videoId` prop
+- `title` prop for screen readers
+- `youtube-nocookie.com` origin
+- `loading="lazy"` attribute
+- `allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"`
+- `allowFullScreen`
+- Responsive 16:9 wrapper using `aspect-ratio` Tailwind utility
+
+Placeholder constant: `PLACEHOLDER_VIDEO_ID = "dQw4w9WgXcQ"` — clearly marked to replace.
+
+### 2. Home page: `src/pages/GettingStarted.tsx`
+
+Insert a new section between the hero intro and the "Core Capabilities" section.
+
+- Section title: "See SuReSuite in action"
+- Subtitle: short one-line description
+- Centered, max-width video card (max 900px) on a clean background
+- Button: "View full tutorial" link to `/help/network-sci`
+
+Use the `Section` component already defined in the file to keep the layout consistent.
+
+### 3. Network view tutorial: `src/pages/About.tsx`
+
+Add a video block inside the `network-sci` doc body, near the top of the section after the opening paragraph.
+
+- Label: "Video walkthrough: exploring the network view"
+- Place it before the metrics table.
+
+### 4. Placeholder instructions
+
+I will add a comment at the top of `YouTubeEmbed.tsx` and next to each usage with:
+
+```
+// Replace with your actual YouTube video ID.
+// Home intro: <YOUR_HOME_VIDEO_ID>
+// Network tutorial: <YOUR_NETWORK_VIDEO_ID>
+```
+
+To find the video ID from a YouTube URL like `https://www.youtube.com/watch?v=abc123XYZ`, use the `v=abc123XYZ` value. From `https://youtu.be/abc123XYZ`, use the path segment `abc123XYZ`.
+
+## Files to modify
+
+1. `src/components/shared/YouTubeEmbed.tsx` (new)
+2. `src/pages/GettingStarted.tsx` (new intro video section)
+3. `src/pages/About.tsx` (video in `network-sci` doc body)
+
+## How to verify
+
+1. Open the home page and confirm the new "See SuReSuite in action" section appears with the embedded video frame.
+2. Navigate to `/help/network-sci` and confirm the tutorial video appears at the top of the article.
+3. Inspect each iframe and confirm the `src` uses `https://www.youtube-nocookie.com/embed/...`.
+4. Replace the placeholder IDs with your real YouTube IDs and reload to verify the correct videos load.
+
+## Out of scope
+
+- No custom video player or lightbox.
+- No auto-play; videos load on click only.
+- No playlist integration or chapter timestamps.
+- No backend changes.
