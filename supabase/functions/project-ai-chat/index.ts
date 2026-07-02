@@ -51,38 +51,36 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    const { projectId, message, conversationHistory, userId, userEmail, mode, model } = await req.json();
+    const { projectId, message, conversationHistory, userId, userEmail, mode, model, agentId } = await req.json();
 
-    if (!projectId || !message || !userId || !userEmail) {
-      throw new Error('Missing required parameters: projectId, message, userId, userEmail');
+    if (!message || !userId || !userEmail) {
+      throw new Error('Missing required parameters: message, userId, userEmail');
     }
 
     // === Tool-calling chat mode (multi-provider: Gemini, OpenAI, DeepSeek) ===
     if (mode === 'tools') {
       try {
-        // Authorize: verify the caller can actually access this project before any tool runs.
-        // The tool client uses the service-role key (which bypasses RLS), so this explicit
-        // check is the gate. get_project_dataset_counts is SECURITY DEFINER and validates the
-        // user's org against the project (raising 'forbidden'/'project_not_found'); this matches
-        // the org-level visibility of list_projects, which populates the project picker.
-        const { error: accessErr } = await supabaseClient.rpc('get_project_dataset_counts', {
-          p_project_id: projectId,
-          p_user_id: userId,
-          p_user_email: userEmail,
-        });
-        if (accessErr) {
-          const m = (accessErr.message || '').toLowerCase();
-          if (m.includes('forbidden') || m.includes('project_not_found')) {
+        // Authorize when a project is attached; general chats skip project scoping.
+        if (projectId) {
+          const { error: accessErr } = await supabaseClient.rpc('get_project_dataset_counts', {
+            p_project_id: projectId,
+            p_user_id: userId,
+            p_user_email: userEmail,
+          });
+          if (accessErr) {
+            const m = (accessErr.message || '').toLowerCase();
+            if (m.includes('forbidden') || m.includes('project_not_found')) {
+              return new Response(JSON.stringify({
+                error: "You don't have access to this project.",
+                type: 'FORBIDDEN',
+              }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+            console.error('access check error:', accessErr);
             return new Response(JSON.stringify({
-              error: "You don't have access to this project.",
-              type: 'FORBIDDEN',
+              error: `Access check failed: ${accessErr.message}`,
+              type: 'AI_ERROR',
             }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
-          console.error('access check error:', accessErr);
-          return new Response(JSON.stringify({
-            error: `Access check failed: ${accessErr.message}`,
-            type: 'AI_ERROR',
-          }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         const history = Array.isArray(conversationHistory)
@@ -90,8 +88,8 @@ serve(async (req) => {
               (m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string',
             )
           : [];
-        const ctx = makeToolContext(projectId, userId);
-        const result = await runChat(model, String(message).slice(0, 4000), history, ctx);
+        const ctx = projectId ? makeToolContext(projectId, userId) : null;
+        const result = await runChat(model, String(message).slice(0, 4000), history, ctx, agentId);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
