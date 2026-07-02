@@ -1,0 +1,4 @@
+supplier_id,name,capacity_per_week,reliability_score
+S0001,Acme Components,5000,0.98
+S0002,Global Metals,,1.0
+S0003,Precision Parts Co,12000,0.95

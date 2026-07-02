@@ -19,6 +19,7 @@ import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { PageLayout, PageHeader, ProjectSelector } from '@/components/shared';
 import { Toggle } from '@/components/ui/toggle';
 import ProjectDataViewer from '@/components/ProjectDataViewer';
+import ItemMasterEditor from '@/components/ItemMasterEditor';
 import { getDefaultSimulationDateRange, formatDateForDatabase } from '@/utils/dateHelpers';
 import UploadWizard from '@/components/UploadWizard';
 import { ProjectCard } from '@/components/ProjectCard';
@@ -51,6 +52,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   const [isCreating, setIsCreating] = useState(false);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [uploadingProject, setUploadingProject] = useState<Project | null>(null);
+  const [itemMasterProjectId, setItemMasterProjectId] = useState<string | null>(null);
   const { globalSelectedProjectId, setGlobalSelectedProjectId, selectedProject, setSelectedProject } = useGlobalProject();
   const [newProjectName, setNewProjectName] = useState('');
   const [plantName, setPlantName] = useState('');
@@ -901,6 +903,12 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                         current?.id === project.id ? null : project
                       );
                     }}
+                    onEditItemMaster={(project) => {
+                      setSelectedProject(project);
+                      setItemMasterProjectId((current) =>
+                        current === project.id ? null : project.id
+                      );
+                    }}
                     onEdit={(project) => {
                       setSelectedProject(project);
                       setEditingProject(project);
@@ -938,6 +946,14 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                            });
                          }}
                        />
+                    </div>
+                  )}
+                  {itemMasterProjectId === project.id && (
+                    <div className="mt-4 ml-4 pl-4 border-l-2 border-border">
+                      <ItemMasterEditor
+                        projectId={project.id}
+                        onClose={() => setItemMasterProjectId(null)}
+                      />
                     </div>
                   )}
                   {uploadingProject?.id === project.id && (

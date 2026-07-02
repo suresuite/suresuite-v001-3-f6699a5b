@@ -1,0 +1,5 @@
+product_id,name,sell_price,production_capacity,fulfillment_mode,demand_distribution,demand_mean,demand_cv
+P0001,Control unit A,120,800,mto,triangular,350,0.25
+P0002,Control unit B,95,600,mto,poisson,180,
+P0003,Sensor module,60,1200,mts,negbin,700,0.4
+P0004,Power supply,45,,mts,deterministic,420,

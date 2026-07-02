@@ -142,6 +142,7 @@ const UploadWizard = ({
   const [errors, setErrors] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [deepTierFormat, setDeepTierFormat] = useState<'csv' | 'json'>('csv');
+  const [itemMasterType, setItemMasterType] = useState<'materials' | 'products' | 'suppliers'>('materials');
   
   // Deep tier CSV specific states
   const [nodesFile, setNodesFile] = useState<File | null>(null);
@@ -210,6 +211,51 @@ const UploadWizard = ({
       category: 'outbound',
     },
     {
+      id: 'item_master_materials',
+      name: 'Materials Master',
+      description: 'Per-material economics the simulation reads (cost, MOQ, holding, lead-time shape)',
+      templateFile: '/template/materials.csv',
+      guideFile: '/docs/csv-upload-guide.md',
+      expectedHeaders: [
+        'material_id',
+        'name',
+        'cost',
+        'holding_cost_pct',
+        'moq',
+        'initial_on_hand',
+        'lead_time_dist',
+        'lead_time_cv',
+      ],
+      category: 'item-master',
+    },
+    {
+      id: 'item_master_products',
+      name: 'Products Master',
+      description: 'Per-product economics the simulation reads (price, capacity, demand shape, fulfillment mode)',
+      templateFile: '/template/products.csv',
+      guideFile: '/docs/csv-upload-guide.md',
+      expectedHeaders: [
+        'product_id',
+        'name',
+        'sell_price',
+        'production_capacity',
+        'fulfillment_mode',
+        'demand_distribution',
+        'demand_mean',
+        'demand_cv',
+      ],
+      category: 'item-master',
+    },
+    {
+      id: 'item_master_suppliers',
+      name: 'Suppliers Master',
+      description: 'Per-supplier capacity and reliability the simulation reads',
+      templateFile: '/template/suppliers.csv',
+      guideFile: '/docs/csv-upload-guide.md',
+      expectedHeaders: ['supplier_id', 'name', 'capacity_per_week', 'reliability_score'],
+      category: 'item-master',
+    },
+    {
       id: 'node_list',
       name: 'Node List',
       description: 'Node list data with locations and descriptions',
@@ -269,6 +315,7 @@ const UploadWizard = ({
     { id: 'bom', name: 'BOM' },
     { id: 'inbound', name: 'Inbound' },
     { id: 'outbound', name: 'Outbound' },
+    { id: 'item-master', name: 'Item Master' },
     { id: 'node-list', name: 'Node List' },
     ...(selectedProject?.deep_tier_enabled ? [
       { id: 'deep_tier', name: 'Deep Tier Network' }
@@ -282,6 +329,8 @@ const UploadWizard = ({
       return 'inbound_logistics';
     } else if (selectedDataset === 'outbound') {
       return 'outbound_logistics';
+    } else if (selectedDataset === 'item-master') {
+      return `item_master_${itemMasterType}`;
     } else if (selectedDataset === 'node-list') {
       return 'node_list';
     } else if (selectedDataset === 'tier2') {
@@ -302,12 +351,36 @@ const UploadWizard = ({
   ): Promise<string[]> => {
     const errors: string[] = [];
 
+    // Item masters: only the id column is required — economics columns may be
+    // left empty (empty = engine default / unlimited). Enum columns must hold
+    // values the engine accepts (scsim/scsim/io/project_map.py).
+    const ITEM_MASTER_ENUMS: Record<string, string[]> = {
+      fulfillment_mode: ['mto', 'mts'],
+      demand_distribution: ['triangular', 'deterministic', 'poisson', 'negbin'],
+      lead_time_dist: ['deterministic', 'lognormal', 'gamma'],
+    };
+    const requiredHeaders =
+      template.category === 'item-master'
+        ? [template.expectedHeaders[0]] // material_id / product_id / supplier_id
+        : template.expectedHeaders;
+
     data.forEach((row, index) => {
-      template.expectedHeaders.forEach((header) => {
+      requiredHeaders.forEach((header) => {
         if (row[header as keyof DataRow] === undefined || row[header as keyof DataRow] === '') {
           errors.push(`Row ${index + 2}: Missing required field "${header}"`);
         }
       });
+
+      if (template.category === 'item-master') {
+        Object.entries(ITEM_MASTER_ENUMS).forEach(([field, allowed]) => {
+          const value = (row as Record<string, unknown>)[field];
+          if (value && !allowed.includes(String(value).toLowerCase())) {
+            errors.push(
+              `Row ${index + 2}: Invalid ${field} "${value}" — allowed: ${allowed.join(', ')}`
+            );
+          }
+        });
+      }
 
       // Special validation for multi-level BOM
       if (template.id === 'bom_multi_level') {
@@ -415,7 +488,11 @@ const UploadWizard = ({
       const data: DataRow[] = [];
       const numericHeaders = [
         'consumption_rate','level','volume','lead_time','unit_price','expected_lead_time','longitude','latitude',
-        'depth','relative_revenue','relative_revenue_percentage','lat','long','number_of_employees'
+        'depth','relative_revenue','relative_revenue_percentage','lat','long','number_of_employees',
+        // item-master economics
+        'cost','holding_cost_pct','moq','initial_on_hand','lead_time_cv',
+        'sell_price','production_capacity','demand_mean','demand_cv',
+        'capacity_per_week','reliability_score'
       ];
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',').map((v) => v.trim());
@@ -1064,6 +1141,20 @@ const UploadWizard = ({
         console.log('📤 Uploading Outbound Logistics data via Edge Function...');
         const batchResult = await uploadOutboundViaEdge(dataToInsert);
         result = { insertedCount: batchResult.insertedCount };
+      } else if (template.category === 'item-master') {
+        // Full-row upsert into the item-master tables via SECURITY DEFINER
+        // RPCs (Phase A / G4 / §8.3); extra keys in the payload are ignored.
+        const rpcByTemplate: Record<string, string> = {
+          item_master_materials: 'bulk_upsert_materials',
+          item_master_products: 'bulk_upsert_products',
+          item_master_suppliers: 'bulk_upsert_suppliers',
+        };
+        console.log('💶 Uploading item-master data...');
+        const batchResult = await processBatches(rpcByTemplate[template.id], dataToInsert, {
+          p_project_id: selectedProject?.id,
+          p_rows: dataToInsert, // Will be replaced per batch
+        });
+        result = { insertedCount: batchResult.insertedCount };
       } else if (template.id === 'node_list') {
         const batchResult = await processBatches('upload_node_list_data', dataToInsert, {
           p_project_id: selectedProject?.id,
@@ -1389,6 +1480,44 @@ const UploadWizard = ({
                 {templateTypes.find((t) => t.id === selectedTemplate)?.name}
               </Label>
             </div>
+
+            {/* Item Master type selection */}
+            {selectedDataset === 'item-master' && (
+              <Card className="border-dashed">
+                <CardContent className="p-4 space-y-3">
+                  <Label className="text-xs font-medium">Item Master Table</Label>
+                  <RadioGroup
+                    value={itemMasterType}
+                    onValueChange={(value: 'materials' | 'products' | 'suppliers') => {
+                      setItemMasterType(value);
+                      setFile(null);
+                      setCsvData([]);
+                      setErrors([]);
+                    }}
+                    className="flex gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="materials" id="im-materials" />
+                      <Label htmlFor="im-materials" className="text-xs cursor-pointer">
+                        Materials (cost, MOQ, holding, lead-time shape)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="products" id="im-products" />
+                      <Label htmlFor="im-products" className="text-xs cursor-pointer">
+                        Products (price, capacity, demand)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="suppliers" id="im-suppliers" />
+                      <Label htmlFor="im-suppliers" className="text-xs cursor-pointer">
+                        Suppliers (capacity, reliability)
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Deep Tier Format Selection */}
             {selectedDataset === 'deep_tier' && (
