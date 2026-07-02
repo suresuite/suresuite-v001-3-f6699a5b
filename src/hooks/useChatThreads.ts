@@ -2,35 +2,39 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatMessage } from "@/hooks/useProjectChat";
 
 /**
- * Per-project chat thread store backed by localStorage.
+ * Global chat thread store backed by localStorage.
  *
- * Storage layout:
- *  - `projectChat.threads.<projectId>`      -> Thread[]
- *  - `projectChat.activeThread.<projectId>` -> string (thread id)
+ * Storage layout (v2):
+ *  - `projectChat.threads.v2`      -> Thread[]
+ *  - `projectChat.activeThread.v2` -> string (thread id)
  *
- * The hook API is intentionally shaped so a future swap to Supabase-backed
- * storage is a drop-in replacement without touching component code.
+ * Threads carry an optional `projectId` (null = unattached / general chat)
+ * and an optional `agentId` (which persona seeded the thread).
+ * Legacy per-project keys `projectChat.threads.<projectId>` are migrated
+ * into the global store on first read.
  */
 
 export const QUICK_THREAD_ID = "quick";
 
+const KEY_THREADS = "projectChat.threads.v2";
+const KEY_ACTIVE = "projectChat.activeThread.v2";
+const KEY_MIGRATED = "projectChat.migrated.v2";
+
 export interface Thread {
   id: string;
-  projectId: string;
+  projectId: string | null;
+  agentId?: string | null;
   title: string;
   updatedAt: number;
   messages: ChatMessage[];
 }
 
-const threadsKey = (projectId: string) => `projectChat.threads.${projectId}`;
-const activeKey = (projectId: string) => `projectChat.activeThread.${projectId}`;
-
 const canUseStorage = () => typeof window !== "undefined";
 
-function readThreads(projectId: string): Thread[] {
+function readAll(): Thread[] {
   if (!canUseStorage()) return [];
   try {
-    const raw = window.localStorage.getItem(threadsKey(projectId));
+    const raw = window.localStorage.getItem(KEY_THREADS);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Thread[];
     return Array.isArray(parsed) ? parsed : [];
@@ -39,30 +43,63 @@ function readThreads(projectId: string): Thread[] {
   }
 }
 
-function writeThreads(projectId: string, threads: Thread[]) {
+function writeAll(list: Thread[]) {
   if (!canUseStorage()) return;
-  try {
-    window.localStorage.setItem(threadsKey(projectId), JSON.stringify(threads));
-  } catch {
-    /* quota / private mode — ignore */
-  }
+  try { window.localStorage.setItem(KEY_THREADS, JSON.stringify(list)); } catch { /* ignore */ }
 }
 
-function readActive(projectId: string): string | null {
+function readActive(): string | null {
   if (!canUseStorage()) return null;
-  try {
-    return window.localStorage.getItem(activeKey(projectId));
-  } catch {
-    return null;
-  }
+  try { return window.localStorage.getItem(KEY_ACTIVE); } catch { return null; }
 }
 
-function writeActive(projectId: string, id: string | null) {
+function writeActive(id: string | null) {
   if (!canUseStorage()) return;
   try {
-    if (id) window.localStorage.setItem(activeKey(projectId), id);
-    else window.localStorage.removeItem(activeKey(projectId));
+    if (id) window.localStorage.setItem(KEY_ACTIVE, id);
+    else window.localStorage.removeItem(KEY_ACTIVE);
   } catch { /* ignore */ }
+}
+
+function migrateLegacy(): Thread[] {
+  if (!canUseStorage()) return [];
+  if (window.localStorage.getItem(KEY_MIGRATED) === "1") return readAll();
+  const merged: Thread[] = readAll();
+  const seen = new Set(merged.map((t) => t.id));
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key || !key.startsWith("projectChat.threads.")) continue;
+      if (key === KEY_THREADS) continue;
+      const projectId = key.substring("projectChat.threads.".length);
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        const arr = JSON.parse(raw) as Thread[];
+        if (!Array.isArray(arr)) continue;
+        for (const t of arr) {
+          if (!t?.id || seen.has(t.id)) continue;
+          merged.push({ ...t, projectId: t.projectId ?? projectId });
+          seen.add(t.id);
+        }
+      } catch { /* ignore malformed */ }
+    }
+  } catch { /* ignore */ }
+  writeAll(merged);
+  try { window.localStorage.setItem(KEY_MIGRATED, "1"); } catch { /* ignore */ }
+  return merged;
+}
+
+function ensureQuickThread(list: Thread[]): Thread[] {
+  if (list.some((t) => t.id === QUICK_THREAD_ID)) return list;
+  const quick: Thread = {
+    id: QUICK_THREAD_ID,
+    projectId: null,
+    title: "Quick chat",
+    updatedAt: 0,
+    messages: [],
+  };
+  return [quick, ...list];
 }
 
 const newId = () => {
@@ -75,154 +112,112 @@ function titleFromMessage(text: string): string {
   return t.length > 60 ? `${t.slice(0, 57)}…` : t || "New chat";
 }
 
-function ensureQuickThread(list: Thread[], projectId: string): Thread[] {
-  if (list.some((t) => t.id === QUICK_THREAD_ID)) return list;
-  const quick: Thread = {
-    id: QUICK_THREAD_ID,
-    projectId,
-    title: "Quick chat",
-    updatedAt: 0,
-    messages: [],
-  };
-  return [quick, ...list];
+function sortThreads(list: Thread[]): Thread[] {
+  return [...list].sort((a, b) => {
+    if (a.id === QUICK_THREAD_ID) return -1;
+    if (b.id === QUICK_THREAD_ID) return 1;
+    return b.updatedAt - a.updatedAt;
+  });
 }
 
-export function useChatThreads(projectId: string | null) {
-  // Idempotent bootstrap: read (and seed the Quick thread) synchronously on
-  // initial state — never inside useEffect, per the chat-agent UI contract.
-  const [threads, setThreads] = useState<Thread[]>(() => {
-    if (!projectId) return [];
-    return ensureQuickThread(readThreads(projectId), projectId);
-  });
-  const [activeThreadId, setActiveThreadIdState] = useState<string | null>(() => {
-    if (!projectId) return null;
-    return readActive(projectId) ?? null;
-  });
+export function useChatThreads() {
+  const [threads, setThreads] = useState<Thread[]>(() => sortThreads(ensureQuickThread(migrateLegacy())));
+  const [activeThreadId, setActiveThreadIdState] = useState<string | null>(() => readActive());
 
-  // When the project changes, hydrate fresh state from storage for that project.
+  // Cross-tab sync.
   useEffect(() => {
-    if (!projectId) {
-      setThreads([]);
-      setActiveThreadIdState(null);
-      return;
-    }
-    const next = ensureQuickThread(readThreads(projectId), projectId);
-    setThreads(next);
-    // Seed Quick thread in storage if we just added it, so other tabs see it.
-    writeThreads(projectId, next);
-    setActiveThreadIdState(readActive(projectId));
-  }, [projectId]);
-
-  // Cross-tab / cross-surface sync: react to storage events from other
-  // browser tabs OR from the floating bubble writing to the same keys.
-  useEffect(() => {
-    if (!projectId || !canUseStorage()) return;
+    if (!canUseStorage()) return;
     const onStorage = (e: StorageEvent) => {
-      if (e.key === threadsKey(projectId)) {
-        setThreads(ensureQuickThread(readThreads(projectId), projectId));
-      } else if (e.key === activeKey(projectId)) {
-        setActiveThreadIdState(readActive(projectId));
-      }
+      if (e.key === KEY_THREADS) setThreads(sortThreads(ensureQuickThread(readAll())));
+      else if (e.key === KEY_ACTIVE) setActiveThreadIdState(readActive());
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [projectId]);
+  }, []);
 
-  const persistThreads = useCallback(
-    (updater: (prev: Thread[]) => Thread[]) => {
-      setThreads((prev) => {
-        const next = updater(prev);
-        if (projectId) writeThreads(projectId, next);
-        return next;
-      });
+  const persist = useCallback((updater: (prev: Thread[]) => Thread[]) => {
+    setThreads((prev) => {
+      const next = sortThreads(updater(prev));
+      writeAll(next);
+      return next;
+    });
+  }, []);
+
+  const setActiveThread = useCallback((id: string | null) => {
+    setActiveThreadIdState(id);
+    writeActive(id);
+  }, []);
+
+  const newThread = useCallback(
+    (opts?: { projectId?: string | null; agentId?: string | null }): string => {
+      const id = newId();
+      const thread: Thread = {
+        id,
+        projectId: opts?.projectId ?? null,
+        agentId: opts?.agentId ?? null,
+        title: "New chat",
+        updatedAt: Date.now(),
+        messages: [],
+      };
+      persist((prev) => [thread, ...prev]);
+      setActiveThread(id);
+      return id;
     },
-    [projectId],
+    [persist, setActiveThread],
   );
-
-  const setActiveThread = useCallback(
-    (id: string | null) => {
-      setActiveThreadIdState(id);
-      if (projectId) writeActive(projectId, id);
-    },
-    [projectId],
-  );
-
-  const newThread = useCallback((): string | null => {
-    if (!projectId) return null;
-    const id = newId();
-    const thread: Thread = {
-      id,
-      projectId,
-      title: "New chat",
-      updatedAt: Date.now(),
-      messages: [],
-    };
-    persistThreads((prev) => [thread, ...prev]);
-    setActiveThread(id);
-    return id;
-  }, [persistThreads, projectId, setActiveThread]);
 
   const deleteThread = useCallback(
     (id: string) => {
-      if (id === QUICK_THREAD_ID) return; // Quick chat is permanent
-      persistThreads((prev) => prev.filter((t) => t.id !== id));
+      if (id === QUICK_THREAD_ID) return;
+      persist((prev) => prev.filter((t) => t.id !== id));
       setActiveThreadIdState((cur) => {
         if (cur !== id) return cur;
-        if (projectId) writeActive(projectId, null);
+        writeActive(null);
         return null;
       });
     },
-    [persistThreads, projectId],
+    [persist],
   );
 
-  const setThreadMessages = useCallback(
-    (id: string, messages: ChatMessage[]) => {
-      persistThreads((prev) => {
-        const idx = prev.findIndex((t) => t.id === id);
-        if (idx === -1) {
-          if (!projectId) return prev;
-          // Auto-create if missing (e.g. quick thread on a new project).
-          const seed: Thread = {
-            id,
-            projectId,
-            title:
-              id === QUICK_THREAD_ID
-                ? "Quick chat"
-                : titleFromMessage(messages.find((m) => m.role === "user")?.content ?? ""),
-            updatedAt: Date.now(),
-            messages,
-          };
-          return [seed, ...prev];
-        }
-        const existing = prev[idx];
-        const firstUser = messages.find((m) => m.role === "user");
-        const nextTitle =
-          existing.title === "New chat" && firstUser
-            ? titleFromMessage(firstUser.content)
-            : existing.title;
-        const next = [...prev];
-        next[idx] = {
-          ...existing,
-          title: nextTitle,
-          updatedAt: messages.length ? Date.now() : existing.updatedAt,
+  const updateThread = useCallback(
+    (id: string, patch: Partial<Pick<Thread, "title" | "projectId" | "agentId">>) => {
+      persist((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t)));
+    },
+    [persist],
+  );
+
+  const setThreadMessages = useCallback((id: string, messages: ChatMessage[]) => {
+    persist((prev) => {
+      const idx = prev.findIndex((t) => t.id === id);
+      if (idx === -1) {
+        const seed: Thread = {
+          id,
+          projectId: null,
+          title:
+            id === QUICK_THREAD_ID
+              ? "Quick chat"
+              : titleFromMessage(messages.find((m) => m.role === "user")?.content ?? ""),
+          updatedAt: Date.now(),
           messages,
         };
-        // Keep list sorted by updatedAt desc, but always keep Quick at top.
-        next.sort((a, b) => {
-          if (a.id === QUICK_THREAD_ID) return -1;
-          if (b.id === QUICK_THREAD_ID) return 1;
-          return b.updatedAt - a.updatedAt;
-        });
-        return next;
-      });
-    },
-    [persistThreads, projectId],
-  );
+        return [seed, ...prev];
+      }
+      const existing = prev[idx];
+      const firstUser = messages.find((m) => m.role === "user");
+      const nextTitle =
+        existing.title === "New chat" && firstUser ? titleFromMessage(firstUser.content) : existing.title;
+      const next = [...prev];
+      next[idx] = {
+        ...existing,
+        title: nextTitle,
+        updatedAt: messages.length ? Date.now() : existing.updatedAt,
+        messages,
+      };
+      return next;
+    });
+  }, [persist]);
 
-  const clearThread = useCallback(
-    (id: string) => setThreadMessages(id, []),
-    [setThreadMessages],
-  );
+  const clearThread = useCallback((id: string) => setThreadMessages(id, []), [setThreadMessages]);
 
   const activeThread = useMemo(
     () => threads.find((t) => t.id === activeThreadId) ?? null,
@@ -236,6 +231,7 @@ export function useChatThreads(projectId: string | null) {
     setActiveThread,
     newThread,
     deleteThread,
+    updateThread,
     setThreadMessages,
     clearThread,
   };
