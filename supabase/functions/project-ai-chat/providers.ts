@@ -237,10 +237,11 @@ export async function runChat(
   modelId: string | undefined | null,
   userMessage: string,
   history: ChatTurn[],
-  ctx: ToolContext,
+  ctx: ToolContext | null,
+  agentId?: string | null,
 ): Promise<ChatRunResult> {
   const model = resolveModel(modelId);
-  const system = buildSystemPrompt(model.label);
+  const system = buildSystemPrompt(model.label, agentId, !!ctx);
 
   if (model.provider === "gemini") {
     const key = Deno.env.get("GEMINI_API_KEY");
