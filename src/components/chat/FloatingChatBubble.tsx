@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Loader2, Send, Trash2, X } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Loader2, Maximize2, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { QUICK_THREAD_ID } from "@/hooks/useChatThreads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
