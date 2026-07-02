@@ -1,143 +1,95 @@
 ## Goal
+Make `/project-intelligence` feel like Claude: project-optional chats, agent presets replacing generic suggestions, a compact composer with model picker beside Send, per-thread three-dot menu, and independent scrolling panels.
 
-Turn `/project-intelligence` into a Claude-style chat workspace tied to the active project, and add a quick "expand to full page" jump from the floating SC Assistant bubble.
+## 1. Decouple threads from project (new chat = no project required)
 
-Storage for v1: **localStorage only**. Hook boundary designed so a future swap to Supabase tables is a drop-in replacement (documented at bottom).
+**`src/hooks/useChatThreads.ts`**
+- Add a global store keyed under `projectChat.threads.__global__` alongside existing per-project stores. Threads carry `projectId: string | null`.
+- New chats start with `projectId = null`. "Attach to project" mutates the thread's `projectId` and moves it into that project's store (or keep single store and filter — simpler: **single global store** `projectChat.threads.v2` and filter by project in views).
+- Refactor to single store: `projectChat.threads.v2` = `Thread[]`, `projectChat.activeThread` = string. Keep `QUICK_THREAD_ID` reserved (bubble). Migrate old per-project keys on first read.
 
----
+**`src/pages/ProjectIntelligence.tsx`**
+- Sidebar always shows all threads (independent of selected project). Selecting a project no longer filters the thread list — it just sets the target project for the *active* chat if the thread has none, or is shown as a chip.
+- "New chat" creates a thread with `projectId: null` and navigates to it. Sending a message without a project either (a) is allowed if the agent doesn't require project data, or (b) prompts inline to attach one via the composer "+".
 
-## 1. Floating chat: "Expand to full page" button
+## 2. Composer redesign (Claude-style)
 
-File: `src/components/chat/FloatingChatBubble.tsx`
+Rebuild the composer used in both empty and active states:
 
-- Add an icon button (`Maximize2` from lucide-react) in the header row, positioned to the LEFT of the existing close (X) button, right of the Trash/Clear.
-- Tooltip / aria-label: "Open in Project Intelligence".
-- On click:
-  - `setOpen(false)` (collapse panel).
-  - `navigate("/project-intelligence?thread=quick")` using `useNavigate` from `react-router-dom`.
-- Style matches Clear/Close (ghost, `h-8 w-8`, white/10 hover on black header).
-
-## 2. Project Intelligence header cleanup
-
-File: `src/pages/ProjectIntelligence.tsx`
-
-- Remove `<ProjectSelector />` from `PageHeader.rightContent` in BOTH the "no project" branch and the main return.
-- Keep title + subtitle. Project switching now lives inside the new left sidebar.
-- If no project is selected, render an inline empty state in the main pane ("Pick a project from the sidebar to start chatting").
-
-## 3. Claude-style workspace on `/project-intelligence`
-
-Reference: uploaded Claude screenshots — left sidebar (New chat, search, Recents), main area with big centered composer + quick-action chips on empty state, transcript + pinned composer on active state.
-
-### Layout
-
-```text
-+-----------------------------------------------------------+
-| PageHeader: Project Intelligence                          |
-+-------------------+---------------------------------------+
-| Sidebar (280px)   | Main pane                             |
-|                   |                                       |
-| [+ New chat]      |  Empty: greeting + suggestion chips   |
-| [Search]          |         + large centered composer     |
-|                   |                                       |
-| Project: [Select] |  Active: transcript (MessageBubble)   |
-|                   |          + sticky bottom composer     |
-| Recents           |                                       |
-|   Today           |                                       |
-|   · Thread A      |                                       |
-|   Previous 7 days |                                       |
-|   · Thread B      |                                       |
-|   Older           |                                       |
-|   · Thread C      |                                       |
-+-------------------+---------------------------------------+
+```
+┌───────────────────────────────────────────────┐
+│  textarea …                                    │
+│                                                │
+│  [+ Project ▾]              [Model ▾] [ ↑ ]   │
+└───────────────────────────────────────────────┘
 ```
 
-### New components
+- **Left of footer**: `+` button → popover listing projects → attaches project to current thread (shows as pill "● Project name ✕" once selected).
+- **Right of footer**: `ModelPicker` (compact, icon+short label) then a circular icon-only Send button (arrow-up, no "Send" text). Loading state shows spinner in same button.
+- Remove the redundant model-label text on the second composer variant. One composer component used in both states.
 
-- `src/components/intelligence/ChatSidebar.tsx`
-  - "New chat" button → creates thread, sets active, clears composer, focuses input.
-  - Search input → client-side filter on thread title.
-  - Project switcher: same shadcn `<Select>` pattern as `/policies`, compact.
-  - Recents grouped by `updatedAt` (Today / Previous 7 days / Older).
-  - Row = non-button container with a select button + separate hover-visible delete button (avoid nested `<button>`).
-- `src/components/intelligence/ChatWorkspace.tsx`
-  - Empty state: centered greeting ("Good afternoon, {firstName}"), suggestion chips (reuse `SUGGESTIONS` from floating bubble + any `safeQuestions` returned by the backend), big composer.
-  - Active state: scrollable transcript using existing `MessageBubble` from `src/components/chat/MessageBubble.tsx`, sticky composer at bottom.
-  - Composer autofocuses on mount, after send, and after thread switch.
+New file: `src/components/intelligence/ChatComposer.tsx` — encapsulates textarea + footer with `onSubmit`, `projectId`, `onAttachProject`, `model`, `onModelChange`, `loading`.
+New file: `src/components/intelligence/AttachProjectButton.tsx` — `+` popover for project selection (uses shadcn Popover + Command).
 
-### Thread + history model (localStorage)
+## 3. Agent presets replace generic suggestions
 
-New hook: `src/hooks/useChatThreads.ts`
+Replace the 4 SC-risk questions with an **Agent picker** on the empty state:
 
-Shape:
-```ts
-type StoredMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  parts?: unknown;
-  toolCalls?: unknown;
-  createdAt: number;
-};
-type Thread = {
-  id: string;            // uuid
-  projectId: string;
-  title: string;         // auto = first user message (60ch)
-  updatedAt: number;
-  messages: StoredMessage[];
-};
+```
+Choose an agent to start with
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ 🛡  Risk      │ │ 🧪 Simulation│ │ 📦 Inventory │
+│  Analyst     │ │  Modeler     │ │  Strategist  │
+└──────────────┘ ┌──────────────┐ ┌──────────────┐
+                 │ 🚚 Logistics │ │ 💬 General   │
+                 │  Planner     │ │  Assistant   │
+                 └──────────────┘ └──────────────┘
 ```
 
-Storage key: `projectChat.threads.<projectId>` → `Thread[]`. Active thread id per project: `projectChat.activeThread.<projectId>`.
+New file: `src/lib/chat/agents.ts` — export `AGENTS: { id, name, icon, blurb, systemPrompt, starterPrompt? }[]`.
+- Risk Analyst, Simulation Modeler, Inventory Strategist, Logistics Planner, General Assistant.
 
-API: `threads, activeThread, activeThreadId, setActiveThread(id), newThread(), deleteThread(id), appendMessage(msg), clearActive()`.
+Selecting an agent seeds `thread.agentId` (extend `Thread` type) and injects the agent's system prompt on send (pass `agentId` through `useProjectChat.send` → edge function body; edge function reads `agentId` and prepends the matching system prompt — small update to `supabase/functions/project-ai-chat/index.ts`).
 
-Rules from the chat-agent UI contract:
-- Idempotent bootstrap guarded by `typeof window !== "undefined"`. Do NOT create the first thread inside a `useEffect` (StrictMode dupes).
-- Persist updates inside the same state update that mutates `threads`.
-- Sync across tabs / floating bubble via a `storage` event listener.
+The active agent shows as a subtle chip above the composer ("🛡 Risk Analyst · change"). Clicking change reopens the picker.
 
-### Wiring the transcript
+## 4. Thread row: three-dot menu
 
-`useProjectChat` currently holds messages in component state and resets on project change. Refactor minimally so it optionally binds to a thread:
+**`src/components/intelligence/ChatSidebar.tsx`**
+- Replace trash button with a `MoreHorizontal` trigger opening a `DropdownMenu`:
+  - **Rename** (inline editable input in the row)
+  - **Attach to project** / **Change project** (submenu with project list)
+  - **Remove from project** (only if attached)
+  - divider
+  - **Delete** (destructive)
+- Fix the nested-button issue by making the row a `div` with two sibling buttons (title button + menu trigger).
 
-- Accept `{ threadId }` alongside `projectId`.
-- On mount / thread change, hydrate `messages` from the thread's stored messages.
-- On every `send` and every assistant reply, call `useChatThreads.appendMessage` so the thread persists.
-- `clear()` calls `clearActive()` which empties the thread's messages (doesn't delete the thread).
+## 5. Independent panels
 
-### Floating bubble ↔ full page connection
+**`src/pages/ProjectIntelligence.tsx`**
+- Grid keeps `[280px_1fr]` but ensure both columns are `h-full min-h-0 overflow-hidden`, and each internal `ScrollArea`/scroll container owns its own overflow. Sidebar body already uses `ScrollArea`; verify main workspace uses `flex-1 overflow-y-auto` inside its own column so the sidebar doesn't grow with a long thread list.
+- Add sidebar width resize affordance later (out of scope unless requested).
 
-- Both surfaces already share `useGlobalProject` → project stays consistent.
-- Floating bubble binds to a reserved thread id: `"quick"` (per project). It appears in the Recents list as **"Quick chat"** and is never deleted, only cleared.
-- The Expand button navigates to `?thread=quick`, so the full page opens the exact same conversation the user was just having.
-- New threads created from the full-page sidebar are separate and only visible there (still project-scoped).
+## Technical notes
 
-### Routing
+- Storage migration: on first mount of `useChatThreads`, if `projectChat.threads.v2` missing, read all legacy `projectChat.threads.<pid>` keys, merge into a single array (preserving `projectId`), write v2, leave legacy keys for one release.
+- `useProjectChat` signature becomes `useProjectChat(threadId)` — project comes from the thread record. The floating bubble keeps its behavior by binding to `QUICK_THREAD_ID` and passing the currently selected global project as its default attach.
+- Edge function: accept optional `agentId`, look up system prompt, allow `projectId: null` (skip project-scoped tool calls, respond generically).
+- Send button: circular `h-9 w-9 rounded-full` with `ArrowUp` icon, disabled state greyed.
 
-- Keep the existing `/project-intelligence` route.
-- Use a `?thread=<id>` query param for the active thread. On mount, read the param and call `setActiveThread`. On thread switch, `navigate("?thread=<id>", { replace: true })`. Reload restores the thread.
+## Out of scope
+- Starring, pinning beyond Quick chat, folder organization, bulk actions.
+- Backend (Supabase) persistence — stays localStorage.
 
-### Removed / simplified
-
-- Drop the current 3 right-rail cards (AI Health, Project Details, Suggested Questions) to match the clean Claude aesthetic.
-- Move AI Health check to a small icon button in the sidebar footer.
-
-## 4. Files touched
-
-- Edit `src/components/chat/FloatingChatBubble.tsx` — add Maximize button + navigate; on send, persist into `quick` thread.
-- Edit `src/pages/ProjectIntelligence.tsx` — remove header project selector, adopt new layout.
-- New `src/components/intelligence/ChatSidebar.tsx`
-- New `src/components/intelligence/ChatWorkspace.tsx`
-- New `src/hooks/useChatThreads.ts`
-- Edit `src/hooks/useProjectChat.ts` — optional `threadId` binding + persistence hooks.
-
-## 5. Future migration to database (not built now)
-
-When we later want cross-device history, the swap is contained to `useChatThreads.ts` and the persistence calls in `useProjectChat`:
-
-- Two tables: `chat_threads(id, project_id, user_id, title, updated_at)` and `chat_messages(id uuid, thread_id, role, content, parts jsonb, created_at)` with RLS scoped to `auth.uid()` and the standard GRANT block.
-- Replace localStorage reads/writes in `useChatThreads` with Supabase queries; keep the same hook API so component code doesn't change.
-- One-time migration: read `projectChat.threads.*` from localStorage on first load and upsert into the tables.
-
-No DB work in this iteration.
+## Files touched
+- `src/hooks/useChatThreads.ts` (refactor to single global store, add `projectId`/`agentId`, migration)
+- `src/hooks/useProjectChat.ts` (derive project from thread, pass agentId)
+- `src/pages/ProjectIntelligence.tsx` (independent panels, no project filter on sidebar)
+- `src/components/intelligence/ChatSidebar.tsx` (three-dot menu, no project select)
+- `src/components/intelligence/ChatWorkspace.tsx` (agent picker empty state, new composer)
+- `src/components/intelligence/ChatComposer.tsx` (new)
+- `src/components/intelligence/AttachProjectButton.tsx` (new)
+- `src/components/intelligence/AgentPicker.tsx` (new)
+- `src/lib/chat/agents.ts` (new)
+- `src/components/chat/FloatingChatBubble.tsx` (adapt to new hook signature)
+- `supabase/functions/project-ai-chat/index.ts` (accept agentId + null projectId)
