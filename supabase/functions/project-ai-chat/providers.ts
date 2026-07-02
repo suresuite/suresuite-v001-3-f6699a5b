@@ -94,7 +94,7 @@ interface GeminiContent { role: "user" | "model" | "function"; parts: GeminiPart
 
 async function runGemini(
   apiKey: string, model: ModelSpec, system: string,
-  userMessage: string, history: ChatTurn[], ctx: ToolContext,
+  userMessage: string, history: ChatTurn[], ctx: ToolContext | null,
 ): Promise<ChatRunResult> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`;
   const contents: GeminiContent[] = [];
