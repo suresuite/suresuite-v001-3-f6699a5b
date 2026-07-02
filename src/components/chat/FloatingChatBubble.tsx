@@ -81,6 +81,7 @@ function defaultPanelPos(): Pos {
 
 export function FloatingChatBubble() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { selectedProject, globalSelectedProjectId, setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const projectId = selectedProject?.id ?? globalSelectedProjectId ?? null;
