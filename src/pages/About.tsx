@@ -3,7 +3,7 @@
 // No auth required, no business logic, purely presentational.
 
 import { Link } from "react-router-dom";
-import { PageLayout, PageHeader } from "@/components/shared";
+import { PageLayout, PageHeader, YouTubeEmbed } from "@/components/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
