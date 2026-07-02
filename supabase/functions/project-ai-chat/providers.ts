@@ -113,9 +113,7 @@ async function runGemini(
       body: JSON.stringify({
         systemInstruction: { role: "system", parts: [{ text: system }] },
         contents,
-        tools: [{ functionDeclarations: toolDeclarations }],
-        // Disable hidden "thinking" so the token budget goes to the visible answer,
-        // and give the model room to produce a full reply.
+        ...(ctx ? { tools: [{ functionDeclarations: toolDeclarations }] } : {}),
         generationConfig: { temperature: 0.4, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
       }),
     });
