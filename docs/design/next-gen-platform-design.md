@@ -1,0 +1,848 @@
+# SureSuite Next-Generation Simulation Platform — Design Blueprint
+
+| | |
+|---|---|
+| **Status** | Draft v0.1 — for review |
+| **Date** | 2026-07-02 |
+| **Altitude** | Platform-wide conceptual architecture: data model → policy layer → engine → experimentation → AI/surrogates → UI |
+| **Non-goals** | Implementation details, code, SQL DDL, dated schedules |
+| **Authority** | This document governs the *platform* design. `scsim/docs/architecture.md` remains authoritative for engine mechanics; `scsim/docs/roadmap.md` for engine milestones. Where this document proposes changes to either, it says so explicitly. |
+
+## 0. Reading guide
+
+This blueprint answers a single question: **how does SureSuite evolve from its current state into a simulation platform that surpasses commercial tools such as AnyLogistix** — not by feature-matching, but by belonging to a different architecture class: modular, extensible, transparent, policy-driven, AI-native, and research-grade.
+
+The document was produced by first studying the existing system in depth (the `/policies` page, `/project-manager`, `/simulation-lab`, the `scsim` engine, the `sim-worker`, and the Supabase schema). Every proposal in it **extends an artifact that already exists** in the repository; nothing here replaces the current direction. The recurring rhetorical form is deliberate: *"X already exists as Y — we complete and generalize it."*
+
+Section map against the design brief:
+
+| Brief step | Where answered |
+|---|---|
+| 1. Study the existing direction | §2 (assessment, preserved assets, gap catalog), §3 (engine strategy) |
+| 2. Complete policy architecture; node-owned policies; required data | §4 (architecture), §8 (parameter-requirement contract) |
+| 3. Policies for every supply chain stage (MTS/MTO scope) | §5 (v1 catalog), Appendix A |
+| 4. Planning horizons | §4.1 (horizon axis), §5 tables |
+| 5. Standardized policy interface, configured in `/policies` | §6 |
+| 6. Policy interactions | §7 |
+| 7. AnyLogistix benchmark | §10 |
+| 8/9. Stress testing, surrogate model, data/model/version management | §9 (experimentation), §11 (surrogate architecture) |
+| Roadmap | §13 |
+
+Companion documents: `docs/data-simulation-mapping.md` (current field-mapping contract), `docs/simulation-data-lifecycle.md` (current state tiers), `scsim/docs/architecture.md`, `scsim/docs/roadmap.md`, `scsim/docs/stress-tests.md`, `scsim/docs/synergy.md`, `scsim/docs/adr/0001-mts-fulfillment-mode.md`.
+
+---
+
+## 1. Vision and design pillars
+
+The long-term objective is a simulation engine and platform that treats **every operational decision in the supply chain as an explicit, replaceable policy** — configured by users without coding, validated before it runs, versioned and hashed for reproducibility, and observable after the fact — and that uses that policy fabric as the substrate for AI-driven experimentation at a scale exhaustive simulation cannot reach.
+
+Six pillars, each already seeded in the codebase:
+
+1. **Modular.** Policies are plugins with declared phase residencies, parameter schemas, feasibility rules, and cost contributions (`scsim/scsim/policies/base.py`). The simulation engine never changes when a policy is added: *"Adding a Tier-1 policy = one plugin file + a registry entry + a docs row (CI-enforced) + one validation experiment. No engine edits"* (`base.py` docstring). This blueprint extends that property from resilience policies to **all** operational decisions.
+
+2. **Extensible.** Different algorithms plug into the same decision slot — a reorder policy can be `min_max`, `base_stock`, `(R,Q)`, periodic review, or a learned policy — without touching the engine or the UI, because forms, validators, and docs are all generated from one registry (`scsim/scsim/io/registry_export.py`).
+
+3. **Transparent.** Open engine, load-time-validated interaction contracts (`scsim/scsim/core/phases.py::validate_hooks`), immutable versioned snapshots with content hashes (`policy_versions.policy_hash`), golden-trace regression tests, and — new in this design — per-decision observability records (§6, facet 11). A user can always answer *"why did the model do that?"*.
+
+4. **Policy-driven.** No hidden behavior. Every default the engine applies today implicitly (greedy production planning, the built-in forecast, the world demand generator) becomes a **named default policy occupying a declared slot** (§4.4), visible in the UI, included in the behavioral fingerprint, and replaceable.
+
+5. **AI-native.** Surrogate models with calibrated uncertainty replace brute-force simulation where they are provably reliable, and fall back to simulation where they are not (§11). LLM assistance configures and explains — but never fabricates — simulation results (§12).
+
+6. **Research-grade.** Common random numbers with a keyed seed tree (`scsim/scsim/stats/seeds.py`), MSER-5 warm-up detection, sequential confidence-interval stopping, conformal prediction intervals, CRN-paired portfolio comparison with bootstrap significance (`scsim/scsim/synergy/decompose.py`) — statistics as a first-class design concern, not an afterthought.
+
+Target platform layering:
+
+```mermaid
+flowchart TD
+    UI["UI layer<br/>/project-manager · /policies · /simulation-lab"]
+    AI["AI layer<br/>surrogates · criticality ranking · LLM assist"]
+    EXP["Experimentation layer<br/>runs · DOE · stress batteries · portfolio studies · run cache"]
+    ENG["Engine: scsim<br/>phase pipeline · policy plugins · KPIs · snapshots"]
+    POL["Policy layer<br/>node-owned bundles · registry · versions · interaction graph"]
+    DATA["Data layer<br/>network graph · item masters · calendars · dataset versions"]
+    UI --> AI
+    AI --> EXP
+    EXP --> ENG
+    ENG --> POL
+    POL --> DATA
+```
+
+---
+
+## 2. Where we are: assessment of the current platform
+
+### 2.1 Architecture today
+
+SureSuite is a four-tier system:
+
+| Tier | Technology | Key artifacts |
+|---|---|---|
+| Frontend | React/Vite + shadcn | `src/pages/ProjectPolicies.tsx` (`/policies`), `src/pages/DataManager.tsx` (`/project-manager`), `src/pages/SimulationLab.tsx` (`/simulation-lab`), four network views |
+| Data & control plane | Supabase (Postgres + edge functions + Realtime) | arc tables, item masters, `policy_defaults` / `policy_overrides` / `policy_versions`, `scenarios` / `simulation_runs` / `run_replications`, `supabase/functions/sim-command/index.ts` |
+| Execution | Fly.io worker consuming Upstash Redis streams | `sim-worker/sim_worker/worker.py`, `datamap.py`, `scsim_bridge.py` |
+| Engine | Python package `scsim` | `scsim/scsim/core/`, `policies/`, `stress/`, `synergy/`, `kpi/`, `stats/`, `io/` |
+
+**The engine paradigm.** `scsim` is a vectorized, weekly time-stepped simulator organized as a **phase pipeline**: every simulated week executes the named sequence PH-00 (week start / disruption state) → PH-10 (demand realization + forecast) → PH-20 (detection) → PH-30 (fulfill from stock, MTS) → PH-40 (production planning) → PH-50 (production execute) → PH-60 (fulfillment) → PH-70 (material planning) → PH-80 (procurement) → PH-90 (logistics) → PH-99 (accounting). Each phase owns a write-contract over named state keys; hooks are validated at load time for read-before-write, write authorization, and write-conflict resolution (`scsim/scsim/core/phases.py`). The docstring says it precisely: *"The weekly cycle is data, not code."* The network is three echelons — suppliers → a single focal plant (materials, BOM, products) → customers — supporting mixed MTO and MTS products per ADR 0001.
+
+**Two policy vocabularies.** The platform currently speaks two different policy languages, connected by a translation layer:
+
+- The **UI/database vocabulary**: seven policy *families* — sourcing, inventory, transport, fulfillment, production, recovery, demand — hand-written as Zod schemas in `src/lib/policies/schemas.ts`, mirrored as Pydantic in `sim-worker/sim_worker/policies.py`, stored per project in `policy_defaults` (JSONB per family) with sparse per-node/per-edge patches in `policy_overrides`, edited on `/policies` through a four-stage flow (supplier → plant → customer → run & validate, `src/lib/policies/stages.ts`), gated by fulfillment strategy (`src/lib/policies/strategyGating.ts`), seeded by eight data-aware presets (`src/lib/policies/presets/`), and snapshotted immutably into `policy_versions` with a SHA-256 `policy_hash`.
+- The **engine vocabulary**: a catalog of ~22 named policy plugins with IDs `P-S.x` (supplier), `P-P.x` (plant), `P-T.x` (transport), `P-C.x` (customer), `P-X.x` (cross-cutting), registered in `scsim/scsim/policies/registry.py`. Nine are implemented and runnable; thirteen are *planned* — registered with full parameter schemas but raising `PolicyNotImplementedError` when enabled, never silently no-oping.
+
+- The **translation layer**: `scsim/scsim/io/project_map.py::_map_policies` converts family dictionaries into plugin activations. It is lossy (§2.3, G1).
+
+**Two engines.** The worker selects between a legacy discrete-time engine (`sim-worker/sim_worker/engine.py`, the current default, `code_version="worker-legacy"`) and scsim (opt-in via `SCSIM_ENGINE=1`). The legacy engine reads the family fields more completely but is architecturally a dead end; scsim reads fewer fields but is the platform's real asset. §3 resolves this.
+
+```mermaid
+flowchart LR
+    subgraph Frontend
+        PM["/project-manager<br/>CSV upload"]
+        PP["/policies<br/>7 families, presets, versions"]
+        SL["/simulation-lab<br/>scenarios, runs, results"]
+    end
+    subgraph Supabase
+        ARC["arc tables + item masters"]
+        POL["policy_defaults / overrides / versions"]
+        RUN["scenarios / simulation_runs / run_replications"]
+        CMD["sim-command edge fn"]
+    end
+    subgraph Worker["Fly.io sim-worker"]
+        LEG["legacy engine (default)"]
+        BRIDGE["scsim_bridge (opt-in)"]
+    end
+    SCSIM["scsim engine<br/>phase pipeline + plugins"]
+    PM --> ARC
+    PP --> POL
+    SL --> CMD
+    CMD -->|Redis stream| Worker
+    ARC --> Worker
+    POL --> CMD
+    BRIDGE --> SCSIM
+    Worker --> RUN
+    RUN --> SL
+```
+
+### 2.2 Design assets we preserve
+
+These are the load-bearing good decisions in the current system. The rest of this document builds on them; none is discarded.
+
+| # | Asset | Where | Why it is kept |
+|---|---|---|---|
+| A1 | Phase pipeline with owned state keys and load-time hook validation | `scsim/scsim/core/phases.py` | The single most valuable artifact in the codebase: it makes policy interactions *machine-checkable* (§7) and the weekly cycle declarative |
+| A2 | `PolicyPlugin` ABC: ClassVar metadata, `hooks`, Pydantic `Params` (`extra="forbid"`), `feasibility()`, `cost_contribution()`, keyed RNG | `scsim/scsim/policies/base.py` | Already the standardized policy interface in embryo; §6 completes it |
+| A3 | Registry with implemented + *planned* entries; planned policies raise, never silently no-op | `scsim/scsim/policies/registry.py`, `planned.py` | Honest capability surface; the catalog doubles as the roadmap |
+| A4 | Catalog ID convention `P-S.x / P-P.x / P-T.x / P-C.x / P-X.x` with Stage / StrategyClass / ConstraintTag metadata | `scsim/scsim/entities/enums.py` | Stable reference scheme; §4.2 extends it without renaming anything |
+| A5 | Immutable policy snapshots with SHA-256 `policy_hash`, lineage, dirty detection, restore | `supabase/migrations/20260612000001_policy_version_snapshots.sql`, `src/hooks/usePolicies.tsx` | The provenance pattern the whole platform generalizes to datasets and runs (§8.4, §9.2) |
+| A6 | "Pydantic is canonical" registry export: forms, validators, and docs generated from one source | `scsim/scsim/io/registry_export.py` | Declared but not yet enforced platform-wide; §6.2 elevates it to law |
+| A7 | Keyed seed tree: world streams independent of policy set; policy streams keyed by policy-ID digest | `scsim/scsim/stats/seeds.py` | CRN across scenarios and portfolios; the statistical bedrock of §9 and §11 |
+| A8 | Warm-state `SnapshotStore` keyed by a family digest (network + settings + policies + engine version, excluding events) | `scsim/scsim/io/snapshots.py` | The in-engine precedent for content-addressed reuse; §11.3 generalizes it |
+| A9 | Stress batteries ST-1/ST-2 with scorecards and `vulnerability_ranking` | `scsim/scsim/stress/battery.py` | The ground-truth generator for the surrogate architecture (§11) |
+| A10 | Portfolio study + synergy decomposition (CRN-paired, bootstrap significance, breadth ladder) | `scsim/scsim/core/engine.py::run_portfolio_study`, `scsim/scsim/synergy/decompose.py` | Research capability no commercial tool offers; §9 productizes it |
+| A11 | Worker as sole authoritative writer of results; idempotent by `run_id`; runs bound to a `policy_version_id` | `sim-worker/sim_worker/worker.py`, `supabase/functions/sim-command/index.ts` | Correct ownership discipline; extended, not changed |
+| A12 | Statistics machinery: MSER-5 + Conway warm-up detection, sequential CI stopping, replication grid | `scsim/scsim/stats/warmup.py`, `core/engine.py` | Reused directly by adaptive replication stopping (§11.2) |
+| A13 | Docs CI gate: reference docs generated from the registry; drift fails the build | `scsim/scripts/gen_docs.py` | The enforcement pattern §6.2 copies for UI codegen |
+| A14 | Four-stage `/policies` UX (supplier → plant → customer → run & validate), data-aware presets with per-field `why`, strategy gating | `src/components/policies/`, `src/lib/policies/presets/` | The right mental model for non-coding users; §5/§6 give it more to configure, not a new paradigm |
+| A15 | Golden-trace test suite (byte-identical determinism, conservation invariants, manuscript reproduction) | `scsim/tests/` | The safety net for every migration this document proposes |
+
+### 2.3 Gap catalog
+
+Numbered gaps, each cited to evidence. Later sections reference these IDs; §13's roadmap phases declare which they close. This table is the requirements-traceability spine of the document.
+
+| ID | Gap | Evidence | Consequence |
+|---|---|---|---|
+| **G1** | **Lossy family→plugin mapping.** Absolute `reorder_point`/`order_up_to` discarded in favor of coverage-κ; `s_S` and `continuous_review` collapsed to `min_max`; sourcing `ratios` and failover parameters ignored; transport and demand families never consumed; most per-node overrides silently fall back to project defaults (only `holding_cost_pct` and capacity survive: `legacy_graph.py::_SUPPORTED_OVERRIDE_FIELDS`) | `scsim/scsim/io/project_map.py::_map_policies` | What the user configures is not what runs; trust erosion masked only by `MappingWarning`s |
+| **G2** | **Two engines, and the default is the weaker one.** Legacy `engine.py` honors more family fields but has no validated contracts, no CRN tree, no snapshots; scsim is opt-in | `sim-worker/sim_worker/worker.py` engine selection | Same configuration can produce different results depending on an env flag |
+| **G3** | **Implemented-but-unreachable policies.** `proactive_multi_sourcing` (P-S.2), `fg_safety_stock` (P-P.4), `material_allocation` (P-P.9) are runnable but no UI family maps to them | `project_map.py` mapping rules vs. `scsim/scsim/policies/` | Engine capability invisible to users |
+| **G4** | **No data-entry surface for the economics the engine actually reads.** `materials.cost`, `products.sell_price` / `production_capacity` / `demand_mean`, `suppliers.capacity_per_week` / `reliability_score` are auto-created NULL and silently defaulted — e.g. production capacity defaults to `max(2·demand, 1000)`, so capacity never binds | `supabase/migrations/20260614000001_item_master.sql`, `project_map.py` fallback rules | Simulations run on invented parameters; capacity/disruption analyses can be vacuous |
+| **G5** | **Network/economics data is not versioned.** Only policies are snapshotted; the graph is read live at run time (*"the graph itself is not versioned"* — `sim-command/index.ts`) | `docs/simulation-data-lifecycle.md` | Re-uploading a CSV silently changes the world behind every past and future run; reproducibility is partial |
+| **G6** | **Three non-aligned validation surfaces.** Client `verification.ts` checks fields the engine does not read; `get_project_dataset_status` checks only table presence; engine `MappingWarning`s arrive after the run is dispatched | `src/lib/policies/verification.ts`, DataManager RPCs, `project_map.py` | Users can pass all pre-run checks and still run a model full of silent defaults |
+| **G7** | **Missing model entities.** No warehouse/DC node type; no calendars, working days, or seasonality objects; transport exists only as unused policy fields, not as first-class lanes with modes/costs/capacity | schema survey; `Lane.lead_time_weeks` schema-valid but engine-ignored (`scsim/docs/roadmap.md` known gaps) | Whole policy classes (DRP, mode choice, seasonal planning) have nothing to attach to |
+| **G8** | **Orphaned frontend capabilities.** `ExperimentDesigner` + DOE library (`src/lib/sim/doe.ts`, full-factorial/LHS) are built but never rendered; the Compare pane is a stub | `src/components/sim/ExperimentDesigner.tsx` (unimported) | Multi-scenario experimentation exists on disk but not for users |
+| **G9** | **Engine riches not productized.** ST-1/ST-2 batteries, `vulnerability_ranking`, portfolio/synergy studies, warm-state snapshots, sequential-CI stopping are never invoked by the worker or UI — the worker calls only `run_scenario` | grep across `sim-worker/`, `src/` | The platform's most differentiating capabilities are unreachable |
+| **G10** | **No run caching or deduplication.** `policy_hash` is stored on `simulation_runs` but never queried for reuse; every Run re-executes the full Monte Carlo | `sim-worker/sim_worker/worker.py` | Identical simulations are recomputed; stress-test sweeps are unaffordable |
+| **G11** | **Narrow disruption model.** Supplier-targeted only (plant targets hard-error; material/customer/edge presets in `StressTestCard` silently degrade), ≤5 events, two effect types (lead-time extension, capacity reduction), no demand-surge class | `project_map.py::_map_events`, `scsim/docs/roadmap.md` | Stress-testing scope far below research needs |
+| **G12** | **No surrogate/ML layer.** No metamodels, no run-result reuse for training, no model registry (the former ml-service was removed) | repo-wide search | Every question costs a full simulation; large-scale stress testing is computationally prohibitive |
+
+### 2.4 Assumptions currently embedded in the simulation
+
+Stated here so later sections can either preserve them deliberately or lift them explicitly:
+
+- **Single focal plant, three echelons** (suppliers → plant → customers); `Supplier.tier` and `Lane.plant_id` are reserved extension points; tier-2/3 data can be uploaded but does not propagate into simulation.
+- **Weekly, fluid quantities.** Fixed 1-week time step; continuous quantities, not integer units; FG production completes in the same week (W^FG = 0); review cadences of 1/2/4 weeks. This is a deliberate fidelity boundary, and §5.8 respects it.
+- **MTO is the core; MTS shipped in 0.2.0 (ADR 0001); ATO is a reserved enum that hard-errors; ETO/CTO exist only as UI strategy labels.**
+- **Demand and transport are data-driven, not policy-driven.** Demand comes from product data / outbound volume; transport lead times from network edges; the corresponding policy families are stored but hidden and unused (G1, G7).
+- **Normality-based safety stock statistics**; ABC by annual value share; XYZ by demand CV.
+- **Supplier capacity defaults to infinite** unless `capacity_per_week` is set (G4).
+- **Recovery is a flat response list**, not a sequenced playbook — P-X.1 is planned.
+
+### 2.5 What commercial tools do (context for the gaps)
+
+Commercial supply chain simulation suites (AnyLogistix being the reference point, detailed in §10) typically provide: a structured input model with forms and table editors for every entity (sites, products, demand, sourcing rules, inventory policies per product-site pair, vehicles, paths); a fixed library of inventory/sourcing/shipment policies selectable per node from a GUI; experiment types (simulation, variation, comparison, safety-stock estimation, risk analysis) wrapped in wizards; and results dashboards with per-KPI drilldowns. Their strengths are completeness of the *input surface* and turnkey experiment packaging. Their weaknesses are closed engines, non-extensible policy sets (extension requires dropping into vendor-specific coding), no provenance/versioning of model+policy+scenario, no statistical machinery beyond replications, and no AI layer. The design below reaches parity on the input surface (§5, §8) and beats the category on extensibility, transparency, experimentation, and AI (§6, §7, §9, §11).
+
+---
+
+## 3. One engine: scsim as the strategic engine
+
+Every section that follows assumes a single execution semantics. The platform therefore commits: **scsim is the strategic engine. The legacy worker engine (`sim-worker/sim_worker/engine.py`) is frozen and will be retired.** No new capability is added to the legacy engine from this document forward.
+
+Why scsim wins despite the legacy engine currently reading more family fields (G2): validated hook contracts (A1), plugin extensibility (A2/A3), CRN and warm-up statistics (A7/A12), warm-state snapshots (A8), golden traces (A15). The legacy engine's only advantage — fuller consumption of the family schema — is exactly what §5 and §6 transfer into scsim by completing the catalog and eliminating the lossy mapping.
+
+Retirement is gated on capability, not dates:
+
+| Gate | Exit criterion |
+|---|---|
+| **E1 — Mapping-loss elimination** | Every field the `/policies` UI offers is either consumed by scsim or formally removed from the UI; `project_map.py` emits zero silent-fallback `MappingWarning`s for a fully-specified project (closes G1) |
+| **E2 — Parity characterization** | The preset library (8 presets × representative projects) is run through both engines; differences are documented and accepted as corrections, with golden traces pinned |
+| **E3 — Default flip** | `SCSIM_ENGINE=1` becomes the default; legacy behind an explicit escape hatch; `code_version` continues to record which engine produced every run |
+| **E4 — Removal** | Legacy code deleted after two release cycles with no escape-hatch use |
+
+---
+## 4. Node-owned policy architecture
+
+The central conceptual move of this design: **a node is not a type, it is a bundle of decisions.** Instead of viewing a node as merely "a supplier" or "a plant", every node instance *owns* a complete, explicit set of decision policies — one per decision domain relevant to its role — each independently configurable and replaceable. This section defines the organizing scheme; it extends the current 7-family + plugin-catalog architecture rather than replacing it.
+
+### 4.1 Three orthogonal axes
+
+Every policy in the catalog is classified along three independent axes.
+
+**Axis 1 — Node role (who owns the decision).** Extends the existing `Stage` enum (`scsim/scsim/entities/enums.py`): `supplier`, `plant`, `customer`, `transport` (edge/lane scope), plus two additions: `warehouse` (reserved — no engine support until the distribution echelon lands, §13 Phase E) and `network` (cross-cutting `P-X` policies owned by the focal firm as a whole).
+
+**Axis 2 — Decision domain (what is being decided).** The seven UI families remain the stable **storage and UI grouping** — `policy_defaults`' seven JSONB columns do not churn. Beneath them, the registry refines to ten engine-level domains:
+
+| UI family (kept) | Engine domains (refined) | Rationale |
+|---|---|---|
+| sourcing | supplier selection & multi-sourcing; order placement | contingent rerouting vs. standing split are different decisions |
+| inventory | inventory control; safety stock | control rule vs. buffer sizing are separable algorithms |
+| production | production planning; capacity management | plan generation vs. capacity flexing |
+| fulfillment | allocation; order management | who gets scarce supply vs. how orders ship (partial/split/consolidate) |
+| transport | transport execution | mode, expedite, frequency, consolidation |
+| demand | demand modeling; **forecasting** (new domain) | demand generation is a customer-side model; forecasting is a plant-side decision — today both are engine mechanics (PH-10), promoted to policy slots in §4.4 |
+| recovery | recovery orchestration | sequenced playbooks (P-X.1), not a flat response list |
+
+**Axis 3 — Planning horizon (when the decision binds).** New registry metadata. One critical subtlety: the existing `StrategyClass` enum (BUILT_IN / STRATEGIC / ANTICIPATION / IMPROVISATION) is a **resilience typology** — it classifies how a policy relates to disruptions. It must not be overloaded to mean planning horizon. Horizon is a separate attribute:
+
+| Horizon | Binds | Examples |
+|---|---|---|
+| **Strategic** | Before the run; network/portfolio design choices | multi-sourcing shares (P-S.2), capacity reservation (P-S.3), safety stock design (P-P.3/P-P.4), lane portfolio (P-T.1) |
+| **Tactical** | Weekly planning parameters, revisable at review cadence | forecast method (P-F.1), inventory control rule (P-P.1), lot sizing (P-P.2), consolidation rules (P-T.5), shipping frequency (P-T.6) |
+| **Operational** | Within-week reactive behavior | expediting (P-T.2), backup activation (P-S.1), allocation LP (P-P.9), overtime (P-P.5), dispatching (P-P.11), backorder handling (P-C.1) |
+
+The `/policies` UI gains a horizon lens: the same catalog can be browsed by stage (today's rail) or by horizon, so users see which knobs are design-time commitments and which are runtime behaviors.
+
+### 4.2 Identifier scheme
+
+The catalog ID convention is preserved exactly — every existing reference, docs row, and test keeps working:
+
+- `P-S.x` supplier, `P-P.x` plant, `P-T.x` transport, `P-C.x` customer, `P-X.x` cross-cutting — **unchanged**.
+- **New namespaces:** `P-F.x` for forecasting policies; `P-W.x` reserved for the future warehouse echelon.
+- **New metadata, not new encoding:** `domain` and `horizon` become registry attributes alongside the existing `stage`, `strategy_class`, `constraint_targeted`. IDs stay semantically thin.
+- **Convention for promoted defaults:** when an engine mechanic is promoted to a policy slot (§4.4), the promoted built-in takes the `.0` suffix in its namespace (e.g. `P-P.0 greedy_production_plan`) to signal "this is the default the engine always had."
+
+### 4.3 The PolicyBundle: every node owns its decisions
+
+Each node **instance** (not node type) carries a resolved **PolicyBundle**: a mapping `{domain slot → (policy_id, params)}` covering every slot its role defines. Resolution is a three-level cascade, a direct generalization of today's `policy_defaults` + `policy_overrides`:
+
+```mermaid
+flowchart TD
+    PD["Project defaults<br/>(policy_defaults — exists today)"]
+    TD["Node-type defaults<br/>(new middle layer: all suppliers, all MTS products, ...)"]
+    NO["Per-node overrides<br/>(policy_overrides — exists today)"]
+    RB["Resolved PolicyBundle per node instance<br/>{slot → (policy_id, params)}"]
+    PD --> TD --> NO --> RB
+```
+
+Storage is additive: `policy_defaults` and `policy_overrides` remain; a node-type default layer slots between them. The resolved bundle — not the raw layers — is what gets snapshotted into `policy_versions`, so the `policy_hash` covers exactly what will execute (see §6 facet 12).
+
+This answers the design brief's requirement directly: a supplier node owns its capacity model, lead-time model, allocation discipline, and shipment discipline; a plant owns forecasting, inventory control, production planning, fulfillment discipline, and procurement; a customer owns its demand model and unmet-demand behavior. Two suppliers in the same project can run different allocation disciplines without any engine change.
+
+### 4.4 Slot-and-default: no hidden behavior
+
+Every role defines a **required slot set**, and every slot is **always filled** — if the user configures nothing, the slot holds a named default policy, visible in the UI and hashed into the version. The engine's current implicit mechanics become the promoted defaults of their slots:
+
+| Current engine mechanic | Becomes | Slot |
+|---|---|---|
+| Greedy production plan (PH-40 default, `core/engine.py::_MECHANIC_HOOKS`) | `P-P.0 greedy_production_plan` | plant / production planning |
+| Built-in forecast update (PH-10, ADR 0001) | `P-F.0 builtin_forecast` (variants graduate into P-F.1, §5.3) | plant / forecasting |
+| World demand generator (PH-10 demand draw) | `P-C.4 demand_model` variants | customer / demand modeling |
+| FIFO fulfillment ordering (PH-60 default inside P-C.1) | explicit `release_order` parameter of P-P.12 | plant / order management |
+| Infinite supplier capacity assumption | `P-S.5 supplier_capacity_model = infinite` | supplier / capacity |
+| Deterministic supplier lead time | `P-S.6 lead_time_model = deterministic` | supplier / lead time |
+
+Consequences:
+
+1. **Transparency.** There is no behavior the UI cannot show. "What will this node do?" is answered by reading its bundle, never by knowing engine internals.
+2. **Complete fingerprint.** Because defaults are explicit bundle entries, `policy_hash` becomes a *complete behavioral fingerprint* of the decision layer — the property the run cache (§9.2) and surrogate validity scoping (§11.4) depend on.
+3. **Graceful growth.** Introducing a new algorithm for a slot never breaks old projects: their bundles keep naming the old policy. This is how the platform absorbs research innovations (RL-based ordering, learned allocation) as just another slot occupant.
+4. **Performance guardrail.** Per-node heterogeneity must resolve to *grouped vectorized execution* — nodes sharing `(policy_id, params)` are batched. This is the top engineering risk (§14, R4) and is stated here as a design constraint, not an afterthought: the bundle model must never force per-node Python loops in the hot path.
+
+---
+
+## 5. The v1 policy catalog: make-to-stock + make-to-order scope
+
+This section selects the concrete catalog from the design brief's long candidate lists. Selection principles: (1) scope to MTS + MTO — the engine's shipped fulfillment modes (ADR 0001); (2) respect the weekly-bucket fidelity boundary — policies whose essence is sub-weekly (machine scheduling, queue discipline in minutes) are deferred with rationale, not faked; (3) prefer activating what exists — 9 implemented plugins, 13 planned schemas — before inventing; (4) every policy that needs data names it (`required data` column feeds the §8 manifest).
+
+Status legend: ✅ implemented in scsim today · 🧩 planned (schema registered, raises until built) · ✚ new in this design · ⏸ deferred (§5.8).
+
+### 5.1 Supplier policies (`P-S.x`)
+
+Covers the brief's supplier list: production, capacity, lead time, order acceptance, allocation, priority rules, shipment, partial shipment, backorder, inventory (deferred), transportation selection (lane-scoped, §5.4), supplier selection / multi-sourcing / procurement timing & quantity (these are *plant-side procurement* decisions and live in §5.3 — the plant decides whom to buy from; the supplier decides how to serve).
+
+| ID | Policy | Domain | Horizon | Status | Variants / algorithms | Required data |
+|---|---|---|---|---|---|---|
+| P-S.5 | `supplier_capacity_model` | capacity | strategic | ✚ | infinite · finite_queue (orders wait) · finite_reject (overflow rejected) — formalizes existing `ST_QUEUE` + capacity-gating mechanics as an explicit slot | `suppliers.capacity_per_week` (required for finite variants) |
+| P-S.6 | `lead_time_model` | lead time | tactical | ✚ | deterministic · stochastic(lognormal/gamma, sampled at ship time — existing engine support) · empirical (deferred until sampling design resolved, currently hard-errors) | `inbound_logistics.lead_time`, `materials.lead_time_dist`, `lead_time_cv` |
+| P-S.7 | `supplier_allocation` | allocation | operational | ✚ | FCFS · proportional · priority-class — how a capacity-constrained supplier serves competing orders (single-plant v1: binds when multiple materials queue; multi-customer-of-supplier later) | none beyond P-S.5 |
+| P-S.8 | `shipment_discipline` | order management | operational | ✚ | ship_complete · partial_allowed · threshold(fill ≥ x%) — covers partial shipment and supplier-side backorder queueing | none |
+| P-S.1 | `backup_supplier` | supplier selection | operational | ✅ | contingent reroute on visible disruption; selection rule min_cost / min_leadtime / reliability; cooldown | backup source links + `unit_price`, `reliability_score` |
+| P-S.2 | `proactive_multi_sourcing` | multi-sourcing | strategic | ✅ (unreachable today — G3; §6.2 wires it) | standing order split across warm sources; weights; rebalance trigger | per-source ratios (today's ignored `sourcing.ratios` — G1) |
+| P-S.3 | `capacity_reservation` | capacity | strategic | 🧩 | reserved capacity contracts at premium | reservation quantum, premium |
+| P-S.4 | `early_warning_failover` | supplier selection | operational | 🧩 (M7) | monitoring signal shortens detection lag; pre-emptive failover | monitoring cost, signal quality |
+
+### 5.2 Plant / focal-firm policies (`P-P.x`, `P-F.x`)
+
+Covers: demand management, production, fulfillment, FG inventory, MPS, MRP, dispatching, allocation (customer/product/inventory/capacity), shipment consolidation & splitting (transport side in §5.4), procurement.
+
+| ID | Policy | Domain | Horizon | Status | Variants / algorithms | Required data |
+|---|---|---|---|---|---|---|
+| P-F.1 | `forecasting_method` | forecasting | tactical | ✚ (promoted from PH-10 mechanic) | moving_average · exponential_smoothing · seasonal_naive · user_supplied_series; forecast-error metrics exposed as KPIs | demand history window; calendar (for seasonal) |
+| P-P.0 | `greedy_production_plan` | production planning | operational | ✚ (promoted default) | MTO: produce to demand+backlog; MTS: replenish to S^FG — today's PH-40 mechanic, named | none |
+| P-P.1 | `inventory_control` | inventory control | tactical | ✅ **extended** | min_max ✅ · s_S · base_stock · (R,Q) · periodic — extension closes G1's biggest loss: absolute `reorder_point` / `order_up_to` / `moq` / `review_period_days` honored, coverage-κ retained as the default sizing heuristic | per-material control params; `materials.moq` |
+| P-P.2 | `lot_sizing` | production planning | tactical | 🧩 | fixed · lot_for_lot · EOQ/EPQ · period_order_quantity | `production.setup_cost`, `setup_time_hours`, holding cost |
+| P-P.3 | `safety_stock_materials` | safety stock | strategic | ✅ | fixed_days · service_level · king · abc_xyz (implemented; expose the abc_xyz variant the UI currently can't reach — G1) | service targets; demand/lead-time variability |
+| P-P.4 | `fg_safety_stock` | safety stock | strategic | ✅ (MTS; unreachable today — G3) | service_level · fixed_days · fixed_units; uniform / abc_by_revenue segmentation | `products.sell_price`, demand stats |
+| P-P.5 | `short_term_capacity` | capacity | operational | ✅ | overtime with premium, revenue-positive activation | `production.capacity_units_per_day`, overtime premium |
+| P-P.6 | `standing_capacity_reserve` | capacity | strategic | 🧩 | pre-paid capacity buffer | reserve size, cost |
+| P-P.9 | `material_allocation` | allocation | operational | ✅ (unreachable today — G3) | rolling-horizon LP (HiGHS) · greedy; objectives max_revenue / max_fill_rate / priority_weighted / fg_replenish | product priorities/prices |
+| P-P.11 | `dispatching_rule` | order management | operational | ✚ | FIFO · EDD · priority_class · smallest-remaining — MTO backlog sequencing at weekly-bucket fidelity | order due dates / priority tiers |
+| P-P.12 | `fulfillment_discipline` | order management | operational | ✚ | ship_complete vs. partial to customers; backorder release ordering; order splitting rules | none |
+| — | procurement timing & quantity | — | — | covered | procurement timing/quantity/prioritization are the PH-80 outputs of P-P.1 (+P-P.2 lots, +P-S.2 splits, +P-S.1 reroutes) — not separate policies | — |
+
+**MPS/MRP, named for what they are.** The brief asks for MPS and MRP policies. The engine already computes them at weekly granularity: **PH-40 production planning is the MPS-lite** (master schedule per product per week, adjusted by P-P.5/P-P.9), and **PH-70 material planning — the D_m projection (Eq. 1) exploded through the BOM with s_m/S_m levels — is the MRP-lite**. The design names this correspondence rather than inventing parallel policies: MPS behavior is configured through P-F.1 + P-P.0/P-P.2, MRP behavior through P-P.1 + P-P.3. A future finite-capacity MPS optimizer is just another occupant of the production-planning slot.
+
+### 5.3 Transportation policies (`P-T.x`)
+
+Prerequisite: lanes become first-class model entities (G7, §8.3) — today `Lane.lead_time_weeks` is schema-valid but folded into supplier lead time (roadmap known gap).
+
+| ID | Policy | Domain | Horizon | Status | Variants | Required data |
+|---|---|---|---|---|---|---|
+| P-T.1 | `multimodal_lane_portfolio` | transport | strategic | 🧩 (activate first — prerequisite for modes) | lane set with per-mode lead time/cost/capacity | lane table: mode, cost, lead-time dist, capacity |
+| P-T.2 | `expedited_shipments` | transport | operational | ✅ | premium freight pulls in-transit forward | expedite premium |
+| P-T.3 | `mode_shift` | transport | operational | 🧩 | shift lanes to faster mode under disruption | P-T.1 data |
+| P-T.5 | `shipment_consolidation` | transport | tactical | ✚ | consolidate orders per lane per window | min fill / window |
+| P-T.6 | `shipping_frequency` | transport | tactical | ✚ | fixed weekly · quantity-threshold dispatch | dispatch threshold |
+
+(P-T.4 `leadtime_hedging` stays catalogued 🧩 but is not v1 priority.)
+
+### 5.4 Customer policies (`P-C.x`)
+
+Demand-side behavior, promoted from engine mechanics and data fields into configurable slots:
+
+| ID | Policy | Domain | Horizon | Status | Variants | Required data |
+|---|---|---|---|---|---|---|
+| P-C.4 | `demand_model` | demand modeling | strategic | ✚ (promoted from world demand mechanic) | distribution family (triangular/poisson/negbin/normal/empirical) · order frequency × size decomposition · seasonality/trend profile · forecast-error injection | `products.demand_mean`, `demand_cv`, seasonality profile (calendar, §8.3) |
+| P-C.1 | `unmet_demand_handling` | order management | operational | ✅ | lost_sales ✅ · backorder · partial_backorder (expose the partial variant — G1) | backorder penalty, horizon |
+| P-C.2 | `customer_allocation` | allocation | operational | 🧩 (activate — matches the UI's existing fulfillment allocation enum) | priority · fair_share · proportional · revenue_max · sla_tier | customer tiers, prices |
+| P-C.5 | `backorder_behavior` | demand modeling | operational | ✚ | patience window → cancellation; delivery-window flexibility; service-level expectation as a measured contract (α/β targets per customer) | patience days, SLA targets |
+
+### 5.5 Cross-cutting (`P-X.x`)
+
+| ID | Policy | Status | Content |
+|---|---|---|---|
+| P-X.1 | `recovery_playbook` | 🧩 (activate) | Sequenced, triggered, budgeted recovery orchestration — replaces the flat `recovery.response` string list; the Disruptions→Recovery interaction of §7 becomes explicit: triggers read `FIRM_KNOWLEDGE` (PH-20), actions enable/retune other policies' crisis modes (`ModeStrip`) |
+
+### 5.6 Catalog summary
+
+v1 active surface: **26 policies** (9 implemented, 6 planned-activated, 11 new — of which 4 are promotions of existing mechanics, so genuinely new engine behavior is limited). Appendix A lists all entries including deferred ones with full metadata.
+
+### 5.7 Parameters mean data (forward reference)
+
+Every `Required data` cell above is a contract: selecting the policy makes those fields *required inputs* that the user must supply in the simulation model before a run is allowed (§8). This is the design brief's "if policies need data/parameters, we require the user to update it in the simulation model" — enforced structurally, not by documentation.
+
+### 5.8 Deferred, with rationale
+
+| Candidate (from the brief) | Rationale for deferral |
+|---|---|
+| Machine priority, bottleneck scheduling, queue management, dispatching below weekly buckets | Violates the deliberate weekly-bucket fidelity boundary (`phases.py`); faking them at weekly resolution would produce untrustworthy results. Revisit only with a sub-weekly tick (§14 open question) |
+| Supplier-held inventory / supplier inventory policy | Requires a supplier stock echelon (state beyond queue + lead time); belongs with the multi-echelon expansion (Phase E) |
+| Product substitution (customer-side) | Material-side substitution is covered by planned P-P.8 `alternative_bom`; demand-side substitution needs a product-affinity model — defer |
+| Pricing sensitivity, P-C.3 `demand_shaping` | Requires a price-elasticity/revenue-management model; currently a no-op mapping (G1) — keep catalogued, defer activation |
+| Distribution planning / DRP, delivery scheduling to DCs | Requires the warehouse/DC echelon (`P-W.x`, Phase E) |
+| Route optimization, milk runs | Network *design* optimization, not simulation policy — see §10 (ALX GFA concession) and §14 open questions |
+| Order acceptance (quote/refuse at plant), ETO/CTO modes | Requires due-date promising and engineering lead times; out of MTS/MTO scope |
+
+---
+
+## 6. The standardized policy interface
+
+### 6.1 Twelve facets
+
+Every policy — implemented, planned, or future — is described by twelve facets. Facets 1–10 already exist in embryo in `PolicyPlugin` (A2) and the registry; facets marked **new** are additions this design introduces.
+
+| # | Facet | Content | Today | Direction |
+|---|---|---|---|---|
+| 1 | **Identity** | `id`, `catalog_ref`, human name, summary | ✅ ClassVar metadata | add per-policy **implementation semver**, folded into the engine fingerprint (§9.2) |
+| 2 | **Scope** | which node/edge instances the policy binds to | mostly global today (G1) | **new**: bundle binding per §4.3, resolved before compile |
+| 3 | **Classification** | stage, strategy class, constraint tag + **domain, horizon** | ✅ enums | add the two new axes (§4.1) |
+| 4 | **Triggers** | declared phase residencies: phase, priority, reads, writes, resolution | ✅ `Hook` model — *the gem; unchanged* | — |
+| 5 | **Parameters** | Pydantic `Params`, `extra="forbid"`, units/ranges, `ModeStrip` nominal/alert/crisis | ✅ | add per-field **`data_requirements`** declarations (§8.1) |
+| 6 | **Inputs** | state keys read + entity fields consumed | hooks declare state keys | **new**: entity-field references made machine-readable (feeds the manifest) |
+| 7 | **Outputs** | state keys written + KPI/trace contributions | hooks + KPI rows | document per policy in registry payload |
+| 8 | **State** | private per-replication state and its participation in warm snapshots | implicit | **new**: declared, so `SnapshotStore` reuse (§11.3) is provably correct per policy |
+| 9 | **Feasibility** | `feasibility(scenario)` composition rules; portfolio-level submodularity/overlap warnings | ✅ + `check_portfolio` | — |
+| 10 | **Cost** | `cost_contribution()` into the C^res ledger (`ST_COST_LEDGER`, append-only) | ✅ | — |
+| 11 | **Observability** | structured **decision-trace record** per firing: week, node, trigger, input snapshot, decision, rationale code | **new** | the transparency pillar made concrete; substrate for LLM explanation (§12) |
+| 12 | **Versioning** | params hashed into `policy_versions.policy_hash`; implementation version into the engine fingerprint | ✅ params side | complete both halves (§9.2) |
+
+### 6.2 One source of truth: the registry export becomes platform law
+
+`scsim/scsim/io/registry_export.py` already states the doctrine:
+
+> *"Pydantic is canonical: this module renders the policy catalog (all, implemented + planned), each Params JSON Schema with units/ranges/defaults, the pipeline schema, the KPI dictionary, and the entity variable dictionary into one JSON document. The frontend renders forms from this ONLY (no hard-coded policies); Zod/Supabase validators are code-generated from the same schemas; the MkDocs catalog pages are generated from it too — so docs cannot drift from code."*
+
+Today this is aspiration: the frontend actually renders from the hand-written parallel vocabulary in `src/lib/policies/schemas.ts`, and the lossy mapper reconciles the two (G1). **This design elevates the doctrine to platform law:**
+
+- The `/policies` forms, the Supabase validation in `sim-command`, and the worker's Pydantic mirror are all **generated** from the registry payload. The hand-written Zod schema file is retired.
+- A CI gate — mirroring the existing docs gate (A13) — fails the build when generated artifacts drift from the registry.
+- Consequence: **the UI can only offer what the engine can execute, and everything the UI offers reaches the engine.** G1 and half of G6 are eliminated at the root, not patched. Planned-but-unbuilt policies appear in the UI as visible-but-disabled entries with their milestone — the registry's honest-catalog property (A3) surfaces to users.
+
+### 6.3 Configuration flow
+
+```mermaid
+flowchart LR
+    REG["scsim registry export<br/>(catalog + Params schemas + pipeline + KPI dictionary)"]
+    GEN["generated forms & validators<br/>(frontend + edge fn + worker)"]
+    UI["/policies UI<br/>bundles, presets, horizon lens"]
+    VER["policy_versions snapshot<br/>resolved bundles + policy_hash"]
+    ENG["engine instantiation<br/>params re-validated, hooks load-time checked"]
+    REG --> GEN --> UI --> VER --> ENG
+    ENG -.->|"hash verified"| VER
+```
+
+Users configure everything in `/policies` (per the brief): pick a policy per slot, fill its parameters, or accept preset-derived values — presets (A14) generalize naturally to bundle presets. Replacing a policy implementation never requires engine or UI changes: it is a new registry entry that immediately appears as a new selectable algorithm for its slot.
+
+---
+
+## 7. Policy interaction framework
+
+### 7.1 Derived, not designed
+
+Most simulation tools document policy interactions in prose, which drifts. SureSuite is in a rare position: the interaction graph can be **derived mechanically** from artifacts that already exist and are already enforced. Nodes of the graph are policy hooks and engine mechanics; a directed edge exists wherever one hook *writes* a state key another hook *reads* — intra-week ordering given by `PHASE_ORDER` and hook priorities, cross-week edges through persistent `state.*` keys (which carry week to week). Because `validate_hooks` (`scsim/scsim/core/phases.py`) already enforces read-before-write, single-owner transient writes, authorized persistent writes, and declared write-conflict resolution, **the derived interaction graph is guaranteed sound at load time** — a property no closed commercial engine can offer.
+
+```mermaid
+flowchart LR
+    PH00["PH-00 week_start<br/>disruption_state"] --> PH10["PH-10 demand<br/>demand · forecast"]
+    PH10 --> PH20["PH-20 detection<br/>firm_knowledge"]
+    PH20 --> PH30["PH-30 fulfill from stock<br/>fg_fulfillment (MTS)"]
+    PH30 --> PH40["PH-40 production planning<br/>production_plan · overtime"]
+    PH40 --> PH50["PH-50 production execute<br/>production_output"]
+    PH50 --> PH60["PH-60 fulfillment<br/>fulfillment"]
+    PH60 --> PH70["PH-70 material planning<br/>material_demand · inventory_levels"]
+    PH70 --> PH80["PH-80 procurement<br/>purchase_orders"]
+    PH80 --> PH90["PH-90 logistics<br/>arrivals"]
+    PH90 --> PH99["PH-99 accounting<br/>kpi_rows"]
+    PH90 -.->|"state.on_hand, state.pipeline<br/>(next week)"| PH40
+```
+
+### 7.2 The nine canonical interactions, mapped to the pipeline
+
+The design brief names nine interactions. Each is already — or becomes, with the v1 catalog — a concrete path through phase state keys:
+
+| # | Interaction | Concrete path (writer → key → reader) |
+|---|---|---|
+| 1 | Forecasting → Inventory | P-F.1 writes `forecast` (PH-10) → PH-70 material planning projects D_m and sets s_m/S_m (P-P.1, P-P.3 read the forecast-driven projection) |
+| 2 | Forecasting → Production | `forecast` (PH-10) → PH-40 `production_plan` (MTS replenish-to-target planning reads the forecast; ADR 0001) |
+| 3 | Inventory → Procurement | `inventory_levels` (PH-70, P-P.1/P-P.3) → `purchase_orders` (PH-80 order release, Eqs. 4–6) |
+| 4 | Procurement → Production | `purchase_orders` → `state.pipeline`/`state.queue` (PH-80/90) → `arrivals` → `state.on_hand` → next week's PH-50 material feasibility (`greedy_feasible`, Eq. 8) |
+| 5 | Production → Transportation | `production_output` (PH-50) → PH-90 logistics (v1: FG completes same week; outbound lanes make this edge physical when P-T.1 lands) |
+| 6 | Transportation → Customer service | `arrivals` (PH-90) → `state.on_hand` / `state.fg_on_hand` → PH-30/PH-60 `fulfillment` → fill-rate and backlog KPIs |
+| 7 | Capacity → Lead time | finite supplier capacity (P-S.5) gates the ship queue (PH-90): congestion in `state.queue` *is* endogenous lead-time extension — the emergent interaction, not a parameter |
+| 8 | Allocation → Service level | P-P.9 (PH-40) and P-C.2 (PH-60) reshape `fulfillment` → per-customer/per-product service KPIs (PH-99) |
+| 9 | Disruptions → Recovery | `disruption_state` (PH-00) → `firm_knowledge` after detection lag (PH-20) → P-S.1/P-S.4/P-T.2/P-P.5 activations and P-X.1 playbook steps; crisis `ModeStrip` values engage while any event is firm-visible |
+
+### 7.3 Publishing the graph
+
+The interaction graph becomes a **generated artifact**: `gen_docs.py` (A13) and the registry export gain an interaction-graph payload (nodes, edges, key labels), rendered (a) in the reference docs and (b) in the `/policies` UI — when a user selects a bundle, the UI shows exactly how their chosen policies couple, which slots feed which. The statistical complement already exists: `check_portfolio`'s constraint-overlap and submodularity warnings (A3) tell users when stacked policies target the same constraint and will underdeliver jointly. Mechanical soundness (validate_hooks) + statistical composition advice (check_portfolio) + visible dependency graph = the interaction framework the brief calls for, with zero prose-drift risk.
+
+---
+## 8. Data model and the parameter-requirement contract
+
+### 8.1 The required-data manifest
+
+Policies need data; today the platform lets a run proceed without it and invents values at map time (G4) — the canonical anti-pattern being `products.production_capacity` defaulting to `max(2·demand, 1000)`, which guarantees capacity never constrains anything while the user believes they are simulating a capacity-constrained plant.
+
+The fix is a **contract, not a checklist**. Facet 5 of the policy interface (§6.1) adds `data_requirements` to every parameter model: machine-readable references to entity fields (e.g. `suppliers.capacity_per_week`, `products.sell_price`, `lanes.mode_cost`) with one of three levels:
+
+| Level | Meaning | Run behavior |
+|---|---|---|
+| `required` | The policy is meaningless without it | **Run blocked** until supplied |
+| `recommended` | Defaults exist but materially affect results | Warning with the default shown, acknowledgment required |
+| `defaulted` | Neutral default is genuinely fine | Informational note |
+
+When the user selects policies for their bundles, the platform **compiles a required-data manifest** deterministically from the registry: the union of all `data_requirements` of all selected policies over all nodes in scope. Choosing `P-S.5 supplier_capacity_model = finite_queue` for a supplier makes that supplier's `capacity_per_week` a required input — the UI walks the user to it. This is the brief's "if policies need data, require the user to update it in the simulation model," enforced structurally.
+
+### 8.2 One validation service
+
+Three validation surfaces exist today and disagree (G6): `src/lib/policies/verification.ts` (client-side, checks fields the engine largely does not read), `get_project_dataset_status` (table presence only), and the engine's `MappingWarning`s (accurate, but delivered after dispatch). They are replaced by **one validation service driven by the same registry export** that generates the forms (§6.2):
+
+- Input: project dataset + resolved bundles + scenario.
+- Output: typed findings (`block` / `warn` / `info`), each naming the policy that demands the datum, the entity field, and the affected nodes.
+- Rendered identically in the `/policies` run-&-validate stage (A14), the `/project-manager` completeness view, and the pre-dispatch gate in `sim-command`.
+- The engine's `MappingWarning` stream remains as a final tripwire — but a fully validated project produces zero of them (this is also engine-retirement gate E1, §3).
+
+Silent defaults become structurally impossible: any default the engine would apply is either declared `defaulted` in the manifest (visible pre-run) or is a validation failure.
+
+### 8.3 Data model evolution
+
+Conceptual additions to the input model, each unblocking policies from §5:
+
+| Addition | Unblocks | Notes |
+|---|---|---|
+| **Item-master editing UI** — forms and grid editors for `materials` (cost, MOQ, holding %, initial on-hand, lead-time distribution), `products` (price, capacity, fulfillment mode, demand parameters), `suppliers` (capacity, reliability) | nearly everything (closes G4) | The tables exist (`supabase/migrations/20260614000001_item_master.sql`); only the entry surface is missing. CSV via `UploadWizard` remains the bulk path; forms become the precision path. Templates gain the item-master columns |
+| **Lanes as first-class entities** — per-lane mode, cost, lead-time distribution, capacity, CO₂ | P-T.1/3/5/6 (closes part of G7) | `Lane` already exists in the engine schema; the data model and mapper catch up |
+| **Calendars & seasonality profiles** — named seasonal shapes, working-week conventions | P-C.4 seasonal demand, P-F.1 seasonal forecasting | Weekly granularity retained; calendars modulate weekly rates, they do not introduce days |
+| **Warehouse/DC node type** — reserved | `P-W.x`, DRP (Phase E) | Schema reserves the node type and echelon links now so IDs and views do not churn later |
+| **Customer entities with tiers/SLAs** | P-C.2, P-C.5 | today customers exist only as outbound-arc endpoints |
+
+### 8.4 Dataset versioning and the three-hash provenance triangle
+
+Policies are versioned and hashed; the network and economics are not (G5) — re-uploading a CSV silently rewrites history. The fix mirrors the pattern the platform already trusts (A5):
+
+- **`dataset_versions`**: immutable snapshots of the simulation-relevant input state (arc tables + item masters + lanes + calendars), each with a content-addressed **`graph_hash`**.
+- **Canonicalization rules** (the hash is only as good as its canonical form): sorted row order; units normalized exactly as the mapper already does (`project_map.py::_unit_days`, `_rate_to_weekly` are the precedent); volatile/no-op columns excluded; hash computed over the mapped `ProjectData`, not raw CSV bytes — so cosmetic re-uploads do not spuriously change identity.
+- **Capture points**: explicit "freeze dataset" action, plus automatic capture at run dispatch (as `snapshot_policy` does today for policies).
+- **Runs become triple-bound**: every run references `(dataset_version_id, policy_version_id, scenario)` — full reproducibility, and the foundation of run identity (§9.2).
+
+```mermaid
+flowchart TD
+    DH["graph_hash<br/>dataset_versions (new)"]
+    PH["policy_hash<br/>policy_versions (exists)"]
+    SH["scenario_hash<br/>canonical scenario JSON (new)"]
+    RK["RunKey = engine_fingerprint + graph_hash + policy_hash + scenario_hash + seed spec"]
+    DH --> RK
+    PH --> RK
+    SH --> RK
+```
+
+---
+
+## 9. Experimentation layer: productizing the engine's riches
+
+The engine already contains a research-grade experimentation core that the product never calls (G8, G9): the worker invokes only `run_scenario`. This section defines the experimentation layer that exposes it.
+
+### 9.1 Experiment types
+
+The `experiments` table (exists, orphaned) becomes the umbrella for five typed experiments:
+
+| Type | Backed by (exists today) | What the user gets |
+|---|---|---|
+| **Single run** | `run_scenario` (wired) | today's behavior, unchanged |
+| **Comparison** | CRN pairing via the keyed seed tree (A7) | paired-sample KPI deltas with CIs; the Compare pane stub becomes real |
+| **DOE sweep** | `src/lib/sim/doe.ts` (full-factorial, LHS) + `ExperimentDesigner.tsx` (built, unrendered) | factor screening, main-effect/tornado views |
+| **Stress battery** | `run_st1` / `run_st2`, scorecards, `vulnerability_ranking` (`scsim/scsim/stress/battery.py`) | one-click supplier sweeps producing criticality rankings — the ground-truth generator for §11 |
+| **Portfolio / synergy study** | `run_portfolio_study` + `synergy/decompose.py` | CRN-paired ΔR/ΔC vs. baseline, synergy significance stars, breadth ladder |
+
+### 9.2 Run identity and content-addressed caching
+
+The design brief's resource-efficiency requirement — *"do not spend a lot of calculation resources repeating the same simulation"* — is solved by giving every run a content-addressed identity:
+
+**`RunKey = hash(engine_fingerprint ∥ graph_hash ∥ policy_hash ∥ scenario_hash ∥ seed-tree spec)`**
+
+- `engine_fingerprint` = `ENGINE_VERSION` + implementation versions of all active policies (facet 12) + the pipeline schema snapshot hash (`pipeline_schema.json` — already snapshot-tested). Any engine or policy code change changes the fingerprint; stale reuse is impossible by construction.
+- `graph_hash`, `policy_hash`, `scenario_hash` from §8.4. Because bundles make all behavior explicit (§4.4), `policy_hash` genuinely fingerprints the decision layer.
+- The seed-tree spec enters the key so CRN-paired designs are reproducible and cache-consistent.
+
+A **`run_cache`** consults the key before dispatch: an exact hit returns stored replication statistics instead of recomputing (the "someone already asked this" case — common in stress sweeps and in teams). A **partial hit** exploits the existing warm-state mechanism: `SnapshotStore` (A8) already keys snapshots by a family digest over network + settings + policies *excluding events* — precisely the reuse class stress testing needs. Battery cells and disruption scenarios that share a family resume from the warm state at the disruption week instead of re-simulating warm-up. §11.3 quantifies where this matters. Invalidation requires no bookkeeping: keys are content-addressed, so nothing is ever invalidated — superseded entries are simply never requested again (garbage-collected by age/usage).
+
+### 9.3 Comparison semantics
+
+Two runs are *comparable* iff they are CRN-paired (same seed spec) and their RunKeys differ in **exactly one** component — different policies on the same world (policy evaluation), different graphs under the same policies (network redesign), different scenarios (disruption impact). The Compare UI enforces this: it is not a chart of two arbitrary runs, it is a paired experiment with valid statistics. This turns A7 from an engine property into a product guarantee.
+
+### 9.4 Worker orchestration
+
+The Redis-stream worker (A11) generalizes from one job type to a typed job family: `simulate`, `battery`, `portfolio`, `train_surrogate`, `rank_criticality` (§11.5). Sweeps shard across workers safely because the seed tree and snapshot store are already shard-safe (`scsim/docs/roadmap.md` notes this explicitly — the missing piece is only the orchestrator). Jobs check the run cache before executing; workers remain the sole writers of results.
+
+---
+
+## 10. Benchmark: AnyLogistix
+
+AnyLogistix (ALX) is the reference commercial tool: network optimization (CPLEX-based) plus simulation (AnyLogic-based engine), with policies configured by end users through GUI tables — no coding required for the built-in policy set. The comparison below is capability-by-capability; the objective is not parity but a demonstrably more powerful architecture class.
+
+### 10.1 Capability comparison
+
+| # | Capability | AnyLogistix | Limitation | SureSuite next-gen |
+|---|---|---|---|---|
+| 1 | Network design / GFA | Greenfield analysis + CPLEX network optimization — mature, a genuine strength | Separate paradigm from simulation; optimizer is a black box | **Honest concession:** out of v1 scope. Roadmap candidate via open solver integration (§14 open question). Our wedge is simulation-side, not MILP-side |
+| 2 | Simulation engine | AnyLogic-based, discrete-event, commercial-grade | Closed source; internals not inspectable; extension requires AnyLogic + Java | Open, vectorized phase pipeline; load-time-validated contracts; golden-trace determinism; inspectable end to end |
+| 3 | Inventory policies | min/max, (R,Q), (s,S), order-up-to, periodic — per product-site pair via GUI tables | Fixed library; parameters only; no new algorithm without leaving the GUI paradigm | Same library (P-P.1 extended) **plus** pluggable algorithms per slot; per-node bundles; policy code is one plugin file away (§6.2) |
+| 4 | Sourcing rules | single / multiple sources; fastest / cheapest / priority / fractions | Rule set is closed; contingent vs. proactive sourcing not separable | P-S.1 contingent + P-S.2 proactive as distinct, composable policies with feasibility checks and cost attribution |
+| 5 | Policy configuration UX | GUI tables per product-site; no coding | No presets with rationale; no completeness contract — missing data surfaces as runtime behavior | Registry-generated forms; data-aware presets with per-field `why` (A14); required-data manifest blocks underspecified runs (§8.1) |
+| 6 | Extensibility | AnyLogic escape hatch (Java, agent-based) | Extension abandons the no-code surface; custom logic invisible to the GUI | New policy = plugin + registry row; instantly a first-class GUI citizen with forms, docs, validation (§6.2) |
+| 7 | Transparency & reproducibility | Experiment configs saved in project files | No content hashes; no immutable versions; no decision traces; engine behavior not fully documentable | Three-hash provenance (§8.4); immutable versioned snapshots; per-decision observability records (facet 11); docs generated from code with CI gates |
+| 8 | Experimentation | Simulation, variation, comparison experiments; risk analysis | No formal DOE designs; no CRN pairing guarantees surfaced; no synergy analysis | Typed experiments incl. LHS/factorial DOE, CRN-paired comparison semantics (§9.3), portfolio synergy decomposition with bootstrap significance |
+| 9 | Statistical rigor | Replications with basic statistics | No warm-up detection; no sequential stopping; no distribution-free intervals | MSER-5 warm-up, sequential-CI stopping, conformal prediction intervals (§11.2) |
+| 10 | Risk / resilience analysis | Event injection in simulation; variation experiments | Manual scenario-by-scenario; no systematic node sweeps; no criticality ranking product | Stress batteries with scorecards and `vulnerability_ranking`; surrogate-accelerated full-network criticality analysis (§11) |
+| 11 | Safety stock | Dedicated safety-stock estimation experiment | Isolated experiment, decoupled from policy fabric | P-P.3/P-P.4 are policies inside the same run fabric — sized, simulated, costed, and compared like everything else |
+| 12 | AI / ML | None native | — | Surrogate layer with calibrated uncertainty + fallback (§11); LLM-assisted configuration and explanation (§12) |
+| 13 | Compute economics | Every experiment simulates | Repeated identical runs recomputed | Content-addressed run cache + warm-state snapshot reuse (§9.2) |
+| 14 | Deployment & licensing | Desktop product, commercial licenses | Per-seat cost; closed ecosystem | Web platform; open engine; research-friendly |
+
+### 10.2 What the pillars buy, concretely
+
+- **For practitioners**: the no-code promise ALX makes, kept more strictly — plus the guarantee that what they configured is what ran (registry law, §6.2) and that a rerun next year reproduces bit-identical results (three hashes + golden traces).
+- **For researchers**: an engine whose every interaction is a validated, published contract; CRN and conformal statistics as defaults; the ability to implement a paper's policy as a plugin and benchmark it against the built-ins in an afternoon.
+- **For the business**: criticality analyses that cost a fraction of exhaustive simulation (§11), and experimentation throughput that grows with the cache instead of with compute spend.
+
+### 10.3 Honest limitations
+
+Stated so the roadmap stays credible: no MILP network optimizer (ALX's GFA/NO remains ahead — deliberate); weekly granularity (no sub-weekly operational scheduling); single focal plant in v1 (multi-plant and DC echelons are Phase E); smaller total policy count than ALX + unlimited AnyLogic customization — our bet is that an extensible open catalog closes the gap fast and then compounds.
+
+---
+
+## 11. Stress testing and the adaptive surrogate architecture
+
+This is the platform's flagship analytical capability: **full-network supplier criticality ranking at a fraction of exhaustive simulation cost**, operationalizing the adaptive simulation–surrogate framework (Nguyen, Borodin, Dolgui & Ivanov, WSC'26 submission) inside the platform. The framework's premise matches the platform's economics problem exactly: node-by-node stress testing over `n` suppliers × start times × durations × replications explodes combinatorially (450,000 runs for a 1,000-supplier network in the paper's example); a digital twin needs answers on planning-cycle timescales.
+
+### 11.1 Assets already in place
+
+The engine half of this architecture exists (A8, A9, A12): ST-1/ST-2 batteries produce per-supplier disruption impacts and a `vulnerability_ranking`; warm-state snapshots make each battery cell resume at the disruption week; the sequential-CI machinery implements adaptive replication stopping; the keyed seed tree gives CRN across cells. What is missing is the prediction half (G12), the orchestration (G9), and the resource management (G10, G5).
+
+### 11.2 The adaptive simulation–surrogate loop
+
+```mermaid
+flowchart TD
+    DV["dataset_version (graph_hash)"] --> FEAT["1 · Structural features per supplier<br/>out-degree · weighted out-degree ·<br/>single-sourced count · multi-source rate"]
+    FEAT --> PART["2 · Stratified partition<br/>k-means clusters → sample fraction γ per cluster"]
+    PART --> K["Simulation subset K"]
+    PART --> U["Prediction subset U"]
+    K --> SIM["3 · Direct simulation (battery, cache-aware)<br/>adaptive replication stopping: ρ ≤ ε"]
+    SIM --> TRAIN["4 · Surrogate training<br/>mean + quantile regressors (XGBoost)<br/>conformalized quantile regression on calibration split"]
+    TRAIN --> GATE{"5 · Dual reliability gate<br/>interval width ≤ τ AND novelty ≤ κ ?"}
+    U --> GATE
+    GATE -->|pass| PRED["Surrogate prediction + interval"]
+    GATE -->|fail| SIM
+    PRED --> RANK["6 · Assembled criticality ranking<br/>every entry labeled: simulated / predicted (interval)"]
+    SIM --> RANK
+```
+
+Platform mapping of each step:
+
+1. **Structural features** are computed on the demand-weighted tripartite graph (suppliers → materials → products) from the *versioned* dataset — the same graph the network pages already render; features are versioned as a `feature_spec` so rankings are reproducible.
+2. **Partition**: k-means over standardized features; stratified sample fraction γ per cluster forms K. Cluster count via elbow criterion; (C, γ) are experiment parameters with defaults from the paper's validation (C=4, γ=0.5 achieved Spearman ρ=0.844, perfect top-10 coverage, 39% run reduction on the reference case).
+3. **Direct simulation of K** reuses the battery machinery (A9) with adaptive stopping: batches of `b` replications until the relative CI half-width `ρ_i(n_i) = z·σ̂_i/(μ̂_i·√n_i) ≤ ε` (A12 implements the mechanism). Every cell consults the run cache first (§9.2) and resumes from warm snapshots (A8) — the framework's efficiency multiplies with, not instead of, caching.
+4. **Surrogate training**: mean regressor `f̂` plus lower/upper quantile regressors; a held-out calibration split yields the conformal correction, giving distribution-free prediction intervals — the right choice for zero-inflated, right-skewed lost-sales outcomes.
+5. **Dual reliability gate**: a prediction is accepted only if its conformal interval width ≤ τ *and* its kNN distance from the training set ≤ κ (both thresholds calibrated from the calibration split, not hand-set). Failures route the node to direct simulation and promote it from U to K, growing the labeled set.
+6. **Assembly**: one ranking over all suppliers; simulated entries carry CIs, predicted entries carry conformal intervals; provenance is visible per row. Framed precisely: **this is the AI-native generalization of the existing `vulnerability_ranking` — same output contract, radically cheaper at scale.**
+
+### 11.3 Resource management: never simulate the same thing twice
+
+The brief's emphasis — manage data, saved models, and versions so compute is never wasted — is answered by three cooperating mechanisms, two of which already exist in embryo:
+
+| Mechanism | Granularity | Prevents |
+|---|---|---|
+| **Run cache** on RunKey (§9.2) | whole run | re-simulating an identical (engine, graph, policies, scenario, seeds) request — e.g. re-running an unchanged quarterly stress test, or two analysts asking the same question |
+| **Warm-state snapshots** (A8, `SnapshotStore` family digest) | within-run | re-simulating warm-up for every battery cell/scenario that shares network+settings+policies and differs only in events |
+| **Surrogate prediction** (§11.2) | across nodes | simulating structurally redundant nodes at all — the biggest multiplier, growing with network size |
+
+Stacked, the three mechanisms mean marginal cost falls with use: the second stress test of a quarter costs cache lookups plus only the cells whose inputs actually changed (their graph/policy hashes differ), plus surrogate inference.
+
+### 11.4 Surrogate model registry
+
+Surrogates are models with lifecycles, so they get the same discipline as policies (A5 applied to ML):
+
+**`surrogate_models`** (conceptual columns): model id + semver; kind (`criticality_ranker`, later: KPI emulators); target KPI; `feature_spec` version; **training lineage** — the `dataset_version_id`, `policy_version_id`, and the set of RunKeys it was trained on (full provenance to raw simulations); calibration reference and achieved coverage; thresholds (ε, τ, κ); quality metrics (Spearman ρ, top-k coverage vs. held-out simulation); status (`active` / `stale` / `retired`).
+
+**Validity scoping — a hard rule:** a surrogate is valid only under the policy configuration and network family it was trained on. Its predictions are served only when the requesting context's `graph_hash`-family and `policy_hash` match its lineage; anything else is a cache miss, not an extrapolation.
+
+**Retraining triggers:** new `dataset_version` whose changes touch feature-relevant structure (supplier panel changes, demand shifts — the paper's quarterly/annual cadence); `policy_hash` change on policies that condition the target; gate rejection-rate drift above threshold (the framework's built-in canary — rising fallback rates mean the surrogate no longer covers the population); `engine_fingerprint` bump (always invalidates). Stale models are never silently used: they flip to `stale` and jobs retrain or fall back to direct simulation.
+
+**`surrogate_predictions`** (conceptual): model id, node, point estimate, interval, novelty score, gate outcome, provenance label — persisted so rankings are auditable and so accepted-vs-routed statistics feed the drift trigger.
+
+### 11.5 Orchestration: stress testing as a digital-twin analysis job
+
+The framework runs as a scheduled or event-triggered **analysis job** on the existing worker fabric (§9.4) — the paper's positioning ("a scheduled analysis job inside the digital twin, reading live data, writing results back for planning") made concrete:
+
+```
+rank_criticality job
+  → freeze dataset_version (or reuse latest)          [§8.4]
+  → compute features + partition (K, U)               [§11.2 steps 1–2]
+  → fan out simulate-K cells (sharded, cache-aware)   [§9.2, §9.4]
+  → train + calibrate surrogate; register version     [§11.4]
+  → predict U; gate; fan out routed-back simulations
+  → assemble ranking; persist predictions + ranking
+```
+
+Triggers: on-demand (analyst), scheduled (quarterly stress review, annual supplier-panel refresh), event-driven (new `dataset_version`). Every stage is idempotent and resumable because every intermediate is content-addressed — a crashed job re-runs only missing cells.
+
+### 11.6 Storage concepts (summary)
+
+New conceptual stores introduced by §§8–11, all following the established immutable-snapshot-plus-hash pattern (A5) — concept-level only, no DDL here:
+
+| Store | Keyed by | Holds |
+|---|---|---|
+| `dataset_versions` | `graph_hash` | immutable input snapshots (§8.4) |
+| `run_cache` | `RunKey` | aggregate + replication statistics for reuse (§9.2) |
+| `experiments` / experiment runs | experiment id → RunKeys | typed experiment definitions and members (§9.1; table exists, gains types) |
+| `surrogate_models` | model id + lineage hashes | registered surrogates (§11.4) |
+| `surrogate_predictions` | model id × node | predictions, intervals, gate outcomes (§11.4) |
+| `analysis_jobs` | job id | DAG state, triggers, schedule (§11.5) |
+
+---
+## 12. AI-native capabilities beyond surrogates
+
+Kept short and grounded — each item anchors to an existing artifact, and all obey one guardrail.
+
+- **LLM-assisted policy configuration.** The engine roadmap already plans an *"LLM diff proposer (flagged)"* (M8, `scsim/docs/roadmap.md`). Generalized: the assistant proposes **bundle diffs** from natural-language intent ("make this network resilient to a 6-week outage of our top supplier, budget-neutral") — but a proposal is only ever a candidate `policy_versions` snapshot that must pass the same gates as human input: registry schema validation, `feasibility()` + portfolio checks, and the required-data manifest (§8.1). Nothing free-form reaches the engine.
+- **Decision-trace explanation.** Facet 11's observability records (§6.1) — week, node, trigger, inputs, decision, rationale code — are exactly the context an LLM needs to answer *"why did fill rate drop in week 37?"* with citations to actual policy firings rather than plausible fiction.
+- **Natural-language experiment specification.** "Compare dual sourcing against +2 weeks of safety stock under last quarter's disruption set" compiles to a typed comparison/DOE experiment (§9.1) — reviewable before dispatch, reproducible after.
+
+**Guardrail (platform law):** LLM output is always a *proposal* that passes the same validation gates as human input; simulation results, KPIs, and rankings are never LLM-generated. The AI layer sits beside the provenance fabric, never inside it.
+
+---
+
+## 13. Roadmap
+
+Capability-level phases, not dated, not code-level. Each phase lists exit criteria and the gaps (§2.3) it closes; engine-milestone alignment refers to `scsim/docs/roadmap.md`.
+
+### Phase A — Foundation: one engine, one vocabulary, honest data
+- Engine-retirement gates E1–E2 (§3): mapping-loss elimination, parity characterization.
+- Registry-driven codegen: forms/validators generated from `registry_export.py`; hand-written Zod vocabulary retired (§6.2).
+- Unified validation service + required-data manifest (§8.1–8.2).
+- Item-master editing UI; CSV templates extended (§8.3).
+- `dataset_versions` + `graph_hash`; runs triple-bound (§8.4).
+- Absorbs remaining M7 engine items: plant/edge disruption targets, edge lead-time split, P-S.4, P-C.2.
+- **Exit:** a fully-specified project runs on scsim with zero mapping warnings; every run reproducible from its three hashes. **Closes:** G4, G5, G6; G1/G2 substantially.
+
+### Phase B — Policy completion: the node-owned catalog
+- v1 catalog (§5) implemented/activated: extended P-P.1 parameterization; unreachable policies (P-S.2, P-P.4, P-P.9) wired; new supplier/customer/transport slots; promoted defaults (P-P.0, P-F.x, P-C.4, P-S.5/6).
+- PolicyBundles: node-type default layer, per-node resolution, bundle-aware snapshots (§4.3); horizon lens in `/policies` (§4.1).
+- Interaction graph published in registry payload and UI (§7.3).
+- Engine default flip (gate E3).
+- **Exit:** two nodes of the same type can run different policies end-to-end; every engine behavior visible as a named bundle entry. **Closes:** G1, G2, G3 fully; G7 partially (lanes, calendars).
+
+### Phase C — Experimentation productized
+- Typed experiments: comparison, DOE (resurrect `ExperimentDesigner` + `doe.ts`), stress batteries, portfolio/synergy studies in the product (§9.1); Compare pane with CRN semantics (§9.3).
+- `run_cache` + platform-tier warm-snapshot reuse (§9.2); typed worker jobs + sweep sharding (§9.4).
+- Disruption model broadened per engine roadmap: demand-surge event class, ST-3…ST-7 batteries (G11).
+- Aligns with M8: remaining planned policies, P-X.1 recovery playbook.
+- **Exit:** a full ST-1 battery over a reference network runs sharded, cache-aware, and a repeat run costs near-zero compute. **Closes:** G8, G9, G10; G11 substantially.
+
+### Phase D — AI-native
+- Surrogate pipeline + `surrogate_models` registry + `rank_criticality` analysis job with dual-gate fallback (§11).
+- Drift-triggered retraining; provenance-labeled rankings in the UI.
+- LLM assist (flagged): bundle diff proposer, decision-trace explanation (§12).
+- Legacy engine removal (gate E4).
+- **Exit:** full-network criticality ranking on a 1,000-supplier-class network within a planning cycle, with measured rank fidelity against held-out simulation. **Closes:** G12.
+
+### Phase E — Expansion
+- Warehouse/DC echelon (`P-W.x`), DRP-class policies, multi-plant; ATO fulfillment mode.
+- Multimodal transport at full fidelity (P-T.1/T.3 across lanes with mode capacity/cost).
+- Network-design/optimization exploration (build-vs-integrate, §14).
+- **Exit criteria set when Phase C/D learnings land.** Extends the platform beyond the assumptions inventoried in §2.4.
+
+---
+
+## 14. Risks and open questions
+
+### Risks
+
+| ID | Risk | Impact | Mitigation |
+|---|---|---|---|
+| R1 | Engine-migration behavioral drift: legacy → scsim changes results users have anchored on | trust | Parity characterization gate (E2); differences documented as corrections; golden traces pinned (A15) |
+| R2 | Weekly-bucket fidelity ceiling: users expect operational policies (machine scheduling) the tick cannot honestly support | scope creep / mistrust | Explicit fidelity boundary in the catalog (§5.8); deferred list is public; sub-weekly tick is a declared open question, not a silent promise |
+| R3 | Registry→UI codegen skew: generated forms drift from engine schemas | correctness | CI gate mirroring the docs gate (A13); registry payload versioned; generated artifacts checked in and diffed |
+| R4 | **Per-node policy heterogeneity vs. vectorized performance** — the engine's speed (0.33 s/rep at manuscript scale) rests on global vectorization; naive per-node dispatch destroys it | performance — the top engineering risk | Design constraint stated in §4.4: bundles resolve to grouped vector ops (batch nodes sharing `(policy_id, params)`); perf guard tests extended to heterogeneous-bundle scenarios |
+| R5 | Policy-portfolio combinatorial explosion: 26-slot bundles overwhelm users | usability | Slot defaults always valid; presets generalize to bundles (A14); feasibility + submodularity warnings (A3); horizon lens separates design-time from run-time choices |
+| R6 | Surrogate validity scope creep: predictions consumed outside their trained context | wrong decisions | Hard lineage scoping (§11.4); dual gate; provenance labels on every ranking row; drift canary on gate rejection rate |
+| R7 | `graph_hash` canonicalization fragility: cosmetic CSV differences change identity, or real changes don't | cache correctness | Hash the mapped `ProjectData`, not raw files; reuse the mapper's unit normalizers; canonicalization rules versioned with the hash spec |
+| R8 | Cache correctness under engine evolution | silent staleness | `engine_fingerprint` includes engine version, policy impl versions, and the pipeline schema hash — already snapshot-tested (`pipeline_schema.json`) |
+| R9 | `policy_versions` back-compat through the bundle migration | broken history | Snapshot `schema_version` already exists (v1/v2 precedent in `policy_snapshot.py`); v3 bundles read v2 families via the same upgrade path |
+
+### Open questions
+
+1. **Storage shape for bundles:** keep the seven JSONB family columns as the storage substrate with bundles as a resolved view (recommended — zero migration risk), or migrate storage to bundle-native rows? Decide in Phase B design review.
+2. **Network optimization:** build a MILP/heuristic optimizer, integrate an open solver, or deliberately stay simulation-pure and interoperate? (§10.1 row 1.) Decide after Phase C, informed by user demand.
+3. **Warehouse echelon math:** how does the DC echelon interact with the single-plant Part-III formulation — extension or second model class?
+4. **Surrogate sharing:** are surrogates strictly per-project, or shareable across projects with compatible feature specs (data governance implications)?
+5. **Sub-weekly tick:** is there ever a business case that justifies breaking the weekly fidelity boundary, or do sub-weekly questions belong to a different tool class?
+
+---
+
+## Appendix A — Full policy catalog
+
+Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this design · 🔒 reserved · ⏸ deferred. StrategyClass is the existing resilience typology (§4.1); horizon is the new axis. Hooks listed for implemented policies only.
+
+| ID | Name | Stage | Domain | Horizon | Status | Hooks / notes |
+|---|---|---|---|---|---|---|
+| P-S.1 | backup_supplier | supplier | supplier selection | operational | ✅ | PH-80; contingent reroute, cooldown |
+| P-S.2 | proactive_multi_sourcing | supplier | multi-sourcing | strategic | ✅ | PH-80; standing split — wire to UI (G3) |
+| P-S.3 | capacity_reservation | supplier | capacity | strategic | 🧩 M8 | reserved capacity at premium |
+| P-S.4 | early_warning_failover | supplier | supplier selection | operational | 🧩 M7 | PH-20 detection resident |
+| P-S.5 | supplier_capacity_model | supplier | capacity | strategic | ✚ | infinite / finite_queue / finite_reject; formalizes `ST_QUEUE` mechanics |
+| P-S.6 | lead_time_model | supplier | lead time | tactical | ✚ | deterministic / stochastic dists; empirical deferred |
+| P-S.7 | supplier_allocation | supplier | allocation | operational | ✚ | FCFS / proportional / priority |
+| P-S.8 | shipment_discipline | supplier | order management | operational | ✚ | complete / partial / threshold |
+| P-F.0 | builtin_forecast | plant | forecasting | tactical | ✚ (promoted PH-10 mechanic) | named default of the forecasting slot |
+| P-F.1 | forecasting_method | plant | forecasting | tactical | ✚ | moving_avg / exp_smoothing / seasonal_naive / user series |
+| P-P.0 | greedy_production_plan | plant | production planning | operational | ✚ (promoted PH-40 mechanic) | MTO to demand+backlog; MTS to S^FG |
+| P-P.1 | inventory_control | plant | inventory control | tactical | ✅ extended | PH-70/80; min_max ✅ + s_S / base_stock / (R,Q) / periodic with absolute params |
+| P-P.2 | lot_sizing | plant | production planning | tactical | 🧩 M8 | fixed / L4L / EOQ-EPQ / POQ |
+| P-P.3 | safety_stock_materials | plant | safety stock | strategic | ✅ | PH-70; fixed_days / service_level / king / abc_xyz |
+| P-P.4 | fg_safety_stock | plant | safety stock | strategic | ✅ (MTS) | PH-70; wire to UI (G3) |
+| P-P.5 | short_term_capacity | plant | capacity | operational | ✅ | PH-40; overtime, revenue-positive activation |
+| P-P.6 | standing_capacity_reserve | plant | capacity | strategic | 🧩 M8 | pre-paid buffer |
+| P-P.7 | process_flexibility | plant | production planning | strategic | 🧩 M8 | |
+| P-P.8 | alternative_bom | plant | production planning | operational | 🧩 M8 | material-side substitution |
+| P-P.9 | material_allocation | plant | allocation | operational | ✅ | PH-40; rolling LP (HiGHS) / greedy — wire to UI (G3) |
+| P-P.10 | repurposing | plant | production planning | operational | 🧩 M8 | |
+| P-P.11 | dispatching_rule | plant | order management | operational | ✚ | FIFO / EDD / priority (weekly buckets) |
+| P-P.12 | fulfillment_discipline | plant | order management | operational | ✚ | complete vs. partial; release order; splitting |
+| P-T.1 | multimodal_lane_portfolio | transport | transport | strategic | 🧩 M7 | prerequisite: lanes first-class (§8.3) |
+| P-T.2 | expedited_shipments | transport | transport | operational | ✅ | PH-90; premium pull-forward |
+| P-T.3 | mode_shift | transport | transport | operational | 🧩 M7 | needs P-T.1 |
+| P-T.4 | leadtime_hedging | transport | transport | tactical | 🧩 M8 | not v1 priority |
+| P-T.5 | shipment_consolidation | transport | transport | tactical | ✚ | per-lane window consolidation |
+| P-T.6 | shipping_frequency | transport | transport | tactical | ✚ | fixed weekly / threshold dispatch |
+| P-C.1 | unmet_demand_handling | customer | order management | operational | ✅ | PH-60; lost_sales ✅ / backorder / partial_backorder |
+| P-C.2 | customer_allocation | customer | allocation | operational | 🧩 M7 | priority / fair_share / proportional / revenue_max / sla_tier |
+| P-C.3 | demand_shaping | customer | demand modeling | operational | 🧩 M8 · ⏸ activation | needs revenue model (§5.8) |
+| P-C.4 | demand_model | customer | demand modeling | strategic | ✚ (promoted mechanic) | distribution / frequency×size / seasonality / forecast error |
+| P-C.5 | backorder_behavior | customer | demand modeling | operational | ✚ | patience → cancellation; delivery windows; SLA expectations |
+| P-X.1 | recovery_playbook | network | recovery | operational | 🧩 M8 (activate) | sequenced triggers/budgets; replaces flat response list |
+| P-W.x | warehouse namespace | warehouse | — | — | 🔒 Phase E | DRP, echelon inventory, delivery scheduling |
+
+Deferred (no IDs assigned): machine-level scheduling & sub-weekly queueing; supplier-held inventory echelon; customer-side product substitution; route optimization / milk runs; order acceptance & due-date promising (ETO/CTO). Rationale in §5.8.
+
+## Appendix B — Phase and state-key reference
+
+Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs/reference/pipeline.md`). Transient keys are owned by exactly one phase and recomputed weekly; persistent `state.*` keys carry across weeks with declared writer phases.
+
+| Phase | Name | Owns (transient) | Resident policies (v1 catalog) |
+|---|---|---|---|
+| PH-00 | week_start | `disruption_state` | — (engine mechanic) |
+| PH-10 | demand_realization | `demand`, `forecast` | P-C.4, P-F.0/P-F.1 |
+| PH-20 | detection | `firm_knowledge` | P-S.4, P-X.1 |
+| PH-30 | fulfill_from_stock (MTS) | `fg_fulfillment` | P-P.12 |
+| PH-40 | production_planning | `production_plan`, `overtime_capacity`, `substitutions` | P-P.0, P-P.2, P-P.5, P-P.8, P-P.9, P-P.11 |
+| PH-50 | production_execute | `production_output` | — (pure mechanics, Eq. 8/9) |
+| PH-60 | fulfillment | `fulfillment` | P-C.1, P-C.2, P-C.3, P-P.12 |
+| PH-70 | material_planning | `material_demand`, `inventory_levels` | P-P.1, P-P.3, P-P.4 |
+| PH-80 | procurement | `purchase_orders` | P-P.1, P-S.1, P-S.2 |
+| PH-90 | logistics | `arrivals` | P-S.5–S.8, P-T.2, P-T.3, P-T.5, P-T.6 |
+| PH-99 | accounting | `kpi_rows` | — (read-only; `cost_contribution` assessed) |
+
+| Persistent key | Authorized writers | Carries |
+|---|---|---|
+| `state.on_hand` | PH-50, PH-90 | material on-hand |
+| `state.backlog` | PH-60 | order backlog |
+| `state.lost_sales` | PH-60 | cumulative lost sales |
+| `state.pipeline` | PH-80, PH-90 | in-transit ring buffer per supplier-material link |
+| `state.queue` | PH-80, PH-90 | supplier order queue (capacity gating) |
+| `state.fg_on_hand` | PH-30, PH-50 | finished-goods stock (MTS) |
+| `state.fg_target` | PH-70 | S^FG target, read next week at PH-40 (ADR 0001) |
+| `state.cost_ledger` | any phase (append-only) | C^res component contributions |
+
+## Appendix C — Glossary and gap index
+
+**Glossary.** *PolicyBundle*: a node instance's resolved `{slot → (policy_id, params)}` map (§4.3). *Slot*: a decision domain a node role must fill (§4.4). *Promoted default*: an engine mechanic given a policy ID and UI visibility (`.0` convention). *Registry export*: the single JSON payload (`registry_export.py`) from which forms, validators, and docs are generated. *Required-data manifest*: the compiled set of entity fields the selected policies demand (§8.1). *RunKey*: content-addressed run identity (§9.2). *Family digest*: `SnapshotStore`'s hash over network+settings+policies excluding events (A8). *Dual reliability gate*: interval-width + novelty test that routes surrogate predictions back to simulation (§11.2). *Three-hash provenance*: `graph_hash` + `policy_hash` + `scenario_hash` binding every run (§8.4).
+
+**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D.
