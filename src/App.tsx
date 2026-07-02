@@ -16,10 +16,8 @@ import ProcessLevelNetwork from './pages/ProcessLevelNetwork';
 import FirmLevelNetwork from './pages/FirmLevelNetwork';
 import InteractiveNetworkSpace from './pages/InteractiveNetworkSpace';
 import GettingStarted from './pages/GettingStarted';
-import Simulation from './pages/Simulation';
 import ProjectPolicies from './pages/ProjectPolicies';
 import SimulationLab from './pages/SimulationLab';
-import TestProminence from './pages/TestProminence';
 import ProjectIntelligence from './pages/ProjectIntelligence';
 import Profile from './pages/Profile';
 import Forbidden from './pages/Forbidden';
@@ -108,17 +106,6 @@ function App() {
                   }
                 />
                 <Route
-                  path="/simulation"
-                  element={
-                    <ProtectedRoute>
-                    <RoleGuard><Simulation 
-                        isCollapsed={isCollapsed} 
-                        setIsCollapsed={setIsCollapsed} 
-                    /></RoleGuard>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
                   path="/policies"
                   element={
                     <ProtectedRoute>
@@ -158,7 +145,6 @@ function App() {
                   <Route path=":slug" element={<HelpPage />} />
                 </Route>
                 <Route path="/about" element={<Navigate to="/help" replace />} />
-                <Route path="/test-prominence" element={<TestProminence />} />
               </Routes>
               <FloatingChatBubble />
             </Router>

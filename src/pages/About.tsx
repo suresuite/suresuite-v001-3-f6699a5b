@@ -2521,8 +2521,8 @@ scenario      ┘    role read)     pure)          defaults · warnings)
             <Section id="boundary" icon={Boxes} title="System boundary">
               <Prose>
                 <p>
-                  Two simulation systems exist in the repository. This document covers{" "}
-                  <strong>System 1</strong>; System 2 is legacy and being phased out.
+                  A single realtime simulation system powers the app. (An older batch system —
+                  Render-hosted, job-based — has been removed from the codebase.)
                 </p>
               </Prose>
               <div className="overflow-x-auto">
@@ -2530,17 +2530,16 @@ scenario      ┘    role read)     pure)          defaults · warnings)
                   <thead className="bg-muted/40 text-left">
                     <tr>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Aspect</th>
-                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">System 1 — Realtime</th>
-                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">System 2 — Batch (legacy)</th>
+                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Realtime system</th>
                     </tr>
                   </thead>
                   <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20">
-                    <tr><td>Entry</td><td><code>sim-command</code></td><td className="text-muted-foreground"><code>simulation-runner</code></td></tr>
-                    <tr><td>Compute</td><td>Fly.io <code>sim-worker</code></td><td className="text-muted-foreground">Render <code>sc-sim-api-brbl</code></td></tr>
-                    <tr><td>Transport</td><td>Upstash Redis stream</td><td className="text-muted-foreground">HTTP POST → edge → HTTP</td></tr>
-                    <tr><td>Latency target</td><td>Sub-second, interactive</td><td className="text-muted-foreground">Minutes, job-based</td></tr>
-                    <tr><td>Result table</td><td><code>simulation_runs</code>, <code>run_replications</code></td><td className="text-muted-foreground"><code>simulation_jobs</code></td></tr>
-                    <tr><td>Used by</td><td>Product/Process UI, Policies preview, Sim Lab</td><td className="text-muted-foreground">Older one-shot runs</td></tr>
+                    <tr><td>Entry</td><td><code>sim-command</code></td></tr>
+                    <tr><td>Compute</td><td>Fly.io <code>sim-worker</code></td></tr>
+                    <tr><td>Transport</td><td>Upstash Redis stream</td></tr>
+                    <tr><td>Latency target</td><td>Sub-second, interactive</td></tr>
+                    <tr><td>Result table</td><td><code>simulation_runs</code>, <code>run_replications</code></td></tr>
+                    <tr><td>Used by</td><td>Product/Process UI, Policies preview, Sim Lab</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -2723,9 +2722,11 @@ scenario      ┘    role read)     pure)          defaults · warnings)
                     function (recovery-aware stub). The Fly worker will upsert real results over them.
                   </li>
                   <li>
-                    System 2 (Render <code>sc-sim-api-brbl</code> + <code>simulation-runner</code> /{" "}
-                    <code>external-simulation-processor</code>) still exists in the codebase but is not
-                    part of this flow and is slated for removal.
+                    The legacy batch system (Render <code>sc-sim-api-brbl</code> +{" "}
+                    <code>simulation-runner</code> / <code>external-simulation-processor</code>) has been
+                    removed from the codebase. Its database tables (<code>simulation_jobs</code>,{" "}
+                    <code>simulation_results</code>, …) remain in Postgres, inert, pending a cleanup
+                    migration.
                   </li>
                 </ul>
               </Prose>

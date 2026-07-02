@@ -90,12 +90,6 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
         label: "Simulation Lab",
         tooltip: "Scientific experiments: replications, warm-up, utilization KPIs",
       },
-      {
-        to: "/simulation",
-        icon: FlaskConical,
-        label: "Legacy Sim",
-        tooltip: "Legacy single-run simulation",
-      },
     ],
   },
   {
