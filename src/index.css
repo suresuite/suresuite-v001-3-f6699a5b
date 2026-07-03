@@ -85,10 +85,13 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --header-background: 0 0% 7%;
-    --header-border: 0 0% 18%;
+    --border: 0 0% 16%;
+    --border-strong: 0 0% 22%;
+    --input: 0 0% 16%;
+    --surface-elevated: 0 0% 6.5%;
+    --surface-sunken: 0 0% 2.5%;
+    --header-background: 0 0% 5%;
+    --header-border: 0 0% 14%;
     --ring: 0 0% 83.1%;
 
     /* Dark mode grays */
