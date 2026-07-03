@@ -441,7 +441,7 @@ export const SCSIM_ENUM_OPTIONS: Record<string, readonly string[]> = {
 export const RESPONSE_ENGINE_EFFECTS: Record<string, string> = Object.fromEntries(
   (["reroute", "dual_source_activate", "mode_shift", "capacity_flex"] as const)
     .map((r) => [r, responseEngineEffect(r)] as const)
-    .filter((e): e is readonly [string, string] => Boolean(e[1])),
+    .filter((e): e is readonly ["capacity_flex" | "dual_source_activate" | "mode_shift" | "reroute", string] => Boolean(e[1])),
 );
 
 /** Human-friendly labels + units for fields. */
