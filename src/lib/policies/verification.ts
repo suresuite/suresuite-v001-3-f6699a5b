@@ -3,6 +3,7 @@ import type { OverrideRow } from "./resolve";
 import { effectivePolicy } from "./resolve";
 import type { StageKey } from "./stages";
 import type { StageRow } from "@/hooks/useStageRows";
+import type { MaterialRow, ProductRow } from "@/hooks/useItemMasters";
 
 export type Severity = "block" | "warn" | "info";
 
@@ -25,13 +26,47 @@ interface VerifyInput {
   customerRows: StageRow[];
   /** Optional — when omitted, the time-unit check is skipped. */
   timeUnit?: "day" | "week" | "month" | null;
+  /**
+   * Item-master economics the engine actually reads (Phase A / G4 / §8.3).
+   * When omitted (e.g. the write RPCs haven't reached the DB yet) the
+   * item-master checks are skipped rather than producing false blockers.
+   */
+  materials?: MaterialRow[];
+  products?: ProductRow[];
 }
 
+const num = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Pre-run validation for the /policies "Run & Validate" stage.
+ *
+ * Two kinds of check:
+ *   1. Structural/topology checks on the sourcing graph (a material must have a
+ *      supplier, exactly one primary, etc.) — these mirror hard errors the
+ *      mapper raises.
+ *   2. Data-completeness checks on the economics the scsim engine actually
+ *      reads — the item masters (materials.cost, products.sell_price/
+ *      demand_mean/production_capacity). Each is graded against the engine's
+ *      real fallback chain (scsim/scsim/io/project_map.py): a field resolves
+ *      to a meaningless *constant* → block; it resolves via a logistics
+ *      fallback → warn; the master is set → clean.
+ *
+ * It deliberately no longer checks policy-override fields the engine ignores
+ * (transport.lead_time_mean_days, sourcing.material_price, production
+ * capacities, absolute reorder points) — that was gap G6: passing validation
+ * while the run silently defaulted every economic input.
+ */
 export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   const out: Finding[] = [];
-  const { defaults, overrides, fulfillmentStrategy, supplierRows, plantRows, customerRows, timeUnit } = input;
-
-  const has = <T,>(v: T | undefined | null): v is T => v !== undefined && v !== null && (v as any) !== "";
+  const {
+    defaults, overrides,
+    supplierRows, plantRows, customerRows, timeUnit,
+    materials, products,
+  } = input;
 
   if (timeUnit === null) {
     out.push({
@@ -43,7 +78,7 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
     });
   }
 
-  // ---------- Suppliers ----------
+  // ---------- Suppliers: sourcing topology ----------
   if (supplierRows.length === 0) {
     out.push({
       id: "no-suppliers",
@@ -53,13 +88,17 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
       hint: "Upload inbound logistics in Data Manager.",
     });
   }
-  // primary checked? exactly one per material
+  // Exactly one primary supplier per material; every material sourced.
   const primariesByMat = new Map<string, number>();
-  // materials whose only "supplier" is the unassigned placeholder
   const materialsMissingSupplier = new Set<string>();
+  // Per-material inbound price — the engine's fallback for materials.cost.
+  const inboundPriceByMat = new Map<string, number>();
   for (const r of supplierRows) {
-    if ((r as any).__needs_supplier || r.supplier_id === "(unassigned supplier)") {
-      const mat = String(r.material_id ?? "");
+    const mat = String(r.material_id ?? "");
+    if (mat) {
+      inboundPriceByMat.set(mat, Math.max(inboundPriceByMat.get(mat) ?? 0, num((r as Record<string, unknown>).material_price)));
+    }
+    if ((r as Record<string, unknown>).__needs_supplier || r.supplier_id === "(unassigned supplier)") {
       if (mat) materialsMissingSupplier.add(mat);
       out.push({
         id: `s-nosup-${r.material_id}`,
@@ -72,54 +111,8 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
       continue;
     }
     const eff = effectivePolicy(defaults, overrides, "node", String(r.key));
-    const isPrimary = (eff.sourcing as any).primary_source === true;
-    const mat = String(r.material_id ?? "");
-    if (isPrimary) primariesByMat.set(mat, (primariesByMat.get(mat) ?? 0) + 1);
-    const lt = (eff.transport as any).lead_time_mean_days;
-    if (!has(lt) || lt <= 0) {
-      out.push({
-        id: `s-lt-${r.key}`,
-        severity: "warn",
-        stage: "supplier",
-        rowKey: String(r.key),
-        field: "lead_time_mean_days",
-        message: `Supplier "${r.supplier_id}" has no positive lead time.`,
-      });
-    }
-    const price = (eff.sourcing as any).material_price ?? 0;
-    if (!has(price) || price <= 0) {
-      out.push({
-        id: `s-price-${r.key}`,
-        severity: "warn",
-        stage: "supplier",
-        rowKey: String(r.key),
-        field: "material_price",
-        message: `Material "${r.material_id}" has no unit price — cost calculations will be zero.`,
-        hint: "Set a material price so the simulation can compute total supply cost.",
-      });
-    }
-    const sigma = (eff.transport as any).lead_time_std_days ?? 0;
-    if (has(lt) && lt > 0 && sigma >= lt * 3) {
-      out.push({
-        id: `s-sigma-${r.key}`,
-        severity: "warn",
-        stage: "supplier",
-        rowKey: String(r.key),
-        field: "lead_time_std_days",
-        message: `σ (${sigma}) is ≥ 3× the mean lead time — distribution will be near-degenerate.`,
-      });
-    }
-    const moq = (eff.inventory as any).moq ?? 0;
-    const cap = (eff.sourcing as any).supplier_capacity_per_day ?? 0;
-    if (moq > 0 && cap > 0 && moq > cap * 30) {
-      out.push({
-        id: `s-moq-${r.key}`,
-        severity: "warn",
-        stage: "supplier",
-        rowKey: String(r.key),
-        field: "moq",
-        message: `MOQ (${moq}) exceeds 30 days of supplier capacity (${cap}/day).`,
-      });
+    if ((eff.sourcing as Record<string, unknown>).primary_source === true) {
+      primariesByMat.set(mat, (primariesByMat.get(mat) ?? 0) + 1);
     }
   }
   for (const [mat, count] of primariesByMat) {
@@ -132,7 +125,6 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
       });
     }
   }
-  // materials with no primary at all → blocker
   const mats = new Set(supplierRows.map((r) => String(r.material_id ?? "")));
   for (const m of mats) {
     if (materialsMissingSupplier.has(m)) continue;
@@ -146,100 +138,23 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
     }
   }
 
-  // ---------- Plant ----------
-  const isMTS = fulfillmentStrategy === "make_to_stock" ||
-    fulfillmentStrategy === "assemble_to_order" ||
-    fulfillmentStrategy === "configure_to_order";
-  for (const r of plantRows) {
-    const eff = effectivePolicy(defaults, overrides, "node", String(r.key));
-    const cap = ((eff.production as any).capacity_machine_per_day ?? 0)
-      + ((eff.production as any).capacity_labor_per_day ?? 0);
-    if (cap <= 0) {
-      out.push({
-        id: `p-cap-${r.key}`,
-        severity: "warn",
-        stage: "plant",
-        rowKey: String(r.key),
-        field: "capacity_machine_per_day",
-        message: `Product "${r.product_id}" has zero machine + labor capacity.`,
-      });
-    }
-    if (isMTS) {
-      const inv = (eff.inventory as any);
-      if (!has(inv.reorder_point) || inv.reorder_point <= 0) {
-        out.push({
-          id: `p-rop-${r.key}`,
-          severity: "warn",
-          stage: "plant",
-          rowKey: String(r.key),
-          field: "reorder_point",
-          message: `MTS strategy but reorder point is 0 for "${r.product_id}".`,
-        });
-      }
-      if (inv.order_up_to <= inv.reorder_point) {
-        out.push({
-          id: `p-S-${r.key}`,
-          severity: "block",
-          stage: "plant",
-          rowKey: String(r.key),
-          field: "order_up_to",
-          message: `Order-up-to (${inv.order_up_to}) must be greater than reorder point (${inv.reorder_point}).`,
-        });
-      }
-    }
-    const prodLt = (eff.production as any).production_lead_time_mean_days;
-    if (!has(prodLt) || prodLt <= 0) {
-      out.push({
-        id: `p-lt-${r.key}`,
-        severity: "warn",
-        stage: "plant",
-        rowKey: String(r.key),
-        field: "production_lead_time_mean_days",
-        message: `No production lead time set for "${r.product_id}".`,
-      });
-    }
-  }
-
-  // ---------- Customer ----------
+  // ---------- Customers: fulfillment topology ----------
+  // Per-product outbound price + volume — the engine's fallbacks for
+  // products.sell_price and products.demand_mean respectively.
+  const outboundPriceByProd = new Map<string, number>();
+  const outboundVolByProd = new Map<string, number>();
   const primariesByCP = new Map<string, number>();
   const cpSeen = new Set<string>();
   for (const r of customerRows) {
+    const prod = String(r.product_id ?? "");
+    if (prod) {
+      outboundPriceByProd.set(prod, Math.max(outboundPriceByProd.get(prod) ?? 0, num((r as Record<string, unknown>).price)));
+      outboundVolByProd.set(prod, (outboundVolByProd.get(prod) ?? 0) + num((r as Record<string, unknown>).mean_per_day));
+    }
     const eff = effectivePolicy(defaults, overrides, "node", String(r.key));
-    const mean = (eff.demand as any).mean_per_day ?? 0;
-    if (mean <= 0 && fulfillmentStrategy !== "engineer_to_order") {
-      out.push({
-        id: `c-mean-${r.key}`,
-        severity: "warn",
-        stage: "customer",
-        rowKey: String(r.key),
-        field: "mean_per_day",
-        message: `Customer "${r.customer_id}" has zero mean demand.`,
-      });
-    }
-    const price = (eff.fulfillment as any).price ?? 0;
-    if (price < 0) {
-      out.push({
-        id: `c-price-${r.key}`,
-        severity: "block",
-        stage: "customer",
-        rowKey: String(r.key),
-        field: "price",
-        message: `Negative price for "${r.product_id}".`,
-      });
-    } else if (price === 0 && mean > 0) {
-      out.push({
-        id: `c-price-zero-${r.key}`,
-        severity: "warn",
-        stage: "customer",
-        rowKey: String(r.key),
-        field: "price",
-        message: `Customer "${r.customer_id}" has demand but zero selling price — revenue will be zero.`,
-        hint: "Set a unit price so the simulation can compute revenue and profit KPIs.",
-      });
-    }
     const cp = `${r.customer_id}::${r.product_id}`;
     cpSeen.add(cp);
-    if ((eff.fulfillment as any).primary_source === true) {
+    if ((eff.fulfillment as Record<string, unknown>).primary_source === true) {
       primariesByCP.set(cp, (primariesByCP.get(cp) ?? 0) + 1);
     }
   }
@@ -254,6 +169,72 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
           n === 0
             ? `Customer/product "${cp}" has no primary sourcing firm — select one.`
             : `Customer/product "${cp}" has ${n} primary firms — pick exactly one.`,
+      });
+    }
+  }
+
+  // ---------- Item-master economics (the fields the engine reads) ----------
+  // Materials: cost → master, else cheapest inbound price, else 1.0.
+  for (const m of materials ?? []) {
+    if (num(m.cost) > 0) continue;
+    const mid = String(m.material_id);
+    const fb = inboundPriceByMat.get(mid) ?? 0;
+    out.push(
+      fb > 0
+        ? {
+            id: `im-cost-${mid}`, severity: "warn", stage: "supplier", rowKey: mid, field: "cost",
+            message: `Material "${mid}" has no master cost — the engine will use its inbound price (≈${round2(fb)}).`,
+            hint: "Set a cost in the Item Master editor to make supply cost explicit.",
+          }
+        : {
+            id: `im-cost-${mid}`, severity: "block", stage: "supplier", rowKey: mid, field: "cost",
+            message: `Material "${mid}" has no cost in the item master or inbound logistics — the engine would default it to 1.0.`,
+            hint: "Set a cost in the Item Master editor (coin icon on the project card).",
+          },
+    );
+  }
+  // Products: sell_price → master, else outbound price, else 1.0; demand_mean →
+  // master, else Σ outbound volume, else 0; production_capacity → master, else
+  // a constant default (never binds, so recommended only).
+  for (const p of products ?? []) {
+    const pid = String(p.product_id);
+    if (num(p.sell_price) <= 0) {
+      const fb = outboundPriceByProd.get(pid) ?? 0;
+      out.push(
+        fb > 0
+          ? {
+              id: `im-price-${pid}`, severity: "warn", stage: "plant", rowKey: pid, field: "sell_price",
+              message: `Product "${pid}" has no master sell price — the engine will use its outbound price (≈${round2(fb)}).`,
+              hint: "Set a sell price in the Item Master editor to make revenue explicit.",
+            }
+          : {
+              id: `im-price-${pid}`, severity: "block", stage: "plant", rowKey: pid, field: "sell_price",
+              message: `Product "${pid}" has no sell price in the item master or outbound logistics — the engine would default it to 1.0 and revenue KPIs would be meaningless.`,
+              hint: "Set a sell price in the Item Master editor.",
+            },
+      );
+    }
+    if (num(p.demand_mean) <= 0) {
+      const fb = outboundVolByProd.get(pid) ?? 0;
+      out.push(
+        fb > 0
+          ? {
+              id: `im-demand-${pid}`, severity: "warn", stage: "plant", rowKey: pid, field: "demand_mean",
+              message: `Product "${pid}" has no master demand mean — the engine will derive demand from its outbound volume.`,
+              hint: "Set a demand mean in the Item Master editor to control it directly.",
+            }
+          : {
+              id: `im-demand-${pid}`, severity: "block", stage: "plant", rowKey: pid, field: "demand_mean",
+              message: `Product "${pid}" has no demand in the item master or outbound logistics — it will never be ordered (zero demand).`,
+              hint: "Set a demand mean in the Item Master editor, or add outbound logistics.",
+            },
+      );
+    }
+    if (num(p.production_capacity) <= 0) {
+      out.push({
+        id: `im-cap-${pid}`, severity: "warn", stage: "plant", rowKey: pid, field: "production_capacity",
+        message: `Product "${pid}" has no production capacity — the engine will assume an effectively unlimited plant.`,
+        hint: "Set a capacity in the Item Master editor if this product's plant is capacity-constrained.",
       });
     }
   }

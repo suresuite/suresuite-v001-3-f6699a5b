@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useStageRows } from "@/hooks/useStageRows";
+import { useItemMasters } from "@/hooks/useItemMasters";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
@@ -177,6 +178,7 @@ export function RunValidateStage({
   const supRows = useStageRows({ projectId, plantName, stage: "supplier" });
   const plantRowsQ = useStageRows({ projectId, plantName, stage: "plant" });
   const custRows = useStageRows({ projectId, plantName, stage: "customer" });
+  const itemMasters = useItemMasters(projectId);
   const { unit: timeUnit } = useTimeUnit(projectId);
 
   // Reuse the working experiment.run pipeline (same as Simulation Lab): a saved
@@ -257,6 +259,8 @@ export function RunValidateStage({
       plantRows: plantRowsQ.rows,
       customerRows: custRows.rows,
       timeUnit: timeUnit ?? null,
+      materials: itemMasters.materials,
+      products: itemMasters.products,
     });
     setFindings(f);
     setVerifiedAt(new Date());
