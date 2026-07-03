@@ -18,14 +18,14 @@ export function PageHeader({
   refreshLoading = false,
 }: PageHeaderProps) {
   return (
-    <div className="sticky top-0 z-40 -mx-12 -mt-6 mb-6 bg-header-background border-b border-header-border">
-      <div className="px-8 py-5 flex items-center justify-between gap-4">
+    <div className="sticky top-0 z-40 -mx-12 -mt-6 mb-5 bg-header-background/95 backdrop-blur-md border-b border-header-border">
+      <div className="px-8 py-3.5 flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[20px] font-semibold tracking-tight text-foreground leading-tight truncate">
+          <h1 className="text-[15px] font-semibold text-foreground leading-tight truncate">
             {title}
           </h1>
           {subtitle && (
-            <div className="text-[13px] text-muted-foreground mt-1">
+            <div className="text-[12px] text-muted-foreground mt-0.5 truncate">
               {subtitle}
             </div>
           )}

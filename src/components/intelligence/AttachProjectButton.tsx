@@ -24,10 +24,10 @@ export function AttachProjectButton({ projects, projectId, onChange, disabled }:
           type="button"
           disabled={disabled}
           className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition",
+            "inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-[12px] font-medium transition",
             active
-              ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
-              : "border-border bg-muted/50 text-muted-foreground hover:bg-muted",
+              ? "border-border bg-muted text-foreground hover:bg-accent"
+              : "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
             disabled && "opacity-50 cursor-not-allowed",
           )}
           aria-label={active ? `Project: ${active.name}` : "Attach a project"}
@@ -41,7 +41,7 @@ export function AttachProjectButton({ projects, projectId, onChange, disabled }:
                 tabIndex={0}
                 onClick={(e) => { e.stopPropagation(); onChange(null); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onChange(null); } }}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20"
+                className="ml-0.5 rounded-sm p-0.5 hover:bg-background"
                 aria-label="Detach project"
               >
                 <X className="h-3 w-3" />
@@ -70,7 +70,7 @@ export function AttachProjectButton({ projects, projectId, onChange, disabled }:
                 >
                   <Folder className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="flex-1 truncate">{p.name}</span>
-                  {p.id === projectId && <Check className="h-3.5 w-3.5 text-primary" />}
+                  {p.id === projectId && <Check className="h-3.5 w-3.5" />}
                 </CommandItem>
               ))}
             </CommandGroup>

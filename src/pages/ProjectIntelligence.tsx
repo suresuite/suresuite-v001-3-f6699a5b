@@ -105,13 +105,13 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className="px-8 py-6">
         <PageHeader
           title="Project Intelligence"
           subtitle="Your on-demand supply-chain colleague"
         />
 
-        <div className="grid h-[calc(100vh-190px)] min-h-[560px] grid-cols-[280px_1fr] overflow-hidden rounded-lg border border-border bg-card">
+        <div className="grid h-[calc(100vh-160px)] min-h-[560px] grid-cols-[260px_1fr] overflow-hidden rounded-xl border border-border bg-background shadow-xs">
           <ChatSidebar
             projects={projects}
             threads={threads}

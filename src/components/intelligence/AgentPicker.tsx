@@ -19,17 +19,26 @@ export function AgentPicker({ activeId, onSelect, className }: Props) {
             type="button"
             onClick={() => onSelect(a.id)}
             className={cn(
-              "group flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition",
+              "group flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-all duration-150",
               active
-                ? "border-foreground bg-accent"
-                : "border-border bg-card hover:border-foreground/40 hover:bg-accent/50",
+                ? "border-foreground/70 bg-surface-elevated shadow-xs"
+                : "border-border bg-surface-elevated hover:border-strong hover:shadow-xs hover:-translate-y-px",
             )}
           >
-            <div className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg bg-muted", a.color)}>
-              <Icon className="h-4 w-4" />
+            <div
+              className={cn(
+                "inline-flex h-7 w-7 items-center justify-center rounded-md bg-muted",
+                a.color,
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
             </div>
-            <div className="text-sm font-medium text-foreground">{a.name}</div>
-            <div className="text-[11px] leading-snug text-muted-foreground">{a.blurb}</div>
+            <div className="text-[13px] font-medium text-foreground leading-tight">
+              {a.name}
+            </div>
+            <div className="text-[11.5px] leading-snug text-muted-foreground line-clamp-2">
+              {a.blurb}
+            </div>
           </button>
         );
       })}

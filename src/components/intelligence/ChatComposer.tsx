@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { ModelPicker } from "@/components/chat/ModelPicker";
 import { AttachProjectButton } from "./AttachProjectButton";
@@ -38,16 +38,25 @@ export function ChatComposer({
   className,
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [focused, setFocused] = useState(false);
   useEffect(() => { if (autoFocus) setTimeout(() => ref.current?.focus(), 40); }, [autoFocus]);
 
   const disabled = !input.trim() || loading;
 
   return (
-    <div className={cn("rounded-2xl border border-border bg-card shadow-sm", className)}>
+    <div
+      className={cn(
+        "rounded-xl border bg-surface-elevated transition-all duration-150",
+        focused ? "border-strong shadow-sharp-sm" : "border-border shadow-xs",
+        className,
+      )}
+    >
       <textarea
         ref={ref}
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey && !disabled) {
             e.preventDefault();
@@ -56,11 +65,11 @@ export function ChatComposer({
         }}
         placeholder={placeholder}
         rows={minRows}
-        className="w-full resize-none rounded-t-2xl bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-        style={{ minHeight: 60, maxHeight: 200 }}
+        className="w-full resize-none rounded-t-xl bg-transparent px-3.5 py-3 text-[14px] leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+        style={{ minHeight: 56, maxHeight: 200 }}
         disabled={loading}
       />
-      <div className="flex items-center justify-between gap-2 border-t border-border/60 px-2.5 py-2">
+      <div className="flex items-center justify-between gap-2 px-2 pb-2">
         <AttachProjectButton
           projects={projects}
           projectId={projectId}
@@ -75,13 +84,13 @@ export function ChatComposer({
             disabled={disabled}
             aria-label="Send"
             className={cn(
-              "inline-flex h-9 w-9 items-center justify-center rounded-full transition",
+              "inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150",
               disabled
-                ? "bg-muted text-muted-foreground/60"
-                : "bg-foreground text-background hover:bg-foreground/85",
+                ? "bg-muted text-muted-foreground/50"
+                : "bg-foreground text-background hover:opacity-90 active:scale-95",
             )}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>
