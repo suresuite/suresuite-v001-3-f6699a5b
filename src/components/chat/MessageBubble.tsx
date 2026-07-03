@@ -7,32 +7,31 @@ import { ToolCallBadge } from "./ToolCallBadge";
 
 export function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
-  return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-          isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-foreground"
-        }`}
-      >
-        {isUser ? (
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[80%] rounded-2xl rounded-tr-md bg-foreground px-3.5 py-2 text-[14px] leading-relaxed text-background">
           <div className="whitespace-pre-wrap">{message.content}</div>
-        ) : (
-          <>
-            <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-              <ReactMarkdown>{message.content || "_(no response)_"}</ReactMarkdown>
-            </div>
-            {message.parts?.map((p, i) => {
-              if (p.kind === "table") return <DataTable key={i} data={p.data} />;
-              if (p.kind === "kpi") return <KpiCards key={i} data={p.data} />;
-              if (p.kind === "bullets") return <BulletList key={i} data={p.data} />;
-              return null;
-            })}
-            {message.toolCalls && message.toolCalls.length > 0 && (
-              <ToolCallBadge calls={message.toolCalls} />
-            )}
-          </>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-start">
+      <div className="w-full max-w-full text-[14px] leading-relaxed text-foreground">
+        <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1.5 prose-ul:my-1.5 prose-li:my-0.5 prose-headings:mt-3 prose-headings:mb-1.5 prose-pre:bg-surface-elevated prose-pre:border prose-pre:border-border prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:text-[12.5px] prose-code:font-mono">
+          <ReactMarkdown>{message.content || "_(no response)_"}</ReactMarkdown>
+        </div>
+        {message.parts?.map((p, i) => {
+          if (p.kind === "table") return <DataTable key={i} data={p.data} />;
+          if (p.kind === "kpi") return <KpiCards key={i} data={p.data} />;
+          if (p.kind === "bullets") return <BulletList key={i} data={p.data} />;
+          return null;
+        })}
+        {message.toolCalls && message.toolCalls.length > 0 && (
+          <ToolCallBadge calls={message.toolCalls} />
         )}
       </div>
     </div>

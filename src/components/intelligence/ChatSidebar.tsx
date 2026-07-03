@@ -30,19 +30,23 @@ interface ChatSidebarProps {
 }
 
 function groupThreads(threads: Thread[]) {
-  const now = Date.now();
-  const day = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = startOfToday - 7 * 24 * 60 * 60 * 1000;
   const groups: { label: string; items: Thread[] }[] = [
     { label: "Pinned", items: [] },
     { label: "Today", items: [] },
+    { label: "Yesterday", items: [] },
     { label: "Previous 7 days", items: [] },
     { label: "Older", items: [] },
   ];
   for (const t of threads) {
     if (t.id === QUICK_THREAD_ID) groups[0].items.push(t);
-    else if (now - t.updatedAt < day) groups[1].items.push(t);
-    else if (now - t.updatedAt < 7 * day) groups[2].items.push(t);
-    else groups[3].items.push(t);
+    else if (t.updatedAt >= startOfToday) groups[1].items.push(t);
+    else if (t.updatedAt >= startOfYesterday) groups[2].items.push(t);
+    else if (t.updatedAt >= sevenDaysAgo) groups[3].items.push(t);
+    else groups[4].items.push(t);
   }
   return groups.filter((g) => g.items.length > 0);
 }
@@ -79,10 +83,14 @@ export function ChatSidebar({
   };
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col border-r border-border bg-muted/30">
-      <div className="space-y-3 border-b border-border p-3">
-        <Button onClick={onNewThread} className="w-full justify-start gap-2" variant="default">
-          <Plus className="h-4 w-4" />
+    <aside className="flex h-full min-h-0 w-full flex-col border-r border-border bg-surface-sunken">
+      <div className="space-y-2 p-2.5">
+        <Button
+          onClick={onNewThread}
+          size="sm"
+          className="h-8 w-full justify-start gap-2 text-[12.5px] font-medium"
+        >
+          <Plus className="h-3.5 w-3.5" />
           New chat
         </Button>
         <div className="relative">
@@ -91,34 +99,35 @@ export function ChatSidebar({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className="h-8 pl-8 text-xs"
+            className="h-8 border-transparent bg-transparent pl-8 text-[12.5px] focus-visible:border-border focus-visible:bg-background"
           />
         </div>
       </div>
 
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-2 py-3">
+        <div className="px-1.5 pb-3">
           {groups.length === 0 ? (
-            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-              No chats yet. Start a new conversation.
+            <p className="px-2 py-6 text-center text-[12px] text-muted-foreground">
+              No chats yet.
             </p>
           ) : (
             groups.map((g) => (
-              <div key={g.label} className="mb-4">
-                <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div key={g.label} className="mb-3">
+                <div className="px-2 pb-1 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                   {g.label}
                 </div>
-                <ul className="space-y-0.5">
+                <ul className="space-y-px">
                   {g.items.map((t) => {
                     const active = t.id === activeThreadId;
                     const isQuick = t.id === QUICK_THREAD_ID;
-                    const attached = projects.find((p) => p.id === t.projectId);
                     return (
                       <li
                         key={t.id}
                         className={cn(
-                          "group flex items-center gap-1 rounded-md px-1.5 transition",
-                          active ? "bg-accent" : "hover:bg-accent/60",
+                          "group relative flex items-center rounded-md pr-0.5 transition-colors",
+                          active
+                            ? "bg-background shadow-xs"
+                            : "hover:bg-background/60",
                         )}
                       >
                         {renamingId === t.id ? (
@@ -131,26 +140,21 @@ export function ChatSidebar({
                               if (e.key === "Enter") commitRename();
                               if (e.key === "Escape") { setRenamingId(null); setRenameValue(""); }
                             }}
-                            className="h-7 flex-1 text-sm"
+                            className="h-7 flex-1 text-[13px]"
                           />
                         ) : (
                           <button
                             type="button"
                             onClick={() => onSelectThread(t.id)}
                             className={cn(
-                              "flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left text-sm",
-                              active ? "text-foreground" : "text-foreground/80",
+                              "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-tight",
+                              active ? "text-foreground font-medium" : "text-foreground/75",
                             )}
                           >
                             {isQuick && (
                               <MessagesSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                             )}
                             <span className="truncate">{t.title}</span>
-                            {attached && !isQuick && (
-                              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
-                                {attached.name.slice(0, 12)}
-                              </span>
-                            )}
                           </button>
                         )}
                         {renamingId !== t.id && (
@@ -159,7 +163,7 @@ export function ChatSidebar({
                               <button
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
-                                className="hidden h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition hover:bg-background hover:text-foreground group-hover:flex group-hover:opacity-100 data-[state=open]:flex data-[state=open]:opacity-100"
+                                className="hidden h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover:flex group-hover:opacity-100 data-[state=open]:flex data-[state=open]:opacity-100"
                                 aria-label="More"
                               >
                                 <MoreHorizontal className="h-3.5 w-3.5" />

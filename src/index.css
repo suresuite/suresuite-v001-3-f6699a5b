@@ -29,11 +29,21 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --header-background: 0 0% 97%;
-    --header-border: 0 0% 85%;
+    --border: 0 0% 92%;
+    --border-strong: 0 0% 85%;
+    --input: 0 0% 92%;
+    --surface-elevated: 0 0% 99%;
+    --surface-sunken: 0 0% 98%;
+    --header-background: 0 0% 99%;
+    --header-border: 0 0% 92%;
     --ring: 0 0% 9%;
+
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.04), 0 2px 4px -2px hsl(0 0% 0% / 0.06);
+    --shadow-md: 0 4px 12px -4px hsl(0 0% 0% / 0.08), 0 2px 4px -2px hsl(0 0% 0% / 0.04);
+    --shadow-lg: 0 12px 32px -12px hsl(0 0% 0% / 0.14);
+
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
 
     --radius: 0.5rem;
 
@@ -75,10 +85,13 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --header-background: 0 0% 7%;
-    --header-border: 0 0% 18%;
+    --border: 0 0% 16%;
+    --border-strong: 0 0% 22%;
+    --input: 0 0% 16%;
+    --surface-elevated: 0 0% 6.5%;
+    --surface-sunken: 0 0% 2.5%;
+    --header-background: 0 0% 5%;
+    --header-border: 0 0% 14%;
     --ring: 0 0% 83.1%;
 
     /* Dark mode grays */
@@ -102,12 +115,16 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "rlig" 1, "calt" 1, "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   /* Vercel-inspired typography */
   h1, h2, h3, h4, h5, h6 {
-    @apply text-foreground font-semibold tracking-tight;
+    @apply text-foreground font-semibold;
+    letter-spacing: -0.015em;
   }
 
   h1 {
@@ -145,6 +162,16 @@
 }
 
 @layer utilities {
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .shadow-xs { box-shadow: var(--shadow-xs); }
+  .shadow-sharp-sm { box-shadow: var(--shadow-sm); }
+  .shadow-sharp-md { box-shadow: var(--shadow-md); }
+  .shadow-sharp-lg { box-shadow: var(--shadow-lg); }
+
+  .bg-surface-elevated { background-color: hsl(var(--surface-elevated)); }
+  .bg-surface-sunken { background-color: hsl(var(--surface-sunken)); }
+  .border-strong { border-color: hsl(var(--border-strong)); }
+
   /* Subtle grid background used in hero sections */
   .bg-grid {
     background-image: linear-gradient(
