@@ -28,6 +28,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Database,
   Gauge,
   Info,
   PlayCircle,
@@ -43,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
+import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
@@ -179,6 +181,7 @@ export function RunValidateStage({
   const plantRowsQ = useStageRows({ projectId, plantName, stage: "plant" });
   const custRows = useStageRows({ projectId, plantName, stage: "customer" });
   const itemMasters = useItemMasters(projectId);
+  const dataset = useDatasetVersion(projectId);
   const { unit: timeUnit } = useTimeUnit(projectId);
 
   // Reuse the working experiment.run pipeline (same as Simulation Lab): a saved
@@ -481,6 +484,23 @@ export function RunValidateStage({
               </Button>
             }
           >
+            <div className="flex items-center flex-wrap gap-2 text-[11px] text-muted-foreground mb-2">
+              <Database className="h-3.5 w-3.5" />
+              <span>Dataset</span>
+              {dataset.currentHash ? (
+                <code className="font-mono">{dataset.currentHash.slice(0, 8)}</code>
+              ) : (
+                <span className="opacity-60">—</span>
+              )}
+              {dataset.neverSnapshotted ? (
+                <Badge variant="secondary" className="h-5">not snapshotted</Badge>
+              ) : dataset.isDirty ? (
+                <Badge variant="secondary" className="h-5">changed since last snapshot</Badge>
+              ) : (
+                <Badge variant="outline" className="h-5">up to date</Badge>
+              )}
+              <span className="opacity-70">· a snapshot is captured automatically when you run</span>
+            </div>
             {findings === null ? (
               <p className="text-xs text-muted-foreground">No checks run yet. Click <b>Run checks</b> to start.</p>
             ) : findings.length === 0 ? (
