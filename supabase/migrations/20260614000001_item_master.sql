@@ -105,7 +105,7 @@ BEGIN
   ON CONFLICT (project_id, product_id) DO NOTHING;
 END;
 $$;
-GRANT EXECUTE ON public.ensure_item_masters(uuid) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.ensure_item_masters(uuid) TO authenticated, anon, service_role;
 
 -- ── Results contract: mapping warnings + idempotent per-rep writes ──────────────
 ALTER TABLE public.simulation_runs

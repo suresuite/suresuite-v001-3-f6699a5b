@@ -387,6 +387,33 @@ async function handleExperimentRun(
   const replications = Math.max(1, Math.min(200, Number(scenario.replications) || 10));
   const seed = Number(scenario.seed) || 42;
 
+  // Snapshot the dataset (graph + economics) and bind this run to it, so a
+  // later CSV re-upload is detectable rather than silently changing history
+  // (Phase A / G5 / §8.4). Deduped server-side: an unchanged dataset reuses
+  // its latest version. Best-effort: if the migration hasn't reached the DB
+  // yet the run still dispatches, just without a dataset binding.
+  let datasetVersionId: string | null = null;
+  let graphHash: string | null = null;
+  try {
+    // deno-lint-ignore no-explicit-any
+    const { data: dsId, error: dsErr } = await (sb as any).rpc("snapshot_dataset", {
+      p_project_id: scenario.project_id,
+    });
+    if (dsErr) throw dsErr;
+    datasetVersionId = (dsId as string | null) ?? null;
+    if (datasetVersionId) {
+      // deno-lint-ignore no-explicit-any
+      const { data: dv } = await (sb as any)
+        .from("dataset_versions")
+        .select("graph_hash")
+        .eq("id", datasetVersionId)
+        .maybeSingle();
+      graphHash = (dv?.graph_hash as string | null) ?? null;
+    }
+  } catch (e) {
+    console.error("snapshot_dataset failed (run continues unbound)", e);
+  }
+
   // Insert run row (queued)
   // deno-lint-ignore no-explicit-any
   const { data: run, error: runErr } = await (sb as any)
@@ -400,6 +427,8 @@ async function handleExperimentRun(
       code_version: "",
       policy_version_id: policyVersionId,
       policy_hash: policyHash,
+      dataset_version_id: datasetVersionId,
+      graph_hash: graphHash,
       created_by: userId,
     })
     .select()

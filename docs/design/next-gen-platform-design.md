@@ -514,6 +514,8 @@ Policies are versioned and hashed; the network and economics are not (G5) — re
 - **Capture points**: explicit "freeze dataset" action, plus automatic capture at run dispatch (as `snapshot_policy` does today for policies).
 - **Runs become triple-bound**: every run references `(dataset_version_id, policy_version_id, scenario)` — full reproducibility, and the foundation of run identity (§9.2).
 
+> **Implementation note (Phase A, delivered).** The first slice (`snapshot_dataset` / `current_graph_hash` / `list_dataset_versions` in `supabase/migrations/20260703000001_dataset_versions.sql`, stamped on `simulation_runs.dataset_version_id`/`graph_hash` by `sim-command`) hashes the **canonical source rows** of the six tables the engine consumes (`suppliers`, `materials`, `products`, `inbound_logistics`, `bom_single_level`, `outbound_logistics` — the exact column sets `sim-worker/sim_worker/datamap.py` reads, cosmetic `name` excluded), not the normalized `ProjectData`. This is simpler and divergence-free (no re-implementing the Python unit normalizers in SQL) and is correct for reproducibility binding + dirty detection. Two refinements remain for **Phase C**: (a) hashing the normalized `ProjectData` so cosmetic unit differences also collapse for the run cache (§9.2), and (b) the worker re-executing against the frozen `dataset_versions.snapshot` instead of live tables — the piece that turns binding into full *re-execution* reproducibility, bundled with the run-cache work since both require the worker to consume content-addressed frozen inputs.
+
 ```mermaid
 flowchart TD
     DH["graph_hash<br/>dataset_versions (new)"]
