@@ -79,7 +79,7 @@ class ReplicationStopping(str, Enum):
 
 class TargetType(str, Enum):
     NODE_SUPPLIER = "node:supplier"  # ✅
-    NODE_PLANT = "node:plant"        # 🧩
+    NODE_PLANT = "node:plant"        # ✅ (throttles/halts the plant's production)
     EDGE_LANE = "edge:lane"          # 🧩 (behavior-neutral: resolves to its supplier)
 
 

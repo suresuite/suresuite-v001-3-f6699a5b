@@ -70,6 +70,10 @@ class ResolvedEvent:
     onset_profile: RampProfile
     recovery_profile: RampProfile
     ramp_weeks: int
+    # node:plant target — applies to the plant's production, not a supplier's
+    # inbound. supplier_idx is -1 for these. The time/severity math below is
+    # target-agnostic and shared with supplier events.
+    is_plant: bool = False
 
     def cap_factor_at(self, t: int) -> float:
         """Effective capacity multiplier at week t (1.0 = unaffected)."""
@@ -334,6 +338,10 @@ class SimContext:
         self.served_new_week = np.zeros(model.n_prods)  # FR numerator (β-service vs D_p[t])
         self.lt_block_end = np.zeros(model.n_sups, dtype=int)   # 0 = no active LT event
         self.cap_factor = np.ones(model.n_sups)
+        # node:plant disruption state (one plant → scalars). Composed weekly in
+        # the week_start mechanic; read by production planning/execute.
+        self.plant_lt_block_end = 0   # > week ⇒ plant produces nothing this week
+        self.plant_cap_factor = 1.0   # φ throttle on the plant's production capacity
         self.lost_inbound_this_week = 0.0
 
         self.trace = WeeklyTrace(T, model.n_prods, model.n_mats, keep_matrices)
@@ -364,6 +372,8 @@ class SimContext:
     def visible_disrupted_suppliers(self) -> np.ndarray:
         mask = np.zeros(self.model.n_sups, dtype=bool)
         for e in self.events_visible():
+            if e.is_plant:
+                continue  # plant events do not disrupt a supplier
             if e.lt_active_at(self.week) or e.cap_factor_at(self.week) < 1.0:
                 mask[e.supplier_idx] = True
         return mask

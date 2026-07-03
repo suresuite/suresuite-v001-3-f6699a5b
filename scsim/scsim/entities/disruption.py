@@ -49,7 +49,7 @@ class DisruptionEvent(BaseModel):
 
     target_type: TargetType = Field(
         TargetType.NODE_SUPPLIER,
-        json_schema_extra=_meta("enum", notes="node:supplier ✅; node:plant 🧩 M7; edge:lane 🧩."),
+        json_schema_extra=_meta("enum", notes="node:supplier ✅; node:plant ✅; edge:lane 🧩."),
     )
     target_id: str = Field(..., min_length=1, json_schema_extra=_meta("id"))
     effect_type: EffectType = Field(

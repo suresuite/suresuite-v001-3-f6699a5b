@@ -131,7 +131,7 @@ Transport edge — §3.6 🧩. Defaults are behavior-neutral (folded into T_s).
 
 | Parameter | Unit | Scope | Default | Range | Notes |
 |---|---|---|---|---|---|
-| `target_type` | enum | event | 'node:supplier' | {node:supplier, node:plant, edge:lane} | node:supplier ✅; node:plant 🧩 M7; edge:lane 🧩. |
+| `target_type` | enum | event | 'node:supplier' | {node:supplier, node:plant, edge:lane} | node:supplier ✅; node:plant ✅; edge:lane 🧩. |
 | `target_id` | id | event | required | — |  |
 | `effect_type` | enum | event | 'lead_time_extension' | {lead_time_extension, capacity_reduction} | LT extension ✅ (Eqs. 11–12) vs capacity throttle. |
 | `capacity_factor` | - | event | 0.0 | [0.0, 1.0] | φ — 0 = full outage. capacity_reduction only. |

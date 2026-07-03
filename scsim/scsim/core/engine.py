@@ -98,10 +98,20 @@ def _mech_week_start(model: CompiledModel, ctx: SimContext) -> None:
     ctx.po_lt_override[:] = -1
     ctx.arrivals[:] = 0.0
     ctx.lost_inbound_this_week = 0.0
-    # Physical disruption state (composition: max severity per supplier).
+    # Physical disruption state (composition: max severity per target).
     ctx.lt_block_end[:] = 0
     ctx.cap_factor[:] = 1.0
+    ctx.plant_lt_block_end = 0
+    ctx.plant_cap_factor = 1.0
     for e in ctx.events:
+        if e.is_plant:
+            # node:plant → throttle/halt the plant's own production.
+            if e.lt_active_at(t):
+                ctx.plant_lt_block_end = max(ctx.plant_lt_block_end, e.end)
+            f = e.cap_factor_at(t)
+            if f < 1.0:
+                ctx.plant_cap_factor = min(ctx.plant_cap_factor, f)
+            continue
         if e.lt_active_at(t):
             s = e.supplier_idx
             ctx.lt_block_end[s] = max(ctx.lt_block_end[s], e.end)
@@ -185,6 +195,19 @@ def _mech_fulfill_from_stock(model: CompiledModel, ctx: SimContext) -> None:
     ctx.fg_served_new = served_new
 
 
+def _effective_prod_capacity(model: CompiledModel, ctx: SimContext) -> np.ndarray:
+    """Plant production capacity for this week, after any node:plant disruption.
+
+    Identical to ``model.capacity + overtime`` when no plant event is active
+    (plant_cap_factor = 1.0, plant_lt_block_end = 0). A plant lead-time
+    extension halts production outright (overtime cannot override a halt); a
+    plant capacity_reduction throttles base capacity by φ.
+    """
+    if ctx.plant_lt_block_end > ctx.week:
+        return np.zeros_like(model.capacity)
+    return model.capacity * ctx.plant_cap_factor + ctx.overtime_extra
+
+
 def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     # MTO: produce to order (D + backlog). MTS step ②: replenish toward last
     # week's S^FG plus any backlog PH-30 could not serve from stock.
@@ -195,12 +218,12 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
         want = np.where(model.mts_mask, gap, want_mto)
     else:
         want = want_mto
-    ctx.production_plan = np.minimum(want, model.capacity + ctx.overtime_extra)
+    ctx.production_plan = np.minimum(want, _effective_prod_capacity(model, ctx))
 
 
 def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
     # Eq. 8: greedy in fixed product order; P-P.9 pre-shapes the plan when active.
-    plan = np.minimum(ctx.production_plan, model.capacity + ctx.overtime_extra)
+    plan = np.minimum(ctx.production_plan, _effective_prod_capacity(model, ctx))
     Q, remaining = greedy_feasible(model, plan, ctx.on_hand)
     ctx.production_output = Q
     ctx.on_hand = remaining
