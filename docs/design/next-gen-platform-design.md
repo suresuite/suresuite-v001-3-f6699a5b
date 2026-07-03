@@ -407,6 +407,8 @@ Today this is aspiration: the frontend actually renders from the hand-written pa
 - A CI gate — mirroring the existing docs gate (A13) — fails the build when generated artifacts drift from the registry.
 - Consequence: **the UI can only offer what the engine can execute, and everything the UI offers reaches the engine.** G1 and half of G6 are eliminated at the root, not patched. Planned-but-unbuilt policies appear in the UI as visible-but-disabled entries with their milestone — the registry's honest-catalog property (A3) surfaces to users.
 
+> **Implementation note (Phase A delivered the rail; Phase B runs the forms on it).** The generation pipeline and its CI gate landed in Phase A: `scsim/scripts/gen_frontend_registry.py` emits a committed snapshot `src/lib/policies/registry.generated.json`, the `scsim-tests` workflow fails on drift (`--check`), the frontend reads it through `src/lib/policies/registryAccess.ts`, and the last residue of the lossy translation is centralized in one validated table (`src/lib/policies/engineBridge.json`, guarded by `scripts/check_registry_bridge.mjs`). What remains for **Phase B** (with the node-owned bundle UI) is switching the `/policies` forms from the 7-family Zod to forms rendered directly from each policy's registry param schema, and deleting the hand-written Zod — that is the point where the screen adopts the engine's plugin-by-plugin vocabulary.
+
 ### 6.3 Configuration flow
 
 ```mermaid

@@ -5,11 +5,17 @@ on:
     paths:
       - "scsim/**"
       - "sim-worker/**"
+      - "src/lib/policies/registry.generated.json"
+      - "src/lib/policies/engineBridge.json"
+      - "scripts/check_registry_bridge.mjs"
       - ".github/workflows/scsim-tests.yml"
   pull_request:
     paths:
       - "scsim/**"
       - "sim-worker/**"
+      - "src/lib/policies/registry.generated.json"
+      - "src/lib/policies/engineBridge.json"
+      - "scripts/check_registry_bridge.mjs"
   workflow_dispatch:
 
 # The repo-root `scsim/` SERVICE directory shadows the installed `scsim`
@@ -43,6 +49,13 @@ jobs:
       - name: Registry payload builds
         run: python -m scsim.io.registry_export > /tmp/registry.json
         working-directory: scsim
+
+      - name: Frontend registry snapshot in sync with the engine (§6.2 gate)
+        run: python scripts/gen_frontend_registry.py --check
+        working-directory: scsim
+
+      - name: Frontend policy bridge consistent with the engine (§6.2 gate)
+        run: node scripts/check_registry_bridge.mjs
 
   sim-worker:
     runs-on: ubuntu-latest

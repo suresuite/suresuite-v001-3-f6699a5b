@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { responseEngineEffect } from "./engineBridge";
 
 /**
  * Supply chain policy schemas — v2 (sophisticated).
@@ -432,13 +433,16 @@ export const SCSIM_ENUM_OPTIONS: Record<string, readonly string[]> = {
   safety_stock_method: ["fixed_days", "service_level", "king_method"],
 };
 
-/** Helper text shown next to recovery responses, naming the engine effect. */
-export const RESPONSE_ENGINE_EFFECTS: Record<string, string> = {
-  reroute: "expedited shipments (P-T.2)",
-  dual_source_activate: "backup supplier (P-S.1)",
-  mode_shift: "expedited shipments (P-T.2)",
-  capacity_flex: "short-term capacity (P-P.5)",
-};
+/**
+ * Helper text shown next to recovery responses, naming the engine effect.
+ * Derived from the engine registry via the validated bridge (§6.2), so the
+ * catalog refs track the engine instead of being hand-typed here.
+ */
+export const RESPONSE_ENGINE_EFFECTS: Record<string, string> = Object.fromEntries(
+  (["reroute", "dual_source_activate", "mode_shift", "capacity_flex"] as const)
+    .map((r) => [r, responseEngineEffect(r)] as const)
+    .filter((e): e is readonly [string, string] => Boolean(e[1])),
+);
 
 /** Human-friendly labels + units for fields. */
 export const FIELD_LABELS: Record<string, string> = {
