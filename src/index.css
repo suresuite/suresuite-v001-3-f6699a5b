@@ -162,6 +162,16 @@
 }
 
 @layer utilities {
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .shadow-xs { box-shadow: var(--shadow-xs); }
+  .shadow-sharp-sm { box-shadow: var(--shadow-sm); }
+  .shadow-sharp-md { box-shadow: var(--shadow-md); }
+  .shadow-sharp-lg { box-shadow: var(--shadow-lg); }
+
+  .bg-surface-elevated { background-color: hsl(var(--surface-elevated)); }
+  .bg-surface-sunken { background-color: hsl(var(--surface-sunken)); }
+  .border-strong { border-color: hsl(var(--border-strong)); }
+
   /* Subtle grid background used in hero sections */
   .bg-grid {
     background-image: linear-gradient(
