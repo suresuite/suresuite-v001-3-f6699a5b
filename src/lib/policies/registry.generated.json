@@ -1,0 +1,2827 @@
+{
+  "engine_version": "0.2.0",
+  "entities": {
+    "bom_line": {
+      "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
+      "properties": {
+        "material_id": {
+          "title": "Material Id",
+          "type": "string"
+        },
+        "product_id": {
+          "title": "Product Id",
+          "type": "string"
+        },
+        "rate": {
+          "exclusiveMinimum": 0,
+          "notes": "r_{p,m}",
+          "scope": "P\u00d7M",
+          "title": "Rate",
+          "type": "number",
+          "unit": "units m / unit p"
+        }
+      },
+      "required": [
+        "product_id",
+        "material_id",
+        "rate"
+      ],
+      "title": "BomLine",
+      "type": "object"
+    },
+    "customer": {
+      "description": "Customer segments \u2014 \u00a73.1. Needed by P-C.2; inert for single-customer MTO.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "priority_weight": {
+          "default": 1.0,
+          "minimum": 0,
+          "title": "Priority Weight",
+          "type": "number"
+        },
+        "segment": {
+          "default": "default",
+          "notes": "\u226410 segments.",
+          "scope": "C",
+          "title": "Segment",
+          "type": "string",
+          "unit": "-"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Customer",
+      "type": "object"
+    },
+    "disruption_event": {
+      "$defs": {
+        "DurationRange": {
+          "description": "Uniform integer draw U{min..max} from the hazard_duration stream.",
+          "properties": {
+            "max": {
+              "maximum": 52,
+              "minimum": 1,
+              "title": "Max",
+              "type": "integer"
+            },
+            "min": {
+              "maximum": 52,
+              "minimum": 1,
+              "title": "Min",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ],
+          "title": "DurationRange",
+          "type": "object"
+        },
+        "EffectType": {
+          "enum": [
+            "lead_time_extension",
+            "capacity_reduction"
+          ],
+          "title": "EffectType",
+          "type": "string"
+        },
+        "OverflowRule": {
+          "enum": [
+            "queue",
+            "reject"
+          ],
+          "title": "OverflowRule",
+          "type": "string"
+        },
+        "RampProfile": {
+          "enum": [
+            "step",
+            "ramp_linear"
+          ],
+          "title": "RampProfile",
+          "type": "string"
+        },
+        "TargetType": {
+          "enum": [
+            "node:supplier",
+            "node:plant",
+            "edge:lane"
+          ],
+          "title": "TargetType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "capacity_factor": {
+          "default": 0.0,
+          "exclusiveMaximum": 1.0,
+          "minimum": 0.0,
+          "notes": "\u03c6 \u2014 0 = full outage. capacity_reduction only.",
+          "scope": "event",
+          "title": "Capacity Factor",
+          "type": "number",
+          "unit": "-"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "$ref": "#/$defs/DurationRange"
+            }
+          ],
+          "notes": "\u0394t. int = fixed; range = U{min..max} from the hazard_duration stream.",
+          "scope": "event",
+          "title": "Duration",
+          "unit": "weeks"
+        },
+        "effect_type": {
+          "$ref": "#/$defs/EffectType",
+          "default": "lead_time_extension",
+          "notes": "LT extension \u2705 (Eqs. 11\u201312) vs capacity throttle.",
+          "scope": "event",
+          "unit": "enum"
+        },
+        "onset_profile": {
+          "$ref": "#/$defs/RampProfile",
+          "default": "step",
+          "notes": "ramp_linear applies to capacity_reduction only.",
+          "scope": "event",
+          "unit": "enum"
+        },
+        "overflow_rule": {
+          "$ref": "#/$defs/OverflowRule",
+          "default": "queue",
+          "notes": "reject logs lost_inbound_units.",
+          "scope": "event",
+          "unit": "enum"
+        },
+        "ramp_weeks": {
+          "default": 0,
+          "maximum": 8,
+          "minimum": 0,
+          "notes": "",
+          "scope": "event",
+          "title": "Ramp Weeks",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "recovery_profile": {
+          "$ref": "#/$defs/RampProfile",
+          "default": "step",
+          "notes": "ramp_linear applies to capacity_reduction only.",
+          "scope": "event",
+          "unit": "enum"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "t*. None \u2192 auto: U{t_w .. t_w+2} (steady state) from the hazard_start stream.",
+          "scope": "event",
+          "title": "Start",
+          "unit": "week"
+        },
+        "target_id": {
+          "minLength": 1,
+          "notes": "",
+          "scope": "event",
+          "title": "Target Id",
+          "type": "string",
+          "unit": "id"
+        },
+        "target_type": {
+          "$ref": "#/$defs/TargetType",
+          "default": "node:supplier",
+          "notes": "node:supplier \u2705; node:plant \ud83e\udde9 M7; edge:lane \ud83e\udde9.",
+          "scope": "event",
+          "unit": "enum"
+        }
+      },
+      "required": [
+        "target_id"
+      ],
+      "title": "DisruptionEvent",
+      "type": "object"
+    },
+    "lane": {
+      "$defs": {
+        "TransportMode": {
+          "enum": [
+            "default",
+            "sea",
+            "air",
+            "road",
+            "rail"
+          ],
+          "title": "TransportMode",
+          "type": "string"
+        }
+      },
+      "description": "Transport edge \u2014 \u00a73.6 \ud83e\udde9. Defaults are behavior-neutral (folded into T_s).",
+      "properties": {
+        "capacity_per_week": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "None = \u221e.",
+          "scope": "E",
+          "title": "Capacity Per Week",
+          "unit": "units/wk"
+        },
+        "cost_per_unit": {
+          "default": 0.0,
+          "minimum": 0,
+          "notes": "",
+          "scope": "E",
+          "title": "Cost Per Unit",
+          "type": "number",
+          "unit": "\u20ac/unit"
+        },
+        "id": {
+          "minLength": 1,
+          "notes": "",
+          "scope": "E",
+          "title": "Id",
+          "type": "string",
+          "unit": "id"
+        },
+        "lead_time_weeks": {
+          "default": 0,
+          "maximum": 26,
+          "minimum": 0,
+          "notes": "T_E; 0 = folded into supplier T_s (v1).",
+          "scope": "E",
+          "title": "Lead Time Weeks",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "mode": {
+          "$ref": "#/$defs/TransportMode",
+          "default": "default",
+          "notes": "",
+          "scope": "E",
+          "unit": "enum"
+        },
+        "plant_id": {
+          "default": "plant",
+          "notes": "v1 single plant.",
+          "scope": "E",
+          "title": "Plant Id",
+          "type": "string",
+          "unit": "id"
+        },
+        "supplier_id": {
+          "title": "Supplier Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "supplier_id"
+      ],
+      "title": "Lane",
+      "type": "object"
+    },
+    "material": {
+      "description": "Plant material master \u2014 \u00a73.4.",
+      "properties": {
+        "cost": {
+          "exclusiveMinimum": 0,
+          "notes": "c_m at the primary source.",
+          "scope": "M",
+          "title": "Cost",
+          "type": "number",
+          "unit": "\u20ac/unit"
+        },
+        "holding_cost_rate": {
+          "default": 20.0,
+          "maximum": 50.0,
+          "minimum": 5.0,
+          "notes": "h_m",
+          "scope": "G/M",
+          "title": "Holding Cost Rate",
+          "type": "number",
+          "unit": "%/yr of c_m"
+        },
+        "id": {
+          "minLength": 1,
+          "notes": "",
+          "scope": "M",
+          "title": "Id",
+          "type": "string",
+          "unit": "id"
+        },
+        "initial_on_hand": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "None \u2192 initialized to the order-up-to level S_m at t=0 (warm start).",
+          "scope": "M",
+          "title": "Initial On Hand",
+          "unit": "units"
+        },
+        "name": {
+          "default": "",
+          "notes": "",
+          "scope": "M",
+          "title": "Name",
+          "type": "string",
+          "unit": "-"
+        }
+      },
+      "required": [
+        "id",
+        "cost"
+      ],
+      "title": "Material",
+      "type": "object"
+    },
+    "product": {
+      "$defs": {
+        "DemandModel": {
+          "enum": [
+            "deterministic",
+            "triangular",
+            "poisson",
+            "negbin",
+            "bootstrap"
+          ],
+          "title": "DemandModel",
+          "type": "string"
+        },
+        "FgPolicy": {
+          "enum": [
+            "base_stock",
+            "min_max"
+          ],
+          "title": "FgPolicy",
+          "type": "string"
+        },
+        "ForecastModel": {
+          "enum": [
+            "naive",
+            "ma",
+            "exp_smoothing",
+            "perfect"
+          ],
+          "title": "ForecastModel",
+          "type": "string"
+        },
+        "FulfillmentMode": {
+          "enum": [
+            "mto",
+            "mts",
+            "ato"
+          ],
+          "title": "FulfillmentMode",
+          "type": "string"
+        }
+      },
+      "description": "Product + demand model + fulfillment mode (CODP) \u2014 \u00a73.1\u20133.3.",
+      "properties": {
+        "demand_floor_factor": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "\u03bd override; falls back to the global setting. Acts as the variability of the triangularAV demand form: triangular(b\u00b7(1\u2212\u03bd), b, b\u00b7(1+\u03bd)).",
+          "scope": "P",
+          "title": "Demand Floor Factor",
+          "unit": "-"
+        },
+        "demand_history": {
+          "items": {
+            "type": "number"
+          },
+          "notes": "Required for demand_model=bootstrap.",
+          "scope": "P",
+          "title": "Demand History",
+          "type": "array",
+          "unit": "units/wk"
+        },
+        "demand_max": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "c_p \u2014 historical max; default (1+\u03bd)\u00b7b_p.",
+          "scope": "P",
+          "title": "Demand Max",
+          "unit": "units/wk"
+        },
+        "demand_min": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "a_p; default max{0,(1\u2212\u03bd)\u00b7b_p}.",
+          "scope": "P",
+          "title": "Demand Min",
+          "unit": "units/wk"
+        },
+        "demand_mode": {
+          "minimum": 0,
+          "notes": "b_p \u2014 historical median; the average (mode) of the triangularAV demand form.",
+          "scope": "P",
+          "title": "Demand Mode",
+          "type": "number",
+          "unit": "units/wk"
+        },
+        "demand_model": {
+          "$ref": "#/$defs/DemandModel",
+          "default": "triangular",
+          "notes": "",
+          "scope": "P",
+          "unit": "enum"
+        },
+        "fg_base_stock": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "S^FG_p; derived if None. MTS only.",
+          "scope": "P",
+          "title": "Fg Base Stock",
+          "unit": "units"
+        },
+        "fg_policy": {
+          "$ref": "#/$defs/FgPolicy",
+          "default": "base_stock",
+          "notes": "MTS only.",
+          "scope": "P",
+          "unit": "enum"
+        },
+        "forecast_bias": {
+          "default": 0.0,
+          "maximum": 30.0,
+          "minimum": -30.0,
+          "notes": "Experimental mis-forecast lever.",
+          "scope": "P",
+          "title": "Forecast Bias",
+          "type": "number",
+          "unit": "%"
+        },
+        "forecast_model": {
+          "$ref": "#/$defs/ForecastModel",
+          "default": "ma",
+          "notes": "MTS plans to forecast.",
+          "scope": "P",
+          "unit": "enum"
+        },
+        "forecast_window": {
+          "default": 8,
+          "maximum": 26,
+          "minimum": 2,
+          "notes": "",
+          "scope": "P",
+          "title": "Forecast Window",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "fulfillment_mode": {
+          "$ref": "#/$defs/FulfillmentMode",
+          "default": "mto",
+          "notes": "",
+          "scope": "P",
+          "unit": "enum"
+        },
+        "id": {
+          "minLength": 1,
+          "notes": "",
+          "scope": "P",
+          "title": "Id",
+          "type": "string",
+          "unit": "id"
+        },
+        "name": {
+          "default": "",
+          "notes": "",
+          "scope": "P",
+          "title": "Name",
+          "type": "string",
+          "unit": "-"
+        },
+        "negbin_dispersion": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "notes": "k for negbin (variance = b + b\u00b2/k).",
+          "scope": "P",
+          "title": "Negbin Dispersion",
+          "type": "number",
+          "unit": "-"
+        },
+        "production_capacity": {
+          "exclusiveMinimum": 0,
+          "notes": "O_p",
+          "scope": "P",
+          "title": "Production Capacity",
+          "type": "number",
+          "unit": "units/wk"
+        },
+        "unit_price": {
+          "exclusiveMinimum": 0,
+          "notes": "u_p",
+          "scope": "P",
+          "title": "Unit Price",
+          "type": "number",
+          "unit": "\u20ac/unit"
+        }
+      },
+      "required": [
+        "id",
+        "unit_price",
+        "demand_mode",
+        "production_capacity"
+      ],
+      "title": "Product",
+      "type": "object"
+    },
+    "simulation_settings": {
+      "$defs": {
+        "ReplicationStopping": {
+          "enum": [
+            "fixed",
+            "sequential_ci"
+          ],
+          "title": "ReplicationStopping",
+          "type": "string"
+        },
+        "RunMode": {
+          "enum": [
+            "full",
+            "fast_scan"
+          ],
+          "title": "RunMode",
+          "type": "string"
+        },
+        "TraceVerbosity": {
+          "enum": [
+            "kpi_only",
+            "weekly",
+            "full_debug"
+          ],
+          "title": "TraceVerbosity",
+          "type": "string"
+        },
+        "WarmupMethod": {
+          "enum": [
+            "conway",
+            "mser5",
+            "manual",
+            "most_conservative"
+          ],
+          "title": "WarmupMethod",
+          "type": "string"
+        }
+      },
+      "description": "Global clock, horizon, seeds and statistical controls (scope G).",
+      "properties": {
+        "analysis_window": {
+          "default": 52,
+          "maximum": 156,
+          "minimum": 13,
+          "notes": "KPI window starting at warmup_end.",
+          "scope": "G",
+          "title": "Analysis Window",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "bootstrap_resamples": {
+          "default": 10000,
+          "maximum": 100000,
+          "minimum": 1000,
+          "notes": "Percentile bootstrap on \u0394 and synergy metrics.",
+          "scope": "G",
+          "title": "Bootstrap Resamples",
+          "type": "integer",
+          "unit": "count"
+        },
+        "ci_halfwidth_target": {
+          "default": 0.05,
+          "maximum": 0.1,
+          "minimum": 0.01,
+          "notes": "\u03b5 for sequential stopping.",
+          "scope": "G",
+          "title": "Ci Halfwidth Target",
+          "type": "number",
+          "unit": "-"
+        },
+        "ci_level": {
+          "default": 95,
+          "notes": "One of {90, 95, 99}.",
+          "scope": "G",
+          "title": "Ci Level",
+          "type": "integer",
+          "unit": "%"
+        },
+        "crn_enabled": {
+          "default": true,
+          "notes": "Common random numbers; required for synergy math.",
+          "scope": "G",
+          "title": "Crn Enabled",
+          "type": "boolean",
+          "unit": "-"
+        },
+        "demand_floor_factor": {
+          "default": 0.3,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "notes": "\u03bd \u2014 partial-observability correction: a_p = max{0,(1\u2212\u03bd)\u00b7b_p}.",
+          "scope": "G/P",
+          "title": "Demand Floor Factor",
+          "type": "number",
+          "unit": "-"
+        },
+        "detection_lag_weeks": {
+          "default": 0,
+          "maximum": 4,
+          "minimum": 0,
+          "notes": "Delay between physical disruption start and firm knowledge (PH-20). Manuscript core uses 0; P-S.4 early_warning_failover governs this lever.",
+          "scope": "G/S",
+          "title": "Detection Lag Weeks",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "disruption_event_seeds": {
+          "default": 18,
+          "maximum": 100,
+          "minimum": 1,
+          "notes": "(start, duration, magnitude) draws. Collapses to 1 when all events are fixed.",
+          "scope": "G",
+          "title": "Disruption Event Seeds",
+          "type": "integer",
+          "unit": "count"
+        },
+        "horizon": {
+          "default": 156,
+          "maximum": 520,
+          "minimum": 52,
+          "notes": "T_sim. Manuscript: 156.",
+          "scope": "G",
+          "title": "Horizon",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "model_seeds": {
+          "default": 30,
+          "maximum": 200,
+          "minimum": 1,
+          "notes": "Replications over world streams. Study-grade floor is 30 (Part VIII); results below 10 carry a below_replication_floor badge.",
+          "scope": "G",
+          "title": "Model Seeds",
+          "type": "integer",
+          "unit": "count"
+        },
+        "project_seed": {
+          "exclusiveMaximum": 18446744073709551616,
+          "minimum": 0,
+          "notes": "Root of the SeedSequence tree (Part VIII).",
+          "scope": "G",
+          "title": "Project Seed",
+          "type": "integer",
+          "unit": "-"
+        },
+        "replication_stopping": {
+          "$ref": "#/$defs/ReplicationStopping",
+          "default": "fixed",
+          "notes": "sequential_ci stops when FR CI half-width \u2264 \u03b5.",
+          "scope": "G",
+          "unit": "enum"
+        },
+        "run_mode": {
+          "$ref": "#/$defs/RunMode",
+          "default": "full",
+          "notes": "fast_scan: 10\u00d76 seeds, kpi_only traces, wide-CI badge (Part X). Never silently mixed with full-mode results.",
+          "scope": "G",
+          "unit": "enum"
+        },
+        "time_step": {
+          "default": 1,
+          "notes": "Weekly clock; fixed.",
+          "scope": "G",
+          "title": "Time Step",
+          "type": "integer",
+          "unit": "week"
+        },
+        "trace_verbosity": {
+          "$ref": "#/$defs/TraceVerbosity",
+          "default": "weekly",
+          "notes": "Stress tests default to kpi_only (\u2248100\u00d7 less IO).",
+          "scope": "G",
+          "unit": "enum"
+        },
+        "visibility_horizon": {
+          "default": 52,
+          "maximum": 104,
+          "minimum": 4,
+          "notes": "\u03c4* \u2014 MTO order schedule length.",
+          "scope": "G/P",
+          "title": "Visibility Horizon",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "warmup_end": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "t_w. Required when warmup_method=manual; auto-detected otherwise. Manuscript: 85.",
+          "scope": "G",
+          "title": "Warmup End",
+          "unit": "week"
+        },
+        "warmup_method": {
+          "$ref": "#/$defs/WarmupMethod",
+          "default": "most_conservative",
+          "notes": "Runs Conway and MSER-5, adopts the later week.",
+          "scope": "G",
+          "unit": "enum"
+        }
+      },
+      "required": [
+        "project_seed"
+      ],
+      "title": "SimulationSettings",
+      "type": "object"
+    },
+    "supplier": {
+      "description": "Supplier echelon \u2014 \u00a73.5.",
+      "properties": {
+        "capacity_per_week": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "None = \u221e (manuscript). Finite required for capacity_reduction events and P-S.3.",
+          "scope": "S",
+          "title": "Capacity Per Week",
+          "unit": "units/wk"
+        },
+        "id": {
+          "minLength": 1,
+          "notes": "",
+          "scope": "S",
+          "title": "Id",
+          "type": "string",
+          "unit": "id"
+        },
+        "name": {
+          "default": "",
+          "notes": "",
+          "scope": "S",
+          "title": "Name",
+          "type": "string",
+          "unit": "-"
+        },
+        "reliability_score": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "notes": "Selection-rule input (P-S.1 reliability rule).",
+          "scope": "S",
+          "title": "Reliability Score",
+          "type": "number",
+          "unit": "-"
+        },
+        "tier": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 1,
+          "notes": "Reserved extension point; v1 simulates tier 1 only.",
+          "scope": "S",
+          "title": "Tier",
+          "type": "integer",
+          "unit": "-"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Supplier",
+      "type": "object"
+    },
+    "supplier_link": {
+      "$defs": {
+        "LeadTimeDist": {
+          "enum": [
+            "deterministic",
+            "lognormal",
+            "gamma",
+            "empirical"
+          ],
+          "title": "LeadTimeDist",
+          "type": "string"
+        }
+      },
+      "description": "Qualified (supplier \u00d7 material) source \u2014 \u00a73.4/\u00a73.5 SM-scoped variables.",
+      "properties": {
+        "cost": {
+          "exclusiveMinimum": 0,
+          "notes": "c_{m,s}",
+          "scope": "SM",
+          "title": "Cost",
+          "type": "number",
+          "unit": "\u20ac/unit"
+        },
+        "lead_time_cv": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "notes": "CV for lognormal/gamma lead-time dists.",
+          "scope": "SM",
+          "title": "Lead Time Cv",
+          "type": "number",
+          "unit": "-"
+        },
+        "lead_time_dist": {
+          "$ref": "#/$defs/LeadTimeDist",
+          "default": "deterministic",
+          "notes": "Stochastic lead times consume the world leadtime stream only when an order is placed; CRN caveat documented in docs/statistics.md.",
+          "scope": "SM",
+          "unit": "enum"
+        },
+        "lead_time_weeks": {
+          "maximum": 51,
+          "minimum": 1,
+          "notes": "T_s; includes transport in v1.",
+          "scope": "SM",
+          "title": "Lead Time Weeks",
+          "type": "integer",
+          "unit": "weeks"
+        },
+        "material_id": {
+          "title": "Material Id",
+          "type": "string"
+        },
+        "moq": {
+          "default": 0.0,
+          "minimum": 0,
+          "notes": "Q_MOQ \u2014 minimum order quantity.",
+          "scope": "SM",
+          "title": "Moq",
+          "type": "number",
+          "unit": "units"
+        },
+        "supplier_id": {
+          "title": "Supplier Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "supplier_id",
+        "material_id",
+        "cost",
+        "lead_time_weeks"
+      ],
+      "title": "SupplierLink",
+      "type": "object"
+    }
+  },
+  "kpis": [
+    {
+      "definition": "Value-weighted served demand: \u03a3 u_p\u00b7served_p / \u03a3 u_p\u00b7D_p over the analysis window (Eq. 10); weekly FR[t] recorded in the trace.",
+      "name": "fill_rate",
+      "symbol": "FR",
+      "unit": "%"
+    },
+    {
+      "definition": "\u03a3 u_p \u00b7 L_p over the window.",
+      "name": "lost_sales_value",
+      "symbol": "\u2014",
+      "unit": "\u20ac"
+    },
+    {
+      "definition": "mat-SS holding + backup premiums + multi-sourcing premiums + expediting + overtime + lost sales + allocation labor + FG-SS holding (MTS) + backorder penalties (Eq. 23).",
+      "name": "cost_of_resilience",
+      "symbol": "C^res",
+      "unit": "\u20ac"
+    },
+    {
+      "definition": "1 \u2212 C^res_i / C^res_S0, CRN-paired per replication (Eq. 24-style); positive = cheaper than do-nothing.",
+      "name": "delta_cost",
+      "symbol": "\u0394C^res_i",
+      "unit": "%"
+    },
+    {
+      "definition": "\u03a3u_p(Q_i \u2212 Q_S0) / \u03a3u_p(D \u2212 Q_S0), CRN-paired (Eq. 25-style); share of S0's lost revenue recovered.",
+      "name": "delta_revenue",
+      "symbol": "\u0394R_i",
+      "unit": "%"
+    },
+    {
+      "definition": "Weeks from disruption start until weekly FR re-enters the pre-disruption band (3-week sustained); 0 if FR never left the band.",
+      "name": "ttr_weeks",
+      "symbol": "TTR",
+      "unit": "wks"
+    },
+    {
+      "definition": "Weeks from disruption start that FR survives inside the band (time-to-survive under the shock).",
+      "name": "tts_weeks",
+      "symbol": "TTS",
+      "unit": "wks"
+    },
+    {
+      "definition": "\u222b max(0, FR_clean \u2212 FR_disrupted) dt over the window, CRN-paired against the same portfolio without events.",
+      "name": "service_loss_area",
+      "symbol": "SLA",
+      "unit": "%\u00b7wks"
+    },
+    {
+      "definition": "Peak \u03a3_p B_p within the window.",
+      "name": "max_backlog",
+      "symbol": "\u2014",
+      "unit": "units"
+    },
+    {
+      "definition": "Inbound rejected under overflow_rule=reject.",
+      "name": "lost_inbound_units",
+      "symbol": "\u2014",
+      "unit": "units"
+    },
+    {
+      "definition": "\u0394_portfolio \u2212 \u03a3 \u0394_components, CRN-paired, percentile-bootstrap stars.",
+      "name": "synergy_R / synergy_C",
+      "symbol": "\u2014",
+      "unit": "pp"
+    },
+    {
+      "definition": "100\u00b7[w1(1\u2212\u0160LA) + w2(1\u2212\u0164TR) + w3\u00b7\u0164TS + w4(1\u2212\u010c)], w=(.35,.25,.15,.25) editable; components always shown.",
+      "name": "resilience_index",
+      "symbol": "RI",
+      "unit": "0\u2013100"
+    }
+  ],
+  "pipeline": {
+    "persistent_state": {
+      "state.backlog": [
+        "PH-60"
+      ],
+      "state.cost_ledger": [
+        "PH-00",
+        "PH-10",
+        "PH-20",
+        "PH-30",
+        "PH-40",
+        "PH-50",
+        "PH-60",
+        "PH-70",
+        "PH-80",
+        "PH-90",
+        "PH-99"
+      ],
+      "state.fg_on_hand": [
+        "PH-30",
+        "PH-50"
+      ],
+      "state.fg_target": [
+        "PH-70"
+      ],
+      "state.lost_sales": [
+        "PH-60"
+      ],
+      "state.on_hand": [
+        "PH-50",
+        "PH-90"
+      ],
+      "state.pipeline": [
+        "PH-80",
+        "PH-90"
+      ],
+      "state.queue": [
+        "PH-80",
+        "PH-90"
+      ]
+    },
+    "phases": [
+      {
+        "description": "Onset/recovery profiles \u2192 physical disruption state for the week.",
+        "id": "PH-00",
+        "name": "week_start",
+        "owns": [
+          "disruption_state"
+        ]
+      },
+      {
+        "description": "Update the demand forecast from history (\u00a73.3 models), then draw D_p[t] from the world demand stream.",
+        "id": "PH-10",
+        "name": "demand_realization",
+        "owns": [
+          "demand",
+          "forecast"
+        ]
+      },
+      {
+        "description": "Firm-visible events (t \u2265 start + detection_lag). P-S.4 / P-X.1 evaluate here.",
+        "id": "PH-20",
+        "name": "detection",
+        "owns": [
+          "firm_knowledge"
+        ]
+      },
+      {
+        "description": "MTS serves D_p from I^FG; no-op for MTO products.",
+        "id": "PH-30",
+        "name": "fulfill_from_stock",
+        "owns": [
+          "fg_fulfillment"
+        ]
+      },
+      {
+        "description": "Plan production: default greedy plan; P-P.5/P-P.9 et al. adjust here.",
+        "id": "PH-40",
+        "name": "production_planning",
+        "owns": [
+          "production_plan",
+          "overtime_capacity",
+          "substitutions"
+        ]
+      },
+      {
+        "description": "Pure mechanics (Eqs. 8/9): produce Q_p, consume materials.",
+        "id": "PH-50",
+        "name": "production_execute",
+        "owns": [
+          "production_output"
+        ]
+      },
+      {
+        "description": "F_p, B_p, L_p \u2014 P-C.1/P-C.2/P-C.3 resident.",
+        "id": "PH-60",
+        "name": "fulfillment",
+        "owns": [
+          "fulfillment"
+        ]
+      },
+      {
+        "description": "D_m projection (Eq. 1); s_m/S_m levels (Eqs. 2\u20133) + safety stock.",
+        "id": "PH-70",
+        "name": "material_planning",
+        "owns": [
+          "material_demand",
+          "inventory_levels"
+        ]
+      },
+      {
+        "description": "Order release (Eqs. 4\u20136) and sourcing decisions; orders enter the supplier queue.",
+        "id": "PH-80",
+        "name": "procurement",
+        "owns": [
+          "purchase_orders"
+        ]
+      },
+      {
+        "description": "Ship queue under capacity gating, defer in-window arrivals (Eqs. 11\u201312), expedite (Eqs. 18\u201319), land arrivals.",
+        "id": "PH-90",
+        "name": "logistics",
+        "owns": [
+          "arrivals"
+        ]
+      },
+      {
+        "description": "Read-only KPI rows, cost rollup, trace.",
+        "id": "PH-99",
+        "name": "accounting",
+        "owns": [
+          "kpi_rows"
+        ]
+      }
+    ]
+  },
+  "policies": [
+    {
+      "catalog_ref": "P-C.1",
+      "constraint_targeted": "demand_side",
+      "hooks": [
+        {
+          "phase": "PH-60",
+          "priority": 50,
+          "reads": [
+            "demand",
+            "fg_fulfillment",
+            "production_output"
+          ],
+          "resolution": null,
+          "writes": [
+            "fulfillment",
+            "state.backlog",
+            "state.cost_ledger",
+            "state.lost_sales"
+          ]
+        }
+      ],
+      "id": "unmet_demand_handling",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "backorder_horizon": {
+            "default": 4,
+            "maximum": 26,
+            "minimum": 0,
+            "notes": "Aged-out backlog becomes lost.",
+            "scope": "P",
+            "title": "Backorder Horizon",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "backorder_penalty": {
+            "default": 0.0,
+            "minimum": 0,
+            "scope": "P",
+            "title": "Backorder Penalty",
+            "type": "number",
+            "unit": "\u20ac/unit/wk"
+          },
+          "partial_accept_prob": {
+            "default": 0.5,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "notes": "Share of unmet demand that waits.",
+            "scope": "P",
+            "title": "Partial Accept Prob",
+            "type": "number",
+            "unit": "-"
+          },
+          "rule": {
+            "default": "lost_sales",
+            "enum": [
+              "lost_sales",
+              "backorder",
+              "partial_backorder"
+            ],
+            "notes": "lost_sales \u2705 (manuscript).",
+            "scope": "P",
+            "title": "Rule",
+            "type": "string",
+            "unit": "enum"
+          }
+        },
+        "title": "UnmetDemandParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "customer",
+      "status": "implemented",
+      "strategy_class": "built_in",
+      "summary": "What happens to an unservable order: it dies (lost_sales \u2014 competitive markets), waits (backorder \u2014 contractual B2B), or splits (partial_backorder). Backorders convert lost revenue into delay cost, changing the economics of every strategy."
+    },
+    {
+      "catalog_ref": "P-C.2",
+      "constraint_targeted": "demand_side",
+      "hooks": [],
+      "id": "customer_allocation",
+      "milestone": "M7",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "fair_share_basis": {
+            "default": "demand",
+            "enum": [
+              "demand",
+              "history"
+            ],
+            "scope": "G",
+            "title": "Fair Share Basis",
+            "type": "string",
+            "unit": "enum"
+          },
+          "priority_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "scope": "C",
+            "title": "Priority Weights",
+            "type": "object",
+            "unit": "weight per customer"
+          },
+          "rule": {
+            "default": "fcfs",
+            "enum": [
+              "fcfs",
+              "priority",
+              "fair_share",
+              "sla_tier"
+            ],
+            "scope": "C",
+            "title": "Rule",
+            "type": "string",
+            "unit": "enum"
+          },
+          "sla_tiers": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "scope": "C",
+            "title": "Sla Tiers",
+            "type": "object",
+            "unit": "tier \u2192 fill floor %"
+          }
+        },
+        "title": "CustomerAllocationParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "customer",
+      "status": "planned",
+      "strategy_class": "improvisation",
+      "summary": "Under scarcity, 'who do we disappoint first' is deliberate \u2014 protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60."
+    },
+    {
+      "catalog_ref": "P-C.3",
+      "constraint_targeted": "demand_side",
+      "hooks": [],
+      "id": "demand_shaping",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "delay_accept_prob": {
+            "default": 0.3,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "scope": "P",
+            "title": "Delay Accept Prob",
+            "type": "number",
+            "unit": "-"
+          },
+          "delay_incentive": {
+            "default": 0.0,
+            "minimum": 0,
+            "scope": "P",
+            "title": "Delay Incentive",
+            "type": "number",
+            "unit": "\u20ac/unit"
+          },
+          "substitution_accept_prob": {
+            "default": 0.5,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "scope": "P",
+            "title": "Substitution Accept Prob",
+            "type": "number",
+            "unit": "-"
+          },
+          "substitution_discount": {
+            "default": 0.0,
+            "minimum": 0,
+            "scope": "P",
+            "title": "Substitution Discount",
+            "type": "number",
+            "unit": "\u20ac/unit"
+          },
+          "substitution_offer": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "scope": "P",
+            "title": "Substitution Offer",
+            "type": "object",
+            "unit": "product \u2192 substitute"
+          }
+        },
+        "title": "DemandShapingParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "customer",
+      "status": "planned",
+      "strategy_class": "improvisation",
+      "summary": "Move demand instead of fighting supply \u2014 substitution offers, delay incentives; cheap when customers accept. Hook: PH-60."
+    },
+    {
+      "catalog_ref": "P-P.1",
+      "constraint_targeted": "material_availability",
+      "hooks": [
+        {
+          "phase": "PH-70",
+          "priority": 50,
+          "reads": [
+            "material_demand"
+          ],
+          "resolution": null,
+          "writes": [
+            "inventory_levels"
+          ]
+        },
+        {
+          "phase": "PH-80",
+          "priority": 50,
+          "reads": [
+            "inventory_levels",
+            "state.on_hand",
+            "state.pipeline",
+            "state.queue"
+          ],
+          "resolution": null,
+          "writes": [
+            "purchase_orders"
+          ]
+        }
+      ],
+      "id": "inventory_control",
+      "milestone": null,
+      "params_schema": {
+        "$defs": {
+          "ModeStrip": {
+            "additionalProperties": false,
+            "description": "nominal/alert/crisis parameter strip (Part IV header). v1 engines use\nnominal normally and crisis while any event is firm-visible; alert engages\nonce P-S.4 early warning lands (M7).",
+            "properties": {
+              "alert": {
+                "title": "Alert",
+                "type": "number"
+              },
+              "crisis": {
+                "title": "Crisis",
+                "type": "number"
+              },
+              "nominal": {
+                "title": "Nominal",
+                "type": "number"
+              }
+            },
+            "required": [
+              "nominal",
+              "alert",
+              "crisis"
+            ],
+            "title": "ModeStrip",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "coverage_weeks": {
+            "$ref": "#/$defs/ModeStrip",
+            "notes": "\u03ba \u2014 order-up-to cover beyond lead time. Strip 8/10/12.",
+            "range": "[0, 26]",
+            "scope": "G/M",
+            "unit": "weeks"
+          },
+          "periodic_review_weeks": {
+            "default": 4,
+            "maximum": 13,
+            "minimum": 1,
+            "scope": "G",
+            "title": "Periodic Review Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "policy_type": {
+            "default": "min_max",
+            "enum": [
+              "min_max",
+              "base_stock",
+              "rop_q",
+              "periodic"
+            ],
+            "notes": "min_max \u2705 (manuscript).",
+            "scope": "M",
+            "title": "Policy Type",
+            "type": "string",
+            "unit": "enum"
+          },
+          "review_cadence_weeks": {
+            "default": 1,
+            "enum": [
+              1,
+              2,
+              4
+            ],
+            "scope": "G",
+            "title": "Review Cadence Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "rop_q_quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "notes": "Fixed (R,Q) lot; \u2265 MOQ enforced.",
+            "scope": "M",
+            "title": "Rop Q Quantity",
+            "unit": "units"
+          }
+        },
+        "title": "InventoryControlParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "plant",
+      "status": "implemented",
+      "strategy_class": "built_in",
+      "summary": "Everyday replenishment rule (min-max / base-stock / (R,Q) / periodic). The baseline shock absorber every chain already has; quantifying it prevents over-buying dedicated resilience."
+    },
+    {
+      "catalog_ref": "P-P.10",
+      "constraint_targeted": "production_capacity",
+      "hooks": [],
+      "id": "repurposing",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "conversion_cost": {
+            "exclusiveMinimum": 0,
+            "scope": "P",
+            "title": "Conversion Cost",
+            "type": "number",
+            "unit": "\u20ac/conversion"
+          },
+          "conversion_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "scope": "P",
+            "title": "Conversion Map",
+            "type": "object",
+            "unit": "line \u2192 capability"
+          },
+          "conversion_time_weeks": {
+            "default": 2,
+            "maximum": 8,
+            "minimum": 1,
+            "scope": "P",
+            "title": "Conversion Time Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "reversion_time_weeks": {
+            "default": 1,
+            "maximum": 4,
+            "minimum": 0,
+            "scope": "P",
+            "title": "Reversion Time Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          }
+        },
+        "required": [
+          "conversion_map",
+          "conversion_cost"
+        ],
+        "title": "RepurposingParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "plant",
+      "status": "planned",
+      "strategy_class": "improvisation",
+      "summary": "Convert lines to new capability mid-crisis (Intel substrate) \u2014 high cost, delay, true bounce-forward. Hook: PH-40."
+    },
+    {
+      "catalog_ref": "P-P.2",
+      "constraint_targeted": "material_availability",
+      "hooks": [],
+      "id": "lot_sizing",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "epq_setup_cost": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "scope": "M",
+            "title": "Epq Setup Cost",
+            "unit": "\u20ac/setup"
+          },
+          "fixed_qty": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "notes": "\u2265 MOQ enforced.",
+            "scope": "M",
+            "title": "Fixed Qty",
+            "unit": "units"
+          },
+          "rule": {
+            "default": "lot_for_lot",
+            "enum": [
+              "lot_for_lot",
+              "fixed_qty",
+              "epq"
+            ],
+            "scope": "M",
+            "title": "Rule",
+            "type": "string",
+            "unit": "enum"
+          }
+        },
+        "title": "LotSizingParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "plant",
+      "status": "planned",
+      "strategy_class": "built_in",
+      "summary": "Batching exists for setup economics but can amplify shocks (bullwhip) \u2014 test whether your lots worsen propagation. Hook: PH-80."
+    },
+    {
+      "catalog_ref": "P-P.3",
+      "constraint_targeted": "material_availability",
+      "hooks": [
+        {
+          "phase": "PH-70",
+          "priority": 60,
+          "reads": [
+            "inventory_levels",
+            "material_demand"
+          ],
+          "resolution": "Adds the safety-stock buffer on top of inventory_control's levels (priority 50) \u2014 Eqs. 20\u201321.",
+          "writes": [
+            "inventory_levels",
+            "state.cost_ledger"
+          ]
+        }
+      ],
+      "id": "safety_stock_materials",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "abc_breakpoints": {
+            "default": [
+              0.8,
+              0.95
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "notes": "A up to 80%, B up to 95%, C the rest (80/15/5).",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "scope": "G",
+            "title": "Abc Breakpoints",
+            "type": "array",
+            "unit": "cumulative value share"
+          },
+          "classification": {
+            "default": "abc_xyz",
+            "enum": [
+              "abc_xyz",
+              "uniform",
+              "fixed_days",
+              "king"
+            ],
+            "notes": "abc_xyz \u2705.",
+            "scope": "G",
+            "title": "Classification",
+            "type": "string",
+            "unit": "enum"
+          },
+          "fixed_days_cover": {
+            "default": 14.0,
+            "maximum": 84.0,
+            "minimum": 0.0,
+            "notes": "classification=fixed_days.",
+            "scope": "G",
+            "title": "Fixed Days Cover",
+            "type": "number",
+            "unit": "days"
+          },
+          "uniform_service_level": {
+            "default": 95.0,
+            "maximum": 99.9,
+            "minimum": 80.0,
+            "notes": "classification=uniform.",
+            "scope": "G",
+            "title": "Uniform Service Level",
+            "type": "number",
+            "unit": "%"
+          },
+          "xyz_cv_breakpoints": {
+            "default": [
+              0.13,
+              0.25
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "notes": "X \u2264 0.13, Y \u2264 0.25, Z above.",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "scope": "G",
+            "title": "Xyz Cv Breakpoints",
+            "type": "array",
+            "unit": "demand CV"
+          },
+          "z_matrix": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "Nine ABC\u00d7XYZ cells.",
+            "range": "[80, 99.9]",
+            "scope": "G",
+            "title": "Z Matrix",
+            "type": "object",
+            "unit": "% service level"
+          }
+        },
+        "title": "SafetyStockParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "plant",
+      "status": "implemented",
+      "strategy_class": "strategic",
+      "summary": "ABC-XYZ-differentiated material safety stock (Eqs. 20\u201321). Dominates short disruptions; depletes \u2014 beyond ~7\u20139 weeks expediting wins (run the crossover sweep)."
+    },
+    {
+      "catalog_ref": "P-P.4",
+      "constraint_targeted": "demand_side",
+      "hooks": [
+        {
+          "phase": "PH-70",
+          "priority": 55,
+          "reads": [
+            "forecast",
+            "state.fg_target"
+          ],
+          "resolution": "Adds the FG safety stock on top of the cycle-stock base target written by mech.fg_target_base (priority 45) \u2014 ADR 0001.",
+          "writes": [
+            "state.cost_ledger",
+            "state.fg_target"
+          ]
+        }
+      ],
+      "id": "fg_safety_stock",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "fixed_days_cover": {
+            "default": 2.0,
+            "maximum": 12.0,
+            "minimum": 0.0,
+            "scope": "P",
+            "title": "Fixed Days Cover",
+            "type": "number",
+            "unit": "days"
+          },
+          "fixed_units": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "notes": "sizing=fixed_units.",
+            "scope": "P",
+            "title": "Fixed Units",
+            "unit": "units"
+          },
+          "holding_cost_rate": {
+            "default": 20.0,
+            "maximum": 50.0,
+            "minimum": 5.0,
+            "notes": "h^FG_p.",
+            "scope": "P",
+            "title": "Holding Cost Rate",
+            "type": "number",
+            "unit": "%/yr of COGS"
+          },
+          "segmentation": {
+            "default": "uniform",
+            "enum": [
+              "uniform",
+              "abc_by_revenue"
+            ],
+            "notes": "abc_by_revenue: A = configured SL, B \u22122 pp, C \u22125 pp (floor 80).",
+            "scope": "G",
+            "title": "Segmentation",
+            "type": "string",
+            "unit": "enum"
+          },
+          "service_level_pct": {
+            "default": 95.0,
+            "maximum": 99.9,
+            "minimum": 80.0,
+            "notes": "z^FG_p.",
+            "scope": "P",
+            "title": "Service Level Pct",
+            "type": "number",
+            "unit": "%"
+          },
+          "sizing": {
+            "default": "service_level",
+            "enum": [
+              "service_level",
+              "fixed_days",
+              "fixed_units"
+            ],
+            "scope": "P",
+            "title": "Sizing",
+            "type": "string",
+            "unit": "enum"
+          }
+        },
+        "title": "FgSafetyStockParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "plant",
+      "status": "implemented",
+      "strategy_class": "strategic",
+      "summary": "The only buffer DOWNSTREAM of production (MTS only): keeps serving customers while production is blocked, and is the only feasible buffer when suppliers are single-sourced. Costs full COGS per unit held \u2014 versus P-P.3, likely submodular for short disruptions (same window, opposite sides of the CODP)."
+    },
+    {
+      "catalog_ref": "P-P.5",
+      "constraint_targeted": "production_capacity",
+      "hooks": [
+        {
+          "phase": "PH-40",
+          "priority": 40,
+          "reads": [
+            "demand",
+            "firm_knowledge",
+            "state.backlog",
+            "state.on_hand"
+          ],
+          "resolution": null,
+          "writes": [
+            "overtime_capacity"
+          ]
+        }
+      ],
+      "id": "short_term_capacity",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "activation": {
+            "default": "revenue_positive",
+            "enum": [
+              "revenue_positive",
+              "always_during_disruption"
+            ],
+            "notes": "revenue_positive \u2705 (Eq. 22).",
+            "scope": "G",
+            "title": "Activation",
+            "type": "string",
+            "unit": "enum"
+          },
+          "max_overtime_factor": {
+            "default": 1.5,
+            "maximum": 2.0,
+            "minimum": 1.0,
+            "scope": "P",
+            "title": "Max Overtime Factor",
+            "type": "number",
+            "unit": "\u00d7 O_p"
+          },
+          "overtime_premium_pct_of_price": {
+            "default": 5.0,
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "notes": "C^o.",
+            "scope": "P",
+            "title": "Overtime Premium Pct Of Price",
+            "type": "number",
+            "unit": "% of u_p per overtime unit"
+          }
+        },
+        "title": "ShortTermCapacityParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "plant",
+      "status": "implemented",
+      "strategy_class": "anticipation",
+      "summary": "Overtime: pay-per-use plant headroom (Eq. 22). Bites only when production capacity binds \u2014 in material-constrained networks that is rare; check utilization first."
+    },
+    {
+      "catalog_ref": "P-P.6",
+      "constraint_targeted": "production_capacity",
+      "hooks": [],
+      "id": "standing_capacity_reserve",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "reserve_factor": {
+            "default": 0.2,
+            "maximum": 0.5,
+            "minimum": 0.0,
+            "scope": "P",
+            "title": "Reserve Factor",
+            "type": "number",
+            "unit": "\u00d7 O_p"
+          },
+          "standing_cost": {
+            "minimum": 0,
+            "scope": "P",
+            "title": "Standing Cost",
+            "type": "number",
+            "unit": "\u20ac/wk"
+          }
+        },
+        "required": [
+          "standing_cost"
+        ],
+        "title": "StandingCapacityReserveParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "plant",
+      "status": "planned",
+      "strategy_class": "strategic",
+      "summary": "Permanently maintained plant headroom \u2014 option premium vs P-P.5's pay-per-use. Hook: PH-40."
+    },
+    {
+      "catalog_ref": "P-P.7",
+      "constraint_targeted": "production_capacity",
+      "hooks": [],
+      "id": "process_flexibility",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "flexibility_matrix": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "scope": "P",
+            "title": "Flexibility Matrix",
+            "type": "object",
+            "unit": "line \u2192 products"
+          },
+          "switchover_cost": {
+            "default": 0.0,
+            "minimum": 0,
+            "scope": "P",
+            "title": "Switchover Cost",
+            "type": "number",
+            "unit": "\u20ac/switch"
+          },
+          "switchover_time_weeks": {
+            "default": 0,
+            "maximum": 2,
+            "minimum": 0,
+            "scope": "P",
+            "title": "Switchover Time Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          }
+        },
+        "required": [
+          "flexibility_matrix"
+        ],
+        "title": "ProcessFlexibilityParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "plant",
+      "status": "planned",
+      "strategy_class": "anticipation",
+      "summary": "Which lines make which products; Jordan\u2013Graves chaining \u2014 a little flexibility buys most of the value. Hook: PH-40."
+    },
+    {
+      "catalog_ref": "P-P.8",
+      "constraint_targeted": "material_availability",
+      "hooks": [],
+      "id": "alternative_bom",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "auto_substitute": {
+            "default": true,
+            "scope": "G",
+            "title": "Auto Substitute",
+            "type": "boolean",
+            "unit": "-"
+          },
+          "substitute_map": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "scope": "M",
+            "title": "Substitute Map",
+            "type": "object",
+            "unit": "material \u2192 substitutes"
+          },
+          "substitute_rates": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "notes": "r\u2032_{p,m\u2032} > 0.",
+            "scope": "P\u00d7M",
+            "title": "Substitute Rates",
+            "type": "object",
+            "unit": "units m\u2032/unit p"
+          },
+          "substitution_cost": {
+            "default": 0.0,
+            "minimum": 0,
+            "scope": "M",
+            "title": "Substitution Cost",
+            "type": "number",
+            "unit": "\u20ac/unit"
+          }
+        },
+        "required": [
+          "substitute_map"
+        ],
+        "title": "AlternativeBomParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "plant",
+      "status": "planned",
+      "strategy_class": "anticipation",
+      "summary": "Pre-qualified substitutes (Tesla chip-redesign pattern) \u2014 the only material-side answer to single-sourced bottlenecks; qualification must precede the crisis. Hooks: PH-40/PH-50."
+    },
+    {
+      "catalog_ref": "P-P.9",
+      "constraint_targeted": "allocation_efficiency",
+      "hooks": [
+        {
+          "phase": "PH-40",
+          "priority": 60,
+          "reads": [
+            "demand",
+            "firm_knowledge",
+            "overtime_capacity",
+            "state.backlog",
+            "state.on_hand",
+            "state.pipeline"
+          ],
+          "resolution": "Replaces the default greedy plan (priority 50 mechanic) with the rolling-LP allocation when active.",
+          "writes": [
+            "production_plan",
+            "state.cost_ledger"
+          ]
+        }
+      ],
+      "id": "material_allocation",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "activation": {
+            "default": "during_disruption",
+            "enum": [
+              "during_disruption",
+              "always"
+            ],
+            "scope": "G",
+            "title": "Activation",
+            "type": "string",
+            "unit": "enum"
+          },
+          "annual_cost": {
+            "default": 6240.0,
+            "minimum": 0,
+            "notes": "C^alc \u2014 planner labor.",
+            "scope": "G",
+            "title": "Annual Cost",
+            "type": "number",
+            "unit": "\u20ac/yr"
+          },
+          "objective": {
+            "default": "max_revenue",
+            "enum": [
+              "max_revenue",
+              "max_fill_rate",
+              "priority_weighted",
+              "fg_replenish"
+            ],
+            "notes": "max_revenue \u2705; fg_replenish is MTS-only (M7).",
+            "scope": "G",
+            "title": "Objective",
+            "type": "string",
+            "unit": "enum"
+          },
+          "priority_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "objective=priority_weighted; missing products weigh 1.",
+            "scope": "P",
+            "title": "Priority Weights",
+            "type": "object",
+            "unit": "weight per product"
+          },
+          "solver": {
+            "default": "lp",
+            "enum": [
+              "lp",
+              "greedy"
+            ],
+            "notes": "greedy = revenue-ranked heuristic (R3 fallback flag).",
+            "scope": "G",
+            "title": "Solver",
+            "type": "string",
+            "unit": "enum"
+          },
+          "window_weeks": {
+            "default": 4,
+            "maximum": 13,
+            "minimum": 1,
+            "notes": "W \u2014 rolling horizon.",
+            "scope": "G",
+            "title": "Window Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          }
+        },
+        "title": "MaterialAllocationParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "plant",
+      "status": "implemented",
+      "strategy_class": "improvisation",
+      "summary": "The weekly war-room as a rolling LP (Eqs. 13\u201317): reassign shared materials across products to protect revenue during scarcity. Costs planner time only; value scales with the shared-material index."
+    },
+    {
+      "catalog_ref": "P-S.1",
+      "constraint_targeted": "material_availability",
+      "hooks": [
+        {
+          "phase": "PH-80",
+          "priority": 60,
+          "reads": [
+            "firm_knowledge",
+            "purchase_orders",
+            "state.on_hand",
+            "state.pipeline",
+            "state.queue"
+          ],
+          "resolution": "Reroutes orders released by inventory_control (priority 50) away from firm-visibly disrupted primary suppliers.",
+          "writes": [
+            "purchase_orders",
+            "state.cost_ledger"
+          ]
+        }
+      ],
+      "id": "backup_supplier",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_trigger": {
+            "default": "on_disruption",
+            "enum": [
+              "on_disruption",
+              "coverage_threshold"
+            ],
+            "scope": "G",
+            "title": "Activation Trigger",
+            "type": "string",
+            "unit": "enum"
+          },
+          "backup_lead_time_weeks": {
+            "anyOf": [
+              {
+                "maximum": 26,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "notes": "T_{s\u2032} override; None \u2192 the backup link's own lead time. Plan default 6.",
+            "scope": "SM",
+            "title": "Backup Lead Time Weeks",
+            "unit": "weeks"
+          },
+          "cooldown_weeks": {
+            "default": 0,
+            "maximum": 8,
+            "minimum": 0,
+            "notes": "Keep using the backup this long after the event clears.",
+            "scope": "G",
+            "title": "Cooldown Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "coverage_threshold_weeks": {
+            "default": 4.0,
+            "maximum": 26,
+            "minimum": 0.5,
+            "notes": "Reroute only when position covers fewer weeks than this.",
+            "scope": "G",
+            "title": "Coverage Threshold Weeks",
+            "type": "number",
+            "unit": "weeks-of-supply"
+          },
+          "enabled_materials": {
+            "anyOf": [
+              {
+                "const": "all_multi_sourced",
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "default": "all_multi_sourced",
+            "notes": "Materials covered; single-sourced ones are skipped.",
+            "scope": "M",
+            "title": "Enabled Materials",
+            "unit": "ids"
+          },
+          "selection_rule": {
+            "default": "min_cost",
+            "enum": [
+              "min_cost",
+              "min_leadtime",
+              "reliability"
+            ],
+            "scope": "G",
+            "title": "Selection Rule",
+            "type": "string",
+            "unit": "enum"
+          }
+        },
+        "title": "BackupSupplierParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "supplier",
+      "status": "implemented",
+      "strategy_class": "strategic",
+      "summary": "Contingent rerouting to a qualified backup source \u2014 premium paid only on rerouted orders. Slower than warm dual-sourcing, and useless when a BoM peer is single-sourced: one missing material still blocks the product."
+    },
+    {
+      "catalog_ref": "P-S.2",
+      "constraint_targeted": "material_availability",
+      "hooks": [
+        {
+          "phase": "PH-80",
+          "priority": 55,
+          "reads": [
+            "firm_knowledge",
+            "purchase_orders"
+          ],
+          "resolution": "Splits the orders released by inventory_control (priority 50) across qualified links; P-S.1 (priority 60) may still reroute a disrupted slice afterwards.",
+          "writes": [
+            "purchase_orders",
+            "state.cost_ledger"
+          ]
+        }
+      ],
+      "id": "proactive_multi_sourcing",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "min_share_pct": {
+            "default": 20.0,
+            "maximum": 50.0,
+            "minimum": 5.0,
+            "notes": "Smallest viable slice; caps how many sources the default split spreads across.",
+            "scope": "G",
+            "title": "Min Share Pct",
+            "type": "number",
+            "unit": "%"
+          },
+          "rebalance_trigger": {
+            "default": "none",
+            "enum": [
+              "none",
+              "disruption"
+            ],
+            "notes": "disruption: shift shares away from firm-visibly disrupted suppliers. reliability_drop lands with reliability dynamics (M8).",
+            "scope": "G",
+            "title": "Rebalance Trigger",
+            "type": "string",
+            "unit": "enum"
+          },
+          "secondary_premium": {
+            "default": 0.0,
+            "minimum": 0,
+            "notes": "Contractual premium on non-primary slices, on top of the link cost difference.",
+            "scope": "SM",
+            "title": "Secondary Premium",
+            "type": "number",
+            "unit": "\u20ac/unit"
+          },
+          "weights": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "notes": "w_{m,s}; each material's shares sum to 100. Materials absent here use the default equal split.",
+            "scope": "SM",
+            "title": "Weights",
+            "type": "object",
+            "unit": "share % per (material \u2192 supplier)"
+          }
+        },
+        "title": "ProactiveMultiSourcingParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "supplier",
+      "status": "implemented",
+      "strategy_class": "strategic",
+      "summary": "Split orders across warm sources in NORMAL operations \u2014 no activation delay, permanent premium; the structural answer to capacity-cut events. Pay-always vs P-S.1's pay-on-activation; each slice carries its own source's lead time, so a disruption hits only its slice."
+    },
+    {
+      "catalog_ref": "P-S.3",
+      "constraint_targeted": "material_availability",
+      "hooks": [],
+      "id": "capacity_reservation",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "call_leadtime_weeks": {
+            "default": 0,
+            "maximum": 4,
+            "minimum": 0,
+            "scope": "SM",
+            "title": "Call Leadtime Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "reservation_fee": {
+            "exclusiveMinimum": 0,
+            "scope": "SM",
+            "title": "Reservation Fee",
+            "type": "number",
+            "unit": "\u20ac/unit/wk"
+          },
+          "reserved_capacity": {
+            "minimum": 0,
+            "scope": "SM",
+            "title": "Reserved Capacity",
+            "type": "number",
+            "unit": "units/wk"
+          }
+        },
+        "required": [
+          "reserved_capacity",
+          "reservation_fee"
+        ],
+        "title": "CapacityReservationParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "supplier",
+      "status": "planned",
+      "strategy_class": "strategic",
+      "summary": "Real-options contract (semiconductor-style): standing fee for callable capacity; reserved units bypass capacity cuts. Cheaper than stock for slow, expensive materials. Hook: PH-80."
+    },
+    {
+      "catalog_ref": "P-S.4",
+      "constraint_targeted": "response_time",
+      "hooks": [],
+      "id": "early_warning_failover",
+      "milestone": "M7",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "detection_lag_weeks": {
+            "default": 1,
+            "maximum": 4,
+            "minimum": 0,
+            "notes": "Applies to ALL reactive strategies (PH-20).",
+            "scope": "G/S",
+            "title": "Detection Lag Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "failover_threshold_weeks": {
+            "default": 4.0,
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "scope": "G",
+            "title": "Failover Threshold Weeks",
+            "type": "number",
+            "unit": "weeks-of-supply"
+          },
+          "monitoring_cost": {
+            "default": 0.0,
+            "minimum": 0,
+            "scope": "G",
+            "title": "Monitoring Cost",
+            "type": "number",
+            "unit": "\u20ac/yr"
+          }
+        },
+        "title": "EarlyWarningFailoverParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "supplier",
+      "status": "planned",
+      "strategy_class": "anticipation",
+      "summary": "Visibility investments compress disruption-start \u2192 firm-knows. Makes 'what is a week of warning worth?' a first-class experiment. Hook: PH-20."
+    },
+    {
+      "catalog_ref": "P-T.1",
+      "constraint_targeted": "transport_capacity",
+      "hooks": [],
+      "id": "multimodal_lane_portfolio",
+      "milestone": "M7 (edge split)",
+      "params_schema": {
+        "$defs": {
+          "LaneSpec": {
+            "additionalProperties": false,
+            "properties": {
+              "capacity_per_week": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "scope": "E",
+                "title": "Capacity Per Week",
+                "unit": "units/wk"
+              },
+              "cost_per_unit": {
+                "minimum": 0,
+                "scope": "E",
+                "title": "Cost Per Unit",
+                "type": "number",
+                "unit": "\u20ac/unit"
+              },
+              "lead_time_weeks": {
+                "maximum": 26,
+                "minimum": 0,
+                "scope": "E",
+                "title": "Lead Time Weeks",
+                "type": "integer",
+                "unit": "weeks"
+              },
+              "mode": {
+                "default": "default",
+                "enum": [
+                  "default",
+                  "sea",
+                  "air",
+                  "road",
+                  "rail"
+                ],
+                "title": "Mode",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lead_time_weeks",
+              "cost_per_unit"
+            ],
+            "title": "LaneSpec",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "lanes": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/$defs/LaneSpec"
+              },
+              "type": "array"
+            },
+            "notes": "\u22643 per SM.",
+            "scope": "SM",
+            "title": "Lanes",
+            "type": "object",
+            "unit": "lanes per supplier link"
+          },
+          "mode_split_pct": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "notes": "Shares sum to 100.",
+            "scope": "SM",
+            "title": "Mode Split Pct",
+            "type": "object",
+            "unit": "%"
+          }
+        },
+        "title": "MultimodalLanePortfolioParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "transport",
+      "status": "planned",
+      "strategy_class": "strategic",
+      "summary": "Qualified alternative lanes/modes per supplier \u2014 edge-risk redundancy; prerequisite for P-T.3 mode_shift. Hook: PH-90."
+    },
+    {
+      "catalog_ref": "P-T.2",
+      "constraint_targeted": "response_time",
+      "hooks": [
+        {
+          "phase": "PH-90",
+          "priority": 40,
+          "reads": [
+            "firm_knowledge",
+            "material_demand",
+            "state.backlog",
+            "state.on_hand",
+            "state.pipeline"
+          ],
+          "resolution": "Runs after the deferral mechanic (priority 10) and before landing (priority 90): expedited quantities land this week at a premium.",
+          "writes": [
+            "state.cost_ledger",
+            "state.pipeline"
+          ]
+        }
+      ],
+      "id": "expedited_shipments",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "default": "revenue_positive",
+            "enum": [
+              "revenue_positive",
+              "always_during_disruption"
+            ],
+            "notes": "revenue_positive \u2705.",
+            "scope": "G",
+            "title": "Decision",
+            "type": "string",
+            "unit": "enum"
+          },
+          "premium_pct_of_cost": {
+            "default": 3.0,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "notes": "C^exp_m.",
+            "scope": "M",
+            "title": "Premium Pct Of Cost",
+            "type": "number",
+            "unit": "% of c_m per unit"
+          },
+          "scope": {
+            "default": "disrupted_materials",
+            "enum": [
+              "disrupted_materials",
+              "all"
+            ],
+            "notes": "disrupted_materials \u2705.",
+            "scope": "G",
+            "title": "Scope",
+            "type": "string",
+            "unit": "enum"
+          }
+        },
+        "title": "ExpeditedShipmentsParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "transport",
+      "status": "implemented",
+      "strategy_class": "improvisation",
+      "summary": "Premium freight pulls existing in-transit forward (Eqs. 18\u201319) \u2014 repeatable every week, hence the strongest long-disruption strategy. Cannot conjure units a capacity cut never shipped (supplier queue is out of reach)."
+    },
+    {
+      "catalog_ref": "P-T.3",
+      "constraint_targeted": "response_time",
+      "hooks": [],
+      "id": "mode_shift",
+      "milestone": "M7 (needs P-T.1)",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "default": "revenue_positive",
+            "enum": [
+              "revenue_positive",
+              "always_during_disruption"
+            ],
+            "scope": "G",
+            "title": "Decision",
+            "type": "string",
+            "unit": "enum"
+          },
+          "lt_saving_weeks": {
+            "minimum": 1,
+            "scope": "E",
+            "title": "Lt Saving Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "upgrade_cost": {
+            "exclusiveMinimum": 0,
+            "scope": "E",
+            "title": "Upgrade Cost",
+            "type": "number",
+            "unit": "\u20ac/unit"
+          },
+          "upgrade_lane": {
+            "notes": "Requires P-T.1.",
+            "scope": "E",
+            "title": "Upgrade Lane",
+            "type": "string",
+            "unit": "lane id"
+          }
+        },
+        "required": [
+          "upgrade_lane",
+          "lt_saving_weeks",
+          "upgrade_cost"
+        ],
+        "title": "ModeShiftParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "transport",
+      "status": "planned",
+      "strategy_class": "improvisation",
+      "summary": "Switch NEW orders to a faster lane (sea\u2192air) \u2014 composable with P-T.2, which moves the EXISTING flow. Hooks: PH-80/PH-90."
+    },
+    {
+      "catalog_ref": "P-T.4",
+      "constraint_targeted": "response_time",
+      "hooks": [],
+      "id": "leadtime_hedging",
+      "milestone": "M8",
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "applies_to": {
+            "default": "long_lt",
+            "enum": [
+              "all",
+              "long_lt",
+              "abc_a_only"
+            ],
+            "scope": "G",
+            "title": "Applies To",
+            "type": "string",
+            "unit": "enum"
+          },
+          "hedge_weeks": {
+            "default": 2,
+            "maximum": 8,
+            "minimum": 0,
+            "scope": "M",
+            "title": "Hedge Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "long_lt_threshold_weeks": {
+            "default": 12,
+            "maximum": 51,
+            "minimum": 1,
+            "scope": "G",
+            "title": "Long Lt Threshold Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          }
+        },
+        "title": "LeadtimeHedgingParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "transport",
+      "status": "planned",
+      "strategy_class": "anticipation",
+      "summary": "Order earlier than policy dictates for long-lead/critical materials \u2014 a time buffer instead of a unit buffer. Hook: PH-70."
+    },
+    {
+      "catalog_ref": "P-X.1",
+      "constraint_targeted": null,
+      "hooks": [],
+      "id": "recovery_playbook",
+      "milestone": "M8",
+      "params_schema": {
+        "$defs": {
+          "PlaybookStep": {
+            "additionalProperties": false,
+            "properties": {
+              "cooldown_weeks": {
+                "default": 0,
+                "maximum": 8,
+                "minimum": 0,
+                "scope": "G",
+                "title": "Cooldown Weeks",
+                "type": "integer",
+                "unit": "weeks"
+              },
+              "param_override": {
+                "additionalProperties": true,
+                "title": "Param Override",
+                "type": "object"
+              },
+              "policy_ref": {
+                "scope": "G",
+                "title": "Policy Ref",
+                "type": "string",
+                "unit": "policy id"
+              },
+              "trigger": {
+                "enum": [
+                  "disruption_detected",
+                  "coverage_below",
+                  "fill_rate_below",
+                  "backlog_above"
+                ],
+                "title": "Trigger",
+                "type": "string"
+              },
+              "trigger_value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "scope": "G",
+                "title": "Trigger Value",
+                "unit": "trigger-specific"
+              }
+            },
+            "required": [
+              "trigger",
+              "policy_ref"
+            ],
+            "title": "PlaybookStep",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "cost_cap": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "scope": "G",
+            "title": "Cost Cap",
+            "unit": "\u20ac"
+          },
+          "evaluation_cadence_weeks": {
+            "default": 1,
+            "enum": [
+              1,
+              2
+            ],
+            "scope": "G",
+            "title": "Evaluation Cadence Weeks",
+            "type": "integer",
+            "unit": "weeks"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/$defs/PlaybookStep"
+            },
+            "maxItems": 10,
+            "scope": "G",
+            "title": "Steps",
+            "type": "array",
+            "unit": "ordered steps"
+          }
+        },
+        "required": [
+          "steps"
+        ],
+        "title": "RecoveryPlaybookParams",
+        "type": "object"
+      },
+      "requires_predeployment": false,
+      "stage": "cross",
+      "status": "planned",
+      "strategy_class": "meta",
+      "summary": "Firms execute SEQUENCED responses \u2014 detect \u2192 expedite \u2192 backup \u2192 overtime \u2014 gated by triggers and budget. Composes enabled policies; replaces flat recovery lists. Hook: PH-20 (evaluation) + delegated."
+    }
+  ]
+}

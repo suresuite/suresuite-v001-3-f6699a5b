@@ -1,0 +1,24 @@
+{
+  "_comment": "Phase A / G1 / §6.2 — the ONE place the UI's family vocabulary is translated to the engine's plugin vocabulary. Mirrors scsim/scsim/io/project_map.py::_map_policies. scripts/check_registry_bridge.mjs asserts every target below exists in registry.generated.json (a CI gate), so this bridge cannot silently drift from the engine. Phase B deletes this bridge when the forms render engine plugin params directly.",
+  "recovery_response_to_policy": {
+    "reroute": "expedited_shipments",
+    "mode_shift": "expedited_shipments",
+    "expedite_freight": "expedited_shipments",
+    "dual_source_activate": "backup_supplier",
+    "capacity_flex": "short_term_capacity"
+  },
+  "inventory_type_to_policy_type": {
+    "min_max": "min_max",
+    "s_S": "min_max",
+    "continuous_review": "min_max",
+    "base_stock": "base_stock",
+    "rop": "rop_q",
+    "periodic_review": "periodic"
+  },
+  "safety_stock_method_to_classification": {
+    "fixed_days": "fixed_days",
+    "service_level": "uniform",
+    "demand_variability": "uniform",
+    "king_method": "king"
+  }
+}
