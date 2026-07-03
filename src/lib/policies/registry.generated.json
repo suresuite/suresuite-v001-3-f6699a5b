@@ -212,7 +212,7 @@
         "target_type": {
           "$ref": "#/$defs/TargetType",
           "default": "node:supplier",
-          "notes": "node:supplier \u2705; node:plant \ud83e\udde9 M7; edge:lane \ud83e\udde9.",
+          "notes": "node:supplier \u2705; node:plant \u2705; edge:lane \ud83e\udde9.",
           "scope": "event",
           "unit": "enum"
         }

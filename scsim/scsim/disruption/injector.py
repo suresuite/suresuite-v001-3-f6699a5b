@@ -1,7 +1,8 @@
 """Generalized event injector — Part III §3.7.
 
-Compile-time: validates targets/effects against the network (node:plant is
-M7; capacity_reduction needs a finite supplier capacity).
+Compile-time: validates targets/effects against the network (capacity_reduction
+on a supplier needs a finite supplier capacity; a node:plant target throttles
+or halts the plant's own production).
 
 Replication-time: draws stochastic fields from the hazard streams keyed by
 (event_rep, event_index) and resolves targets to supplier indices.
@@ -29,10 +30,10 @@ class DisruptionCompileError(ValueError):
 def validate_events(model: CompiledModel) -> None:
     for i, ev in enumerate(model.scenario.events):
         if ev.target_type == TargetType.NODE_PLANT:
-            raise DisruptionCompileError(
-                f"event[{i}]: node:plant targets land in M7 (engine {model.settings.time_step}); "
-                f"only node:supplier and edge:lane are supported in this engine version"
-            )
+            # The plant's production capacity is always finite (products carry a
+            # production_capacity), so capacity_reduction is always meaningful —
+            # no supplier resolution or finiteness check needed.
+            continue
         sup_idx = _resolve_supplier(model, ev, i)
         if ev.effect_type == EffectType.CAPACITY_REDUCTION and not np.isfinite(
             model.sup_capacity[sup_idx]
@@ -69,7 +70,8 @@ def resolve_events(
     resolved: list[ResolvedEvent] = []
     seed = model.settings.project_seed
     for i, ev in enumerate(model.scenario.events):
-        sup_idx = _resolve_supplier(model, ev, i)
+        is_plant = ev.target_type == TargetType.NODE_PLANT
+        sup_idx = -1 if is_plant else _resolve_supplier(model, ev, i)
         if ev.start is not None:
             start = ev.start
         else:
@@ -92,6 +94,7 @@ def resolve_events(
                 onset_profile=ev.onset_profile,
                 recovery_profile=ev.recovery_profile,
                 ramp_weeks=ev.ramp_weeks,
+                is_plant=is_plant,
             )
         )
     return resolved
