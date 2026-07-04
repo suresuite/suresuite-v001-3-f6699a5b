@@ -233,6 +233,30 @@ def test_unsourced_material_raises():
         from_project_data(d)
 
 
+def test_e1_fully_specified_project_has_no_silent_fallbacks():
+    """Engine-retirement gate E1 (blueprint §3): a fully-specified project
+    maps with ZERO warn-level MappingWarnings — every warn is a silent
+    fallback the user did not ask for. The one info-level residue is the
+    known Phase B leftover (absolute order_up_to → coverage-κ, G1)."""
+    d = ProjectData(
+        suppliers=[SupplierRow(id="s1", capacity_per_week=500.0)],
+        materials=[MaterialRow(id="m1", cost=2.0)],
+        products=[ProductRow(id="p1", sell_price=20.0, demand_mean=100.0,
+                             production_capacity=200.0)],
+        supply_arcs=[SupplyArc(supplier_id="s1", material_id="m1", unit_price=2.0,
+                               lead_time=2, lead_time_unit="week")],
+        bom=[BomArc(product_id="p1", material_id="m1", consumption_rate=1.0)],
+        outbound=[OutboundArc(product_id="p1", customer_id="c1", unit_price=20.0,
+                              volume=100.0, time_unit="week")],
+        scenario=ScenarioSettings(horizon_days=364),
+    )
+    res = from_project_data(d)
+    warns = [w for w in res.warnings if w.level == "warn"]
+    assert warns == [], [w.as_dict() for w in warns]
+    info_residue = {(w.entity, w.field) for w in res.warnings if w.level == "info"}
+    assert info_residue <= {("policy:inventory_control", "order_up_to")}, info_residue
+
+
 def test_scenario_runs_end_to_end():
     from scsim.core.engine import run_scenario
     res = from_project_data(_base(replications=2, horizon_days=560, warmup_mode="manual", warmup_days=70))

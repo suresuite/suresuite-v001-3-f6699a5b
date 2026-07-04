@@ -198,6 +198,18 @@ Retirement is gated on capability, not dates:
 | **E3 — Default flip** | `SCSIM_ENGINE=1` becomes the default; legacy behind an explicit escape hatch; `code_version` continues to record which engine produced every run |
 | **E4 — Removal** | Legacy code deleted after two release cycles with no escape-hatch use |
 
+> **Implementation note (Phase A, gate evidence).** E1 is now regression-tested:
+> `scsim/tests/test_project_map.py::test_e1_fully_specified_project_has_no_silent_fallbacks`
+> asserts a fully-specified project maps with zero warn-level `MappingWarning`s; the sole
+> info-level residue is the absolute-`order_up_to` → coverage-κ note, which Phase B's
+> extended P-P.1 parameterization retires. E2 has its first characterization:
+> `scripts/parity_characterization.py` runs the 8 system presets (family-field reductions)
+> through both engines on a BoM-peer-bottleneck reference network and regenerates
+> `docs/parity-characterization.md` — differences documented there and accepted as
+> corrections (coverage-κ sizing, fulfillment semantics, per-engine RNG, and the
+> definitional `cost_of_resilience` mismatch). Golden-trace pinning across the full preset
+> grid and the E3 default flip remain Phase B work.
+
 ---
 ## 4. Node-owned policy architecture
 
