@@ -29,25 +29,36 @@ const PANEL_MIN = { w: 340, h: 380 };
 interface Pos { x: number; y: number }
 interface Dims { w: number; h: number }
 
-function loadPosFrom(key: string): Pos | null {
+function clampPos(p: Pos, size: { w: number; h: number }): Pos {
+  if (typeof window === "undefined") return p;
+  return {
+    x: Math.min(Math.max(0, p.x), Math.max(0, window.innerWidth - size.w)),
+    y: Math.min(Math.max(0, p.y), Math.max(0, window.innerHeight - size.h)),
+  };
+}
+
+function loadPosFrom(key: string, size?: { w: number; h: number }): Pos | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const p = JSON.parse(raw);
-    if (typeof p?.x === "number" && typeof p?.y === "number") return p;
+    if (typeof p?.x === "number" && typeof p?.y === "number") {
+      return size ? clampPos(p, size) : p;
+    }
   } catch { /* ignore */ }
   return null;
 }
 
 function loadPos(): Pos | null {
-  return loadPosFrom(LAUNCHER_POS_KEY);
+  return loadPosFrom(LAUNCHER_POS_KEY, LAUNCHER_SIZE);
 }
 
 function defaultPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
   return { x: window.innerWidth - LAUNCHER_SIZE.w - 20, y: window.innerHeight - LAUNCHER_SIZE.h - 20 };
 }
+
 
 // Clamp panel size to the viewport (and a sensible minimum) so it always fits.
 function clampDims(w: number, h: number): Dims {
@@ -92,7 +103,7 @@ export function FloatingChatBubble() {
   const [pos, setPos] = useState<Pos>(() => loadPos() ?? defaultPos());
   const [dragging, setDragging] = useState(false);
   const dragState = useRef<{ ox: number; oy: number; moved: boolean } | null>(null);
-  const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos());
+  const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY, defaultDims()) ?? defaultPanelPos());
   const [panelDragging, setPanelDragging] = useState(false);
   const panelDragState = useRef<{ ox: number; oy: number } | null>(null);
   const [panelDims, setPanelDims] = useState<Dims>(() => loadDims() ?? defaultDims());
@@ -115,23 +126,26 @@ export function FloatingChatBubble() {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
+  // Re-clamp on mount (viewport may be smaller than when positions were saved).
+  useEffect(() => {
+    setPos((p) => clampPos(p, LAUNCHER_SIZE));
+    const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
+    setPanelDims(s);
+    setPanelPos((p) => clampPos(p, s));
+  }, []);
+
   // Keep launcher and panel (position + size) in viewport on window resize.
   useEffect(() => {
     const onResize = () => {
-      setPos((p) => ({
-        x: Math.min(Math.max(0, p.x), window.innerWidth - LAUNCHER_SIZE.w),
-        y: Math.min(Math.max(0, p.y), window.innerHeight - LAUNCHER_SIZE.h),
-      }));
+      setPos((p) => clampPos(p, LAUNCHER_SIZE));
       const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
       setPanelDims(s);
-      setPanelPos((p) => ({
-        x: Math.min(Math.max(8, p.x), window.innerWidth - s.w),
-        y: Math.min(Math.max(8, p.y), window.innerHeight - s.h),
-      }));
+      setPanelPos((p) => clampPos(p, s));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
 
   // Drag handlers
   useEffect(() => {
