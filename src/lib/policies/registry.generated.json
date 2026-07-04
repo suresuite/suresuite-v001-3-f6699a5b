@@ -1239,27 +1239,28 @@
     {
       "catalog_ref": "P-C.2",
       "constraint_targeted": "demand_side",
-      "hooks": [],
+      "hooks": [
+        {
+          "phase": "PH-60",
+          "priority": 60,
+          "reads": [
+            "demand",
+            "fulfillment"
+          ],
+          "resolution": null,
+          "writes": []
+        }
+      ],
       "id": "customer_allocation",
-      "milestone": "M7",
+      "milestone": null,
       "params_schema": {
         "additionalProperties": false,
         "properties": {
-          "fair_share_basis": {
-            "default": "demand",
-            "enum": [
-              "demand",
-              "history"
-            ],
-            "scope": "G",
-            "title": "Fair Share Basis",
-            "type": "string",
-            "unit": "enum"
-          },
           "priority_weights": {
             "additionalProperties": {
               "type": "number"
             },
+            "notes": "Overrides Customer.priority_weight; higher serves first.",
             "scope": "C",
             "title": "Priority Weights",
             "type": "object",
@@ -1269,10 +1270,12 @@
             "default": "fcfs",
             "enum": [
               "fcfs",
-              "priority",
+              "proportional",
               "fair_share",
+              "priority",
               "sla_tier"
             ],
+            "notes": "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority and sla_tier reorder.",
             "scope": "C",
             "title": "Rule",
             "type": "string",
@@ -1282,10 +1285,11 @@
             "additionalProperties": {
               "type": "number"
             },
+            "notes": "Guaranteed first-pass fill per segment; scaled down pro-rata when supply cannot honor all floors.",
             "scope": "C",
             "title": "Sla Tiers",
             "type": "object",
-            "unit": "tier \u2192 fill floor %"
+            "unit": "segment \u2192 fill floor %"
           }
         },
         "title": "CustomerAllocationParams",
@@ -1293,7 +1297,7 @@
       },
       "requires_predeployment": false,
       "stage": "customer",
-      "status": "planned",
+      "status": "implemented",
       "strategy_class": "improvisation",
       "summary": "Under scarcity, 'who do we disappoint first' is deliberate \u2014 protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60."
     },

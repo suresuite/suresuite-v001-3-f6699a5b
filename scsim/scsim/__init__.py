@@ -24,6 +24,7 @@ from scsim.entities.config import SimulationSettings, StatisticsReport  # noqa: 
 from scsim.entities.network import (  # noqa: E402,F401
     BomLine,
     Customer,
+    CustomerLink,
     Lane,
     Material,
     Network,

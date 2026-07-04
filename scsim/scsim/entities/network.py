@@ -267,6 +267,20 @@ class Customer(BaseModel):
     priority_weight: float = Field(1.0, ge=0)
 
 
+class CustomerLink(BaseModel):
+    """Outbound demand edge — which customer buys which product, and how much.
+
+    ``share`` is a relative weight (e.g. the outbound arc's weekly volume);
+    shares are normalized per product at compile time. Products with no links
+    default to a uniform split across all customers, so the field is
+    behavior-neutral until P-C.2 customer_allocation reads it."""
+
+    product_id: str = Field(..., min_length=1)
+    customer_id: str = Field(..., min_length=1)
+    share: float = Field(1.0, gt=0, json_schema_extra=_meta(
+        "relative weight", "PC", "Normalized per product at compile."))
+
+
 class Lane(BaseModel):
     """Transport edge — §3.6 🧩. Defaults are behavior-neutral (folded into T_s)."""
 
@@ -297,6 +311,7 @@ class Network(BaseModel):
     bom: list[BomLine] = Field(..., min_length=1)
     supplier_links: list[SupplierLink] = Field(..., min_length=1)
     customers: list[Customer] = Field(default_factory=list, max_length=10_000)
+    customer_links: list[CustomerLink] = Field(default_factory=list)
     lanes: list[Lane] = Field(default_factory=list)
 
     # Supplier-profile classifier thresholds (configurable; §3.5).
@@ -345,6 +360,18 @@ class Network(BaseModel):
         for lane in self.lanes:
             if lane.supplier_id not in sup_ids:
                 raise ValueError(f"lane {lane.id!r} references unknown supplier {lane.supplier_id!r}")
+
+        cust_ids = {c.id for c in self.customers}
+        if len(cust_ids) != len(self.customers):
+            raise ValueError("duplicate customer ids")
+        for cl in self.customer_links:
+            if cl.product_id not in prod_ids:
+                raise ValueError(f"customer_link references unknown product {cl.product_id!r}")
+            if cl.customer_id not in cust_ids:
+                raise ValueError(f"customer_link references unknown customer {cl.customer_id!r}")
+        cl_keys = {(l.product_id, l.customer_id) for l in self.customer_links}
+        if len(cl_keys) != len(self.customer_links):
+            raise ValueError("duplicate (product, customer) links")
         return self
 
     # ------------------------------------------------------------------ derived

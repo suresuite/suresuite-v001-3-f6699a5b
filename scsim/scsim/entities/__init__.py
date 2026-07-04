@@ -3,6 +3,7 @@ from scsim.entities.disruption import DisruptionEvent, DurationRange
 from scsim.entities.network import (
     BomLine,
     Customer,
+    CustomerLink,
     Lane,
     Material,
     Network,
@@ -17,6 +18,7 @@ __all__ = [
     "BUILT_IN_POLICY_IDS",
     "BomLine",
     "Customer",
+    "CustomerLink",
     "DisruptionEvent",
     "DurationRange",
     "Lane",

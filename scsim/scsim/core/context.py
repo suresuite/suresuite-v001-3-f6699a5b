@@ -204,6 +204,24 @@ class CompiledModel:
         # Full COGS per FG unit (P-P.4 holding basis): Σ_m r_{p,m} · c_m.
         self.fg_unit_cogs = np.asarray(self.bom @ self.mat_cost).ravel()
 
+        # Customers (P-C.2). Share matrix rows are normalized per product;
+        # products with no customer_links split uniformly — behavior-neutral
+        # until a customer-allocation policy reads it.
+        self.cust_ids = [c.id for c in net.customers]
+        self.n_custs = len(self.cust_ids)
+        self.cust_index = {cid: i for i, cid in enumerate(self.cust_ids)}
+        self.cust_priority = np.array([c.priority_weight for c in net.customers])
+        self.cust_segment = [c.segment for c in net.customers]
+        if self.n_custs:
+            W = np.zeros((self.n_prods, self.n_custs))
+            for cl in net.customer_links:
+                W[self.prod_index[cl.product_id], self.cust_index[cl.customer_id]] = cl.share
+            unlinked = W.sum(axis=1) == 0.0
+            W[unlinked, :] = 1.0
+            self.cust_share = W / W.sum(axis=1, keepdims=True)
+        else:
+            self.cust_share = np.zeros((self.n_prods, 0))
+
         # Ring width: longest quoted arrival distance is max(T_link, deferral≤52)
         # plus the recovery ramp; +4 slack (§10.2.2).
         self.ring_width = int(self.link_lt.max()) + 52 + 8 + 4

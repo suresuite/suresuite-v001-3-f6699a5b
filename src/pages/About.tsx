@@ -980,13 +980,12 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-C.2", id: "customer_allocation", stage: "customer", cls: "improvisation",
-    constraint: "demand_side", status: "🧩", milestone: "M7",
-    logic: "Under scarcity, 'who do we disappoint first' is deliberate — protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60.",
+    constraint: "demand_side", status: "✅",
+    logic: "Under scarcity, 'who do we disappoint first' is deliberate — distributes each product's weekly fulfillment across customers (protect strategic accounts / SLA floors / spread pain) and reports per-segment fill-rate KPIs. Product-level physics untouched. Inert for single-customer MTO. Hook: PH-60.",
     params: [
-      ["rule", "enum", "C", "fcfs", "{fcfs, priority, fair_share, sla_tier}", ""],
-      ["priority_weights", "weight per customer", "C", "—", "—", ""],
-      ["sla_tiers", "tier → fill floor %", "C", "—", "—", ""],
-      ["fair_share_basis", "enum", "G", "demand", "{demand, history}", ""],
+      ["rule", "enum", "C", "fcfs", "{fcfs, proportional, fair_share, priority, sla_tier}", "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata)."],
+      ["priority_weights", "weight per customer", "C", "—", "—", "Overrides Customer.priority_weight; higher serves first."],
+      ["sla_tiers", "segment → fill floor %", "C", "—", "[0, 100]", "Guaranteed first pass; scaled pro-rata when supply can't honor all floors."],
     ],
   },
   {
@@ -1546,7 +1545,7 @@ const ROADMAP: { m: string; deliverable: string; status: string }[] = [
   { m: "M4", deliverable: "ST-1 end-to-end + scorecard + Resilience Index; fast_scan.", status: "✅ engine" },
   { m: "M5", deliverable: "Portfolio study + synergy decomposition (CRN, bootstrap stars, breadth ladder).", status: "✅ engine" },
   { m: "M6", deliverable: "Docs auto-generation + docs CI gate; validation suite.", status: "✅" },
-  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅, plant targets ✅, P-S.4 ✅; edge targets, edge split, P-C.2, ST-3/4/5.", status: "🔜 most shipped" },
+  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅, plant targets ✅, P-S.4 ✅, P-C.2 ✅; edge targets, edge split, ST-3/4/5.", status: "🔜 most shipped" },
   { m: "M8", deliverable: "Remaining policies; P-X.1 recovery playbook; LLM diff proposer.", status: "🧩" },
 ];
 

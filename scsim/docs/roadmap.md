@@ -11,7 +11,7 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 | M4 | ST-1 end-to-end + scorecard + RI; fast_scan | ✅ engine-side (`run_st1`, badges, snapshot reuse); job sharding to workers is orchestration-layer work |
 | M5 | Portfolio study + synergy decomposition (CRN, bootstrap stars, overlap diagnostics, breadth ladder) | ✅ engine-side; Portfolio Builder / Synergy Explorer UI pending |
 | M6 | Docs auto-generation + docs CI gate; validation suite | ✅ — `scripts/gen_docs.py --check` gates CI; 90+ tests including golden traces |
-| M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant targets ✅; P-S.4 ✅; edge targets, edge split, P-C.2, ST-3/4/5 | 🔜 — most of M7 shipped; edge split / P-C.2 / remaining batteries scheduled |
+| M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant targets ✅; P-S.4 ✅; P-C.2 ✅; edge targets, edge split, ST-3/4/5 | 🔜 — most of M7 shipped; edge split / remaining batteries scheduled |
 | M8 | Remaining 🧩 policies; P-X.1 playbook; LLM diff proposer (flagged) | 🧩 — full parameter schemas already in the registry |
 
 ## Shipped ahead of plan
@@ -37,7 +37,10 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 * ~~P-S.4 early-warning.~~ ✅ shipped — `ctx.detection_lag_override` compresses
   the lag `events_visible()` serves (effective = min(monitored, scenario));
   standing `monitoring` cost component (`tests/test_ps4_early_warning.py`).
-* P-C.2 customer_allocation.
+* ~~P-C.2 customer_allocation.~~ ✅ shipped — PH-60 read-only resident splits
+  each product's weekly fulfillment across customers (pro-rata / priority /
+  SLA floors) and reports per-segment fill KPIs via the new
+  `PolicyPlugin.kpi_contribution` facet (`tests/test_pc2_customer_allocation.py`).
 * ST-3..7 batteries; demand-surge events need a demand-side effect type
   (Tier-3: new event target class).
 * Worker-pool sharding / resumable sweeps (orchestration; the seed tree and

@@ -202,6 +202,30 @@ def test_supplier_literally_named_plant_stays_a_supplier():
     assert res.scenario.events[0].target_type == TargetType.NODE_SUPPLIER
 
 
+def test_fulfillment_allocation_enables_customer_allocation():
+    d = _base()
+    d.outbound = [
+        OutboundArc(product_id="p1", customer_id="c1", unit_price=20.0,
+                    volume=60.0, time_unit="week"),
+        OutboundArc(product_id="p1", customer_id="c2", unit_price=20.0,
+                    volume=40.0, time_unit="week"),
+    ]
+    d.policies = {"default": {"fulfillment": {"allocation": "fair_share"}}}
+    res = from_project_data(d)
+    assert res.scenario.policies["customer_allocation"] == {"rule": "fair_share"}
+    links = res.scenario.network.customer_links
+    assert {(l.product_id, l.customer_id) for l in links} == {("p1", "c1"), ("p1", "c2")}
+    shares = {l.customer_id: l.share for l in links}
+    assert shares["c1"] == pytest.approx(60.0)
+
+
+def test_single_customer_does_not_enable_customer_allocation():
+    d = _base()  # one customer c1
+    d.policies = {"default": {"fulfillment": {"allocation": "priority"}}}
+    res = from_project_data(d)
+    assert "customer_allocation" not in res.scenario.policies
+
+
 def test_unsourced_material_raises():
     d = _base()
     d.supply_arcs = []  # m1 now has no supplier

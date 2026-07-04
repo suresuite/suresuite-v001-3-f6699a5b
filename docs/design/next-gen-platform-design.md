@@ -343,7 +343,7 @@ Demand-side behavior, promoted from engine mechanics and data fields into config
 |---|---|---|---|---|---|---|
 | P-C.4 | `demand_model` | demand modeling | strategic | ✚ (promoted from world demand mechanic) | distribution family (triangular/poisson/negbin/normal/empirical) · order frequency × size decomposition · seasonality/trend profile · forecast-error injection | `products.demand_mean`, `demand_cv`, seasonality profile (calendar, §8.3) |
 | P-C.1 | `unmet_demand_handling` | order management | operational | ✅ | lost_sales ✅ · backorder · partial_backorder (expose the partial variant — G1) | backorder penalty, horizon |
-| P-C.2 | `customer_allocation` | allocation | operational | 🧩 (activate — matches the UI's existing fulfillment allocation enum) | priority · fair_share · proportional · revenue_max · sla_tier | customer tiers, prices |
+| P-C.2 | `customer_allocation` | allocation | operational | ✅ (Phase A; wired to the UI's fulfillment allocation enum via the mappers) | fcfs · proportional · fair_share · priority · sla_tier (revenue_max deferred — needs per-customer pricing; mapped to priority with a warning) | customer segments/weights (`Network.customers` + `customer_links` from outbound volumes) |
 | P-C.5 | `backorder_behavior` | demand modeling | operational | ✚ | patience window → cancellation; delivery-window flexibility; service-level expectation as a measured contract (α/β targets per customer) | patience days, SLA targets |
 
 ### 5.5 Cross-cutting (`P-X.x`)
@@ -809,7 +809,7 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-T.5 | shipment_consolidation | transport | transport | tactical | ✚ | per-lane window consolidation |
 | P-T.6 | shipping_frequency | transport | transport | tactical | ✚ | fixed weekly / threshold dispatch |
 | P-C.1 | unmet_demand_handling | customer | order management | operational | ✅ | PH-60; lost_sales ✅ / backorder / partial_backorder |
-| P-C.2 | customer_allocation | customer | allocation | operational | 🧩 M7 | priority / fair_share / proportional / revenue_max / sla_tier |
+| P-C.2 | customer_allocation | customer | allocation | operational | ✅ | PH-60; fcfs / proportional / fair_share / priority / sla_tier; per-segment fill-rate KPIs |
 | P-C.3 | demand_shaping | customer | demand modeling | operational | 🧩 M8 · ⏸ activation | needs revenue model (§5.8) |
 | P-C.4 | demand_model | customer | demand modeling | strategic | ✚ (promoted mechanic) | distribution / frequency×size / seasonality / forecast error |
 | P-C.5 | backorder_behavior | customer | demand modeling | operational | ✚ | patience → cancellation; delivery windows; SLA expectations |

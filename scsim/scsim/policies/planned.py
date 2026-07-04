@@ -195,25 +195,8 @@ register_planned(
 )
 
 
-class CustomerAllocationParams(PolicyParams):
-    rule: Literal["fcfs", "priority", "fair_share", "sla_tier"] = Field(
-        "fcfs", json_schema_extra={"unit": "enum", "scope": "C"})
-    priority_weights: dict[str, float] = Field(
-        default_factory=dict, json_schema_extra={"unit": "weight per customer", "scope": "C"})
-    sla_tiers: dict[str, float] = Field(
-        default_factory=dict, json_schema_extra={"unit": "tier → fill floor %", "scope": "C"})
-    fair_share_basis: Literal["demand", "history"] = Field(
-        "demand", json_schema_extra={"unit": "enum", "scope": "G"})
-
-
-register_planned(
-    id="customer_allocation", catalog_ref="P-C.2", stage=Stage.CUSTOMER,
-    strategy_class=StrategyClass.IMPROVISATION,
-    constraint_targeted=ConstraintTag.DEMAND_SIDE,
-    requires_predeployment=False, params_model=CustomerAllocationParams, milestone="M7",
-    summary="Under scarcity, 'who do we disappoint first' is deliberate — protect strategic "
-            "accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60.",
-)
+# P-C.2 customer_allocation graduated to an implemented plugin:
+# scsim/policies/improvisation/p_c2_customer_allocation.py
 
 
 class DemandShapingParams(PolicyParams):

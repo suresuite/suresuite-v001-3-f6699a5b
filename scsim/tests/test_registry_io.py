@@ -33,7 +33,7 @@ EXPECTED_CATALOG = {
     "P-P.9": ("implemented", "plant"),
     "P-T.2": ("implemented", "transport"),
     "P-T.3": ("planned", "transport"),
-    "P-C.2": ("planned", "customer"),
+    "P-C.2": ("implemented", "customer"),
     "P-C.3": ("planned", "customer"),
     "P-P.10": ("planned", "plant"),
     "P-X.1": ("planned", "cross"),

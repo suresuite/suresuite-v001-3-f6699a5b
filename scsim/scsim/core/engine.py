@@ -676,6 +676,8 @@ def run_scenario(
             snapshot_store=snapshot_store, snapshot_digest=snapshot_digest, warmup_week=t_w,
         )
         row = compute_replication_kpis(ctx, t_w, window_end, events)
+        for pol in compiled.policies:
+            row.update(pol.kpi_contribution(ctx, t_w, window_end))
         row["model_rep"], row["event_rep"] = float(i), float(j)
         kpis.append(row)
         fr_rows[n] = ctx.trace.fill_rate
@@ -734,6 +736,8 @@ def _extend_until_ci(compiled, scenario, kpis, fr_rows, grid, t_w, window_end, d
             events = resolve_events(compiled.model, t_w, j) if scenario.events else []
             ctx = run_replication(compiled, i, j, events, debug=debug)
             row = compute_replication_kpis(ctx, t_w, window_end, events)
+            for pol in compiled.policies:
+                row.update(pol.kpi_contribution(ctx, t_w, window_end))
             row["model_rep"], row["event_rep"] = float(i), float(j)
             kpis.append(row)
             fr_rows = np.vstack([fr_rows, ctx.trace.fill_rate[None, :]])

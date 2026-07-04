@@ -8,7 +8,7 @@ Twenty-two policies in five classes. ✅ = validated manuscript core, runnable t
 | Ref | id | Stage | Class | Constraint | Status |
 |---|---|---|---|---|---|
 | P-C.1 | [`unmet_demand_handling`](#unmet_demand_handling) | customer | built_in | demand_side | ✅ implemented |
-| P-C.2 | [`customer_allocation`](#customer_allocation) | customer | improvisation | demand_side | 🧩 planned |
+| P-C.2 | [`customer_allocation`](#customer_allocation) | customer | improvisation | demand_side | ✅ implemented |
 | P-C.3 | [`demand_shaping`](#demand_shaping) | customer | improvisation | demand_side | 🧩 planned |
 | P-P.1 | [`inventory_control`](#inventory_control) | plant | built_in | material_availability | ✅ implemented |
 | P-P.10 | [`repurposing`](#repurposing) | plant | improvisation | production_capacity | 🧩 planned |
@@ -53,18 +53,23 @@ What happens to an unservable order: it dies (lost_sales — competitive markets
 
 ## `customer_allocation`
 
-**P-C.2** · customer · improvisation · constraint: demand_side · 🧩 planned · lands in M7
+**P-C.2** · customer · improvisation · constraint: demand_side · ✅ implemented
 
 Under scarcity, 'who do we disappoint first' is deliberate — protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60.
+
+**Hooks**
+
+| Phase | Priority | Reads | Writes | Resolution |
+|---|---|---|---|---|
+| PH-60 | 60 | demand, fulfillment | — | — |
 
 **Parameters**
 
 | Parameter | Unit | Scope | Default | Range | Notes |
 |---|---|---|---|---|---|
-| `rule` | enum | C | 'fcfs' | {fcfs, priority, fair_share, sla_tier} |  |
-| `priority_weights` | weight per customer | C | — | — |  |
-| `sla_tiers` | tier → fill floor % | C | — | — |  |
-| `fair_share_basis` | enum | G | 'demand' | {demand, history} |  |
+| `rule` | enum | C | 'fcfs' | {fcfs, proportional, fair_share, priority, sla_tier} | fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority and sla_tier reorder. |
+| `priority_weights` | weight per customer | C | — | — | Overrides Customer.priority_weight; higher serves first. |
+| `sla_tiers` | segment → fill floor % | C | — | — | Guaranteed first-pass fill per segment; scaled down pro-rata when supply cannot honor all floors. |
 
 ## `demand_shaping`
 
