@@ -1,10 +1,10 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const CHAT_MODELS = [
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", hint: "fast (default)" },
-  { id: "gpt-5", label: "GPT-5", hint: "highest quality" },
-  { id: "gpt-5-mini", label: "GPT-5 mini", hint: "balanced" },
-  { id: "deepseek-chat", label: "DeepSeek", hint: "experimental" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { id: "gpt-5", label: "GPT-5" },
+  { id: "gpt-5-mini", label: "GPT-5 mini" },
+  { id: "deepseek-chat", label: "DeepSeek" },
 ] as const;
 
 export const DEFAULT_MODEL_ID = "gemini-2.5-flash";
@@ -41,10 +41,7 @@ export function ModelPicker({ value, onChange, className }: Props) {
       <SelectContent align="end" className="z-[110] min-w-[200px]">
         {CHAT_MODELS.map((m) => (
           <SelectItem key={m.id} value={m.id} className="text-[13px]">
-            <div className="flex flex-col">
-              <span className="font-medium">{m.label}</span>
-              <span className="text-[11px] text-muted-foreground">{m.hint}</span>
-            </div>
+            {m.label}
           </SelectItem>
         ))}
       </SelectContent>
