@@ -126,23 +126,26 @@ export function FloatingChatBubble() {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
+  // Re-clamp on mount (viewport may be smaller than when positions were saved).
+  useEffect(() => {
+    setPos((p) => clampPos(p, LAUNCHER_SIZE));
+    const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
+    setPanelDims(s);
+    setPanelPos((p) => clampPos(p, s));
+  }, []);
+
   // Keep launcher and panel (position + size) in viewport on window resize.
   useEffect(() => {
     const onResize = () => {
-      setPos((p) => ({
-        x: Math.min(Math.max(0, p.x), window.innerWidth - LAUNCHER_SIZE.w),
-        y: Math.min(Math.max(0, p.y), window.innerHeight - LAUNCHER_SIZE.h),
-      }));
+      setPos((p) => clampPos(p, LAUNCHER_SIZE));
       const s = clampDims(panelDimsRef.current.w, panelDimsRef.current.h);
       setPanelDims(s);
-      setPanelPos((p) => ({
-        x: Math.min(Math.max(8, p.x), window.innerWidth - s.w),
-        y: Math.min(Math.max(8, p.y), window.innerHeight - s.h),
-      }));
+      setPanelPos((p) => clampPos(p, s));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
 
   // Drag handlers
   useEffect(() => {
