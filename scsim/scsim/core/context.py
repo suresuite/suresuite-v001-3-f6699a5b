@@ -53,6 +53,7 @@ COST_COMPONENTS: tuple[str, ...] = (
     "allocation_labor",       # P-P.9 planner time
     "fg_ss_holding",          # P-P.4 FG safety stock at full COGS (MTS)
     "backorder_penalty",      # P-C.1 backorder variant
+    "monitoring",             # P-S.4 standing visibility cost
 )
 COST_INDEX = {name: i for i, name in enumerate(COST_COMPONENTS)}
 
@@ -343,6 +344,9 @@ class SimContext:
         self.plant_lt_block_end = 0   # > week ⇒ plant produces nothing this week
         self.plant_cap_factor = 1.0   # φ throttle on the plant's production capacity
         self.lost_inbound_this_week = 0.0
+        # P-S.4 early_warning_failover: monitored detection lag. None → the
+        # scenario's settings.detection_lag_weeks applies unchanged.
+        self.detection_lag_override: Optional[int] = None
 
         self.trace = WeeklyTrace(T, model.n_prods, model.n_mats, keep_matrices)
         self._active_hook: Optional[BoundHook] = None
@@ -366,7 +370,9 @@ class SimContext:
     def events_visible(self) -> list[ResolvedEvent]:
         """Post-detection view (PH-20): events the FIRM knows about (§3.7, P-S.4)."""
         t = self.week
-        lag = self.model.settings.detection_lag_weeks
+        lag = (self.detection_lag_override
+               if self.detection_lag_override is not None
+               else self.model.settings.detection_lag_weeks)
         return [e for e in self.events if e.start + lag <= t and t < e.end + e.ramp_weeks]
 
     def visible_disrupted_suppliers(self) -> np.ndarray:

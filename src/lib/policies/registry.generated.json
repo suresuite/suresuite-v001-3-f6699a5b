@@ -2390,9 +2390,21 @@
     {
       "catalog_ref": "P-S.4",
       "constraint_targeted": "response_time",
-      "hooks": [],
+      "hooks": [
+        {
+          "phase": "PH-20",
+          "priority": 60,
+          "reads": [
+            "disruption_state"
+          ],
+          "resolution": "Compresses the detection lag the mechanic (priority 50) applies when serving firm knowledge: effective lag = min(monitored, scenario). Later residents see the compressed view.",
+          "writes": [
+            "firm_knowledge"
+          ]
+        }
+      ],
       "id": "early_warning_failover",
-      "milestone": "M7",
+      "milestone": null,
       "params_schema": {
         "additionalProperties": false,
         "properties": {
@@ -2400,24 +2412,16 @@
             "default": 1,
             "maximum": 4,
             "minimum": 0,
-            "notes": "Applies to ALL reactive strategies (PH-20).",
+            "notes": "Monitored disruption-start \u2192 firm-knows delay; the effective lag is min(this, settings.detection_lag_weeks). Applies to ALL reactive strategies (PH-20).",
             "scope": "G/S",
             "title": "Detection Lag Weeks",
             "type": "integer",
             "unit": "weeks"
           },
-          "failover_threshold_weeks": {
-            "default": 4.0,
-            "maximum": 12.0,
-            "minimum": 1.0,
-            "scope": "G",
-            "title": "Failover Threshold Weeks",
-            "type": "number",
-            "unit": "weeks-of-supply"
-          },
           "monitoring_cost": {
             "default": 0.0,
             "minimum": 0,
+            "notes": "Standing visibility cost, charged weekly (\u00f752) into C^res whether or not a disruption occurs.",
             "scope": "G",
             "title": "Monitoring Cost",
             "type": "number",
@@ -2429,7 +2433,7 @@
       },
       "requires_predeployment": true,
       "stage": "supplier",
-      "status": "planned",
+      "status": "implemented",
       "strategy_class": "anticipation",
       "summary": "Visibility investments compress disruption-start \u2192 firm-knows. Makes 'what is a week of warning worth?' a first-class experiment. Hook: PH-20."
     },

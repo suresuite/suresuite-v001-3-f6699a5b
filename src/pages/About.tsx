@@ -1166,12 +1166,11 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-S.4", id: "early_warning_failover", stage: "supplier", cls: "anticipation",
-    constraint: "response_time", status: "🧩", milestone: "M7",
-    logic: "Visibility investments compress disruption-start → firm-knows. Makes 'what is a week of warning worth?' a first-class experiment. Requires pre-deployment. Hook: PH-20.",
+    constraint: "response_time", status: "✅",
+    logic: "Visibility investments compress disruption-start → firm-knows: effective lag = min(monitored, scenario). Reactive policies (P-S.1/P-T.2/P-P.5) simply engage earlier; rerouting itself stays P-S.1's job. Makes 'what is a week of warning worth?' a first-class experiment. Requires pre-deployment. Hook: PH-20.",
     params: [
-      ["detection_lag_weeks", "weeks", "G/S", "1", "[0, 4]", "Applies to ALL reactive strategies (PH-20)."],
-      ["failover_threshold_weeks", "weeks-of-supply", "G", "4.0", "[1.0, 12.0]", ""],
-      ["monitoring_cost", "€/yr", "G", "0.0", "[0, ∞]", ""],
+      ["detection_lag_weeks", "weeks", "G/S", "1", "[0, 4]", "Monitored lag; effective lag = min(this, settings). Applies to ALL reactive strategies (PH-20)."],
+      ["monitoring_cost", "€/yr", "G", "0.0", "[0, ∞]", "Standing cost, charged weekly (÷52) into C^res."],
     ],
   },
   {
@@ -1547,7 +1546,7 @@ const ROADMAP: { m: string; deliverable: string; status: string }[] = [
   { m: "M4", deliverable: "ST-1 end-to-end + scorecard + Resilience Index; fast_scan.", status: "✅ engine" },
   { m: "M5", deliverable: "Portfolio study + synergy decomposition (CRN, bootstrap stars, breadth ladder).", status: "✅ engine" },
   { m: "M6", deliverable: "Docs auto-generation + docs CI gate; validation suite.", status: "✅" },
-  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅; plant/edge targets, edge split, P-S.4, P-C.2, ST-3/4/5.", status: "🔜 most shipped" },
+  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅, plant targets ✅, P-S.4 ✅; edge targets, edge split, P-C.2, ST-3/4/5.", status: "🔜 most shipped" },
   { m: "M8", deliverable: "Remaining policies; P-X.1 recovery playbook; LLM diff proposer.", status: "🧩" },
 ];
 

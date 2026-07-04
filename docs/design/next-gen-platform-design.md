@@ -298,7 +298,7 @@ Covers the brief's supplier list: production, capacity, lead time, order accepta
 | P-S.1 | `backup_supplier` | supplier selection | operational | ✅ | contingent reroute on visible disruption; selection rule min_cost / min_leadtime / reliability; cooldown | backup source links + `unit_price`, `reliability_score` |
 | P-S.2 | `proactive_multi_sourcing` | multi-sourcing | strategic | ✅ (unreachable today — G3; §6.2 wires it) | standing order split across warm sources; weights; rebalance trigger | per-source ratios (today's ignored `sourcing.ratios` — G1) |
 | P-S.3 | `capacity_reservation` | capacity | strategic | 🧩 | reserved capacity contracts at premium | reservation quantum, premium |
-| P-S.4 | `early_warning_failover` | supplier selection | operational | 🧩 (M7) | monitoring signal shortens detection lag; pre-emptive failover | monitoring cost, signal quality |
+| P-S.4 | `early_warning_failover` | supplier selection | operational | ✅ (Phase A; unreachable from UI until Phase B wires it) | monitoring compresses detection lag (effective = min(monitored, scenario)); reactive policies engage earlier — rerouting stays P-S.1's job; standing monitoring cost | monitoring cost |
 
 ### 5.2 Plant / focal-firm policies (`P-P.x`, `P-F.x`)
 
@@ -782,7 +782,7 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-S.1 | backup_supplier | supplier | supplier selection | operational | ✅ | PH-80; contingent reroute, cooldown |
 | P-S.2 | proactive_multi_sourcing | supplier | multi-sourcing | strategic | ✅ | PH-80; standing split — wire to UI (G3) |
 | P-S.3 | capacity_reservation | supplier | capacity | strategic | 🧩 M8 | reserved capacity at premium |
-| P-S.4 | early_warning_failover | supplier | supplier selection | operational | 🧩 M7 | PH-20 detection resident |
+| P-S.4 | early_warning_failover | supplier | supplier selection | operational | ✅ | PH-20 detection resident; compresses detection lag, standing monitoring cost |
 | P-S.5 | supplier_capacity_model | supplier | capacity | strategic | ✚ | infinite / finite_queue / finite_reject; formalizes `ST_QUEUE` mechanics |
 | P-S.6 | lead_time_model | supplier | lead time | tactical | ✚ | deterministic / stochastic dists; empirical deferred |
 | P-S.7 | supplier_allocation | supplier | allocation | operational | ✚ | FCFS / proportional / priority |
