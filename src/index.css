@@ -115,16 +115,25 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1, "cv11", "ss01", "ss03";
+    font-family: 'Inter Variable', Inter, system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01", "ss03", "cv02", "cv04", "calt", "rlig";
+    font-variation-settings: "opsz" 14;
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
-  /* Vercel-inspired typography */
+  code, kbd, pre, samp, .font-mono {
+    font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+    font-feature-settings: "calt", "liga", "zero", "ss01";
+  }
+
+  /* Inter-tuned typography */
   h1, h2, h3, h4, h5, h6 {
     @apply text-foreground font-semibold;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.019em;
+    font-variation-settings: "opsz" 32;
   }
 
   h1 {
