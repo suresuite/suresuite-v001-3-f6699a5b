@@ -282,7 +282,9 @@ class CustomerLink(BaseModel):
 
 
 class Lane(BaseModel):
-    """Transport edge — §3.6 🧩. Defaults are behavior-neutral (folded into T_s)."""
+    """Transport edge — §3.6. Transit time composes into the effective link
+    lead time at compile (default 0 = behavior-neutral); per-mode pipelines
+    and lane capacity land with P-T.1."""
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -292,7 +294,8 @@ class Lane(BaseModel):
     mode: TransportMode = Field(TransportMode.DEFAULT, json_schema_extra=_meta("enum", "E"))
     lead_time_weeks: int = Field(
         0, ge=0, le=26,
-        json_schema_extra=_meta("weeks", "E", "T_E; 0 = folded into supplier T_s (v1)."),
+        json_schema_extra=_meta("weeks", "E", "T_E transit leg, added to the supplier link's "
+                                              "lead time at compile; 0 = behavior-neutral."),
     )
     capacity_per_week: Optional[float] = Field(
         None, gt=0, json_schema_extra=_meta("units/wk", "E", "None = ∞."),

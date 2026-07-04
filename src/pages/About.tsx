@@ -1545,7 +1545,7 @@ const ROADMAP: { m: string; deliverable: string; status: string }[] = [
   { m: "M4", deliverable: "ST-1 end-to-end + scorecard + Resilience Index; fast_scan.", status: "✅ engine" },
   { m: "M5", deliverable: "Portfolio study + synergy decomposition (CRN, bootstrap stars, breadth ladder).", status: "✅ engine" },
   { m: "M6", deliverable: "Docs auto-generation + docs CI gate; validation suite.", status: "✅" },
-  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅, plant targets ✅, P-S.4 ✅, P-C.2 ✅; edge targets, edge split, ST-3/4/5.", status: "🔜 most shipped" },
+  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅, plant targets ✅, P-S.4 ✅, P-C.2 ✅, edge split ✅; ST-3/4/5.", status: "🔜 most shipped" },
   { m: "M8", deliverable: "Remaining policies; P-X.1 recovery playbook; LLM diff proposer.", status: "🧩" },
 ];
 

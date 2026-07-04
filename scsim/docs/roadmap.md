@@ -11,7 +11,7 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 | M4 | ST-1 end-to-end + scorecard + RI; fast_scan | ✅ engine-side (`run_st1`, badges, snapshot reuse); job sharding to workers is orchestration-layer work |
 | M5 | Portfolio study + synergy decomposition (CRN, bootstrap stars, overlap diagnostics, breadth ladder) | ✅ engine-side; Portfolio Builder / Synergy Explorer UI pending |
 | M6 | Docs auto-generation + docs CI gate; validation suite | ✅ — `scripts/gen_docs.py --check` gates CI; 90+ tests including golden traces |
-| M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant targets ✅; P-S.4 ✅; P-C.2 ✅; edge targets, edge split, ST-3/4/5 | 🔜 — most of M7 shipped; edge split / remaining batteries scheduled |
+| M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant targets ✅; P-S.4 ✅; P-C.2 ✅; edge split ✅; ST-3/4/5 batteries | 🔜 — remaining batteries + per-mode lanes (P-T.1) scheduled |
 | M8 | Remaining 🧩 policies; P-X.1 playbook; LLM diff proposer (flagged) | 🧩 — full parameter schemas already in the registry |
 
 ## Shipped ahead of plan
@@ -32,8 +32,11 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
   halts the plant's own production (`tests/test_plant_disruption.py`); both
   input mappers (`io/project_map.py`, `io/legacy_graph.py`) pass `plant:*` /
   `node:plant` targets through instead of skipping them.
-* Edge lead-time split (`Lane.lead_time_weeks > 0` is schema-valid but the
-  engine still folds transport into `T_s`).
+* ~~Edge lead-time split.~~ ✅ shipped — `Lane.lead_time_weeks` composes into
+  the effective link lead time at compile (planning, shipping, and ring
+  sizing see the same total; lane-quoted transit is byte-identical to
+  link-folded transit — `tests/test_edge_leadtime_split.py`). Per-mode
+  pipelines and lane capacity remain with P-T.1.
 * ~~P-S.4 early-warning.~~ ✅ shipped — `ctx.detection_lag_override` compresses
   the lag `events_visible()` serves (effective = min(monitored, scenario));
   standing `monitoring` cost component (`tests/test_ps4_early_warning.py`).

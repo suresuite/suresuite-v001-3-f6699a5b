@@ -38,6 +38,7 @@ from scsim.entities.enums import (
     FulfillmentMode,
     OverflowRule,
     RampProfile,
+    TransportMode,
 )
 from scsim.entities.scenario import Scenario
 from scsim.stats.seeds import ReplicationStreams
@@ -160,7 +161,18 @@ class CompiledModel:
         self.n_links = len(links)
         self.link_sup = np.array([self.sup_index[l.supplier_id] for l in links], dtype=int)
         self.link_mat = np.array([self.mat_index[l.material_id] for l in links], dtype=int)
-        self.link_lt = np.array([l.lead_time_weeks for l in links], dtype=int)
+        # Edge lead-time split (M7): a lane's transit time composes into the
+        # effective link lead time, so planning (s_m/S_m coverage), shipping,
+        # and ring sizing all see the same total. Quoting transit on the lane
+        # is exactly equivalent to folding it into the supplier link (tested
+        # byte-identical). One lane per supplier binds in v1: the default-mode
+        # lane wins, then lowest id; per-mode pipelines land with P-T.1.
+        lane_extra: dict[str, int] = {}
+        for lane in sorted(net.lanes, key=lambda l: (l.mode != TransportMode.DEFAULT, l.id)):
+            lane_extra.setdefault(lane.supplier_id, int(lane.lead_time_weeks))
+        self.link_lt = np.array(
+            [l.lead_time_weeks + lane_extra.get(l.supplier_id, 0) for l in links], dtype=int
+        )
         self.link_cost = np.array([l.cost for l in links])
         self.link_moq = np.array([l.moq for l in links])
         self.link_lt_dist = [l.lead_time_dist for l in links]

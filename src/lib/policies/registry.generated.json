@@ -237,7 +237,7 @@
           "type": "string"
         }
       },
-      "description": "Transport edge \u2014 \u00a73.6 \ud83e\udde9. Defaults are behavior-neutral (folded into T_s).",
+      "description": "Transport edge \u2014 \u00a73.6. Transit time composes into the effective link\nlead time at compile (default 0 = behavior-neutral); per-mode pipelines\nand lane capacity land with P-T.1.",
       "properties": {
         "capacity_per_week": {
           "anyOf": [
@@ -276,7 +276,7 @@
           "default": 0,
           "maximum": 26,
           "minimum": 0,
-          "notes": "T_E; 0 = folded into supplier T_s (v1).",
+          "notes": "T_E transit leg, added to the supplier link's lead time at compile; 0 = behavior-neutral.",
           "scope": "E",
           "title": "Lead Time Weeks",
           "type": "integer",
