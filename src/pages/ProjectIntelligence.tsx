@@ -105,7 +105,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-8 py-6">
+      <div className="px-12 py-6">
         <PageHeader
           title="Project Intelligence"
           subtitle="Your on-demand supply-chain colleague"
