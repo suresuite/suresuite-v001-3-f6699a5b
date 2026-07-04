@@ -103,7 +103,7 @@ export function FloatingChatBubble() {
   const [pos, setPos] = useState<Pos>(() => loadPos() ?? defaultPos());
   const [dragging, setDragging] = useState(false);
   const dragState = useRef<{ ox: number; oy: number; moved: boolean } | null>(null);
-  const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY) ?? defaultPanelPos());
+  const [panelPos, setPanelPos] = useState<Pos>(() => loadPosFrom(PANEL_POS_KEY, defaultDims()) ?? defaultPanelPos());
   const [panelDragging, setPanelDragging] = useState(false);
   const panelDragState = useRef<{ ox: number; oy: number } | null>(null);
   const [panelDims, setPanelDims] = useState<Dims>(() => loadDims() ?? defaultDims());
