@@ -898,7 +898,7 @@ const SIM_PARAM_GROUPS: ParamGroup[] = [
     title: "§3.7 · Disruption event model",
     blurb: "What fails, when, and for how long — the stress applied to the twin.",
     rows: [
-      ["target_type", "enum", "event", "node:supplier", "{node:supplier, node:plant, edge:lane}", "node:supplier ✅; node:plant 🧩 M7; edge:lane 🧩."],
+      ["target_type", "enum", "event", "node:supplier", "{node:supplier, node:plant, edge:lane}", "node:supplier ✅; node:plant ✅; edge:lane 🧩."],
       ["target_id", "id", "event", "required", "—", ""],
       ["effect_type", "enum", "event", "lead_time_extension", "{lead_time_extension, capacity_reduction}", "LT extension ✅ (Eqs. 11–12) vs capacity throttle."],
       ["capacity_factor", "—", "event", "0.0", "[0.0, 1.0]", "φ — 0 = full outage. capacity_reduction only."],
@@ -1429,7 +1429,7 @@ const ENUM_GROUPS: [string, string][] = [
   ["FulfillmentMode (CODP)", "mto ✅ · mts (M7) · ato (reserved)"],
   ["ForecastModel", "naive · ma ✅ · exp_smoothing · perfect"],
   ["EffectType", "lead_time_extension ✅ · capacity_reduction"],
-  ["TargetType", "node:supplier ✅ · node:plant (M7) · edge:lane (behavior-neutral)"],
+  ["TargetType", "node:supplier ✅ · node:plant ✅ · edge:lane (behavior-neutral)"],
   ["OverflowRule", "queue · reject (→ lost_inbound_units)"],
   ["Onset / RecoveryProfile", "step · ramp_linear"],
   ["TransportMode", "default · sea · air · road · rail"],

@@ -29,7 +29,9 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 
 * ~~`node:plant` disruption targets (P-P.4's "uniquely protective" case).~~
   ✅ shipped — a plant capacity_reduction / lead_time_extension throttles or
-  halts the plant's own production (`tests/test_plant_disruption.py`).
+  halts the plant's own production (`tests/test_plant_disruption.py`); both
+  input mappers (`io/project_map.py`, `io/legacy_graph.py`) pass `plant:*` /
+  `node:plant` targets through instead of skipping them.
 * Edge lead-time split (`Lane.lead_time_weeks > 0` is schema-valid but the
   engine still folds transport into `T_s`).
 * P-S.4 early-warning (the global `detection_lag_weeks` lever already

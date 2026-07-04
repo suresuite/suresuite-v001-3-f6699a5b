@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Layers,
   Target,
+  Factory,
   FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,19 @@ const TESTS: StressTest[] = [
       description: "Primary supplier offline for 14 days starting on day 30.",
       disruption_schedule: [
         { target: "supplier:primary", target_type: "node", start_day: 30, duration_days: 14, magnitude_pct: 100 },
+      ],
+    },
+  },
+  {
+    id: "plant_shutdown",
+    label: "Plant shutdown",
+    blurb: "The plant itself halts production for 14 days from day 30. Unbuffered by material stock — tests FG safety stock and backlog recovery.",
+    icon: Factory,
+    scenario: {
+      name: "[Stress] Plant shutdown",
+      description: "Plant production halted for 14 days starting on day 30.",
+      disruption_schedule: [
+        { target: "node:plant", target_type: "node", start_day: 30, duration_days: 14, magnitude_pct: 100 },
       ],
     },
   },

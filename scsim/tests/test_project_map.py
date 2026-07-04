@@ -140,6 +140,68 @@ def test_partial_cut_without_capacity_warns_and_uses_extension():
     assert any("finite supplier capacity" in w.reason for w in res.warnings)
 
 
+def test_plant_target_maps_to_node_plant_halt():
+    from scsim.entities.enums import TargetType
+    d = _base()
+    d.scenario.disruption_schedule = [
+        {"target": "plant:main", "magnitude_pct": 100, "start_week": 90, "duration_weeks": 6},
+    ]
+    res = from_project_data(d)
+    ev = res.scenario.events[0]
+    assert ev.target_type == TargetType.NODE_PLANT
+    assert ev.effect_type == EffectType.LEAD_TIME_EXTENSION  # full cut = halt
+    assert not any(w.field == "target" for w in res.warnings)
+
+
+def test_plant_partial_cut_throttles_without_capacity_precondition():
+    """Unlike suppliers, the plant needs no capacity_per_week: production_capacity
+    is always finite, so a partial cut always becomes capacity_reduction."""
+    from scsim.entities.enums import TargetType
+    d = _base()
+    d.scenario.disruption_schedule = [
+        {"target": "node:plant", "magnitude_pct": 75, "start_week": 90, "duration_weeks": 6},
+    ]
+    res = from_project_data(d)
+    ev = res.scenario.events[0]
+    assert ev.target_type == TargetType.NODE_PLANT
+    assert ev.effect_type == EffectType.CAPACITY_REDUCTION
+    assert ev.capacity_factor == pytest.approx(0.25)  # 75% cut → 25% remains
+    assert not any("finite supplier capacity" in w.reason for w in res.warnings)
+
+
+def test_plant_event_runs_end_to_end():
+    from scsim.core.engine import run_scenario
+    d = _base(replications=2, horizon_days=560, warmup_mode="manual", warmup_days=70)
+    d.scenario.disruption_schedule = [
+        {"target": "plant:main", "magnitude_pct": 100, "start_week": 12, "duration_weeks": 8},
+    ]
+    out = run_scenario(from_project_data(d).scenario)
+    assert out.aggregates["lost_sales_value"]["mean"] > 0.0
+
+
+def test_material_target_still_skipped_with_warning():
+    d = _base()
+    d.scenario.disruption_schedule = [
+        {"target": "material:m1", "magnitude_pct": 50, "start_week": 90, "duration_weeks": 6},
+    ]
+    res = from_project_data(d)
+    assert res.scenario.events == []
+    assert any(w.field == "target" and "skipped" in w.reason for w in res.warnings)
+
+
+def test_supplier_literally_named_plant_stays_a_supplier():
+    from scsim.entities.enums import TargetType
+    d = _base()
+    d.suppliers = [SupplierRow(id="plant")]
+    d.supply_arcs = [SupplyArc(supplier_id="plant", material_id="m1", unit_price=2.0,
+                               lead_time=2, lead_time_unit="week")]
+    d.scenario.disruption_schedule = [
+        {"target": "plant", "magnitude_pct": 100, "start_week": 90, "duration_weeks": 6},
+    ]
+    res = from_project_data(d)
+    assert res.scenario.events[0].target_type == TargetType.NODE_SUPPLIER
+
+
 def test_unsourced_material_raises():
     d = _base()
     d.supply_arcs = []  # m1 now has no supplier

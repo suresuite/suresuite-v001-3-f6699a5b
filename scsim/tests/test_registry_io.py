@@ -143,3 +143,25 @@ def test_legacy_adapter_notes_surface_approximations():
                               "magnitude_pct": 50}],
     )
     assert any("mapped to a full" in n for n in conv.notes)
+
+
+def test_legacy_adapter_maps_plant_targets():
+    """plant:* / node:plant reach the engine as NODE_PLANT instead of being skipped."""
+    from scsim.entities.enums import EffectType, TargetType
+
+    conv = from_legacy_graph(
+        _FakeGraph(), {}, horizon_weeks=70, model_seeds=2,
+        disruption_schedule=[
+            {"target": "plant:main", "start_day": 140, "duration_days": 56, "magnitude_pct": 100},
+            {"target": "node:plant", "start_day": 280, "duration_days": 28, "magnitude_pct": 40},
+        ],
+    )
+    halt, throttle = conv.scenario.events
+    assert halt.target_type == TargetType.NODE_PLANT
+    assert halt.effect_type == EffectType.LEAD_TIME_EXTENSION
+    assert throttle.target_type == TargetType.NODE_PLANT
+    assert throttle.effect_type == EffectType.CAPACITY_REDUCTION
+    assert throttle.capacity_factor == pytest.approx(0.60)
+    assert not any("skipped" in n for n in conv.notes)
+    res = run_scenario(conv.scenario, debug=True)
+    assert res.aggregates["lost_sales_value"]["mean"] > 0.0

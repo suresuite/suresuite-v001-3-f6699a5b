@@ -438,6 +438,11 @@ def _build_settings(sc: ScenarioSettings, w: list[MappingWarning]) -> Simulation
     return SimulationSettings(**kwargs)
 
 
+def _is_plant_target(raw: str, stripped: str) -> bool:
+    """`plant:X`, `node:plant`, or bare `plant` address the (single) focal plant."""
+    return raw.lower().startswith("plant:") or stripped.lower() == "plant"
+
+
 def _map_events(
     schedule: list[dict], sup_ids: set[str], cap_by_sup: dict[str, Optional[float]],
     w: list[MappingWarning],
@@ -446,9 +451,10 @@ def _map_events(
     for entry in schedule[:5]:
         raw = str(entry.get("target", entry.get("target_id", "")))
         target = raw.rsplit(":", 1)[1] if ":" in raw else raw
-        if target not in sup_ids:
+        is_plant = target not in sup_ids and _is_plant_target(raw, target)
+        if target not in sup_ids and not is_plant:
             w.append(MappingWarning("warn", f"event:{raw}", "target",
-                                    "non-supplier target skipped (material/plant land in M7)"))
+                                    "unsupported target skipped (material/edge land later in M7)"))
             continue
         start_days = float(entry.get("start_day", entry.get("start_week", 0)) or 0)
         # 'start_week' already weeks; 'start_day' days
@@ -457,11 +463,14 @@ def _map_events(
         dur_weeks = round(dur_days) if "duration_weeks" in entry else round(dur_days / 7.0)
         magnitude = float(entry.get("magnitude_pct", entry.get("magnitude", 100.0)) or 100.0)
         kwargs: dict[str, Any] = dict(
-            target_type=TargetType.NODE_SUPPLIER, target_id=target,
+            target_type=TargetType.NODE_PLANT if is_plant else TargetType.NODE_SUPPLIER,
+            target_id=target or "plant",
             start=max(1, int(start_week)), duration=int(_clamp(dur_weeks, 1, 52)),
         )
         if magnitude < 100.0:
-            if cap_by_sup.get(target) is not None:
+            # Plant capacity is always finite (products carry production_capacity),
+            # so a partial cut always throttles; suppliers need capacity_per_week.
+            if is_plant or cap_by_sup.get(target) is not None:
                 kwargs["effect_type"] = EffectType.CAPACITY_REDUCTION
                 kwargs["capacity_factor"] = float(_clamp((100.0 - magnitude) / 100.0, 0.0, 0.999))
             else:

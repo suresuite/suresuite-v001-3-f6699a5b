@@ -20,7 +20,7 @@ from typing import Any
 
 from scsim.entities.config import SimulationSettings
 from scsim.entities.disruption import DisruptionEvent
-from scsim.entities.enums import TargetType, WarmupMethod
+from scsim.entities.enums import EffectType, TargetType, WarmupMethod
 from scsim.entities.network import (
     BomLine,
     Customer,
@@ -240,13 +240,28 @@ def _map_events(
     for entry in schedule[:5]:
         raw = str(entry.get("target", ""))
         target = raw.split(":", 1)[1] if ":" in raw else raw
-        if target not in sup_ids:
-            notes.append(f"disruption target {raw!r} is not a supplier — skipped "
-                         f"(material/plant targets land in M7)")
+        is_plant = target not in sup_ids and (
+            raw.lower().startswith("plant:") or target.lower() == "plant"
+        )
+        if target not in sup_ids and not is_plant:
+            notes.append(f"disruption target {raw!r} unsupported — skipped "
+                         f"(material/edge targets land later in M7)")
             continue
         start_week = max(1, round(float(entry.get("start_day", 0)) / 7.0))
         duration = max(1, min(52, round(float(entry.get("duration_days", 7)) / 7.0)))
         magnitude = float(entry.get("magnitude_pct", 100.0))
+        if is_plant:
+            # The plant's production capacity is always finite, so a partial cut
+            # throttles it (capacity_reduction); a 100% cut halts production.
+            kwargs: dict[str, Any] = dict(
+                target_type=TargetType.NODE_PLANT, target_id=target or "plant",
+                start=start_week, duration=duration,
+            )
+            if magnitude < 100.0:
+                kwargs["effect_type"] = EffectType.CAPACITY_REDUCTION
+                kwargs["capacity_factor"] = max(0.0, min(0.999, (100.0 - magnitude) / 100.0))
+            events.append(DisruptionEvent(**kwargs))
+            continue
         if magnitude < 100.0:
             notes.append(
                 f"event on {target!r}: magnitude {magnitude:.0f}% mapped to a full "
