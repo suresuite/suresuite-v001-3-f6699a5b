@@ -898,7 +898,7 @@ const SIM_PARAM_GROUPS: ParamGroup[] = [
     title: "§3.7 · Disruption event model",
     blurb: "What fails, when, and for how long — the stress applied to the twin.",
     rows: [
-      ["target_type", "enum", "event", "node:supplier", "{node:supplier, node:plant, edge:lane}", "node:supplier ✅; node:plant 🧩 M7; edge:lane 🧩."],
+      ["target_type", "enum", "event", "node:supplier", "{node:supplier, node:plant, edge:lane}", "node:supplier ✅; node:plant ✅; edge:lane 🧩."],
       ["target_id", "id", "event", "required", "—", ""],
       ["effect_type", "enum", "event", "lead_time_extension", "{lead_time_extension, capacity_reduction}", "LT extension ✅ (Eqs. 11–12) vs capacity throttle."],
       ["capacity_factor", "—", "event", "0.0", "[0.0, 1.0]", "φ — 0 = full outage. capacity_reduction only."],
@@ -980,13 +980,12 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-C.2", id: "customer_allocation", stage: "customer", cls: "improvisation",
-    constraint: "demand_side", status: "🧩", milestone: "M7",
-    logic: "Under scarcity, 'who do we disappoint first' is deliberate — protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60.",
+    constraint: "demand_side", status: "✅",
+    logic: "Under scarcity, 'who do we disappoint first' is deliberate — distributes each product's weekly fulfillment across customers (protect strategic accounts / SLA floors / spread pain) and reports per-segment fill-rate KPIs. Product-level physics untouched. Inert for single-customer MTO. Hook: PH-60.",
     params: [
-      ["rule", "enum", "C", "fcfs", "{fcfs, priority, fair_share, sla_tier}", ""],
-      ["priority_weights", "weight per customer", "C", "—", "—", ""],
-      ["sla_tiers", "tier → fill floor %", "C", "—", "—", ""],
-      ["fair_share_basis", "enum", "G", "demand", "{demand, history}", ""],
+      ["rule", "enum", "C", "fcfs", "{fcfs, proportional, fair_share, priority, sla_tier}", "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata)."],
+      ["priority_weights", "weight per customer", "C", "—", "—", "Overrides Customer.priority_weight; higher serves first."],
+      ["sla_tiers", "segment → fill floor %", "C", "—", "[0, 100]", "Guaranteed first pass; scaled pro-rata when supply can't honor all floors."],
     ],
   },
   {
@@ -1166,12 +1165,11 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-S.4", id: "early_warning_failover", stage: "supplier", cls: "anticipation",
-    constraint: "response_time", status: "🧩", milestone: "M7",
-    logic: "Visibility investments compress disruption-start → firm-knows. Makes 'what is a week of warning worth?' a first-class experiment. Requires pre-deployment. Hook: PH-20.",
+    constraint: "response_time", status: "✅",
+    logic: "Visibility investments compress disruption-start → firm-knows: effective lag = min(monitored, scenario). Reactive policies (P-S.1/P-T.2/P-P.5) simply engage earlier; rerouting itself stays P-S.1's job. Makes 'what is a week of warning worth?' a first-class experiment. Requires pre-deployment. Hook: PH-20.",
     params: [
-      ["detection_lag_weeks", "weeks", "G/S", "1", "[0, 4]", "Applies to ALL reactive strategies (PH-20)."],
-      ["failover_threshold_weeks", "weeks-of-supply", "G", "4.0", "[1.0, 12.0]", ""],
-      ["monitoring_cost", "€/yr", "G", "0.0", "[0, ∞]", ""],
+      ["detection_lag_weeks", "weeks", "G/S", "1", "[0, 4]", "Monitored lag; effective lag = min(this, settings). Applies to ALL reactive strategies (PH-20)."],
+      ["monitoring_cost", "€/yr", "G", "0.0", "[0, ∞]", "Standing cost, charged weekly (÷52) into C^res."],
     ],
   },
   {
@@ -1429,7 +1427,7 @@ const ENUM_GROUPS: [string, string][] = [
   ["FulfillmentMode (CODP)", "mto ✅ · mts (M7) · ato (reserved)"],
   ["ForecastModel", "naive · ma ✅ · exp_smoothing · perfect"],
   ["EffectType", "lead_time_extension ✅ · capacity_reduction"],
-  ["TargetType", "node:supplier ✅ · node:plant (M7) · edge:lane (behavior-neutral)"],
+  ["TargetType", "node:supplier ✅ · node:plant ✅ · edge:lane (behavior-neutral)"],
   ["OverflowRule", "queue · reject (→ lost_inbound_units)"],
   ["Onset / RecoveryProfile", "step · ramp_linear"],
   ["TransportMode", "default · sea · air · road · rail"],
@@ -1547,7 +1545,7 @@ const ROADMAP: { m: string; deliverable: string; status: string }[] = [
   { m: "M4", deliverable: "ST-1 end-to-end + scorecard + Resilience Index; fast_scan.", status: "✅ engine" },
   { m: "M5", deliverable: "Portfolio study + synergy decomposition (CRN, bootstrap stars, breadth ladder).", status: "✅ engine" },
   { m: "M6", deliverable: "Docs auto-generation + docs CI gate; validation suite.", status: "✅" },
-  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅; plant/edge targets, edge split, P-S.4, P-C.2, ST-3/4/5.", status: "🔜 most shipped" },
+  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅, plant targets ✅, P-S.4 ✅, P-C.2 ✅, edge split ✅; ST-3/4/5.", status: "🔜 most shipped" },
   { m: "M8", deliverable: "Remaining policies; P-X.1 recovery playbook; LLM diff proposer.", status: "🧩" },
 ];
 

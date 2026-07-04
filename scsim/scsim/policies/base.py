@@ -106,6 +106,12 @@ class PolicyPlugin(ABC):
         in-phase through ``ctx.cost.add``)."""
         return CostBreakdown()
 
+    def kpi_contribution(self, ctx: "SimContext", t_w: int, window_end: int) -> dict[str, float]:
+        """Policy-owned KPI rows (facet 7 — outputs), merged into the
+        replication row after the engine KPIs. Computed over the analysis
+        window ``[t_w, window_end)``; keys must not collide with engine KPIs."""
+        return {}
+
     def feasibility(self, scenario: "Scenario") -> FeasibilityResult:
         """Engine-enforced composition rules (Part IV §4.6)."""
         return FeasibilityResult.ok()

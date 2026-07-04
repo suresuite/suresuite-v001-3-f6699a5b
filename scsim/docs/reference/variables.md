@@ -115,7 +115,7 @@ Qualified (supplier × material) source — §3.4/§3.5 SM-scoped variables.
 
 ## §3.6 Transport edges (behavior-neutral defaults) — `lane`
 
-Transport edge — §3.6 🧩. Defaults are behavior-neutral (folded into T_s).
+Transport edge — §3.6. Transit time composes into the effective link
 
 | Parameter | Unit | Scope | Default | Range | Notes |
 |---|---|---|---|---|---|
@@ -123,7 +123,7 @@ Transport edge — §3.6 🧩. Defaults are behavior-neutral (folded into T_s).
 | `supplier_id` | — | — | required | — |  |
 | `plant_id` | id | E | 'plant' | — | v1 single plant. |
 | `mode` | enum | E | 'default' | {default, sea, air, road, rail} |  |
-| `lead_time_weeks` | weeks | E | 0 | [0, 26] | T_E; 0 = folded into supplier T_s (v1). |
+| `lead_time_weeks` | weeks | E | 0 | [0, 26] | T_E transit leg, added to the supplier link's lead time at compile; 0 = behavior-neutral. |
 | `capacity_per_week` | units/wk | E | — | see schema | None = ∞. |
 | `cost_per_unit` | €/unit | E | 0.0 | [0, ∞] |  |
 

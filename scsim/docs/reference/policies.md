@@ -8,7 +8,7 @@ Twenty-two policies in five classes. ✅ = validated manuscript core, runnable t
 | Ref | id | Stage | Class | Constraint | Status |
 |---|---|---|---|---|---|
 | P-C.1 | [`unmet_demand_handling`](#unmet_demand_handling) | customer | built_in | demand_side | ✅ implemented |
-| P-C.2 | [`customer_allocation`](#customer_allocation) | customer | improvisation | demand_side | 🧩 planned |
+| P-C.2 | [`customer_allocation`](#customer_allocation) | customer | improvisation | demand_side | ✅ implemented |
 | P-C.3 | [`demand_shaping`](#demand_shaping) | customer | improvisation | demand_side | 🧩 planned |
 | P-P.1 | [`inventory_control`](#inventory_control) | plant | built_in | material_availability | ✅ implemented |
 | P-P.10 | [`repurposing`](#repurposing) | plant | improvisation | production_capacity | 🧩 planned |
@@ -23,7 +23,7 @@ Twenty-two policies in five classes. ✅ = validated manuscript core, runnable t
 | P-S.1 | [`backup_supplier`](#backup_supplier) | supplier | strategic | material_availability | ✅ implemented |
 | P-S.2 | [`proactive_multi_sourcing`](#proactive_multi_sourcing) | supplier | strategic | material_availability | ✅ implemented |
 | P-S.3 | [`capacity_reservation`](#capacity_reservation) | supplier | strategic | material_availability | 🧩 planned |
-| P-S.4 | [`early_warning_failover`](#early_warning_failover) | supplier | anticipation | response_time | 🧩 planned |
+| P-S.4 | [`early_warning_failover`](#early_warning_failover) | supplier | anticipation | response_time | ✅ implemented |
 | P-T.1 | [`multimodal_lane_portfolio`](#multimodal_lane_portfolio) | transport | strategic | transport_capacity | 🧩 planned |
 | P-T.2 | [`expedited_shipments`](#expedited_shipments) | transport | improvisation | response_time | ✅ implemented |
 | P-T.3 | [`mode_shift`](#mode_shift) | transport | improvisation | response_time | 🧩 planned |
@@ -53,18 +53,23 @@ What happens to an unservable order: it dies (lost_sales — competitive markets
 
 ## `customer_allocation`
 
-**P-C.2** · customer · improvisation · constraint: demand_side · 🧩 planned · lands in M7
+**P-C.2** · customer · improvisation · constraint: demand_side · ✅ implemented
 
 Under scarcity, 'who do we disappoint first' is deliberate — protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60.
+
+**Hooks**
+
+| Phase | Priority | Reads | Writes | Resolution |
+|---|---|---|---|---|
+| PH-60 | 60 | demand, fulfillment | — | — |
 
 **Parameters**
 
 | Parameter | Unit | Scope | Default | Range | Notes |
 |---|---|---|---|---|---|
-| `rule` | enum | C | 'fcfs' | {fcfs, priority, fair_share, sla_tier} |  |
-| `priority_weights` | weight per customer | C | — | — |  |
-| `sla_tiers` | tier → fill floor % | C | — | — |  |
-| `fair_share_basis` | enum | G | 'demand' | {demand, history} |  |
+| `rule` | enum | C | 'fcfs' | {fcfs, proportional, fair_share, priority, sla_tier} | fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority and sla_tier reorder. |
+| `priority_weights` | weight per customer | C | — | — | Overrides Customer.priority_weight; higher serves first. |
+| `sla_tiers` | segment → fill floor % | C | — | — | Guaranteed first-pass fill per segment; scaled down pro-rata when supply cannot honor all floors. |
 
 ## `demand_shaping`
 
@@ -325,17 +330,22 @@ Real-options contract (semiconductor-style): standing fee for callable capacity;
 
 ## `early_warning_failover`
 
-**P-S.4** · supplier · anticipation · constraint: response_time · 🧩 planned · lands in M7 · requires pre-deployment
+**P-S.4** · supplier · anticipation · constraint: response_time · ✅ implemented · requires pre-deployment
 
 Visibility investments compress disruption-start → firm-knows. Makes 'what is a week of warning worth?' a first-class experiment. Hook: PH-20.
+
+**Hooks**
+
+| Phase | Priority | Reads | Writes | Resolution |
+|---|---|---|---|---|
+| PH-20 | 60 | disruption_state | firm_knowledge | Compresses the detection lag the mechanic (priority 50) applies when serving firm knowledge: effective lag = min(monitored, scenario). Later residents see the compressed view. |
 
 **Parameters**
 
 | Parameter | Unit | Scope | Default | Range | Notes |
 |---|---|---|---|---|---|
-| `detection_lag_weeks` | weeks | G/S | 1 | [0, 4] | Applies to ALL reactive strategies (PH-20). |
-| `failover_threshold_weeks` | weeks-of-supply | G | 4.0 | [1.0, 12.0] |  |
-| `monitoring_cost` | €/yr | G | 0.0 | [0, ∞] |  |
+| `detection_lag_weeks` | weeks | G/S | 1 | [0, 4] | Monitored disruption-start → firm-knows delay; the effective lag is min(this, settings.detection_lag_weeks). Applies to ALL reactive strategies (PH-20). |
+| `monitoring_cost` | €/yr | G | 0.0 | [0, ∞] | Standing visibility cost, charged weekly (÷52) into C^res whether or not a disruption occurs. |
 
 ## `multimodal_lane_portfolio`
 

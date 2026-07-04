@@ -31,6 +31,7 @@ from scsim.entities.enums import (
 from scsim.entities.network import (
     BomLine,
     Customer,
+    CustomerLink,
     Material,
     Network,
     Product,
@@ -303,10 +304,14 @@ def from_project_data(data: ProjectData) -> MappingResult:
     out_price_den: dict[str, float] = {}
     out_demand: dict[str, float] = {}
     customers: set[str] = set(data.customers)
+    cust_share: dict[tuple[str, str], float] = {}  # (product, customer) → weekly volume
     for o in data.outbound:
         customers.add(o.customer_id)
         weekly = _rate_to_weekly(float(o.volume or 0.0), o.time_unit)
         out_demand[o.product_id] = out_demand.get(o.product_id, 0.0) + weekly
+        if weekly > 0:
+            key = (o.product_id, o.customer_id)
+            cust_share[key] = cust_share.get(key, 0.0) + weekly
         if o.unit_price:
             wgt = max(weekly, 1e-9)
             out_price_num[o.product_id] = out_price_num.get(o.product_id, 0.0) + float(o.unit_price) * wgt
@@ -398,15 +403,20 @@ def from_project_data(data: ProjectData) -> MappingResult:
                    rate=float(b.consumption_rate or 1.0))
            for b in data.bom if b.product_id in {p.id for p in products}]
 
+    prod_ids = {p.id for p in products}
     network = Network(
         suppliers=suppliers, materials=materials, products=products,
         bom=bom, supplier_links=links,
         customers=[Customer(id=c, name=c) for c in sorted(customers)],
+        customer_links=[
+            CustomerLink(product_id=pid, customer_id=cid, share=share)
+            for (pid, cid), share in sorted(cust_share.items()) if pid in prod_ids
+        ],
     )
 
     settings = _build_settings(sc, w)
     events = _map_events(sc.disruption_schedule, sup_ids, cap_by_sup, w)
-    policies = _map_policies(data.policies, w)
+    policies = _map_policies(data.policies, w, n_customers=len(customers))
 
     scenario = Scenario(name=sc.name or "scenario", network=network,
                         settings=settings, events=events, policies=policies)
@@ -438,6 +448,11 @@ def _build_settings(sc: ScenarioSettings, w: list[MappingWarning]) -> Simulation
     return SimulationSettings(**kwargs)
 
 
+def _is_plant_target(raw: str, stripped: str) -> bool:
+    """`plant:X`, `node:plant`, or bare `plant` address the (single) focal plant."""
+    return raw.lower().startswith("plant:") or stripped.lower() == "plant"
+
+
 def _map_events(
     schedule: list[dict], sup_ids: set[str], cap_by_sup: dict[str, Optional[float]],
     w: list[MappingWarning],
@@ -446,9 +461,10 @@ def _map_events(
     for entry in schedule[:5]:
         raw = str(entry.get("target", entry.get("target_id", "")))
         target = raw.rsplit(":", 1)[1] if ":" in raw else raw
-        if target not in sup_ids:
+        is_plant = target not in sup_ids and _is_plant_target(raw, target)
+        if target not in sup_ids and not is_plant:
             w.append(MappingWarning("warn", f"event:{raw}", "target",
-                                    "non-supplier target skipped (material/plant land in M7)"))
+                                    "unsupported target skipped (material/edge land later in M7)"))
             continue
         start_days = float(entry.get("start_day", entry.get("start_week", 0)) or 0)
         # 'start_week' already weeks; 'start_day' days
@@ -457,11 +473,14 @@ def _map_events(
         dur_weeks = round(dur_days) if "duration_weeks" in entry else round(dur_days / 7.0)
         magnitude = float(entry.get("magnitude_pct", entry.get("magnitude", 100.0)) or 100.0)
         kwargs: dict[str, Any] = dict(
-            target_type=TargetType.NODE_SUPPLIER, target_id=target,
+            target_type=TargetType.NODE_PLANT if is_plant else TargetType.NODE_SUPPLIER,
+            target_id=target or "plant",
             start=max(1, int(start_week)), duration=int(_clamp(dur_weeks, 1, 52)),
         )
         if magnitude < 100.0:
-            if cap_by_sup.get(target) is not None:
+            # Plant capacity is always finite (products carry production_capacity),
+            # so a partial cut always throttles; suppliers need capacity_per_week.
+            if is_plant or cap_by_sup.get(target) is not None:
                 kwargs["effect_type"] = EffectType.CAPACITY_REDUCTION
                 kwargs["capacity_factor"] = float(_clamp((100.0 - magnitude) / 100.0, 0.0, 0.999))
             else:
@@ -475,7 +494,13 @@ def _map_events(
     return events
 
 
-def _map_policies(policies: dict, w: list[MappingWarning]) -> dict[str, dict]:
+_ALLOCATION_RULE = {  # UI fulfillment.allocation → P-C.2 rule (engineBridge.json mirror)
+    "priority": "priority", "fair_share": "fair_share",
+    "proportional": "proportional", "sla_tier": "sla_tier",
+}
+
+
+def _map_policies(policies: dict, w: list[MappingWarning], n_customers: int = 0) -> dict[str, dict]:
     out: dict[str, dict] = {}
     default = policies.get("default") or {}
     inv = default.get("inventory") or {}
@@ -512,6 +537,18 @@ def _map_policies(policies: dict, w: list[MappingWarning]) -> dict[str, dict]:
         }
     else:
         out["unmet_demand_handling"] = {"rule": "lost_sales"}
+
+    # P-C.2 customer allocation — the UI's fulfillment.allocation enum finally
+    # reaches the engine. Inert (skipped) below two customers.
+    alloc = str(fulfil.get("allocation", "") or "")
+    if alloc and n_customers >= 2:
+        if alloc == "revenue_max":
+            w.append(MappingWarning("warn", "policy:customer_allocation", "allocation",
+                                    "revenue_max needs per-customer pricing (deferred) — "
+                                    "mapped to priority"))
+            out["customer_allocation"] = {"rule": "priority"}
+        elif alloc in _ALLOCATION_RULE:
+            out["customer_allocation"] = {"rule": _ALLOCATION_RULE[alloc]}
 
     responses = set(recovery.get("response") or [])
     if str(sourcing.get("strategy", "single")) in ("primary_backup", "dual_sourcing", "multi") \

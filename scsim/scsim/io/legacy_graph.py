@@ -20,10 +20,11 @@ from typing import Any
 
 from scsim.entities.config import SimulationSettings
 from scsim.entities.disruption import DisruptionEvent
-from scsim.entities.enums import TargetType, WarmupMethod
+from scsim.entities.enums import EffectType, TargetType, WarmupMethod
 from scsim.entities.network import (
     BomLine,
     Customer,
+    CustomerLink,
     Material,
     Network,
     Product,
@@ -148,10 +149,24 @@ def from_legacy_graph(
         ))
 
     customers = [Customer(id=cid, name=str(d.get("name", cid))) for cid, d in cust_nodes]
+    prod_ids = {pid for pid, _ in prod_nodes}
+    customer_links: list[CustomerLink] = []
+    for cid, _ in cust_nodes:
+        for prod_id, _, edata in graph.in_edges(cid, data=True):
+            if str(prod_id) not in prod_ids:
+                continue
+            if edata.get("edge_type") not in ("outbound", None):
+                continue
+            vol = float(edata.get("volume") or 0.0)
+            customer_links.append(CustomerLink(
+                product_id=str(prod_id), customer_id=cid,
+                share=vol if vol > 0 else 1.0,
+            ))
 
     network = Network(
         suppliers=suppliers, materials=materials, products=products,
         bom=bom, supplier_links=links, customers=customers,
+        customer_links=customer_links,
     )
 
     # Legacy warm-up convention (min(15, horizon/4)) → manual warm-up.
@@ -167,7 +182,7 @@ def from_legacy_graph(
     if horizon_weeks < 52:
         notes.append(f"horizon raised from {horizon_weeks} to 52 weeks (engine floor)")
 
-    scenario_policies = _map_policies(policies, notes)
+    scenario_policies = _map_policies(policies, notes, n_customers=len(customers))
     _note_unsupported_overrides(policies, notes)
     events = _map_events(disruption_schedule or [], network, warmup, notes)
 
@@ -180,7 +195,13 @@ def from_legacy_graph(
     )
 
 
-def _map_policies(policies: dict, notes: list[str]) -> dict[str, dict]:
+_ALLOCATION_RULE = {  # UI fulfillment.allocation → P-C.2 rule (engineBridge.json mirror)
+    "priority": "priority", "fair_share": "fair_share",
+    "proportional": "proportional", "sla_tier": "sla_tier",
+}
+
+
+def _map_policies(policies: dict, notes: list[str], n_customers: int = 0) -> dict[str, dict]:
     out: dict[str, dict] = {}
     inv = (policies.get("default") or {}).get("inventory") or {}
     fulfil = (policies.get("default") or {}).get("fulfillment") or {}
@@ -221,6 +242,17 @@ def _map_policies(policies: dict, notes: list[str]) -> dict[str, dict]:
     else:
         out["unmet_demand_handling"] = {"rule": "lost_sales"}
 
+    # P-C.2 customer allocation — the UI's fulfillment.allocation enum finally
+    # reaches the engine. Inert (skipped) below two customers.
+    alloc = str(fulfil.get("allocation", "") or "")
+    if alloc and n_customers >= 2:
+        if alloc == "revenue_max":
+            notes.append("fulfillment.allocation=revenue_max needs per-customer pricing "
+                         "(deferred) — mapped to customer_allocation rule=priority")
+            out["customer_allocation"] = {"rule": "priority"}
+        elif alloc in _ALLOCATION_RULE:
+            out["customer_allocation"] = {"rule": _ALLOCATION_RULE[alloc]}
+
     responses = set(recovery.get("response") or [])
     if str(sourcing.get("strategy", "single")) in ("primary_backup", "dual_sourcing", "multi") \
             or "dual_source_activate" in responses:
@@ -240,13 +272,28 @@ def _map_events(
     for entry in schedule[:5]:
         raw = str(entry.get("target", ""))
         target = raw.split(":", 1)[1] if ":" in raw else raw
-        if target not in sup_ids:
-            notes.append(f"disruption target {raw!r} is not a supplier — skipped "
-                         f"(material/plant targets land in M7)")
+        is_plant = target not in sup_ids and (
+            raw.lower().startswith("plant:") or target.lower() == "plant"
+        )
+        if target not in sup_ids and not is_plant:
+            notes.append(f"disruption target {raw!r} unsupported — skipped "
+                         f"(material/edge targets land later in M7)")
             continue
         start_week = max(1, round(float(entry.get("start_day", 0)) / 7.0))
         duration = max(1, min(52, round(float(entry.get("duration_days", 7)) / 7.0)))
         magnitude = float(entry.get("magnitude_pct", 100.0))
+        if is_plant:
+            # The plant's production capacity is always finite, so a partial cut
+            # throttles it (capacity_reduction); a 100% cut halts production.
+            kwargs: dict[str, Any] = dict(
+                target_type=TargetType.NODE_PLANT, target_id=target or "plant",
+                start=start_week, duration=duration,
+            )
+            if magnitude < 100.0:
+                kwargs["effect_type"] = EffectType.CAPACITY_REDUCTION
+                kwargs["capacity_factor"] = max(0.0, min(0.999, (100.0 - magnitude) / 100.0))
+            events.append(DisruptionEvent(**kwargs))
+            continue
         if magnitude < 100.0:
             notes.append(
                 f"event on {target!r}: magnitude {magnitude:.0f}% mapped to a full "

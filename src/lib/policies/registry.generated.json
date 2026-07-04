@@ -237,7 +237,7 @@
           "type": "string"
         }
       },
-      "description": "Transport edge \u2014 \u00a73.6 \ud83e\udde9. Defaults are behavior-neutral (folded into T_s).",
+      "description": "Transport edge \u2014 \u00a73.6. Transit time composes into the effective link\nlead time at compile (default 0 = behavior-neutral); per-mode pipelines\nand lane capacity land with P-T.1.",
       "properties": {
         "capacity_per_week": {
           "anyOf": [
@@ -276,7 +276,7 @@
           "default": 0,
           "maximum": 26,
           "minimum": 0,
-          "notes": "T_E; 0 = folded into supplier T_s (v1).",
+          "notes": "T_E transit leg, added to the supplier link's lead time at compile; 0 = behavior-neutral.",
           "scope": "E",
           "title": "Lead Time Weeks",
           "type": "integer",
@@ -1239,27 +1239,28 @@
     {
       "catalog_ref": "P-C.2",
       "constraint_targeted": "demand_side",
-      "hooks": [],
+      "hooks": [
+        {
+          "phase": "PH-60",
+          "priority": 60,
+          "reads": [
+            "demand",
+            "fulfillment"
+          ],
+          "resolution": null,
+          "writes": []
+        }
+      ],
       "id": "customer_allocation",
-      "milestone": "M7",
+      "milestone": null,
       "params_schema": {
         "additionalProperties": false,
         "properties": {
-          "fair_share_basis": {
-            "default": "demand",
-            "enum": [
-              "demand",
-              "history"
-            ],
-            "scope": "G",
-            "title": "Fair Share Basis",
-            "type": "string",
-            "unit": "enum"
-          },
           "priority_weights": {
             "additionalProperties": {
               "type": "number"
             },
+            "notes": "Overrides Customer.priority_weight; higher serves first.",
             "scope": "C",
             "title": "Priority Weights",
             "type": "object",
@@ -1269,10 +1270,12 @@
             "default": "fcfs",
             "enum": [
               "fcfs",
-              "priority",
+              "proportional",
               "fair_share",
+              "priority",
               "sla_tier"
             ],
+            "notes": "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority and sla_tier reorder.",
             "scope": "C",
             "title": "Rule",
             "type": "string",
@@ -1282,10 +1285,11 @@
             "additionalProperties": {
               "type": "number"
             },
+            "notes": "Guaranteed first-pass fill per segment; scaled down pro-rata when supply cannot honor all floors.",
             "scope": "C",
             "title": "Sla Tiers",
             "type": "object",
-            "unit": "tier \u2192 fill floor %"
+            "unit": "segment \u2192 fill floor %"
           }
         },
         "title": "CustomerAllocationParams",
@@ -1293,7 +1297,7 @@
       },
       "requires_predeployment": false,
       "stage": "customer",
-      "status": "planned",
+      "status": "implemented",
       "strategy_class": "improvisation",
       "summary": "Under scarcity, 'who do we disappoint first' is deliberate \u2014 protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60."
     },
@@ -2390,9 +2394,21 @@
     {
       "catalog_ref": "P-S.4",
       "constraint_targeted": "response_time",
-      "hooks": [],
+      "hooks": [
+        {
+          "phase": "PH-20",
+          "priority": 60,
+          "reads": [
+            "disruption_state"
+          ],
+          "resolution": "Compresses the detection lag the mechanic (priority 50) applies when serving firm knowledge: effective lag = min(monitored, scenario). Later residents see the compressed view.",
+          "writes": [
+            "firm_knowledge"
+          ]
+        }
+      ],
       "id": "early_warning_failover",
-      "milestone": "M7",
+      "milestone": null,
       "params_schema": {
         "additionalProperties": false,
         "properties": {
@@ -2400,24 +2416,16 @@
             "default": 1,
             "maximum": 4,
             "minimum": 0,
-            "notes": "Applies to ALL reactive strategies (PH-20).",
+            "notes": "Monitored disruption-start \u2192 firm-knows delay; the effective lag is min(this, settings.detection_lag_weeks). Applies to ALL reactive strategies (PH-20).",
             "scope": "G/S",
             "title": "Detection Lag Weeks",
             "type": "integer",
             "unit": "weeks"
           },
-          "failover_threshold_weeks": {
-            "default": 4.0,
-            "maximum": 12.0,
-            "minimum": 1.0,
-            "scope": "G",
-            "title": "Failover Threshold Weeks",
-            "type": "number",
-            "unit": "weeks-of-supply"
-          },
           "monitoring_cost": {
             "default": 0.0,
             "minimum": 0,
+            "notes": "Standing visibility cost, charged weekly (\u00f752) into C^res whether or not a disruption occurs.",
             "scope": "G",
             "title": "Monitoring Cost",
             "type": "number",
@@ -2429,7 +2437,7 @@
       },
       "requires_predeployment": true,
       "stage": "supplier",
-      "status": "planned",
+      "status": "implemented",
       "strategy_class": "anticipation",
       "summary": "Visibility investments compress disruption-start \u2192 firm-knows. Makes 'what is a week of warning worth?' a first-class experiment. Hook: PH-20."
     },

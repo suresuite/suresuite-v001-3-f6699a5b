@@ -107,26 +107,8 @@ register_planned(
 
 
 # --------------------------------------------------------------------- 4.3
-
-class EarlyWarningFailoverParams(PolicyParams):
-    detection_lag_weeks: int = Field(
-        1, ge=0, le=4,
-        json_schema_extra={"unit": "weeks", "scope": "G/S",
-                           "notes": "Applies to ALL reactive strategies (PH-20)."})
-    failover_threshold_weeks: float = Field(
-        4.0, ge=1.0, le=12.0, json_schema_extra={"unit": "weeks-of-supply", "scope": "G"})
-    monitoring_cost: float = Field(
-        0.0, ge=0, json_schema_extra={"unit": "€/yr", "scope": "G"})
-
-
-register_planned(
-    id="early_warning_failover", catalog_ref="P-S.4", stage=Stage.SUPPLIER,
-    strategy_class=StrategyClass.ANTICIPATION,
-    constraint_targeted=ConstraintTag.RESPONSE_TIME,
-    requires_predeployment=True, params_model=EarlyWarningFailoverParams, milestone="M7",
-    summary="Visibility investments compress disruption-start → firm-knows. Makes 'what is a "
-            "week of warning worth?' a first-class experiment. Hook: PH-20.",
-)
+# P-S.4 early_warning_failover graduated to an implemented plugin:
+# scsim/policies/anticipation/p_s4_early_warning.py
 
 
 class AlternativeBomParams(PolicyParams):
@@ -213,25 +195,8 @@ register_planned(
 )
 
 
-class CustomerAllocationParams(PolicyParams):
-    rule: Literal["fcfs", "priority", "fair_share", "sla_tier"] = Field(
-        "fcfs", json_schema_extra={"unit": "enum", "scope": "C"})
-    priority_weights: dict[str, float] = Field(
-        default_factory=dict, json_schema_extra={"unit": "weight per customer", "scope": "C"})
-    sla_tiers: dict[str, float] = Field(
-        default_factory=dict, json_schema_extra={"unit": "tier → fill floor %", "scope": "C"})
-    fair_share_basis: Literal["demand", "history"] = Field(
-        "demand", json_schema_extra={"unit": "enum", "scope": "G"})
-
-
-register_planned(
-    id="customer_allocation", catalog_ref="P-C.2", stage=Stage.CUSTOMER,
-    strategy_class=StrategyClass.IMPROVISATION,
-    constraint_targeted=ConstraintTag.DEMAND_SIDE,
-    requires_predeployment=False, params_model=CustomerAllocationParams, milestone="M7",
-    summary="Under scarcity, 'who do we disappoint first' is deliberate — protect strategic "
-            "accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60.",
-)
+# P-C.2 customer_allocation graduated to an implemented plugin:
+# scsim/policies/improvisation/p_c2_customer_allocation.py
 
 
 class DemandShapingParams(PolicyParams):

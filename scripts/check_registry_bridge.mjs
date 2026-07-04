@@ -52,6 +52,17 @@ for (const [method, engineValue] of Object.entries(bridge.safety_stock_method_to
   }
 }
 
+// 4. Every UI fulfillment allocation value maps to a real customer_allocation.rule value.
+const ruleEnum = paramEnum("customer_allocation", "rule") ?? [];
+for (const [uiAlloc, engineValue] of Object.entries(bridge.fulfillment_allocation_to_rule ?? {})) {
+  if (!ruleEnum.includes(engineValue)) {
+    errors.push(
+      `fulfillment allocation "${uiAlloc}" -> "${engineValue}" is not in ` +
+        `customer_allocation.rule [${ruleEnum.join(", ")}]`,
+    );
+  }
+}
+
 if (errors.length > 0) {
   console.error("REGISTRY BRIDGE DRIFT — engineBridge.json disagrees with the engine:");
   for (const e of errors) console.error("  - " + e);

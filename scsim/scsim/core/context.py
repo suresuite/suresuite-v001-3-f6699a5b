@@ -38,6 +38,7 @@ from scsim.entities.enums import (
     FulfillmentMode,
     OverflowRule,
     RampProfile,
+    TransportMode,
 )
 from scsim.entities.scenario import Scenario
 from scsim.stats.seeds import ReplicationStreams
@@ -53,6 +54,7 @@ COST_COMPONENTS: tuple[str, ...] = (
     "allocation_labor",       # P-P.9 planner time
     "fg_ss_holding",          # P-P.4 FG safety stock at full COGS (MTS)
     "backorder_penalty",      # P-C.1 backorder variant
+    "monitoring",             # P-S.4 standing visibility cost
 )
 COST_INDEX = {name: i for i, name in enumerate(COST_COMPONENTS)}
 
@@ -159,7 +161,18 @@ class CompiledModel:
         self.n_links = len(links)
         self.link_sup = np.array([self.sup_index[l.supplier_id] for l in links], dtype=int)
         self.link_mat = np.array([self.mat_index[l.material_id] for l in links], dtype=int)
-        self.link_lt = np.array([l.lead_time_weeks for l in links], dtype=int)
+        # Edge lead-time split (M7): a lane's transit time composes into the
+        # effective link lead time, so planning (s_m/S_m coverage), shipping,
+        # and ring sizing all see the same total. Quoting transit on the lane
+        # is exactly equivalent to folding it into the supplier link (tested
+        # byte-identical). One lane per supplier binds in v1: the default-mode
+        # lane wins, then lowest id; per-mode pipelines land with P-T.1.
+        lane_extra: dict[str, int] = {}
+        for lane in sorted(net.lanes, key=lambda l: (l.mode != TransportMode.DEFAULT, l.id)):
+            lane_extra.setdefault(lane.supplier_id, int(lane.lead_time_weeks))
+        self.link_lt = np.array(
+            [l.lead_time_weeks + lane_extra.get(l.supplier_id, 0) for l in links], dtype=int
+        )
         self.link_cost = np.array([l.cost for l in links])
         self.link_moq = np.array([l.moq for l in links])
         self.link_lt_dist = [l.lead_time_dist for l in links]
@@ -202,6 +215,24 @@ class CompiledModel:
         )
         # Full COGS per FG unit (P-P.4 holding basis): Σ_m r_{p,m} · c_m.
         self.fg_unit_cogs = np.asarray(self.bom @ self.mat_cost).ravel()
+
+        # Customers (P-C.2). Share matrix rows are normalized per product;
+        # products with no customer_links split uniformly — behavior-neutral
+        # until a customer-allocation policy reads it.
+        self.cust_ids = [c.id for c in net.customers]
+        self.n_custs = len(self.cust_ids)
+        self.cust_index = {cid: i for i, cid in enumerate(self.cust_ids)}
+        self.cust_priority = np.array([c.priority_weight for c in net.customers])
+        self.cust_segment = [c.segment for c in net.customers]
+        if self.n_custs:
+            W = np.zeros((self.n_prods, self.n_custs))
+            for cl in net.customer_links:
+                W[self.prod_index[cl.product_id], self.cust_index[cl.customer_id]] = cl.share
+            unlinked = W.sum(axis=1) == 0.0
+            W[unlinked, :] = 1.0
+            self.cust_share = W / W.sum(axis=1, keepdims=True)
+        else:
+            self.cust_share = np.zeros((self.n_prods, 0))
 
         # Ring width: longest quoted arrival distance is max(T_link, deferral≤52)
         # plus the recovery ramp; +4 slack (§10.2.2).
@@ -343,6 +374,9 @@ class SimContext:
         self.plant_lt_block_end = 0   # > week ⇒ plant produces nothing this week
         self.plant_cap_factor = 1.0   # φ throttle on the plant's production capacity
         self.lost_inbound_this_week = 0.0
+        # P-S.4 early_warning_failover: monitored detection lag. None → the
+        # scenario's settings.detection_lag_weeks applies unchanged.
+        self.detection_lag_override: Optional[int] = None
 
         self.trace = WeeklyTrace(T, model.n_prods, model.n_mats, keep_matrices)
         self._active_hook: Optional[BoundHook] = None
@@ -366,7 +400,9 @@ class SimContext:
     def events_visible(self) -> list[ResolvedEvent]:
         """Post-detection view (PH-20): events the FIRM knows about (§3.7, P-S.4)."""
         t = self.week
-        lag = self.model.settings.detection_lag_weeks
+        lag = (self.detection_lag_override
+               if self.detection_lag_override is not None
+               else self.model.settings.detection_lag_weeks)
         return [e for e in self.events if e.start + lag <= t and t < e.end + e.ramp_weeks]
 
     def visible_disrupted_suppliers(self) -> np.ndarray:

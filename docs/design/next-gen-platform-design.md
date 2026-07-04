@@ -198,6 +198,18 @@ Retirement is gated on capability, not dates:
 | **E3 — Default flip** | `SCSIM_ENGINE=1` becomes the default; legacy behind an explicit escape hatch; `code_version` continues to record which engine produced every run |
 | **E4 — Removal** | Legacy code deleted after two release cycles with no escape-hatch use |
 
+> **Implementation note (Phase A, gate evidence).** E1 is now regression-tested:
+> `scsim/tests/test_project_map.py::test_e1_fully_specified_project_has_no_silent_fallbacks`
+> asserts a fully-specified project maps with zero warn-level `MappingWarning`s; the sole
+> info-level residue is the absolute-`order_up_to` → coverage-κ note, which Phase B's
+> extended P-P.1 parameterization retires. E2 has its first characterization:
+> `scripts/parity_characterization.py` runs the 8 system presets (family-field reductions)
+> through both engines on a BoM-peer-bottleneck reference network and regenerates
+> `docs/parity-characterization.md` — differences documented there and accepted as
+> corrections (coverage-κ sizing, fulfillment semantics, per-engine RNG, and the
+> definitional `cost_of_resilience` mismatch). Golden-trace pinning across the full preset
+> grid and the E3 default flip remain Phase B work.
+
 ---
 ## 4. Node-owned policy architecture
 
@@ -298,7 +310,7 @@ Covers the brief's supplier list: production, capacity, lead time, order accepta
 | P-S.1 | `backup_supplier` | supplier selection | operational | ✅ | contingent reroute on visible disruption; selection rule min_cost / min_leadtime / reliability; cooldown | backup source links + `unit_price`, `reliability_score` |
 | P-S.2 | `proactive_multi_sourcing` | multi-sourcing | strategic | ✅ (unreachable today — G3; §6.2 wires it) | standing order split across warm sources; weights; rebalance trigger | per-source ratios (today's ignored `sourcing.ratios` — G1) |
 | P-S.3 | `capacity_reservation` | capacity | strategic | 🧩 | reserved capacity contracts at premium | reservation quantum, premium |
-| P-S.4 | `early_warning_failover` | supplier selection | operational | 🧩 (M7) | monitoring signal shortens detection lag; pre-emptive failover | monitoring cost, signal quality |
+| P-S.4 | `early_warning_failover` | supplier selection | operational | ✅ (Phase A; unreachable from UI until Phase B wires it) | monitoring compresses detection lag (effective = min(monitored, scenario)); reactive policies engage earlier — rerouting stays P-S.1's job; standing monitoring cost | monitoring cost |
 
 ### 5.2 Plant / focal-firm policies (`P-P.x`, `P-F.x`)
 
@@ -343,7 +355,7 @@ Demand-side behavior, promoted from engine mechanics and data fields into config
 |---|---|---|---|---|---|---|
 | P-C.4 | `demand_model` | demand modeling | strategic | ✚ (promoted from world demand mechanic) | distribution family (triangular/poisson/negbin/normal/empirical) · order frequency × size decomposition · seasonality/trend profile · forecast-error injection | `products.demand_mean`, `demand_cv`, seasonality profile (calendar, §8.3) |
 | P-C.1 | `unmet_demand_handling` | order management | operational | ✅ | lost_sales ✅ · backorder · partial_backorder (expose the partial variant — G1) | backorder penalty, horizon |
-| P-C.2 | `customer_allocation` | allocation | operational | 🧩 (activate — matches the UI's existing fulfillment allocation enum) | priority · fair_share · proportional · revenue_max · sla_tier | customer tiers, prices |
+| P-C.2 | `customer_allocation` | allocation | operational | ✅ (Phase A; wired to the UI's fulfillment allocation enum via the mappers) | fcfs · proportional · fair_share · priority · sla_tier (revenue_max deferred — needs per-customer pricing; mapped to priority with a warning) | customer segments/weights (`Network.customers` + `customer_links` from outbound volumes) |
 | P-C.5 | `backorder_behavior` | demand modeling | operational | ✚ | patience window → cancellation; delivery-window flexibility; service-level expectation as a measured contract (α/β targets per customer) | patience days, SLA targets |
 
 ### 5.5 Cross-cutting (`P-X.x`)
@@ -782,7 +794,7 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-S.1 | backup_supplier | supplier | supplier selection | operational | ✅ | PH-80; contingent reroute, cooldown |
 | P-S.2 | proactive_multi_sourcing | supplier | multi-sourcing | strategic | ✅ | PH-80; standing split — wire to UI (G3) |
 | P-S.3 | capacity_reservation | supplier | capacity | strategic | 🧩 M8 | reserved capacity at premium |
-| P-S.4 | early_warning_failover | supplier | supplier selection | operational | 🧩 M7 | PH-20 detection resident |
+| P-S.4 | early_warning_failover | supplier | supplier selection | operational | ✅ | PH-20 detection resident; compresses detection lag, standing monitoring cost |
 | P-S.5 | supplier_capacity_model | supplier | capacity | strategic | ✚ | infinite / finite_queue / finite_reject; formalizes `ST_QUEUE` mechanics |
 | P-S.6 | lead_time_model | supplier | lead time | tactical | ✚ | deterministic / stochastic dists; empirical deferred |
 | P-S.7 | supplier_allocation | supplier | allocation | operational | ✚ | FCFS / proportional / priority |
@@ -809,7 +821,7 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-T.5 | shipment_consolidation | transport | transport | tactical | ✚ | per-lane window consolidation |
 | P-T.6 | shipping_frequency | transport | transport | tactical | ✚ | fixed weekly / threshold dispatch |
 | P-C.1 | unmet_demand_handling | customer | order management | operational | ✅ | PH-60; lost_sales ✅ / backorder / partial_backorder |
-| P-C.2 | customer_allocation | customer | allocation | operational | 🧩 M7 | priority / fair_share / proportional / revenue_max / sla_tier |
+| P-C.2 | customer_allocation | customer | allocation | operational | ✅ | PH-60; fcfs / proportional / fair_share / priority / sla_tier; per-segment fill-rate KPIs |
 | P-C.3 | demand_shaping | customer | demand modeling | operational | 🧩 M8 · ⏸ activation | needs revenue model (§5.8) |
 | P-C.4 | demand_model | customer | demand modeling | strategic | ✚ (promoted mechanic) | distribution / frequency×size / seasonality / forecast error |
 | P-C.5 | backorder_behavior | customer | demand modeling | operational | ✚ | patience → cancellation; delivery windows; SLA expectations |

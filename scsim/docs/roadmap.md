@@ -11,7 +11,7 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 | M4 | ST-1 end-to-end + scorecard + RI; fast_scan | ✅ engine-side (`run_st1`, badges, snapshot reuse); job sharding to workers is orchestration-layer work |
 | M5 | Portfolio study + synergy decomposition (CRN, bootstrap stars, overlap diagnostics, breadth ladder) | ✅ engine-side; Portfolio Builder / Synergy Explorer UI pending |
 | M6 | Docs auto-generation + docs CI gate; validation suite | ✅ — `scripts/gen_docs.py --check` gates CI; 90+ tests including golden traces |
-| M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant/edge targets, edge split, P-S.4, P-C.2, ST-3/4/5 | 🔜 — most of M7 shipped; plant targets / edge split / remaining batteries scheduled |
+| M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant targets ✅; P-S.4 ✅; P-C.2 ✅; edge split ✅; ST-3/4/5 batteries | 🔜 — remaining batteries + per-mode lanes (P-T.1) scheduled |
 | M8 | Remaining 🧩 policies; P-X.1 playbook; LLM diff proposer (flagged) | 🧩 — full parameter schemas already in the registry |
 
 ## Shipped ahead of plan
@@ -29,11 +29,21 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 
 * ~~`node:plant` disruption targets (P-P.4's "uniquely protective" case).~~
   ✅ shipped — a plant capacity_reduction / lead_time_extension throttles or
-  halts the plant's own production (`tests/test_plant_disruption.py`).
-* Edge lead-time split (`Lane.lead_time_weeks > 0` is schema-valid but the
-  engine still folds transport into `T_s`).
-* P-S.4 early-warning (the global `detection_lag_weeks` lever already
-  exists in settings; the policy packages it with monitoring cost), P-C.2.
+  halts the plant's own production (`tests/test_plant_disruption.py`); both
+  input mappers (`io/project_map.py`, `io/legacy_graph.py`) pass `plant:*` /
+  `node:plant` targets through instead of skipping them.
+* ~~Edge lead-time split.~~ ✅ shipped — `Lane.lead_time_weeks` composes into
+  the effective link lead time at compile (planning, shipping, and ring
+  sizing see the same total; lane-quoted transit is byte-identical to
+  link-folded transit — `tests/test_edge_leadtime_split.py`). Per-mode
+  pipelines and lane capacity remain with P-T.1.
+* ~~P-S.4 early-warning.~~ ✅ shipped — `ctx.detection_lag_override` compresses
+  the lag `events_visible()` serves (effective = min(monitored, scenario));
+  standing `monitoring` cost component (`tests/test_ps4_early_warning.py`).
+* ~~P-C.2 customer_allocation.~~ ✅ shipped — PH-60 read-only resident splits
+  each product's weekly fulfillment across customers (pro-rata / priority /
+  SLA floors) and reports per-segment fill KPIs via the new
+  `PolicyPlugin.kpi_contribution` facet (`tests/test_pc2_customer_allocation.py`).
 * ST-3..7 batteries; demand-surge events need a demand-side effect type
   (Tier-3: new event target class).
 * Worker-pool sharding / resumable sweeps (orchestration; the seed tree and
