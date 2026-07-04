@@ -29,25 +29,36 @@ const PANEL_MIN = { w: 340, h: 380 };
 interface Pos { x: number; y: number }
 interface Dims { w: number; h: number }
 
-function loadPosFrom(key: string): Pos | null {
+function clampPos(p: Pos, size: { w: number; h: number }): Pos {
+  if (typeof window === "undefined") return p;
+  return {
+    x: Math.min(Math.max(0, p.x), Math.max(0, window.innerWidth - size.w)),
+    y: Math.min(Math.max(0, p.y), Math.max(0, window.innerHeight - size.h)),
+  };
+}
+
+function loadPosFrom(key: string, size?: { w: number; h: number }): Pos | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const p = JSON.parse(raw);
-    if (typeof p?.x === "number" && typeof p?.y === "number") return p;
+    if (typeof p?.x === "number" && typeof p?.y === "number") {
+      return size ? clampPos(p, size) : p;
+    }
   } catch { /* ignore */ }
   return null;
 }
 
 function loadPos(): Pos | null {
-  return loadPosFrom(LAUNCHER_POS_KEY);
+  return loadPosFrom(LAUNCHER_POS_KEY, LAUNCHER_SIZE);
 }
 
 function defaultPos(): Pos {
   if (typeof window === "undefined") return { x: 20, y: 20 };
   return { x: window.innerWidth - LAUNCHER_SIZE.w - 20, y: window.innerHeight - LAUNCHER_SIZE.h - 20 };
 }
+
 
 // Clamp panel size to the viewport (and a sensible minimum) so it always fits.
 function clampDims(w: number, h: number): Dims {
