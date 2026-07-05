@@ -16,6 +16,7 @@ import {
   Target,
   Brain,
   SlidersHorizontal,
+  Shield,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
