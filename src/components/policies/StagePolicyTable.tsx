@@ -27,6 +27,10 @@ import {
 } from "@/lib/policies/columnSpecs";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { useAuth } from "@/hooks/useAuth";
+import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
@@ -176,6 +180,12 @@ function ValueCell({
   );
 }
 
+/** Supabase errors are plain objects, not Error instances — extract either. */
+function errMsg(e: unknown, fallback: string): string {
+  const m = (e as { message?: unknown })?.message;
+  return typeof m === "string" && m ? m : fallback;
+}
+
 function isEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null && b == null) return true;
@@ -196,8 +206,10 @@ export function StagePolicyTable({
 }: Props) {
   const spec = specFor(stageKey);
   const families = familiesForStage(stageKey);
-  const { rows: dataRows, loading, fallback } = useStageRows({ projectId, plantName, stage: stageKey });
+  const { rows: dataRows, loading, fallback, reload: reloadRows } = useStageRows({ projectId, plantName, stage: stageKey });
   const { unit, adaptLabel } = useTimeUnit(projectId);
+  const { user } = useAuth();
+  const { selectedProject } = useGlobalProject();
 
   // Item masters back the economics columns (ColSpec.master): the grid shows
   // and edits materials.cost / products.sell_price / production_capacity /
@@ -231,6 +243,103 @@ export function StagePolicyTable({
     const n = Number(v);
     return v == null || !Number.isFinite(n) ? undefined : n;
   };
+  // Suppliers the user can assign to an "(unassigned supplier)" material:
+  // the suppliers master plus every supplier already sourcing in this stage.
+  const knownSuppliers = useMemo(() => {
+    const set = new Set<string>(suppliers.map((s) => s.supplier_id));
+    for (const r of dataRows) {
+      const sid = String((r as Record<string, unknown>).supplier_id ?? "");
+      if (sid && !sid.startsWith("(")) set.add(sid);
+    }
+    return [...set].sort();
+  }, [suppliers, dataRows]);
+  const [assigning, setAssigning] = useState<string | null>(null);
+  // Inline "new supplier" input state (per material row).
+  const [newSupplierFor, setNewSupplierFor] = useState<string | null>(null);
+  const [newSupplierId, setNewSupplierId] = useState("");
+  const assignSupplier = async (materialId: string, supplierId: string) => {
+    if (!projectId || !user) return;
+    setAssigning(materialId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    try {
+      // Fast path: the dedicated RPC (creates lane + edge + supplier master).
+      const { error } = await sb.rpc("assign_material_supplier", {
+        p_project_id: projectId,
+        p_material_id: materialId,
+        p_supplier_id: supplierId,
+        p_user_id: user.id,
+        p_user_email: user.email,
+      });
+      if (error) throw error;
+      toast.success(`Assigned ${supplierId} to ${materialId}. Fill in its price/lead time in the grid.`);
+      reloadRows();
+    } catch (rpcErr) {
+      // Fallback: the upload pipeline that provably works in every deployed
+      // environment (same edge function the Data Manager uploads use), then a
+      // combine so the supply-chain edge list picks the pair up.
+      try {
+        // The ingest edge function validates plant_name against the PROJECT
+        // record (projects.plant_name) — which can differ from the plant name
+        // stamped on older data rows. Prefer the project's registered plant,
+        // then the page prop, then any existing lane as last resort.
+        let plant =
+          (selectedProject?.id === projectId ? selectedProject?.plant_name : null) ||
+          (plantName && plantName !== "Focal plant" ? plantName : null);
+        if (!plant) {
+          const lanes = await fetchProjectLanes(projectId, user);
+          plant = String(
+            lanes.inbound[0]?.plant_name ?? lanes.outbound[0]?.plant_name ?? "",
+          ) || null;
+        }
+        if (!plant) throw new Error("could not resolve the project's plant name");
+        const { data, error: edgeErr } = await supabase.functions.invoke("ingest-inbound-logistics", {
+          body: {
+            rows: [{
+              project_id: projectId,
+              plant_name: plant,
+              supplier_id: supplierId,
+              material_id: materialId,
+              volume: null,
+              time_unit: null,
+              lead_time: null,
+              unit_price: null,
+            }],
+            userId: user.id,
+            userEmail: user.email,
+          },
+        });
+        if (edgeErr) {
+          // FunctionsHttpError hides the response body — surface the real
+          // error message the edge function returned.
+          let detail = errMsg(edgeErr, "edge function failed");
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const body = await (edgeErr as any).context?.json?.();
+            if (body?.error) detail = String(body.error);
+          } catch { /* keep generic message */ }
+          throw new Error(detail);
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((data as any)?.success === false) {
+          throw new Error(String((data as { error?: string })?.error ?? "upload failed"));
+        }
+        await sb.rpc("combine_project_into_supply_chain", {
+          p_project_id: projectId,
+          p_user_id: user.id,
+          p_user_email: user.email,
+        });
+        toast.success(`Assigned ${supplierId} to ${materialId} via the upload pipeline. Fill in its price/lead time in the grid.`);
+        reloadRows();
+      } catch (fallbackErr) {
+        const msg = (e: unknown) => (e as { message?: string })?.message ?? String(e);
+        toast.error(`Failed to assign supplier: ${msg(rpcErr)} · fallback: ${msg(fallbackErr)}`);
+      }
+    } finally {
+      setAssigning(null);
+    }
+  };
+
   const derivedValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined => {
     if (!col.master) return undefined;
     const id = String(r[col.master.idFrom] ?? "");
@@ -521,7 +630,7 @@ export function StagePolicyTable({
     } catch (e) {
       // Surface RPC failures (e.g. bulk_upsert_* missing in this DB) instead
       // of swallowing them — the click handler has no other catch.
-      toast.error(e instanceof Error ? e.message : "Failed to save changes");
+      toast.error(errMsg(e, "Failed to save changes"));
       return;
     }
     setDrafts({});
@@ -546,7 +655,7 @@ export function StagePolicyTable({
               }
               toast.success("Version saved — runs can now bind to this state.");
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Failed to save version");
+              toast.error(errMsg(e, "Failed to save version"));
             }
           })();
         },
@@ -582,7 +691,7 @@ export function StagePolicyTable({
       setDrafts({});
       toast.success(`Removed ${stageOverrides.length} saved override(s) — showing project data + defaults.`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to reset overrides");
+      toast.error(errMsg(e, "Failed to reset overrides"));
     } finally {
       setResetting(false);
       setConfirmResetAll(false);
@@ -1048,13 +1157,82 @@ export function StagePolicyTable({
                                 title="Row has saved overrides"
                               />
                             )}
-                            <span className="truncate">{String(r[c.id] ?? "")}</span>
+                            {c.id === "supplier_id" && r.__needs_supplier ? (
+                              newSupplierFor === rowKey ? (
+                                // Typing a brand-new supplier id: Enter confirms,
+                                // Escape cancels.
+                                <Input
+                                  autoFocus
+                                  value={newSupplierId}
+                                  placeholder="new supplier id…"
+                                  className="h-6 text-[11px] px-2 border-destructive/40"
+                                  disabled={assigning === String(r.material_id)}
+                                  onChange={(e) => setNewSupplierId(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      setNewSupplierFor(null);
+                                      setNewSupplierId("");
+                                    }
+                                    if (e.key === "Enter") {
+                                      const id = newSupplierId.trim();
+                                      if (!id || id.startsWith("(")) {
+                                        toast.warning("Enter a valid supplier id.");
+                                        return;
+                                      }
+                                      setNewSupplierFor(null);
+                                      setNewSupplierId("");
+                                      void assignSupplier(String(r.material_id), id);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    setNewSupplierFor(null);
+                                    setNewSupplierId("");
+                                  }}
+                                />
+                              ) : (
+                                // Unassigned material: pick (or create) a supplier —
+                                // creates the sourcing lane.
+                                <Select
+                                  disabled={assigning === String(r.material_id)}
+                                  onValueChange={(v) => {
+                                    if (v === "__new__") {
+                                      setNewSupplierFor(rowKey);
+                                      setNewSupplierId("");
+                                      return;
+                                    }
+                                    void assignSupplier(String(r.material_id), v);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-6 w-full text-[11px] border-destructive/40 bg-destructive/5 px-2">
+                                    <SelectValue
+                                      placeholder={
+                                        assigning === String(r.material_id)
+                                          ? "Assigning…"
+                                          : "assign supplier…"
+                                      }
+                                    />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__new__" className="text-xs font-medium">
+                                      + New supplier…
+                                    </SelectItem>
+                                    {knownSuppliers.map((s) => (
+                                      <SelectItem key={s} value={s} className="text-xs">
+                                        {s}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )
+                            ) : (
+                              <span className="truncate">{String(r[c.id] ?? "")}</span>
+                            )}
                           </span>
                           {/* material-level required actions (red) */}
                           {i === 0 && r.__needs_supplier && (
                             <span
                               className="ml-1.5 inline-block rounded-sm bg-destructive/15 text-destructive px-1 text-[9px] align-middle"
-                              title="This material has no supplier in the project data — assign one."
+                              title="This material has no supplier in the project data — assign one in the Supplier column."
                             >
                               needs supplier
                             </span>

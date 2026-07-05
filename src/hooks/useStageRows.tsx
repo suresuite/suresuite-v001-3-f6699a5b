@@ -37,6 +37,8 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
   const [rows, setRows] = useState<StageRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [fallback, setFallback] = useState<boolean>(false);
+  // Bumped by reload() to refetch after a write (e.g. assigning a supplier).
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     if (!projectId || !user || stage === "run_validate") {
@@ -534,7 +536,9 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
     return () => {
       cancelled = true;
     };
-  }, [projectId, plantName, stage, user]);
+  }, [projectId, plantName, stage, user, tick]);
 
-  return { rows, loading, fallback };
+  const reload = () => setTick((t) => t + 1);
+
+  return { rows, loading, fallback, reload };
 }
