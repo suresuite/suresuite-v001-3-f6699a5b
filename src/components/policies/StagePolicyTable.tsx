@@ -498,6 +498,35 @@ export function StagePolicyTable({
   const [confirmPrefill, setConfirmPrefill] = useState(false);
   const [applying, setApplying] = useState(false);
 
+  // Bulk reset: delete every saved override targeting a row in this stage.
+  // Clears stale values frozen by the old auto-seed (e.g. 0-prices) so the
+  // grid shows pure project data + bundle defaults again.
+  const [confirmResetAll, setConfirmResetAll] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const stageOverrides = useMemo(() => {
+    const keys = new Set(dataRows.map((r) => String(r.key)));
+    return overrides.filter((o) => keys.has(o.target_key));
+  }, [overrides, dataRows]);
+  const resetAllOverrides = async () => {
+    if (!deleteOverride || stageOverrides.length === 0) {
+      setConfirmResetAll(false);
+      return;
+    }
+    setResetting(true);
+    try {
+      for (const o of stageOverrides) {
+        await deleteOverride(spec.scope, o.target_key, o.family);
+      }
+      setDrafts({});
+      toast.success(`Removed ${stageOverrides.length} saved override(s) — showing project data + defaults.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reset overrides");
+    } finally {
+      setResetting(false);
+      setConfirmResetAll(false);
+    }
+  };
+
   // Whether any row has at least one field backed by real uploaded data.
   const hasRealProjectData = useMemo(
     () => dataRows.some((r) => Object.keys((r as any).__from_data ?? {}).length > 0),
@@ -757,6 +786,18 @@ export function StagePolicyTable({
         >
           Apply prefill
         </Button>
+        {deleteOverride && stageOverrides.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            disabled={resetting}
+            onClick={() => setConfirmResetAll(true)}
+            title="Delete every saved override in this stage — the grid falls back to project data + defaults"
+          >
+            Reset overrides ({stageOverrides.length})
+          </Button>
+        )}
         <Button size="sm" className="h-8" disabled={dirtyKeys.length === 0} onClick={saveAll}>
           Save changes
         </Button>
@@ -1152,6 +1193,32 @@ export function StagePolicyTable({
               disabled={applying}
             >
               {applying ? "Applying…" : "Apply prefill"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmResetAll} onOpenChange={setConfirmResetAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset all saved overrides in this stage?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This deletes {stageOverrides.length} saved override(s) for the rows in this stage.
+              The grid falls back to your uploaded project data and the bundle defaults — use it
+              to clear stale values (e.g. zeros frozen by an earlier auto-prefill). Uploaded
+              data and item masters are not touched.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void resetAllOverrides();
+              }}
+              disabled={resetting}
+            >
+              {resetting ? "Resetting…" : "Reset overrides"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
