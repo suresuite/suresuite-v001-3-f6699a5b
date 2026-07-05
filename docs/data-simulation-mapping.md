@@ -158,7 +158,27 @@ KPI keys (the `ScenarioResult → DB` contract, in `scsim_bridge.py`): `fill_rat
 
 ---
 
-## 8. Extending
+## 8. Frontend rendering of this contract (live)
+
+The /policies UI renders the §4 priority chains live, so a planner never has to re-enter
+economics that already exist in the uploaded logistics:
+
+- **`src/lib/policies/effectiveEconomics.ts`** is the frontend encoding of the §4 reducers
+  (cheapest inbound `unit_price` for material cost; demand-weighted outbound `unit_price` for
+  product price; Σ weekly outbound volume for demand). It must change in lockstep with
+  `from_project_data` — it ports `_UNIT_DAYS` and the weight semantics verbatim.
+- **Item Master editor** shows the derived value as a `≈` placeholder with a provenance badge
+  ("from inbound data" / "from outbound data") when the master field is NULL; typing a value is
+  the master override. The DB stays NULL for derived fields, so re-uploads refresh them.
+- **Verification** (`src/lib/policies/verification.ts`) grades against the same module: a field
+  resolving via a logistics fallback is `info`, resolving to a meaningless constant is `block`.
+- **Data map tab** (`src/lib/policies/dataMap.ts` + `DataMapGrid`) lists every column of the six
+  worker-read datasets, its engine destination, and its live status (used / fallback-active /
+  default-applied / unused) so no uploaded field is silently dropped.
+- The sell-price COALESCE view created in `20260614000001_item_master.sql` is **not** a consumer
+  of this feature; the frontend computes from raw lanes. Don't add a second SQL consumer.
+
+## 9. Extending
 
 - New stored field that drives the sim → add it to the relevant master table, to `ProjectData`,
   and to a rule in §4 + `from_project_data`; add a `MappingWarning` for its fallback; cover it in

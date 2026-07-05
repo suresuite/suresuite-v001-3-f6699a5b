@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Layers, Compass } from "lucide-react";
+import { Layers, Compass, Database } from "lucide-react";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjects } from "@/hooks/useProjects";
 import { usePolicies } from "@/hooks/usePolicies";
@@ -14,6 +14,7 @@ import { StageRail } from "@/components/policies/StageRail";
 import { FocusedStage } from "@/components/policies/FocusedStage";
 import { GuidePanel } from "@/components/policies/GuidePanel";
 import { PolicyVersionBar } from "@/components/policies/PolicyVersionBar";
+import { DataMapGrid } from "@/components/policies/DataMapGrid";
 import { TimeUnitBar } from "@/components/policies/TimeUnitBar";
 import type { StageKey } from "@/lib/policies/stages";
 
@@ -63,7 +64,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
   const { ctx, hasData } = useProjectContext({ projectId, fulfillmentStrategy });
 
-  const [tab, setTab] = useState<"stages" | "guide">("stages");
+  const [tab, setTab] = useState<"stages" | "guide" | "datamap">("stages");
   const [activeStage, setActiveStage] = useState<StageKey>("supplier");
 
   return (
@@ -99,13 +100,16 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
           <div className="flex flex-col gap-6">
 
 
-            <Tabs value={tab} onValueChange={(v) => setTab(v as "stages" | "guide")}>
-              <TabsList className="grid grid-cols-2 w-full max-w-md">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "stages" | "guide" | "datamap")}>
+              <TabsList className="grid grid-cols-3 w-full max-w-lg">
                 <TabsTrigger value="stages" className="gap-1.5">
                   <Layers className="h-3.5 w-3.5" /> Stages
                 </TabsTrigger>
                 <TabsTrigger value="guide" className="gap-1.5">
                   <Compass className="h-3.5 w-3.5" /> Guide me
+                </TabsTrigger>
+                <TabsTrigger value="datamap" className="gap-1.5">
+                  <Database className="h-3.5 w-3.5" /> Data map
                 </TabsTrigger>
               </TabsList>
 
@@ -149,6 +153,10 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                 />
 
                 {loading && <p className="text-xs text-muted-foreground">Loading policies…</p>}
+              </TabsContent>
+
+              <TabsContent value="datamap" className="mt-6">
+                <DataMapGrid projectId={projectId} />
               </TabsContent>
 
               <TabsContent value="guide" className="mt-6">

@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  cheapestInboundCost,
+  demandWeightedSellPrice,
+  weeklyDemand,
+  type InboundArc,
+  type OutboundArc,
+} from "@/lib/policies/effectiveEconomics";
 
 // Item-master rows (supabase/migrations/20260614000001_item_master.sql).
 // The generated Supabase types are out of sync with the supply-chain schema,
@@ -58,6 +65,20 @@ const UPSERT_RPC: Record<ItemMasterTable, string> = {
 
 const SAVE_BATCH_SIZE = 100;
 
+/**
+ * Engine-fallback economics derived live from the uploaded logistics lanes
+ * (inbound/outbound unit_price) via effectiveEconomics.ts. NULL master fields
+ * with a derived value here are NOT "missing" — the engine resolves them.
+ */
+export interface DerivedEconomics {
+  /** materials.cost fallback: cheapest inbound unit_price per material. */
+  materialCost: Map<string, number>;
+  /** products.sell_price fallback: demand-weighted outbound unit_price. */
+  sellPrice: Map<string, number>;
+  /** products.demand_mean fallback: Σ weekly outbound volume. */
+  demandMean: Map<string, number>;
+}
+
 interface UseItemMastersResult {
   materials: MaterialRow[];
   products: ProductRow[];
@@ -65,6 +86,7 @@ interface UseItemMastersResult {
   loading: boolean;
   error: string | null;
   missingCounts: Record<ItemMasterTable, number>;
+  derived: DerivedEconomics;
   reload: () => Promise<void>;
   saveRows: (
     table: ItemMasterTable,
@@ -81,8 +103,31 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [inboundArcs, setInboundArcs] = useState<InboundArc[]>([]);
+  const [outboundArcs, setOutboundArcs] = useState<OutboundArc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Logistics lanes — the engine's price/demand fallback sources.
+  const loadLogistics = useCallback(async () => {
+    if (!projectId) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    const [inQ, outQ] = await Promise.all([
+      sb
+        .from("inbound_logistics")
+        .select("material_id,unit_price")
+        .eq("project_id", projectId)
+        .limit(10000),
+      sb
+        .from("outbound_logistics")
+        .select("product_id,unit_price,volume,time_unit")
+        .eq("project_id", projectId)
+        .limit(10000),
+    ]);
+    if (!inQ.error) setInboundArcs((inQ.data ?? []) as InboundArc[]);
+    if (!outQ.error) setOutboundArcs((outQ.data ?? []) as OutboundArc[]);
+  }, [projectId]);
 
   const loadTable = useCallback(
     async (table: ItemMasterTable) => {
@@ -119,9 +164,14 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
       p_project_id: projectId,
     });
     if (ensureErr) console.error("ensure_item_masters failed", ensureErr);
-    await Promise.all([loadTable("materials"), loadTable("products"), loadTable("suppliers")]);
+    await Promise.all([
+      loadTable("materials"),
+      loadTable("products"),
+      loadTable("suppliers"),
+      loadLogistics(),
+    ]);
     setLoading(false);
-  }, [projectId, loadTable]);
+  }, [projectId, loadTable, loadLogistics]);
 
   useEffect(() => {
     void reload();
@@ -139,11 +189,19 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
         () => void loadTable(table),
       );
     });
+    // Logistics re-uploads change the derived (fallback) economics too.
+    (["inbound_logistics", "outbound_logistics"] as const).forEach((table) => {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table, filter: `project_id=eq.${projectId}` },
+        () => void loadLogistics(),
+      );
+    });
     channel.subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [projectId, loadTable]);
+  }, [projectId, loadTable, loadLogistics]);
 
   const saveRows = useCallback(
     async (table: ItemMasterTable, rows: Array<MaterialRow | ProductRow | SupplierRow>) => {
@@ -166,15 +224,36 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     [projectId, loadTable],
   );
 
+  const derived: DerivedEconomics = useMemo(
+    () => ({
+      materialCost: cheapestInboundCost(inboundArcs),
+      sellPrice: demandWeightedSellPrice(outboundArcs),
+      demandMean: weeklyDemand(outboundArcs),
+    }),
+    [inboundArcs, outboundArcs],
+  );
+
+  // A field is "missing" only when the master is NULL *and* the engine has no
+  // logistics fallback for it — mirroring verification.ts's warn/block split.
+  const derivedFor = (table: ItemMasterTable, field: string, id: string): boolean => {
+    if (table === "materials" && field === "cost") return derived.materialCost.has(id);
+    if (table === "products" && field === "sell_price") return derived.sellPrice.has(id);
+    if (table === "products" && field === "demand_mean") return (derived.demandMean.get(id) ?? 0) > 0;
+    return false;
+  };
   const missingCounts: Record<ItemMasterTable, number> = {
     materials: materials.filter((r) =>
-      REQUIRED_FIELDS.materials.some((f) => r[f as keyof MaterialRow] == null),
+      REQUIRED_FIELDS.materials.some(
+        (f) => r[f as keyof MaterialRow] == null && !derivedFor("materials", f, r.material_id),
+      ),
     ).length,
     products: products.filter((r) =>
-      REQUIRED_FIELDS.products.some((f) => r[f as keyof ProductRow] == null),
+      REQUIRED_FIELDS.products.some(
+        (f) => r[f as keyof ProductRow] == null && !derivedFor("products", f, r.product_id),
+      ),
     ).length,
     suppliers: 0,
   };
 
-  return { materials, products, suppliers, loading, error, missingCounts, reload, saveRows };
+  return { materials, products, suppliers, loading, error, missingCounts, derived, reload, saveRows };
 }
