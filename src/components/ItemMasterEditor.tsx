@@ -17,11 +17,14 @@ import { Loader2, Save, X } from "lucide-react";
 import {
   REQUIRED_FIELDS,
   useItemMasters,
+  type DerivedEconomics,
   type ItemMasterTable,
   type MaterialRow,
   type ProductRow,
   type SupplierRow,
 } from "@/hooks/useItemMasters";
+import { ProvenanceBadge } from "@/components/policies/ProvenanceBadge";
+import type { Provenance } from "@/lib/policies/effectiveEconomics";
 
 // Enum options restricted to what the scsim engine accepts
 // (scsim/scsim/io/project_map.py). `ato` parses but hard-errors at compile,
@@ -98,8 +101,32 @@ interface ItemMasterEditorProps {
  * Draft-then-save pattern after StagePolicyTable: edits stay local until
  * "Save changes" bulk-upserts the dirty rows via the item-master RPCs.
  */
+// Which derived (engine-fallback) value backs each nullable master field.
+const derivedLookup = (
+  derived: DerivedEconomics,
+  table: ItemMasterTable,
+  field: string,
+  rowId: string,
+): { value: number; source: Provenance } | undefined => {
+  if (table === "materials" && field === "cost") {
+    const v = derived.materialCost.get(rowId);
+    return v === undefined ? undefined : { value: v, source: "inbound" };
+  }
+  if (table === "products" && field === "sell_price") {
+    const v = derived.sellPrice.get(rowId);
+    return v === undefined ? undefined : { value: v, source: "outbound" };
+  }
+  if (table === "products" && field === "demand_mean") {
+    const v = derived.demandMean.get(rowId) ?? 0;
+    return v > 0 ? { value: v, source: "outbound" } : undefined;
+  }
+  return undefined;
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 const ItemMasterEditor = ({ projectId, onClose }: ItemMasterEditorProps) => {
-  const { materials, products, suppliers, loading, error, missingCounts, saveRows } =
+  const { materials, products, suppliers, loading, error, missingCounts, derived, saveRows } =
     useItemMasters(projectId);
   const [activeTab, setActiveTab] = useState<ItemMasterTable>("materials");
   // drafts[table] = { [rowId]: { [field]: raw input value } }
@@ -244,6 +271,13 @@ const ItemMasterEditor = ({ projectId, onClose }: ItemMasterEditorProps) => {
                         </TableCell>
                       );
                     }
+                    const fallback =
+                      c.kind === "number"
+                        ? derivedLookup(derived, table, c.field, rowId)
+                        : undefined;
+                    // Truly missing = required, empty, and no logistics fallback
+                    // the engine could resolve it from.
+                    const trulyMissing = missing && !fallback;
                     return (
                       <TableCell key={c.field} className="min-w-[7rem]">
                         <Input
@@ -251,10 +285,22 @@ const ItemMasterEditor = ({ projectId, onClose }: ItemMasterEditorProps) => {
                           min={c.kind === "number" ? 0 : undefined}
                           step={c.kind === "number" ? "any" : undefined}
                           value={value}
-                          placeholder={missing ? "required" : ""}
-                          className={`h-8 text-xs ${missing ? "border-destructive" : ""}`}
+                          placeholder={
+                            value === "" && fallback
+                              ? `≈ ${round2(fallback.value)}`
+                              : trulyMissing
+                              ? "required"
+                              : ""
+                          }
+                          className={`h-8 text-xs ${trulyMissing ? "border-destructive" : ""}`}
                           onChange={(e) => setDraft(table, rowId, c.field, e.target.value)}
                         />
+                        {fallback && (
+                          <ProvenanceBadge
+                            className="mt-0.5"
+                            source={value === "" ? fallback.source : "master"}
+                          />
+                        )}
                       </TableCell>
                     );
                   })}
@@ -273,8 +319,10 @@ const ItemMasterEditor = ({ projectId, onClose }: ItemMasterEditorProps) => {
         <div>
           <CardTitle className="text-base">Item master — simulation economics</CardTitle>
           <CardDescription>
-            Costs, prices, capacities and demand parameters the simulation engine reads. Fields
-            marked * fall back to engine defaults (with mapping warnings) when left empty.
+            Costs, prices, capacities and demand parameters the simulation engine reads. Empty
+            fields showing ≈ values resolve automatically from your uploaded inbound/outbound
+            unit prices — type a value only to override. Fields marked * with no fallback would
+            hit a meaningless engine default.
           </CardDescription>
         </div>
         {onClose && (

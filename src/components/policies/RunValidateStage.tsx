@@ -264,6 +264,7 @@ export function RunValidateStage({
       timeUnit: timeUnit ?? null,
       materials: itemMasters.materials,
       products: itemMasters.products,
+      derived: itemMasters.derived,
     });
     setFindings(f);
     setVerifiedAt(new Date());

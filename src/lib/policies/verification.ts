@@ -3,7 +3,7 @@ import type { OverrideRow } from "./resolve";
 import { effectivePolicy } from "./resolve";
 import type { StageKey } from "./stages";
 import type { StageRow } from "@/hooks/useStageRows";
-import type { MaterialRow, ProductRow } from "@/hooks/useItemMasters";
+import type { DerivedEconomics, MaterialRow, ProductRow } from "@/hooks/useItemMasters";
 
 export type Severity = "block" | "warn" | "info";
 
@@ -33,6 +33,14 @@ interface VerifyInput {
    */
   materials?: MaterialRow[];
   products?: ProductRow[];
+  /**
+   * Engine-fallback economics computed from the raw logistics lanes with the
+   * exact project_map.py reducers (effectiveEconomics.ts, exposed by
+   * useItemMasters). When provided, the fallback estimates in the findings
+   * match what the engine will actually use. When omitted, coarser per-row
+   * stage-table values are used instead.
+   */
+  derived?: DerivedEconomics;
 }
 
 const num = (v: unknown): number => {
@@ -65,7 +73,7 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   const {
     defaults, overrides,
     supplierRows, plantRows, customerRows, timeUnit,
-    materials, products,
+    materials, products, derived,
   } = input;
 
   if (timeUnit === null) {
@@ -92,11 +100,15 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   const primariesByMat = new Map<string, number>();
   const materialsMissingSupplier = new Set<string>();
   // Per-material inbound price — the engine's fallback for materials.cost.
+  // The engine takes the CHEAPEST supplier price (project_map.py:294), so the
+  // stage-row estimate mirrors that with min, not max. Superseded by
+  // `derived.materialCost` (exact raw-lane computation) when available.
   const inboundPriceByMat = new Map<string, number>();
   for (const r of supplierRows) {
     const mat = String(r.material_id ?? "");
-    if (mat) {
-      inboundPriceByMat.set(mat, Math.max(inboundPriceByMat.get(mat) ?? 0, num((r as Record<string, unknown>).material_price)));
+    const p = num((r as Record<string, unknown>).material_price);
+    if (mat && p > 0) {
+      inboundPriceByMat.set(mat, Math.min(inboundPriceByMat.get(mat) ?? p, p));
     }
     if ((r as Record<string, unknown>).__needs_supplier || r.supplier_id === "(unassigned supplier)") {
       if (mat) materialsMissingSupplier.add(mat);
@@ -140,16 +152,25 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
 
   // ---------- Customers: fulfillment topology ----------
   // Per-product outbound price + volume — the engine's fallbacks for
-  // products.sell_price and products.demand_mean respectively.
-  const outboundPriceByProd = new Map<string, number>();
+  // products.sell_price and products.demand_mean respectively. The engine
+  // uses a DEMAND-WEIGHTED average price (project_map.py:315-318), mirrored
+  // here from stage rows; superseded by `derived.sellPrice` when available.
+  const outboundPriceNum = new Map<string, number>();
+  const outboundPriceDen = new Map<string, number>();
   const outboundVolByProd = new Map<string, number>();
   const primariesByCP = new Map<string, number>();
   const cpSeen = new Set<string>();
   for (const r of customerRows) {
     const prod = String(r.product_id ?? "");
     if (prod) {
-      outboundPriceByProd.set(prod, Math.max(outboundPriceByProd.get(prod) ?? 0, num((r as Record<string, unknown>).price)));
-      outboundVolByProd.set(prod, (outboundVolByProd.get(prod) ?? 0) + num((r as Record<string, unknown>).mean_per_day));
+      const price = num((r as Record<string, unknown>).price);
+      const vol = num((r as Record<string, unknown>).mean_per_day);
+      if (price > 0) {
+        const wgt = Math.max(vol, 1e-9);
+        outboundPriceNum.set(prod, (outboundPriceNum.get(prod) ?? 0) + price * wgt);
+        outboundPriceDen.set(prod, (outboundPriceDen.get(prod) ?? 0) + wgt);
+      }
+      outboundVolByProd.set(prod, (outboundVolByProd.get(prod) ?? 0) + vol);
     }
     const eff = effectivePolicy(defaults, overrides, "node", String(r.key));
     const cp = `${r.customer_id}::${r.product_id}`;
@@ -178,13 +199,13 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   for (const m of materials ?? []) {
     if (num(m.cost) > 0) continue;
     const mid = String(m.material_id);
-    const fb = inboundPriceByMat.get(mid) ?? 0;
+    const fb = derived?.materialCost.get(mid) ?? inboundPriceByMat.get(mid) ?? 0;
     out.push(
       fb > 0
         ? {
-            id: `im-cost-${mid}`, severity: "warn", stage: "supplier", rowKey: mid, field: "cost",
-            message: `Material "${mid}" has no master cost — the engine will use its inbound price (≈${round2(fb)}).`,
-            hint: "Set a cost in the Item Master editor to make supply cost explicit.",
+            id: `im-cost-${mid}`, severity: "info", stage: "supplier", rowKey: mid, field: "cost",
+            message: `Material "${mid}" has no master cost — the engine will use its cheapest inbound price (≈${round2(fb)}).`,
+            hint: "Set a cost in the Item Master editor only if you want to override the uploaded inbound price.",
           }
         : {
             id: `im-cost-${mid}`, severity: "block", stage: "supplier", rowKey: mid, field: "cost",
@@ -199,13 +220,16 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   for (const p of products ?? []) {
     const pid = String(p.product_id);
     if (num(p.sell_price) <= 0) {
-      const fb = outboundPriceByProd.get(pid) ?? 0;
+      const legacyDen = outboundPriceDen.get(pid) ?? 0;
+      const fb =
+        derived?.sellPrice.get(pid) ??
+        (legacyDen > 0 ? (outboundPriceNum.get(pid) ?? 0) / legacyDen : 0);
       out.push(
         fb > 0
           ? {
-              id: `im-price-${pid}`, severity: "warn", stage: "plant", rowKey: pid, field: "sell_price",
-              message: `Product "${pid}" has no master sell price — the engine will use its outbound price (≈${round2(fb)}).`,
-              hint: "Set a sell price in the Item Master editor to make revenue explicit.",
+              id: `im-price-${pid}`, severity: "info", stage: "plant", rowKey: pid, field: "sell_price",
+              message: `Product "${pid}" has no master sell price — the engine will use its demand-weighted outbound price (≈${round2(fb)}).`,
+              hint: "Set a sell price in the Item Master editor only if you want to override the uploaded outbound price.",
             }
           : {
               id: `im-price-${pid}`, severity: "block", stage: "plant", rowKey: pid, field: "sell_price",
@@ -215,11 +239,11 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
       );
     }
     if (num(p.demand_mean) <= 0) {
-      const fb = outboundVolByProd.get(pid) ?? 0;
+      const fb = derived?.demandMean.get(pid) ?? outboundVolByProd.get(pid) ?? 0;
       out.push(
         fb > 0
           ? {
-              id: `im-demand-${pid}`, severity: "warn", stage: "plant", rowKey: pid, field: "demand_mean",
+              id: `im-demand-${pid}`, severity: "info", stage: "plant", rowKey: pid, field: "demand_mean",
               message: `Product "${pid}" has no master demand mean — the engine will derive demand from its outbound volume.`,
               hint: "Set a demand mean in the Item Master editor to control it directly.",
             }
