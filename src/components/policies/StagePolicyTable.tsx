@@ -28,6 +28,7 @@ import {
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
@@ -276,11 +277,21 @@ export function StagePolicyTable({
       // environment (same edge function the Data Manager uploads use), then a
       // combine so the supply-chain edge list picks the pair up.
       try {
+        // inbound_logistics.plant_name is NOT NULL — the prop can be empty on
+        // this page, so resolve the real plant from the project's own lanes.
+        let plant = plantName && plantName !== "Focal plant" ? plantName : null;
+        if (!plant) {
+          const lanes = await fetchProjectLanes(projectId, user);
+          plant = String(
+            lanes.inbound[0]?.plant_name ?? lanes.outbound[0]?.plant_name ?? "",
+          ) || null;
+        }
+        if (!plant) throw new Error("could not resolve the project's plant name");
         const { data, error: edgeErr } = await supabase.functions.invoke("ingest-inbound-logistics", {
           body: {
             rows: [{
               project_id: projectId,
-              plant_name: plantName ?? null,
+              plant_name: plant,
               supplier_id: supplierId,
               material_id: materialId,
               volume: null,
@@ -292,9 +303,20 @@ export function StagePolicyTable({
             userEmail: user.email,
           },
         });
+        if (edgeErr) {
+          // FunctionsHttpError hides the response body — surface the real
+          // error message the edge function returned.
+          let detail = errMsg(edgeErr, "edge function failed");
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const body = await (edgeErr as any).context?.json?.();
+            if (body?.error) detail = String(body.error);
+          } catch { /* keep generic message */ }
+          throw new Error(detail);
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (edgeErr || (data as any)?.success === false) {
-          throw edgeErr ?? new Error(String((data as { error?: string })?.error ?? "upload failed"));
+        if ((data as any)?.success === false) {
+          throw new Error(String((data as { error?: string })?.error ?? "upload failed"));
         }
         await sb.rpc("combine_project_into_supply_chain", {
           p_project_id: projectId,
