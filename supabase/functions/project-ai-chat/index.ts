@@ -74,6 +74,79 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
+    // Service-role client for bypassing RLS on internal logging tables (usage logs).
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    // --- AI usage logging helper (fire-and-forget; never throws) ---
+    async function logAiUsage(input: {
+      status: 'success' | 'error' | 'blocked';
+      modelCode?: string;
+      providerCode?: string;
+      promptChars?: number;
+      completionChars?: number;
+      latencyMs?: number;
+      errorCode?: string;
+    }) {
+      try {
+        // Rough token estimate: ~4 chars per token. Real usage figures come with
+        // Phase 2 (provider response parsing).
+        const promptTokens = Math.ceil((input.promptChars ?? 0) / 4);
+        const completionTokens = Math.ceil((input.completionChars ?? 0) / 4);
+        const totalTokens = promptTokens + completionTokens;
+
+        // Look up model + cost + user org
+        let modelId: string | null = null;
+        let inputCost = 0;
+        let outputCost = 0;
+        if (input.modelCode) {
+          const { data: m } = await supabaseAdmin
+            .from('ai_models')
+            .select('id,input_cost_per_1k,output_cost_per_1k')
+            .eq('code', input.modelCode)
+            .maybeSingle();
+          if (m) {
+            modelId = (m as any).id;
+            inputCost = Number((m as any).input_cost_per_1k) || 0;
+            outputCost = Number((m as any).output_cost_per_1k) || 0;
+          }
+        }
+        const costUsd =
+          (promptTokens / 1000) * inputCost + (completionTokens / 1000) * outputCost;
+
+        let orgId: string | null = null;
+        if (userId) {
+          const { data: u } = await supabaseAdmin
+            .from('approved_users')
+            .select('organization_id')
+            .eq('id', userId)
+            .maybeSingle();
+          orgId = (u as any)?.organization_id ?? null;
+        }
+
+        await supabaseAdmin.from('ai_usage_logs').insert({
+          user_id: userId ?? null,
+          org_id: orgId,
+          project_id: projectId ?? null,
+          model_id: modelId,
+          model_code: input.modelCode ?? null,
+          provider_code: input.providerCode ?? null,
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: totalTokens,
+          cost_usd: costUsd,
+          latency_ms: input.latencyMs ?? null,
+          status: input.status,
+          error_code: input.errorCode ?? null,
+        });
+      } catch (e) {
+        console.warn('[usage-log] failed:', e);
+      }
+    }
+
+
     // === Tool-calling chat mode (multi-provider: Gemini, OpenAI, DeepSeek) ===
     if (mode === 'tools') {
       try {
