@@ -29,6 +29,7 @@ import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type Policy
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
+import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import type { StageKey } from "@/lib/policies/stages";
 
@@ -41,6 +42,8 @@ interface Props {
   fulfillmentStrategy: FulfillmentStrategy;
   bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
   deleteOverride?: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
+  /** Save a policy version snapshot — offered after saving grid edits. */
+  saveSnapshot?: (label?: string) => Promise<string | null>;
   leftActions?: React.ReactNode;
 }
 
@@ -188,6 +191,7 @@ export function StagePolicyTable({
   fulfillmentStrategy,
   bulkUpsertOverrides,
   deleteOverride,
+  saveSnapshot,
   leftActions,
 }: Props) {
   const spec = specFor(stageKey);
@@ -198,13 +202,15 @@ export function StagePolicyTable({
   // Item masters back the economics columns (ColSpec.master): the grid shows
   // and edits materials.cost / products.sell_price / production_capacity /
   // demand_mean directly, with the engine's derived fallback (≈) when unset.
-  const { materials, products, derived, saveRows } = useItemMasters(projectId);
+  const { materials, products, suppliers, derived, saveRows } = useItemMasters(projectId);
+  const { snapshot: snapshotDataset } = useDatasetVersion(projectId);
   const masterRowById = useMemo(
     () => ({
       materials: new Map(materials.map((m) => [m.material_id, m as unknown as Record<string, unknown>])),
       products: new Map(products.map((p) => [p.product_id, p as unknown as Record<string, unknown>])),
+      suppliers: new Map(suppliers.map((s) => [s.supplier_id, s as unknown as Record<string, unknown>])),
     }),
-    [materials, products],
+    [materials, products, suppliers],
   );
   const masterColByField = useMemo(() => {
     const m = new Map<string, ColSpec>();
@@ -489,7 +495,33 @@ export function StagePolicyTable({
     }
     if (toUpsert.length > 0) await bulkUpsertOverrides(toUpsert);
     setDrafts({});
-    toast.success(`Saved ${dirtyKeys.length} row(s)`);
+    // Offer to capture the edit as a version right away: master edits are
+    // dataset state (dataset_versions), override edits are policy state
+    // (policy version snapshot) — runs bind to both.
+    const savedMasters = masterRowCount > 0;
+    const savedOverrides = toUpsert.length > 0;
+    toast.success(`Saved ${dirtyKeys.length} row(s)`, {
+      action: {
+        label: "Save version",
+        onClick: () => {
+          void (async () => {
+            try {
+              if (savedMasters) await snapshotDataset();
+              if (savedOverrides && saveSnapshot) {
+                await saveSnapshot(`Grid edits — ${new Date().toLocaleString()}`);
+              } else if (savedMasters && !savedOverrides && saveSnapshot) {
+                // Masters changed only: still offer a policy version so the
+                // run picker has a labeled point-in-time to bind to.
+                await saveSnapshot(`Data edits — ${new Date().toLocaleString()}`);
+              }
+              toast.success("Version saved — runs can now bind to this state.");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Failed to save version");
+            }
+          })();
+        },
+      },
+    });
   };
 
   const revertAll = () => setDrafts({});

@@ -26,7 +26,7 @@ export interface ColSpec {
    * from the masters first, with a logistics-derived fallback
    * (docs/data-simulation-mapping.md §4).
    */
-  master?: { table: "materials" | "products"; field: string; idFrom: string };
+  master?: { table: "materials" | "products" | "suppliers"; field: string; idFrom: string };
 }
 
 export interface StageTableSpec {
@@ -76,7 +76,17 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("material_cost", "sourcing", {
         master: { table: "materials", field: "cost", idFrom: "material_id" },
       }),
-      col("supplier_capacity_per_day", "sourcing", { defaultWhenMissing: 999_999_999 }),
+      col("material_moq", "sourcing", {
+        master: { table: "materials", field: "moq", idFrom: "material_id" },
+      }),
+      // Engine-real supplier attributes (suppliers master): finite capacity
+      // enables partial capacity-reduction disruptions; empty = unlimited.
+      col("capacity_per_week", "sourcing", {
+        master: { table: "suppliers", field: "capacity_per_week", idFrom: "supplier_id" },
+      }),
+      col("reliability_score", "sourcing", {
+        master: { table: "suppliers", field: "reliability_score", idFrom: "supplier_id" },
+      }),
 
       col("type", "inventory"),
       col("safety_stock_days", "inventory", { defaultWhenMissing: 0 }),
