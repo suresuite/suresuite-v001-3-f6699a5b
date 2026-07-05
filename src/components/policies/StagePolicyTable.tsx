@@ -30,6 +30,7 @@ import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
+import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
@@ -208,6 +209,7 @@ export function StagePolicyTable({
   const { rows: dataRows, loading, fallback, reload: reloadRows } = useStageRows({ projectId, plantName, stage: stageKey });
   const { unit, adaptLabel } = useTimeUnit(projectId);
   const { user } = useAuth();
+  const { selectedProject } = useGlobalProject();
 
   // Item masters back the economics columns (ColSpec.master): the grid shows
   // and edits materials.cost / products.sell_price / production_capacity /
@@ -277,9 +279,13 @@ export function StagePolicyTable({
       // environment (same edge function the Data Manager uploads use), then a
       // combine so the supply-chain edge list picks the pair up.
       try {
-        // inbound_logistics.plant_name is NOT NULL — the prop can be empty on
-        // this page, so resolve the real plant from the project's own lanes.
-        let plant = plantName && plantName !== "Focal plant" ? plantName : null;
+        // The ingest edge function validates plant_name against the PROJECT
+        // record (projects.plant_name) — which can differ from the plant name
+        // stamped on older data rows. Prefer the project's registered plant,
+        // then the page prop, then any existing lane as last resort.
+        let plant =
+          (selectedProject?.id === projectId ? selectedProject?.plant_name : null) ||
+          (plantName && plantName !== "Focal plant" ? plantName : null);
         if (!plant) {
           const lanes = await fetchProjectLanes(projectId, user);
           plant = String(
