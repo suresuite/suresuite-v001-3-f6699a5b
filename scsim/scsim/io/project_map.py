@@ -195,6 +195,67 @@ class MappingResult:
         return [w.as_dict() for w in self.warnings]
 
 
+# ── Base data requirements (§8.1) ─────────────────────────────────────────────
+# The entity fields the always-on engine mechanics read, with the exact
+# fallback chains this module applies. Policy-specific requirements live on
+# each plugin (PolicyPlugin.data_requirements); these are the world-model
+# inputs every run consumes regardless of the policy set. When §4.4 promotes
+# the mechanics into named default policies (P-C.4, P-P.0, …), these entries
+# migrate onto those plugins. Exported to the frontend/edge validators via
+# registry_export.build_registry()["base_data_requirements"].
+
+def base_data_requirements() -> tuple:
+    # Imported lazily: scsim.policies pulls in scsim.core, which imports this
+    # module's package — a top-level import here would be circular.
+    from scsim.policies.base import DataRequirement
+
+    return (
+        DataRequirement(
+            field="materials.cost", level="required",
+            reason="Inventory valuation and holding cost — the terminal default of "
+                   "1.0 makes every cost KPI meaningless.",
+            fallback="cheapest inbound unit_price across the material's suppliers",
+        ),
+        DataRequirement(
+            field="products.sell_price", level="required",
+            reason="Revenue and lost-sales valuation — the terminal default of 1.0 "
+                   "makes revenue KPIs meaningless.",
+            fallback="demand-weighted average outbound unit_price",
+        ),
+        DataRequirement(
+            field="products.demand_mean", level="required",
+            reason="Demand generation — with neither source the product is never "
+                   "ordered (zero demand).",
+            fallback="Σ weekly outbound volume",
+        ),
+        DataRequirement(
+            field="products.production_capacity", level="recommended",
+            reason="With no capacity source the engine defaults to max(2·demand, "
+                   "1000), so plant capacity never binds.",
+            fallback="production policy capacity_units_per_day × 7 × utilization",
+        ),
+        DataRequirement(
+            field="inbound_logistics.unit_price", level="recommended",
+            reason="Purchase cost per sourcing arc — a missing price defaults to "
+                   "1.0 and distorts procurement spend.",
+            fallback=None,
+        ),
+        DataRequirement(
+            field="inbound_logistics.lead_time", level="recommended",
+            reason="Supplier lead time per sourcing arc — missing values default "
+                   "to 2 weeks.",
+            fallback=None,
+        ),
+        DataRequirement(
+            field="suppliers.capacity_per_week", level="defaulted",
+            reason="Empty means unlimited (a valid modeling choice) — but partial-"
+                   "magnitude supplier disruptions need a finite capacity to "
+                   "throttle, else they degrade to full outages.",
+            fallback="unlimited",
+        ),
+    )
+
+
 # ── Policy & demand helpers ───────────────────────────────────────────────────
 
 def _merged_policy(policies: dict, node_id: str, family: str) -> dict:

@@ -35,6 +35,7 @@ from scsim.core.phases import (
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
 from scsim.entities.scenario import Scenario
 from scsim.policies.base import (
+    DataRequirement,
     FeasibilityIssue,
     FeasibilityResult,
     PolicyParams,
@@ -87,6 +88,20 @@ class BackupSupplier(PolicyPlugin):
         "single-sourced: one missing material still blocks the product."
     )
     Params: ClassVar[type[PolicyParams]] = BackupSupplierParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="inbound_logistics.unit_price", level="recommended",
+            reason="The min_cost reroute selection rule compares supplier "
+                   "prices; missing prices default to 1.0.",
+            fallback=None,
+        ),
+        DataRequirement(
+            field="suppliers.reliability_score", level="defaulted",
+            reason="The reliability selection rule ranks backup sources by "
+                   "this score.",
+            fallback="1.0",
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

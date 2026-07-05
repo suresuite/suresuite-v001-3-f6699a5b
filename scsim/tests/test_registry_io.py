@@ -77,6 +77,50 @@ def test_param_schemas_carry_units():
     assert props["coverage_weeks"].get("scope") == "G/M"
 
 
+# ------------------------------------------------- data requirements (§8.1)
+
+# The dataset.column vocabulary of docs/data-simulation-mapping.md §4 — the
+# frontend (dataMap.ts) and the sim-command gate key their evaluators on it.
+_KNOWN_DATASETS = {
+    "materials", "products", "suppliers",
+    "inbound_logistics", "outbound_logistics", "bom_single_level",
+}
+_LEVELS = {"required", "recommended", "defaulted"}
+
+
+def test_registry_exports_data_requirements():
+    reg = build_registry()
+
+    # Base requirements: the always-on world-model economics with fallbacks.
+    base = {r["field"]: r for r in reg["base_data_requirements"]}
+    for field in ("materials.cost", "products.sell_price", "products.demand_mean"):
+        assert base[field]["level"] == "required", field
+        assert base[field]["fallback"], f"{field} must name its fallback chain"
+    assert base["products.production_capacity"]["level"] == "recommended"
+    assert base["suppliers.capacity_per_week"]["level"] == "defaulted"
+
+    # Per-policy requirements: the manifest's policy-conditional half.
+    by_id = {p["id"]: p for p in reg["policies"]}
+    p5 = {r["field"]: r for r in by_id["short_term_capacity"]["data_requirements"]}
+    assert p5["products.production_capacity"]["level"] == "required"
+    pc2 = {r["field"]: r for r in by_id["customer_allocation"]["data_requirements"]}
+    assert pc2["outbound_logistics.volume"]["level"] == "required"
+
+    # Vocabulary discipline: every declared field must parse as a known
+    # dataset.column reference with a valid level (else the generated
+    # validators cannot grade it).
+    all_reqs = list(reg["base_data_requirements"])
+    for pol in reg["policies"]:
+        all_reqs.extend(pol["data_requirements"])
+    assert all_reqs, "manifest must not be empty"
+    for r in all_reqs:
+        dataset, _, column = r["field"].partition(".")
+        assert dataset in _KNOWN_DATASETS, r["field"]
+        assert column, r["field"]
+        assert r["level"] in _LEVELS, r["field"]
+        assert r["reason"], f"{r['field']} missing reason"
+
+
 # --------------------------------------------------------------------- traces
 
 def test_trace_roundtrip(tmp_path):

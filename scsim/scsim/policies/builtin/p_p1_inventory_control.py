@@ -30,7 +30,7 @@ from scsim.core.phases import (
     PhaseId,
 )
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
-from scsim.policies.base import ModeStrip, PolicyParams, PolicyPlugin
+from scsim.policies.base import DataRequirement, ModeStrip, PolicyParams, PolicyPlugin
 from scsim.policies.registry import register_plugin
 
 
@@ -82,6 +82,18 @@ class InventoryControl(PolicyPlugin):
         "dedicated resilience."
     )
     Params: ClassVar[type[PolicyParams]] = InventoryControlParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="materials.moq", level="defaulted",
+            reason="Minimum order quantity rounds up PH-80 order releases.",
+            fallback="0 (no minimum)",
+        ),
+        DataRequirement(
+            field="materials.holding_cost_pct", level="defaulted",
+            reason="Holding cost rate prices the inventory this policy carries.",
+            fallback="policy inventory.holding_cost_pct, then 20%",
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

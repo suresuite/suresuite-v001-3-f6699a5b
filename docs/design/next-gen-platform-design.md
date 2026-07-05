@@ -496,6 +496,22 @@ The fix is a **contract, not a checklist**. Facet 5 of the policy interface (§6
 
 When the user selects policies for their bundles, the platform **compiles a required-data manifest** deterministically from the registry: the union of all `data_requirements` of all selected policies over all nodes in scope. Choosing `P-S.5 supplier_capacity_model = finite_queue` for a supplier makes that supplier's `capacity_per_week` a required input — the UI walks the user to it. This is the brief's "if policies need data, require the user to update it in the simulation model," enforced structurally.
 
+> **Implementation note (Phase A, delivered).** `data_requirements` is facet-5
+> metadata in the engine: `scsim/scsim/policies/base.py::DataRequirement`
+> (field in the `dataset.column` vocabulary of the mapping contract, level,
+> reason, fallback chain, optional condition), declared on the implemented
+> plugins, carried through `CatalogEntry`, and exported in the registry
+> payload. The always-on world-model inputs (economics, demand, capacity,
+> lead times) live as `base_data_requirements` next to the reducers that
+> consume them (`scsim/scsim/io/project_map.py::base_data_requirements`)
+> until §4.4 promotes those mechanics into named default policies, at which
+> point the entries migrate onto the promoted plugins. Contract-tested in
+> `scsim/tests/test_registry_io.py::test_registry_exports_data_requirements`.
+> Family configurations map to activated plugins pre-bundle via the same
+> activation rules as `project_map.py::_map_policies`; requirements whose
+> `condition` cannot be resolved client-side are graded one level softer
+> rather than over-blocking.
+
 ### 8.2 One validation service
 
 Three validation surfaces exist today and disagree (G6): `src/lib/policies/verification.ts` (client-side, checks fields the engine largely does not read), `get_project_dataset_status` (table presence only), and the engine's `MappingWarning`s (accurate, but delivered after dispatch). They are replaced by **one validation service driven by the same registry export** that generates the forms (§6.2):
@@ -506,6 +522,26 @@ Three validation surfaces exist today and disagree (G6): `src/lib/policies/verif
 - The engine's `MappingWarning` stream remains as a final tripwire — but a fully validated project produces zero of them (this is also engine-retirement gate E1, §3).
 
 Silent defaults become structurally impossible: any default the engine would apply is either declared `defaulted` in the manifest (visible pre-run) or is a validation failure.
+
+> **Implementation note (Phase A, delivered).** The manifest compiler is
+> `src/lib/policies/validationService.ts`, reading the generated registry
+> snapshot only (no hand-written per-policy rules). Its three §8.2 surfaces:
+> (a) the `/policies` run-&-validate stage — `verification.ts` keeps its
+> structural/topology checks and delegates all data-completeness grading to
+> the manifest; (b) the Data map grid gains a registry-driven "Demanded by"
+> column showing which policy demands each column at which level; (c) a
+> **pre-dispatch gate** in `sim-command`
+> (`supabase/functions/_shared/validationGate.ts`) grades the same manifest
+> server-side against the live tables — `required` gaps reject the run
+> (HTTP 422 with typed findings), `recommended` gaps reject unless the
+> caller acknowledged them (`payload.acknowledge_warnings`; the verification
+> stage sets it after displaying the findings, the Simulation Lab offers a
+> "Run anyway"). The gate also catches the scenario-conditional case of a
+> partial-magnitude supplier disruption without a finite
+> `suppliers.capacity_per_week`. The edge function reads a mirrored snapshot
+> (`supabase/functions/_shared/registry.generated.json`) written and
+> drift-checked by the same `gen_frontend_registry.py` CI gate, so the three
+> surfaces cannot disagree.
 
 ### 8.3 Data model evolution
 
@@ -610,6 +646,7 @@ AnyLogistix (ALX) is the reference commercial tool: network optimization (CPLEX-
 - **For practitioners**: the no-code promise ALX makes, kept more strictly — plus the guarantee that what they configured is what ran (registry law, §6.2) and that a rerun next year reproduces bit-identical results (three hashes + golden traces).
 - **For researchers**: an engine whose every interaction is a validated, published contract; CRN and conformal statistics as defaults; the ability to implement a paper's policy as a plugin and benchmark it against the built-ins in an afternoon.
 - **For the business**: criticality analyses that cost a fraction of exhaustive simulation (§11), and experimentation throughput that grows with the cache instead of with compute spend.
+- **For education**: SureSuite doubles as a teaching platform — students learn inventory, MRP, and resilience concepts by changing policies on a prepared model and observing KPIs move. The same properties that serve practitioners serve the classroom: every behavior is a named, visible policy (§4.4), presets explain *why* each value is set (A14), the required-data manifest (§8.1) stops novices from running underspecified models, and decision traces (facet 11) will let a student ask "why did the model do that?". Classroom-specific packaging (shared reference projects, sandbox copies) rides on the run cache (§9.2) and dataset versioning (§8.4) rather than requiring engine work.
 
 ### 10.3 Honest limitations
 

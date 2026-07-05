@@ -27,7 +27,7 @@ from scsim.core.phases import (
     PhaseId,
 )
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
-from scsim.policies.base import CostBreakdown, PolicyParams, PolicyPlugin
+from scsim.policies.base import CostBreakdown, DataRequirement, PolicyParams, PolicyPlugin
 from scsim.policies.registry import register_plugin
 
 # Plan §4.2 z-matrix defaults (service levels in %).
@@ -94,6 +94,14 @@ class SafetyStockMaterials(PolicyPlugin):
         "disruptions; depletes — beyond ~7–9 weeks expediting wins (run the crossover sweep)."
     )
     Params: ClassVar[type[PolicyParams]] = SafetyStockParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="products.demand_cv", level="recommended",
+            reason="Safety-stock sizing scales with demand variability; the "
+                   "default CV of 0.30 may badly misstate your buffers.",
+            fallback="scenario demand_model.cv, then 0.30",
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

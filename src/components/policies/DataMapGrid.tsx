@@ -8,6 +8,18 @@ import { CheckCircle2, CircleOff, Database, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DATA_MAP_CONTRACT, DATASET_LABEL, type DataMapDataset } from "@/lib/policies/dataMap";
 import { useDataMap, type DataMapStatus } from "@/hooks/useDataMap";
+import { requirementsByField } from "@/lib/policies/validationService";
+
+// §8.1 — which engine mechanics / catalog policies demand each column, from
+// the registry's data_requirements (static: independent of the current
+// policy selection; the verification stage grades the selected subset).
+const FIELD_DEMANDS = requirementsByField();
+
+const LEVEL_CLASS: Record<string, string> = {
+  required: "bg-destructive/10 text-destructive border-destructive/30",
+  recommended: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  defaulted: "bg-muted text-muted-foreground border-border",
+};
 
 const STATUS_META: Record<DataMapStatus, { label: string; className: string }> = {
   ok: { label: "used", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30" },
@@ -58,6 +70,7 @@ export function DataMapGrid({ projectId }: { projectId: string }) {
                     <TableHead className="text-xs min-w-[16rem]">Resolution chain</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">Status</TableHead>
                     <TableHead className="text-xs min-w-[14rem]">This project</TableHead>
+                    <TableHead className="whitespace-nowrap text-xs">Demanded by</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -85,6 +98,20 @@ export function DataMapGrid({ projectId }: { projectId: string }) {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {loading ? "…" : live.detail}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {(FIELD_DEMANDS.get(`${row.dataset}.${row.field}`) ?? []).map((d) => (
+                              <Badge
+                                key={`${d.policyRef}-${d.level}`}
+                                variant="outline"
+                                className={cn("h-5 text-[10px] whitespace-nowrap", LEVEL_CLASS[d.level])}
+                                title={`${d.policyName} — ${d.level}${d.condition ? ` (when ${d.condition})` : ""}`}
+                              >
+                                {d.policyRef} · {d.level}
+                              </Badge>
+                            ))}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

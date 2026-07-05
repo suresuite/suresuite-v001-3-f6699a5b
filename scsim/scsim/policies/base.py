@@ -43,6 +43,40 @@ class ModeStrip(BaseModel):
 
 
 @dataclass(frozen=True)
+class DataRequirement:
+    """Facet 5 of the policy interface — the parameter-requirement contract
+    (design blueprint §8.1): an entity field this policy needs from the
+    project dataset, declared machine-readably so the platform can compile
+    a required-data manifest from the registry instead of hand-writing
+    validation rules.
+
+    ``field`` uses the canonical ``dataset.column`` vocabulary of
+    ``docs/data-simulation-mapping.md`` §4 (mirrored by the frontend's
+    ``dataMap.ts``). ``level`` drives run behavior: ``required`` blocks
+    dispatch while the field is unresolvable, ``recommended`` warns and
+    needs acknowledgment, ``defaulted`` is an informational note.
+    ``fallback`` names the mapper's fallback chain when one exists
+    (project_map.py is authoritative); ``condition`` scopes the
+    requirement to a parameterization (e.g. ``"segmentation=abc_by_revenue"``).
+    """
+
+    field: str
+    level: str  # "required" | "recommended" | "defaulted"
+    reason: str
+    fallback: Optional[str] = None
+    condition: Optional[str] = None
+
+    def as_dict(self) -> dict:
+        return {
+            "field": self.field,
+            "level": self.level,
+            "reason": self.reason,
+            "fallback": self.fallback,
+            "condition": self.condition,
+        }
+
+
+@dataclass(frozen=True)
 class FeasibilityIssue:
     severity: str  # "error" | "warning"
     code: str
@@ -81,6 +115,8 @@ class PolicyPlugin(ABC):
     catalog_ref: ClassVar[str]                 # e.g. "P-P.1"
     summary: ClassVar[str]                     # one-paragraph context (docs)
     Params: ClassVar[type[PolicyParams]]
+    # Facet 5 (§8.1): entity fields the policy reads; () = params-only policy.
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = ()
 
     def __init__(self, params: PolicyParams):
         self.params = params

@@ -31,7 +31,7 @@ from scsim.core.phases import (
     PhaseId,
 )
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
-from scsim.policies.base import CostBreakdown, PolicyParams, PolicyPlugin
+from scsim.policies.base import CostBreakdown, DataRequirement, PolicyParams, PolicyPlugin
 from scsim.policies.registry import register_plugin
 
 
@@ -64,6 +64,15 @@ class ShortTermCapacity(PolicyPlugin):
         "binds — in material-constrained networks that is rare; check utilization first."
     )
     Params: ClassVar[type[PolicyParams]] = ShortTermCapacityParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="products.production_capacity", level="required",
+            reason="Overtime only bites when base capacity binds; the engine "
+                   "default max(2*demand, 1000) never binds, making this "
+                   "policy a silent no-op.",
+            fallback="production policy capacity_units_per_day x 7 x utilization",
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

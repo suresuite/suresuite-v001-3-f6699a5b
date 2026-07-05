@@ -38,7 +38,7 @@ from scsim.core.phases import (
     PhaseId,
 )
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
-from scsim.policies.base import PolicyParams, PolicyPlugin
+from scsim.policies.base import DataRequirement, PolicyParams, PolicyPlugin
 from scsim.policies.registry import register_plugin
 
 
@@ -86,6 +86,14 @@ class MaterialAllocation(PolicyPlugin):
         "with the shared-material index."
     )
     Params: ClassVar[type[PolicyParams]] = MaterialAllocationParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="products.sell_price", level="recommended",
+            reason="Revenue-weighted allocation objectives need real product "
+                   "prices to rank products.",
+            fallback="demand-weighted average outbound unit_price",
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

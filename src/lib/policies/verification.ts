@@ -3,19 +3,10 @@ import type { OverrideRow } from "./resolve";
 import { effectivePolicy } from "./resolve";
 import type { StageKey } from "./stages";
 import type { StageRow } from "@/hooks/useStageRows";
-import type { DerivedEconomics, MaterialRow, ProductRow } from "@/hooks/useItemMasters";
+import type { DerivedEconomics, MaterialRow, ProductRow, SupplierRow } from "@/hooks/useItemMasters";
+import { compileRequiredDataFindings, type Finding, type Severity } from "./validationService";
 
-export type Severity = "block" | "warn" | "info";
-
-export interface Finding {
-  id: string;
-  severity: Severity;
-  stage: StageKey;
-  rowKey?: string;
-  field?: string;
-  message: string;
-  hint?: string;
-}
+export type { Finding, Severity };
 
 interface VerifyInput {
   defaults: PolicyBundle;
@@ -27,53 +18,41 @@ interface VerifyInput {
   /** Optional — when omitted, the time-unit check is skipped. */
   timeUnit?: "day" | "week" | "month" | null;
   /**
-   * Item-master economics the engine actually reads (Phase A / G4 / §8.3).
-   * When omitted (e.g. the write RPCs haven't reached the DB yet) the
-   * item-master checks are skipped rather than producing false blockers.
+   * Item-master rows the engine actually reads (Phase A / G4 / §8.3). When
+   * omitted (e.g. the write RPCs haven't reached the DB yet) the required-data
+   * manifest checks are skipped rather than producing false blockers.
    */
   materials?: MaterialRow[];
   products?: ProductRow[];
+  suppliers?: SupplierRow[];
   /**
    * Engine-fallback economics computed from the raw logistics lanes with the
    * exact project_map.py reducers (effectiveEconomics.ts, exposed by
-   * useItemMasters). When provided, the fallback estimates in the findings
-   * match what the engine will actually use. When omitted, coarser per-row
-   * stage-table values are used instead.
+   * useItemMasters), so fallback estimates match what the engine will use.
    */
   derived?: DerivedEconomics;
 }
 
-const num = (v: unknown): number => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
 /**
- * Pre-run validation for the /policies "Run & Validate" stage.
+ * Pre-run validation for the /policies "Run & Validate" stage (§8.2).
  *
  * Two kinds of check:
- *   1. Structural/topology checks on the sourcing graph (a material must have a
- *      supplier, exactly one primary, etc.) — these mirror hard errors the
+ *   1. Structural/topology checks on the sourcing graph (a material must have
+ *      a supplier, exactly one primary, etc.) — these mirror hard errors the
  *      mapper raises.
- *   2. Data-completeness checks on the economics the scsim engine actually
- *      reads — the item masters (materials.cost, products.sell_price/
- *      demand_mean/production_capacity). Each is graded against the engine's
- *      real fallback chain (scsim/scsim/io/project_map.py): a field resolves
- *      to a meaningless *constant* → block; it resolves via a logistics
- *      fallback → warn; the master is set → clean.
- *
- * It deliberately no longer checks policy-override fields the engine ignores
- * (transport.lead_time_mean_days, sourcing.material_price, production
- * capacities, absolute reorder points) — that was gap G6: passing validation
- * while the run silently defaulted every economic input.
+ *   2. The required-data manifest (§8.1) — compiled by validationService.ts
+ *      from the engine registry's data_requirements: every entity field the
+ *      always-on mechanics and the currently-activated policies read, graded
+ *      against the engine's real fallback chains. The same registry payload
+ *      drives the sim-command pre-dispatch gate, so passing here means the
+ *      run will dispatch.
  */
 export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   const out: Finding[] = [];
   const {
     defaults, overrides,
     supplierRows, plantRows, customerRows, timeUnit,
-    materials, products, derived,
+    materials, products, suppliers, derived,
   } = input;
 
   if (timeUnit === null) {
@@ -99,17 +78,8 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   // Exactly one primary supplier per material; every material sourced.
   const primariesByMat = new Map<string, number>();
   const materialsMissingSupplier = new Set<string>();
-  // Per-material inbound price — the engine's fallback for materials.cost.
-  // The engine takes the CHEAPEST supplier price (project_map.py:294), so the
-  // stage-row estimate mirrors that with min, not max. Superseded by
-  // `derived.materialCost` (exact raw-lane computation) when available.
-  const inboundPriceByMat = new Map<string, number>();
   for (const r of supplierRows) {
     const mat = String(r.material_id ?? "");
-    const p = num((r as Record<string, unknown>).material_price);
-    if (mat && p > 0) {
-      inboundPriceByMat.set(mat, Math.min(inboundPriceByMat.get(mat) ?? p, p));
-    }
     if ((r as Record<string, unknown>).__needs_supplier || r.supplier_id === "(unassigned supplier)") {
       if (mat) materialsMissingSupplier.add(mat);
       out.push({
@@ -151,27 +121,9 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   }
 
   // ---------- Customers: fulfillment topology ----------
-  // Per-product outbound price + volume — the engine's fallbacks for
-  // products.sell_price and products.demand_mean respectively. The engine
-  // uses a DEMAND-WEIGHTED average price (project_map.py:315-318), mirrored
-  // here from stage rows; superseded by `derived.sellPrice` when available.
-  const outboundPriceNum = new Map<string, number>();
-  const outboundPriceDen = new Map<string, number>();
-  const outboundVolByProd = new Map<string, number>();
   const primariesByCP = new Map<string, number>();
   const cpSeen = new Set<string>();
   for (const r of customerRows) {
-    const prod = String(r.product_id ?? "");
-    if (prod) {
-      const price = num((r as Record<string, unknown>).price);
-      const vol = num((r as Record<string, unknown>).mean_per_day);
-      if (price > 0) {
-        const wgt = Math.max(vol, 1e-9);
-        outboundPriceNum.set(prod, (outboundPriceNum.get(prod) ?? 0) + price * wgt);
-        outboundPriceDen.set(prod, (outboundPriceDen.get(prod) ?? 0) + wgt);
-      }
-      outboundVolByProd.set(prod, (outboundVolByProd.get(prod) ?? 0) + vol);
-    }
     const eff = effectivePolicy(defaults, overrides, "node", String(r.key));
     const cp = `${r.customer_id}::${r.product_id}`;
     cpSeen.add(cp);
@@ -194,73 +146,20 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
     }
   }
 
-  // ---------- Item-master economics (the fields the engine reads) ----------
-  // Materials: cost → master, else cheapest inbound price, else 1.0.
-  for (const m of materials ?? []) {
-    if (num(m.cost) > 0) continue;
-    const mid = String(m.material_id);
-    const fb = derived?.materialCost.get(mid) ?? inboundPriceByMat.get(mid) ?? 0;
+  // ---------- Required-data manifest (§8.1) ----------
+  // Registry-driven: the fields the engine reads for this policy selection.
+  if (materials || products || suppliers) {
     out.push(
-      fb > 0
-        ? {
-            id: `im-cost-${mid}`, severity: "info", stage: "supplier", rowKey: mid, field: "cost",
-            message: `Material "${mid}" has no master cost — the engine will use its cheapest inbound price (≈${round2(fb)}).`,
-            hint: "Set a cost in the Item Master editor only if you want to override the uploaded inbound price.",
-          }
-        : {
-            id: `im-cost-${mid}`, severity: "block", stage: "supplier", rowKey: mid, field: "cost",
-            message: `Material "${mid}" has no cost in the item master or inbound logistics — the engine would default it to 1.0.`,
-            hint: "Set a cost in the Item Master editor (coin icon on the project card).",
-          },
+      ...compileRequiredDataFindings({
+        defaults,
+        materials,
+        products,
+        suppliers,
+        derived,
+        supplierRows,
+        customerRows,
+      }),
     );
-  }
-  // Products: sell_price → master, else outbound price, else 1.0; demand_mean →
-  // master, else Σ outbound volume, else 0; production_capacity → master, else
-  // a constant default (never binds, so recommended only).
-  for (const p of products ?? []) {
-    const pid = String(p.product_id);
-    if (num(p.sell_price) <= 0) {
-      const legacyDen = outboundPriceDen.get(pid) ?? 0;
-      const fb =
-        derived?.sellPrice.get(pid) ??
-        (legacyDen > 0 ? (outboundPriceNum.get(pid) ?? 0) / legacyDen : 0);
-      out.push(
-        fb > 0
-          ? {
-              id: `im-price-${pid}`, severity: "info", stage: "plant", rowKey: pid, field: "sell_price",
-              message: `Product "${pid}" has no master sell price — the engine will use its demand-weighted outbound price (≈${round2(fb)}).`,
-              hint: "Set a sell price in the Item Master editor only if you want to override the uploaded outbound price.",
-            }
-          : {
-              id: `im-price-${pid}`, severity: "block", stage: "plant", rowKey: pid, field: "sell_price",
-              message: `Product "${pid}" has no sell price in the item master or outbound logistics — the engine would default it to 1.0 and revenue KPIs would be meaningless.`,
-              hint: "Set a sell price in the Item Master editor.",
-            },
-      );
-    }
-    if (num(p.demand_mean) <= 0) {
-      const fb = derived?.demandMean.get(pid) ?? outboundVolByProd.get(pid) ?? 0;
-      out.push(
-        fb > 0
-          ? {
-              id: `im-demand-${pid}`, severity: "info", stage: "plant", rowKey: pid, field: "demand_mean",
-              message: `Product "${pid}" has no master demand mean — the engine will derive demand from its outbound volume.`,
-              hint: "Set a demand mean in the Item Master editor to control it directly.",
-            }
-          : {
-              id: `im-demand-${pid}`, severity: "block", stage: "plant", rowKey: pid, field: "demand_mean",
-              message: `Product "${pid}" has no demand in the item master or outbound logistics — it will never be ordered (zero demand).`,
-              hint: "Set a demand mean in the Item Master editor, or add outbound logistics.",
-            },
-      );
-    }
-    if (num(p.production_capacity) <= 0) {
-      out.push({
-        id: `im-cap-${pid}`, severity: "warn", stage: "plant", rowKey: pid, field: "production_capacity",
-        message: `Product "${pid}" has no production capacity — the engine will assume an effectively unlimited plant.`,
-        hint: "Set a capacity in the Item Master editor if this product's plant is capacity-constrained.",
-      });
-    }
   }
 
   // ---------- Orphan overrides ----------
