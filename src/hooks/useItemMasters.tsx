@@ -125,6 +125,8 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
         .eq("project_id", projectId)
         .limit(10000),
     ]);
+    if (inQ.error) console.warn("[useItemMasters] inbound_logistics read failed", inQ.error);
+    if (outQ.error) console.warn("[useItemMasters] outbound_logistics read failed", outQ.error);
     if (!inQ.error) setInboundArcs((inQ.data ?? []) as InboundArc[]);
     if (!outQ.error) setOutboundArcs((outQ.data ?? []) as OutboundArc[]);
   }, [projectId]);

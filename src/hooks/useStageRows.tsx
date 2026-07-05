@@ -84,6 +84,11 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             .limit(10000),
         ]);
 
+        // Surface read failures loudly — an RLS/grant block returns silently
+        // empty data and previously masqueraded as "no uploaded data".
+        if (inboundQ.error) console.warn("[useStageRows] inbound_logistics read failed", inboundQ.error);
+        if (outboundQ.error) console.warn("[useStageRows] outbound_logistics read failed", outboundQ.error);
+        if (bomQ.error) console.warn("[useStageRows] bom_multi_level read failed", bomQ.error);
         const inbound = inboundQ.data ?? [];
         const outbound = outboundQ.data ?? [];
         const bom = bomQ.data ?? [];
