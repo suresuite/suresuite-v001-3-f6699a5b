@@ -179,17 +179,34 @@ serve(async (req) => {
             )
           : [];
         const ctx = projectId ? makeToolContext(projectId, userId) : null;
-        const result = await runChat(model, String(message).slice(0, 4000), history, ctx, agentId);
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        const _t0 = Date.now();
+        const promptText = String(message).slice(0, 4000);
+        try {
+          const result = await runChat(model, promptText, history, ctx, agentId);
+          logAiUsage({
+            status: 'success',
+            modelCode: model,
+            promptChars: promptText.length,
+            completionChars: (result?.reply ?? '').length,
+            latencyMs: Date.now() - _t0,
+          });
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (innerErr) {
+          logAiUsage({
+            status: 'error',
+            modelCode: model,
+            promptChars: promptText.length,
+            latencyMs: Date.now() - _t0,
+            errorCode: innerErr instanceof Error ? innerErr.message.slice(0, 200) : 'unknown',
+          });
+          throw innerErr;
+        }
       } catch (err) {
         console.error('tools-mode error:', err);
         const msg = err instanceof Error ? err.message : 'AI request failed.';
         const isConfig = /not configured/i.test(msg);
-        // Return 200 with the real message in `error`: supabase-js `invoke` discards the
-        // body of non-2xx responses, which would hide the cause behind a generic
-        // "Edge Function returned a non-2xx status code". The client throws on `error`.
         return new Response(JSON.stringify({
           error: msg,
           type: isConfig ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR',
