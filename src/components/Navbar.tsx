@@ -106,6 +106,16 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
   {
     items: [
       {
+        to: "/admin",
+        icon: Shield,
+        label: "Super Admin",
+        tooltip: "Platform administration",
+      },
+    ],
+  },
+  {
+    items: [
+      {
         to: "/help",
         icon: Info,
         label: "About & Help",
