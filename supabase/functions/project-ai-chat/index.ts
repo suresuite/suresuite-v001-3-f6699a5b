@@ -74,6 +74,79 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
+    // Service-role client for bypassing RLS on internal logging tables (usage logs).
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    // --- AI usage logging helper (fire-and-forget; never throws) ---
+    async function logAiUsage(input: {
+      status: 'success' | 'error' | 'blocked';
+      modelCode?: string;
+      providerCode?: string;
+      promptChars?: number;
+      completionChars?: number;
+      latencyMs?: number;
+      errorCode?: string;
+    }) {
+      try {
+        // Rough token estimate: ~4 chars per token. Real usage figures come with
+        // Phase 2 (provider response parsing).
+        const promptTokens = Math.ceil((input.promptChars ?? 0) / 4);
+        const completionTokens = Math.ceil((input.completionChars ?? 0) / 4);
+        const totalTokens = promptTokens + completionTokens;
+
+        // Look up model + cost + user org
+        let modelId: string | null = null;
+        let inputCost = 0;
+        let outputCost = 0;
+        if (input.modelCode) {
+          const { data: m } = await supabaseAdmin
+            .from('ai_models')
+            .select('id,input_cost_per_1k,output_cost_per_1k')
+            .eq('code', input.modelCode)
+            .maybeSingle();
+          if (m) {
+            modelId = (m as any).id;
+            inputCost = Number((m as any).input_cost_per_1k) || 0;
+            outputCost = Number((m as any).output_cost_per_1k) || 0;
+          }
+        }
+        const costUsd =
+          (promptTokens / 1000) * inputCost + (completionTokens / 1000) * outputCost;
+
+        let orgId: string | null = null;
+        if (userId) {
+          const { data: u } = await supabaseAdmin
+            .from('approved_users')
+            .select('organization_id')
+            .eq('id', userId)
+            .maybeSingle();
+          orgId = (u as any)?.organization_id ?? null;
+        }
+
+        await supabaseAdmin.from('ai_usage_logs').insert({
+          user_id: userId ?? null,
+          org_id: orgId,
+          project_id: projectId ?? null,
+          model_id: modelId,
+          model_code: input.modelCode ?? null,
+          provider_code: input.providerCode ?? null,
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: totalTokens,
+          cost_usd: costUsd,
+          latency_ms: input.latencyMs ?? null,
+          status: input.status,
+          error_code: input.errorCode ?? null,
+        });
+      } catch (e) {
+        console.warn('[usage-log] failed:', e);
+      }
+    }
+
+
     // === Tool-calling chat mode (multi-provider: Gemini, OpenAI, DeepSeek) ===
     if (mode === 'tools') {
       try {
@@ -106,17 +179,34 @@ serve(async (req) => {
             )
           : [];
         const ctx = projectId ? makeToolContext(projectId, userId) : null;
-        const result = await runChat(model, String(message).slice(0, 4000), history, ctx, agentId);
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        const _t0 = Date.now();
+        const promptText = String(message).slice(0, 4000);
+        try {
+          const result = await runChat(model, promptText, history, ctx, agentId);
+          logAiUsage({
+            status: 'success',
+            modelCode: model,
+            promptChars: promptText.length,
+            completionChars: (result?.reply ?? '').length,
+            latencyMs: Date.now() - _t0,
+          });
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (innerErr) {
+          logAiUsage({
+            status: 'error',
+            modelCode: model,
+            promptChars: promptText.length,
+            latencyMs: Date.now() - _t0,
+            errorCode: innerErr instanceof Error ? innerErr.message.slice(0, 200) : 'unknown',
+          });
+          throw innerErr;
+        }
       } catch (err) {
         console.error('tools-mode error:', err);
         const msg = err instanceof Error ? err.message : 'AI request failed.';
         const isConfig = /not configured/i.test(msg);
-        // Return 200 with the real message in `error`: supabase-js `invoke` discards the
-        // body of non-2xx responses, which would hide the cause behind a generic
-        // "Edge Function returned a non-2xx status code". The client throws on `error`.
         return new Response(JSON.stringify({
           error: msg,
           type: isConfig ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR',

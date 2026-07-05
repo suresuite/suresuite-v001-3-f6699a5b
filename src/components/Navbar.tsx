@@ -16,6 +16,7 @@ import {
   Target,
   Brain,
   SlidersHorizontal,
+  Shield,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,16 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
         icon: Brain,
         label: "Project Intelligence",
         tooltip: "AI-powered project insights",
+      },
+    ],
+  },
+  {
+    items: [
+      {
+        to: "/admin",
+        icon: Shield,
+        label: "Super Admin",
+        tooltip: "Platform administration",
       },
     ],
   },

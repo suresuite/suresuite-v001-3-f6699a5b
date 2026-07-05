@@ -24,6 +24,13 @@ import Forbidden from './pages/Forbidden';
 import DocsLayout from '@/components/docs/DocsLayout';
 import HelpPage from './pages/help/HelpPage';
 import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminOrganizations from './pages/admin/AdminOrganizations';
+import AdminProjects from './pages/admin/AdminProjects';
+import AdminModels from './pages/admin/AdminModels';
+import AdminUsage from './pages/admin/AdminUsage';
+import AdminAudit from './pages/admin/AdminAudit';
 
 const queryClient = new QueryClient();
 
@@ -145,6 +152,15 @@ function App() {
                   <Route path=":slug" element={<HelpPage />} />
                 </Route>
                 <Route path="/about" element={<Navigate to="/help" replace />} />
+
+                {/* Super Admin routes */}
+                <Route path="/admin" element={<ProtectedRoute><RoleGuard><AdminDashboard isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute><RoleGuard><AdminUsers isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/organizations" element={<ProtectedRoute><RoleGuard><AdminOrganizations isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/projects" element={<ProtectedRoute><RoleGuard><AdminProjects isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/models" element={<ProtectedRoute><RoleGuard><AdminModels isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/usage" element={<ProtectedRoute><RoleGuard><AdminUsage isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/audit" element={<ProtectedRoute><RoleGuard><AdminAudit isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
               </Routes>
               <FloatingChatBubble />
             </Router>
