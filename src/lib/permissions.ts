@@ -3,18 +3,19 @@ import type { UserRole } from '@/hooks/useUserRole';
 /**
  * Route → roles allowed map.
  * Use `*` as a wildcard suffix (e.g. `/network/*`).
- * Keep in sync with src/App.tsx routes.
+ * super_admin is granted access to everything by default in canAccessRoute().
  */
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-  '/': ['admin', 'modeler', 'user'],
-  '/project-manager': ['admin', 'modeler'],
-  '/network/firm-level': ['admin', 'modeler', 'user'],
-  '/network/product-level': ['admin', 'modeler', 'user'],
-  '/network/process-level': ['admin', 'modeler', 'user'],
-  '/network/interactive-space': ['admin', 'modeler', 'user'],
-  '/project-intelligence': ['admin', 'modeler', 'user'],
-  '/profile': ['admin', 'modeler', 'user'],
-  '/admin': ['admin'],
+  '/': ['admin', 'modeler', 'user', 'super_admin'],
+  '/project-manager': ['admin', 'modeler', 'super_admin'],
+  '/network/firm-level': ['admin', 'modeler', 'user', 'super_admin'],
+  '/network/product-level': ['admin', 'modeler', 'user', 'super_admin'],
+  '/network/process-level': ['admin', 'modeler', 'user', 'super_admin'],
+  '/network/interactive-space': ['admin', 'modeler', 'user', 'super_admin'],
+  '/project-intelligence': ['admin', 'modeler', 'user', 'super_admin'],
+  '/profile': ['admin', 'modeler', 'user', 'super_admin'],
+  '/admin': ['super_admin'],
+  '/admin/*': ['super_admin'],
 };
 
 function matchRoute(path: string, pattern: string): boolean {
@@ -26,7 +27,6 @@ function matchRoute(path: string, pattern: string): boolean {
 }
 
 export function getAllowedRoles(path: string): UserRole[] | null {
-  // Prefer the most specific (longest) matching pattern
   const matches = Object.keys(ROUTE_PERMISSIONS)
     .filter((p) => matchRoute(path, p))
     .sort((a, b) => b.length - a.length);
@@ -35,8 +35,9 @@ export function getAllowedRoles(path: string): UserRole[] | null {
 }
 
 export function canAccessRoute(path: string, role: UserRole | undefined | null): boolean {
+  if (role === 'super_admin') return true;
   const allowed = getAllowedRoles(path);
-  if (!allowed) return true; // unknown routes default to allowed (e.g. /auth)
+  if (!allowed) return true;
   if (!role) return false;
   return allowed.includes(role);
 }
