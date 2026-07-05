@@ -27,6 +27,8 @@ import {
 } from "@/lib/policies/columnSpecs";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
@@ -196,8 +198,9 @@ export function StagePolicyTable({
 }: Props) {
   const spec = specFor(stageKey);
   const families = familiesForStage(stageKey);
-  const { rows: dataRows, loading, fallback } = useStageRows({ projectId, plantName, stage: stageKey });
+  const { rows: dataRows, loading, fallback, reload: reloadRows } = useStageRows({ projectId, plantName, stage: stageKey });
   const { unit, adaptLabel } = useTimeUnit(projectId);
+  const { user } = useAuth();
 
   // Item masters back the economics columns (ColSpec.master): the grid shows
   // and edits materials.cost / products.sell_price / production_capacity /
@@ -231,6 +234,39 @@ export function StagePolicyTable({
     const n = Number(v);
     return v == null || !Number.isFinite(n) ? undefined : n;
   };
+  // Suppliers the user can assign to an "(unassigned supplier)" material:
+  // the suppliers master plus every supplier already sourcing in this stage.
+  const knownSuppliers = useMemo(() => {
+    const set = new Set<string>(suppliers.map((s) => s.supplier_id));
+    for (const r of dataRows) {
+      const sid = String((r as Record<string, unknown>).supplier_id ?? "");
+      if (sid && !sid.startsWith("(")) set.add(sid);
+    }
+    return [...set].sort();
+  }, [suppliers, dataRows]);
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const assignSupplier = async (materialId: string, supplierId: string) => {
+    if (!projectId || !user) return;
+    setAssigning(materialId);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).rpc("assign_material_supplier", {
+        p_project_id: projectId,
+        p_material_id: materialId,
+        p_supplier_id: supplierId,
+        p_user_id: user.id,
+        p_user_email: user.email,
+      });
+      if (error) throw error;
+      toast.success(`Assigned ${supplierId} to ${materialId}. Fill in its price/lead time in the grid.`);
+      reloadRows();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to assign supplier");
+    } finally {
+      setAssigning(null);
+    }
+  };
+
   const derivedValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined => {
     if (!col.master) return undefined;
     const id = String(r[col.master.idFrom] ?? "");
@@ -1048,13 +1084,47 @@ export function StagePolicyTable({
                                 title="Row has saved overrides"
                               />
                             )}
-                            <span className="truncate">{String(r[c.id] ?? "")}</span>
+                            {c.id === "supplier_id" && r.__needs_supplier ? (
+                              // Unassigned material: pick a supplier to create
+                              // the sourcing lane (assign_material_supplier RPC).
+                              <Select
+                                disabled={assigning === String(r.material_id)}
+                                onValueChange={(v) =>
+                                  void assignSupplier(String(r.material_id), v)
+                                }
+                              >
+                                <SelectTrigger className="h-6 w-full text-[11px] border-destructive/40 bg-destructive/5 px-2">
+                                  <SelectValue
+                                    placeholder={
+                                      assigning === String(r.material_id)
+                                        ? "Assigning…"
+                                        : "assign supplier…"
+                                    }
+                                  />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {knownSuppliers.length === 0 ? (
+                                    <SelectItem value="__none__" disabled className="text-xs">
+                                      No suppliers in project — upload suppliers first
+                                    </SelectItem>
+                                  ) : (
+                                    knownSuppliers.map((s) => (
+                                      <SelectItem key={s} value={s} className="text-xs">
+                                        {s}
+                                      </SelectItem>
+                                    ))
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="truncate">{String(r[c.id] ?? "")}</span>
+                            )}
                           </span>
                           {/* material-level required actions (red) */}
                           {i === 0 && r.__needs_supplier && (
                             <span
                               className="ml-1.5 inline-block rounded-sm bg-destructive/15 text-destructive px-1 text-[9px] align-middle"
-                              title="This material has no supplier in the project data — assign one."
+                              title="This material has no supplier in the project data — assign one in the Supplier column."
                             >
                               needs supplier
                             </span>
