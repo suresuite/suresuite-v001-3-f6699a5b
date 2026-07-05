@@ -45,10 +45,12 @@ from scsim.entities.scenario import Scenario
 # Everything in scsim is weekly. A duration of N units → weeks; a quantity per
 # unit-period → quantity per week (the inverse).
 _UNIT_DAYS = {
-    "day": 1.0, "days": 1.0, "d": 1.0,
-    "week": 7.0, "weeks": 7.0, "wk": 7.0, "w": 7.0,
-    "month": 30.4375, "months": 30.4375, "mo": 30.4375, "m": 30.4375,
+    "day": 1.0, "days": 1.0, "d": 1.0, "daily": 1.0,
+    "week": 7.0, "weeks": 7.0, "wk": 7.0, "w": 7.0, "weekly": 7.0,
+    "month": 30.4375, "months": 30.4375, "mo": 30.4375, "m": 30.4375, "monthly": 30.4375,
+    "quarter": 91.3125, "quarters": 91.3125, "quarterly": 91.3125,
     "year": 365.25, "years": 365.25, "yr": 365.25, "y": 365.25,
+    "yearly": 365.25, "annual": 365.25, "annually": 365.25,
 }
 _DEFAULT_CV = 0.30  # triangularAV variability when none supplied
 
@@ -109,13 +111,18 @@ class ProductRow:
 
 @dataclass
 class SupplyArc:
-    """inbound_logistics row: supplier → material."""
+    """inbound_logistics row: supplier → material.
+
+    Unit contract (docs/data-simulation-mapping.md §3): ``time_unit`` describes
+    the VOLUME period only (e.g. "yearly"). ``lead_time`` is in WEEKS unless
+    ``lead_time_unit`` explicitly overrides it — it never inherits ``time_unit``.
+    """
     supplier_id: str
     material_id: str
     unit_price: Optional[float] = None  # c_{m,s}
-    lead_time: Optional[float] = None
-    lead_time_unit: Optional[str] = None  # falls back to time_unit
-    time_unit: Optional[str] = None
+    lead_time: Optional[float] = None   # weeks (see unit contract above)
+    lead_time_unit: Optional[str] = None  # explicit override only
+    time_unit: Optional[str] = None       # volume period
     volume: Optional[float] = None
 
 
@@ -278,7 +285,10 @@ def from_project_data(data: ProjectData) -> MappingResult:
             cost = 1.0
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
                                     "cost", "missing inbound unit_price → defaulted to 1.0"))
-        lt_unit = arc.lead_time_unit or arc.time_unit
+        # Lead times are weeks; time_unit describes the volume period only
+        # (§3). With lead_time_unit unset, _duration_to_weeks defaults to a
+        # 7-day basis → the value is taken as weeks verbatim.
+        lt_unit = arc.lead_time_unit
         lt_weeks = _duration_to_weeks(arc.lead_time, lt_unit) if arc.lead_time else 2.0
         if not arc.lead_time:
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",

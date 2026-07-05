@@ -79,6 +79,12 @@ def test_missing_price_defaults_to_one_and_warns():
     ("week", 100.0, 100.0),
     ("day", 10.0, 70.0),       # per-day → ×7
     ("month", 434.8, pytest.approx(100.0, rel=1e-3)),  # ÷4.348
+    # Rate-word synonyms the upload templates actually use.
+    ("yearly", 5218.0, pytest.approx(100.0, rel=1e-3)),   # ÷52.18
+    ("annually", 5218.0, pytest.approx(100.0, rel=1e-3)),
+    ("daily", 10.0, 70.0),
+    ("weekly", 100.0, 100.0),
+    ("monthly", 434.8, pytest.approx(100.0, rel=1e-3)),
 ])
 def test_demand_unit_normalization(unit, vol, expected):
     d = _base()
@@ -93,6 +99,17 @@ def test_lead_time_days_normalized_to_weeks():
     d.supply_arcs = [SupplyArc("s1", "m1", unit_price=2.0, lead_time=14, lead_time_unit="day")]
     res = from_project_data(d)
     assert res.scenario.network.supplier_links[0].lead_time_weeks == 2
+
+
+def test_lead_time_is_weeks_and_ignores_rate_time_unit():
+    """§3 contract: time_unit describes the volume period only; lead_time is
+    weeks unless lead_time_unit explicitly overrides. A template row with
+    time_unit="yearly" and lead_time=4 must map to 4 weeks, not 4 years."""
+    d = _base()
+    d.supply_arcs = [SupplyArc("s1", "m1", unit_price=2.0, lead_time=4,
+                               time_unit="yearly")]
+    res = from_project_data(d)
+    assert res.scenario.network.supplier_links[0].lead_time_weeks == 4
 
 
 def test_fulfillment_mode_from_project_model():

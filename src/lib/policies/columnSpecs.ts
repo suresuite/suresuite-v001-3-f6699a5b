@@ -17,6 +17,16 @@ export interface ColSpec {
   defaultWhenMissing?: number | string | boolean;
   /** Read-only synthetic columns (e.g. allocation share). Rendered as a badge. */
   readOnly?: boolean;
+  /** Formatter for read-only values (e.g. append "%" for share_pct). */
+  format?: (n: number) => string;
+  /**
+   * Item-master-backed column: the value lives in the materials/products
+   * table (row id taken from `idFrom`), edits save via the item-master
+   * upsert RPCs — NOT as policy overrides. The engine reads these fields
+   * from the masters first, with a logistics-derived fallback
+   * (docs/data-simulation-mapping.md §4).
+   */
+  master?: { table: "materials" | "products"; field: string; idFrom: string };
 }
 
 export interface StageTableSpec {
@@ -34,6 +44,8 @@ const col = (
     visibleWhen?: ColSpec["visibleWhen"];
     defaultWhenMissing?: ColSpec["defaultWhenMissing"];
     readOnly?: boolean;
+    format?: ColSpec["format"];
+    master?: ColSpec["master"];
   } = {},
 ): ColSpec => ({ field, family, label: lbl(field), ...opts });
 
@@ -58,8 +70,12 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
     // from network edge attributes.
     cols: [
       col("primary_source", "sourcing"),
-      col("share_pct", "sourcing", { readOnly: true }),
+      col("share_pct", "sourcing", { readOnly: true, format: (n) => `${n}%` }),
       col("material_price", "sourcing", { defaultWhenMissing: 0 }),
+      col("lead_time_mean_days", "sourcing", { readOnly: true, format: (n) => `${n} d` }),
+      col("material_cost", "sourcing", {
+        master: { table: "materials", field: "cost", idFrom: "material_id" },
+      }),
       col("supplier_capacity_per_day", "sourcing", { defaultWhenMissing: 999_999_999 }),
 
       col("type", "inventory"),
@@ -79,6 +95,15 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
     // scsim alignment: lot sizing, setup, scheduling, machine/labor capacity
     // and production lead-time distributions are not consumed by the engine.
     cols: [
+      col("sell_price", "production", {
+        master: { table: "products", field: "sell_price", idFrom: "product_id" },
+      }),
+      col("production_capacity", "production", {
+        master: { table: "products", field: "production_capacity", idFrom: "product_id" },
+      }),
+      col("demand_mean", "production", {
+        master: { table: "products", field: "demand_mean", idFrom: "product_id" },
+      }),
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
       col("backorder_cost_per_day", "fulfillment", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
 
@@ -103,6 +128,8 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("primary_source", "fulfillment"),
       col("sourcing_firm", "fulfillment"),
       col("price", "fulfillment", { defaultWhenMissing: 0 }),
+      col("mean_per_day", "fulfillment", { readOnly: true, format: (n) => `${Math.round(n * 100) / 100}/d` }),
+      col("delivery_window_days", "fulfillment", { readOnly: true, format: (n) => `${n} d` }),
       col("backorder_cost_per_day", "fulfillment", { defaultWhenMissing: 0 }),
     ],
     targetKey: (r) => `${r.customer_id}::${r.product_id ?? ""}`,

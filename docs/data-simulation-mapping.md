@@ -50,9 +50,16 @@ so a master row (with NULL economics to fill) always exists for every id in the 
 
 ## 3. Unit normalization (always to weeks)
 
-`day=1, week=7, month=30.4375, year=365.25` days. Unknown unit → assume week.
+`day=1, week=7, month=30.4375, quarter=91.3125, year=365.25` days. Recognized synonyms:
+`daily`, `weekly`, `monthly`, `quarterly`, `yearly`, `annual`, `annually` plus the abbreviations
+(`d`, `wk`, `mo`, `yr`, …) — the shipped upload templates use **`yearly`**. Unknown unit →
+assume week.
 
-- **Duration → weeks** (lead time, start, duration): `value × days(unit) / 7`
+- **`time_unit` describes the VOLUME period only.** It never applies to durations.
+- **Lead times are WEEKS.** `inbound_logistics.lead_time` and
+  `outbound_logistics.expected_lead_time` are taken as weeks verbatim; only an explicit
+  `lead_time_unit` on the arc overrides that (it does **not** inherit `time_unit`).
+- **Duration → weeks** (start, duration, explicit-unit lead time): `value × days(unit) / 7`
   (day ÷7, week ×1, month ×4.348, year ×52.18).
 - **Quantity-per-period → per week** (demand volume): `value × 7 / days(unit)`
   (per-day ×7, per-week ×1, per-month ÷4.348, per-year ÷52.18).
@@ -67,7 +74,7 @@ Priority = first non-null wins. A ⚠ default emits a `warn`; a derived value em
 | scsim param | Source | Reducer / unit | Default |
 |---|---|---|---|
 | `cost` c_{m,s} | `inbound_logistics.unit_price` | per arc | 1.0 ⚠ |
-| `lead_time_weeks` T_s | `inbound_logistics.lead_time` (+ `lead_time_unit`/`time_unit`) | →weeks, clamp [1,51] | 2 wks ⚠ |
+| `lead_time_weeks` T_s | `inbound_logistics.lead_time` — **weeks as-is**; `lead_time_unit` explicit override only (never `time_unit`) | clamp [1,51] | 2 wks ⚠ |
 | `lead_time_dist`, `lead_time_cv` | `materials.lead_time_dist`/`lead_time_cv` | — | deterministic, 0 |
 | `moq` | `materials.moq` | units | 0 |
 
@@ -163,13 +170,20 @@ KPI keys (the `ScenarioResult → DB` contract, in `scsim_bridge.py`): `fill_rat
 The /policies UI renders the §4 priority chains live, so a planner never has to re-enter
 economics that already exist in the uploaded logistics:
 
-- **`src/lib/policies/effectiveEconomics.ts`** is the frontend encoding of the §4 reducers
-  (cheapest inbound `unit_price` for material cost; demand-weighted outbound `unit_price` for
-  product price; Σ weekly outbound volume for demand). It must change in lockstep with
-  `from_project_data` — it ports `_UNIT_DAYS` and the weight semantics verbatim.
+- **`src/lib/policies/effectiveEconomics.ts`** is the frontend encoding of the §3 unit table
+  (`unitDays`, `ratePerDay`, `rateToWeekly`) and the §4 reducers (cheapest inbound `unit_price`
+  for material cost; demand-weighted outbound `unit_price` for product price; Σ weekly outbound
+  volume for demand). It must change in lockstep with `from_project_data` — it ports
+  `_UNIT_DAYS` (including the rate-word synonyms) and the weight semantics verbatim.
 - **Item Master editor** shows the derived value as a `≈` placeholder with a provenance badge
   ("from inbound data" / "from outbound data") when the master field is NULL; typing a value is
   the master override. The DB stays NULL for derived fields, so re-uploads refresh them.
+- **Stage grids on /policies** render the uploaded lane data (prices, weekly-normalized
+  volumes, lead times in weeks) and the master-backed economics columns
+  (`materials.cost`, `products.sell_price` / `production_capacity` / `demand_mean`) directly;
+  editing a master-backed cell saves through the item-master upsert RPCs (full-row merge), not
+  as a policy override. The auto-seed prefill never persists imputed averages or master-backed
+  fields.
 - **Verification** (`src/lib/policies/verification.ts`) grades against the same module: a field
   resolving via a logistics fallback is `info`, resolving to a meaningless constant is `block`.
 - **Data map tab** (`src/lib/policies/dataMap.ts` + `DataMapGrid`) lists every column of the six

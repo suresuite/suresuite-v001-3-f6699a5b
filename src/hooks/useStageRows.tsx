@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { StageKey } from "@/lib/policies/stages";
+import { ratePerDay } from "@/lib/policies/effectiveEconomics";
 
 export interface StageRow {
   /** Composite key = "<location>::<material_or_product>" — also used as override target_key. */
@@ -87,39 +88,29 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         const outbound = outboundQ.data ?? [];
         const bom = bomQ.data ?? [];
 
-        // Normalise any value carrying a time_unit (week|month|day) into days.
-        const daysFromUnit = (value: number | null | undefined, unit: string | null | undefined): number | undefined => {
-          if (value === null || value === undefined) return undefined;
+        // Unit contract (docs/data-simulation-mapping.md §3): `time_unit`
+        // describes the VOLUME period only (day/week/month/yearly/…), while
+        // `lead_time` / `expected_lead_time` are always WEEKS. Volume converts
+        // via the shared engine-matching vocabulary in effectiveEconomics.
+        const weeksToDays = (value: number | null | undefined): number | undefined => {
           const n = Number(value);
-          if (!Number.isFinite(n)) return undefined;
-          const mul = unit === "week" ? 7 : unit === "month" ? 30 : 1;
-          return n * mul;
+          return Number.isFinite(n) ? n * 7 : undefined;
         };
 
         const inboundByKey = new Map<string, any>();
         for (const r of inbound) {
           inboundByKey.set(`${r.supplier_id}::${r.material_id}`, {
             ...r,
-            lead_time_days: daysFromUnit(r.lead_time, r.time_unit),
-            volume_per_day:
-              r.time_unit === "week"
-                ? Number(r.volume) / 7
-                : r.time_unit === "month"
-                ? Number(r.volume) / 30
-                : Number(r.volume),
+            lead_time_days: weeksToDays(r.lead_time),
+            volume_per_day: ratePerDay(Number(r.volume), r.time_unit),
           });
         }
         const outboundByKey = new Map<string, any>();
         for (const r of outbound) {
           outboundByKey.set(`${r.customer_id}::${r.product_id}`, {
             ...r,
-            expected_lead_time_days: daysFromUnit(r.expected_lead_time, r.time_unit),
-            volume_per_day:
-              r.time_unit === "week"
-                ? Number(r.volume) / 7
-                : r.time_unit === "month"
-                ? Number(r.volume) / 30
-                : Number(r.volume),
+            expected_lead_time_days: weeksToDays(r.expected_lead_time),
+            volume_per_day: ratePerDay(Number(r.volume), r.time_unit),
           });
         }
 
@@ -140,16 +131,18 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           if (!map.has(k)) map.set(k, []);
           map.get(k)!.push(n);
         };
-        // Inbound (supplier) bases — keyed by material_id.
+        // Inbound (supplier) bases — keyed by material_id. Computed from the
+        // raw rows with the same conversions as the enriched maps above (the
+        // raw rows themselves carry no *_days fields).
         const inPriceByMaterial = new Map<string, number[]>();
         const inLeadByMaterial = new Map<string, number[]>();
         for (const r of inbound) {
           const mat = String(r.material_id);
           pushTo(inPriceByMaterial, mat, r.unit_price);
-          pushTo(inLeadByMaterial, mat, (r as any).lead_time_days);
+          pushTo(inLeadByMaterial, mat, weeksToDays(r.lead_time));
         }
         const inPriceGlobal = avg(inbound.map((r: any) => Number(r.unit_price)));
-        const inLeadGlobal = avg(inbound.map((r: any) => Number(r.lead_time_days)));
+        const inLeadGlobal = avg(inbound.map((r: any) => Number(weeksToDays(r.lead_time))));
         // Outbound (customer) bases — keyed by product_id.
         const outPriceByProduct = new Map<string, number[]>();
         const outVolByProduct = new Map<string, number[]>();
@@ -157,12 +150,12 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         for (const r of outbound) {
           const prod = String(r.product_id);
           pushTo(outPriceByProduct, prod, r.unit_price);
-          pushTo(outVolByProduct, prod, (r as any).volume_per_day);
-          pushTo(outLeadByProduct, prod, (r as any).expected_lead_time_days);
+          pushTo(outVolByProduct, prod, ratePerDay(Number(r.volume), r.time_unit));
+          pushTo(outLeadByProduct, prod, weeksToDays(r.expected_lead_time));
         }
         const outPriceGlobal = avg(outbound.map((r: any) => Number(r.unit_price)));
-        const outVolGlobal = avg(outbound.map((r: any) => Number((r as any).volume_per_day)));
-        const outLeadGlobal = avg(outbound.map((r: any) => Number((r as any).expected_lead_time_days)));
+        const outVolGlobal = avg(outbound.map((r: any) => ratePerDay(Number(r.volume), r.time_unit)));
+        const outLeadGlobal = avg(outbound.map((r: any) => Number(weeksToDays(r.expected_lead_time))));
         // Per-item average first, else project-wide average, else undefined.
         const impute = (
           perItem: Map<string, number[]>,
@@ -382,17 +375,17 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             if (!parent) continue;
             componentsByProduct.set(parent, (componentsByProduct.get(parent) ?? 0) + 1);
           }
-          // outbound demand → product
+          // outbound demand → product (raw rows: convert volume by time_unit)
           for (const o of outbound) {
             const p = String(o.product_id);
-            const v = (o as any).volume_per_day ?? 0;
+            const v = ratePerDay(Number(o.volume), o.time_unit);
             outboundDemandByProduct.set(p, (outboundDemandByProduct.get(p) ?? 0) + (Number.isFinite(v) ? v : 0));
           }
-          // inbound lead times grouped by parent product via BOM
+          // inbound lead times grouped by parent product via BOM (weeks → days)
           const inboundLeadByMaterial = new Map<string, number[]>();
           for (const i of inbound) {
             const mat = String(i.material_id);
-            const lt = (i as any).lead_time_days;
+            const lt = weeksToDays(i.lead_time);
             if (lt !== undefined) {
               if (!inboundLeadByMaterial.has(mat)) inboundLeadByMaterial.set(mat, []);
               inboundLeadByMaterial.get(mat)!.push(lt);

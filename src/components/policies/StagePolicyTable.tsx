@@ -28,6 +28,7 @@ import {
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { useStageRows } from "@/hooks/useStageRows";
+import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import type { StageKey } from "@/lib/policies/stages";
 
@@ -102,7 +103,7 @@ function ValueCell({
     return (
       <div className="flex items-center justify-end h-6 px-2">
         <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
-          {n == null || !Number.isFinite(n) ? "—" : `${n}%`}
+          {n == null || !Number.isFinite(n) ? "—" : spec.format ? spec.format(n) : String(n)}
         </span>
       </div>
     );
@@ -194,6 +195,42 @@ export function StagePolicyTable({
   const { rows: dataRows, loading, fallback } = useStageRows({ projectId, plantName, stage: stageKey });
   const { unit, adaptLabel } = useTimeUnit(projectId);
 
+  // Item masters back the economics columns (ColSpec.master): the grid shows
+  // and edits materials.cost / products.sell_price / production_capacity /
+  // demand_mean directly, with the engine's derived fallback (≈) when unset.
+  const { materials, products, derived, saveRows } = useItemMasters(projectId);
+  const masterRowById = useMemo(
+    () => ({
+      materials: new Map(materials.map((m) => [m.material_id, m as unknown as Record<string, unknown>])),
+      products: new Map(products.map((p) => [p.product_id, p as unknown as Record<string, unknown>])),
+    }),
+    [materials, products],
+  );
+  const masterColByField = useMemo(() => {
+    const m = new Map<string, ColSpec>();
+    for (const c of specFor(stageKey).cols) if (c.master) m.set(c.field, c);
+    return m;
+  }, [stageKey]);
+  const masterValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined => {
+    if (!col.master) return undefined;
+    const id = String(r[col.master.idFrom] ?? "");
+    const v = masterRowById[col.master.table].get(id)?.[col.master.field];
+    const n = Number(v);
+    return v == null || !Number.isFinite(n) ? undefined : n;
+  };
+  const derivedValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined => {
+    if (!col.master) return undefined;
+    const id = String(r[col.master.idFrom] ?? "");
+    if (col.master.table === "materials" && col.master.field === "cost")
+      return derived.materialCost.get(id);
+    if (col.master.field === "sell_price") return derived.sellPrice.get(id);
+    if (col.master.field === "demand_mean") {
+      const v = derived.demandMean.get(id) ?? 0;
+      return v > 0 ? v : undefined;
+    }
+    return undefined; // production_capacity has no logistics-derived fallback
+  };
+
   // Per-column "contains" filters (key = column id/field) + single active sort.
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
@@ -279,10 +316,16 @@ export function StagePolicyTable({
     setSort(null);
   }, [stageKey, projectId]);
 
-  /** Effective value lookup: data prefill → override → default. */
+  /** Effective value lookup: data prefill → override → default.
+   *  Master-backed columns resolve draft → item-master value → derived fallback. */
   const getEffective = (rowKey: string, dataRow: Record<string, unknown>, field: string): unknown => {
     const draft = drafts[rowKey]?.[field];
     if (draft !== undefined) return draft;
+    const mcol = masterColByField.get(field);
+    if (mcol) {
+      const mv = masterValueFor(mcol, dataRow);
+      return mv !== undefined ? mv : derivedValueFor(mcol, dataRow);
+    }
     if (dataRow[field] !== undefined && dataRow[field] !== null) return dataRow[field];
     for (const fam of families) {
       const eff = effectivePolicy(defaults, overrides, spec.scope, rowKey)[fam] as Record<string, unknown>;
@@ -292,7 +335,7 @@ export function StagePolicyTable({
   };
 
   const getDefault = (field: string, family: PolicyFamily): unknown =>
-    (defaults[family] as Record<string, unknown>)[field];
+    ((defaults[family] ?? {}) as Record<string, unknown>)[field];
 
   // Detect whether a row currently has any existing override (vs default).
   const hasOverride = (rowKey: string): boolean =>
@@ -391,12 +434,33 @@ export function StagePolicyTable({
   const saveAll = async () => {
     if (dirtyKeys.length === 0) return;
     const toUpsert: OverrideRow[] = [];
+    // Master-backed drafts, merged onto the FULL current master row — the
+    // bulk_upsert RPCs overwrite every column, so a partial row would wipe
+    // the other master fields.
+    const masterMerged: Record<ItemMasterTable, Map<string, Record<string, unknown>>> = {
+      materials: new Map(),
+      products: new Map(),
+      suppliers: new Map(),
+    };
     for (const rowKey of dirtyKeys) {
       const draft = drafts[rowKey];
+      const dataRow = dataRows.find((row) => row.key === rowKey) as
+        | Record<string, unknown>
+        | undefined;
       const byFamily = new Map<PolicyFamily, Record<string, unknown>>();
       for (const [field, v] of Object.entries(draft)) {
         const col = allCols.find((c) => c.field === field);
         if (!col) continue;
+        const mcol = col.master;
+        if (mcol && dataRow) {
+          const id = String(dataRow[mcol.idFrom] ?? "");
+          const base =
+            masterMerged[mcol.table].get(id) ?? masterRowById[mcol.table].get(id);
+          if (!base) continue;
+          if (isEqual(v ?? null, (base as Record<string, unknown>)[mcol.field] ?? null)) continue;
+          masterMerged[mcol.table].set(id, { ...base, [mcol.field]: v ?? null });
+          continue;
+        }
         if (v === undefined) continue;
         const def = getDefault(field, col.family);
         if (isEqual(v, def)) continue;
@@ -409,12 +473,21 @@ export function StagePolicyTable({
         toUpsert.push({ scope: spec.scope, target_key: rowKey, family, patch });
       }
     }
-    if (toUpsert.length === 0) {
+    const masterRowCount =
+      masterMerged.materials.size + masterMerged.products.size + masterMerged.suppliers.size;
+    if (toUpsert.length === 0 && masterRowCount === 0) {
       setDrafts({});
       toast.info("No effective changes to save.");
       return;
     }
-    await bulkUpsertOverrides(toUpsert);
+    for (const table of ["materials", "products", "suppliers"] as ItemMasterTable[]) {
+      if (masterMerged[table].size === 0) continue;
+      await saveRows(
+        table,
+        [...masterMerged[table].values()] as unknown as Parameters<typeof saveRows>[1],
+      );
+    }
+    if (toUpsert.length > 0) await bulkUpsertOverrides(toUpsert);
     setDrafts({});
     toast.success(`Saved ${dirtyKeys.length} row(s)`);
   };
@@ -455,6 +528,11 @@ export function StagePolicyTable({
       const byFamily = new Map<PolicyFamily, Record<string, unknown>>();
       for (const col of allCols) {
         if (col.readOnly) continue;
+        // Master-backed fields live in the item masters, never in overrides.
+        if (col.master) continue;
+        // Never persist imputed averages — they are estimates to verify,
+        // not data (silently freezing them poisoned projects before).
+        if ((r.__imputed as Record<string, true> | undefined)?.[col.field]) continue;
         // draft → project-data prefill → effective default
         const v = getEffective(rowKey, r, col.field);
         if (v === undefined || v === null) continue;
@@ -708,6 +786,9 @@ export function StagePolicyTable({
             <span className="h-1.5 w-1.5 rounded-full bg-destructive" /> imputed average — verify
           </span>
           <span className="inline-flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> derived fallback (≈)
+          </span>
+          <span className="inline-flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> saved override
           </span>
           <span className="inline-flex items-center gap-1">
@@ -946,10 +1027,15 @@ export function StagePolicyTable({
                           );
                         }
                         const cellValue = getEffective(rowKey, r, col.field);
+                        // Master-backed columns: value from the item master, with
+                        // the engine's derived fallback (≈) shown when unset.
+                        const masterSet = col.master ? masterValueFor(col, r) !== undefined : false;
+                        const derivedVal = col.master && !masterSet ? derivedValueFor(col, r) : undefined;
                         // live default = bundle value > spec.defaultWhenMissing > family raw default
                         const bundleVal = eff?.[col.field];
-                        const liveDefault =
-                          bundleVal !== undefined
+                        const liveDefault = col.master
+                          ? derivedVal ?? 0
+                          : bundleVal !== undefined
                             ? bundleVal
                             : col.defaultWhenMissing !== undefined
                             ? col.defaultWhenMissing
@@ -959,15 +1045,19 @@ export function StagePolicyTable({
                         const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
                         const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
                         const tracked = col.field in fromDataMap || col.field in imputedMap;
-                        const imputed = !edited && imputedMap[col.field] === true;
+                        const imputed = !edited && !col.master && imputedMap[col.field] === true;
                         const fromData =
                           !edited &&
                           !imputed &&
-                          (tracked
+                          (col.master
+                            ? masterSet
+                            : tracked
                             ? fromDataMap[col.field] === true
                             : r[col.field] !== undefined && r[col.field] !== null);
+                        const derivedFallback =
+                          !edited && !!col.master && !masterSet && derivedVal !== undefined;
                         const fromOverride =
-                          !edited && !imputed && !fromData && overrides.some(
+                          !edited && !imputed && !fromData && !col.master && overrides.some(
                             (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
                           );
                         const dotClass = edited
@@ -976,6 +1066,8 @@ export function StagePolicyTable({
                           ? "bg-destructive"
                           : fromData
                           ? "bg-sky-500"
+                          : derivedFallback
+                          ? "bg-amber-500"
                           : fromOverride
                           ? "bg-emerald-500"
                           : null;
@@ -984,7 +1076,11 @@ export function StagePolicyTable({
                           : imputed
                           ? "Imputed project average — verify"
                           : fromData
-                          ? "From project data"
+                          ? col.master
+                            ? "From item master"
+                            : "From project data"
+                          : derivedFallback
+                          ? "Derived fallback (≈) — engine computes this from your inbound/outbound uploads"
                           : fromOverride
                           ? "Saved override"
                           : "Bundle default";
