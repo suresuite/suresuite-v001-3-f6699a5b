@@ -178,6 +178,12 @@ function ValueCell({
   );
 }
 
+/** Supabase errors are plain objects, not Error instances — extract either. */
+function errMsg(e: unknown, fallback: string): string {
+  const m = (e as { message?: unknown })?.message;
+  return typeof m === "string" && m ? m : fallback;
+}
+
 function isEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null && b == null) return true;
@@ -245,12 +251,17 @@ export function StagePolicyTable({
     return [...set].sort();
   }, [suppliers, dataRows]);
   const [assigning, setAssigning] = useState<string | null>(null);
+  // Inline "new supplier" input state (per material row).
+  const [newSupplierFor, setNewSupplierFor] = useState<string | null>(null);
+  const [newSupplierId, setNewSupplierId] = useState("");
   const assignSupplier = async (materialId: string, supplierId: string) => {
     if (!projectId || !user) return;
     setAssigning(materialId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).rpc("assign_material_supplier", {
+      // Fast path: the dedicated RPC (creates lane + edge + supplier master).
+      const { error } = await sb.rpc("assign_material_supplier", {
         p_project_id: projectId,
         p_material_id: materialId,
         p_supplier_id: supplierId,
@@ -260,8 +271,42 @@ export function StagePolicyTable({
       if (error) throw error;
       toast.success(`Assigned ${supplierId} to ${materialId}. Fill in its price/lead time in the grid.`);
       reloadRows();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to assign supplier");
+    } catch (rpcErr) {
+      // Fallback: the upload pipeline that provably works in every deployed
+      // environment (same edge function the Data Manager uploads use), then a
+      // combine so the supply-chain edge list picks the pair up.
+      try {
+        const { data, error: edgeErr } = await supabase.functions.invoke("ingest-inbound-logistics", {
+          body: {
+            rows: [{
+              project_id: projectId,
+              plant_name: plantName ?? null,
+              supplier_id: supplierId,
+              material_id: materialId,
+              volume: null,
+              time_unit: null,
+              lead_time: null,
+              unit_price: null,
+            }],
+            userId: user.id,
+            userEmail: user.email,
+          },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (edgeErr || (data as any)?.success === false) {
+          throw edgeErr ?? new Error(String((data as { error?: string })?.error ?? "upload failed"));
+        }
+        await sb.rpc("combine_project_into_supply_chain", {
+          p_project_id: projectId,
+          p_user_id: user.id,
+          p_user_email: user.email,
+        });
+        toast.success(`Assigned ${supplierId} to ${materialId} via the upload pipeline. Fill in its price/lead time in the grid.`);
+        reloadRows();
+      } catch (fallbackErr) {
+        const msg = (e: unknown) => (e as { message?: string })?.message ?? String(e);
+        toast.error(`Failed to assign supplier: ${msg(rpcErr)} · fallback: ${msg(fallbackErr)}`);
+      }
     } finally {
       setAssigning(null);
     }
@@ -557,7 +602,7 @@ export function StagePolicyTable({
     } catch (e) {
       // Surface RPC failures (e.g. bulk_upsert_* missing in this DB) instead
       // of swallowing them — the click handler has no other catch.
-      toast.error(e instanceof Error ? e.message : "Failed to save changes");
+      toast.error(errMsg(e, "Failed to save changes"));
       return;
     }
     setDrafts({});
@@ -582,7 +627,7 @@ export function StagePolicyTable({
               }
               toast.success("Version saved — runs can now bind to this state.");
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Failed to save version");
+              toast.error(errMsg(e, "Failed to save version"));
             }
           })();
         },
@@ -618,7 +663,7 @@ export function StagePolicyTable({
       setDrafts({});
       toast.success(`Removed ${stageOverrides.length} saved override(s) — showing project data + defaults.`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to reset overrides");
+      toast.error(errMsg(e, "Failed to reset overrides"));
     } finally {
       setResetting(false);
       setConfirmResetAll(false);
@@ -1085,37 +1130,72 @@ export function StagePolicyTable({
                               />
                             )}
                             {c.id === "supplier_id" && r.__needs_supplier ? (
-                              // Unassigned material: pick a supplier to create
-                              // the sourcing lane (assign_material_supplier RPC).
-                              <Select
-                                disabled={assigning === String(r.material_id)}
-                                onValueChange={(v) =>
-                                  void assignSupplier(String(r.material_id), v)
-                                }
-                              >
-                                <SelectTrigger className="h-6 w-full text-[11px] border-destructive/40 bg-destructive/5 px-2">
-                                  <SelectValue
-                                    placeholder={
-                                      assigning === String(r.material_id)
-                                        ? "Assigning…"
-                                        : "assign supplier…"
+                              newSupplierFor === rowKey ? (
+                                // Typing a brand-new supplier id: Enter confirms,
+                                // Escape cancels.
+                                <Input
+                                  autoFocus
+                                  value={newSupplierId}
+                                  placeholder="new supplier id…"
+                                  className="h-6 text-[11px] px-2 border-destructive/40"
+                                  disabled={assigning === String(r.material_id)}
+                                  onChange={(e) => setNewSupplierId(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      setNewSupplierFor(null);
+                                      setNewSupplierId("");
                                     }
-                                  />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {knownSuppliers.length === 0 ? (
-                                    <SelectItem value="__none__" disabled className="text-xs">
-                                      No suppliers in project — upload suppliers first
+                                    if (e.key === "Enter") {
+                                      const id = newSupplierId.trim();
+                                      if (!id || id.startsWith("(")) {
+                                        toast.warning("Enter a valid supplier id.");
+                                        return;
+                                      }
+                                      setNewSupplierFor(null);
+                                      setNewSupplierId("");
+                                      void assignSupplier(String(r.material_id), id);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    setNewSupplierFor(null);
+                                    setNewSupplierId("");
+                                  }}
+                                />
+                              ) : (
+                                // Unassigned material: pick (or create) a supplier —
+                                // creates the sourcing lane.
+                                <Select
+                                  disabled={assigning === String(r.material_id)}
+                                  onValueChange={(v) => {
+                                    if (v === "__new__") {
+                                      setNewSupplierFor(rowKey);
+                                      setNewSupplierId("");
+                                      return;
+                                    }
+                                    void assignSupplier(String(r.material_id), v);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-6 w-full text-[11px] border-destructive/40 bg-destructive/5 px-2">
+                                    <SelectValue
+                                      placeholder={
+                                        assigning === String(r.material_id)
+                                          ? "Assigning…"
+                                          : "assign supplier…"
+                                      }
+                                    />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__new__" className="text-xs font-medium">
+                                      + New supplier…
                                     </SelectItem>
-                                  ) : (
-                                    knownSuppliers.map((s) => (
+                                    {knownSuppliers.map((s) => (
                                       <SelectItem key={s} value={s} className="text-xs">
                                         {s}
                                       </SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )
                             ) : (
                               <span className="truncate">{String(r[c.id] ?? "")}</span>
                             )}
