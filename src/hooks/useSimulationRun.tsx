@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Engine fallback report (scsim MappingWarning, written by the worker). */
+export interface MappingWarning {
+  level: "info" | "warn" | "error";
+  entity: string;
+  field: string;
+  reason: string;
+}
+
 export interface SimulationRun {
   id: string;
   scenario_id: string;
@@ -17,6 +25,7 @@ export interface SimulationRun {
   code_version: string | null;
   policy_version_id: string | null;
   policy_hash: string | null;
+  mapping_warnings: MappingWarning[] | null;
   created_at: string;
 }
 

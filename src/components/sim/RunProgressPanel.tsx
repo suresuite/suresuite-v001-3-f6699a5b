@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Play, Square, Plus } from "lucide-react";
-import type { SimulationRun, Replication } from "@/hooks/useSimulationRun";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, Play, Square, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { MappingWarning, SimulationRun, Replication } from "@/hooks/useSimulationRun";
 
 interface Props {
   run: SimulationRun | null;
@@ -96,6 +98,8 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
         </CardContent>
       </Card>
 
+      <MappingWarningsCard warnings={run.mapping_warnings} status={run.status} />
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Per-replication</CardTitle>
@@ -128,5 +132,95 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+const WARN_META = {
+  error: { icon: AlertTriangle, cls: "text-destructive" },
+  warn: { icon: AlertTriangle, cls: "text-amber-600 dark:text-amber-400" },
+  info: { icon: Info, cls: "text-muted-foreground" },
+} as const;
+
+/**
+ * The engine's fallback report (simulation_runs.mapping_warnings) — every
+ * value the mapper had to derive or default instead of reading from the
+ * project data. A fully specified project produces zero of these
+ * (docs/design blueprint §8.2 / Phase A exit criterion).
+ */
+function MappingWarningsCard({
+  warnings,
+  status,
+}: {
+  warnings: MappingWarning[] | null;
+  status: SimulationRun["status"];
+}) {
+  const [open, setOpen] = useState(false);
+  if (status !== "done" && (!warnings || warnings.length === 0)) return null;
+  const list = warnings ?? [];
+  const warnCount = list.filter((w) => w.level !== "info").length;
+  const infoCount = list.length - warnCount;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <button
+          type="button"
+          className="flex items-center gap-2 w-full text-left"
+          onClick={() => setOpen((o) => !o)}
+        >
+          {list.length > 0 ? (
+            open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />
+          ) : (
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          )}
+          <CardTitle className="text-sm">Engine mapping report</CardTitle>
+          {list.length === 0 ? (
+            <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
+              fully specified — no fallbacks
+            </Badge>
+          ) : (
+            <>
+              {warnCount > 0 && (
+                <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300">
+                  {warnCount} defaulted
+                </Badge>
+              )}
+              {infoCount > 0 && (
+                <Badge variant="outline" className="text-[10px]">
+                  {infoCount} derived
+                </Badge>
+              )}
+            </>
+          )}
+        </button>
+      </CardHeader>
+      {open && list.length > 0 && (
+        <CardContent className="pt-0">
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Values the engine derived from logistics data (info) or defaulted because no source
+            existed (warn). Fix warns in the Item Master / uploads to make results trustworthy.
+          </p>
+          <div className="max-h-52 overflow-auto rounded-md border">
+            <ul className="text-xs divide-y">
+              {list.map((w, i) => {
+                const meta = WARN_META[w.level] ?? WARN_META.info;
+                const Icon = meta.icon;
+                return (
+                  <li key={i} className="flex items-start gap-2 px-2.5 py-1.5">
+                    <Icon className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", meta.cls)} />
+                    <div className="min-w-0">
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {w.entity} · {w.field}
+                      </span>
+                      <div>{w.reason}</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </CardContent>
+      )}
+    </Card>
   );
 }
