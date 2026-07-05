@@ -103,3 +103,6 @@ Consequences (migration `20260705000001_open_logistics_reads.sql`):
 - **Never** gate a directly-read table's SELECT on `get_current_user_id()` — route it through
   a SECURITY DEFINER RPC instead if row-level access control is required.
 - Writes stay on the guarded policies/RPCs; only SELECT is open.
+- The policies UI reads lane rows via `get_project_datasets` (RPC-first with a direct-read
+  fallback, `src/lib/policies/projectLanes.ts`), so it works even before the RLS migration is
+  applied to a given environment.

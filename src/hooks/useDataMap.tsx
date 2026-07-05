@@ -2,8 +2,9 @@
 // the project's live data to show, per uploaded column, whether the engine
 // resolves it from the master, from a logistics fallback, or from a default.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useItemMasters } from "@/hooks/useItemMasters";
+import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import type { StatusKey } from "@/lib/policies/dataMap";
 
 export type DataMapStatus = "ok" | "fallback" | "default" | "unused" | "missing";
@@ -29,6 +30,7 @@ const num = (v: unknown): number => {
 };
 
 export function useDataMap(projectId: string | null | undefined) {
+  const { user } = useAuth();
   const { materials, products, suppliers, derived, loading: mastersLoading } =
     useItemMasters(projectId);
   const [inbound, setInbound] = useState<LaneRow[]>([]);
@@ -46,34 +48,19 @@ export function useDataMap(projectId: string | null | undefined) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sb = supabase as any;
-      const [inQ, outQ, bomQ] = await Promise.all([
-        sb
-          .from("inbound_logistics")
-          .select("material_id,unit_price,lead_time,volume")
-          .eq("project_id", projectId)
-          .limit(10000),
-        sb
-          .from("outbound_logistics")
-          .select("product_id,unit_price,expected_lead_time,volume")
-          .eq("project_id", projectId)
-          .limit(10000),
-        sb
-          .from("bom_single_level")
-          .select("product_id", { count: "exact", head: true })
-          .eq("project_id", projectId),
-      ]);
+      // Lane rows via the SECURITY DEFINER RPC (direct reads are RLS-blocked
+      // under the app's custom auth — see src/lib/policies/projectLanes.ts).
+      const lanes = await fetchProjectLanes(projectId, user);
       if (cancelled) return;
-      setInbound((inQ.data ?? []) as LaneRow[]);
-      setOutbound((outQ.data ?? []) as LaneRow[]);
-      setBomCount(bomQ.count ?? 0);
+      setInbound(lanes.inbound as unknown as LaneRow[]);
+      setOutbound(lanes.outbound as unknown as LaneRow[]);
+      setBomCount(lanes.bom.length);
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, user]);
 
   const statuses = useMemo<Record<StatusKey, LiveFieldStatus>>(() => {
     // Helper for "k of n rows have this field set" master columns.

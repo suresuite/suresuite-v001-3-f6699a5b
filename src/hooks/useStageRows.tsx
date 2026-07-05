@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { StageKey } from "@/lib/policies/stages";
 import { ratePerDay } from "@/lib/policies/effectiveEconomics";
+import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 
 export interface StageRow {
   /** Composite key = "<location>::<material_or_product>" — also used as override target_key. */
@@ -61,37 +62,15 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           (d: SCDRow) => d.data_source && d.data_source !== "multi_tier",
         );
 
-        // 2) Enrichment tables (best-effort — may be empty).
-        const [inboundQ, outboundQ, bomQ] = await Promise.all([
-          sb
-            .from("inbound_logistics")
-            .select("supplier_id,material_id,unit_price,lead_time,volume,time_unit")
-            .eq("project_id", projectId)
-            .limit(10000),
-          sb
-            .from("outbound_logistics")
-            .select(
-              "customer_id,product_id,unit_price,expected_lead_time,volume,time_unit",
-            )
-            .eq("project_id", projectId)
-            .limit(10000),
-          sb
-            .from("bom_multi_level")
-            .select(
-              "material_id,level,higher_level_component_id,consumption_rate",
-            )
-            .eq("project_id", projectId)
-            .limit(10000),
-        ]);
-
-        // Surface read failures loudly — an RLS/grant block returns silently
-        // empty data and previously masqueraded as "no uploaded data".
-        if (inboundQ.error) console.warn("[useStageRows] inbound_logistics read failed", inboundQ.error);
-        if (outboundQ.error) console.warn("[useStageRows] outbound_logistics read failed", outboundQ.error);
-        if (bomQ.error) console.warn("[useStageRows] bom_multi_level read failed", bomQ.error);
-        const inbound = inboundQ.data ?? [];
-        const outbound = outboundQ.data ?? [];
-        const bom = bomQ.data ?? [];
+        // 2) Enrichment rows via the SECURITY DEFINER RPC (the app's custom
+        //    auth makes direct .from() reads on the lane tables return empty
+        //    under RLS — see src/lib/policies/projectLanes.ts).
+        const lanes = await fetchProjectLanes(projectId, user);
+        const inbound = lanes.inbound;
+        const outbound = lanes.outbound;
+        // Multi-level BOM shape only; single-level projects have no
+        // higher_level_component_id hierarchy (matches previous behavior).
+        const bom = lanes.bomLevel.includes("multi") ? lanes.bom : [];
 
         // Unit contract (docs/data-simulation-mapping.md §3): `time_unit`
         // describes the VOLUME period only (day/week/month/yearly/…), while
