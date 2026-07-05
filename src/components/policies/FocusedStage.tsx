@@ -244,6 +244,7 @@ export function FocusedStage({
         fulfillmentStrategy={fulfillmentStrategy}
         bulkUpsertOverrides={bulkUpsertOverrides}
         deleteOverride={deleteOverride}
+        saveSnapshot={saveSnapshot}
         leftActions={tableLeftActions}
       />
 

@@ -529,11 +529,14 @@ export const FIELD_LABELS: Record<string, string> = {
   share_pct: "Share (%)",
   material_price: "Material price",
   supplier_capacity_per_day: "Supplier capacity (units/day)",
-  // item-master-backed grid columns (saved to materials/products, not overrides)
+  // item-master-backed grid columns (saved to materials/products/suppliers, not overrides)
   material_cost: "Material cost (master)",
   sell_price: "Sell price",
   production_capacity: "Capacity (units/wk)",
   demand_mean: "Demand mean (units/wk)",
+  capacity_per_week: "Supplier capacity (units/wk)",
+  reliability_score: "Reliability (0–1)",
+  material_moq: "MOQ (master)",
   // inventory extensions
   moq: "MOQ",
   // production extensions
