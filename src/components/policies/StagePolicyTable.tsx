@@ -202,7 +202,14 @@ export function StagePolicyTable({
   // Item masters back the economics columns (ColSpec.master): the grid shows
   // and edits materials.cost / products.sell_price / production_capacity /
   // demand_mean directly, with the engine's derived fallback (≈) when unset.
-  const { materials, products, suppliers, derived, saveRows } = useItemMasters(projectId);
+  const {
+    materials,
+    products,
+    suppliers,
+    derived,
+    saveRows,
+    error: mastersError,
+  } = useItemMasters(projectId);
   const { snapshot: snapshotDataset } = useDatasetVersion(projectId);
   const masterRowById = useMemo(
     () => ({
@@ -460,9 +467,14 @@ export function StagePolicyTable({
         const mcol = col.master;
         if (mcol && dataRow) {
           const id = String(dataRow[mcol.idFrom] ?? "");
+          if (!id) continue;
+          // Merge onto the loaded master row when one exists (the upsert RPCs
+          // overwrite every column); when the master table has no row yet,
+          // send a minimal row — the RPC inserts it.
           const base =
-            masterMerged[mcol.table].get(id) ?? masterRowById[mcol.table].get(id);
-          if (!base) continue;
+            masterMerged[mcol.table].get(id) ??
+            masterRowById[mcol.table].get(id) ??
+            ({ [mcol.idFrom]: id } as Record<string, unknown>);
           if (isEqual(v ?? null, (base as Record<string, unknown>)[mcol.field] ?? null)) continue;
           masterMerged[mcol.table].set(id, { ...base, [mcol.field]: v ?? null });
           continue;
@@ -486,14 +498,32 @@ export function StagePolicyTable({
       toast.info("No effective changes to save.");
       return;
     }
-    for (const table of ["materials", "products", "suppliers"] as ItemMasterTable[]) {
-      if (masterMerged[table].size === 0) continue;
-      await saveRows(
-        table,
-        [...masterMerged[table].values()] as unknown as Parameters<typeof saveRows>[1],
+    const masterTablesToSave = (["materials", "products", "suppliers"] as ItemMasterTable[]).filter(
+      (t) => masterMerged[t].size > 0,
+    );
+    if (masterTablesToSave.length > 0 && mastersError) {
+      // Don't pretend: if the masters failed to load (missing table/RPC in
+      // this environment), a save would clobber unseen data or fail anyway.
+      toast.error(
+        `Cannot save master data — item masters failed to load: ${mastersError}. ` +
+          "Apply the item-master DB migrations, then retry.",
       );
+      return;
     }
-    if (toUpsert.length > 0) await bulkUpsertOverrides(toUpsert);
+    try {
+      for (const table of masterTablesToSave) {
+        await saveRows(
+          table,
+          [...masterMerged[table].values()] as unknown as Parameters<typeof saveRows>[1],
+        );
+      }
+      if (toUpsert.length > 0) await bulkUpsertOverrides(toUpsert);
+    } catch (e) {
+      // Surface RPC failures (e.g. bulk_upsert_* missing in this DB) instead
+      // of swallowing them — the click handler has no other catch.
+      toast.error(e instanceof Error ? e.message : "Failed to save changes");
+      return;
+    }
     setDrafts({});
     // Offer to capture the edit as a version right away: master edits are
     // dataset state (dataset_versions), override edits are policy state
@@ -722,6 +752,15 @@ export function StagePolicyTable({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Item masters unavailable → master-backed columns can't save. */}
+      {mastersError && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
+          Item masters failed to load ({mastersError}) — master-data columns (cost, capacity,
+          demand, MOQ, reliability) cannot be saved until the item-master DB migrations are
+          applied to this environment.
+        </div>
+      )}
       {/* Project data status banner */}
       {dataBannerState === "seeded" && (
         <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
