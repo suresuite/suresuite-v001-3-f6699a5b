@@ -173,7 +173,18 @@ class GraphCache:
             cust_id = str(row["customer_id"])
             vol = float(row.get("volume") or 0.0)
             t_unit = str(row.get("time_unit") or "week").lower()
-            weekly_vol = vol / 4.0 if "month" in t_unit else vol
+            # time_unit is the volume period (docs/data-simulation-mapping.md §3);
+            # the shipped templates use "yearly".
+            if "year" in t_unit or "annual" in t_unit:
+                weekly_vol = vol * 7.0 / 365.25
+            elif "quarter" in t_unit:
+                weekly_vol = vol * 7.0 / 91.3125
+            elif "month" in t_unit:
+                weekly_vol = vol * 7.0 / 30.4375
+            elif "day" in t_unit or t_unit == "daily":
+                weekly_vol = vol * 7.0
+            else:
+                weekly_vol = vol
             product_demand[prd_id] = product_demand.get(prd_id, 0.0) + weekly_vol
             if row.get("unit_price"):
                 product_price[prd_id] = float(row["unit_price"])

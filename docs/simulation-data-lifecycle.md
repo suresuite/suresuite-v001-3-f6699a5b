@@ -84,3 +84,25 @@ All tables are RLS-scoped by project membership. The sim worker uses the service
 ## Data API requirements
 
 Every table above must have explicit `GRANT` statements for `authenticated` (and `service_role` for tables touched by the edge function / worker). Without those grants, PostgREST hides the table from its schema cache and the client sees `Could not find the table 'public.<name>' in the schema cache` — which is what caused the recent /policies save failure.
+
+### RLS rule for tables the frontend reads directly
+
+The app authenticates via the custom `authenticate_approved_user` RPC — the Supabase client
+always runs as `anon`, and per-user context lives in the session GUC `app.current_user_id`
+(set by `set_user_context`). **That GUC does not survive PostgREST connection pooling**, so any
+RLS policy built on `get_current_user_id()` evaluates NULL on direct `.from()` reads and
+silently returns 0 rows (HTTP 200 + `[]`, no error). This blocked the /policies grids from
+seeing `inbound_logistics`/`outbound_logistics`/`bom_*` for months.
+
+Consequences (migration `20260705000001_open_logistics_reads.sql`):
+
+- Tables the frontend reads directly (`materials`, `products`, `suppliers`,
+  `inbound_logistics`, `outbound_logistics`, `bom_single_level`, `bom_multi_level`, policy
+  tables) use `FOR SELECT ... USING (true)` for `anon` + `authenticated`, with per-user
+  filtering enforced in the SECURITY DEFINER RPCs that take `p_user_id`/`p_user_email`.
+- **Never** gate a directly-read table's SELECT on `get_current_user_id()` — route it through
+  a SECURITY DEFINER RPC instead if row-level access control is required.
+- Writes stay on the guarded policies/RPCs; only SELECT is open.
+- The policies UI reads lane rows via `get_project_datasets` (RPC-first with a direct-read
+  fallback, `src/lib/policies/projectLanes.ts`), so it works even before the RLS migration is
+  applied to a given environment.

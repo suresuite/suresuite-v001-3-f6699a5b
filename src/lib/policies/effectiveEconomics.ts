@@ -42,17 +42,30 @@ export interface OutboundArc {
 
 export const ENGINE_DEFAULT_PRICE = 1.0;
 
-// project_map.py `_UNIT_DAYS`, verbatim.
+// project_map.py `_UNIT_DAYS` — kept in lockstep. Includes the rate-word
+// synonyms the shipped upload templates actually use (time_unit="yearly").
 const UNIT_DAYS: Record<string, number> = {
-  day: 1, days: 1, d: 1,
-  week: 7, weeks: 7, wk: 7, w: 7,
-  month: 30.4375, months: 30.4375, mo: 30.4375, m: 30.4375,
+  day: 1, days: 1, d: 1, daily: 1,
+  week: 7, weeks: 7, wk: 7, w: 7, weekly: 7,
+  month: 30.4375, months: 30.4375, mo: 30.4375, m: 30.4375, monthly: 30.4375,
+  quarter: 91.3125, quarters: 91.3125, quarterly: 91.3125,
   year: 365.25, years: 365.25, yr: 365.25, y: 365.25,
+  yearly: 365.25, annual: 365.25, annually: 365.25,
 };
 
-function unitDays(unit: string | null | undefined): number | undefined {
+export function unitDays(unit: string | null | undefined): number | undefined {
   if (!unit) return undefined;
   return UNIT_DAYS[String(unit).trim().toLowerCase()];
+}
+
+/** Quantity per `unit`-period → quantity per day. Unknown unit → weekly basis. */
+export function ratePerDay(
+  value: number,
+  unit: string | null | undefined,
+  defaultDays = 7,
+): number {
+  const days = unitDays(unit) ?? defaultDays;
+  return value / days;
 }
 
 /** project_map.py `_rate_to_weekly`: quantity per unit-period → per week. */

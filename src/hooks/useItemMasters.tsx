@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import {
   cheapestInboundCost,
   demandWeightedSellPrice,
@@ -100,6 +102,7 @@ interface UseItemMastersResult {
  * then keeps the three tables live via postgres_changes.
  */
 export function useItemMasters(projectId: string | null | undefined): UseItemMastersResult {
+  const { user } = useAuth();
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -108,26 +111,15 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Logistics lanes — the engine's price/demand fallback sources.
+  // Logistics lanes — the engine's price/demand fallback sources. Read via
+  // the SECURITY DEFINER RPC (direct .from() reads are RLS-blocked under the
+  // app's custom auth — see src/lib/policies/projectLanes.ts).
   const loadLogistics = useCallback(async () => {
     if (!projectId) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabase as any;
-    const [inQ, outQ] = await Promise.all([
-      sb
-        .from("inbound_logistics")
-        .select("material_id,unit_price")
-        .eq("project_id", projectId)
-        .limit(10000),
-      sb
-        .from("outbound_logistics")
-        .select("product_id,unit_price,volume,time_unit")
-        .eq("project_id", projectId)
-        .limit(10000),
-    ]);
-    if (!inQ.error) setInboundArcs((inQ.data ?? []) as InboundArc[]);
-    if (!outQ.error) setOutboundArcs((outQ.data ?? []) as OutboundArc[]);
-  }, [projectId]);
+    const lanes = await fetchProjectLanes(projectId, user);
+    setInboundArcs(lanes.inbound as unknown as InboundArc[]);
+    setOutboundArcs(lanes.outbound as unknown as OutboundArc[]);
+  }, [projectId, user]);
 
   const loadTable = useCallback(
     async (table: ItemMasterTable) => {

@@ -63,15 +63,15 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "inbound_logistics", field: "supplier_id", engineField: "SupplierLink.supplier_id", chain: "identity — builds the supplier→material sourcing arc", statusKey: "identity" },
   { dataset: "inbound_logistics", field: "material_id", engineField: "SupplierLink.material_id", chain: "identity — builds the supplier→material sourcing arc", statusKey: "identity" },
   { dataset: "inbound_logistics", field: "unit_price", engineField: "SupplierLink.cost (c_{m,s})", chain: "per arc → 1.0 (warn); also the fallback for materials.cost (cheapest wins)", statusKey: "inbound_unit_price" },
-  { dataset: "inbound_logistics", field: "lead_time", engineField: "SupplierLink.lead_time_weeks", chain: "→ weeks, clamp [1,51] → 2 weeks (warn)", statusKey: "inbound_lead_time" },
-  { dataset: "inbound_logistics", field: "time_unit", engineField: "unit normalizer", chain: "converts lead_time/volume to weekly basis; unknown → week", statusKey: "identity" },
+  { dataset: "inbound_logistics", field: "lead_time", engineField: "SupplierLink.lead_time_weeks", chain: "WEEKS as-is, clamp [1,51] → 2 weeks (warn); time_unit does not apply", statusKey: "inbound_lead_time" },
+  { dataset: "inbound_logistics", field: "time_unit", engineField: "unit normalizer", chain: "volume period only (day/week/month/yearly…); unknown → week", statusKey: "identity" },
   { dataset: "inbound_logistics", field: "volume", engineField: "sourcing share basis", chain: "per-lane volume; drives supplier share and primary suggestion", statusKey: "inbound_volume" },
   // ── outbound_logistics ─────────────────────────────────────────────────
   { dataset: "outbound_logistics", field: "customer_id", engineField: "CustomerLink.customer_id", chain: "identity — builds the product→customer arc", statusKey: "identity" },
   { dataset: "outbound_logistics", field: "product_id", engineField: "CustomerLink.product_id", chain: "identity — builds the product→customer arc", statusKey: "identity" },
   { dataset: "outbound_logistics", field: "unit_price", engineField: "Product.unit_price fallback", chain: "demand-weighted average per product when products.sell_price is empty", statusKey: "outbound_unit_price" },
   { dataset: "outbound_logistics", field: "volume", engineField: "Product.demand fallback", chain: "Σ weekly volume per product when products.demand_mean is empty", statusKey: "outbound_volume" },
-  { dataset: "outbound_logistics", field: "time_unit", engineField: "unit normalizer", chain: "converts volume to weekly basis; unknown → week", statusKey: "identity" },
+  { dataset: "outbound_logistics", field: "time_unit", engineField: "unit normalizer", chain: "volume period only (day/week/month/yearly…); unknown → week", statusKey: "identity" },
   { dataset: "outbound_logistics", field: "expected_lead_time", engineField: null, chain: "shown in the customer stage table; the engine does not read it", statusKey: "outbound_expected_lead_time" },
   // ── bom_single_level ───────────────────────────────────────────────────
   { dataset: "bom_single_level", field: "product_id", engineField: "BomLine.product_id", chain: "identity — links product to its components", statusKey: "identity" },
