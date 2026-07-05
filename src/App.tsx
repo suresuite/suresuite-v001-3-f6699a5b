@@ -24,6 +24,13 @@ import Forbidden from './pages/Forbidden';
 import DocsLayout from '@/components/docs/DocsLayout';
 import HelpPage from './pages/help/HelpPage';
 import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminOrganizations from './pages/admin/AdminOrganizations';
+import AdminProjects from './pages/admin/AdminProjects';
+import AdminModels from './pages/admin/AdminModels';
+import AdminUsage from './pages/admin/AdminUsage';
+import AdminAudit from './pages/admin/AdminAudit';
 
 const queryClient = new QueryClient();
 
