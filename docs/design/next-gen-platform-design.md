@@ -811,7 +811,19 @@ Kept short and grounded — each item anchors to an existing artifact, and all o
 - **Decision-trace explanation.** Facet 11's observability records (§6.1) — week, node, trigger, inputs, decision, rationale code — are exactly the context an LLM needs to answer *"why did fill rate drop in week 37?"* with citations to actual policy firings rather than plausible fiction.
 - **Natural-language experiment specification.** "Compare dual sourcing against +2 weeks of safety stock under last quarter's disruption set" compiles to a typed comparison/DOE experiment (§9.1) — reviewable before dispatch, reproducible after.
 
-**Guardrail (platform law):** LLM output is always a *proposal* that passes the same validation gates as human input; simulation results, KPIs, and rankings are never LLM-generated. The AI layer sits beside the provenance fabric, never inside it.
+**The assistant roster: five task-scoped agents *(added in v0.2)*.** The three capabilities above are delivered not as one monolithic copilot but as **five agents — one per room of the analyst journey plus a cross-cutting explainer — behind a single copilot entry point**. Rationale for the number: each of the four product rooms owns exactly one artifact class an assistant can produce a *reviewable proposal* for; a monolith cannot be given least-privilege tool access or evaluated against a stable task distribution, and agents that own no artifact class add surface without capability. The roster grows only when a new room/artifact class exists (Phase E).
+
+| # | Agent | Room | Produces (always a proposal) | Hard gate | Phase |
+|---|---|---|---|---|---|
+| A1 | Data Steward | /project-manager | item-master value drafts with source citations; mapping-fix diffs | same validated mutations as manual edits; diff review | B |
+| A2 | Policy Configurator | /policies | bundle diffs from NL intent, as candidate `policy_versions` | registry schema + `feasibility()` + portfolio checks + manifest (§8.1) | B (M8 diff proposer) |
+| A3 | V&V Analyst | Run & Validate | pipeline interpretation, next-step recommendations, drafted model-card narrative | card *content* is computed, never asserted; adoption is a user action (§9.5) | B0/B |
+| A4 | Experiment Designer | /simulation-lab | typed experiment specs (CRN-enforced); decision briefs citing only persisted results | specs dispatch through the `sim-command` gate like any run | C |
+| A5 | Explainer | cross-cutting | grounded answers from decision traces (facet 11) with mandatory citations | refuses when the trace does not support an answer | B/C |
+
+Engineering discipline: agents are stateless per task (context assembled from project artifacts, not conversation memory — reproducible, auditable); every action lands as a reviewable artifact, so the platform's immutability/single-writer disciplines contain agent error by construction; a golden task suite per agent gates roster changes in CI, mirroring the golden-trace gate on engine changes. Success metrics are product metrics: time-to-complete-model (A1), accepted-proposal rate (A2), models reaching validated state (A3), question-to-brief latency (A4), citation coverage (A5).
+
+**Guardrail (platform law):** LLM output is always a *proposal* that passes the same validation gates as human input; simulation results, KPIs, and rankings are never LLM-generated. The AI layer sits beside the provenance fabric, never inside it. No agent has a privileged path: every tool surface is a subset of the platform's existing public interfaces.
 
 ---
 
@@ -855,7 +867,7 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 ### Phase D — AI-native
 - Surrogate pipeline + `surrogate_models` registry + `rank_criticality` analysis job with dual-gate fallback (§11).
 - Drift-triggered retraining; provenance-labeled rankings in the UI.
-- LLM assist (flagged): bundle diff proposer, decision-trace explanation (§12).
+- LLM assist (flagged): the five-agent roster completed (§12) — A4 Experiment Designer and A5 Explainer join A1–A3 landed with their rooms in Phases B/C; golden agent-task suites in CI.
 - Legacy engine removal (gate E4).
 - **Exit:** full-network criticality ranking on a 1,000-supplier-class network within a planning cycle, with measured rank fidelity against held-out simulation. **Closes:** G12.
 
