@@ -28,6 +28,8 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Database,
   Gauge,
   Info,
@@ -51,7 +53,7 @@ import { useSimulationRun } from "@/hooks/useSimulationRun";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
 import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
-import type { Replication } from "@/hooks/useSimulationRun";
+import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { PolicyBundle, FulfillmentStrategy } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import { PolicyRunStepper } from "./PolicyRunStepper";
@@ -216,6 +218,15 @@ export function RunValidateStage({
   const [validationScenarioId, setValidationScenarioId] = useState<string | null>(null);
   const { latestRun, reps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
 
+  // Re-attach to the auto-managed validation scenario on mount, so engine
+  // output persisted by earlier sessions renders immediately — previously the
+  // run panel only appeared after dispatching a fresh run in this session.
+  useEffect(() => {
+    if (validationScenarioId) return;
+    const scen = scenarios.find((s) => s.name === VALIDATION_SCENARIO_NAME);
+    if (scen) setValidationScenarioId(scen.id);
+  }, [scenarios, validationScenarioId]);
+
   // ── Real run output (run_replications) — the source for every chart,
   //    warm-up estimate and validation statistic below. ────────────────────
   const doneReps = useMemo(
@@ -283,6 +294,7 @@ export function RunValidateStage({
   const [multiQueuedAt, setMultiQueuedAt] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState<"single" | "multi" | null>(null);
   const [runTab, setRunTab] = useState<"single" | "multi">("single");
+  const [showTopology, setShowTopology] = useState(false);
 
   // Warm-up
   const [indicators, setIndicators] = useState<IndicatorUpload[]>([]);
@@ -309,15 +321,17 @@ export function RunValidateStage({
   const completed = useMemo(() => {
     const s = new Set<number>();
     if (findings !== null && blockCount === 0) s.add(0);
-    if (multiQueuedAt) s.add(1);
+    // Completed replications in the DB are the real evidence; a queued
+    // multi-run also counts so the stepper stays responsive while it runs.
+    if (multiQueuedAt || hasRealData) s.add(1);
     if (warmupComputed && warmCfg.warmup_days > 0) s.add(2);
     if (validationResult) s.add(3);
     return s;
-  }, [findings, blockCount, multiQueuedAt, warmupComputed, warmCfg.warmup_days, validationResult]);
+  }, [findings, blockCount, multiQueuedAt, hasRealData, warmupComputed, warmCfg.warmup_days, validationResult]);
 
   const canContinue = (i: number): boolean => {
     if (i === 0) return findings !== null && blockCount === 0;
-    if (i === 1) return multiQueuedAt !== null;
+    if (i === 1) return multiQueuedAt !== null || hasRealData;
     if (i === 2) return warmupComputed && warmCfg.warmup_days > 0;
     return true;
   };
@@ -671,7 +685,9 @@ export function RunValidateStage({
 
               <TabsContent value="single" className="mt-3 flex flex-col gap-3">
                 <p className="text-[11px] text-muted-foreground">
-                  Single run validates one deterministic trajectory — inspect material flow.
+                  Single run validates one deterministic trajectory. Real engine output —
+                  status, KPIs and weekly traces persisted by the worker — appears in the
+                  panel below the moment the run finishes.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <Field label="Seed">
@@ -697,18 +713,29 @@ export function RunValidateStage({
                     </Button>
                   </div>
                 </div>
-                <MaterialFlowAnimated
-                  suppliers={supRows.rows}
-                  plants={plantRowsQ.rows}
-                  customers={custRows.rows}
-                  seed={singleCfg.seed}
-                  horizonDays={singleCfg.horizon_days}
-                />
-                <p className="text-[10px] text-muted-foreground -mt-1">
-                  Illustrative animation of your network topology — not simulation output. Real
-                  results appear in the run status below and in the following steps once the
-                  worker finishes.
-                </p>
+                {/* The animation is decorative topology only — collapsed by
+                    default so it can't be mistaken for simulation output. */}
+                <button
+                  type="button"
+                  onClick={() => setShowTopology((v) => !v)}
+                  className="self-start flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showTopology ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                  Topology preview (illustrative animation — not simulation output)
+                </button>
+                {showTopology && (
+                  <MaterialFlowAnimated
+                    suppliers={supRows.rows}
+                    plants={plantRowsQ.rows}
+                    customers={custRows.rows}
+                    seed={singleCfg.seed}
+                    horizonDays={singleCfg.horizon_days}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="multi" className="mt-3 flex flex-col gap-3">
@@ -817,12 +844,16 @@ export function RunValidateStage({
               </TabsContent>
             </Tabs>
 
-            {/* Live run status — the queued experiment.run flows to the Fly
-                worker; the badge goes preliminary (stub) → worker engine when
-                the real Monte Carlo result lands. */}
+            {/* Live run evidence — the queued experiment.run flows to the Fly
+                worker; the engine badge flips to "scsim engine <version>" and
+                the persisted per-replication output renders the moment the
+                worker writes it. This section, not the animation above, is
+                the proof the simulation actually ran. */}
             {validationScenarioId && (
-              <div className="mt-5 border-t pt-4">
-                <h4 className="text-xs font-semibold mb-2">Run status</h4>
+              <div className="mt-5 border-t pt-4 flex flex-col gap-3">
+                <h4 className="text-xs font-semibold">
+                  Engine run — live status &amp; persisted output
+                </h4>
                 <RunProgressPanel
                   run={latestRun}
                   reps={reps}
@@ -834,6 +865,9 @@ export function RunValidateStage({
                     if (projectId && latestRun) void addReps(projectId, latestRun.id, n);
                   }}
                 />
+                {latestRun && hasRealData && (
+                  <EngineOutputSummary run={latestRun} reps={doneReps} />
+                )}
               </div>
             )}
           </StepShell>
@@ -1715,6 +1749,75 @@ function RealWeeklyTraces({
         <Line type="monotone" dataKey="mean" stroke="hsl(var(--primary))" strokeWidth={2.2} dot={false} isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
+  );
+}
+
+function fmtKpi(id: string, v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  if (id === "fill_rate") return `${(v * 100).toFixed(1)}%`;
+  return Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2);
+}
+
+const SUMMARY_TILES = [
+  { id: "fill_rate", label: "Fill rate" },
+  { id: "revenue", label: "Revenue (€)" },
+  { id: "lost_sales_value", label: "Lost sales (€)" },
+  { id: "max_backlog", label: "Max backlog (u)" },
+] as const;
+
+/** Persisted engine output for the latest validation run: aggregate KPIs ± CI
+ *  half-widths (simulation_runs) and real weekly per-replication traces
+ *  (run_replications.time_series). Nothing here is synthetic. */
+function EngineOutputSummary({ run, reps }: { run: SimulationRun; reps: Replication[] }) {
+  const agg = run.aggregate_kpis ?? {};
+  const ci = run.ci_half_widths ?? {};
+  const warmupDays = run.warmup_detected_at != null ? run.warmup_detected_at * 7 : undefined;
+  return (
+    <div className="rounded-md border bg-card">
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+        <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+        <span className="text-xs font-semibold">Engine output</span>
+        <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+          persisted results · {reps.length} replication(s)
+        </span>
+        <div className="flex-1" />
+        {run.policy_hash && (
+          <span
+            className="text-[10px] font-mono text-muted-foreground"
+            title="SHA-256 of the policy version this run is bound to"
+          >
+            policy {run.policy_hash.slice(0, 8)}
+          </span>
+        )}
+        {run.ended_at && (
+          <span className="text-[10px] text-muted-foreground">
+            finished {new Date(run.ended_at).toLocaleString()}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 border-b px-3 py-2 text-[11px]">
+        {SUMMARY_TILES.map((t) => (
+          <div key={t.id} className="flex flex-col">
+            <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+              {t.label}
+            </span>
+            <span className="font-mono tabular-nums text-foreground">
+              {fmtKpi(t.id, agg[t.id])}
+              {Number.isFinite(ci[t.id]) && (
+                <span className="text-muted-foreground/70 ml-1 text-[10px]">
+                  ± {fmtKpi(t.id, ci[t.id])}
+                </span>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
+        {(["fill_rate", "max_backlog", "avg_on_hand_value", "revenue"] as KpiId[]).map((kpi) => (
+          <KpiPreviewChart key={kpi} kpi={kpi} reps={reps} warmup={warmupDays} />
+        ))}
+      </div>
+    </div>
   );
 }
 

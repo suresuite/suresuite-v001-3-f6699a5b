@@ -254,7 +254,7 @@ export function MaterialFlowAnimated({
           <RotateCcw className="h-3.5 w-3.5" />
         </Button>
         <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Material flow · day {Math.floor(simDay)} / {horizonDays}
+          Topology preview (illustrative) · day {Math.floor(simDay)} / {horizonDays}
         </div>
         <input
           type="range"
@@ -268,7 +268,7 @@ export function MaterialFlowAnimated({
           className="flex-1 h-1 accent-primary"
         />
         <span className="text-[10px] font-mono text-muted-foreground">
-          {cumulativeUnits.toLocaleString()} u shipped
+          {cumulativeUnits.toLocaleString()} u (preview)
         </span>
       </div>
 
@@ -355,7 +355,7 @@ export function MaterialFlowAnimated({
           <span>emission rate → flow rate</span>
         </div>
         <div className="ml-auto font-mono">
-          active packets: {packetsRef.current.length}
+          preview packets: {packetsRef.current.length}
         </div>
       </div>
     </div>
