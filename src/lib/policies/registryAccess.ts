@@ -22,6 +22,19 @@ export interface RegistryParamProp {
   maximum?: number;
 }
 
+/**
+ * Facet-5 data contract (§8.1): an entity field a policy (or the always-on
+ * engine mechanics) reads, declared engine-side and exported here. `field`
+ * uses the `dataset.column` vocabulary of dataMap.ts / the mapping contract.
+ */
+export interface RegistryDataRequirement {
+  field: string;
+  level: "required" | "recommended" | "defaulted";
+  reason: string;
+  fallback: string | null;
+  condition: string | null;
+}
+
 export interface RegistryPolicy {
   id: string;
   catalog_ref: string;
@@ -34,11 +47,13 @@ export interface RegistryPolicy {
   summary: string;
   hooks: Array<{ phase: string; priority: number; reads: string[]; writes: string[]; resolution: string | null }>;
   params_schema: { properties?: Record<string, RegistryParamProp>; [k: string]: unknown };
+  data_requirements: RegistryDataRequirement[];
 }
 
 interface RegistryPayload {
   engine_version: string;
   policies: RegistryPolicy[];
+  base_data_requirements: RegistryDataRequirement[];
   pipeline: unknown;
   kpis: Array<{ name: string; symbol: string; definition: string; unit: string }>;
   entities: Record<string, unknown>;
@@ -76,3 +91,11 @@ export const paramRange = (
 
 export const paramDefault = (policyId: string, field: string): unknown =>
   BY_ID.get(policyId)?.params_schema?.properties?.[field]?.default;
+
+/** Entity fields the always-on engine mechanics read (§8.1 manifest base). */
+export const baseDataRequirements = (): RegistryDataRequirement[] =>
+  REGISTRY.base_data_requirements ?? [];
+
+/** Entity fields a specific policy declares it reads (facet 5). */
+export const policyDataRequirements = (policyId: string): RegistryDataRequirement[] =>
+  BY_ID.get(policyId)?.data_requirements ?? [];

@@ -43,6 +43,7 @@ from scsim.core.phases import DEMAND, FULFILLMENT, Hook, PhaseId
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
 from scsim.entities.scenario import Scenario
 from scsim.policies.base import (
+    DataRequirement,
     FeasibilityIssue,
     FeasibilityResult,
     PolicyParams,
@@ -81,6 +82,15 @@ class CustomerAllocation(PolicyPlugin):
         "accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60."
     )
     Params: ClassVar[type[PolicyParams]] = CustomerAllocationParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="outbound_logistics.volume", level="required",
+            reason="Per-customer demand shares come from outbound volumes; "
+                   "without them there are no customer segments to allocate "
+                   "between (the policy is inert below two customers).",
+            fallback=None,
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

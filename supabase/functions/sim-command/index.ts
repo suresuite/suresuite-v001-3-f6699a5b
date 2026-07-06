@@ -10,6 +10,11 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
+import {
+  loadGateDataset,
+  runValidationGate,
+  type GateResult,
+} from "../_shared/validationGate.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -315,6 +320,13 @@ async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
+/** Carries a §8.1 gate result out of handleExperimentRun as a 422 response. */
+class ValidationRejection extends Error {
+  constructor(public gate: GateResult) {
+    super(`run rejected by the required-data manifest (${gate.status})`);
+  }
+}
+
 async function handleExperimentRun(
   sb: ReturnType<typeof createClient>,
   cmd: Command,
@@ -364,6 +376,29 @@ async function handleExperimentRun(
     (snapshotDefaults?.recovery as Record<string, unknown> | null) ?? null,
     (scenario.recovery_overrides as Record<string, unknown> | null) ?? null,
   );
+
+  // Pre-dispatch validation gate (§8.1–8.2): grade the required-data manifest
+  // — compiled from the engine registry for THIS policy configuration —
+  // against the live project tables. `required` gaps reject the run;
+  // `recommended` gaps reject unless the caller acknowledged them after
+  // seeing the findings (the /policies verification stage does; the Lab
+  // offers a "Run anyway"). Best-effort on read errors: a gate that cannot
+  // load data must not take run dispatch down with it.
+  try {
+    const gateDataset = await loadGateDataset(sb, scenario.project_id as string);
+    const gate = runValidationGate({
+      dataset: gateDataset,
+      snapshotDefaults: snapshotDefaults ?? {},
+      disruptionSchedule:
+        (scenario.disruption_schedule as Array<Record<string, unknown>>) ?? [],
+      acknowledgeWarnings:
+        (cmd.payload as Record<string, unknown>).acknowledge_warnings === true,
+    });
+    if (gate) throw new ValidationRejection(gate);
+  } catch (e) {
+    if (e instanceof ValidationRejection) throw e;
+    console.error("validation gate skipped (data load failed)", e);
+  }
 
   // Compute daily revenue and cost from actual project data (unit_price × volume_per_day).
   // These ground the stub KPIs in real numbers instead of hardcoded $1M/$720k.
@@ -536,7 +571,23 @@ Deno.serve(async (req) => {
     const envelope = { ...cmd, user_id: userData.user.id, server_ts: Date.now() };
 
     if (cmd.kind === "experiment.run") {
-      const result = await handleExperimentRun(sb, cmd, userData.user.id);
+      let result: { run_id: string };
+      try {
+        result = await handleExperimentRun(sb, cmd, userData.user.id);
+      } catch (e) {
+        if (e instanceof ValidationRejection) {
+          return new Response(
+            JSON.stringify({
+              error: "run rejected by the required-data manifest",
+              validation: e.gate.status,
+              ack_required: e.gate.status === "ack_required",
+              findings: e.gate.findings,
+            }),
+            { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        throw e;
+      }
       await broadcast(channel, "run.queued", { ...envelope, ...result });
       return new Response(JSON.stringify({ ok: true, ...result }), {
         status: 202,

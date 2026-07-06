@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 /** Engine fallback report (scsim MappingWarning, written by the worker). */
@@ -27,6 +28,23 @@ export interface SimulationRun {
   policy_hash: string | null;
   mapping_warnings: MappingWarning[] | null;
   created_at: string;
+}
+
+/** Body of a sim-command 422 — the §8.1 required-data gate result. */
+interface GateErrorBody {
+  validation?: "blocked" | "ack_required";
+  ack_required?: boolean;
+  findings?: Array<{ severity: string; field: string; policy: string; message: string }>;
+}
+
+async function parseFunctionError(error: unknown): Promise<GateErrorBody | null> {
+  const ctx = (error as { context?: Response }).context;
+  if (!ctx || typeof ctx.json !== "function") return null;
+  try {
+    return (await ctx.json()) as GateErrorBody;
+  } catch {
+    return null;
+  }
 }
 
 export interface Replication {
@@ -100,18 +118,48 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
   }, [scenarioId, loadLatest]);
 
   const runExperiment = useCallback(
-    async (projectId: string, policyVersionId: string) => {
+    async (projectId: string, policyVersionId: string, acknowledgeWarnings = false) => {
       if (!scenarioId) return;
       const { error } = await supabase.functions.invoke("sim-command", {
         body: {
           project_id: projectId,
           scenario_id: scenarioId,
           kind: "experiment.run",
-          payload: { policy_version_id: policyVersionId },
+          payload: {
+            policy_version_id: policyVersionId,
+            acknowledge_warnings: acknowledgeWarnings,
+          },
           client_ts: Date.now(),
         },
       });
-      if (error) throw error;
+      if (!error) return;
+
+      // §8.1 required-data gate: sim-command returns 422 with typed findings
+      // instead of dispatching a run on silently-defaulted data.
+      const body = await parseFunctionError(error);
+      if (body?.validation) {
+        const summary = (body.findings ?? [])
+          .slice(0, 3)
+          .map((f) => f.message)
+          .join("\n");
+        if (body.ack_required) {
+          toast.warning("Run paused — data the engine would default", {
+            description: summary,
+            duration: 12000,
+            action: {
+              label: "Run anyway",
+              onClick: () => void runExperiment(projectId, policyVersionId, true),
+            },
+          });
+          return;
+        }
+        toast.error("Run blocked — required data is missing", {
+          description: summary,
+          duration: 12000,
+        });
+        return;
+      }
+      throw error;
     },
     [scenarioId],
   );

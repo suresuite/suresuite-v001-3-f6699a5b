@@ -315,6 +315,7 @@ export function RunValidateStage({
       timeUnit: timeUnit ?? null,
       materials: itemMasters.materials,
       products: itemMasters.products,
+      suppliers: itemMasters.suppliers,
       derived: itemMasters.derived,
     });
     setFindings(f);
@@ -350,7 +351,10 @@ export function RunValidateStage({
         project_id: projectId,
         scenario_id: scenarioId,
         kind: "experiment.run",
-        payload: { policy_version_id: policyVersionId },
+        // Runs from this stage always follow a verification pass in which any
+        // warn-level manifest findings were displayed — that is the §8.1
+        // acknowledgment the sim-command gate requires for `recommended` gaps.
+        payload: { policy_version_id: policyVersionId, acknowledge_warnings: true },
         client_ts: Date.now(),
       },
     });

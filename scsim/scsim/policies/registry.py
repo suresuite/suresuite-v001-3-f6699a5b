@@ -13,7 +13,12 @@ from dataclasses import dataclass
 from typing import Optional
 
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
-from scsim.policies.base import FeasibilityIssue, PolicyParams, PolicyPlugin
+from scsim.policies.base import (
+    DataRequirement,
+    FeasibilityIssue,
+    PolicyParams,
+    PolicyPlugin,
+)
 
 
 class UnknownPolicyError(KeyError):
@@ -38,6 +43,7 @@ class CatalogEntry:
     params_model: type[PolicyParams]
     plugin_cls: Optional[type[PolicyPlugin]]  # None for planned policies
     milestone: str = ""                       # for planned policies: when it lands
+    data_requirements: tuple[DataRequirement, ...] = ()  # facet 5 (§8.1)
 
 
 _REGISTRY: dict[str, CatalogEntry] = {}
@@ -57,6 +63,7 @@ def register_plugin(cls: type[PolicyPlugin]) -> type[PolicyPlugin]:
         summary=cls.summary,
         params_model=cls.Params,
         plugin_cls=cls,
+        data_requirements=tuple(getattr(cls, "data_requirements", ()) or ()),
     )
     if cls.id in _REGISTRY:
         raise ValueError(f"duplicate policy id {cls.id!r}")
@@ -75,6 +82,7 @@ def register_planned(
     summary: str,
     params_model: type[PolicyParams],
     milestone: str,
+    data_requirements: tuple[DataRequirement, ...] = (),
 ) -> None:
     if id in _REGISTRY:
         raise ValueError(f"duplicate policy id {id!r}")
@@ -91,6 +99,7 @@ def register_planned(
         params_model=params_model,
         plugin_cls=None,
         milestone=milestone,
+        data_requirements=data_requirements,
     )
 
 

@@ -38,6 +38,7 @@ from scsim.core.phases import (
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
 from scsim.entities.scenario import Scenario
 from scsim.policies.base import (
+    DataRequirement,
     FeasibilityIssue,
     FeasibilityResult,
     PolicyParams,
@@ -90,6 +91,14 @@ class ProactiveMultiSourcing(PolicyPlugin):
         "disruption hits only its slice."
     )
     Params: ClassVar[type[PolicyParams]] = ProactiveMultiSourcingParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="inbound_logistics.volume", level="recommended",
+            reason="Standing order splits derive source weights from lane "
+                   "volumes when explicit ratios are not set.",
+            fallback=None,
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

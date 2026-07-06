@@ -38,6 +38,7 @@ from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyCla
 from scsim.entities.scenario import Scenario
 from scsim.policies.base import (
     CostBreakdown,
+    DataRequirement,
     FeasibilityIssue,
     FeasibilityResult,
     PolicyParams,
@@ -88,6 +89,20 @@ class FgSafetyStock(PolicyPlugin):
         "for short disruptions (same window, opposite sides of the CODP)."
     )
     Params: ClassVar[type[PolicyParams]] = FgSafetyStockParams
+    data_requirements: ClassVar[tuple[DataRequirement, ...]] = (
+        DataRequirement(
+            field="products.sell_price", level="required",
+            reason="Revenue-based ABC segmentation ranks products by price x "
+                   "demand; the 1.0 price default collapses the classes.",
+            fallback="demand-weighted average outbound unit_price",
+            condition="segmentation=abc_by_revenue",
+        ),
+        DataRequirement(
+            field="products.demand_cv", level="recommended",
+            reason="FG buffer sizing scales with demand variability.",
+            fallback="scenario demand_model.cv, then 0.30",
+        ),
+    )
 
     @property
     def hooks(self) -> list[Hook]:

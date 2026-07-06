@@ -19,9 +19,13 @@ from pathlib import Path
 from scsim.io.registry_export import registry_json
 
 # scripts/ -> scsim/ -> repo root -> src/lib/policies/registry.generated.json
-TARGET = (
-    Path(__file__).resolve().parents[2]
-    / "src" / "lib" / "policies" / "registry.generated.json"
+_ROOT = Path(__file__).resolve().parents[2]
+TARGET = _ROOT / "src" / "lib" / "policies" / "registry.generated.json"
+# The sim-command edge function reads the same snapshot for its pre-dispatch
+# validation gate (§8.2); Supabase bundles only supabase/functions/**, so the
+# payload is mirrored there rather than imported across the repo boundary.
+EDGE_TARGET = (
+    _ROOT / "supabase" / "functions" / "_shared" / "registry.generated.json"
 )
 
 
@@ -38,20 +42,22 @@ def main() -> int:
 
     content = _content()
     if args.check:
-        if not TARGET.exists() or TARGET.read_text() != content:
-            print(
-                "REGISTRY DRIFT: src/lib/policies/registry.generated.json is out of "
-                "sync with the engine — run `python scsim/scripts/gen_frontend_registry.py` "
-                "and commit the result.",
-                file=sys.stderr,
-            )
-            return 1
-        print("frontend registry snapshot is in sync with the engine")
+        for target in (TARGET, EDGE_TARGET):
+            if not target.exists() or target.read_text() != content:
+                print(
+                    f"REGISTRY DRIFT: {target.relative_to(_ROOT)} is out of "
+                    "sync with the engine — run `python scsim/scripts/gen_frontend_registry.py` "
+                    "and commit the result.",
+                    file=sys.stderr,
+                )
+                return 1
+        print("frontend + edge registry snapshots are in sync with the engine")
         return 0
 
-    TARGET.parent.mkdir(parents=True, exist_ok=True)
-    TARGET.write_text(content)
-    print(f"wrote {TARGET}")
+    for target in (TARGET, EDGE_TARGET):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+        print(f"wrote {target}")
     return 0
 
 

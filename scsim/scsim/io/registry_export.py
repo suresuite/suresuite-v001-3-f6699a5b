@@ -28,6 +28,7 @@ from scsim.entities.network import (
     Supplier,
     SupplierLink,
 )
+from scsim.io.project_map import base_data_requirements
 from scsim.kpi.definitions import KPI_DICTIONARY
 from scsim.policies.registry import catalog
 
@@ -73,10 +74,15 @@ def build_registry() -> dict[str, Any]:
             "summary": entry.summary,
             "hooks": plugin_hooks,
             "params_schema": entry.params_model.model_json_schema(),
+            "data_requirements": [r.as_dict() for r in entry.data_requirements],
         })
     return {
         "engine_version": ENGINE_VERSION,
         "policies": policies,
+        # §8.1 — entity fields the always-on engine mechanics read (world model,
+        # economics), with project_map.py's fallback chains. The per-policy
+        # counterpart is each policy's "data_requirements".
+        "base_data_requirements": [r.as_dict() for r in base_data_requirements()],
         "pipeline": pipeline_schema(),
         "kpis": [
             {"name": k.name, "symbol": k.symbol, "definition": k.definition, "unit": k.unit}
