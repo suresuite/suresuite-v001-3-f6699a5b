@@ -338,7 +338,7 @@ class ValidationRejection extends Error {
 async function handleExperimentRun(
   sb: ReturnType<typeof createClient>,
   cmd: Command,
-  userId: string,
+  userId: string | null,
 ) {
   if (!cmd.scenario_id) throw new Error("experiment.run requires scenario_id");
 
@@ -546,13 +546,15 @@ Deno.serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: userData, error: userErr } = await sb.auth.getUser();
-    if (userErr || !userData.user) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // This app authenticates through the approved_users RPC flow and always
+    // invokes functions with the platform-verified anon JWT — there is no
+    // Supabase Auth session (see migration 20260610000002). Use the auth
+    // user when one exists (future Supabase Auth migration keeps working),
+    // otherwise proceed with the anon identity, matching the RLS posture of
+    // the rest of the data layer. created_by stays an auth.users id (FK),
+    // so it is null for app users.
+    const { data: userData } = await sb.auth.getUser();
+    const authUserId: string | null = userData?.user?.id ?? null;
 
     const parsed = CommandSchema.safeParse(await req.json());
     if (!parsed.success) {
@@ -576,12 +578,12 @@ Deno.serve(async (req) => {
     }
 
     const channel = `sim:${cmd.project_id}`;
-    const envelope = { ...cmd, user_id: userData.user.id, server_ts: Date.now() };
+    const envelope = { ...cmd, user_id: authUserId, server_ts: Date.now() };
 
     if (cmd.kind === "experiment.run") {
       let result: { run_id: string };
       try {
-        result = await handleExperimentRun(sb, cmd, userData.user.id);
+        result = await handleExperimentRun(sb, cmd, authUserId);
       } catch (e) {
         if (e instanceof ValidationRejection) {
           return new Response(
