@@ -5,12 +5,17 @@ name: Deploy sim-worker to Fly
 # simulation_runs with real KPIs (code_version "worker-legacy"/"scsim-*").
 # Without this deploy, runs only ever show the edge function's "stub-recovery-2"
 # preliminary results.
+#
+# The image bundles the scsim engine (fly.toml sets SCSIM_ENGINE=1), so the
+# Docker build context is the REPO ROOT and engine changes under scsim/**
+# must trigger a redeploy too.
 
 on:
   push:
     branches: [main]
     paths:
       - "sim-worker/**"
+      - "scsim/**"
       - ".github/workflows/deploy-sim-worker.yml"
   workflow_dispatch:
 
@@ -26,7 +31,6 @@ jobs:
       # Idempotent: create the app on the first run, ignore "already exists".
       - name: Ensure Fly app exists
         run: flyctl apps create "$FLY_APP" || true
-        working-directory: sim-worker
         env:
           FLY_APP: ${{ vars.FLY_APP_NAME }}
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -41,7 +45,6 @@ jobs:
             UPSTASH_REDIS_URL="$UPSTASH_REDIS_URL" \
             SUPABASE_URL="$SUPABASE_URL" \
             SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
-        working-directory: sim-worker
         env:
           FLY_APP: ${{ vars.FLY_APP_NAME }}
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -49,9 +52,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
+      # Repo-root build context: the Dockerfile COPYs both sim-worker/ and
+      # scsim/ (see sim-worker/Dockerfile). Config + Dockerfile are passed
+      # explicitly since neither lives at the context root.
       - name: Deploy
-        run: flyctl deploy --remote-only --app "$FLY_APP"
-        working-directory: sim-worker
+        run: |
+          flyctl deploy . --remote-only --app "$FLY_APP" \
+            --config sim-worker/fly.toml \
+            --dockerfile sim-worker/Dockerfile
         env:
           FLY_APP: ${{ vars.FLY_APP_NAME }}
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

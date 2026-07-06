@@ -1,0 +1,19 @@
+# Only the sim-worker image builds from the repo root (see
+# sim-worker/Dockerfile). Allowlist exactly what that build COPYs so the
+# context stays small — everything else (frontend, node_modules, docs, …)
+# never reaches the builder.
+*
+!sim-worker/requirements.txt
+!sim-worker/sim_worker
+!scsim
+# scsim ships as an installed package; its docs/tests/tooling aren't needed.
+scsim/docs
+scsim/tests
+scsim/scripts
+scsim/mkdocs.yml
+# Local pip/setuptools residue — a stale build/ could ship outdated engine code.
+scsim/build
+scsim/scsim.egg-info
+**/__pycache__
+**/*.pyc
+**/.pytest_cache

@@ -8,6 +8,7 @@ import signal
 
 from dotenv import load_dotenv
 
+from .scsim_bridge import scsim_enabled
 from .worker import SimWorker
 
 load_dotenv()
@@ -19,7 +20,23 @@ logging.basicConfig(
 log = logging.getLogger("sim_worker")
 
 
+def _log_engine_mode() -> None:
+    """Announce (and fail fast on) the experiment engine at startup, so a
+    `fly logs` glance shows which engine will handle experiment.run."""
+    if not scsim_enabled():
+        log.warning(
+            "engine mode: LEGACY — experiment.run uses the frozen analytical "
+            "engine (aggregates only, no per-replication rows). "
+            "Set SCSIM_ENGINE=1 for the canonical scsim path."
+        )
+        return
+    from scsim import ENGINE_VERSION  # ImportError here must kill the worker
+
+    log.info("engine mode: scsim %s (SCSIM_ENGINE=1)", ENGINE_VERSION)
+
+
 async def main() -> None:
+    _log_engine_mode()
     worker = SimWorker(
         redis_url=os.environ["UPSTASH_REDIS_URL"],
         supabase_url=os.environ["SUPABASE_URL"],

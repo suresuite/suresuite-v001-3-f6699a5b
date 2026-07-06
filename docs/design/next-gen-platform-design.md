@@ -93,7 +93,9 @@ SureSuite is a four-tier system:
 
 - The **translation layer**: `scsim/scsim/io/project_map.py::_map_policies` converts family dictionaries into plugin activations. It is lossy (§2.3, G1).
 
-**Two engines.** The worker selects between a legacy discrete-time engine (`sim-worker/sim_worker/engine.py`, the current default, `code_version="worker-legacy"`) and scsim (opt-in via `SCSIM_ENGINE=1`). The legacy engine reads the family fields more completely but is architecturally a dead end; scsim reads fewer fields but is the platform's real asset. §3 resolves this.
+**Two engines.** The worker selects between a legacy discrete-time engine (`sim-worker/sim_worker/engine.py`, the code-level default, `code_version="worker-legacy"`) and scsim (via `SCSIM_ENGINE=1`). The legacy engine reads the family fields more completely but is architecturally a dead end; scsim reads fewer fields but is the platform's real asset. §3 resolves this.
+
+> **Implementation note (Phase A, deployment).** The production worker now actually runs scsim: the Fly image bundles the engine (`sim-worker/Dockerfile` builds from the repo root and installs `scsim/`; previously the image shipped without it, so the worker could not even import `datamap.py`) and `sim-worker/fly.toml` sets `SCSIM_ENGINE=1`. The deploy workflow also redeploys on `scsim/**` changes. The in-code default remains legacy until gate E3 (Phase B) flips it; unsetting the env var is the escape hatch E3 requires.
 
 ```mermaid
 flowchart LR
