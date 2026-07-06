@@ -29,15 +29,27 @@ the edge function (or filter `source==='stub'` client-side).
 - `networkx` + `simpy` — graph + DES (reuse logic from the existing `ml-service`)
 - `pydantic` — shared command/event schemas
 
-## SCSIM engine bridge (opt-in)
+## SCSIM engine (the deployed default)
 
-`experiment.run` workloads can execute on the new phase-pipeline engine in
-[`../scsim`](../scsim/README.md) instead of the legacy dict-based engine:
+`experiment.run` workloads execute on the phase-pipeline engine in
+[`../scsim`](../scsim/README.md). The Docker image bundles scsim (the build
+context is the repo root so `COPY scsim` works) and `fly.toml` sets
+`SCSIM_ENGINE=1`, so the deployed worker always runs the canonical scsim
+path: project data + saved policy snapshot → `scsim.io.from_project_data` →
+`run_scenario` → the worker persists `simulation_runs` aggregates and
+per-replication `run_replications` rows as the sole authoritative writer.
+
+For a local checkout the engine is installed from the sibling directory:
 
 ```bash
 pip install -e ../scsim        # alongside requirements.txt
 SCSIM_ENGINE=1 python -m sim_worker
 ```
+
+Unsetting `SCSIM_ENGINE` falls back to the frozen legacy analytical engine
+(`code_version "worker-legacy"`; aggregates only, no per-replication rows).
+The worker logs its engine mode at startup — check `fly logs` for
+`engine mode: scsim <version>`.
 
 `sim_worker/scsim_bridge.py` converts the project graph + effective policy
 dict via `scsim.io.legacy_graph.from_legacy_graph` (a structural mapping —
@@ -52,20 +64,24 @@ flip per deployment.
 ```bash
 cd sim-worker
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -e ../scsim
 cp .env.example .env  # fill in values
 python -m sim_worker
 ```
 
 ## Deploy to Fly.io
 
+Deploy from the **repo root** (the Docker build context must contain both
+`sim-worker/` and `scsim/`):
+
 ```bash
-fly launch --no-deploy --copy-config --name <your-app>
-fly secrets set \
+fly launch --no-deploy --copy-config --name <your-app> --path sim-worker
+fly secrets set --app <your-app> \
   UPSTASH_REDIS_URL=rediss://...:6379 \
   SUPABASE_URL=https://<ref>.supabase.co \
   SUPABASE_SERVICE_ROLE_KEY=eyJ...
-fly deploy
+cd <repo-root>
+fly deploy . --config sim-worker/fly.toml --dockerfile sim-worker/Dockerfile
 fly scale count 1 --region <closest-to-supabase>
 ```
 
@@ -76,9 +92,11 @@ which is essential for sub-50 ms command pickup.
 ### Automated deploy (CI)
 
 `.github/workflows/deploy-sim-worker.yml` deploys this worker to Fly on every
-push that touches `sim-worker/**` (and on manual `workflow_dispatch`). It
-creates the app if missing, syncs the Fly secrets, and runs
-`flyctl deploy --remote-only`. Configure once in **GitHub repo → Settings →
+push that touches `sim-worker/**` or `scsim/**` (and on manual
+`workflow_dispatch`). It creates the app if missing, syncs the Fly secrets,
+and runs `flyctl deploy . --remote-only --config sim-worker/fly.toml
+--dockerfile sim-worker/Dockerfile` from the repo root so the image can bundle
+the scsim engine. Configure once in **GitHub repo → Settings →
 Secrets and variables → Actions**:
 
 | Kind | Name | Value |

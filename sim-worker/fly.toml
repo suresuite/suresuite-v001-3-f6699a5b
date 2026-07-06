@@ -1,5 +1,6 @@
 # Fly.io configuration for sim-worker.
-# Run `fly launch --no-deploy --copy-config` to register the app, then `fly deploy`.
+# The image bundles the scsim engine, so deploys build from the REPO ROOT:
+#   flyctl deploy . --config sim-worker/fly.toml --dockerfile sim-worker/Dockerfile
 # CI (.github/workflows/deploy-sim-worker.yml) overrides `app` with the
 # FLY_APP_NAME Actions variable, so keep that variable and this value in sync.
 
@@ -11,6 +12,10 @@ primary_region = "iad"   # set this close to your Supabase region
 [env]
   LOG_LEVEL = "INFO"
   IDLE_TTL_SECONDS = "600"
+  # Run experiment.run on the scsim phase-pipeline engine (the canonical path:
+  # worker is the sole authoritative writer of runs + per-replication rows).
+  # Remove to fall back to the legacy analytical engine (aggregates only).
+  SCSIM_ENGINE = "1"
 
 [[vm]]
   cpu_kind = "shared"
