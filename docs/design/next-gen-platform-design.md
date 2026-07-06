@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.1 — for review |
-| **Date** | 2026-07-02 |
+| **Status** | Draft v0.2 — v0.1 reviewed against the Phase A implementation; adds the model-credibility (V&V) pipeline (§9.5), gap G13, the policy-picker interaction contract (§6.3), and a re-sequenced Phase B that puts the CORE (picker + V&V) first |
+| **Date** | 2026-07-06 (v0.1: 2026-07-02) |
 | **Altitude** | Platform-wide conceptual architecture: data model → policy layer → engine → experimentation → AI/surrogates → UI |
 | **Non-goals** | Implementation details, code, SQL DDL, dated schedules |
 | **Authority** | This document governs the *platform* design. `scsim/docs/architecture.md` remains authoritative for engine mechanics; `scsim/docs/roadmap.md` for engine milestones. Where this document proposes changes to either, it says so explicitly. |
@@ -26,7 +26,10 @@ Section map against the design brief:
 | 6. Policy interactions | §7 |
 | 7. AnyLogistix benchmark | §10 |
 | 8/9. Stress testing, surrogate model, data/model/version management | §9 (experimentation), §11 (surrogate architecture) |
+| Verification & validation → confident decision support (v0.2 review) | §9.5 (model-credibility pipeline), G13 |
 | Roadmap | §13 |
+
+Companion descriptive document: `docs/design/platform-architecture-report.md` — the platform described *as built* from technical and supply-chain-management viewpoints, framed as a scientific report skeleton. This blueprint stays normative (what to build and why); the report is descriptive (what exists and how to present it).
 
 Companion documents: `docs/data-simulation-mapping.md` (current field-mapping contract), `docs/simulation-data-lifecycle.md` (current state tiers), `scsim/docs/architecture.md`, `scsim/docs/roadmap.md`, `scsim/docs/stress-tests.md`, `scsim/docs/synergy.md`, `scsim/docs/adr/0001-mts-fulfillment-mode.md`.
 
@@ -166,6 +169,7 @@ Numbered gaps, each cited to evidence. Later sections reference these IDs; §13'
 | **G10** | **No run caching or deduplication.** `policy_hash` is stored on `simulation_runs` but never queried for reuse; every Run re-executes the full Monte Carlo | `sim-worker/sim_worker/worker.py` | Identical simulations are recomputed; stress-test sweeps are unaffordable |
 | **G11** | **Narrow disruption model.** Supplier-targeted only (plant targets hard-error; material/customer/edge presets in `StressTestCard` silently degrade), ≤5 events, two effect types (lead-time extension, capacity reduction), no demand-surge class | `project_map.py::_map_events`, `scsim/docs/roadmap.md` | Stress-testing scope far below research needs |
 | **G12** | **No surrogate/ML layer.** No metamodels, no run-result reuse for training, no model registry (the former ml-service was removed) | repo-wide search | Every question costs a full simulation; large-scale stress testing is computationally prohibitive |
+| **G13** | **V&V outcomes are not persisted — no model-credibility artifact.** *(added in v0.2)* The Run & Validate stage detects warm-up and checks replication adequacy, but the adopted warm-up, replication recommendation, and validation verdict live only in browser `localStorage`; `scenarios.warmup_mode/warmup_days` keep their defaults; nothing marks a `policy_versions` snapshot as validated | `src/components/policies/RunValidateStage.tsx` (persistKey → localStorage), `scenarios` schema defaults, `policy_versions` columns | The credibility established in `/policies` never reaches the Simulation Lab: decision runs neither inherit the adopted warm-up/replication settings nor show validation status — users can unknowingly base decisions on an unvalidated or drifted configuration. §9.5 defines the fix |
 
 ### 2.4 Assumptions currently embedded in the simulation
 
@@ -438,6 +442,16 @@ flowchart LR
 
 Users configure everything in `/policies` (per the brief): pick a policy per slot, fill its parameters, or accept preset-derived values — presets (A14) generalize naturally to bundle presets. Replacing a policy implementation never requires engine or UI changes: it is a new registry entry that immediately appears as a new selectable algorithm for its slot.
 
+**The picker interaction contract (Phase B UX — the ALX-class selection experience, added in v0.2).** The reference interaction commercial users expect (§10.1 rows 3/5) — *select a policy, and the corresponding list of parameters to fill appears* — is delivered as a contract on the registry, not as hand-crafted screens:
+
+1. **Slot → catalog.** For each slot of a node's bundle (§4.3/4.4), the UI lists exactly the catalog entries registered for that slot: implemented policies selectable; planned ones visible-but-disabled with their milestone (A3's honest catalog, surfaced to users).
+2. **Selection → parameter form.** Choosing a policy renders its parameter form directly from the registry's `params_schema` — labels, units, ranges, enum options, defaults, and `ModeStrip` nominal/alert/crisis values all come from the engine's Pydantic models via `registry.generated.json`; nothing is re-typed by hand (`src/lib/policies/registryAccess.ts` is the only access path).
+3. **Selection → data demands.** The same selection immediately re-compiles the required-data manifest (§8.1), so "what must I now supply in the model?" updates live: picking `finite_queue` capacity makes `suppliers.capacity_per_week` a required input on the spot, with a link that walks the user to the field.
+4. **Always-valid default.** Every slot shows its named default policy when the user has chosen nothing (§4.4), so the form is never empty and behavior is never hidden.
+5. **Validation before save.** Field-level validation uses the schema's own ranges; cross-field and cross-policy checks reuse `feasibility()`/`check_portfolio` findings rendered inline.
+
+This is the point where the hand-written 7-family Zod vocabulary (`src/lib/policies/schemas.ts`, `columnSpecs.ts`) and the `engineBridge.json` translation retire: the forms speak the engine's plugin vocabulary natively.
+
 ---
 
 ## 7. Policy interaction framework
@@ -634,6 +648,33 @@ Two runs are *comparable* iff they are CRN-paired (same seed spec) and their Run
 
 The Redis-stream worker (A11) generalizes from one job type to a typed job family: `simulate`, `battery`, `portfolio`, `train_surrogate`, `rank_criticality` (§11.5). Sweeps shard across workers safely because the seed tree and snapshot store are already shard-safe (`scsim/docs/roadmap.md` notes this explicitly — the missing piece is only the orchestrator). Jobs check the run cache before executing; workers remain the sole writers of results.
 
+### 9.5 Model credibility: the verification & validation pipeline *(added in v0.2)*
+
+This subsection is numbered inside §9 but **logically precedes §9.1**: experiments presuppose a credible model. It formalizes what the product treats as the CORE user journey — *configure policies → verify the model runs → validate it statistically → then, and only then, use the Simulation Lab for decision support* — and closes G13.
+
+**Grounding in simulation methodology.** The pipeline implements the standard discrete-event simulation V&V discipline (Sargent's verification-vs-validation distinction; Law's run-length/warm-up/replication tactics) as a guided product flow rather than a textbook checklist:
+
+| Step | Question answered | Mechanism (status) |
+|---|---|---|
+| 1 · **Verification** | *Is the model specified and consistent?* | Structural/topology checks (`verification.ts`) + the registry-driven required-data manifest (§8.1–8.2) — `block` findings stop the pipeline. **Shipped (Phase A)** |
+| 2 · **Single-run face validation** | *Does the model work at all, and does its behavior look right?* | One replication, fixed seed; the user inspects real weekly traces and the engine mapping report — "fully specified, no fallbacks" is the visible pass signal. **Shipped (Phase A)** |
+| 3 · **Replication study** | *How many replications does a trustworthy estimate need?* | N seeded replications persisted to `run_replications`; running-mean convergence and CI half-width vs. a target precision; adequacy n* = (z·s/(ε·x̄))². **Shipped (Phase A, fixed-N client-side); Phase C exposes the engine's sequential-CI stopping (A12) as the server-side variant** |
+| 4 · **Warm-up determination** | *When does the transient end, so KPIs measure steady state?* | Engine-authoritative MSER-5 + Conway (`warmup_detected_at`); client-side Welch/MSER-5 over persisted weekly series as cross-checks. **Shipped (Phase A)** |
+| 5 · **Statistical validation** | *Does the model reproduce reality?* | Two-sample tests of persisted per-replication output against user-uploaded empirical series (KS on distributions, Welch-t on means), post-warm-up. **Shipped (Phase A)** |
+| 6 · **Adoption — the validated model card** | *How do these findings govern later use?* | **Missing today (G13)** — defined below |
+
+**The validated model card.** The pipeline's outcome becomes a persisted, immutable artifact — the same snapshot-plus-hash discipline as A5 — instead of browser state:
+
+- **Identity**: bound to the exact provenance triple it was established on — `policy_version_id` (+ `policy_hash`), `dataset_version_id` (+ `graph_hash`), `engine_fingerprint` — plus the validation scenario and seed spec.
+- **Content**: adopted warm-up (weeks, method, and the evidence series reference), replication recommendation per focal KPI (n for target precision ε at confidence 1−α), validation test results (statistic, p, sample provenance), verifier findings snapshot, timestamp and author.
+- **Storage shape** (concept-level): a `model_validations` table keyed by the hash triple; `policy_versions` gains a derived "validated" badge through it. One card per (triple); re-running V&V on the same triple supersedes the card.
+- **Consumption in the Simulation Lab**: scenarios created under a validated triple **inherit** the adopted warm-up (manual mode, adopted weeks) and default replication count; every run header shows a credibility badge — `validated ✓` / `stale` / `unvalidated`.
+- **Staleness law** (mirrors surrogate validity scoping, §11.4): the card is valid only for its exact hashes. Any change — policy edit, data re-upload, engine upgrade — flips consuming surfaces to `stale`, with a one-click path back to the pipeline. Credibility is never inferred across drift.
+
+**Decision-support readiness, stated as a product guarantee:** *a KPI shown for decision-making is either produced under a validated model card, or is visibly labeled as unvalidated.* This is the V&V analogue of §6.2's "the UI can only offer what the engine can execute" — the Lab can only *assert* what the pipeline has established.
+
+**Roadmap placement:** the card, inheritance, and badges are the first workstream of Phase B (§13), alongside the registry-driven picker — together they are the platform's CORE loop. Sequential-CI replication service and CRN-paired validation experiments join in Phase C, where they reuse the experiment machinery (§9.1–9.3).
+
 ---
 
 ## 10. Benchmark: AnyLogistix
@@ -658,6 +699,7 @@ AnyLogistix (ALX) is the reference commercial tool: network optimization (CPLEX-
 | 12 | AI / ML | None native | — | Surrogate layer with calibrated uncertainty + fallback (§11); LLM-assisted configuration and explanation (§12) |
 | 13 | Compute economics | Every experiment simulates | Repeated identical runs recomputed | Content-addressed run cache + warm-state snapshot reuse (§9.2) |
 | 14 | Deployment & licensing | Desktop product, commercial licenses | Per-seat cost; closed ecosystem | Web platform; open engine; research-friendly |
+| 15 | Model credibility / V&V workflow | Replications and variation experiments; verification left to user discipline | No guided V&V pipeline; no warm-up methodology; validation state not persisted or enforced | Guided verification → validation pipeline with MSER-5/Welch warm-up, replication adequacy, KS/Welch-t empirical validation, and a persisted validated-model card that decision runs inherit and display (§9.5) |
 
 ### 10.2 What the pillars buy, concretely
 
@@ -787,6 +829,15 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 - **Exit:** a fully-specified project runs on scsim with zero mapping warnings; every run reproducible from its three hashes. **Closes:** G4, G5, G6; G1/G2 substantially.
 
 ### Phase B — Policy completion: the node-owned catalog
+
+*(Re-sequenced in v0.2: workstream B0 is the platform's CORE loop — the ALX-class policy-selection experience plus the V&V credibility pipeline — and lands before the catalog is broadened. A wide catalog configured through an unfinished picker, or validated results that evaporate before the Lab, would both miss the point.)*
+
+**B0 — The CORE loop (first):**
+- Registry-driven policy picker (§6.3 interaction contract): per-slot policy selection with parameter forms rendered from `params_schema`; planned policies visible-but-disabled; hand-written Zod vocabulary and `engineBridge.json` retired.
+- V&V credibility pipeline completion (§9.5): `model_validations` card persisted on the provenance triple; Lab scenarios inherit adopted warm-up + replication counts; credibility badges (`validated` / `stale` / `unvalidated`) on every run surface; staleness on any hash drift.
+- **B0 exit:** selecting any implemented policy shows exactly its engine parameters and its data demands live; a model validated in Run & Validate carries its warm-up and replication settings into every Lab scenario automatically, and validation status is visible on every result. **Closes:** G13; the UI half of G1.
+
+**B1 — Catalog and bundles:**
 - v1 catalog (§5) implemented/activated: extended P-P.1 parameterization; unreachable policies (P-S.2, P-P.4, P-P.9) wired; new supplier/customer/transport slots; promoted defaults (P-P.0, P-F.x, P-C.4, P-S.5/6).
 - PolicyBundles: node-type default layer, per-node resolution, bundle-aware snapshots (§4.3); horizon lens in `/policies` (§4.1).
 - Interaction graph published in registry payload and UI (§7.3).
@@ -797,6 +848,7 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 - Typed experiments: comparison, DOE (resurrect `ExperimentDesigner` + `doe.ts`), stress batteries, portfolio/synergy studies in the product (§9.1); Compare pane with CRN semantics (§9.3).
 - `run_cache` + platform-tier warm-snapshot reuse (§9.2); typed worker jobs + sweep sharding (§9.4).
 - Disruption model broadened per engine roadmap: demand-surge event class, ST-3…ST-7 batteries (G11).
+- V&V pipeline upgrades riding on the experiment machinery (§9.5): server-side sequential-CI replication stopping (A12) replaces the client-side fixed-N adequacy check; validation runs become CRN-paired experiments.
 - Aligns with M8: remaining planned policies, P-X.1 recovery playbook.
 - **Exit:** a full ST-1 battery over a reference network runs sharded, cache-aware, and a repeat run costs near-zero compute. **Closes:** G8, G9, G10; G11 substantially.
 
@@ -917,6 +969,6 @@ Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs
 
 ## Appendix C — Glossary and gap index
 
-**Glossary.** *PolicyBundle*: a node instance's resolved `{slot → (policy_id, params)}` map (§4.3). *Slot*: a decision domain a node role must fill (§4.4). *Promoted default*: an engine mechanic given a policy ID and UI visibility (`.0` convention). *Registry export*: the single JSON payload (`registry_export.py`) from which forms, validators, and docs are generated. *Required-data manifest*: the compiled set of entity fields the selected policies demand (§8.1). *RunKey*: content-addressed run identity (§9.2). *Family digest*: `SnapshotStore`'s hash over network+settings+policies excluding events (A8). *Dual reliability gate*: interval-width + novelty test that routes surrogate predictions back to simulation (§11.2). *Three-hash provenance*: `graph_hash` + `policy_hash` + `scenario_hash` binding every run (§8.4).
+**Glossary.** *PolicyBundle*: a node instance's resolved `{slot → (policy_id, params)}` map (§4.3). *Slot*: a decision domain a node role must fill (§4.4). *Promoted default*: an engine mechanic given a policy ID and UI visibility (`.0` convention). *Registry export*: the single JSON payload (`registry_export.py`) from which forms, validators, and docs are generated. *Required-data manifest*: the compiled set of entity fields the selected policies demand (§8.1). *RunKey*: content-addressed run identity (§9.2). *Family digest*: `SnapshotStore`'s hash over network+settings+policies excluding events (A8). *Dual reliability gate*: interval-width + novelty test that routes surrogate predictions back to simulation (§11.2). *Three-hash provenance*: `graph_hash` + `policy_hash` + `scenario_hash` binding every run (§8.4). *Validated model card*: the persisted V&V outcome (adopted warm-up, replication recommendation, validation verdict) bound to a provenance triple; Lab scenarios inherit it and runs display its status (§9.5).
 
-**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D.
+**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D. G13 unpersisted V&V outcomes → §9.5, Phase B0.
