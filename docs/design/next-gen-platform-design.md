@@ -552,10 +552,12 @@ Silent defaults become structurally impossible: any default the engine would app
 > user's empirical CSVs. Pre-run, the only synthetic visuals left are the explicitly labeled
 > "illustrative preview" panel and the material-flow animation. The engine mapping report
 > (`simulation_runs.mapping_warnings`) renders in the run panel — "fully specified, no
-> fallbacks" is the visible Phase A exit signal. **Remaining gap:** the worker persists a weekly
-> series for `fill_rate` only; extending `scsim_bridge.compute_run_from_project`'s
-> `time_series` (backlog / on-hand / revenue weekly) is bundled into Phase C with the run-cache
-> work, at which point the scalar-KPI charts upgrade to weekly traces too.
+> fallbacks" is the visible Phase A exit signal. The engine now exposes the weekly trace
+> series it already records (`ScenarioResult.extra_series`: `backlog_units`, `on_hand_value`,
+> `revenue_value`), the bridge persists them per replication into
+> `run_replications.time_series`, and the V&V charts/tests use whichever weekly series exists
+> per KPI (fill rate, max backlog, on-hand value, revenue) — `lost_sales_value` remains
+> per-rep-scalar only (no weekly trace column).
 
 ### 8.3 Data model evolution
 

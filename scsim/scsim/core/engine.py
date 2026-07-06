@@ -639,6 +639,9 @@ class ScenarioResult:
     rep_cells: list[tuple[int, int]] = field(default_factory=list)
     warmup: Optional[WarmupReport] = None
     lp_fallbacks: int = 0
+    # Additional weekly per-replication series lifted from the trace
+    # (same shape as fr_series): "backlog_units", "on_hand_value", "revenue_value".
+    extra_series: dict[str, np.ndarray] = field(default_factory=dict)
 
     def kpi_array(self, key: str) -> np.ndarray:
         return np.array([row.get(key, np.nan) for row in self.kpis])
@@ -668,6 +671,9 @@ def run_scenario(
     )
     kpis: list[dict[str, float]] = []
     fr_rows = np.zeros((len(grid), settings.horizon))
+    backlog_rows = np.zeros((len(grid), settings.horizon))
+    onhand_rows = np.zeros((len(grid), settings.horizon))
+    revenue_rows = np.zeros((len(grid), settings.horizon))
     lp_fallbacks = 0
     for n, (i, j) in enumerate(grid):
         events = resolve_events(compiled.model, t_w, j) if scenario.events else []
@@ -681,13 +687,17 @@ def run_scenario(
         row["model_rep"], row["event_rep"] = float(i), float(j)
         kpis.append(row)
         fr_rows[n] = ctx.trace.fill_rate
+        backlog_rows[n] = ctx.trace.backlog_units
+        onhand_rows[n] = ctx.trace.on_hand_value
+        revenue_rows[n] = ctx.trace.revenue_value
         lp_fallbacks += int(ctx.policy_state.get("material_allocation", {}).get("lp_fallbacks", 0))
 
     # Sequential stopping (optional) extends model seeds until ε is met.
     from scsim.entities.enums import ReplicationStopping
     if settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI and scenario.events:
-        kpis, fr_rows, grid = _extend_until_ci(
-            compiled, scenario, kpis, fr_rows, grid, t_w, window_end, debug
+        kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows, grid = _extend_until_ci(
+            compiled, scenario, kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows,
+            grid, t_w, window_end, debug,
         )
 
     keys = sorted({k for row in kpis for k in row} - {"model_rep", "event_rep"})
@@ -717,10 +727,16 @@ def run_scenario(
         rep_cells=grid,
         warmup=warmup,
         lp_fallbacks=lp_fallbacks,
+        extra_series={
+            "backlog_units": backlog_rows,
+            "on_hand_value": onhand_rows,
+            "revenue_value": revenue_rows,
+        },
     )
 
 
-def _extend_until_ci(compiled, scenario, kpis, fr_rows, grid, t_w, window_end, debug):
+def _extend_until_ci(compiled, scenario, kpis, fr_rows, backlog_rows, onhand_rows,
+                     revenue_rows, grid, t_w, window_end, debug):
     settings = compiled.model.settings
     e_axis = max({j for _, j in grid}) + 1
     next_i = max({i for i, _ in grid}) + 1
@@ -741,9 +757,12 @@ def _extend_until_ci(compiled, scenario, kpis, fr_rows, grid, t_w, window_end, d
             row["model_rep"], row["event_rep"] = float(i), float(j)
             kpis.append(row)
             fr_rows = np.vstack([fr_rows, ctx.trace.fill_rate[None, :]])
+            backlog_rows = np.vstack([backlog_rows, ctx.trace.backlog_units[None, :]])
+            onhand_rows = np.vstack([onhand_rows, ctx.trace.on_hand_value[None, :]])
+            revenue_rows = np.vstack([revenue_rows, ctx.trace.revenue_value[None, :]])
         grid = grid + batch
         next_i += 10
-    return kpis, fr_rows, grid
+    return kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows, grid
 
 
 # ---------------------------------------------------------------------------

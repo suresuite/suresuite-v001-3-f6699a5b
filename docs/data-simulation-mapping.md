@@ -162,6 +162,9 @@ to the project default and are reported.
 KPI keys (the `ScenarioResult → DB` contract, in `scsim_bridge.py`): `fill_rate`, `revenue`,
 `lost_sales_value`, `cost_of_resilience`, `ttr_weeks`, `tts_weeks`, `service_loss_area`,
 `max_backlog`, `resilience_index`. Aggregates carry `mean` and `ci_halfwidth` per key.
+`run_replications.time_series` carries the weekly per-replication series: `fill_rate` plus the
+engine's `extra_series` (`backlog_units`, `on_hand_value`, `revenue_value`) — consumed by the
+/policies Run & Validate stage for warm-up estimation and KS/Welch-t validation.
 
 ---
 
