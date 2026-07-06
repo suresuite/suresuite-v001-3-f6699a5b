@@ -542,6 +542,20 @@ Silent defaults become structurally impossible: any default the engine would app
 > (`supabase/functions/_shared/registry.generated.json`) written and
 > drift-checked by the same `gen_frontend_registry.py` CI gate, so the three
 > surfaces cannot disagree.
+> **Implementation note (Phase A, delivered).** The Run & Validate stage now renders **persisted
+> run output** instead of browser-synthesized previews: KPI options are the engine's own keys
+> (`run_replications.kpis`); the multi-run panel shows real per-replication weekly fill-rate
+> traces (`time_series.fill_rate`) with a cross-rep mean ± CI band, and running-mean convergence
+> for scalar KPIs; warm-up auto-detect returns the engine's `warmup_detected_at` (or client-side
+> Welch/MSER-5 over the real weekly series — `src/lib/sim/validationStats.ts`); replication
+> adequacy and the KS/Welch-t validation are computed from real per-rep samples against the
+> user's empirical CSVs. Pre-run, the only synthetic visuals left are the explicitly labeled
+> "illustrative preview" panel and the material-flow animation. The engine mapping report
+> (`simulation_runs.mapping_warnings`) renders in the run panel — "fully specified, no
+> fallbacks" is the visible Phase A exit signal. **Remaining gap:** the worker persists a weekly
+> series for `fill_rate` only; extending `scsim_bridge.compute_run_from_project`'s
+> `time_series` (backlog / on-hand / revenue weekly) is bundled into Phase C with the run-cache
+> work, at which point the scalar-KPI charts upgrade to weekly traces too.
 
 ### 8.3 Data model evolution
 
