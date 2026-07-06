@@ -391,7 +391,38 @@ export function RunValidateStage({
         client_ts: Date.now(),
       },
     });
-    if (error) throw error;
+    if (!error) return;
+    // Surface the server's actual response instead of supabase-js's generic
+    // "non-2xx" message — a §8.1 gate rejection carries typed findings, and
+    // operational failures carry an error string worth reading.
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.json === "function") {
+      let body: {
+        error?: unknown;
+        validation?: string;
+        findings?: Array<{ message: string }>;
+      } | null = null;
+      try {
+        body = await ctx.json();
+      } catch {
+        /* non-JSON body — fall through to the status line */
+      }
+      if (body?.validation) {
+        const lines = (body.findings ?? []).slice(0, 4).map((f) => f.message).join(" · ");
+        throw new Error(
+          `run rejected by the required-data gate (${body.validation}): ${lines || "see verification step"}`,
+        );
+      }
+      if (body?.error) {
+        const msg = typeof body.error === "string" ? body.error : JSON.stringify(body.error);
+        throw new Error(`sim-command HTTP ${ctx.status}: ${msg.slice(0, 300)}`);
+      }
+      throw new Error(
+        `sim-command HTTP ${ctx.status} — check the function logs in the Supabase dashboard ` +
+        `(a 503 boot error means a stale/broken function version is deployed)`,
+      );
+    }
+    throw error;
   };
 
   const onRunSingle = async () => {
