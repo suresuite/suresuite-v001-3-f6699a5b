@@ -565,14 +565,21 @@ Deno.serve(async (req) => {
     }
     const cmd = parsed.data;
 
-    const { data: project, error: projErr } = await sb
+    // Existence check via service role: projects RLS is scoped to the
+    // custom approved_users context, which a pooled PostgREST connection
+    // never carries — an anon-context select returns zero rows even for
+    // valid projects (the frontend reads projects through the
+    // list_projects SECURITY DEFINER RPC for the same reason). In this
+    // app access control lives in that RPC layer, not here.
+    const svc = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: project, error: projErr } = await svc
       .from("projects")
       .select("id")
       .eq("id", cmd.project_id)
       .maybeSingle();
     if (projErr || !project) {
-      return new Response(JSON.stringify({ error: "project not accessible" }), {
-        status: 403,
+      return new Response(JSON.stringify({ error: "project not found" }), {
+        status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
