@@ -40,6 +40,18 @@ def test_golden1_single_chain_steady_state():
     assert res.aggregates["cost_of_resilience"]["mean"] == 0.0
 
 
+def test_extra_weekly_series_shapes_match_fr_series():
+    """backlog/on-hand/revenue weekly series are exposed per replication,
+    same shape as fr_series, finite (persisted by the worker for V&V)."""
+    res = run_scenario(scenario(single_chain_network()), debug=True)
+    for key in ("backlog_units", "on_hand_value", "revenue_value"):
+        assert key in res.extra_series
+        assert res.extra_series[key].shape == res.fr_series.shape
+        assert np.isfinite(res.extra_series[key]).all()
+    # steady 100%-fill chain: no backlog anywhere
+    assert np.allclose(res.extra_series["backlog_units"], 0.0)
+
+
 def test_golden1_trace_byte_identical_across_runs():
     sc = scenario(single_chain_network())
     c1 = compile_scenario(sc)

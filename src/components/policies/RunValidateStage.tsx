@@ -72,17 +72,33 @@ interface Props {
 }
 
 // Engine KPI vocabulary (scsim_bridge _BRIDGE_KEYS / kpi/compute.py) — every
-// option here is a real key on run_replications.kpis. Only fill_rate has a
-// persisted weekly series (time_series.fill_rate); the rest are per-rep
-// scalars.
+// option here is a real key on run_replications.kpis.
 const KPI_OPTIONS = [
-  { id: "fill_rate", label: "Fill rate", unit: "%", weekly: true },
-  { id: "max_backlog", label: "Max backlog", unit: "units", weekly: false },
-  { id: "avg_on_hand_value", label: "On-hand value", unit: "€", weekly: false },
-  { id: "revenue", label: "Revenue", unit: "€", weekly: false },
-  { id: "lost_sales_value", label: "Lost sales", unit: "€", weekly: false },
+  { id: "fill_rate", label: "Fill rate", unit: "%" },
+  { id: "max_backlog", label: "Max backlog", unit: "units" },
+  { id: "avg_on_hand_value", label: "On-hand value", unit: "€" },
+  { id: "revenue", label: "Revenue", unit: "€" },
+  { id: "lost_sales_value", label: "Lost sales", unit: "€" },
 ] as const;
 type KpiId = (typeof KPI_OPTIONS)[number]["id"];
+
+// Weekly per-rep series persisted by the worker (run_replications.time_series
+// keys) per KPI. lost_sales has no weekly trace → per-rep scalars only.
+const SERIES_KEY: Partial<Record<KpiId, string>> = {
+  fill_rate: "fill_rate",
+  max_backlog: "backlog_units",
+  avg_on_hand_value: "on_hand_value",
+  revenue: "revenue_value",
+};
+
+/** Weekly per-rep series for a KPI from completed replications. */
+function repsSeries(reps: Replication[], kpi: KpiId): number[][] {
+  const key = SERIES_KEY[kpi];
+  if (!key) return [];
+  return reps
+    .map((r) => r.time_series?.[key])
+    .filter((s): s is number[] => Array.isArray(s) && s.length > 0);
+}
 
 interface MultiRunCfg {
   seeds_mode: "auto" | "list";
@@ -206,7 +222,9 @@ export function RunValidateStage({
     () => reps.filter((r) => r.status === "done" && r.kpis),
     [reps],
   );
-  /** Per-rep weekly fill-rate series (the only persisted weekly series). */
+  /** Per-rep weekly series for a KPI (empty when the worker didn't persist one). */
+  const seriesFor = (kpi: KpiId): number[][] => repsSeries(doneReps, kpi);
+  /** Fill-rate weekly series — the warm-up estimation basis (engine's too). */
   const frSeries = useMemo(
     () =>
       doneReps
@@ -217,12 +235,13 @@ export function RunValidateStage({
   /** Per-rep scalar sample for a KPI. */
   const scalarSample = (kpi: KpiId): number[] =>
     doneReps.map((r) => Number(r.kpis[kpi])).filter((n) => Number.isFinite(n));
-  /** Sim-side sample for validation: steady-state weekly values (fill_rate)
-   *  or per-rep scalars (everything else). */
+  /** Sim-side sample for validation: steady-state weekly values when a weekly
+   *  series exists, else per-rep scalars. */
   const simSample = (kpi: KpiId, warmupWeeks: number): { values: number[]; source: string } => {
-    if (kpi === "fill_rate" && frSeries.length > 0) {
+    const series = seriesFor(kpi);
+    if (series.length > 0) {
       return {
-        values: frSeries.flatMap((s) => s.slice(Math.max(0, warmupWeeks))),
+        values: series.flatMap((s) => s.slice(Math.max(0, warmupWeeks))),
         source: "weekly series",
       };
     }
@@ -788,7 +807,6 @@ export function RunValidateStage({
                     horizon={multiCfg.horizon_days}
                     confidence={multiCfg.confidence}
                     reps={doneReps}
-                    frSeries={frSeries}
                     warmupWeeks={latestRun?.warmup_detected_at ?? null}
                   />
                 </div>
@@ -972,7 +990,7 @@ export function RunValidateStage({
                         <KpiPreviewChart
                           key={kpi}
                           kpi={kpi}
-                          frSeries={frSeries}
+                          reps={doneReps}
                           warmup={warmCfg.warmup_days}
                         />
                       ))}
@@ -1240,19 +1258,19 @@ function MaterialFlowSankey({
   );
 }
 
-/** Real per-replication weekly traces (fill_rate only — the engine persists
- *  no weekly series for the other KPIs). Warm-up line in weeks. */
+/** Real per-replication weekly traces for KPIs with a persisted weekly
+ *  series; scalar-only KPIs get an explanatory note. Warm-up line in weeks. */
 function KpiPreviewChart({
   kpi,
-  frSeries,
+  reps,
   warmup,
 }: {
   kpi: KpiId;
-  frSeries: number[][];
+  reps: Replication[];
   warmup?: number;
 }) {
   const meta = KPI_OPTIONS.find((x) => x.id === kpi)!;
-  const traces = kpi === "fill_rate" ? frSeries.slice(0, 8) : [];
+  const traces = useMemo(() => repsSeries(reps, kpi).slice(0, 8), [reps, kpi]);
   const data = useMemo(() => {
     if (traces.length === 0) return [];
     const n = Math.min(...traces.map((s) => s.length));
@@ -1265,11 +1283,11 @@ function KpiPreviewChart({
     });
   }, [traces]);
 
-  if (kpi !== "fill_rate") {
+  if (!SERIES_KEY[kpi]) {
     return (
       <div className="rounded-md border border-dashed bg-card p-3 text-[11px] text-muted-foreground">
-        <b className="text-foreground">{meta.label}</b>: the engine persists a weekly series for
-        fill rate only — this KPI is validated from per-replication values instead.
+        <b className="text-foreground">{meta.label}</b>: no weekly series persisted for this KPI
+        — it is validated from per-replication values instead.
       </div>
     );
   }
@@ -1429,7 +1447,6 @@ function MultiRunPreviewPanel({
   horizon,
   confidence,
   reps,
-  frSeries,
   warmupWeeks,
 }: {
   kpis: KpiId[];
@@ -1437,7 +1454,6 @@ function MultiRunPreviewPanel({
   horizon: number;
   confidence: number;
   reps: Replication[];
-  frSeries: number[][];
   warmupWeeks: number | null;
 }) {
   const [activeKpi, setActiveKpi] = useState<KpiId | null>(kpis[0] ?? null);
@@ -1462,6 +1478,7 @@ function MultiRunPreviewPanel({
       .map((r) => Number(r.kpis[activeKpi]))
       .filter((n) => Number.isFinite(n));
     const overallReal = meanCI(values, confidence);
+    const weekly = repsSeries(reps, activeKpi);
     return (
       <div className="rounded-md border bg-card flex flex-col">
         <div className="flex items-center gap-1 border-b px-2 py-1.5 overflow-x-auto">
@@ -1495,16 +1512,16 @@ function MultiRunPreviewPanel({
           <Stat label="n reps" value={String(values.length)} />
         </div>
         <div className="p-2">
-          {activeKpi === "fill_rate" && frSeries.length > 0 ? (
-            <RealWeeklyTraces frSeries={frSeries} confidence={confidence} warmupWeeks={warmupWeeks} />
+          {weekly.length > 0 ? (
+            <RealWeeklyTraces frSeries={weekly} confidence={confidence} warmupWeeks={warmupWeeks} />
           ) : (
             <ConvergencePlot reps={reps} primaryKpi={activeKpi} warmupAt={null} />
           )}
         </div>
         <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">
-          {activeKpi === "fill_rate"
-            ? "Weekly fill-rate series per replication (engine output)."
-            : "Running mean ± 95% CI as replications accumulate — the engine persists weekly series for fill rate only."}
+          {weekly.length > 0
+            ? "Weekly per-replication series (engine output) with cross-rep mean ± CI."
+            : "Running mean ± 95% CI as replications accumulate — no weekly series persisted for this KPI."}
         </div>
       </div>
     );

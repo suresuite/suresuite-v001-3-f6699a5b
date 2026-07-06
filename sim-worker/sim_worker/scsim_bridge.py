@@ -118,13 +118,26 @@ def compute_run_from_project(data: Any) -> dict[str, Any]:
 
     seed = int(mapping.scenario.settings.project_seed)
     cells = result.rep_cells or [(i, 0) for i in range(len(result.kpis))]
+    # Weekly per-rep series: fill_rate plus any extra series the engine
+    # exposes (backlog_units, on_hand_value, revenue_value). getattr-guarded
+    # so an older engine wheel without extra_series keeps working.
+    extra = getattr(result, "extra_series", None) or {}
+
+    def _series_for(i: int) -> dict:
+        if i >= len(result.fr_series):
+            return {}
+        ts = {"fill_rate": [round(float(x), 5) for x in result.fr_series[i].tolist()]}
+        for key, rows in extra.items():
+            if i < len(rows):
+                ts[key] = [round(float(x), 5) for x in rows[i].tolist()]
+        return ts
+
     out["replications"] = [
         {
             "rep_index": i,
             "seed_used": seed * 1000 + int(cells[i][0]) if i < len(cells) else seed,
             "kpis": {k: round(float(v), 6) for k, v in row.items()},
-            "time_series": {"fill_rate": [round(float(x), 5) for x in result.fr_series[i].tolist()]}
-            if i < len(result.fr_series) else {},
+            "time_series": _series_for(i),
             "warmup_at": out["warmup_detected_at"],
         }
         for i, row in enumerate(result.kpis)
