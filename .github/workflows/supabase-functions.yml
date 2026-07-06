@@ -2,8 +2,12 @@ name: Deploy Supabase Functions
 
 on:
   push:
+    branches: [main]
     paths:
       - 'supabase/functions/project-ai-chat/**'
+      - 'supabase/functions/sim-command/**'
+      - 'supabase/functions/_shared/**'
+      - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
   workflow_dispatch:
 
@@ -26,20 +30,34 @@ jobs:
           [ -n "$GEMINI_API_KEY" ]   && args+=("GEMINI_API_KEY=$GEMINI_API_KEY")
           [ -n "$OPENAI_API_KEY" ]   && args+=("OPENAI_API_KEY=$OPENAI_API_KEY")
           [ -n "$DEEPSEEK_API_KEY" ] && args+=("DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY")
+          # sim-command needs the Upstash REST pair to enqueue worker commands
+          # (the Fly worker uses the NATIVE rediss:// URL — same database).
+          [ -n "$UPSTASH_REDIS_REST_URL" ]   && args+=("UPSTASH_REDIS_REST_URL=$UPSTASH_REDIS_REST_URL")
+          [ -n "$UPSTASH_REDIS_REST_TOKEN" ] && args+=("UPSTASH_REDIS_REST_TOKEN=$UPSTASH_REDIS_REST_TOKEN")
           if [ ${#args[@]} -gt 0 ]; then
             supabase secrets set --project-ref wckdrutwkytwcomrlpib "${args[@]}"
           else
-            echo "No provider API keys found in GitHub secrets; skipping (function will report 'not configured')."
+            echo "No function secrets found in GitHub secrets; skipping (function will report 'not configured')."
           fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       # Deploy the AI chat edge function. verify_jwt is configured in
       # supabase/config.toml, which the deploy reads.
       - name: Deploy project-ai-chat
         run: supabase functions deploy project-ai-chat --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Deploy the simulation command gateway — the entry point every run
+      # dispatch goes through. Without this deploy, the frontend gets
+      # "Failed to send a request to the Edge Function" on Run.
+      - name: Deploy sim-command
+        run: supabase functions deploy sim-command --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

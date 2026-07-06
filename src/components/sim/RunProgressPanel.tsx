@@ -92,6 +92,12 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
             </span>
           </div>
           <Progress value={pct} />
+          {run.status === "running" && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Replications stream in live as the engine finishes them — the grid and
+              charts below update in real time.
+            </p>
+          )}
           {run.status === "queued" && (
             <p className="text-[11px] text-muted-foreground mt-1">
               Waiting for the sim worker to pick this up (usually seconds). If a run

@@ -65,3 +65,60 @@ def test_flag_off_by_default(monkeypatch):
     assert scsim_enabled() is False
     monkeypatch.setenv("SCSIM_ENGINE", "1")
     assert scsim_enabled() is True
+
+
+def _project_data(replications: int = 3):
+    from sim_worker.datamap import build_project_data
+
+    return build_project_data(
+        suppliers=[{"supplier_id": "S1", "name": "S1"}],
+        materials=[{"material_id": "M1", "cost": 4.0, "initial_on_hand": 200}],
+        products=[{"product_id": "P1", "sell_price": 25.0, "production_capacity": 900,
+                   "demand_mean": 300, "demand_cv": 0.2}],
+        inbound=[{"supplier_id": "S1", "material_id": "M1", "unit_price": 4.0, "lead_time": 2}],
+        bom=[{"product_id": "P1", "material_id": "M1", "consumption_rate": 1.0}],
+        outbound=[{"product_id": "P1", "customer_id": "C1", "unit_price": 25.0,
+                   "volume": 300, "time_unit": "week"}],
+        policies={"default": {"inventory": {"type": "min_max"}}},
+        scenario={"horizon_days": 365, "seed": 1, "replications": replications, "crn": True},
+        project_model="make_to_stock",
+    )
+
+
+def test_run_from_project_streams_each_replication():
+    """on_replication receives every rep live, in the exact persistence shape
+    the final `replications` list carries (streamed upserts stay idempotent)."""
+    from sim_worker.scsim_bridge import compute_run_from_project
+
+    streamed: list[tuple[dict, int, int]] = []
+    out = compute_run_from_project(
+        _project_data(replications=3),
+        on_replication=lambda rep, done, total: streamed.append((rep, done, total)),
+    )
+
+    assert [d for _, d, _ in streamed] == [1, 2, 3]
+    assert all(t == 3 for _, _, t in streamed)
+    assert len(out["replications"]) == 3
+    import math
+
+    for (rep, done, _), final in zip(streamed, out["replications"]):
+        assert rep["rep_index"] == done - 1 == final["rep_index"]
+        assert rep["seed_used"] == final["seed_used"]
+        assert set(rep["kpis"]) == set(final["kpis"])
+        for k, v in rep["kpis"].items():  # NaN-aware: inert KPIs report NaN
+            fv = final["kpis"][k]
+            assert v == fv or (math.isnan(v) and math.isnan(fv))
+        assert rep["time_series"]["fill_rate"] == final["time_series"]["fill_rate"]
+        # warmup is only known at run end — the final upsert fills it in.
+        assert rep["warmup_at"] is None
+
+
+def test_run_from_project_observer_errors_do_not_break_the_run():
+    from sim_worker.scsim_bridge import compute_run_from_project
+
+    def boom(rep, done, total):
+        raise RuntimeError("observer bug")
+
+    out = compute_run_from_project(_project_data(replications=2), on_replication=boom)
+    assert out["source"] == "scsim"
+    assert len(out["replications"]) == 2

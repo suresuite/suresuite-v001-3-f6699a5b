@@ -226,7 +226,31 @@ class SimWorker:
                                 cmd.project_id, scenario=scenario_data, policies=policies,
                                 project_model=project_model,
                             )
-                            kpis = await asyncio.to_thread(compute_run_from_project, data)
+                            # Live streaming: the engine invokes this observer from
+                            # its worker thread after each replication; hand the
+                            # upsert to the event loop without blocking the run.
+                            # The UI's realtime subscriptions on run_replications /
+                            # simulation_runs render rows as they land.
+                            loop = asyncio.get_running_loop()
+                            stream_futs: list = []
+
+                            def on_replication(rep: dict, done: int, total: int) -> None:
+                                stream_futs.append(asyncio.run_coroutine_threadsafe(
+                                    self._stream_replication(
+                                        run_id, cmd.project_id, rep, done),
+                                    loop,
+                                ))
+
+                            kpis = await asyncio.to_thread(
+                                compute_run_from_project, data, on_replication)
+                            # Let in-flight streamed writes settle before the final
+                            # authoritative update, so a stale rep_count_done can't
+                            # land after the run is marked done.
+                            if stream_futs:
+                                await asyncio.gather(
+                                    *[asyncio.wrap_future(f) for f in stream_futs],
+                                    return_exceptions=True,
+                                )
                         except Exception as exc:
                             await self._update_run(run_id, {
                                 "status": "failed", "error_message": str(exc)[:500],
@@ -310,6 +334,16 @@ class SimWorker:
             return rows[0].get("supply_chain_model") if rows else None
         except Exception:
             return None
+
+    async def _stream_replication(
+        self, run_id: str, project_id: str, rep: dict[str, Any], done: int
+    ) -> None:
+        """Persist one finished replication mid-run and bump the live counter,
+        so researchers watch real data accumulate while the engine runs. The
+        final _write_replications/_update_run pass re-upserts everything
+        idempotently — losing a streamed write costs liveness, never data."""
+        await self._write_replications(run_id, project_id, [rep])
+        await self._update_run(run_id, {"rep_count_done": done})
 
     async def _write_replications(
         self, run_id: str, project_id: str, reps: list[dict[str, Any]]
