@@ -1772,14 +1772,21 @@ function EngineOutputSummary({ run, reps }: { run: SimulationRun; reps: Replicat
   const agg = run.aggregate_kpis ?? {};
   const ci = run.ci_half_widths ?? {};
   const warmupDays = run.warmup_detected_at != null ? run.warmup_detected_at * 7 : undefined;
+  const streaming = run.status === "running" || run.status === "queued";
   return (
     <div className="rounded-md border bg-card">
       <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
         <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
         <span className="text-xs font-semibold">Engine output</span>
-        <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-          persisted results · {reps.length} replication(s)
-        </span>
+        {streaming ? (
+          <span className="text-[10px] text-amber-600 dark:text-amber-400 animate-pulse">
+            ● live — {reps.length} replication(s) streamed, run in progress
+          </span>
+        ) : (
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+            persisted results · {reps.length} replication(s)
+          </span>
+        )}
         <div className="flex-1" />
         {run.policy_hash && (
           <span

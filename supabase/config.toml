@@ -23,3 +23,8 @@ verify_jwt = false
 
 [functions.project-ai-health]
 verify_jwt = false
+
+[functions.sim-command]
+# The function validates the caller's JWT itself (RLS-aware createClient with
+# the forwarded Authorization header); platform verification stays on too.
+verify_jwt = true

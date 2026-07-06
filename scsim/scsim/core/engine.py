@@ -647,11 +647,38 @@ class ScenarioResult:
         return np.array([row.get(key, np.nan) for row in self.kpis])
 
 
+# Per-replication progress observer: called as (done, total, kpi_row,
+# weekly_series) after each replication completes; ``weekly_series`` carries
+# the same four traces ScenarioResult exposes (fill_rate, backlog_units,
+# on_hand_value, revenue_value) for that single replication. ``total`` is the
+# planned grid size and may grow under sequential-CI stopping.
+ProgressFn = Callable[[int, int, dict[str, float], dict[str, np.ndarray]], None]
+
+
+def _notify_progress(
+    progress: Optional[ProgressFn], done: int, total: int,
+    row: dict[str, float], ctx: SimContext,
+) -> None:
+    """Observer errors must never kill a run — swallow and continue."""
+    if progress is None:
+        return
+    try:
+        progress(done, total, row, {
+            "fill_rate": ctx.trace.fill_rate,
+            "backlog_units": ctx.trace.backlog_units,
+            "on_hand_value": ctx.trace.on_hand_value,
+            "revenue_value": ctx.trace.revenue_value,
+        })
+    except Exception:  # noqa: BLE001 — observer only, run integrity first
+        pass
+
+
 def run_scenario(
     scenario: Scenario,
     debug: bool = False,
     compiled: Optional[CompiledScenario] = None,
     snapshot_store=None,
+    progress: Optional[ProgressFn] = None,
 ) -> ScenarioResult:
     compiled = compiled or compile_scenario(scenario)
     settings = compiled.model.settings
@@ -691,13 +718,14 @@ def run_scenario(
         onhand_rows[n] = ctx.trace.on_hand_value
         revenue_rows[n] = ctx.trace.revenue_value
         lp_fallbacks += int(ctx.policy_state.get("material_allocation", {}).get("lp_fallbacks", 0))
+        _notify_progress(progress, n + 1, len(grid), row, ctx)
 
     # Sequential stopping (optional) extends model seeds until ε is met.
     from scsim.entities.enums import ReplicationStopping
     if settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI and scenario.events:
         kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows, grid = _extend_until_ci(
             compiled, scenario, kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows,
-            grid, t_w, window_end, debug,
+            grid, t_w, window_end, debug, progress,
         )
 
     keys = sorted({k for row in kpis for k in row} - {"model_rep", "event_rep"})
@@ -736,7 +764,8 @@ def run_scenario(
 
 
 def _extend_until_ci(compiled, scenario, kpis, fr_rows, backlog_rows, onhand_rows,
-                     revenue_rows, grid, t_w, window_end, debug):
+                     revenue_rows, grid, t_w, window_end, debug,
+                     progress: Optional[ProgressFn] = None):
     settings = compiled.model.settings
     e_axis = max({j for _, j in grid}) + 1
     next_i = max({i for i, _ in grid}) + 1
@@ -760,6 +789,9 @@ def _extend_until_ci(compiled, scenario, kpis, fr_rows, backlog_rows, onhand_row
             backlog_rows = np.vstack([backlog_rows, ctx.trace.backlog_units[None, :]])
             onhand_rows = np.vstack([onhand_rows, ctx.trace.on_hand_value[None, :]])
             revenue_rows = np.vstack([revenue_rows, ctx.trace.revenue_value[None, :]])
+            # The final total is unknown while extending — report the current
+            # count as both done and total so observers see monotone progress.
+            _notify_progress(progress, len(kpis), len(kpis), row, ctx)
         grid = grid + batch
         next_i += 10
     return kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows, grid

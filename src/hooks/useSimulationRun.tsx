@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -91,6 +91,18 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
     }
   }, [scenarioId]);
 
+  // The worker streams run_replications rows live while the engine runs, so
+  // realtime events arrive in bursts — coalesce reloads instead of refetching
+  // per row.
+  const reloadTimer = useRef<number | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimer.current != null) window.clearTimeout(reloadTimer.current);
+    reloadTimer.current = window.setTimeout(() => {
+      reloadTimer.current = null;
+      void loadLatest();
+    }, 400);
+  }, [loadLatest]);
+
   useEffect(() => {
     if (!scenarioId) {
       setLatestRun(null);
@@ -104,18 +116,19 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "simulation_runs", filter: `scenario_id=eq.${scenarioId}` },
-        () => void loadLatest(),
+        scheduleReload,
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "run_replications" },
-        () => void loadLatest(),
+        scheduleReload,
       )
       .subscribe();
     return () => {
+      if (reloadTimer.current != null) window.clearTimeout(reloadTimer.current);
       sb.removeChannel(ch);
     };
-  }, [scenarioId, loadLatest]);
+  }, [scenarioId, loadLatest, scheduleReload]);
 
   const runExperiment = useCallback(
     async (projectId: string, policyVersionId: string, acknowledgeWarnings = false) => {

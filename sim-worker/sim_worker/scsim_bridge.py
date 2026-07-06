@@ -81,17 +81,38 @@ def compute_kpis_scsim(
     return out
 
 
-def compute_run_from_project(data: Any) -> dict[str, Any]:
+def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str, Any]:
     """Canonical experiment path: map a ProjectData (item masters + logistics +
     policies + scenario) into an scsim Scenario, run it, and return both the
     aggregate broadcast shape AND per-replication rows + mapping warnings, ready
-    for the worker to persist as the sole writer."""
+    for the worker to persist as the sole writer.
+
+    ``on_replication(rep_row, done, total)`` — optional live observer, invoked
+    from the engine thread after EACH replication completes with a row already
+    in the run_replications persistence shape (rep_index / seed_used / kpis /
+    time_series). The final return value still carries the complete
+    ``replications`` list, so streamed upserts are safely idempotent."""
     from scsim import ENGINE_VERSION
     from scsim.core.engine import run_scenario
     from scsim.io import from_project_data
 
     mapping = from_project_data(data)
-    result = run_scenario(mapping.scenario)
+    project_seed = int(mapping.scenario.settings.project_seed)
+
+    progress = None
+    if on_replication is not None:
+        def progress(done: int, total: int, row: dict, series: dict) -> None:
+            on_replication({
+                "rep_index": done - 1,
+                "seed_used": project_seed * 1000 + int(row.get("model_rep", done - 1)),
+                "kpis": {k: round(float(v), 6) for k, v in row.items()},
+                "time_series": {
+                    k: [round(float(x), 5) for x in v.tolist()] for k, v in series.items()
+                },
+                "warmup_at": None,  # known only at run end; final upsert fills it
+            }, done, total)
+
+    result = run_scenario(mapping.scenario, progress=progress)
 
     out: dict[str, Any] = {
         "source": "scsim",
@@ -116,7 +137,7 @@ def compute_run_from_project(data: Any) -> dict[str, Any]:
     out["otif"] = out.get("mean_fill_rate", 0.0)
     out["revenue"] = out.get("mean_revenue", 0.0)
 
-    seed = int(mapping.scenario.settings.project_seed)
+    seed = project_seed
     cells = result.rep_cells or [(i, 0) for i in range(len(result.kpis))]
     # Weekly per-rep series: fill_rate plus any extra series the engine
     # exposes (backlog_units, on_hand_value, revenue_value). getattr-guarded
