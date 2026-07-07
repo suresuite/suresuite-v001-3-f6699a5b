@@ -1,0 +1,22 @@
+# Makes sim_worker pip-installable so the Vercel Python function
+# (api/run_simulation.py) can `from sim_worker.datamap import build_project_data`
+# etc. Deps here are the PURE ingestion/compute path only — redis (the Fly
+# worker's stream consumer) stays in requirements.txt, not here, because the
+# serverless engine never touches Redis.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sim-worker"
+version = "0.1.0"
+description = "SureSuite simulation worker — ingestion + scsim bridge"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "httpx>=0.27",
+    "networkx>=3.3",
+]
+
+[tool.setuptools.packages.find]
+include = ["sim_worker*"]

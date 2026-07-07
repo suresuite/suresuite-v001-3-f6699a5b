@@ -1,0 +1,9 @@
+# Vercel Python serverless function deps (api/run_simulation.py — the
+# serverless simulation engine that replaces the Fly/Redis worker).
+# The two local path installs pull their own transitive deps (scsim →
+# numpy/scipy/pydantic; sim-worker → pydantic/httpx/networkx); numpy/scipy
+# are pinned here too so the resolver never picks an incompatible wheel.
+numpy>=1.26
+scipy>=1.11
+./scsim
+./sim-worker
