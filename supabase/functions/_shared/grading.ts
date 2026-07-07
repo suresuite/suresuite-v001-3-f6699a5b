@@ -232,9 +232,13 @@ export function activeEnginePolicies(
   defaults: Row,
   nCustomers: number,
   bridge: BridgeTables,
+  /** Any material with ≥2 qualified suppliers? P-S.2 is infeasible (and the
+   * mapper skips it with a warn) on fully single-sourced networks. */
+  hasMultiSource = true,
 ): string[] {
   const active = new Set<string>(ALWAYS_ACTIVE);
   const sourcing = (defaults.sourcing ?? {}) as Row;
+  const inv = (defaults.inventory ?? {}) as Row;
   const fulfil = (defaults.fulfillment ?? {}) as Row;
   const recovery = (defaults.recovery ?? {}) as Row;
 
@@ -247,6 +251,21 @@ export function activeEnginePolicies(
   }
   if (BACKUP_STRATEGIES.has(String(sourcing.strategy ?? "single"))) {
     active.add("backup_supplier");
+  }
+  // P-S.2: standing order splits — mirrors _map_policies' strategy/ratios
+  // activation, including the single-sourced-network skip.
+  const ratios = (sourcing.ratios ?? {}) as Row;
+  if (
+    (String(sourcing.strategy ?? "single") === "multi" ||
+      Object.keys(ratios).length > 0) &&
+    hasMultiSource
+  ) {
+    active.add("proactive_multi_sourcing");
+  }
+  // P-P.4: FG safety stock opts in via the inventory family (MTS semantics
+  // are enforced engine-side; the manifest grades its data needs either way).
+  if (String(inv.fg_safety_stock ?? "none") !== "none") {
+    active.add("fg_safety_stock");
   }
   if (String(fulfil.allocation ?? "") && nCustomers >= 2) {
     active.add("customer_allocation");
@@ -261,12 +280,13 @@ export function compileManifest(
   defaults: Row,
   nCustomers: number,
   bridge: BridgeTables,
+  hasMultiSource = true,
 ): CompiledRequirement[] {
   const out: CompiledRequirement[] = (registry.base_data_requirements ?? []).map(
     (r) => ({ ...r, policyRef: "engine", policyName: "engine mechanics" }),
   );
   const byId = new Map(registry.policies.map((p) => [p.id, p]));
-  for (const pid of activeEnginePolicies(defaults, nCustomers, bridge)) {
+  for (const pid of activeEnginePolicies(defaults, nCustomers, bridge, hasMultiSource)) {
     const pol = byId.get(pid);
     for (const r of pol?.data_requirements ?? []) {
       out.push({ ...r, policyRef: pol?.catalog_ref ?? pid, policyName: pid });
@@ -340,7 +360,16 @@ export function gradeManifest(
   const customers = new Set(
     dataset.outbound.map((o) => String(o.customer_id ?? "")).filter(Boolean),
   );
-  const manifest = compileManifest(registry, defaults, customers.size, bridge);
+  const supsByMat = new Map<string, Set<string>>();
+  for (const a of dataset.inbound) {
+    const mat = String(a.material_id ?? "");
+    const sup = String(a.supplier_id ?? "");
+    if (!mat || !sup) continue;
+    if (!supsByMat.has(mat)) supsByMat.set(mat, new Set());
+    supsByMat.get(mat)!.add(sup);
+  }
+  const hasMultiSource = [...supsByMat.values()].some((s) => s.size > 1);
+  const manifest = compileManifest(registry, defaults, customers.size, bridge, hasMultiSource);
   const ctx = buildReducerCtx(dataset, defaults);
 
   const out: GradedField[] = [];

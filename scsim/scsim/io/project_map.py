@@ -511,7 +511,11 @@ def from_project_data(data: ProjectData) -> MappingResult:
 
     settings = _build_settings(sc, w)
     events = _map_events(sc.disruption_schedule, sup_ids, cap_by_sup, w)
-    policies = _map_policies(data.policies, w, n_customers=len(customers))
+    sups_by_mat: dict[str, set[str]] = {}
+    for link in links:
+        sups_by_mat.setdefault(link.material_id, set()).add(link.supplier_id)
+    policies = _map_policies(data.policies, w, n_customers=len(customers),
+                             sups_by_mat=sups_by_mat)
 
     scenario = Scenario(name=sc.name or "scenario", network=network,
                         settings=settings, events=events, policies=policies)
@@ -595,13 +599,61 @@ _ALLOCATION_RULE = {  # UI fulfillment.allocation → P-C.2 rule (engineBridge.j
 }
 
 
-def _map_policies(policies: dict, w: list[MappingWarning], n_customers: int = 0) -> dict[str, dict]:
+def _node_override(policies: dict, key: str, family: str) -> dict:
+    """Family patch of a `node:<target_key>` override, {} when absent."""
+    return (policies.get(f"node:{key}") or {}).get(family) or {}
+
+
+def _multi_sourcing_weights(
+    policies: dict, sourcing: dict, sups_by_mat: dict[str, set[str]],
+    w: list[MappingWarning],
+) -> dict[str, dict[str, float]]:
+    """Build P-S.2 ``weights[material][supplier] = share %`` from the UI's
+    sourcing ratios: arc-level overrides (target_key ``supplier::material``)
+    take precedence; project-level ``sourcing.ratios`` (supplier → fraction)
+    spread to every multi-sourced material that supplier serves. Shares are
+    renormalized to 100 per material — the plugin hard-errors otherwise."""
+    weights: dict[str, dict[str, float]] = {}
+    for key, families in policies.items():
+        if not isinstance(key, str) or not key.startswith("node:") or "::" not in key:
+            continue
+        row_sup, _, mat = key[len("node:"):].partition("::")
+        src = families.get("sourcing") or {}
+        # Grid-friendly scalar: the row's own share of its material.
+        scalar = src.get("supply_share")
+        if scalar is not None and row_sup in sups_by_mat.get(mat, set()):
+            weights.setdefault(mat, {})[row_sup] = float(scalar) * 100.0
+        for sup, share in (src.get("ratios") or {}).items():
+            if sup in sups_by_mat.get(mat, set()):
+                weights.setdefault(mat, {})[str(sup)] = float(share) * 100.0
+    for sup, share in (sourcing.get("ratios") or {}).items():
+        for mat, sups in sups_by_mat.items():
+            if sup in sups and len(sups) > 1:
+                weights.setdefault(mat, {}).setdefault(str(sup), float(share) * 100.0)
+    for mat, shares in list(weights.items()):
+        total = sum(shares.values())
+        if total <= 0:
+            weights.pop(mat)
+            continue
+        if abs(total - 100.0) > 1e-6:
+            w.append(MappingWarning(
+                "info", "policy:proactive_multi_sourcing", "weights",
+                f"sourcing shares for {mat!r} sum to {total:.0f}% — renormalized to 100%"))
+            weights[mat] = {s: v * 100.0 / total for s, v in shares.items()}
+    return weights
+
+
+def _map_policies(
+    policies: dict, w: list[MappingWarning], n_customers: int = 0,
+    sups_by_mat: Optional[dict[str, set[str]]] = None,
+) -> dict[str, dict]:
     out: dict[str, dict] = {}
     default = policies.get("default") or {}
     inv = default.get("inventory") or {}
     fulfil = default.get("fulfillment") or {}
     sourcing = default.get("sourcing") or {}
     recovery = default.get("recovery") or {}
+    sups_by_mat = sups_by_mat or {}
 
     type_map = {
         "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
@@ -642,15 +694,87 @@ def _map_policies(policies: dict, w: list[MappingWarning], n_customers: int = 0)
                                     "revenue_max needs per-customer pricing (deferred) — "
                                     "mapped to priority"))
             out["customer_allocation"] = {"rule": "priority"}
+        elif alloc == "sla_tier":
+            # G1 closure: the UI's tier fill floors (fractions) reach P-C.2.
+            out["customer_allocation"] = {
+                "rule": "sla_tier",
+                "sla_tiers": {
+                    str(k): _clamp(float(v) * 100.0, 0.0, 100.0)
+                    for k, v in (fulfil.get("tier_overrides") or {}).items()
+                },
+            }
         elif alloc in _ALLOCATION_RULE:
             out["customer_allocation"] = {"rule": _ALLOCATION_RULE[alloc]}
 
+    # P-S.2 proactive multi-sourcing — sourcing.ratios finally reach the
+    # engine (G1's flagship loss). Empty weights are valid: the plugin
+    # derives a volume/equal split over qualified links.
+    strategy = str(sourcing.get("strategy", "single"))
+    weights = _multi_sourcing_weights(policies, sourcing, sups_by_mat, w)
+    if strategy == "multi" or weights:
+        if any(len(s) > 1 for s in sups_by_mat.values()):
+            out["proactive_multi_sourcing"] = {"weights": weights}
+        else:
+            w.append(MappingWarning(
+                "warn", "policy:proactive_multi_sourcing", "strategy",
+                "multi-sourcing configured but every material is single-sourced — "
+                "P-S.2 skipped (add a second qualified supplier arc)"))
+
+    # P-P.4 finished-goods safety stock — MTS only (MTO builds no FG stock).
+    fg = str(inv.get("fg_safety_stock", "none") or "none")
+    if fg != "none":
+        mode = str(default.get("fulfillment_strategy", "")).strip().lower()
+        if mode in ("mts", "make_to_stock"):
+            if fg == "service_level":
+                out["fg_safety_stock"] = {
+                    "sizing": "service_level",
+                    "service_level_pct": _clamp(
+                        float(inv.get("fg_service_level_target", 0.95)) * 100.0, 80.0, 99.9),
+                    "segmentation": "uniform",
+                }
+            else:
+                out["fg_safety_stock"] = {
+                    "sizing": "fixed_days",
+                    "fixed_days_cover": _clamp(float(inv.get("fg_safety_stock_days", 2.0)), 0.0, 12.0),
+                    "segmentation": "uniform",
+                }
+        else:
+            w.append(MappingWarning(
+                "warn", "policy:fg_safety_stock", "fg_safety_stock",
+                "finished-goods safety stock requires make_to_stock — skipped under MTO"))
+
     responses = set(recovery.get("response") or [])
-    if str(sourcing.get("strategy", "single")) in ("primary_backup", "dual_sourcing", "multi") \
+    if strategy in ("primary_backup", "dual_sourcing", "multi") \
             or "dual_source_activate" in responses:
         out["backup_supplier"] = {}
     if responses & {"mode_shift", "expedite_freight", "reroute"}:
         out["expedited_shipments"] = {}
     if "capacity_flex" in responses:
         out["short_term_capacity"] = {}
+
+    # P-S.4 early warning — recovery.detection_lag_days finally reaches the
+    # engine, compressing how fast every reactive policy engages.
+    if "early_warning" in responses:
+        days = float(recovery.get("detection_lag_days", 1.0) or 0.0)
+        out["early_warning_failover"] = {
+            "detection_lag_weeks": int(_clamp(round(days / 7.0), 0, 4)),
+        }
+
+    # P-P.9 optimized material allocation — per-product priorities fold in
+    # from plant-stage overrides (target_key "<plant>::<product>").
+    if "allocate_materials" in responses:
+        priority: dict[str, float] = {}
+        for key, families in policies.items():
+            if not isinstance(key, str) or not key.startswith("node:") or "::" not in key:
+                continue
+            _node, _, prod = key[len("node:"):].partition("::")
+            v = (families.get("production") or {}).get("allocation_priority_weight")
+            if v is not None and prod:
+                priority[prod] = float(v)
+        params: dict[str, Any] = {"activation": "during_disruption"}
+        if priority:
+            params["objective"] = "priority_weighted"
+            params["priority_weights"] = priority
+        out["material_allocation"] = params
+
     return out

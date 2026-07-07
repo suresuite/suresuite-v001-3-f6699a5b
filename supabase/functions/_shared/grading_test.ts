@@ -12,6 +12,7 @@ import bridge from "./engineBridge.json" with { type: "json" };
 import fixture from "./fixtures/validation_parity/dataset.json" with { type: "json" };
 import expected from "./fixtures/validation_parity/expected_findings.json" with { type: "json" };
 import {
+  activeEnginePolicies,
   flattenFindings,
   gradeManifest,
   type BridgeTables,
@@ -75,6 +76,14 @@ Deno.test("gate: warns require acknowledgment, acknowledged warns dispatch", () 
     acknowledgeWarnings: true,
   });
   assertEquals(acknowledged, null, "acknowledged warns must dispatch");
+});
+
+Deno.test("policy activation matches the engine mapper (parity variant)", () => {
+  // sim-worker/tests/test_validation_parity.py asserts the Python half:
+  // _map_policies on the same defaults yields exactly expected_policies.
+  const v = fixture.activation_variant;
+  const active = activeEnginePolicies(v.defaults as Row, 1, BRIDGE, true).sort();
+  assertEquals(active, v.expected_policies, "TS activation set diverged from _map_policies");
 });
 
 Deno.test("gate: partial-magnitude disruption on a capacity-less supplier warns", () => {

@@ -129,3 +129,69 @@ def test_unsourced_bom_material_is_the_hard_block():
     }
     with pytest.raises(ValueError, match="no supplier link"):
         from_project_data(_project_data(ds, fx))
+
+
+def test_policy_activation_matches_shared_grader():
+    """The fixture's activation_variant pins _map_policies' activation keys to
+    the TS activeEnginePolicies mirror (grading_test.ts asserts the TS half)."""
+    fx = _fixture()
+    variant = fx["activation_variant"]
+    data = build_project_data(
+        suppliers=fx["dataset"]["suppliers"],
+        materials=fx["dataset"]["materials"],
+        products=fx["dataset"]["products"],
+        inbound=fx["dataset"]["inbound"],
+        bom=fx["dataset"]["bom"],
+        outbound=fx["dataset"]["outbound"],
+        policies={"default": variant["defaults"]},
+        scenario=fx["scenario"],
+        project_model="make_to_stock",
+    )
+    mapping = from_project_data(data)
+    assert sorted(mapping.scenario.policies.keys()) == variant["expected_policies"]
+
+    # Wired parameters, not just activation (G1 closure):
+    pols = mapping.scenario.policies
+    assert pols["proactive_multi_sourcing"]["weights"] == {
+        "M_OK": {"S1": 60.0, "S2": 40.0}
+    }
+    assert pols["early_warning_failover"]["detection_lag_weeks"] == 1  # 7 days
+    assert pols["fg_safety_stock"]["sizing"] == "service_level"
+    assert pols["fg_safety_stock"]["service_level_pct"] == 95.0
+    assert pols["material_allocation"]["activation"] == "during_disruption"
+
+
+def test_sla_tiers_and_node_ratio_overrides_reach_the_engine():
+    fx = _fixture()
+    policies = {
+        "default": {
+            "fulfillment_strategy": "make_to_stock",
+            "sourcing": {"strategy": "multi"},
+            "fulfillment": {"allocation": "sla_tier",
+                            "tier_overrides": {"gold": 0.98, "silver": 0.9}},
+        },
+        # Supplier-stage overrides (target_key "<supplier>::<material>"):
+        # arc-level shares that don't sum to 100 are renormalized with a note.
+        "node:S1::M_OK": {"sourcing": {"ratios": {"S1": 0.5}}},
+        "node:S2::M_OK": {"sourcing": {"ratios": {"S2": 0.3}}},
+    }
+    ds = dict(fx["dataset"])
+    # Two customers so P-C.2 activates.
+    ds = {**ds, "outbound": ds["outbound"] + [
+        {"product_id": "P_OK", "customer_id": "C2", "unit_price": 24.0,
+         "volume": 50, "time_unit": "week"},
+    ]}
+    data = build_project_data(
+        suppliers=ds["suppliers"], materials=ds["materials"], products=ds["products"],
+        inbound=ds["inbound"], bom=ds["bom"], outbound=ds["outbound"],
+        policies=policies, scenario=fx["scenario"], project_model="make_to_stock",
+    )
+    mapping = from_project_data(data)
+    pols = mapping.scenario.policies
+    assert pols["customer_allocation"] == {
+        "rule": "sla_tier", "sla_tiers": {"gold": 98.0, "silver": 90.0}
+    }
+    weights = pols["proactive_multi_sourcing"]["weights"]["M_OK"]
+    assert round(weights["S1"], 4) == 62.5 and round(weights["S2"], 4) == 37.5
+    assert any(w.entity == "policy:proactive_multi_sourcing" and "renormalized" in w.reason
+               for w in mapping.warnings)

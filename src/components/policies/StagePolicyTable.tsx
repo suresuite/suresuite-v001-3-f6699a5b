@@ -100,17 +100,29 @@ function ValueCell({
   onChange: (v: unknown) => void;
 }) {
   // Read-only synthetic columns (e.g. share_pct) render as a static badge.
+  // Milestone-pending fields render dimmed with the "not consumed yet" title.
   if (spec.readOnly) {
-    const n =
-      typeof value === "number"
-        ? value
-        : typeof defaultValue === "number"
-        ? defaultValue
-        : null;
+    const raw = value ?? defaultValue;
+    const n = typeof raw === "number" ? raw : null;
+    const text =
+      n != null && Number.isFinite(n)
+        ? spec.format
+          ? spec.format(n)
+          : String(n)
+        : typeof raw === "string" && raw !== ""
+        ? raw
+        : "—";
     return (
-      <div className="flex items-center justify-end h-6 px-2">
+      <div
+        className={`flex items-center justify-end h-6 px-2 ${spec.engineStatus ? "opacity-50" : ""}`}
+        title={
+          spec.engineStatus
+            ? `Not consumed by the engine yet — activates with ${spec.engineStatus.milestone}.`
+            : undefined
+        }
+      >
         <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
-          {n == null || !Number.isFinite(n) ? "—" : spec.format ? spec.format(n) : String(n)}
+          {text}
         </span>
       </div>
     );
@@ -1094,7 +1106,17 @@ export function StagePolicyTable({
                     key={col.field}
                     className="py-1.5 px-2 text-left text-[10px] font-medium text-muted-foreground border-b border-r whitespace-nowrap bg-muted/70"
                   >
-                    {renderSortFilter(col.field, adaptLabel(col.label))}
+                    <span className="inline-flex items-center gap-1">
+                      {renderSortFilter(col.field, adaptLabel(col.label))}
+                      {col.engineStatus && (
+                        <span
+                          className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-[9px] text-amber-700 dark:text-amber-300 cursor-help"
+                          title={`Stored + versioned, not consumed by the engine yet — activates with ${col.engineStatus.milestone}.`}
+                        >
+                          {col.engineStatus.milestone.split(" ")[0]}
+                        </span>
+                      )}
+                    </span>
                   </th>
                 ));
               })}
