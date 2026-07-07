@@ -3,10 +3,15 @@ import type { OverrideRow } from "./resolve";
 import { effectivePolicy } from "./resolve";
 import type { StageKey } from "./stages";
 import type { StageRow } from "@/hooks/useStageRows";
-import type { DerivedEconomics, MaterialRow, ProductRow, SupplierRow } from "@/hooks/useItemMasters";
+import type { MaterialRow, ProductRow, SupplierRow } from "@/hooks/useItemMasters";
 import { compileRequiredDataFindings, type Finding, type Severity } from "./validationService";
 
 export type { Finding, Severity };
+
+/** Discriminated result: grading is only meaningful once the inputs exist. */
+export type VerifyResult =
+  | { status: "ready"; findings: Finding[] }
+  | { status: "loading"; findings: [] };
 
 interface VerifyInput {
   defaults: PolicyBundle;
@@ -17,20 +22,24 @@ interface VerifyInput {
   customerRows: StageRow[];
   /** Optional — when omitted, the time-unit check is skipped. */
   timeUnit?: "day" | "week" | "month" | null;
-  /**
-   * Item-master rows the engine actually reads (Phase A / G4 / §8.3). When
-   * omitted (e.g. the write RPCs haven't reached the DB yet) the required-data
-   * manifest checks are skipped rather than producing false blockers.
-   */
+  /** Item-master rows the engine actually reads (Phase A / G4 / §8.3). */
   materials?: MaterialRow[];
   products?: ProductRow[];
   suppliers?: SupplierRow[];
   /**
-   * Engine-fallback economics computed from the raw logistics lanes with the
-   * exact project_map.py reducers (effectiveEconomics.ts, exposed by
-   * useItemMasters), so fallback estimates match what the engine will use.
+   * RAW logistics/BOM rows for the shared grader (useItemMasters.lanes) —
+   * the same tables the sim-command gate reads, never imputed.
    */
-  derived?: DerivedEconomics;
+  inbound?: Record<string, unknown>[];
+  outbound?: Record<string, unknown>[];
+  bom?: Record<string, unknown>[];
+  /**
+   * False while the hooks are still fetching masters/lanes. Grading with
+   * partial data used to be skipped SILENTLY, letting a run dispatch into a
+   * server-side gate rejection the user never saw coming — now the caller
+   * gets an explicit "loading" status and keeps Run disabled.
+   */
+  dataReady: boolean;
 }
 
 /**
@@ -44,15 +53,19 @@ interface VerifyInput {
  *      from the engine registry's data_requirements: every entity field the
  *      always-on mechanics and the currently-activated policies read, graded
  *      against the engine's real fallback chains. The same registry payload
- *      drives the sim-command pre-dispatch gate, so passing here means the
- *      run will dispatch.
+ *      AND the same grading module drive the sim-command pre-dispatch gate,
+ *      so passing here means the run will dispatch.
  */
-export function verifyProjectPolicies(input: VerifyInput): Finding[] {
+export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
+  // Grading partial data produces false confidence (this surface once passed
+  // while the server gate blocked) — report loading instead of guessing.
+  if (!input.dataReady) return { status: "loading", findings: [] };
+
   const out: Finding[] = [];
   const {
     defaults, overrides,
     supplierRows, plantRows, customerRows, timeUnit,
-    materials, products, suppliers, derived,
+    materials, products, suppliers, inbound, outbound, bom,
   } = input;
 
   if (timeUnit === null) {
@@ -147,20 +160,19 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
   }
 
   // ---------- Required-data manifest (§8.1) ----------
-  // Registry-driven: the fields the engine reads for this policy selection.
-  if (materials || products || suppliers) {
-    out.push(
-      ...compileRequiredDataFindings({
-        defaults,
-        materials,
-        products,
-        suppliers,
-        derived,
-        supplierRows,
-        customerRows,
-      }),
-    );
-  }
+  // Registry-driven: the fields the engine reads for this policy selection,
+  // graded from RAW rows by the module shared with the sim-command gate.
+  out.push(
+    ...compileRequiredDataFindings({
+      defaults,
+      materials: materials as unknown as Record<string, unknown>[] | undefined,
+      products: products as unknown as Record<string, unknown>[] | undefined,
+      suppliers: suppliers as unknown as Record<string, unknown>[] | undefined,
+      inbound,
+      outbound,
+      bom,
+    }),
+  );
 
   // ---------- Orphan overrides ----------
   const validKeys = new Set([
@@ -180,5 +192,5 @@ export function verifyProjectPolicies(input: VerifyInput): Finding[] {
     }
   }
 
-  return out;
+  return { status: "ready", findings: out };
 }

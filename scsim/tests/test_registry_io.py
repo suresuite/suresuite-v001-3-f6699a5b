@@ -121,6 +121,31 @@ def test_registry_exports_data_requirements():
         assert r["reason"], f"{r['field']} missing reason"
 
 
+def test_registry_exports_machine_readable_fallback_specs():
+    """§8.2: the engine's fallback chains export as ordered steps the platform
+    graders dispatch on — each step either a named reducer (data-derived,
+    grade info) or a neutral constant (grade warn), mirroring the
+    MappingWarning level project_map.py emits when that step resolves."""
+    reg = build_registry()
+    base = {r["field"]: r for r in reg["base_data_requirements"]}
+
+    cost = base["materials.cost"]["fallback_spec"]
+    assert [s["reducer"] for s in cost] == ["cheapest_inbound_price", None]
+    assert cost[1]["constant"] == 1.0
+    assert [s["grade"] for s in cost] == ["info", "warn"]
+
+    assert base["products.sell_price"]["fallback_spec"][0]["reducer"] == \
+        "demand_weighted_outbound_price"
+    assert base["products.demand_mean"]["fallback_spec"][1]["constant"] == 0.0
+    assert base["inbound_logistics.lead_time"]["fallback_spec"][0]["constant"] == 2.0
+
+    # Every step is well-formed: exactly one of reducer/constant, a valid grade.
+    for r in reg["base_data_requirements"]:
+        for s in r.get("fallback_spec", []):
+            assert s["grade"] in ("info", "warn"), r["field"]
+            assert (s["reducer"] is None) != (s["constant"] is None), r["field"]
+
+
 # --------------------------------------------------------------------- traces
 
 def test_trace_roundtrip(tmp_path):

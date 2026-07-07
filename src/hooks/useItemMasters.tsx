@@ -6,8 +6,6 @@ import {
   cheapestInboundCost,
   demandWeightedSellPrice,
   weeklyDemand,
-  type InboundArc,
-  type OutboundArc,
 } from "@/lib/policies/effectiveEconomics";
 
 // Item-master rows (supabase/migrations/20260614000001_item_master.sql).
@@ -89,6 +87,14 @@ interface UseItemMastersResult {
   error: string | null;
   missingCounts: Record<ItemMasterTable, number>;
   derived: DerivedEconomics;
+  /** RAW logistics/BOM rows for the shared grader — never imputed. The
+   * verification manifest must grade exactly what the edge gate reads. */
+  lanes: {
+    inbound: Record<string, unknown>[];
+    outbound: Record<string, unknown>[];
+    bom: Record<string, unknown>[];
+    loaded: boolean;
+  };
   reload: () => Promise<void>;
   saveRows: (
     table: ItemMasterTable,
@@ -106,19 +112,24 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
-  const [inboundArcs, setInboundArcs] = useState<InboundArc[]>([]);
-  const [outboundArcs, setOutboundArcs] = useState<OutboundArc[]>([]);
+  const [inboundArcs, setInboundArcs] = useState<Record<string, unknown>[]>([]);
+  const [outboundArcs, setOutboundArcs] = useState<Record<string, unknown>[]>([]);
+  const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
+  const [lanesLoaded, setLanesLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Logistics lanes — the engine's price/demand fallback sources. Read via
   // the SECURITY DEFINER RPC (direct .from() reads are RLS-blocked under the
-  // app's custom auth — see src/lib/policies/projectLanes.ts).
+  // app's custom auth — see src/lib/policies/projectLanes.ts). Rows are kept
+  // RAW: the shared grader must see exactly what the edge gate reads.
   const loadLogistics = useCallback(async () => {
     if (!projectId) return;
     const lanes = await fetchProjectLanes(projectId, user);
-    setInboundArcs(lanes.inbound as unknown as InboundArc[]);
-    setOutboundArcs(lanes.outbound as unknown as OutboundArc[]);
+    setInboundArcs(lanes.inbound);
+    setOutboundArcs(lanes.outbound);
+    setBomRows(lanes.bomLevel === "single" ? lanes.bom : []);
+    setLanesLoaded(true);
   }, [projectId, user]);
 
   const loadTable = useCallback(
@@ -247,5 +258,10 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     suppliers: 0,
   };
 
-  return { materials, products, suppliers, loading, error, missingCounts, derived, reload, saveRows };
+  const lanes = useMemo(
+    () => ({ inbound: inboundArcs, outbound: outboundArcs, bom: bomRows, loaded: lanesLoaded }),
+    [inboundArcs, outboundArcs, bomRows, lanesLoaded],
+  );
+
+  return { materials, products, suppliers, loading, error, missingCounts, derived, lanes, reload, saveRows };
 }

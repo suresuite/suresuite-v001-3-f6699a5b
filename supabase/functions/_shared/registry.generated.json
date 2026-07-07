@@ -3,6 +3,18 @@
     {
       "condition": null,
       "fallback": "cheapest inbound unit_price across the material's suppliers",
+      "fallback_spec": [
+        {
+          "constant": null,
+          "grade": "info",
+          "reducer": "cheapest_inbound_price"
+        },
+        {
+          "constant": 1.0,
+          "grade": "warn",
+          "reducer": null
+        }
+      ],
       "field": "materials.cost",
       "level": "required",
       "reason": "Inventory valuation and holding cost \u2014 the terminal default of 1.0 makes every cost KPI meaningless."
@@ -10,6 +22,18 @@
     {
       "condition": null,
       "fallback": "demand-weighted average outbound unit_price",
+      "fallback_spec": [
+        {
+          "constant": null,
+          "grade": "info",
+          "reducer": "demand_weighted_outbound_price"
+        },
+        {
+          "constant": 1.0,
+          "grade": "warn",
+          "reducer": null
+        }
+      ],
       "field": "products.sell_price",
       "level": "required",
       "reason": "Revenue and lost-sales valuation \u2014 the terminal default of 1.0 makes revenue KPIs meaningless."
@@ -17,6 +41,18 @@
     {
       "condition": null,
       "fallback": "\u03a3 weekly outbound volume",
+      "fallback_spec": [
+        {
+          "constant": null,
+          "grade": "info",
+          "reducer": "weekly_outbound_volume"
+        },
+        {
+          "constant": 0.0,
+          "grade": "warn",
+          "reducer": null
+        }
+      ],
       "field": "products.demand_mean",
       "level": "required",
       "reason": "Demand generation \u2014 with neither source the product is never ordered (zero demand)."
@@ -24,6 +60,18 @@
     {
       "condition": null,
       "fallback": "production policy capacity_units_per_day \u00d7 7 \u00d7 utilization",
+      "fallback_spec": [
+        {
+          "constant": null,
+          "grade": "info",
+          "reducer": "production_policy_capacity"
+        },
+        {
+          "constant": null,
+          "grade": "warn",
+          "reducer": "twice_demand_floor_1000"
+        }
+      ],
       "field": "products.production_capacity",
       "level": "recommended",
       "reason": "With no capacity source the engine defaults to max(2\u00b7demand, 1000), so plant capacity never binds."
@@ -31,6 +79,13 @@
     {
       "condition": null,
       "fallback": null,
+      "fallback_spec": [
+        {
+          "constant": 1.0,
+          "grade": "warn",
+          "reducer": null
+        }
+      ],
       "field": "inbound_logistics.unit_price",
       "level": "recommended",
       "reason": "Purchase cost per sourcing arc \u2014 a missing price defaults to 1.0 and distorts procurement spend."
@@ -38,6 +93,13 @@
     {
       "condition": null,
       "fallback": null,
+      "fallback_spec": [
+        {
+          "constant": 2.0,
+          "grade": "warn",
+          "reducer": null
+        }
+      ],
       "field": "inbound_logistics.lead_time",
       "level": "recommended",
       "reason": "Supplier lead time per sourcing arc \u2014 missing values default to 2 weeks."
@@ -45,6 +107,7 @@
     {
       "condition": null,
       "fallback": "unlimited",
+      "fallback_spec": [],
       "field": "suppliers.capacity_per_week",
       "level": "defaulted",
       "reason": "Empty means unlimited (a valid modeling choice) \u2014 but partial-magnitude supplier disruptions need a finite capacity to throttle, else they degrade to full outages."
@@ -1295,6 +1358,7 @@
         {
           "condition": null,
           "fallback": null,
+          "fallback_spec": [],
           "field": "outbound_logistics.volume",
           "level": "required",
           "reason": "Per-customer demand shares come from outbound volumes; without them there are no customer segments to allocate between (the policy is inert below two customers)."
@@ -1432,6 +1496,7 @@
         {
           "condition": null,
           "fallback": "0 (no minimum)",
+          "fallback_spec": [],
           "field": "materials.moq",
           "level": "defaulted",
           "reason": "Minimum order quantity rounds up PH-80 order releases."
@@ -1439,6 +1504,7 @@
         {
           "condition": null,
           "fallback": "policy inventory.holding_cost_pct, then 20%",
+          "fallback_spec": [],
           "field": "materials.holding_cost_pct",
           "level": "defaulted",
           "reason": "Holding cost rate prices the inventory this policy carries."
@@ -1699,6 +1765,7 @@
         {
           "condition": null,
           "fallback": "scenario demand_model.cv, then 0.30",
+          "fallback_spec": [],
           "field": "products.demand_cv",
           "level": "recommended",
           "reason": "Safety-stock sizing scales with demand variability; the default CV of 0.30 may badly misstate your buffers."
@@ -1828,6 +1895,7 @@
         {
           "condition": "segmentation=abc_by_revenue",
           "fallback": "demand-weighted average outbound unit_price",
+          "fallback_spec": [],
           "field": "products.sell_price",
           "level": "required",
           "reason": "Revenue-based ABC segmentation ranks products by price x demand; the 1.0 price default collapses the classes."
@@ -1835,6 +1903,7 @@
         {
           "condition": null,
           "fallback": "scenario demand_model.cv, then 0.30",
+          "fallback_spec": [],
           "field": "products.demand_cv",
           "level": "recommended",
           "reason": "FG buffer sizing scales with demand variability."
@@ -1946,6 +2015,7 @@
         {
           "condition": null,
           "fallback": "production policy capacity_units_per_day x 7 x utilization",
+          "fallback_spec": [],
           "field": "products.production_capacity",
           "level": "required",
           "reason": "Overtime only bites when base capacity binds; the engine default max(2*demand, 1000) never binds, making this policy a silent no-op."
@@ -2174,6 +2244,7 @@
         {
           "condition": null,
           "fallback": "demand-weighted average outbound unit_price",
+          "fallback_spec": [],
           "field": "products.sell_price",
           "level": "recommended",
           "reason": "Revenue-weighted allocation objectives need real product prices to rank products."
@@ -2286,6 +2357,7 @@
         {
           "condition": null,
           "fallback": null,
+          "fallback_spec": [],
           "field": "inbound_logistics.unit_price",
           "level": "recommended",
           "reason": "The min_cost reroute selection rule compares supplier prices; missing prices default to 1.0."
@@ -2293,6 +2365,7 @@
         {
           "condition": null,
           "fallback": "1.0",
+          "fallback_spec": [],
           "field": "suppliers.reliability_score",
           "level": "defaulted",
           "reason": "The reliability selection rule ranks backup sources by this score."
@@ -2417,6 +2490,7 @@
         {
           "condition": null,
           "fallback": null,
+          "fallback_spec": [],
           "field": "inbound_logistics.volume",
           "level": "recommended",
           "reason": "Standing order splits derive source weights from lane volumes when explicit ratios are not set."

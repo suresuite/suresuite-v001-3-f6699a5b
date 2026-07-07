@@ -207,7 +207,13 @@ class MappingResult:
 def base_data_requirements() -> tuple:
     # Imported lazily: scsim.policies pulls in scsim.core, which imports this
     # module's package — a top-level import here would be circular.
-    from scsim.policies.base import DataRequirement
+    #
+    # fallback_spec mirrors THIS module's reducers step for step (§8.2): the
+    # named reducers are the shared vocabulary the TS grading module
+    # (supabase/functions/_shared/grading.ts) dispatches on, and each step's
+    # grade matches the MappingWarning level the mapper emits when that step
+    # is what resolves the field — the validation-parity tests pin this.
+    from scsim.policies.base import DataRequirement, FallbackStep
 
     return (
         DataRequirement(
@@ -215,36 +221,54 @@ def base_data_requirements() -> tuple:
             reason="Inventory valuation and holding cost — the terminal default of "
                    "1.0 makes every cost KPI meaningless.",
             fallback="cheapest inbound unit_price across the material's suppliers",
+            fallback_spec=(
+                FallbackStep(grade="info", reducer="cheapest_inbound_price"),
+                FallbackStep(grade="warn", constant=1.0),
+            ),
         ),
         DataRequirement(
             field="products.sell_price", level="required",
             reason="Revenue and lost-sales valuation — the terminal default of 1.0 "
                    "makes revenue KPIs meaningless.",
             fallback="demand-weighted average outbound unit_price",
+            fallback_spec=(
+                FallbackStep(grade="info", reducer="demand_weighted_outbound_price"),
+                FallbackStep(grade="warn", constant=1.0),
+            ),
         ),
         DataRequirement(
             field="products.demand_mean", level="required",
             reason="Demand generation — with neither source the product is never "
                    "ordered (zero demand).",
             fallback="Σ weekly outbound volume",
+            fallback_spec=(
+                FallbackStep(grade="info", reducer="weekly_outbound_volume"),
+                FallbackStep(grade="warn", constant=0.0),
+            ),
         ),
         DataRequirement(
             field="products.production_capacity", level="recommended",
             reason="With no capacity source the engine defaults to max(2·demand, "
                    "1000), so plant capacity never binds.",
             fallback="production policy capacity_units_per_day × 7 × utilization",
+            fallback_spec=(
+                FallbackStep(grade="info", reducer="production_policy_capacity"),
+                FallbackStep(grade="warn", reducer="twice_demand_floor_1000"),
+            ),
         ),
         DataRequirement(
             field="inbound_logistics.unit_price", level="recommended",
             reason="Purchase cost per sourcing arc — a missing price defaults to "
                    "1.0 and distorts procurement spend.",
             fallback=None,
+            fallback_spec=(FallbackStep(grade="warn", constant=1.0),),
         ),
         DataRequirement(
             field="inbound_logistics.lead_time", level="recommended",
             reason="Supplier lead time per sourcing arc — missing values default "
                    "to 2 weeks.",
             fallback=None,
+            fallback_spec=(FallbackStep(grade="warn", constant=2.0),),
         ),
         DataRequirement(
             field="suppliers.capacity_per_week", level="defaulted",

@@ -1,0 +1,128 @@
+[
+  {
+    "severity": "warn",
+    "field": "products.sell_price",
+    "policy": "engine",
+    "rows": [
+      "P_NO_DEMAND"
+    ],
+    "message": "products.sell_price is unset for 1 row(s) — the engine will apply its neutral default (1). Revenue and lost-sales valuation — the terminal default of 1.0 makes revenue KPIs meaningless.",
+    "reason": "Revenue and lost-sales valuation — the terminal default of 1.0 makes revenue KPIs meaningless."
+  },
+  {
+    "severity": "warn",
+    "field": "products.demand_mean",
+    "policy": "engine",
+    "rows": [
+      "P_NO_DEMAND"
+    ],
+    "message": "products.demand_mean is unset for 1 row(s) — the engine will apply its neutral default (0). Demand generation — with neither source the product is never ordered (zero demand).",
+    "reason": "Demand generation — with neither source the product is never ordered (zero demand)."
+  },
+  {
+    "severity": "warn",
+    "field": "products.production_capacity",
+    "policy": "engine",
+    "rows": [
+      "P_PRICE_FALLBACK",
+      "P_NO_DEMAND"
+    ],
+    "message": "products.production_capacity is unset for 2 row(s) — the engine will apply its neutral default (twice_demand_floor_1000). With no capacity source the engine defaults to max(2·demand, 1000), so plant capacity never binds.",
+    "reason": "With no capacity source the engine defaults to max(2·demand, 1000), so plant capacity never binds."
+  },
+  {
+    "severity": "warn",
+    "field": "inbound_logistics.unit_price",
+    "policy": "engine",
+    "rows": [
+      "S2→M_UNPRICED"
+    ],
+    "message": "inbound_logistics.unit_price is unset for 1 row(s) — the engine will apply its neutral default (1). Purchase cost per sourcing arc — a missing price defaults to 1.0 and distorts procurement spend.",
+    "reason": "Purchase cost per sourcing arc — a missing price defaults to 1.0 and distorts procurement spend."
+  },
+  {
+    "severity": "warn",
+    "field": "inbound_logistics.lead_time",
+    "policy": "engine",
+    "rows": [
+      "S2→M_UNPRICED"
+    ],
+    "message": "inbound_logistics.lead_time is unset for 1 row(s) — the engine will apply its neutral default (2). Supplier lead time per sourcing arc — missing values default to 2 weeks.",
+    "reason": "Supplier lead time per sourcing arc — missing values default to 2 weeks."
+  },
+  {
+    "severity": "warn",
+    "field": "products.demand_cv",
+    "policy": "P-P.3",
+    "rows": [
+      "P_PRICE_FALLBACK",
+      "P_NO_DEMAND"
+    ],
+    "message": "products.demand_cv is missing for 2 row(s) (required by P-P.3): Safety-stock sizing scales with demand variability; the default CV of 0.30 may badly misstate your buffers. Fallback: scenario demand_model.cv, then 0.30.",
+    "reason": "Safety-stock sizing scales with demand variability; the default CV of 0.30 may badly misstate your buffers."
+  },
+  {
+    "severity": "info",
+    "field": "materials.cost",
+    "policy": "engine",
+    "rows": [
+      "M_DERIVED",
+      "M_UNPRICED"
+    ],
+    "message": "materials.cost is derived for 2 row(s) via cheapest inbound unit_price across the material's suppliers — set the master value only to override.",
+    "reason": "Inventory valuation and holding cost — the terminal default of 1.0 makes every cost KPI meaningless."
+  },
+  {
+    "severity": "info",
+    "field": "products.sell_price",
+    "policy": "engine",
+    "rows": [
+      "P_PRICE_FALLBACK"
+    ],
+    "message": "products.sell_price is derived for 1 row(s) via demand-weighted average outbound unit_price — set the master value only to override.",
+    "reason": "Revenue and lost-sales valuation — the terminal default of 1.0 makes revenue KPIs meaningless."
+  },
+  {
+    "severity": "info",
+    "field": "products.demand_mean",
+    "policy": "engine",
+    "rows": [
+      "P_PRICE_FALLBACK"
+    ],
+    "message": "products.demand_mean is derived for 1 row(s) via Σ weekly outbound volume — set the master value only to override.",
+    "reason": "Demand generation — with neither source the product is never ordered (zero demand)."
+  },
+  {
+    "severity": "info",
+    "field": "suppliers.capacity_per_week",
+    "policy": "engine",
+    "rows": [
+      "S1"
+    ],
+    "message": "suppliers.capacity_per_week is missing for 1 row(s) (required by the engine): Empty means unlimited (a valid modeling choice) — but partial-magnitude supplier disruptions need a finite capacity to throttle, else they degrade to full outages. Fallback: unlimited.",
+    "reason": "Empty means unlimited (a valid modeling choice) — but partial-magnitude supplier disruptions need a finite capacity to throttle, else they degrade to full outages."
+  },
+  {
+    "severity": "info",
+    "field": "materials.moq",
+    "policy": "P-P.1",
+    "rows": [
+      "M_OK",
+      "M_DERIVED",
+      "M_UNPRICED"
+    ],
+    "message": "materials.moq is missing for 3 row(s) (required by P-P.1): Minimum order quantity rounds up PH-80 order releases. Fallback: 0 (no minimum).",
+    "reason": "Minimum order quantity rounds up PH-80 order releases."
+  },
+  {
+    "severity": "info",
+    "field": "materials.holding_cost_pct",
+    "policy": "P-P.1",
+    "rows": [
+      "M_DERIVED",
+      "M_UNPRICED"
+    ],
+    "message": "materials.holding_cost_pct is missing for 2 row(s) (required by P-P.1): Holding cost rate prices the inventory this policy carries. Fallback: policy inventory.holding_cost_pct, then 20%.",
+    "reason": "Holding cost rate prices the inventory this policy carries."
+  }
+]

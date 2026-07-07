@@ -6,7 +6,7 @@ on:
       - "scsim/**"
       - "sim-worker/**"
       - "src/lib/policies/registry.generated.json"
-      - "src/lib/policies/engineBridge.json"
+      - "supabase/functions/_shared/**"
       - "scripts/check_registry_bridge.mjs"
       - ".github/workflows/scsim-tests.yml"
   pull_request:
@@ -14,7 +14,7 @@ on:
       - "scsim/**"
       - "sim-worker/**"
       - "src/lib/policies/registry.generated.json"
-      - "src/lib/policies/engineBridge.json"
+      - "supabase/functions/_shared/**"
       - "scripts/check_registry_bridge.mjs"
   workflow_dispatch:
 
@@ -72,6 +72,22 @@ jobs:
           pip install -r sim-worker/requirements.txt pytest
           pip install ./scsim
 
-      - name: Worker test suite (legacy engine + scsim bridge)
+      - name: Worker test suite (legacy engine + scsim bridge + validation parity)
         run: python -m pytest tests -q
         working-directory: sim-worker
+
+  # The shared grading module (§8.2) — the ONE grader the browser and the
+  # sim-command gate both import. Locked to the golden parity fixture; the
+  # sim-worker job above asserts the engine half of the same contract.
+  grading:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Grader contract tests (golden fixture + gate semantics)
+        run: deno test --allow-read grading_test.ts
+        working-directory: supabase/functions/_shared
