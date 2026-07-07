@@ -463,9 +463,13 @@ async function handleExperimentRun(
     console.error("snapshot_dataset failed (run continues unbound)", e);
   }
 
-  // Insert run row (queued)
+  // Insert run row (queued) with the SERVICE ROLE: sim-command is the
+  // authoritative creator of the queued row (as the worker is of results),
+  // and an RLS/migration-ordering gap must never 500 a dispatch. The anon
+  // grants migration (20260706000001) remains required for the FRONTEND to
+  // read runs/replications + receive their realtime events.
   // deno-lint-ignore no-explicit-any
-  const { data: run, error: runErr } = await (sb as any)
+  const { data: run, error: runErr } = await (svc as any)
     .from("simulation_runs")
     .insert({
       scenario_id: scenario.id,
@@ -518,13 +522,15 @@ async function handleExperimentRun(
 }
 
 async function handleExperimentCancel(
-  sb: ReturnType<typeof createClient>,
+  svc: ReturnType<typeof createClient>,
   cmd: Command,
 ) {
   const runId = String((cmd.payload as Record<string, unknown>).run_id ?? "");
   if (!runId) throw new Error("run_id required");
+  // Service role for the same reason as the run insert: the status flip must
+  // not silently no-op on a database missing the anon-grants migration.
   // deno-lint-ignore no-explicit-any
-  await (sb as any)
+  await (svc as any)
     .from("simulation_runs")
     .update({ status: "cancelled", ended_at: new Date().toISOString() })
     .eq("id", runId)
@@ -620,7 +626,7 @@ Deno.serve(async (req) => {
     }
 
     if (cmd.kind === "experiment.cancel") {
-      await handleExperimentCancel(sb, cmd);
+      await handleExperimentCancel(svc, cmd);
       return new Response(JSON.stringify({ ok: true }), {
         status: 202,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
