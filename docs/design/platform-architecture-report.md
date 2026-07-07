@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Report frame v2.0 — scientific-report skeleton with real content and code-verified claims; ⟦double-bracket⟧ marks placeholders to fill with case-study results |
+| **Status** | Report frame v2.1 — scientific-report skeleton with real content, code-verified claims, and a 14-figure program addressing four reviewer communities (§1.4); ⟦double-bracket⟧ marks placeholders to fill with case-study results |
 | **Date** | 2026-07-06 |
 | **Role** | *Descriptive* companion to the governing blueprint `docs/design/next-gen-platform-design.md`. The blueprint is normative (what to build and why); this report describes the platform as designed and built, structured to lift into a scientific paper (WSC tools track / SoftwareX style) or expand into a thesis chapter. |
 | **Evidence discipline** | Every architectural claim in §4 is annotated with the repository artifact that implements it, and every status is marked. A reader (or reviewer) can audit any statement against the code. |
@@ -89,6 +89,37 @@ this way — the design rationale. §6: module and feature catalog. §7: the V&V
 §8: experimentation and decision support. §9: the state-of-the-art argument. §10: the AI
 layer and agent roster. §11: case-study protocol. §12: limitations. §13: conclusion.
 
+### 1.4 Figure program
+
+This report deliberately serves four reviewer communities at once, and its figures are
+designed so that each community finds at least one diagram pitched at its own level of
+abstraction — a domain reviewer need not read a sequence diagram to grasp the contribution,
+and a systems reviewer need not parse an echelon model to audit the run lifecycle. The
+fourteen figures are therefore not decoration; they are the paper's second, parallel argument,
+each captioned with what the reader should *conclude* from it (journal convention), and each
+carrying a status legend so that no diagram over-claims: solid nodes/edges are implemented and
+deployed, dashed (`planned`) nodes/edges are designed and scheduled with the blueprint phase
+named in the caption.
+
+**Table 0 — The figure program.**
+
+| Fig. | Title | Diagram type | §  | Primary audience |
+|---|---|---|---|---|
+| 1 | Supply chain conceptual model: echelons, decoupling point, disruption injection | flow (LR) | §3.1 | SCM / OM |
+| 2 | The analyst journey: four rooms, gates, and the artifacts they emit | flow (LR) | §3.3 | Decision-support / IS |
+| 3 | System architecture with trust boundaries and evidence-keyed edges | flow (LR) | §4.1 | Information systems |
+| 4 | Layered architecture and the "law" enforced at each boundary | flow (TD) | §4.1 | Computer science |
+| 5 | The weekly phase pipeline PH-00…PH-99 and its state-key contract | flow (TD) | §4.2 | Simulation |
+| 6 | The nine canonical policy interactions as writer→key→reader paths | flow (LR) | §4.2 | OM + CS |
+| 7 | Single source of truth: plugin → registry → generated artifacts, CI-gated | flow (LR) | §4.3 | Software engineering |
+| 8 | PolicyBundle resolution cascade and the behavioral fingerprint | flow (TD) | §4.3 | SCM decision architecture |
+| 9 | Core data model (entity–relationship) | ER | §4.4 | Information systems |
+| 10 | Run lifecycle: dispatch gate, durable stream, idempotent write-back | sequence | §4.5 | Systems / IS |
+| 11 | Three-hash provenance and the four capabilities it underwrites | flow (TD) | §4.6 | Reproducibility / open science |
+| 12 | The V&V pipeline as a credibility state machine | state | §7.2 | Simulation methodology |
+| 13 | Experiment typology and CRN-paired comparison validity | flow (TD) | §8 | OM / statistics |
+| 14 | The AI layer: surrogate loop and the five-agent roster, both gated | flow (TD) | §10 | AI / OR |
+
 ---
 
 ## 2. Background and reference context
@@ -143,7 +174,53 @@ out of scope rather than faked (blueprint §2.4, §5.8).
 Uncertainty enters through stochastic demand, stochastic lead times, and **disruption
 scenarios**: a supplier, the plant, or a lane loses capacity or gains lead time for a window
 of weeks, with a detection lag before the firm *knows*. Recovery behavior — expediting, backup
-sourcing, overtime — is not scripted; it emerges from the policies the user configured.
+sourcing, overtime — is not scripted; it emerges from the policies the user configured. Figure
+1 renders this world at the level of abstraction an operations reviewer works in — echelons,
+material and order flows, the make-to-order vs. make-to-stock decoupling point, and the three
+classes of injection point where a disruption can strike — with no software vocabulary.
+
+```mermaid
+flowchart LR
+    subgraph SUP["Suppliers (echelon 1)"]
+        S1["Supplier A\ncapacity · lead time · reliability"]
+        S2["Supplier B\n(backup / 2nd source)"]
+    end
+    subgraph PL["Focal plant (echelon 2)"]
+        RM["Raw-material\nstock"]
+        BOM["BoM explosion\nmaterials to products"]
+        PROD["Production\nMPS-lite · capacity"]
+        FG["Finished-goods\nbuffer (MTS)"]
+    end
+    subgraph CUS["Customers (echelon 3)"]
+        C1["Customer segment 1\ndemand · SLA"]
+        C2["Customer segment 2"]
+    end
+    S1 -->|"inbound lane\nmode · cost · transit"| RM
+    S2 -.->|"contingent"| RM
+    RM --> BOM --> PROD
+    PROD -->|"MTS replenish to target"| FG
+    PROD ==>|"MTO: build to order"| ORD
+    FG -->|"serve from stock"| ORD["Order fulfilment\n(decoupling point ★)"]
+    ORD -->|"outbound lane"| C1
+    ORD --> C2
+    C1 -.->|"orders / forecast signal"| PROD
+
+    D1(["Disruption:\nsupplier capacity ↓\nor lead time ↑"]):::dis --> S1
+    D2(["Disruption:\nplant capacity ↓"]):::dis --> PROD
+    D3(["Disruption:\nlane transit ↑"]):::dis --> ORD
+    classDef dis fill:#fde,stroke:#c39,stroke-width:1px,color:#712;
+```
+
+**Figure 1 — Supply chain conceptual model.** The three-echelon network the platform
+simulates, drawn in operations terms. Solid arrows are physical material/order flows; the
+★ marks the customer-order decoupling point, which sits at the finished-goods buffer for
+make-to-stock products (`serve from stock`) and at production for make-to-order products
+(`build to order`) — a network may mix both per product (ADR 0001). The three pink nodes are
+the disruption *injection points* the scenario layer supports today (supplier, plant, lane);
+recovery is not drawn because it is not a fixed flow — it emerges from whichever policies the
+analyst has configured (§3.2). A reviewer should conclude that the modeled world is a faithful,
+if aggregate, rendering of a single-plant supply chain, and that its fidelity boundary
+(weekly, continuous quantities) is a deliberate modeling choice, not an omission.
 
 ### 3.2 Decisions as policies
 
@@ -179,6 +256,54 @@ supplied — the model cannot silently invent the number.
    dashboards, comparisons — inheriting the validated settings from step 3 🧭(the
    currently-landing piece, blueprint §9.5/G13).
 
+Figure 2 renders this journey as a gated pipeline of four rooms, each consuming the artifact
+the previous room emitted; the gates are the platform's guarantee that a downstream room
+cannot run on an unfit upstream artifact.
+
+```mermaid
+flowchart LR
+    subgraph R1["Room 1 · Project Manager"]
+        direction TB
+        A1["describe network\n+ economics"]
+    end
+    subgraph R2["Room 2 · Policies"]
+        direction TB
+        A2["select policy per slot\n+ fill parameters"]
+    end
+    subgraph R3["Room 3 · Run & Validate"]
+        direction TB
+        A3["verify → run once →\nreplicate → warm-up →\nvalidate vs. empirical"]
+    end
+    subgraph R4["Room 4 · Simulation Lab"]
+        direction TB
+        A4["scenarios · experiments ·\nKPI dashboards · compare"]
+    end
+
+    A1 -->|"emits"| DV[["dataset_version\n(graph_hash)"]]
+    A2 -->|"emits"| PV[["policy_version\n(policy_hash)"]]
+    A3 -->|"emits"| MC[["validated model card\n(triple-bound)"]]:::planned
+    DV --> G1{{"gate:\nrequired-data\nmanifest"}}
+    PV --> G1
+    G1 -->|"pass"| A3
+    G1 -.->|"block: missing datum"| A2
+    MC --> G2{{"gate:\ncredibility\ninheritance"}}:::planned
+    G2 --> A4
+    A4 -.->|"new question →\nnew scenario"| A4
+    A4 -.->|"edit policy →\nre-validate"| A2
+
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
+```
+
+**Figure 2 — The analyst journey.** Four rooms as a gated production line. Each room emits a
+first-class, versioned artifact (double-bordered): the network freeze, the policy version, and
+the validated model card. Gate G1 (the required-data manifest, §7) is enforced *both* in the
+UI and server-side at dispatch, so an underspecified model is bounced back to Room 2 rather
+than run on invented parameters. Gate G2 and the model card are dashed because credibility
+*inheritance* into the Lab is the currently-landing piece (blueprint §9.5, gap G13): the
+pipeline that establishes credibility ships; the mechanism that carries it forward is Phase B0.
+The reviewer's takeaway: trust is not assumed between stages — it is an artifact that must pass
+a gate, which is precisely what commercial tools leave to user discipline.
+
 ### 3.4 Questions the platform answers
 
 *Service vs. inventory*: what fill rate does the current policy set deliver, at what average
@@ -210,55 +335,76 @@ TTR/TTS, service-loss area, and a composite resilience index. Full dictionary: A
 | **Execution** | Fly.io worker (Python), Upstash Redis streams | Consumes commands; maps project data to engine input; executes replications; **sole writer of results**; idempotent by `run_id` |
 | **Engine** | `scsim` (Python, NumPy-vectorized) | Phase-pipeline weekly simulator; policy plugins; disruptions; KPIs; statistics; stress batteries; portfolio studies |
 
+Figure 3 is the four-tier system, upgraded from a plain block diagram into an evidence-keyed,
+trust-boundary-annotated architecture figure: every edge carries a circled number that indexes
+Table 1, and the two dashed provenance edges show where content hashes are stamped.
+
 ```mermaid
 flowchart LR
-    subgraph FE["Frontend (React)"]
-        PM["/project-manager"]
-        PP["/policies"]
-        SL["/simulation-lab"]
+    subgraph BROWSER["① Client trust zone — browser"]
+        subgraph FE["Frontend (React + Vite)"]
+            PM["/project-manager"]
+            PP["/policies"]
+            SL["/simulation-lab"]
+        end
     end
-    subgraph SB["Supabase"]
-        TBL["network + master tables"]
-        POL["policy_defaults/overrides/versions"]
-        DSV["dataset_versions"]
-        RUN["scenarios / simulation_runs / run_replications"]
-        CMD["sim-command (+ validation gate)"]
+    subgraph CLOUD["② Server trust zone — RLS + service-role"]
+        subgraph SB["Supabase (Postgres · Deno edge fns · Realtime)"]
+            TBL["network + master tables\n(6 engine-read datasets)"]
+            POL["policy_defaults / overrides /\nversions (policy_hash)"]
+            DSV["dataset_versions\n(graph_hash)"]
+            RUN["scenarios /\nsimulation_runs /\nrun_replications"]
+            CMD["sim-command\n(+ validation gate)"]
+        end
+        subgraph WK["Fly.io sim-worker (Python)"]
+            BR["scsim_bridge"]
+            LEG["legacy engine\n(frozen · escape hatch)"]:::planned
+        end
+        ENG["scsim engine\n(vectorized phase pipeline)"]
     end
-    subgraph WK["Fly.io sim-worker"]
-        BR["scsim_bridge"]
-    end
-    ENG["scsim engine"]
-    PM --> TBL
-    PP --> POL
-    SL --> CMD
-    CMD -->|Redis stream| WK
-    TBL --> WK
-    DSV -. graph_hash stamped .-> RUN
-    POL -. policy_hash .-> RUN
-    BR --> ENG
-    WK --> RUN
-    RUN --> SL
+
+    PM -->|"①"| TBL
+    PP -->|"②"| POL
+    SL -->|"③ invoke"| CMD
+    CMD -->|"④ gate: 422 on required gap"| SL
+    CMD -->|"⑤ XADD Redis stream"| WK
+    CMD -.->|"⑥ stamp policy_hash"| RUN
+    CMD -.->|"⑥ stamp graph_hash"| RUN
+    TBL -->|"⑦ GraphCache + datamap"| WK
+    POL --> CMD
+    DSV --> CMD
+    BR -->|"⑧ compile + run"| ENG
+    LEG -.-> ENG
+    WK -->|"⑨ idempotent upsert (sole writer)"| RUN
+    RUN -->|"⑩ Realtime channel"| SL
+
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
 ```
 
-**Figure 1 is not an aspiration diagram.** Every box and edge is implemented and deployed;
-Table 1 maps each edge to the artifact that implements it. This auditability is itself a
-design point: the report's architecture claims are checkable against the repository.
+**Figure 3 — System architecture with trust boundaries and evidence-keyed edges.** The two
+boxes ① client / ② server are the security boundary: the browser holds *no* authority — all
+mutations pass row-level security or the service-role edge functions, and the worker is the
+*sole* writer of results (edge ⑨). Circled edge numbers index Table 1, which names the file
+implementing each and the behavior verified. Dashed edges ⑥ are the provenance stamps
+(`policy_hash`, `graph_hash`) written at dispatch; the dashed `legacy engine` node is the
+frozen escape hatch (blueprint §3). Unlike a conventional architecture diagram, **every element
+here is auditable against the repository** — the figure is a claim, and Table 1 is its proof.
 
-**Table 1 — Edge-by-edge evidence for Figure 1.**
+**Table 1 — Edge-by-edge evidence for Figure 3.**
 
 | Edge | Implementing artifact | Verified behavior | Status |
 |---|---|---|---|
-| `/project-manager` → tables | `supabase/functions/ingest-*`, upload wizard, item-master grids (`useItemMasters`) | CSV wizards + in-grid edits populate the six engine-read tables (`suppliers`, `materials`, `products`, `inbound_logistics`, `bom_single_level`, `outbound_logistics`) | ✅ |
-| `/policies` → policy stores | `src/hooks/usePolicies.tsx` | Family defaults, per-node/edge overrides, immutable `policy_versions` snapshots with SHA-256 `policy_hash`, dirty detection, restore | ✅ |
-| `/simulation-lab` → `sim-command` | `src/hooks/useSimulationRun.tsx` → `supabase.functions.invoke("sim-command")` | Dispatch, cancel, add-replications commands | ✅ |
-| `sim-command` validation gate | `supabase/functions/_shared/validationGate.ts` + mirrored registry snapshot | Required-data gaps reject the run (HTTP 422, typed findings); `recommended` gaps require explicit acknowledgment | ✅ |
-| `sim-command` → Redis stream | `sim-command/index.ts` (`XADD` to Upstash REST) | Commands published to a per-project stream; cancel and add-reps are further messages | ✅ |
-| Provenance stamping (dashed edges) | `sim-command/index.ts` run insert | `policy_version_id` + `policy_hash` + `dataset_version_id` + `graph_hash` written onto `simulation_runs` at dispatch | ✅ |
-| Stream → worker | `sim_worker/worker.py` (`xreadgroup` consumer group, `xack`) | At-least-once consumption; processing idempotent by `run_id`, so redelivery is safe | ✅ |
-| Tables → worker | `GraphCache` + `sim_worker/datamap.py` | Project rows fetched, unit-normalized, mapped to the engine payload per the documented mapping contract | ✅ |
-| Bridge → engine | `sim_worker/scsim_bridge.py` | Compiles the scenario, executes scsim replications, records warm-up metadata and weekly series | ✅ |
-| Worker → results | `worker.py` upserts | Sole authoritative writer of `simulation_runs` / `run_replications`; per-replication rows streamed live as each finishes | ✅ |
-| Results → Lab | `useSimulationRun.tsx` Supabase Realtime channel | Live per-replication UI updates without polling | ✅ |
+| ① `/project-manager` → tables | `supabase/functions/ingest-*`, upload wizard, item-master grids (`useItemMasters`) | CSV wizards + in-grid edits populate the six engine-read tables (`suppliers`, `materials`, `products`, `inbound_logistics`, `bom_single_level`, `outbound_logistics`) | ✅ |
+| ② `/policies` → policy stores | `src/hooks/usePolicies.tsx` | Family defaults, per-node/edge overrides, immutable `policy_versions` snapshots with SHA-256 `policy_hash`, dirty detection, restore | ✅ |
+| ③ `/simulation-lab` → `sim-command` | `src/hooks/useSimulationRun.tsx` → `supabase.functions.invoke("sim-command")` | Dispatch, cancel, add-replications commands | ✅ |
+| ④ `sim-command` validation gate | `supabase/functions/_shared/validationGate.ts` + mirrored registry snapshot | Required-data gaps reject the run (HTTP 422, typed findings); `recommended` gaps require explicit acknowledgment | ✅ |
+| ⑤ `sim-command` → Redis stream | `sim-command/index.ts` (`XADD` to Upstash REST) | Commands published to a per-project stream; cancel and add-reps are further messages | ✅ |
+| ⑥ Provenance stamping (dashed edges) | `sim-command/index.ts` run insert | `policy_version_id` + `policy_hash` + `dataset_version_id` + `graph_hash` written onto `simulation_runs` at dispatch | ✅ |
+| ⑦ Tables → worker | `GraphCache` + `sim_worker/datamap.py` | Project rows fetched, unit-normalized, mapped to the engine payload per the documented mapping contract | ✅ |
+| ⑦ Stream → worker | `sim_worker/worker.py` (`xreadgroup` consumer group, `xack`) | At-least-once consumption; processing idempotent by `run_id`, so redelivery is safe | ✅ |
+| ⑧ Bridge → engine | `sim_worker/scsim_bridge.py` | Compiles the scenario, executes scsim replications, records warm-up metadata and weekly series | ✅ |
+| ⑨ Worker → results | `worker.py` upserts | Sole authoritative writer of `simulation_runs` / `run_replications`; per-replication rows streamed live as each finishes | ✅ |
+| ⑩ Results → Lab | `useSimulationRun.tsx` Supabase Realtime channel | Live per-replication UI updates without polling | ✅ |
 
 One deliberate asymmetry: a **legacy** in-worker engine predates `scsim` and is frozen
 (blueprint §3); the deployed configuration runs `scsim` (`SCSIM_ENGINE=1` in
@@ -266,6 +412,41 @@ One deliberate asymmetry: a **legacy** in-worker engine predates `scsim` and is 
 not dates: mapping-loss elimination is regression-tested (gate E1 ✅), engine differences are
 characterized and accepted as corrections (`docs/parity-characterization.md`, gate E2 ✅),
 default flip and deletion follow (E3/E4 🧭).
+
+Where Figure 3 shows the *topology*, Figure 4 shows the *discipline*: the platform is a stack
+of layers, and at every layer boundary an explicit invariant ("law") is enforced rather than
+merely hoped for. These laws are the substance of the design rationale in §5; the figure is
+their map.
+
+```mermaid
+flowchart TD
+    UI["<b>UI layer</b><br/>/project-manager · /policies · /simulation-lab · network views"]
+    AI["<b>AI layer</b> (§10)<br/>surrogate criticality loop · five-agent roster"]:::planned
+    EXP["<b>Experimentation layer</b> (§8)<br/>typed experiments · CRN pairing · run cache"]
+    ENG["<b>Engine layer</b> — scsim<br/>phase pipeline · policy plugins · KPIs · snapshots"]
+    POL["<b>Policy layer</b><br/>node-owned bundles · registry · versions · interaction graph"]
+    DATA["<b>Data layer</b><br/>network graph · item masters · calendars · dataset versions"]
+
+    UI -->|"<i>law:</i> UI can only offer<br/>what the engine can execute<br/>(registry codegen §4.3)"| AI
+    AI -->|"<i>law:</i> AI output is a proposal,<br/>never a result — same gates<br/>as human input (§10)"| EXP
+    EXP -->|"<i>law:</i> a run is comparable only<br/>if CRN-paired and one-component<br/>different (§8)"| ENG
+    ENG -->|"<i>law:</i> hooks validated at load<br/>for read-before-write & ownership<br/>(phase pipeline §4.2)"| POL
+    POL -->|"<i>law:</i> resolved bundle is hashed<br/>= complete behavioral fingerprint<br/>(policy_hash §4.3)"| DATA
+    DATA -->|"<i>law:</i> inputs are immutable,<br/>content-addressed snapshots<br/>(graph_hash §4.6)"| GATE["<b>Dispatch gate</b><br/>required-data manifest —<br/>no underspecified run executes"]
+
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
+```
+
+**Figure 4 — Layered architecture and the law at each boundary.** Read top-down as request
+flow, bottom-up as trust flow. The value of the figure is the edge labels: each layer boundary
+enforces a *machine-checked invariant*, not a convention. Reading the laws in sequence gives
+the platform's thesis in six lines — the UI cannot diverge from the engine, AI cannot fabricate
+results, comparisons are statistically valid by construction, policy interactions are sound at
+load time, behavior is completely fingerprinted, and inputs are immutable — culminating in a
+dispatch gate that refuses underspecified runs. A computer-science reviewer should read this as
+the claim to a *different architecture class* (§9.2): the guarantees are structural, so they
+hold for every future policy and every future experiment, not just the ones shipped today. The
+AI layer is dashed (Phase D).
 
 ### 4.2 The engine: a contract-validated phase pipeline
 
@@ -279,6 +460,91 @@ single-owner transient writes, authorized persistent writes, and declared confli
 (`scsim/scsim/core/phases.py`). "The weekly cycle is data, not code." Execution is vectorized
 across materials/products/links; reference performance 0.33 s per replication at manuscript
 scale. 90+ tests include byte-identical golden traces and conservation invariants.
+
+Figure 5 unrolls one simulated week as the eleven-phase pipeline, showing for each phase the
+transient state key it *owns* (recomputed weekly) and, on the right, the persistent `state.*`
+keys that carry across weeks — the closed loop that makes the model dynamic. This is the
+figure a simulation reviewer will scrutinize, because it is where the model's causal structure
+lives.
+
+```mermaid
+flowchart TD
+    subgraph WEEK["One simulated week (vectorized)"]
+        P00["PH-00 week start\nowns: disruption_state"]
+        P10["PH-10 demand + forecast\nowns: demand, forecast"]
+        P20["PH-20 detection\nowns: firm_knowledge"]
+        P30["PH-30 fulfil from stock (MTS)\nowns: fg_fulfillment"]
+        P40["PH-40 production planning\nowns: production_plan, overtime"]
+        P50["PH-50 production execute\nowns: production_output"]
+        P60["PH-60 fulfilment\nowns: fulfillment"]
+        P70["PH-70 material planning\nowns: material_demand, inventory_levels"]
+        P80["PH-80 procurement\nowns: purchase_orders"]
+        P90["PH-90 logistics\nowns: arrivals"]
+        P99["PH-99 accounting\nowns: kpi_rows"]
+        P00 --> P10 --> P20 --> P30 --> P40 --> P50 --> P60 --> P70 --> P80 --> P90 --> P99
+    end
+    subgraph STATE["Persistent state (carries week to week)"]
+        SON["state.on_hand"]
+        SBK["state.backlog"]
+        SPIPE["state.pipeline (in-transit ring)"]
+        SQ["state.queue (capacity gating)"]
+        SFG["state.fg_on_hand / fg_target"]
+    end
+    P50 --> SON
+    P90 --> SON
+    P90 --> SPIPE
+    P80 --> SQ
+    P60 --> SBK
+    P70 --> SFG
+    STATE -.->|"read next week"| P40
+    SFG -.->|"S^FG target"| P40
+    P99 -->|"next week"| P00
+
+    classDef ph fill:#eef,stroke:#88a;
+```
+
+**Figure 5 — The weekly phase pipeline and its state-key contract.** Eleven phases execute in
+fixed order (left column); each is annotated with the transient key it exclusively owns. The
+right column is persistent state, the only channel by which one week influences the next: PH-50
+and PH-90 write on-hand inventory, PH-80/90 the supplier pipeline and queue, PH-70 the
+finished-goods target read at PH-40 *next* week (the make-to-stock loop, ADR 0001). Because
+ownership and read-before-write are checked at load time (`validate_hooks`), a reviewer can
+trust that no phase silently depends on another's unwritten output — the classic source of
+irreproducible discrete-event bugs. The dashed feedback edges are what make the system a
+dynamical model rather than a spreadsheet; Figure 6 shows how *policies* ride on these same
+edges.
+
+Figure 6 abstracts the same machinery to the nine canonical policy interactions the OM
+literature names — but here each is a concrete writer→state-key→reader path, not prose, and
+each is therefore load-time-verifiable.
+
+```mermaid
+flowchart LR
+    F["Forecasting\nP-F.1"] -->|forecast| INV["Inventory / safety stock\nP-P.1, P-P.3"]
+    F -->|forecast| PRODP["Production planning\nP-P.0, P-P.2"]
+    INV -->|inventory_levels| PROC["Procurement\nPH-80"]
+    PROC -->|purchase_orders → pipeline| PRODX["Production feasibility\nPH-50 next week"]
+    PRODX -->|production_output| LOG["Logistics / transport\nP-T.x"]
+    LOG -->|arrivals → on_hand| SERV["Customer service\nPH-30/60 fulfillment"]
+    CAP["Supplier capacity\nP-S.5"] ==>|"queue congestion\n= endogenous lead time"| LOG
+    ALLOC["Allocation\nP-P.9 · P-C.2"] -->|reshaped fulfillment| SERV
+    DIS["Disruption\nPH-00"] -->|"firm_knowledge\n(after detection lag)"| REC["Recovery activations\nP-S.1/S.4 · P-T.2 · P-P.5 · P-X.1"]
+    REC -.->|crisis mode| CAP
+    REC -.->|crisis mode| LOG
+    SERV -->|fill rate · backlog · TTR/TTS| KPI["KPIs\nPH-99"]
+
+    classDef emergent stroke:#c39,stroke-width:2px;
+    class CAP emergent;
+```
+
+**Figure 6 — The nine canonical policy interactions.** Each labeled edge is a real data
+dependency through a phase state key, so the "interaction graph" the OM literature usually
+documents in drifting prose is here *derived from and validated by* the engine's hook
+declarations (blueprint §7). The thick pink path is the one interaction that is *emergent*
+rather than parameterized: finite supplier capacity (P-S.5) congests the ship queue, and that
+congestion *is* an endogenous lead-time extension — no lead-time parameter is edited, the
+delay arises from the mechanism. A reviewer should conclude that policy composition in
+SureSuite is a machine-checked property, which is exactly what a closed engine cannot expose.
 
 ### 4.3 The policy layer and the single source of truth
 
@@ -301,6 +567,73 @@ offer what the engine can execute, and everything the UI offers reaches the engi
 ✅ rail + validation surfaces; 🔶 the `/policies` parameter forms still render a transitional
 7-family vocabulary until Phase B0 switches them to per-policy registry forms.
 
+Figure 7 is the mechanism behind that "platform law" — the single-source-of-truth pipeline —
+showing how one engine artifact fans out into every downstream surface, each guarded by a CI
+drift gate so the surfaces cannot diverge. This is the figure a software-engineering reviewer
+will care about, because it is the difference between a claim of consistency and a *proof* of
+it.
+
+```mermaid
+flowchart LR
+    subgraph ENGINE["Engine (Python) — the only authored source"]
+        PLUG["PolicyPlugin classes\nParams (Pydantic) · hooks ·\nfeasibility · data_requirements"]
+        REGX["registry_export.py"]
+    end
+    PLUG --> REGX
+    REGX -->|"gen_frontend_registry.py"| SNAP["registry.generated.json\n(committed snapshot)"]
+    SNAP --> FE["Frontend forms & enums\n(registryAccess.ts)"]
+    SNAP --> GATE["Edge-fn validation gate\n(mirrored snapshot)"]
+    SNAP --> DOCS["Reference docs\n(gen_docs.py)"]
+
+    CI1{{"CI drift gate\n--check fails build"}}:::gate
+    SNAP -.->|"drift?"| CI1
+    REGX -.->|"drift?"| CI1
+    BRIDGE["engineBridge.json\n(validated translation)"]:::planned
+    FE -.->|"transitional\n(retired Phase B0)"| BRIDGE
+
+    classDef gate fill:#efe,stroke:#4a4;
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
+```
+
+**Figure 7 — Single source of truth: plugin → registry → generated artifacts.** The engine's
+policy plugins are the *only* place policy schemas are authored. `registry_export.py` renders
+them into one JSON payload; `gen_frontend_registry.py` commits a snapshot consumed by the
+frontend forms, the server-side validation gate, and the docs. A CI gate fails the build if any
+consumer drifts from the source — the same enforcement pattern the engine already uses for its
+reference docs. Consequence (blueprint §6.2): the "pick a policy → its parameters appear"
+experience is *derived*, and "what you configured is what ran" is a checkable invariant rather
+than a hope. The dashed `engineBridge.json` is the last remnant of the transitional 7-family
+translation, retired when the forms render registry params directly (Phase B0).
+
+Figure 8 shows the other half of the policy layer — how a *specific node's* behavior is
+resolved from three layers of configuration into one hashed bundle, the object that becomes the
+behavioral fingerprint.
+
+```mermaid
+flowchart TD
+    L1["Project defaults\npolicy_defaults (7-family JSONB)"] --> RES
+    L2["Node-type defaults\n(all suppliers / all MTS products)"]:::planned --> RES
+    L3["Per-node / per-edge overrides\npolicy_overrides (sparse patch)"] --> RES
+    RES["Resolution cascade\n(most specific wins)"] --> BUNDLE["Resolved PolicyBundle\n{slot → (policy_id, params)}\nper node instance"]
+    BUNDLE --> SNAPV["policy_versions snapshot"]
+    SNAPV --> HASH["SHA-256 policy_hash\n= complete behavioral fingerprint"]
+    HASH --> USE1["run identity (§4.6)"]
+    HASH --> USE2["run cache key"]:::planned
+    HASH --> USE3["model-card staleness"]:::planned
+
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
+```
+
+**Figure 8 — PolicyBundle resolution and the behavioral fingerprint.** A node instance's
+behavior is not a type but a *resolved bundle*: project defaults, overlaid by node-type
+defaults (the dashed middle layer landing with node-owned bundles, blueprint §4.3), overlaid by
+sparse per-node overrides. The resolved bundle — everything the node will actually do,
+including the named defaults for slots the user left untouched — is what gets hashed. Because
+no behavior is implicit, `policy_hash` is a *complete* fingerprint of the decision layer, which
+is precisely why it can serve as a run-cache key and a staleness trigger downstream. An OM
+reviewer should note that this makes "two suppliers running different allocation disciplines in
+the same model" a first-class, versioned, comparable object.
+
 ### 4.4 Data plane and lifecycle
 
 Six datasets feed the engine, populated by CSV wizards and editable in-grid. A documented
@@ -312,6 +645,78 @@ resolved at run time; policy versions are immutable snapshots with hash, lineage
 Dataset versions snapshot the canonical source rows of the six tables under a content-derived
 `graph_hash`.
 
+Figure 9 is the entity–relationship model of the control plane, the schema an information-
+systems reviewer will audit. It shows the three parallel version stores (policy, dataset, and
+the scheduled model-validation card) and how a run is triple-bound to its provenance.
+
+```mermaid
+erDiagram
+    projects ||--o{ suppliers : has
+    projects ||--o{ materials : has
+    projects ||--o{ products : has
+    projects ||--o{ inbound_logistics : has
+    projects ||--o{ bom_single_level : has
+    projects ||--o{ outbound_logistics : has
+    projects ||--|| policy_defaults : "7-family JSONB"
+    projects ||--o{ policy_overrides : "sparse patches"
+    projects ||--o{ policy_versions : "immutable snapshots"
+    projects ||--o{ dataset_versions : "immutable snapshots"
+    projects ||--o{ scenarios : has
+    scenarios ||--o{ simulation_runs : "queued / run"
+    simulation_runs ||--o{ run_replications : "per-seed rows"
+    policy_versions ||--o{ simulation_runs : "policy_hash binds"
+    dataset_versions ||--o{ simulation_runs : "graph_hash binds"
+    policy_versions ||--o{ model_validations : "validated card"
+    dataset_versions ||--o{ model_validations : "validated card"
+
+    policy_versions {
+        uuid id PK
+        text label
+        jsonb snapshot
+        text policy_hash
+    }
+    dataset_versions {
+        uuid id PK
+        jsonb snapshot
+        text graph_hash
+    }
+    simulation_runs {
+        uuid id PK
+        uuid policy_version_id FK
+        uuid dataset_version_id FK
+        text policy_hash
+        text graph_hash
+        integer warmup_detected_at
+        jsonb aggregate_kpis
+    }
+    run_replications {
+        uuid id PK
+        integer rep_index
+        bigint seed_used
+        jsonb kpis
+        jsonb time_series
+        integer warmup_at
+    }
+    model_validations {
+        uuid id PK
+        text triple_hash
+        integer adopted_warmup
+        jsonb replication_reco
+        jsonb validation_verdict
+    }
+```
+
+**Figure 9 — Core data model.** The six engine-read datasets hang off `projects` alongside
+three provenance stores. A `simulation_runs` row is *triple-bound* — it carries both
+`policy_version_id`/`policy_hash` and `dataset_version_id`/`graph_hash` (verified in the
+`sim-command` insert), so any result is traceable to the exact policy snapshot and data
+snapshot that produced it. Each `run_replications` row persists its own seed, KPIs, weekly
+time series, and warm-up index — the evidence, not a summary, is stored, which is what lets the
+V&V pipeline (§7) compute statistics from real per-replication samples. `model_validations`
+(dashed border in the schema sense — blueprint §9.5, gap G13) is the one store not yet built:
+it keys the validated model card by the provenance triple. A reviewer should note that
+reproducibility here is a schema-level property, not a convention.
+
 ### 4.5 Execution plane
 
 `sim-command` is the single command gateway. Before dispatch it (a) grades the required-data
@@ -321,6 +726,57 @@ replications (streaming each finished replication row), and writes results idemp
 Per-replication output: KPI scalars, weekly time series (fill rate, backlog, on-hand value,
 revenue), seed, warm-up metadata; run-level: the engine's mapping report and detected warm-up.
 
+Figure 10 traces one run end-to-end as a sequence diagram — the temporal counterpart to Figure
+3's static topology. It shows the two control-flow branches a systems reviewer will look for:
+the gate's reject path, and the durable-stream decoupling that lets a long replication study
+outlive any synchronous request.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Analyst
+    participant SL as /simulation-lab
+    participant CMD as sim-command (edge fn)
+    participant DB as Postgres
+    participant RS as Redis stream
+    participant WK as sim-worker
+    participant EN as scsim engine
+
+    U->>SL: Run scenario
+    SL->>CMD: invoke(experiment.run, policy_version_id)
+    CMD->>DB: grade required-data manifest
+    alt required datum missing
+        CMD-->>SL: 422 typed findings
+        SL-->>U: "fix inputs" (bounced to Policies)
+    else complete
+        CMD->>DB: insert simulation_runs (stamp policy_hash, graph_hash)
+        CMD->>RS: XADD run command
+        CMD-->>SL: 202 queued
+    end
+    WK->>RS: xreadgroup (consumer group)
+    WK->>DB: fetch project rows (GraphCache)
+    WK->>EN: compile scenario + map policies
+    loop each replication (seeded)
+        EN->>EN: simulate weeks PH-00..PH-99
+        EN-->>WK: rep KPIs + weekly series
+        WK->>DB: upsert run_replications (idempotent)
+        DB-->>SL: Realtime push (live rep)
+    end
+    WK->>DB: finalize aggregate_kpis + warmup_detected_at
+    WK->>RS: xack
+    Note over U,SL: cancel / add-reps = further XADD messages on the same stream
+```
+
+**Figure 10 — Run lifecycle.** The `alt` block is the dispatch gate: a required-data gap is
+rejected with typed findings *before* any compute is spent (the guarantee Figure 2's gate G1
+depicts). The `XADD`/`xreadgroup` pair decouples request from execution — the edge function
+returns `202` immediately while the worker processes asynchronously, so a study of hundreds of
+replications is not bound to an HTTP timeout, and a worker restart re-reads unacked messages.
+Each replication streams to the UI via a Realtime push as it finishes (no polling), and the
+worker's idempotent upsert keyed by `run_id` makes at-least-once redelivery harmless. Cancel
+and add-replications are not special endpoints — they are further messages on the same stream.
+A reviewer should read this as production-grade job orchestration, not a research script.
+
 ### 4.6 Provenance and reproducibility
 
 Three content-addressed identities bind every run: `policy_hash` (immutable policy snapshot),
@@ -329,6 +785,51 @@ makes replications reproducible and CRN-pairable (world streams independent of t
 set; policy streams keyed by policy-ID digest). Golden traces pin determinism across engine
 versions. Scheduled completions: scenario hashing, re-execution against frozen snapshots, the
 content-addressed run cache 🧭(Phase C).
+
+Figure 11 is the argument for why provenance is treated as a *primitive* rather than a feature:
+one content-addressed run identity underwrites four otherwise-separate capabilities. This is
+the report's clearest instance of architecture-class thinking, and the figure an open-science
+or reproducibility reviewer will anchor on.
+
+```mermaid
+flowchart TD
+    subgraph INPUTS["Content-addressed inputs"]
+        GH["graph_hash\n(dataset_versions)"]
+        PH["policy_hash\n(policy_versions)"]
+        SH["scenario_hash"]:::planned
+        EF["engine_fingerprint\n(ENGINE_VERSION + policy impl\nversions + pipeline schema hash)"]
+        SEED["seed-tree spec\n(CRN)"]
+    end
+    GH --> RK["RunKey =\nhash(EF ∥ graph ∥ policy ∥ scenario ∥ seeds)"]:::planned
+    PH --> RK
+    SH --> RK
+    EF --> RK
+    SEED --> RK
+
+    RK --> C1["Reproducibility\nre-run from hashes = identical output\n(golden traces prove engine half)"]
+    RK --> C2["Run cache\nexact hit returns stored stats,\nno recompute"]:::planned
+    RK --> C3["Surrogate validity scoping\nmodel served only inside its\ntrained lineage (§10)"]:::planned
+    RK --> C4["Model-card staleness\ncredibility flips 'stale' on any\nhash change (§7)"]:::planned
+
+    subgraph CRN["Comparison validity (§8)"]
+        CMP["Two runs are comparable iff\nsame seed spec AND RunKeys differ\nin exactly one component"]
+    end
+    RK -.-> CMP
+
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
+```
+
+**Figure 11 — Three-hash provenance and the four capabilities it underwrites.** Every run has
+a content-addressed identity assembled from the input hashes plus the engine fingerprint and
+the seed spec. From that single primitive follow four capabilities that a commercial tool would
+ship as four unrelated wizards: bit-reproducibility, the run cache ("never simulate the same
+thing twice"), surrogate validity scoping (a learned model is served only where its lineage
+matches — never an extrapolation), and V&V staleness (credibility cannot survive a silent input
+change). The inset states the comparison-validity rule that Figure 13 elaborates: differencing
+is only statistically meaningful when exactly one component varies. Solid nodes are implemented
+(`policy_hash`, `graph_hash`, engine fingerprint, seed tree, reproducibility); dashed nodes are
+the Phase C completions. The takeaway: provenance is not bookkeeping here — it is the load-
+bearing primitive the AI and experimentation layers are built on.
 
 ### 4.7 Statistical machinery (engine-resident)
 
@@ -476,16 +977,47 @@ the pipeline's verdict governs downstream use.
 
 ### 7.2 The pipeline
 
+Figure 12 presents the V&V discipline not as a linear checklist but as a **credibility state
+machine**: a model version moves between explicit credibility states, failure at any step
+loops back rather than proceeding, and — crucially — a validated model can be knocked back to
+`stale` by any change to its provenance triple. This is the figure a simulation-methodology
+reviewer will judge the contribution by, because it encodes *when a model may be trusted for
+decisions* as a machine state, not a habit.
+
 ```mermaid
-flowchart LR
-    V["1 · Verification\nstructural checks +\nrequired-data manifest"]
-    S["2 · Single run\nface validation:\nweekly traces,\nzero-fallback report"]
-    R["3 · Replications\nN seeded runs,\nCI convergence,\nadequacy n*"]
-    W["4 · Warm-up\nMSER-5/Conway (engine),\nWelch (cross-check)"]
-    T["5 · Validation\nKS + Welch-t vs\nempirical series"]
-    C["6 · Adoption\nvalidated model card\n(G13 → Phase B0)"]
-    V --> S --> R --> W --> T --> C
+stateDiagram-v2
+    [*] --> Unverified
+    Unverified --> Verified : verification passes\n(manifest: no blockers)
+    Unverified --> Unverified : block finding\n(fix inputs / policies)
+    Verified --> FaceChecked : single run\nbehavior plausible + zero fallback
+    FaceChecked --> Verified : implausible →\nrevise model
+    FaceChecked --> Replicated : N seeded reps\nCI half-width ≤ ε
+    Replicated --> Replicated : precision short →\nadd replications
+    Replicated --> WarmupSet : adopt warm-up\n(MSER-5 / Conway / Welch agree)
+    WarmupSet --> Replicated : estimators diverge →\nlengthen horizon
+    WarmupSet --> Validated : KS + Welch-t vs empirical\npass (post-warm-up)
+    Validated --> FaceChecked : validation fails →\nrevise model
+    Validated --> [*] : emit validated model card\n(triple-bound) → Lab inherits
+    Validated --> Stale : policy_hash / graph_hash /\nengine_fingerprint changes
+    Stale --> Verified : re-enter pipeline
+
+    note right of Validated
+        Guarantee: a KPI shown for
+        decisions is produced under a
+        validated card, or labeled
+        unvalidated. (card = Phase B0)
+    end note
 ```
+
+**Figure 12 — The V&V pipeline as a credibility state machine.** Each state is a claim about
+the model; each forward transition is the evidence that earns the next claim; each back-edge is
+a named failure that must be repaired rather than skipped. The `WarmupSet → Replicated` and
+`Validated → FaceChecked` loops are where methodological honesty lives — divergent warm-up
+estimators or a failed distribution test send the analyst *back*, not forward. The `Validated →
+Stale` transition is the property commercial tools lack entirely: credibility is bound to the
+provenance triple (Figure 11), so any silent change to policy, data, or engine demotes the
+model automatically. The terminal transition emits the validated model card the Simulation Lab
+inherits (blueprint §9.5). The steps below annotate each transition.
 
 1. **Verification.** Structural checks plus the registry-compiled required-data manifest:
    every selected policy's data demands, graded `block`/`warn`/`info`, each finding naming
@@ -545,6 +1077,49 @@ and warm-state reuse; typed worker jobs with sweep sharding.
 The decision-support claim is the composition of §7 and §8: questions are asked *of a
 validated model*, answered by *replicated, provenance-bound experiments*, with *paired
 statistics where comparison is the question*.
+
+Figure 13 organizes the five experiment types by the question each answers and shows the one
+invariant that makes comparison statistically valid — the property that separates a defensible
+decision study from a chart of two arbitrary runs.
+
+```mermaid
+flowchart TD
+    Q["Decision question"] --> TYPE{"What varies?"}
+    TYPE -->|nothing| E1["Single run\n(face validity)"]
+    TYPE -->|policies only| E2["Comparison\nΔKPI, CRN-paired"]
+    TYPE -->|factors, designed| E3["DOE sweep\nfull-factorial / LHS\nmain effects, tornado"]:::planned
+    TYPE -->|disruptions, node-by-node| E4["Stress battery\nST-1/ST-2 → vulnerability ranking"]:::planned
+    TYPE -->|policy portfolio| E5["Portfolio / synergy\nΔR, ΔC + significance stars"]:::planned
+
+    subgraph CRN["Comparison-validity invariant (from RunKey, Figure 11)"]
+        RULE["comparable ⟺ same seed spec\nAND RunKeys differ in exactly ONE component"]
+        V1["policies differ → policy evaluation"]
+        V2["graph differs → network redesign"]
+        V3["scenario differs → disruption impact"]
+        RULE --> V1
+        RULE --> V2
+        RULE --> V3
+    end
+    E2 --> RULE
+    E3 --> RULE
+    E5 --> RULE
+
+    E2 --> OUT["Decision brief:\nevery number carries its RunKey"]
+    E4 --> OUT
+    E5 --> OUT
+
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
+```
+
+**Figure 13 — Experiment typology and comparison validity.** The five experiment types are
+distinguished by *what varies* between runs, which is exactly what the RunKey (Figure 11) makes
+checkable: the platform admits a comparison only when two runs share a seed spec and differ in
+one component, so a KPI delta is a valid CRN-paired estimate rather than an eyeballed
+difference of two dashboards. Single-run and comparison are shipped on today's scenario
+machinery; DOE, stress batteries, and portfolio/synergy are engine-ready and scheduled for
+product exposure (Phase C, dashed). An OM/statistics reviewer should note that comparison
+validity is enforced *structurally* — the design refuses invalid comparisons — which is the
+statistical discipline the falsifiable claim C5 (§9.2) rests on.
 
 ---
 
@@ -618,6 +1193,68 @@ drift-triggered retraining, and provenance labels on every ranking row. Referenc
 Spearman ρ = 0.844, perfect top-10 coverage, 39% run reduction (Nguyen et al. 2026). This is
 the AI-native generalization of the engine's existing `vulnerability_ranking` — same output
 contract, radically cheaper at scale.
+
+Figure 14 places both forms of AI in one frame and — most importantly — shows the single
+guardrail they share: neither the surrogate loop nor any agent writes to the provenance fabric;
+both emit *proposals* that must pass the same gates as a human, and predictions are always
+routed back to simulation when uncertain. This is the figure an AI/OR reviewer will test the
+safety argument against.
+
+```mermaid
+flowchart TD
+    subgraph SURR["Statistical AI — surrogate criticality loop (Phase D)"]
+        direction TB
+        FEAT["structural features\n(versioned graph)"] --> PART["stratified partition\nK simulate · U predict"]
+        PART --> SIMK["direct simulation of K\n(cache-aware, adaptive stopping)"]
+        SIMK --> TRAIN["train mean + quantile regressors\nconformal calibration"]
+        TRAIN --> GATE2{"dual reliability gate\nwidth ≤ τ AND novelty ≤ κ?"}
+        PART --> GATE2
+        GATE2 -->|pass| PRED["prediction + interval"]
+        GATE2 -->|fail| SIMK
+        PRED --> RANK["criticality ranking\nrow-level provenance: simulated / predicted"]
+        SIMK --> RANK
+    end
+
+    subgraph AGENTS["Language-model agents — five task-scoped, one copilot"]
+        direction TB
+        A1["A1 Data Steward\n→ data fixes"]
+        A2["A2 Policy Configurator\n→ bundle diffs"]
+        A3["A3 V&V Analyst\n→ card narrative"]
+        A4["A4 Experiment Designer\n→ experiment specs"]
+        A5["A5 Explainer\n→ trace-cited answers"]
+    end
+
+    A1 --> PROP["Proposal\n(diff / version / spec / draft)"]
+    A2 --> PROP
+    A3 --> PROP
+    A4 --> PROP
+    PROP --> GATE3{{"same gates as human:\nschema · feasibility ·\nrequired-data manifest"}}
+    GATE3 -->|pass| HUMAN["Human adoption\n(review + apply)"]
+    GATE3 -.->|fail| PROP
+
+    FABRIC[("Provenance fabric\nruns · versions · hashes · traces")]
+    FABRIC -->|read only| SURR
+    FABRIC -->|read only| AGENTS
+    A5 -->|cites| FABRIC
+    RANK -->|"labeled predictions persisted"| FABRIC
+    HUMAN -->|"writes via normal gated path"| FABRIC
+
+    classDef planned stroke-dasharray:4 3,stroke:#8a6d00,color:#6b5400;
+    class SURR,A1,A2,A3,A4,A5 planned;
+```
+
+**Figure 14 — The AI layer: surrogate loop and five-agent roster, both gated.** Two subsystems,
+one law. The surrogate loop (left) predicts supplier criticality but *never* asserts a
+prediction it is unsure of — the dual gate routes uncertain nodes back to real simulation, and
+every ranking row is labeled simulated-or-predicted. The five agents (right) each own one
+artifact class from the four-room journey (§10.2) plus explanation; every agent output is a
+*proposal* funnelled through the identical schema/feasibility/manifest gates a human edit
+passes, then a human adopts it. The central invariant is the read-only edges from the
+provenance fabric: AI *reads* runs, versions, hashes, and traces, but only the normal gated
+write path (or the labeled-prediction store) writes back — **simulation results, KPIs, and
+rankings are never AI-generated** (blueprint §12). The whole figure is dashed because the AI
+layer is Phase D; the guardrail, however, is a property of today's gate architecture, which is
+why the safety argument does not depend on future work.
 
 ### 10.2 Why agents, and why exactly five
 
