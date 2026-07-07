@@ -43,6 +43,24 @@ class ModeStrip(BaseModel):
 
 
 @dataclass(frozen=True)
+class FallbackStep:
+    """One step of a machine-readable fallback chain (§8.2). Exactly one of
+    ``reducer`` (a named derivation over project data — the shared vocabulary
+    the platform graders dispatch on) or ``constant`` (the engine's neutral
+    default) is set. ``grade`` is the finding level the manifest assigns when
+    THIS step is what resolves the field: data-derived → "info",
+    neutral constant → "warn" (the engine emits the same levels as
+    MappingWarnings, which is the parity contract)."""
+
+    grade: str                     # "info" | "warn"
+    reducer: Optional[str] = None  # e.g. "cheapest_inbound_price"
+    constant: Optional[float] = None
+
+    def as_dict(self) -> dict:
+        return {"grade": self.grade, "reducer": self.reducer, "constant": self.constant}
+
+
+@dataclass(frozen=True)
 class DataRequirement:
     """Facet 5 of the policy interface — the parameter-requirement contract
     (design blueprint §8.1): an entity field this policy needs from the
@@ -56,7 +74,9 @@ class DataRequirement:
     dispatch while the field is unresolvable, ``recommended`` warns and
     needs acknowledgment, ``defaulted`` is an informational note.
     ``fallback`` names the mapper's fallback chain when one exists
-    (project_map.py is authoritative); ``condition`` scopes the
+    (project_map.py is authoritative); ``fallback_spec`` is its
+    machine-readable form — ordered steps the graders resolve without
+    hand-coding per-field logic; ``condition`` scopes the
     requirement to a parameterization (e.g. ``"segmentation=abc_by_revenue"``).
     """
 
@@ -65,6 +85,7 @@ class DataRequirement:
     reason: str
     fallback: Optional[str] = None
     condition: Optional[str] = None
+    fallback_spec: tuple[FallbackStep, ...] = ()
 
     def as_dict(self) -> dict:
         return {
@@ -73,6 +94,7 @@ class DataRequirement:
             "reason": self.reason,
             "fallback": self.fallback,
             "condition": self.condition,
+            "fallback_spec": [s.as_dict() for s in self.fallback_spec],
         }
 
 

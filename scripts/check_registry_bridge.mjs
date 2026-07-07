@@ -4,7 +4,7 @@
 //
 //   node scripts/check_registry_bridge.mjs
 //
-// Fails (exit 1) if src/lib/policies/engineBridge.json references an engine
+// Fails (exit 1) if supabase/functions/_shared/engineBridge.json references an engine
 // policy id or enum value that does not exist in
 // src/lib/policies/registry.generated.json — i.e. if the engine changed and
 // the bridge (or the snapshot) was not updated to match.
@@ -15,7 +15,7 @@ const load = (rel) =>
   JSON.parse(readFileSync(new URL(rel, import.meta.url), "utf8"));
 
 const registry = load("../src/lib/policies/registry.generated.json");
-const bridge = load("../src/lib/policies/engineBridge.json");
+const bridge = load("../supabase/functions/_shared/engineBridge.json");
 
 const byId = new Map(registry.policies.map((p) => [p.id, p]));
 const errors = [];
@@ -67,7 +67,7 @@ if (errors.length > 0) {
   console.error("REGISTRY BRIDGE DRIFT — engineBridge.json disagrees with the engine:");
   for (const e of errors) console.error("  - " + e);
   console.error(
-    "\nUpdate src/lib/policies/engineBridge.json (and regenerate registry.generated.json " +
+    "\nUpdate supabase/functions/_shared/engineBridge.json (and regenerate registry.generated.json " +
       "if the engine changed).",
   );
   process.exit(1);

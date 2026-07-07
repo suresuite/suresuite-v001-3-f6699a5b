@@ -1,0 +1,222 @@
+{
+  "_comment": [
+    "Golden validation-parity project (§8.2). One row per fallback case:",
+    "  M_OK        master cost set, priced arc            → no findings",
+    "  M_DERIVED   no cost, priced arc (3.0)              → info (cheapest inbound)",
+    "  M_UNPRICED  no cost, arc without price/lead_time   → info cost + WARN arc price + WARN arc lead_time",
+    "  P_OK        fully specified                        → no findings",
+    "  P_PRICE_FALLBACK  no sell_price/demand_mean, priced outbound → info ×2; no capacity → WARN",
+    "  P_NO_DEMAND       no sell_price/demand_mean, no outbound     → WARN ×2 (neutral constants); no capacity → WARN",
+    "  unsourced_extra   BOM material with no supplier arc → BLOCK (engine ValueError)",
+    "The deno test locks the grader to expected_findings.json; the pytest runs",
+    "this same dataset through datamap→from_project_data and asserts the",
+    "engine's WARN-level MappingWarnings match the grader's warn findings.",
+    "activation_variant: policy-activation parity — python _map_policies keys == TS activeEnginePolicies for the same defaults (M_OK is dual-sourced via the priced S2 arc, so P-S.2 is feasible)."
+  ],
+  "defaults": {},
+  "scenario": {
+    "horizon_days": 365,
+    "seed": 7,
+    "replications": 2,
+    "crn": true
+  },
+  "dataset": {
+    "suppliers": [
+      {
+        "supplier_id": "S1",
+        "name": "S1",
+        "capacity_per_week": null,
+        "reliability_score": 0.95
+      },
+      {
+        "supplier_id": "S2",
+        "name": "S2",
+        "capacity_per_week": 500,
+        "reliability_score": 0.9
+      }
+    ],
+    "materials": [
+      {
+        "material_id": "M_OK",
+        "cost": 5.0,
+        "holding_cost_pct": 0.2,
+        "moq": null,
+        "initial_on_hand": 100
+      },
+      {
+        "material_id": "M_DERIVED",
+        "cost": null,
+        "holding_cost_pct": null,
+        "moq": null,
+        "initial_on_hand": null
+      },
+      {
+        "material_id": "M_UNPRICED",
+        "cost": null,
+        "holding_cost_pct": null,
+        "moq": null,
+        "initial_on_hand": null
+      }
+    ],
+    "products": [
+      {
+        "product_id": "P_OK",
+        "sell_price": 25.0,
+        "demand_mean": 300,
+        "demand_cv": 0.2,
+        "production_capacity": 900
+      },
+      {
+        "product_id": "P_PRICE_FALLBACK",
+        "sell_price": null,
+        "demand_mean": null,
+        "demand_cv": null,
+        "production_capacity": null
+      },
+      {
+        "product_id": "P_NO_DEMAND",
+        "sell_price": null,
+        "demand_mean": null,
+        "demand_cv": null,
+        "production_capacity": null
+      }
+    ],
+    "inbound": [
+      {
+        "supplier_id": "S1",
+        "material_id": "M_OK",
+        "unit_price": 4.0,
+        "lead_time": 2,
+        "time_unit": "week",
+        "volume": 400
+      },
+      {
+        "supplier_id": "S1",
+        "material_id": "M_DERIVED",
+        "unit_price": 3.0,
+        "lead_time": 2,
+        "time_unit": "week",
+        "volume": 200
+      },
+      {
+        "supplier_id": "S2",
+        "material_id": "M_UNPRICED",
+        "unit_price": null,
+        "lead_time": null,
+        "time_unit": "week",
+        "volume": 100
+      },
+      {
+        "supplier_id": "S2",
+        "material_id": "M_OK",
+        "unit_price": 4.5,
+        "lead_time": 3,
+        "time_unit": "week",
+        "volume": 150
+      }
+    ],
+    "outbound": [
+      {
+        "product_id": "P_OK",
+        "customer_id": "C1",
+        "unit_price": 25.0,
+        "volume": 300,
+        "time_unit": "week"
+      },
+      {
+        "product_id": "P_PRICE_FALLBACK",
+        "customer_id": "C1",
+        "unit_price": 30.0,
+        "volume": 100,
+        "time_unit": "week"
+      }
+    ],
+    "bom": [
+      {
+        "product_id": "P_OK",
+        "material_id": "M_OK",
+        "consumption_rate": 1.0
+      },
+      {
+        "product_id": "P_OK",
+        "material_id": "M_DERIVED",
+        "consumption_rate": 1.0
+      },
+      {
+        "product_id": "P_OK",
+        "material_id": "M_UNPRICED",
+        "consumption_rate": 1.0
+      },
+      {
+        "product_id": "P_PRICE_FALLBACK",
+        "material_id": "M_OK",
+        "consumption_rate": 1.0
+      },
+      {
+        "product_id": "P_NO_DEMAND",
+        "material_id": "M_OK",
+        "consumption_rate": 1.0
+      }
+    ]
+  },
+  "unsourced_extra": {
+    "materials": [
+      {
+        "material_id": "M_UNSOURCED",
+        "cost": null,
+        "holding_cost_pct": null,
+        "moq": null,
+        "initial_on_hand": null
+      }
+    ],
+    "bom": [
+      {
+        "product_id": "P_OK",
+        "material_id": "M_UNSOURCED",
+        "consumption_rate": 1.0
+      }
+    ]
+  },
+  "activation_variant": {
+    "defaults": {
+      "fulfillment_strategy": "make_to_stock",
+      "sourcing": {
+        "strategy": "multi",
+        "ratios": {
+          "S1": 0.6,
+          "S2": 0.4
+        }
+      },
+      "inventory": {
+        "fg_safety_stock": "service_level",
+        "fg_service_level_target": 0.95
+      },
+      "fulfillment": {
+        "allocation": "sla_tier",
+        "tier_overrides": {
+          "gold": 0.98
+        },
+        "backorder_allowed": true
+      },
+      "recovery": {
+        "response": [
+          "reroute",
+          "early_warning",
+          "allocate_materials"
+        ],
+        "detection_lag_days": 7
+      }
+    },
+    "expected_policies": [
+      "backup_supplier",
+      "early_warning_failover",
+      "expedited_shipments",
+      "fg_safety_stock",
+      "inventory_control",
+      "material_allocation",
+      "proactive_multi_sourcing",
+      "safety_stock_materials",
+      "unmet_demand_handling"
+    ]
+  }
+}

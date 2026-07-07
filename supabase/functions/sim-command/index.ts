@@ -337,6 +337,7 @@ class ValidationRejection extends Error {
 
 async function handleExperimentRun(
   sb: ReturnType<typeof createClient>,
+  svc: ReturnType<typeof createClient>,
   cmd: Command,
   userId: string | null,
 ) {
@@ -387,13 +388,17 @@ async function handleExperimentRun(
 
   // Pre-dispatch validation gate (§8.1–8.2): grade the required-data manifest
   // — compiled from the engine registry for THIS policy configuration —
-  // against the live project tables. `required` gaps reject the run;
-  // `recommended` gaps reject unless the caller acknowledged them after
-  // seeing the findings (the /policies verification stage does; the Lab
-  // offers a "Run anyway"). Best-effort on read errors: a gate that cannot
-  // load data must not take run dispatch down with it.
+  // against the live project tables, read with the SERVICE ROLE (grading is a
+  // read-only completeness check; anon-context reads silently miss rows and
+  // once produced false blocks). `block` findings reject the run; `warn`
+  // findings reject unless the caller acknowledged them after seeing the
+  // findings (the /policies verification stage does; the Lab offers a
+  // "Run anyway"). Fail-open on read errors — a gate that cannot load data
+  // must not take run dispatch down with it — but the skip is recorded on
+  // the run row (gate_skipped) instead of vanishing into the logs.
+  let gateSkipped = false;
   try {
-    const gateDataset = await loadGateDataset(sb, scenario.project_id as string);
+    const gateDataset = await loadGateDataset(svc, scenario.project_id as string);
     const gate = runValidationGate({
       dataset: gateDataset,
       snapshotDefaults: snapshotDefaults ?? {},
@@ -405,6 +410,7 @@ async function handleExperimentRun(
     if (gate) throw new ValidationRejection(gate);
   } catch (e) {
     if (e instanceof ValidationRejection) throw e;
+    gateSkipped = true;
     console.error("validation gate skipped (data load failed)", e);
   }
 
@@ -473,6 +479,7 @@ async function handleExperimentRun(
       dataset_version_id: datasetVersionId,
       graph_hash: graphHash,
       created_by: userId,
+      ...(gateSkipped ? { gate_skipped: true } : {}),
     })
     .select()
     .single();
@@ -590,7 +597,7 @@ Deno.serve(async (req) => {
     if (cmd.kind === "experiment.run") {
       let result: { run_id: string };
       try {
-        result = await handleExperimentRun(sb, cmd, authUserId);
+        result = await handleExperimentRun(sb, svc, cmd, authUserId);
       } catch (e) {
         if (e instanceof ValidationRejection) {
           return new Response(

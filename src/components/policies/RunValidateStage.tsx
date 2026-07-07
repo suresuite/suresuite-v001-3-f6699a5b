@@ -338,7 +338,7 @@ export function RunValidateStage({
 
   // --- handlers ------------------------------------------------------------
   const onVerify = () => {
-    const f = verifyProjectPolicies({
+    const result = verifyProjectPolicies({
       defaults,
       overrides,
       fulfillmentStrategy,
@@ -349,8 +349,18 @@ export function RunValidateStage({
       materials: itemMasters.materials,
       products: itemMasters.products,
       suppliers: itemMasters.suppliers,
-      derived: itemMasters.derived,
+      inbound: itemMasters.lanes.inbound,
+      outbound: itemMasters.lanes.outbound,
+      bom: itemMasters.lanes.bom,
+      dataReady: !itemMasters.loading && itemMasters.lanes.loaded,
     });
+    if (result.status === "loading") {
+      // Never grade partial data — this surface once said "all clear" while
+      // the server gate (grading the full tables) blocked the dispatch.
+      toast.warning("Project data is still loading — try Run checks again in a moment.");
+      return;
+    }
+    const f = result.findings;
     setFindings(f);
     setVerifiedAt(new Date());
     const blockers = f.filter((x) => x.severity === "block").length;

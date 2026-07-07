@@ -539,25 +539,29 @@ Three validation surfaces exist today and disagree (G6): `src/lib/policies/verif
 
 Silent defaults become structurally impossible: any default the engine would apply is either declared `defaulted` in the manifest (visible pre-run) or is a validation failure.
 
-> **Implementation note (Phase A, delivered).** The manifest compiler is
-> `src/lib/policies/validationService.ts`, reading the generated registry
-> snapshot only (no hand-written per-policy rules). Its three §8.2 surfaces:
-> (a) the `/policies` run-&-validate stage — `verification.ts` keeps its
-> structural/topology checks and delegates all data-completeness grading to
-> the manifest; (b) the Data map grid gains a registry-driven "Demanded by"
-> column showing which policy demands each column at which level; (c) a
-> **pre-dispatch gate** in `sim-command`
-> (`supabase/functions/_shared/validationGate.ts`) grades the same manifest
-> server-side against the live tables — `required` gaps reject the run
-> (HTTP 422 with typed findings), `recommended` gaps reject unless the
-> caller acknowledged them (`payload.acknowledge_warnings`; the verification
-> stage sets it after displaying the findings, the Simulation Lab offers a
-> "Run anyway"). The gate also catches the scenario-conditional case of a
-> partial-magnitude supplier disruption without a finite
-> `suppliers.capacity_per_week`. The edge function reads a mirrored snapshot
-> (`supabase/functions/_shared/registry.generated.json`) written and
-> drift-checked by the same `gen_frontend_registry.py` CI gate, so the three
-> surfaces cannot disagree.
+> **Implementation note (Phase A, delivered — hardened after a real divergence).**
+> Grading now lives in ONE canonical module, `supabase/functions/_shared/grading.ts`
+> (dependency-free TS; Supabase bundles only that tree, and `src/` imports it
+> by relative path), consumed by both the `/policies` verification surface
+> (`validationService.ts`, a thin UI adapter) and the **pre-dispatch gate**
+> in `sim-command` (`validationGate.ts`, a thin edge adapter). Mirrored-logic
+> copies proved insufficient: the gate once blocked a run over fallbacks the
+> engine (and the browser mirror) resolve. Severities mirror the engine:
+> its one hard failure (unsourced BOM material) → `block`; neutral-constant
+> fallbacks (price→1.0, lead time→2w) → acknowledgeable `warn`
+> (`payload.acknowledge_warnings`); data-derived fallbacks → `info`.
+> Fallback chains are data, not code: `DataRequirement.fallback_spec`
+> (named reducer / constant steps with grades) exports through the registry
+> snapshots, and graders dispatch on the shared reducer library. The gate
+> reads the project tables with the **service role** (grading is read-only;
+> anon-context reads once silently returned zero rows) and records
+> fail-open skips on the run row (`simulation_runs.gate_skipped`). The
+> browser grades RAW rows (display imputation can no longer mask gaps) and
+> reports an explicit loading state instead of silently skipping. Parity is
+> pinned by a golden fixture graded identically in `deno test`
+> (`grading_test.ts`) and through the engine itself
+> (`sim-worker/tests/test_validation_parity.py`: engine WARN MappingWarnings
+> == grader warns row-for-row; new silent engine defaults fail the suite).
 > **Implementation note (Phase A, delivered).** The Run & Validate stage now renders **persisted
 > run output** instead of browser-synthesized previews: KPI options are the engine's own keys
 > (`run_replications.kpis`); the multi-run panel shows real per-replication weekly fill-rate
@@ -841,6 +845,8 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 - **Exit:** a fully-specified project runs on scsim with zero mapping warnings; every run reproducible from its three hashes. **Closes:** G4, G5, G6; G1/G2 substantially.
 
 ### Phase B — Policy completion: the node-owned catalog
+- v1 catalog (§5) implemented/activated: extended P-P.1 parameterization; new supplier/customer/transport slots; promoted defaults (P-P.0, P-F.x, P-C.4, P-S.5/6).
+  > **Pulled forward into Phase A (delivered):** the implemented-but-unreachable policies are wired through `_map_policies` + the bridge — P-S.2 (sourcing `ratios`/per-arc `supply_share` → normalized `weights`, skipped with a warn on single-sourced networks), P-P.4 (inventory `fg_safety_stock*` fields, MTS-gated), P-P.9 (recovery response `allocate_materials`, per-product `allocation_priority_weight` overrides), P-S.4 (response `early_warning` + `detection_lag_days`), and P-C.2 SLA floors (`tier_overrides` → `sla_tiers`). TS/Python activation parity is fixture-tested. Every not-yet-consumed field now renders visible-disabled with its catalog milestone badge (`fieldStatus.ts`) instead of being hidden — G1's "which gap in which policy" is answered in-grid.
 
 *(Re-sequenced in v0.2: workstream B0 is the platform's CORE loop — the ALX-class policy-selection experience plus the V&V credibility pipeline — and lands before the catalog is broadened. A wide catalog configured through an unfinished picker, or validated results that evaporate before the Lab, would both miss the point.)*
 
@@ -855,6 +861,31 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 - Interaction graph published in registry payload and UI (§7.3).
 - Engine default flip (gate E3).
 - **Exit:** two nodes of the same type can run different policies end-to-end; every engine behavior visible as a named bundle entry. **Closes:** G1, G2, G3 fully; G7 partially (lanes, calendars).
+
+> **Design addendum (M3, planned next): the registry-driven grid.** The
+> approved implementation design for closing this phase's UI half:
+> (1) *Registry export grows UI metadata* — per-param `label`, `group`,
+> `order`, structured `visible_when`, `key_domain` for dict params, a
+> machine-actionable `scope` enum; policy-level `family`/`slot`. Same gen
+> pipeline + CI drift gates (R3). (2) *Declarative activation table* in the
+> engine (`scsim/scsim/io/activation.py`) consumed by `_map_policies` AND
+> exported in the registry payload; `grading.ts` interprets the exported
+> table, making TS/Python activation structurally identical — the
+> precondition for deleting `engineBridge.json`. (3) *`registryColumns.ts`* —
+> a registry→ColSpec adapter: per stage, one policy-variant select column per
+> slot (planned policies visible-but-disabled with milestone) plus parameter
+> columns typed via the `registryAccess.ts` accessors; `columnSpecs.ts`
+> shrinks to data/master columns; the existing grid, xlsx round-trip, drafts
+> and provenance dots are reused unchanged; land behind a per-stage flag.
+> (4) *Codegen retires the mirrors*: `gen_policy_schemas.py` emits plain-TS
+> metadata/validators and a worker Pydantic module with `--check` gates (no
+> Zod generation — one schema language). (5) *Storage groundwork (§4.3)*:
+> `policy_node_type_defaults` middle layer; snapshot `schema_version` v3
+> embedding the resolved per-policy activation+params (R9 upgrade path).
+> (6) *Engine DX*: plugin auto-discovery replaces `_ensure_loaded`'s import
+> list; acceptance demo — add a policy, run the gen scripts, zero `src/`
+> edits, its columns appear in the right stage. Guardrails: R3, R4 (per-node
+> params only via grouped dict-keyed params), R9.
 
 ### Phase C — Experimentation productized
 - Typed experiments: comparison, DOE (resurrect `ExperimentDesigner` + `doe.ts`), stress batteries, portfolio/synergy studies in the product (§9.1); Compare pane with CRN semantics (§9.3).

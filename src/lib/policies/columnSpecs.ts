@@ -1,4 +1,5 @@
 import { FIELD_LABELS, type PolicyBundle, type PolicyFamily } from "./schemas";
+import { fieldEngineStatus } from "./fieldStatus";
 import type { StageKey } from "./stages";
 
 export interface ColSpecCtx {
@@ -19,6 +20,12 @@ export interface ColSpec {
   readOnly?: boolean;
   /** Formatter for read-only values (e.g. append "%" for share_pct). */
   format?: (n: number) => string;
+  /**
+   * "Which gap in which policy" (G1 visibility): fields the engine does not
+   * consume yet are shown DISABLED with the milestone of the catalog policy
+   * that will consume them — never silently hidden or silently dropped.
+   */
+  engineStatus?: { state: "pending"; milestone: string };
   /**
    * Item-master-backed column: the value lives in the materials/products
    * table (row id taken from `idFrom`), edits save via the item-master
@@ -49,11 +56,35 @@ const col = (
   } = {},
 ): ColSpec => ({ field, family, label: lbl(field), ...opts });
 
+/** A field a PLANNED engine policy will consume: visible, disabled, badged
+ * with its milestone — replacing the old "hide the whole family" approach. */
+const pendingCol = (field: string, family: PolicyFamily): ColSpec => {
+  const st = fieldEngineStatus(family, field);
+  return {
+    field,
+    family,
+    label: lbl(field),
+    readOnly: true,
+    engineStatus: st.state === "pending" ? st : undefined,
+  };
+};
+
 // ---------- gating helpers ----------
 const plantNeedsInventory: ColSpec["visibleWhen"] = ({ fulfillmentStrategy }) =>
   fulfillmentStrategy === "make_to_stock" ||
   fulfillmentStrategy === "assemble_to_order" ||
   fulfillmentStrategy === "configure_to_order";
+
+const multiSourcing: ColSpec["visibleWhen"] = ({ effective }) =>
+  String(effective?.strategy ?? "") === "multi" ||
+  Object.keys((effective?.ratios as Record<string, unknown>) ?? {}).length > 0;
+
+const wantsMaterialAllocation: ColSpec["visibleWhen"] = ({ effective }) =>
+  Array.isArray(effective?.response) &&
+  (effective?.response as unknown[]).includes("allocate_materials");
+
+const fgStockOn: ColSpec["visibleWhen"] = (ctx) =>
+  plantNeedsInventory(ctx) && String(ctx.effective?.fg_safety_stock ?? "none") !== "none";
 
 export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
   // ----------------------------- SUPPLIER -----------------------------
@@ -63,14 +94,15 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       { id: "material_id", label: "Material" },
       { id: "supplier_id", label: "Supplier" },
     ],
-    // scsim alignment: only fields the engine consumes (plus master-data
-    // columns describing the supplier × material row itself). Absolute stock
-    // levels, review period, MOQ, ordering cost and the entire transport
-    // family are not read by scsim and are hidden. Transport lead times come
-    // from network edge attributes.
+    // scsim alignment: editable fields the engine consumes (plus master-data
+    // columns describing the supplier × material row itself). Fields awaiting
+    // a planned catalog policy (transport family) are shown DISABLED with
+    // their milestone badge — never silently hidden (G1 visibility).
     cols: [
       col("primary_source", "sourcing"),
       col("share_pct", "sourcing", { readOnly: true, format: (n) => `${n}%` }),
+      // P-S.2 standing split: this row's share of its material (0–1).
+      col("supply_share", "sourcing", { visibleWhen: multiSourcing, defaultWhenMissing: 0 }),
       col("material_price", "sourcing", { defaultWhenMissing: 0 }),
       col("lead_time_mean_days", "sourcing", { readOnly: true, format: (n) => `${n} d` }),
       col("material_cost", "sourcing", {
@@ -91,6 +123,12 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("type", "inventory"),
       col("safety_stock_days", "inventory", { defaultWhenMissing: 0 }),
       col("holding_cost_pct", "inventory", { defaultWhenMissing: 0.2 }),
+
+      // Transport family: stored + versioned today, consumed when the P-T.x
+      // catalog policies land — visible-disabled with the milestone badge.
+      pendingCol("mode", "transport"),
+      pendingCol("lead_time_mean_days", "transport"),
+      pendingCol("cost_per_km", "transport"),
     ],
     targetKey: (r) => `${r.supplier_id}::${r.material_id ?? ""}`,
   },
@@ -121,6 +159,13 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
       col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
       col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
+
+      // P-P.4 finished-goods safety stock (MTS): sizing + its parameter.
+      col("fg_safety_stock", "inventory", { visibleWhen: plantNeedsInventory }),
+      col("fg_service_level_target", "inventory", { visibleWhen: fgStockOn, defaultWhenMissing: 0.95 }),
+      col("fg_safety_stock_days", "inventory", { visibleWhen: fgStockOn, defaultWhenMissing: 2 }),
+      // P-P.9 per-product allocation priority (recovery response opt-in).
+      col("allocation_priority_weight", "production", { visibleWhen: wantsMaterialAllocation, defaultWhenMissing: 1 }),
     ],
     targetKey: (r) => `${r.item_id}::${r.product_id ?? ""}`,
   },

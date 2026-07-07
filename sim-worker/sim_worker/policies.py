@@ -30,6 +30,8 @@ class SourcingPolicy(BaseModel):
     max_lead_time_variance_days: float = 3
     contract_type: Literal["spot", "contract", "vmi", "consignment"] = "contract"
     order_consolidation: Literal["none", "daily", "weekly", "monthly"] = "none"
+    # P-S.2 per-arc share (grid-friendly scalar; 0..1 of the row's material).
+    supply_share: float = 0.0
 
 
 class InventoryPolicy(BaseModel):
@@ -47,6 +49,10 @@ class InventoryPolicy(BaseModel):
     service_level_target: float = 0.95
     review_period_days: float = 1
     abc_class: Literal["A", "B", "C"] = "B"
+    # P-P.4 finished-goods safety stock (MTS only; "none" keeps it off).
+    fg_safety_stock: Literal["none", "service_level", "fixed_days"] = "none"
+    fg_service_level_target: float = 0.95
+    fg_safety_stock_days: float = 2.0
     holding_cost_pct: float = 0.2
     stockout_cost_per_unit: float = 5
     ordering_cost: float = 100
@@ -94,6 +100,9 @@ class FulfillmentPolicy(BaseModel):
 
 class ProductionPolicy(BaseModel):
     lot_policy: Literal["fixed", "epq", "lot_for_lot", "pohm"] = "epq"
+    # P-P.9 priority when recovery.response includes "allocate_materials";
+    # per-product values come from plant-stage overrides.
+    allocation_priority_weight: float = 1.0
     setup_time_hours: float = 1
     setup_cost: float = 500
     capacity_units_per_day: float = 1000
@@ -123,6 +132,7 @@ class RecoveryPolicy(BaseModel):
         Literal[
             "reroute", "dual_source_activate", "safety_stock_drawdown",
             "mode_shift", "capacity_flex", "demand_shaping",
+            "early_warning", "allocate_materials",
         ]
     ] = Field(default_factory=list)
     detection_lag_days: float = 1

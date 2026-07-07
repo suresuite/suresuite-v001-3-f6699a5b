@@ -77,6 +77,7 @@ export const SourcingPolicy = z.object({
   contract_type: ContractType.default("contract"),
   order_consolidation: ConsolidationCadence.default("none"),
   // per (supplier × material) extensions
+  supply_share: z.number().min(0).max(1).default(0),
   primary_source: z.boolean().default(false),
   material_price: z.number().min(0).default(0),
   supplier_capacity_per_day: z.number().min(0).default(0),
@@ -99,6 +100,7 @@ export const SafetyStockMethod = z.enum([
 ]);
 export const ABCClass = z.enum(["A", "B", "C"]);
 export const StockRotation = z.enum(["FIFO", "LIFO", "FEFO"]);
+export const FgSafetyStockSizing = z.enum(["none", "service_level", "fixed_days"]);
 
 export const InventoryPolicy = z.object({
   type: InventoryPolicyType.default("min_max"),
@@ -116,6 +118,10 @@ export const InventoryPolicy = z.object({
   ordering_cost: z.number().min(0).default(100),
   shelf_life_days: z.number().min(0).default(0),
   rotation: StockRotation.default("FIFO"),
+  // P-P.4 finished-goods safety stock (MTS only; "none" keeps the policy off).
+  fg_safety_stock: FgSafetyStockSizing.default("none"),
+  fg_service_level_target: z.number().min(0.8).max(0.999).default(0.95),
+  fg_safety_stock_days: z.number().min(0).max(12).default(2),
   // per-row extensions
   moq: z.number().min(0).default(0),
 });
@@ -181,6 +187,9 @@ export const SchedulingRule = z.enum(["fifo", "edd", "spt", "critical_ratio"]);
 
 export const ProductionPolicy = z.object({
   lot_policy: LotPolicy.default("epq"),
+  // P-P.9 priority when recovery.response includes "allocate_materials";
+  // per-product values via plant-stage overrides.
+  allocation_priority_weight: z.number().min(0).default(1),
   setup_time_hours: z.number().min(0).default(1),
   setup_cost: z.number().min(0).default(500),
   capacity_units_per_day: z.number().min(0).default(1000),
@@ -209,6 +218,8 @@ export const RecoveryResponse = z.enum([
   "mode_shift",
   "capacity_flex",
   "demand_shaping",
+  "early_warning",
+  "allocate_materials",
 ]);
 
 export const RecoveryPolicy = z.object({
@@ -314,6 +325,11 @@ export const FIELD_GROUPS: Record<PolicyFamily, Record<string, string[]>> = {
       "service_level_target",
       "review_period_days",
     ],
+    "FG safety stock (P-P.4)": [
+      "fg_safety_stock",
+      "fg_service_level_target",
+      "fg_safety_stock_days",
+    ],
     Classification: ["abc_class", "rotation", "shelf_life_days"],
     Costs: ["holding_cost_pct", "stockout_cost_per_unit", "ordering_cost"],
   },
@@ -330,6 +346,7 @@ export const FIELD_GROUPS: Record<PolicyFamily, Record<string, string[]>> = {
   },
   production: {
     Basics: ["lot_policy", "scheduling", "capacity_units_per_day", "utilization_cap_pct"],
+    "Allocation (P-P.9)": ["allocation_priority_weight"],
     Setup: ["setup_time_hours", "setup_cost"],
   },
   recovery: {
@@ -357,6 +374,7 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   safety_stock_method: SafetyStockMethod.options,
   abc_class: ABCClass.options,
   rotation: StockRotation.options,
+  fg_safety_stock: FgSafetyStockSizing.options,
   // transport
   mode: TransportMode.options,
   load_type: LoadType.options,
@@ -379,8 +397,12 @@ export const MULTI_SELECT_FIELDS = new Set(["response"]);
 export const MULTI_SELECT_OPTIONS: Record<string, readonly string[]> = {
   // Restricted to the responses the scsim engine maps to policies:
   // dual_source_activate → backup_supplier, mode_shift/reroute → expedited_shipments,
-  // capacity_flex → short_term_capacity.
-  response: ["reroute", "dual_source_activate", "mode_shift", "capacity_flex"],
+  // capacity_flex → short_term_capacity, early_warning → early_warning_failover (P-S.4),
+  // allocate_materials → material_allocation (P-P.9).
+  response: [
+    "reroute", "dual_source_activate", "mode_shift", "capacity_flex",
+    "early_warning", "allocate_materials",
+  ],
 };
 
 /**
@@ -392,22 +414,26 @@ export const MULTI_SELECT_OPTIONS: Record<string, readonly string[]> = {
  * attributes, demand by product/graph data.
  */
 export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<string>>> = {
-  sourcing: new Set(["strategy"]),
+  sourcing: new Set(["strategy", "ratios", "supply_share"]),
   inventory: new Set([
     "type",
     "safety_stock_method",
     "safety_stock_days",
     "service_level_target",
     "holding_cost_pct",
+    "fg_safety_stock",
+    "fg_service_level_target",
+    "fg_safety_stock_days",
   ]),
   fulfillment: new Set([
     "allocation",
     "backorder_allowed",
     "max_backorder_days",
     "backorder_cost_per_day",
+    "tier_overrides",
   ]),
-  production: new Set(["capacity_units_per_day"]),
-  recovery: new Set(["response"]),
+  production: new Set(["capacity_units_per_day", "allocation_priority_weight"]),
+  recovery: new Set(["response", "detection_lag_days"]),
 };
 
 /** True when a default-level field is exposed in the GUI (consumed by scsim). */
@@ -507,6 +533,11 @@ export const FIELD_LABELS: Record<string, string> = {
   trigger_geography: "Geography filter",
   response: "Response playbook",
   detection_lag_days: "Detection lag (days)",
+  supply_share: "Supply share (P-S.2)",
+  fg_safety_stock: "FG safety stock (P-P.4)",
+  fg_service_level_target: "FG service level",
+  fg_safety_stock_days: "FG cover (days)",
+  allocation_priority_weight: "Allocation priority (P-P.9)",
   recovery_target_days: "Recovery target (days)",
   cost_cap: "Cost cap / event",
   // demand

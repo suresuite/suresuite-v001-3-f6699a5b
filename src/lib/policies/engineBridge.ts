@@ -3,12 +3,13 @@
 // The /policies forms speak the 7-family vocabulary; the engine speaks the
 // plugin vocabulary. `project_map.py` translates between them at run time.
 // This module is the frontend's single, validated copy of that translation
-// (data in engineBridge.json), so the two vocabularies cannot silently drift:
-// scripts/check_registry_bridge.mjs asserts every engine target below exists
-// in the registry snapshot (a CI gate). Phase B removes this bridge when the
-// forms render engine plugin params directly.
+// (data in supabase/functions/_shared/engineBridge.json — canonical there so
+// the edge gate's grading shares the same tables), so the two vocabularies
+// cannot silently drift: scripts/check_registry_bridge.mjs asserts every
+// engine target below exists in the registry snapshot (a CI gate). Phase B
+// removes this bridge when the forms render engine plugin params directly.
 
-import bridge from "./engineBridge.json";
+import bridge from "../../../supabase/functions/_shared/engineBridge.json";
 import { catalogRef, policyById } from "./registryAccess";
 
 const RESPONSE_TO_POLICY = bridge.recovery_response_to_policy as Record<string, string>;

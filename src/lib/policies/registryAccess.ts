@@ -33,6 +33,13 @@ export interface RegistryDataRequirement {
   reason: string;
   fallback: string | null;
   condition: string | null;
+  /** Machine-readable fallback chain (scsim base.py::FallbackStep) — resolved
+   * by the shared grading module against its named-reducer library. */
+  fallback_spec?: Array<{
+    grade: "info" | "warn";
+    reducer: string | null;
+    constant: number | null;
+  }>;
 }
 
 export interface RegistryPolicy {
