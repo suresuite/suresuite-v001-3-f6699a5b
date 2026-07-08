@@ -37,8 +37,6 @@ interface NavbarProps {
   setIsCollapsed: (value: boolean) => void;
 }
 
-const sectionLabel =
-  "px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider";
 
 const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
   {
