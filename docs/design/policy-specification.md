@@ -14,6 +14,29 @@
 
 ---
 
+## PART 0 — The mandatory per-policy template (Inputs → Logic → Outputs)
+
+**Every policy in this document is specified with the identical structure below.** This is the
+"clear structure of input, logic, output" the specification is required to follow; no policy is
+described in prose alone.
+
+1. **Purpose** — the single decision the policy makes.
+2. **Inputs** — always in three parts:
+   - *Sets & indices* the policy ranges over.
+   - *Parameters* — a table `symbol · unit · range/enum · default · meaning` (these are exactly
+     the Policy-Parameters dialog fields in the UI).
+   - *State & data read* — persistent state variables (§1) and item-master/data fields consumed.
+3. **Logic** — the decision rule as **equations** in the §1 notation: the trigger condition and
+   the produced quantity/decision, step by step. Never prose-only.
+4. **Outputs** — the state/decision variables written (with units) and the KPI(s) it feeds.
+5. **UI & engine** — the table/dialog it appears in; engine status (✅/✚/🧩/⛔).
+
+Empty blocks are stated explicitly ("Parameters: none"). The Inventory library (§PART III) and
+the Demand library (§PART III-D) are the two fully-worked references for this template; all other
+policies follow it identically.
+
+---
+
 ## PART I — What a policy *is* (and is not)
 
 ### I.1 Policy vs. strategy — the distinction this document enforces
@@ -219,100 +242,92 @@ Each is specified below with its mathematical model.
 
 ### III.1 Min-max policy (s, S) ✅
 
-**Purpose.** Reorder when position falls below $s$; raise it to $S$. The classic (s,S) rule.
-**Parameters.** $s$ (reorder point, units or day-multiplier), $S$ (order-up-to, $S>s$). **Model.**
-$$O_{i,t} = \rho_t \cdot \big(S - \mathrm{IP}_{i,t}\big)^+ \cdot \mathbf 1\!\left[\mathrm{IP}_{i,t} < s\right],\qquad (x)^+=\max(0,x).$$
-Then $O_{i,t} \leftarrow \max(O_{i,t}, Q^{\min}_i)$ if $O_{i,t}>0$. **Interpretation.** No order
-unless below $s$; when it fires, exactly refill to $S$. Under Days-of-supply basis, $s,S$ are first
-converted via §II.4. **Decision rule.** single trigger, single target. **Feasibility.** require
-$S>s\ge0$. **Engine.** `P-P.1 policy_type=min_max`; today with Days-of-supply basis and $s=\bar D L$,
-$S=\bar D(L+\kappa)$; Quantity basis is the ✚ addition.
+- **Purpose.** Reorder when position falls below $s$; raise it to $S$ (the classic (s,S) rule).
+- **Inputs.** *Sets:* item $i$ at facility $f$. *Parameters:*
+
+  | symbol | unit | range | default | meaning |
+  |---|---|---|---|---|
+  | $s$ | units or day-mult | $0\le s<S$ | — | reorder point |
+  | $S$ | units or day-mult | $>s$ | — | order-up-to level |
+
+  *State/data read:* $\mathrm{IP}_{i,t}=I_{i,t}+\Pi_{i,t}-B_{i,t}$; MOQ $Q^{\min}_i$; review gate $\rho_t$.
+- **Logic.** Trigger $\mathrm{IP}_{i,t}<s$; order to $S$:
+  $$O_{i,t}=\rho_t\,(S-\mathrm{IP}_{i,t})^+\,\mathbf 1[\mathrm{IP}_{i,t}<s],\qquad O_{i,t}\leftarrow\max(O_{i,t},Q^{\min}_i)\ \text{if}\ O_{i,t}>0.$$
+  Under Days-of-supply basis, $s,S$ are converted via §3.4 first. Feasibility: $S>s\ge0$.
+- **Outputs.** $O_{i,t}$ (purchase order / production release, PH-80); levels $s_{i,t},S_{i,t}$ (PH-70). KPI: holding-vs-fill trade-off.
+- **UI & engine.** `P-P.1 policy_type=min_max`; today Days-of-supply with $s=\bar D_iL,\ S=\bar D_i(L+\kappa)$; Quantity basis ✚.
 
 ### III.2 Min-max with safety stock (s, S, SS) ✚
 
-**Purpose.** (s,S) with an explicit safety buffer added to both thresholds. **Parameters.**
-$s,S,\mathrm{SS}\ge0$. **Model.**
-$$O_{i,t} = \rho_t\big((S+\mathrm{SS}) - \mathrm{IP}_{i,t}\big)^+\,\mathbf 1\!\left[\mathrm{IP}_{i,t} < s+\mathrm{SS}\right].$$
-**Interpretation.** Everything shifts up by $\mathrm{SS}$: the chain holds $\mathrm{SS}$ more on
-average, trading holding cost for service. **Relation to §IV.4.** $\mathrm{SS}$ may be entered
-directly (this policy) *or* computed by a Safety-stock policy (§IV.4) and injected — the two are
-composable; if a §IV.4 method is active it overrides the manual $\mathrm{SS}$ here. **Engine.**
-✚ (P-P.1 + P-P.3 already compute SS separately; this fuses them into one selectable type).
+- **Purpose.** (s,S) with an explicit safety buffer added to both thresholds.
+- **Inputs.** *Parameters:* $s,S,\mathrm{SS}\ge0$. *State read:* $\mathrm{IP}_{i,t}$, $Q^{\min}_i$, $\rho_t$; $\mathrm{SS}$ may instead be supplied by a §IV.4 method (which overrides the manual value).
+- **Logic.** $O_{i,t}=\rho_t\big((S+\mathrm{SS})-\mathrm{IP}_{i,t}\big)^+\mathbf 1[\mathrm{IP}_{i,t}<s+\mathrm{SS}]$. Everything shifts up by $\mathrm{SS}$ (more average stock, higher service).
+- **Outputs.** $O_{i,t}$; raised levels $s+\mathrm{SS},\,S+\mathrm{SS}$. KPI: service ↑, holding ↑.
+- **UI & engine.** ✚ (fuses P-P.1 with the P-P.3 buffer into one selectable type).
 
 ### III.3 (R, Q) policy ✅
 
-**Purpose.** Reorder a **fixed lot** $Q$ whenever position drops below $R$. **Parameters.** $R$
-(reorder point), $Q$ (lot size, $\ge Q^{\min}_i$). **Model.** With optional multi-lot to clear the
-deficit,
-$$O_{i,t} = \rho_t\, Q\left\lceil \frac{(R-\mathrm{IP}_{i,t})^+}{Q} \right\rceil \mathbf 1\!\left[\mathrm{IP}_{i,t} < R\right].$$
-Single-lot variant: $O_{i,t} = \rho_t\,Q\,\mathbf 1[\mathrm{IP}_{i,t}<R]$. **Interpretation.**
-Fixed-quantity ordering (EOQ-style lots); position saw-tooths between $R-\!$demand and $R+Q$.
-**Feasibility.** $Q\ge Q^{\min}_i>0$, $R\ge0$. **Engine.** `P-P.1 policy_type=rop_q`,
-`rop_q_quantity`$=Q$ (engine enforces $Q\ge$MOQ). Multi-lot ceiling is the ✚ refinement.
+- **Purpose.** Reorder a **fixed lot** $Q$ whenever position drops below $R$.
+- **Inputs.** *Parameters:* $R$ (reorder point), $Q\ge Q^{\min}_i$ (lot). *State read:* $\mathrm{IP}_{i,t}$, $\rho_t$.
+- **Logic.** Multi-lot to clear the deficit: $O_{i,t}=\rho_t\,Q\big\lceil (R-\mathrm{IP}_{i,t})^+/Q\big\rceil\mathbf 1[\mathrm{IP}_{i,t}<R]$; single-lot variant $O_{i,t}=\rho_t Q\,\mathbf 1[\mathrm{IP}_{i,t}<R]$. Position saw-tooths in $[R-\!\text{demand},\,R+Q]$.
+- **Outputs.** $O_{i,t}$ (fixed-lot order). KPI: cycle-stock, order frequency.
+- **UI & engine.** `P-P.1 policy_type=rop_q`, `rop_q_quantity`$=Q$ (engine floors to MOQ); multi-lot ceiling ✚.
 
 ### III.4 Base stock / order-up-to (S) ✅
 
-**Purpose.** Every review, top the position back up to $S$ — a one-parameter order-up-to rule.
-**Parameters.** $S$. **Model.** $O_{i,t} = \rho_t\,(S-\mathrm{IP}_{i,t})^+.$ **Interpretation.**
-Equivalent to (s,S) with $s=S$ (order every review); best for steady, high-frequency replenishment.
-**Engine.** `P-P.1 policy_type=base_stock`.
+- **Purpose.** Every review, top the position back up to $S$ (one-parameter order-up-to).
+- **Inputs.** *Parameters:* $S$. *State read:* $\mathrm{IP}_{i,t}$, $\rho_t$.
+- **Logic.** $O_{i,t}=\rho_t\,(S-\mathrm{IP}_{i,t})^+$ (equivalent to (s,S) with $s=S$).
+- **Outputs.** $O_{i,t}$. KPI: low stockout for steady high-frequency demand.
+- **UI & engine.** `P-P.1 policy_type=base_stock`.
 
 ### III.5 Periodic review (R, S) / (T, S) ✅
 
-**Purpose.** Order-up-to $S$, but only at review epochs spaced $T$ weeks apart. **Parameters.** $S$;
-period $T$ (grid column). **Model.** $O_{i,t} = \mathbf 1[(t-t_0)\bmod T=0]\,(S-\mathrm{IP}_{i,t})^+.$
-**Interpretation.** The canonical periodic-review system; between reviews the position drifts down
-with demand. **Engine.** `P-P.1 policy_type=periodic`, `periodic_review_weeks`$=T$.
+- **Purpose.** Order-up-to $S$, but only at review epochs spaced $T$ weeks apart.
+- **Inputs.** *Parameters:* $S$; period $T$ (grid column), first check $t_0$. *State read:* $\mathrm{IP}_{i,t}$.
+- **Logic.** $O_{i,t}=\mathbf 1[(t-t_0)\bmod T=0]\,(S-\mathrm{IP}_{i,t})^+$. Between reviews position drifts down with demand.
+- **Outputs.** $O_{i,t}$. KPI: review-cadence vs stock trade-off.
+- **UI & engine.** `P-P.1 policy_type=periodic`, `periodic_review_weeks`$=T$.
 
 ### III.6 Regular policy (fixed quantity, periodic) ✚
 
-**Purpose.** Order a **fixed quantity every period, regardless of stock level** — a push/heartbeat
-replenishment. Requires Periodic Check on. **Parameters.** $Q$ (quantity); period $T$. **Model.**
-$$O_{i,t} = \mathbf 1[(t-t_0)\bmod T=0]\; Q.$$
-**Interpretation.** Contractual/standing deliveries (e.g. a supplier ships 5 pallets weekly
-irrespective of demand). No feedback on position — stock can build or deplete. **Engine.** ✚ (new
-type). **Necessity.** Justified: models fixed-schedule supply contracts and heartbeat production
-feeds that the (s,S)/(R,Q) family cannot express (they are all position-triggered).
+- **Purpose.** Order a **fixed quantity every period, regardless of stock level** (push/heartbeat). Requires Periodic Check on.
+- **Inputs.** *Parameters:* $Q$ (quantity), period $T$, first check $t_0$. *State read:* none (open-loop).
+- **Logic.** $O_{i,t}=\mathbf 1[(t-t_0)\bmod T=0]\,Q$. No feedback on position — stock can build or deplete.
+- **Outputs.** $O_{i,t}$ (standing delivery). KPI: schedule adherence; risk of over/under-stock.
+- **UI & engine.** ✚. *Necessity:* models fixed-schedule supply contracts / heartbeat feeds that the position-triggered family cannot express.
 
 ### III.7 Regular policy with safety stock ✚
 
-**Purpose.** Regular fixed-quantity ordering, **plus** a corrective top-up if a safety level is
-violated. **Parameters.** $Q, \mathrm{SS}$; period $T$. **Model.**
-$$O_{i,t} = \mathbf 1[(t-t_0)\bmod T=0]\Big(Q + \big(\mathrm{SS}-\mathrm{IP}_{i,t}\big)^+\Big).$$
-**Worked example (matches ALX).** $Q=5$, $\mathrm{SS}=0$: if position is $-7$ (backordered),
-$O = 5 + (0-(-7))^+ = 5+7 = 12$. This is why "Regular with SS, SS=0" ≠ "Regular": the corrective
-term activates whenever position is negative. **Engine.** ✚. **Necessity.** Justified: the only
-policy that combines a standing schedule with shortfall correction.
+- **Purpose.** Regular fixed-quantity ordering **plus** a corrective top-up on safety-level violation.
+- **Inputs.** *Parameters:* $Q,\mathrm{SS}$, period $T$. *State read:* $\mathrm{IP}_{i,t}$.
+- **Logic.** $O_{i,t}=\mathbf 1[(t-t_0)\bmod T=0]\big(Q+(\mathrm{SS}-\mathrm{IP}_{i,t})^+\big)$. **Worked example (ALX):** $Q=5,\mathrm{SS}=0$, position $-7$ ⇒ $O=5+(0-(-7))^+=12$ — so "Regular+SS, SS=0" ≠ "Regular".
+- **Outputs.** $O_{i,t}$. KPI: schedule + shortfall protection.
+- **UI & engine.** ✚. *Necessity:* the only policy combining a standing schedule with shortfall correction.
 
 ### III.8 Order on demand (lot-for-lot / pull) ✚
 
-**Purpose.** Hold **no** cycle stock; order exactly what incoming demand/orders require this period
-(pull). **Parameters.** none. **Model.** Let $G_{i,t}$ be the gross requirement landing this week
-(customer orders for FG, or BoM-exploded production requirement for materials). Then
-$$O_{i,t} = \big(G_{i,t} - I_{i,t}\big)^+ .$$
-**Interpretation.** Lot-for-lot / just-in-time / make-to-order procurement — the decoupling point
-sits downstream. **Engine.** ✚ as an explicit inventory type; the **MTO** production path already
-behaves this way for FG. **Necessity.** Justified: it is the inventory-side of make-to-order and of
-JIT inbound; distinct from all position-triggered rules (holds zero target).
+- **Purpose.** Hold **no** cycle stock; order exactly what incoming demand/orders require (pull).
+- **Inputs.** *Parameters:* none. *State read:* gross requirement $G_{i,t}$ (customer orders for FG, or BoM-exploded production requirement for materials); $I_{i,t}$.
+- **Logic.** $O_{i,t}=(G_{i,t}-I_{i,t})^+$ — lot-for-lot / JIT; decoupling point sits downstream.
+- **Outputs.** $O_{i,t}$; zero target stock. KPI: minimal inventory, exposure to lead-time risk.
+- **UI & engine.** ✚ (the MTO FG path already behaves this way). *Necessity:* the inventory side of make-to-order / JIT inbound.
 
 ### III.9 Unlimited inventory ✚
 
-**Purpose.** Model a facility/item that is **always available in any quantity** (an idealized
-source). **Parameters.** none; Initial Stock = ∞ (locked). **Model.** $O_{i,t}=0$ (never orders);
-availability constraint removed: any demand on $i$ is met in full, $I_{i,t}\equiv\infty$; **no
-holding cost accrues** and inventory statistics are suppressed (report ∞ available, 0 peak). **Use.**
-Upstream boundary of the modeled scope (e.g. commodity raw material assumed infinite), or isolating
-a downstream analysis from supply constraints. **Engine.** ✚. **Necessity.** Justified: the correct,
-explicit way to say "this input never constrains" — replaces the *implicit* infinite-supplier-capacity
-default (which is currently silent, gap G4) with a *named, visible* choice.
+- **Purpose.** Model a facility/item **always available in any quantity** (idealized source).
+- **Inputs.** *Parameters:* none. Initial Stock = ∞ (locked). *State read:* none.
+- **Logic.** $O_{i,t}=0$; availability constraint removed ($I_{i,t}\equiv\infty$); **no holding cost accrues**; inventory statistics suppressed (∞ available, 0 peak).
+- **Outputs.** none (no orders, no cost). KPI: inventory stats empty by design.
+- **UI & engine.** ✚. *Necessity:* the explicit, visible way to say "this input never constrains" — replaces the silent infinite-supplier-capacity default (gap G4).
 
 ### III.10 No replenishment ✚
 
-**Purpose.** Never reorder; ship from **Initial Stock** until exhausted, then stock out. **Parameters.**
-none. **Model.** $O_{i,t}\equiv0$; $I_{i,t}$ monotonically non-increasing. **Use.** End-of-life items,
-one-shot allocations, or stress scenarios ("what if this source stops?"). **Engine.** ✚. **Necessity.**
-Justified: a distinct terminal policy; also the mechanism behind a supply-cut disruption expressed
-as a policy rather than an event.
+- **Purpose.** Never reorder; ship from Initial Stock until exhausted, then stock out.
+- **Inputs.** *Parameters:* none. *State read:* $I_{i,t}$.
+- **Logic.** $O_{i,t}\equiv0$; $I_{i,t}$ monotonically non-increasing.
+- **Outputs.** none. KPI: depletion curve; stockout once exhausted.
+- **UI & engine.** ✚. *Necessity:* distinct terminal policy; also expresses a supply-cut as a policy rather than an event.
 
 ### III.11 Material Requirements Planning (MRP, time-phased) ✚
 
@@ -360,6 +375,73 @@ their $S$ is sized by the FG safety-stock policy (§IV.4, P-P.4). Make-to-order 
 Each inventory policy contributes to: average on-hand value $\sum_i c_i \bar I_i$; holding cost
 $\sum_i c^h_i c_i \bar I_i / 52$ per week; fill rate (via downstream availability); stockout /
 backorder frequency; peak inventory. These feed §PART IX accounting.
+
+---
+
+## PART III-D — Demand / order-generation policy library (customer side)
+
+**Category decision.** For each *(customer, product)*: how customer orders are generated over
+time — the exogenous driver of the entire simulation. The ALX "Demand table." Columns: Customer,
+Product, Demand Type, Parameters, Time Period, Revenue, Down/Up Penalty, Currency, Expected Lead
+Time, Min Split Ratio, Backorder Policy, Inclusion. **Notation:** an order places quantity $q$ at
+week $\tau$; realized weekly demand $D_{p,c,t}=\sum_k q_k\mathbf 1[\tau_k=t]$; stochastic
+$q\sim\mathcal D(\theta)$.
+
+### III-D.1 Periodic demand ✅
+
+- **Purpose.** A (fixed or stochastic) order every fixed interval.
+- **Inputs.** *Sets:* customer $c$, product $p$. *Parameters:*
+
+  | symbol | unit | range/enum | default | meaning |
+  |---|---|---|---|---|
+  | $T^{ord}$ | weeks | ≥1 | 1 | order interval |
+  | $q$ | units or Dist | ≥0 | — | quantity per interval |
+  | `first_occurrence` | enum | first_day \| next_day \| random | first_day | first order timing |
+
+  *State/data read:* none (exogenous); uses **scenario start** $t_0$, not experiment start.
+- **Logic.** Epochs $\tau_k=o_1+kT^{ord}$ with $o_1=0$ (first_day), $T^{ord}$ (next_day), or
+  $\sim\mathrm{Unif}\{0,\dots,T^{ord}-1\}$ (random, SIM) / $\lfloor T^{ord}/2\rfloor$ (GFA/NO).
+  Quantity $q_k=q$ or $q_k\sim\mathcal D$. $D_{p,c,t}=\sum_k q_k\mathbf 1[\tau_k=t]$. Schedule is
+  anchored to $t_0$, so moving the experiment window does not shift it.
+- **Outputs.** $D_{p,c,t}$ at PH-10 → fulfillment $F$, backlog $B$, lost sales $\Lambda$, KPIs.
+- **UI & engine.** Demand table, Type = Periodic. ✅ weekly draw; interval scheduling ✚.
+
+### III-D.2 Periodic demand with first occurrence ✚
+
+- **Purpose.** As III-D.1 but the first order is pinned to calendar week $\tau_0$.
+- **Inputs.** III-D.1 parameters + `first_occurrence_week` $\tau_0$.
+- **Logic.** $D_{p,c,t}=0$ for $t<\tau_0$; epochs $\tau_k=\tau_0+kT^{ord}$.
+- **Outputs / UI.** As III-D.1; Type = Periodic-with-first-occurrence. ✚.
+
+### III-D.3 Historic demand ✅ (empirical replay)
+
+- **Purpose.** Replay an exact recorded series (CRM/orders).
+- **Inputs.** Series $\{(w_j,q_j)\}$; Total-Q $=\sum_j q_j$.
+- **Logic.** $D_{p,c,t}=\sum_j q_j\mathbf 1[w_j=t]$ — deterministic replay.
+- **Outputs / UI.** Demand table, Type = Historic. ✅ (already consumed by V&V validation).
+
+### III-D.4 Stochastic quantity (modifier on III-D.1/2)
+
+- **Purpose.** Make per-interval quantity random.
+- **Inputs.** $\mathcal D\in$ {uniform$[a,b]$, normal$(\mu,\sigma)$, triangular$(a,b,c)$,
+  triangularAV$(\bar D,\mathrm{CV})$, poisson$(\lambda)$, negbin$(\mu,k)$}.
+- **Logic.** Per epoch $q_k\sim\mathcal D$. Aggregate (GFA/NO) per-period demand $=\mathbb
+  E[\mathcal D]\times(\text{intervals in period})$; e.g. 10-day interval, Jan 31 days ⇒ 3.1
+  intervals ⇒ $\bar q\times3.1$. TriangularAV maps $(\bar D,\mathrm{CV})\to(a,b,c)$.
+- **Outputs / UI.** Same $D_{p,c,t}$ channel; ✅ (triangularAV/poisson/negbin/normal implemented).
+
+### III-D.5 Demand-table economic & service columns (per row)
+
+Per-row attributes with precise math (not policy types):
+- **Revenue override** $u_{p,c}$: per-customer price; overrides product $u_p$. Currency `currency`.
+- **Down/Up penalty** on demanded $Q$, delivered $F$: $\text{penalty}=\pi^-(Q-F)^+ + \pi^+(F-Q)^+$.
+  **$\pi=0$ ⇒ HARD constraint** (met exactly / not exceeded); else soft (deviation penalized).
+- **Expected Lead Time** $\mathrm{ELT}_{p,c}$ (wk): drives the ELT service-level KPI (share of a
+  customer's orders received within $\mathrm{ELT}$).
+- **Minimum Split Ratio** $\mu\in(0,1]$: partial shipment, each part $\ge\mu Q$; default ship-complete.
+- **Backorder Policy**: Not-Allowed → order dropped ($\Lambda\mathrel+=$ unmet, Dropped-orders);
+  Allowed-Total → order waits ($B\mathrel+=$ unmet).
+- **Inclusion**: include/exclude the row.
 
 ---
 
