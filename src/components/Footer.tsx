@@ -9,7 +9,7 @@ const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }
   <footer className="fixed bottom-0 left-0 right-0 z-50">
     <div
       className={`bg-black px-3 py-2 text-xs text-white text-center transition-all duration-500 ${
-        hasNavBar ? (isCollapsed ? "ml-[60px]" : "ml-0 sm:ml-56") : ""
+        hasNavBar ? (isCollapsed ? "ml-14" : "ml-0 sm:ml-48") : ""
       }`}
     >
       Developed by <span className="font-medium">Phu Nguyen</span> &{" "}

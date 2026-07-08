@@ -2,6 +2,7 @@ import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import PasswordExpiryBanner from '@/components/PasswordExpiryBanner';
+import { cn } from '@/lib/utils';
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -13,7 +14,10 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
   return (
     <div className="min-h-screen bg-background">
       <Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-      <div className={`transition-all duration-300 ${isCollapsed ? 'ml-[50px]' : 'ml-56'}`}>
+      <div className={cn(
+        "dark min-h-screen bg-background pb-10 transition-all duration-300",
+        isCollapsed ? 'ml-14' : 'ml-48'
+      )}>
         <PasswordExpiryBanner />
         {children}
       </div>

@@ -17,13 +17,14 @@ export interface NavItemConfig {
 
 interface NavItemProps extends NavItemConfig {
   isCollapsed: boolean;
-  iconSize?: number; // WIDE type
+  iconSize?: number;
 }
 
 const linkBase =
-  "flex items-center rounded-md transition-all duration-200 p-2.5 text-sm font-medium";
-const linkActive = "bg-accent text-accent-foreground shadow-sm";
-const linkHover = "hover:bg-muted hover:text-foreground";
+  "relative flex items-center rounded-md transition-all duration-200 p-2 text-xs font-medium gap-2 min-w-0";
+const linkActive =
+  "bg-muted/80 text-foreground font-medium before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-primary";
+const linkHover = "hover:bg-muted/50 hover:text-foreground text-muted-foreground";
 
 const NavItem = ({
   to,
@@ -31,7 +32,7 @@ const NavItem = ({
   label,
   tooltip,
   isCollapsed,
-  iconSize = 16, // default (number, not literal-only type)
+  iconSize = 14,
 }: NavItemProps) => {
   const location = useLocation();
   const active = location.pathname === to;
@@ -50,14 +51,11 @@ const NavItem = ({
             )}
           >
             <Icon size={iconSize} className="flex-shrink-0" />
-            {!isCollapsed && <span className="ml-2">{label}</span>}
+            {!isCollapsed && <span className="truncate">{label}</span>}
           </Link>
         </TooltipTrigger>
         {isCollapsed && (
-          <TooltipContent
-            side="right"
-            className="px-2 py-1 text-sm text-white bg-black"
-          >
+          <TooltipContent side="right" className="px-2 py-1 text-xs">
             {tooltip}
           </TooltipContent>
         )}

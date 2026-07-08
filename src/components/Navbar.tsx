@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   LogOut,
   User,
-  Building2,
   Database,
   FlaskConical,
   Info,
@@ -13,13 +12,11 @@ import {
   ChevronRight,
   Factory,
   Layers,
-  Target,
   Brain,
   SlidersHorizontal,
   Shield,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,7 +38,7 @@ interface NavbarProps {
 }
 
 const sectionLabel =
-  "px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider";
+  "px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider";
 
 const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
   {
@@ -139,39 +136,37 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
     .filter((section) => section.items.length > 0);
 
   const sizes = {
-    collapsedW: "w-[64px]",
-    expandedW: "w-56",
-    logoBoxH: "h-12",
-    logoBoxW: "w-28",
-    // Match NavItem exact dimensions and spacing
-    navItemPadding: "p-2.5", // exact NavItem padding
-    logoIconSize: "h-[15px] w-[15px]", // same size as nav icons
-    navIconSize: 15,
+    collapsedW: "w-14",
+    expandedW: "w-48",
+    logoBoxH: "h-10",
+    logoBoxW: "w-24",
+    navItemPadding: "p-2",
+    logoIconSize: "h-[14px] w-[14px]",
+    navIconSize: 14,
   } as const;
 
   return (
     <div
       className={cn(
-        "fixed left-0 top-0 h-full flex z-[60] overflow-hidden transition-[width] duration-500 ease-in-out",
+        "light fixed left-0 top-0 h-full flex z-[60] overflow-hidden transition-[width] duration-500 ease-in-out",
         isCollapsed ? sizes.collapsedW : `w-full ${sizes.expandedW}`
       )}
     >
       <nav
         className={cn(
           "w-full bg-background border-r border-border relative",
-          isCollapsed ? "p-2" : "p-4"
+          isCollapsed ? "p-2" : "p-3"
         )}
       >
-        {/* Header - Unified positioning approach */}
-        <div className="mb-6 h-12 relative">
+        {/* Header */}
+        <div className="mb-4 h-10 relative">
           {!isCollapsed ? (
-            /* Expanded state */
             <>
-              <div className="absolute left-2 right-12 top-0 h-full flex items-center justify-center">
+              <div className="absolute left-2 right-10 top-0 h-full flex items-center justify-center">
                 <img
                   src="/logo.png"
                   alt="SuReSuite"
-                  className="object-contain h-8"
+                  className="object-contain h-6"
                   width={144}
                   height={80}
                 />
@@ -181,37 +176,30 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                   onClick={() => setIsCollapsed(true)}
                   aria-label="Collapse sidebar"
                   title="Collapse navigation bar"
-                  className="p-2.5 rounded-md hover:bg-accent"
+                  className="p-2 rounded-md hover:bg-accent"
                 >
-                  <ChevronLeft size={15} />
+                  <ChevronLeft size={14} />
                 </button>
               </div>
             </>
           ) : (
-            /* Collapsed state - centered in the collapsed width */
             <div className="absolute left-0 right-0 top-0 h-full flex items-center justify-center">
-              <div className="relative">
-                <button
-                  onClick={() => setIsCollapsed(false)}
-                  aria-label="Expand navigation bar"
-                  title="Expand navigation bar"
-                  className="p-2.5 rounded-md hover:bg-muted hover:text-foreground"
-                >
-                  <img
-                    src="/logo1.png"
-                    alt="SuReSuite compact"
-                    className="h-[32px] w-[32px] object-contain"
-                  />
-                </button>
-                <button
-                  onClick={() => setIsCollapsed(false)}
-                  aria-label="Expand sidebar" 
-                  title="Expand navigation bar"
-                  className="absolute inset-0 p-2.5 rounded-md opacity-0 hover:opacity-100 hover:bg-muted hover:text-foreground"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
+              <button
+                onClick={() => setIsCollapsed(false)}
+                aria-label="Expand navigation bar"
+                title="Expand navigation bar"
+                className="group relative p-2 rounded-md hover:bg-muted hover:text-foreground"
+              >
+                <img
+                  src="/logo1.png"
+                  alt="SuReSuite compact"
+                  className="h-6 w-6 object-contain transition-opacity group-hover:opacity-0"
+                />
+                <ChevronRight
+                  size={14}
+                  className="absolute inset-0 m-auto opacity-0 transition-opacity group-hover:opacity-100"
+                />
+              </button>
             </div>
           )}
         </div>
@@ -219,7 +207,8 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
         {/* Links */}
         <div>
           {visibleSections.map((section, index) => (
-            <div key={section.title ?? index} className={cn(index > 0 && "mt-6")}>
+            <div key={section.title ?? index}>
+              {index > 0 && <Separator className="my-3 bg-border/50" />}
               {!isCollapsed && section.title && (
                 <div className={sectionLabel}>{section.title}</div>
               )}
@@ -237,7 +226,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
           ))}
         </div>
 
-        {/* Bottom area — unified account menu */}
+        {/* Bottom area — account menu */}
         <div className="absolute bottom-3 left-3 right-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -282,7 +271,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
               side={isCollapsed ? "right" : "top"}
               align={isCollapsed ? "end" : "start"}
               sideOffset={8}
-              className="w-52 z-[70]"
+              className="light w-52 z-[70]"
             >
               <DropdownMenuLabel className="flex flex-col gap-0.5">
                 <span className="text-xs font-medium truncate">
