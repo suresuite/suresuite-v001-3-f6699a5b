@@ -87,6 +87,51 @@ frontend see runs (migrations `20260706000001`, `20260707000002`, `2026070700000
 - `.github/workflows/supabase-migrations.yml` — applies migrations.
 - `.github/workflows/scsim-tests.yml` — engine/worker tests + wheel-drift gate.
 
+## Data & policy fidelity — the non-negotiable requirement
+
+The user's #1 concern: **their real item-master data and their policy settings must reach
+the engine on the server faithfully — no silent divergence.** The mechanisms exist; your
+job is to *prove* they hold on the user's actual project, not to assume.
+
+How it works today (do not weaken any of this):
+- **Policies** travel as the immutable `policy_versions.snapshot` (with `policy_hash`)
+  embedded by `sim-command`; the worker runs `snapshot_to_policies()`
+  (`sim-worker/sim_worker/policy_snapshot.py`) — the SAME function the browser uses. Runs
+  are version-bound and reproducible (defaults + per-node/edge overrides + fulfillment
+  strategy all carry).
+- **Data** is read straight from the project's live tables with the service role in
+  `load_project_data()` (`sim-worker/sim_worker/datamap.py`): `suppliers`, `materials`,
+  `products`, `inbound_logistics`, `bom_single_level`, `outbound_logistics`. The DB is the
+  single source of truth; `ensure_item_masters` is called first so every graph node has a
+  master row. Both paths funnel through the pure `build_project_data()`.
+- **Fidelity is observable**: the §8.1 required-data gate blocks/warns pre-dispatch on
+  missing required fields; the engine's **mapping-warnings** report (persisted on
+  `simulation_runs.mapping_warnings`) lists every field it had to default or derive. A
+  fully-specified project → zero mapping warnings + no gate block.
+
+Mandatory fidelity checks you must perform and report (on the USER'S real project, not a
+fixture):
+1. **Table parity** — confirm the six tables `load_project_data()` reads are exactly the
+   tables the app's Data Manager / Item Master / logistics uploads WRITE to. If the app
+   writes item masters or BOM to differently-named tables/views, the worker will read empty
+   and the run will be all-defaults. Fix the read set (or add a view) — do not let it
+   silently diverge. Trace the frontend writers (e.g. `src/pages/DataManager.tsx`,
+   `src/lib/policies/projectLanes.ts`, the ingest edge functions
+   `supabase/functions/ingest-*`) against these six tables.
+2. **Zero-drift on real data** — dispatch a run on the user's real project and show the
+   `mapping_warnings` report is empty (or only expected `info` derivations). Any `warn`
+   ("defaulted because no source existed") means data did NOT fully transfer — surface it,
+   don't bury it. The UI already renders this (`src/components/sim/RunProgressPanel.tsx`
+   "Engine mapping report").
+3. **Browser == server == golden parity** — the browser fallback's `engineDataset()`
+   (`RunValidateStage.tsx`) must map to the same `ProjectData` the server builds. Lock this
+   with the existing parity test `sim-worker/tests/test_validation_parity.py` (extend it if
+   needed) so identical input → identical KPIs on both paths. This is the guarantee that
+   "run on server" and "run in browser (offline)" agree.
+4. **Policy round-trip** — verify the `policy_hash` on the finished `simulation_runs` row
+   matches the saved `policy_versions.policy_hash` the user ran, proving the exact policy
+   configuration (not the live tables) drove the run.
+
 ## Step 1 — one-time human setup (an agent cannot do these)
 
 These require the user's own accounts/dashboards. Do **not** invent tokens; stop and hand
@@ -220,6 +265,9 @@ In `src/components/policies/RunValidateStage.tsx` (`runValidationScenario`, `onR
    `queued → running → done`; `run_replications` rows **stream in live** and the per-rep grid
    + weekly charts fill via realtime; `code_version` = `scsim-<version>`; aggregate KPIs + CI
    half-widths present; mapping-warnings report shown.
+2b. **Fidelity proof** (see "Data & policy fidelity"): on the user's real project the
+    `mapping_warnings` report is empty / only expected `info`; the finished run's
+    `policy_hash` equals the saved version's; and the browser/server parity test passes.
 3. **Cancel** a running run → status `cancelled`. **Add reps** → more replications land.
 4. **Big run** (e.g. 200 reps × 365 days): completes **without freezing the browser**
    (compute is entirely server-side). This is the whole objective.
