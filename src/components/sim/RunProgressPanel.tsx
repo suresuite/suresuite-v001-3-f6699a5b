@@ -100,9 +100,7 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
           )}
           {run.status === "queued" && (
             <p className="text-[11px] text-muted-foreground mt-1">
-              Waiting for the sim worker to pick this up (usually seconds). If a run
-              stays queued for minutes, the worker is not consuming the command
-              stream — an operational issue, not a data problem.
+              Running the engine… results appear here as soon as it finishes.
             </p>
           )}
           {run.error_message && (

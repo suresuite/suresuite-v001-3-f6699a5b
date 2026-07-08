@@ -37,59 +37,76 @@ export interface RunOnServerlessArgs {
   dataset: EngineDataset;
 }
 
-/**
- * Compute a run on the serverless engine and persist its result. Marks the
- * run failed (so the UI shows the reason) if the engine errors. Returns the
- * engine version on success.
- */
-export async function runOnServerless(args: RunOnServerlessArgs): Promise<string> {
-  const { runId, projectId, snapshot, scenario, projectModel, dataset } = args;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
+export interface EngineResult {
+  engineVersion: string;
+  runUpdate: Record<string, unknown>;
+  replications: Record<string, unknown>[];
+}
 
+/**
+ * Compute a run on the serverless engine and return its result. The caller
+ * renders it directly (so the run is visible even if the DB round-trip is
+ * unavailable) — persistence is best-effort on top (persistEngineResult).
+ */
+export async function runOnServerless(args: RunOnServerlessArgs): Promise<EngineResult> {
+  const { runId, projectId, snapshot, scenario, projectModel, dataset } = args;
+
+  const res = await fetch("/api/run_simulation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      run_id: runId,
+      project_id: projectId,
+      snapshot,
+      scenario,
+      project_model: projectModel,
+      dataset,
+    }),
+  });
   let reply: EngineReply;
   try {
-    const res = await fetch("/api/run_simulation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        run_id: runId,
-        project_id: projectId,
-        snapshot,
-        scenario,
-        project_model: projectModel,
-        dataset,
-      }),
-    });
     reply = (await res.json()) as EngineReply;
-    if (!res.ok || !reply.ok) {
-      throw new Error(reply.error || `engine HTTP ${res.status}`);
+  } catch {
+    throw new Error(`engine HTTP ${res.status} — the /api/run_simulation function did not return JSON (is it deployed?)`);
+  }
+  if (!res.ok || !reply.ok) {
+    throw new Error(reply.error || `engine HTTP ${res.status}`);
+  }
+
+  return {
+    engineVersion: reply.engine_version ?? "scsim",
+    runUpdate: reply.run_update ?? {},
+    replications: reply.replications ?? [],
+  };
+}
+
+/**
+ * Best-effort persistence of an engine result to Supabase (so the run joins
+ * project history and the Lab). Requires the anon write grants (migrations
+ * 20260706000001 / 20260707000002); if they are not yet applied the write
+ * fails harmlessly — the caller already rendered the result from memory.
+ * Returns true on success.
+ */
+export async function persistEngineResult(runId: string, result: EngineResult): Promise<boolean> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any;
+  try {
+    if (result.replications.length > 0) {
+      const { error: repErr } = await sb
+        .from("run_replications")
+        .upsert(result.replications, { onConflict: "run_id,rep_index" });
+      if (repErr) throw repErr;
     }
-  } catch (err) {
-    const message = (err as Error).message ?? String(err);
-    await sb.from("simulation_runs")
-      .update({ status: "failed", error_message: message.slice(0, 500), ended_at: new Date().toISOString() })
+    const { error: runErr } = await sb
+      .from("simulation_runs")
+      .update(result.runUpdate)
       .eq("id", runId);
-    throw new Error(message);
+    if (runErr) throw runErr;
+    return true;
+  } catch (err) {
+    console.warn("[serverlessEngine] result rendered but not persisted:", err);
+    return false;
   }
-
-  // Persist per-replication rows first (idempotent on run_id,rep_index), then
-  // flip the run to done with aggregates — so a reader never sees "done" with
-  // no replications behind it.
-  const reps = reply.replications ?? [];
-  if (reps.length > 0) {
-    const { error: repErr } = await sb
-      .from("run_replications")
-      .upsert(reps, { onConflict: "run_id,rep_index" });
-    if (repErr) throw new Error(`replication write failed: ${repErr.message ?? repErr}`);
-  }
-  const { error: runErr } = await sb
-    .from("simulation_runs")
-    .update(reply.run_update ?? {})
-    .eq("id", runId);
-  if (runErr) throw new Error(`run update failed: ${runErr.message ?? runErr}`);
-
-  return reply.engine_version ?? "scsim";
 }
 
 /** Fetch the immutable saved snapshot to run (reproducible source of truth). */

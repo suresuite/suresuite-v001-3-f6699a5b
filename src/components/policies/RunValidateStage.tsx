@@ -53,8 +53,10 @@ import { useSimulationRun } from "@/hooks/useSimulationRun";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
 import {
   fetchPolicySnapshot,
+  persistEngineResult,
   runOnServerless,
   type EngineDataset,
+  type EngineResult,
 } from "@/lib/sim/serverlessEngine";
 import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
@@ -221,7 +223,19 @@ export function RunValidateStage({
   // policy version + a scenario bound to the run, dispatched to the Fly worker.
   const { scenarios, create: createScenario, update: updateScenario } = useScenarios(projectId);
   const [validationScenarioId, setValidationScenarioId] = useState<string | null>(null);
-  const { latestRun, reps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
+  const { latestRun: dbRun, reps: dbReps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
+
+  // In-memory result of the run just computed on the serverless engine. It
+  // renders the engine output immediately and independently of the DB
+  // round-trip: the /api/run_simulation function is the only thing that must
+  // be deployed for a researcher to SEE the simulation run — persistence
+  // (which needs the anon-write migrations) is best-effort on top.
+  const [localRun, setLocalRun] = useState<SimulationRun | null>(null);
+  const [localReps, setLocalReps] = useState<Replication[]>([]);
+
+  // Prefer freshly persisted DB output; fall back to the in-memory result.
+  const latestRun = dbRun ?? localRun;
+  const reps = dbReps.length > 0 ? dbReps : localReps;
 
   // Re-attach to the auto-managed validation scenario on mount, so engine
   // output persisted by earlier sessions renders immediately — previously the
@@ -468,7 +482,7 @@ export function RunValidateStage({
     setValidationScenarioId(scenarioId);
     const runId = await dispatchRun(scenarioId, versionId);
     const snapshot = await fetchPolicySnapshot(versionId);
-    await runOnServerless({
+    const result = await runOnServerless({
       runId,
       projectId: projectId!,
       snapshot,
@@ -476,6 +490,11 @@ export function RunValidateStage({
       projectModel: fulfillmentStrategy,
       dataset: engineDataset(),
     });
+    // Render the engine output immediately from memory (works with only the
+    // Vercel deploy), then persist best-effort so it also joins DB history.
+    setLocalRun(engineResultToRun(runId, scenarioId, projectId!, result));
+    setLocalReps(engineResultToReps(result));
+    void persistEngineResult(runId, result);
   };
 
   const onRunSingle = async () => {
@@ -1857,7 +1876,60 @@ const SUMMARY_TILES = [
   { id: "max_backlog", label: "Max backlog (u)" },
 ] as const;
 
-/** Persisted engine output for the latest validation run: aggregate KPIs ± CI
+// ── Engine result → UI row shapes (for immediate in-memory rendering) ──────
+// The /api/run_simulation function returns the exact persisted-row shapes;
+// these adapt them to the SimulationRun / Replication types the panels read,
+// so the output renders without waiting on (or requiring) the DB round-trip.
+
+function engineResultToRun(
+  runId: string,
+  scenarioId: string,
+  projectId: string,
+  result: EngineResult,
+): SimulationRun {
+  const u = result.runUpdate as Record<string, unknown>;
+  const nowIso = new Date().toISOString();
+  return {
+    id: runId,
+    scenario_id: scenarioId,
+    project_id: projectId,
+    status: (u.status as SimulationRun["status"]) ?? "done",
+    started_at: nowIso,
+    ended_at: (u.ended_at as string) ?? nowIso,
+    aggregate_kpis: (u.aggregate_kpis as Record<string, number>) ?? {},
+    ci_half_widths: (u.ci_half_widths as Record<string, number>) ?? {},
+    warmup_detected_at: (u.warmup_detected_at as number | null) ?? null,
+    rep_count_target: (u.rep_count_done as number) ?? result.replications.length,
+    rep_count_done: (u.rep_count_done as number) ?? result.replications.length,
+    error_message: null,
+    code_version: (u.code_version as string) ?? `scsim-${result.engineVersion}`,
+    policy_version_id: null,
+    policy_hash: null,
+    mapping_warnings:
+      (u.mapping_warnings as SimulationRun["mapping_warnings"]) ?? null,
+    created_at: nowIso,
+  };
+}
+
+function engineResultToReps(result: EngineResult): Replication[] {
+  return result.replications.map((r) => {
+    const row = r as Record<string, unknown>;
+    return {
+      id: `${row.run_id}:${row.rep_index}`,
+      run_id: String(row.run_id ?? ""),
+      rep_index: Number(row.rep_index ?? 0),
+      seed_used: Number(row.seed_used ?? 0),
+      status: String(row.status ?? "done"),
+      kpis: (row.kpis as Record<string, number>) ?? {},
+      time_series: (row.time_series as Record<string, number[]>) ?? {},
+      warmup_at: (row.warmup_at as number | null) ?? null,
+      started_at: null,
+      ended_at: (row.ended_at as string) ?? null,
+    };
+  });
+}
+
+/** Engine output for the latest validation run: aggregate KPIs ± CI
  *  half-widths (simulation_runs) and real weekly per-replication traces
  *  (run_replications.time_series). Nothing here is synthetic. */
 function EngineOutputSummary({ run, reps }: { run: SimulationRun; reps: Replication[] }) {
