@@ -8,6 +8,8 @@ on:
       - "src/lib/policies/registry.generated.json"
       - "supabase/functions/_shared/**"
       - "scripts/check_registry_bridge.mjs"
+      - "scripts/build_engine_wheels.sh"
+      - "public/engine/**"
       - ".github/workflows/scsim-tests.yml"
   pull_request:
     paths:
@@ -16,6 +18,8 @@ on:
       - "src/lib/policies/registry.generated.json"
       - "supabase/functions/_shared/**"
       - "scripts/check_registry_bridge.mjs"
+      - "scripts/build_engine_wheels.sh"
+      - "public/engine/**"
   workflow_dispatch:
 
 # The repo-root `scsim/` SERVICE directory shadows the installed `scsim`
@@ -75,6 +79,26 @@ jobs:
       - name: Worker test suite (legacy engine + scsim bridge + validation parity)
         run: python -m pytest tests -q
         working-directory: sim-worker
+
+  # The browser engine runs pre-built pure-Python wheels committed under
+  # public/engine/ (Pyodide loads them client-side). This gate fails if those
+  # committed wheels' source has drifted from the current scsim/sim-worker code
+  # — same regenerate-and-diff discipline as the registry snapshots above.
+  browser-wheels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install scsim (build backend picks it up for version stamp)
+        run: pip install ./scsim
+
+      - name: Committed browser-engine wheels in sync with the engine
+        run: bash scripts/build_engine_wheels.sh --check
 
   # The shared grading module (§8.2) — the ONE grader the browser and the
   # sim-command gate both import. Locked to the golden parity fixture; the
