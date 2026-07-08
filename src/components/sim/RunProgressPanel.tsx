@@ -35,10 +35,19 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
   const statusColor = {
     queued: "secondary",
     running: "default",
-    done: "outline",
+    done: "default",
     cancelled: "destructive",
     failed: "destructive",
   }[run.status] as "secondary" | "default" | "outline" | "destructive";
+
+  // Loud, unmissable treatment for the two terminal states — a grey badge is
+  // too easy to miss when the whole point is "did it run?".
+  const statusChrome =
+    run.status === "done"
+      ? { card: "border-emerald-500 ring-1 ring-emerald-500/40", badge: "bg-emerald-600 text-white border-transparent", Icon: CheckCircle2 }
+      : run.status === "failed" || run.status === "cancelled"
+      ? { card: "border-destructive ring-1 ring-destructive/40", badge: "", Icon: AlertTriangle }
+      : { card: "", badge: "", Icon: null as typeof CheckCircle2 | null };
 
   const cv = run.code_version ?? "";
   const engine = cv.startsWith("scsim-")
@@ -49,12 +58,13 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
 
   return (
     <div className="flex flex-col gap-3">
-      <Card>
+      <Card className={statusChrome.card}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center gap-2">
               Latest run
-              <Badge variant={statusColor} className="text-[10px] uppercase">
+              <Badge variant={statusColor} className={cn("text-[10px] uppercase gap-1", statusChrome.badge)}>
+                {statusChrome.Icon && <statusChrome.Icon className="h-3 w-3" />}
                 {run.status}
               </Badge>
               {versionLabel && (

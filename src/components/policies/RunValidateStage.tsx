@@ -54,10 +54,12 @@ import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification
 import {
   fetchPolicySnapshot,
   persistEngineResult,
-  runOnServerless,
+  runInBrowser,
+  selfTest,
   type EngineDataset,
   type EngineResult,
-} from "@/lib/sim/serverlessEngine";
+  type LoadPhase,
+} from "@/lib/sim/pyodideEngine";
 import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
@@ -232,6 +234,33 @@ export function RunValidateStage({
   // (which needs the anon-write migrations) is best-effort on top.
   const [localRun, setLocalRun] = useState<SimulationRun | null>(null);
   const [localReps, setLocalReps] = useState<Replication[]>([]);
+
+  // Loud, PERSISTENT run status (not a vanishing toast). This is the single
+  // "did it run?" signal the whole redesign is about.
+  type RunPhase =
+    | { kind: "idle" }
+    | { kind: "loading"; detail: string }
+    | { kind: "computing" }
+    | { kind: "succeeded"; summary: string; persisted: boolean | null }
+    | { kind: "failed"; step: string; message: string };
+  const [runPhase, setRunPhase] = useState<RunPhase>({ kind: "idle" });
+
+  // One-click engine self-test (fixed input, no user data / DB).
+  const [selfTestState, setSelfTestState] = useState<
+    | { kind: "idle" }
+    | { kind: "running"; detail: string }
+    | { kind: "ok"; fillRate: number; reps: number; version: string }
+    | { kind: "fail"; error: string }
+  >({ kind: "idle" });
+
+  const loadDetail = (p: LoadPhase): string =>
+    p === "loading-runtime"
+      ? "Loading simulation runtime (one-time, ~20 MB)…"
+      : p === "loading-packages"
+      ? "Loading numpy / scipy…"
+      : p === "loading-engine"
+      ? "Loading the scsim engine…"
+      : "Engine ready";
 
   // Prefer freshly persisted DB output; fall back to the in-memory result.
   const latestRun = dbRun ?? localRun;
@@ -474,27 +503,107 @@ export function RunValidateStage({
   // Full run: gate + queued row via sim-command, then compute on the
   // serverless engine and persist the result. Returns nothing; the run panel
   // updates over realtime as rows land.
+  // Build the v2 snapshot the engine consumes directly from the current
+  // defaults/overrides/strategy — the reproducible fallback when the saved
+  // policy_versions row can't be read (e.g. anon read blocked).
+  const buildClientSnapshot = (): Record<string, unknown> => ({
+    schema_version: 2,
+    defaults: defaults as unknown as Record<string, unknown>,
+    fulfillment_strategy: fulfillmentStrategy,
+    overrides: overrides.map((o) => ({
+      scope: o.scope,
+      target_key: o.target_key,
+      family: o.family,
+      patch: o.patch,
+    })),
+  });
+
+  // Full run: best-effort gate + queued row via sim-command, then compute the
+  // REAL engine in the browser (Pyodide), render immediately, persist
+  // best-effort. The only hard dependency is the static frontend — every
+  // backend step degrades gracefully and is surfaced in runPhase.
   const runValidationScenario = async (
     scenarioId: string,
-    versionId: string,
+    versionId: string | null,
     scenario: { seed: number; horizon_days: number; replications: number },
   ) => {
     setValidationScenarioId(scenarioId);
-    const runId = await dispatchRun(scenarioId, versionId);
-    const snapshot = await fetchPolicySnapshot(versionId);
-    const result = await runOnServerless({
-      runId,
-      projectId: projectId!,
-      snapshot,
-      scenario: { ...scenario, crn: true },
-      projectModel: fulfillmentStrategy,
-      dataset: engineDataset(),
-    });
-    // Render the engine output immediately from memory (works with only the
-    // Vercel deploy), then persist best-effort so it also joins DB history.
+
+    // Step 1 — gate + run row (best-effort; a client UUID keeps us going if
+    // sim-command is unavailable, so "see it run" never depends on it).
+    let runId: string;
+    let snapshot: Record<string, unknown> | null = null;
+    if (versionId) {
+      try {
+        runId = await dispatchRun(scenarioId, versionId);
+        snapshot = await fetchPolicySnapshot(versionId);
+      } catch (err) {
+        // A hard gate rejection (missing required data) must still stop the run.
+        const msg = (err as Error).message ?? String(err);
+        if (msg.includes("required-data gate")) {
+          setRunPhase({ kind: "failed", step: "validation gate", message: msg });
+          throw err;
+        }
+        console.warn("sim-command unavailable, running unbound:", msg);
+        runId = crypto.randomUUID();
+      }
+    } else {
+      runId = crypto.randomUUID();
+    }
+    if (!snapshot) snapshot = buildClientSnapshot();
+
+    // Step 2 — compute the real engine in the browser.
+    setRunPhase({ kind: "loading", detail: loadDetail("loading-runtime") });
+    let result: EngineResult;
+    try {
+      result = await runInBrowser(
+        {
+          runId,
+          projectId: projectId!,
+          snapshot,
+          scenario: { ...scenario, crn: true },
+          projectModel: fulfillmentStrategy,
+          dataset: engineDataset(),
+        },
+        (p) => setRunPhase(p === "ready" ? { kind: "computing" } : { kind: "loading", detail: loadDetail(p) }),
+      );
+      setRunPhase({ kind: "computing" });
+    } catch (err) {
+      setRunPhase({ kind: "failed", step: "engine", message: (err as Error).message ?? String(err) });
+      throw err;
+    }
+
+    // Step 3 — render immediately from memory.
     setLocalRun(engineResultToRun(runId, scenarioId, projectId!, result));
     setLocalReps(engineResultToReps(result));
-    void persistEngineResult(runId, result);
+
+    // Step 4 — persist best-effort; surface the outcome (never silent).
+    const persisted = await persistEngineResult(runId, projectId!, result);
+
+    const agg = (result.runUpdate.aggregate_kpis as Record<string, number>) ?? {};
+    const fr = agg.fill_rate != null ? `${(agg.fill_rate * 100).toFixed(1)}%` : "—";
+    const rev = agg.revenue != null ? `€${Math.round(agg.revenue).toLocaleString()}` : "—";
+    setRunPhase({
+      kind: "succeeded",
+      summary: `fill rate ${fr} · revenue ${rev} · ${result.replications.length} replication(s) · scsim ${result.engineVersion}`,
+      persisted,
+    });
+  };
+
+  const onSelfTest = async () => {
+    setSelfTestState({ kind: "running", detail: loadDetail("loading-runtime") });
+    const r = await selfTest((p) =>
+      setSelfTestState({ kind: "running", detail: loadDetail(p) }),
+    );
+    if (r.ok) {
+      const fill = r.fillRate ?? NaN;
+      setSelfTestState({ kind: "ok", fillRate: fill, reps: r.reps ?? 0, version: r.engineVersion ?? "scsim" });
+      toast.success(`Engine works in your browser — scsim ${r.engineVersion ?? ""}, fill rate ${(fill * 100).toFixed(1)}%`);
+    } else {
+      const err = r.error ?? "unknown error";
+      setSelfTestState({ kind: "fail", error: err });
+      toast.error(`Engine self-test failed: ${err}`);
+    }
   };
 
   const onRunSingle = async () => {
@@ -504,28 +613,25 @@ export function RunValidateStage({
     }
     setSubmitting("single");
     try {
+      // saveSnapshot / scenario are best-effort — a run must not be blocked by
+      // a DB write; it computes in the browser regardless.
       const versionId = await saveSnapshot(`Validate single — ${new Date().toLocaleString()}`);
-      if (!versionId) return; // saveSnapshot already surfaced the error
-      const scenarioId = await ensureValidationScenario({
-        replications: 1,
-        seed: singleCfg.seed,
-        horizon_days: singleCfg.horizon_days,
-        primary_kpi: "fill_rate",
-      });
-      if (!scenarioId) {
-        toast.error("Could not prepare a validation scenario.");
-        return;
-      }
+      const scenarioId =
+        (await ensureValidationScenario({
+          replications: 1,
+          seed: singleCfg.seed,
+          horizon_days: singleCfg.horizon_days,
+          primary_kpi: "fill_rate",
+        })) ?? `local:${projectId}`;
       setSingleQueuedAt(new Date());
-      toast.info("Running the engine…");
       await runValidationScenario(scenarioId, versionId, {
         seed: singleCfg.seed,
         horizon_days: singleCfg.horizon_days,
         replications: 1,
       });
-      toast.success("Single-seed run complete — engine output is below.");
     } catch (err) {
       console.error(err);
+      setSingleQueuedAt(null);
       toast.error(`Run failed: ${(err as Error).message ?? err}`);
     } finally {
       setSubmitting(null);
@@ -552,27 +658,22 @@ export function RunValidateStage({
         return;
       }
       const versionId = await saveSnapshot(`Validate ×${seeds.length} — ${new Date().toLocaleString()}`);
-      if (!versionId) return;
-      const scenarioId = await ensureValidationScenario({
-        replications: seeds.length,
-        seed: seeds[0],
-        horizon_days: multiCfg.horizon_days,
-        primary_kpi: multiCfg.kpis[0],
-      });
-      if (!scenarioId) {
-        toast.error("Could not prepare a validation scenario.");
-        return;
-      }
+      const scenarioId =
+        (await ensureValidationScenario({
+          replications: seeds.length,
+          seed: seeds[0],
+          horizon_days: multiCfg.horizon_days,
+          primary_kpi: multiCfg.kpis[0],
+        })) ?? `local:${projectId}`;
       setMultiQueuedAt(new Date());
-      toast.info(`Running ${seeds.length} replications on the engine…`);
       await runValidationScenario(scenarioId, versionId, {
         seed: seeds[0],
         horizon_days: multiCfg.horizon_days,
         replications: seeds.length,
       });
-      toast.success(`${seeds.length} replications complete — engine output is below.`);
     } catch (err) {
       console.error(err);
+      setMultiQueuedAt(null);
       toast.error(`Run failed: ${(err as Error).message ?? err}`);
     } finally {
       setSubmitting(null);
@@ -782,6 +883,34 @@ export function RunValidateStage({
             icon={PlayCircle}
             title="Run the simulation"
           >
+            {/* Engine self-test + build marker: prove the engine works in THIS
+                browser, independent of data/DB, and show which build is live. */}
+            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+                onClick={onSelfTest} disabled={selfTestState.kind === "running"}>
+                <Gauge className="h-3.5 w-3.5" />
+                {selfTestState.kind === "running" ? "Testing…" : "Test engine"}
+              </Button>
+              {selfTestState.kind === "running" && (
+                <span className="text-[11px] text-muted-foreground">{selfTestState.detail}</span>
+              )}
+              {selfTestState.kind === "ok" && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Engine works — scsim {selfTestState.version}, fill rate {(selfTestState.fillRate * 100).toFixed(1)}% ({selfTestState.reps} reps)
+                </span>
+              )}
+              {selfTestState.kind === "fail" && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-destructive">
+                  <AlertOctagon className="h-3.5 w-3.5" /> Engine failed: {selfTestState.error}
+                </span>
+              )}
+              <span className="ml-auto text-[10px] font-mono text-muted-foreground/60" title="Deployed build — if this doesn't change after a deploy, the new code isn't live yet">
+                build {String(__BUILD_SHA__)} · {String(__BUILD_TIME__)}
+              </span>
+            </div>
+
+            {runPhase.kind !== "idle" && <RunStatusBanner phase={runPhase} />}
+
             <Tabs value={runTab} onValueChange={(v) => setRunTab(v as "single" | "multi")} className="w-full">
               <TabsList className="grid w-full grid-cols-2 h-9">
                 <TabsTrigger value="single" className="text-xs gap-1.5">
@@ -1876,6 +2005,56 @@ const SUMMARY_TILES = [
   { id: "max_backlog", label: "Max backlog (u)" },
 ] as const;
 
+// The loud, PERSISTENT run-status banner — the definitive "did it run?"
+// signal (replaces reliance on vanishing toasts). Green on success with the
+// headline KPIs; red on failure naming the exact step; amber while loading
+// the engine / computing.
+type RunPhaseT =
+  | { kind: "idle" }
+  | { kind: "loading"; detail: string }
+  | { kind: "computing" }
+  | { kind: "succeeded"; summary: string; persisted: boolean | null }
+  | { kind: "failed"; step: string; message: string };
+
+function RunStatusBanner({ phase }: { phase: RunPhaseT }) {
+  if (phase.kind === "idle") return null;
+  if (phase.kind === "loading" || phase.kind === "computing") {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+        <span className="font-medium">
+          {phase.kind === "computing" ? "Running the engine…" : phase.detail}
+        </span>
+      </div>
+    );
+  }
+  if (phase.kind === "failed") {
+    return (
+      <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2.5 text-sm">
+        <AlertOctagon className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+        <div>
+          <div className="font-semibold text-destructive">Simulation failed at {phase.step}</div>
+          <div className="text-xs text-destructive/90 mt-0.5 break-words">{phase.message}</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2.5 text-sm">
+      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+      <div>
+        <div className="font-semibold text-emerald-700 dark:text-emerald-300">Simulation ran successfully</div>
+        <div className="text-xs text-foreground/80 mt-0.5">{phase.summary}</div>
+        {phase.persisted === false && (
+          <div className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">
+            Shown from this session only — not saved to history (DB write grants not yet applied); it will disappear on reload.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Engine result → UI row shapes (for immediate in-memory rendering) ──────
 // The /api/run_simulation function returns the exact persisted-row shapes;
 // these adapt them to the SimulationRun / Replication types the panels read,
@@ -1948,7 +2127,7 @@ function EngineOutputSummary({ run, reps }: { run: SimulationRun; reps: Replicat
           </span>
         ) : (
           <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-            persisted results · {reps.length} replication(s)
+            complete · {reps.length} replication(s)
           </span>
         )}
         <div className="flex-1" />
