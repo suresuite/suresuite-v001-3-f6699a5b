@@ -207,9 +207,6 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
           {visibleSections.map((section, index) => (
             <div key={section.title ?? index}>
               {index > 0 && <Separator className="my-3 bg-border/50" />}
-              {!isCollapsed && section.title && (
-                <div className={sectionLabel}>{section.title}</div>
-              )}
               <div className="space-y-0.5">
                 {section.items.map((item) => (
                   <NavItem
