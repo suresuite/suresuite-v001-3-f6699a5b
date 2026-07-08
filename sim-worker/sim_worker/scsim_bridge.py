@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import networkx as nx
+if TYPE_CHECKING:  # networkx is only needed by the legacy graph path
+    import networkx as nx  # noqa: F401  (compute_kpis_scsim imports it lazily)
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +42,8 @@ def compute_kpis_scsim(
     disruption_schedule: list[dict] | None = None,
 ) -> dict[str, Any]:
     """Drop-in sibling of ``engine.compute_kpis`` running on scsim."""
+    import networkx as nx  # noqa: F401  (legacy-graph path only; kept out of
+    #                        the serverless bundle, which never calls this)
     from scsim import ENGINE_VERSION
     from scsim.core.engine import run_scenario
     from scsim.io.legacy_graph import from_legacy_graph

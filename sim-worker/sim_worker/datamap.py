@@ -7,9 +7,10 @@ See docs/data-simulation-mapping.md.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-import httpx
+if TYPE_CHECKING:  # httpx only used by load_project_data (the worker's DB reads);
+    import httpx    # the serverless engine calls build_project_data directly.
 
 from scsim.io import (
     BomArc,

@@ -51,6 +51,13 @@ import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
+import {
+  fetchPolicySnapshot,
+  persistEngineResult,
+  runOnServerless,
+  type EngineDataset,
+  type EngineResult,
+} from "@/lib/sim/serverlessEngine";
 import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
@@ -216,7 +223,19 @@ export function RunValidateStage({
   // policy version + a scenario bound to the run, dispatched to the Fly worker.
   const { scenarios, create: createScenario, update: updateScenario } = useScenarios(projectId);
   const [validationScenarioId, setValidationScenarioId] = useState<string | null>(null);
-  const { latestRun, reps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
+  const { latestRun: dbRun, reps: dbReps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
+
+  // In-memory result of the run just computed on the serverless engine. It
+  // renders the engine output immediately and independently of the DB
+  // round-trip: the /api/run_simulation function is the only thing that must
+  // be deployed for a researcher to SEE the simulation run — persistence
+  // (which needs the anon-write migrations) is best-effort on top.
+  const [localRun, setLocalRun] = useState<SimulationRun | null>(null);
+  const [localReps, setLocalReps] = useState<Replication[]>([]);
+
+  // Prefer freshly persisted DB output; fall back to the in-memory result.
+  const latestRun = dbRun ?? localRun;
+  const reps = dbReps.length > 0 ? dbReps : localReps;
 
   // Re-attach to the auto-managed validation scenario on mount, so engine
   // output persisted by earlier sessions renders immediately — previously the
@@ -385,11 +404,12 @@ export function RunValidateStage({
     return scen.id;
   };
 
-  // Dispatch the same experiment.run command the Simulation Lab uses. We invoke
-  // directly (rather than the hook's runExperiment) so the freshly-resolved
-  // scenario id is used immediately instead of a stale closure value.
-  const dispatchRun = async (scenarioId: string, policyVersionId: string) => {
-    const { error } = await supabase.functions.invoke("sim-command", {
+  // Dispatch through sim-command (the §8.1 validation gate + the queued
+  // simulation_runs row), returning the new run_id. The actual compute then
+  // runs on the serverless engine (runValidationScenario below) — the Fly
+  // worker the command also enqueues for never deployed.
+  const dispatchRun = async (scenarioId: string, policyVersionId: string): Promise<string> => {
+    const { data, error } = await supabase.functions.invoke("sim-command", {
       body: {
         project_id: projectId,
         scenario_id: scenarioId,
@@ -401,7 +421,11 @@ export function RunValidateStage({
         client_ts: Date.now(),
       },
     });
-    if (!error) return;
+    if (!error) {
+      const runId = (data as { run_id?: string } | null)?.run_id;
+      if (!runId) throw new Error("sim-command did not return a run_id");
+      return runId;
+    }
     // Surface the server's actual response instead of supabase-js's generic
     // "non-2xx" message — a §8.1 gate rejection carries typed findings, and
     // operational failures carry an error string worth reading.
@@ -435,6 +459,44 @@ export function RunValidateStage({
     throw error;
   };
 
+  /** The dataset the serverless engine needs — exactly the rows the hooks
+   *  already loaded (via the SECURITY DEFINER lane RPC + item masters), so no
+   *  new DB reads and no RLS surface. */
+  const engineDataset = (): EngineDataset => ({
+    suppliers: itemMasters.suppliers as unknown as Record<string, unknown>[],
+    materials: itemMasters.materials as unknown as Record<string, unknown>[],
+    products: itemMasters.products as unknown as Record<string, unknown>[],
+    inbound: itemMasters.lanes.inbound,
+    bom: itemMasters.lanes.bom,
+    outbound: itemMasters.lanes.outbound,
+  });
+
+  // Full run: gate + queued row via sim-command, then compute on the
+  // serverless engine and persist the result. Returns nothing; the run panel
+  // updates over realtime as rows land.
+  const runValidationScenario = async (
+    scenarioId: string,
+    versionId: string,
+    scenario: { seed: number; horizon_days: number; replications: number },
+  ) => {
+    setValidationScenarioId(scenarioId);
+    const runId = await dispatchRun(scenarioId, versionId);
+    const snapshot = await fetchPolicySnapshot(versionId);
+    const result = await runOnServerless({
+      runId,
+      projectId: projectId!,
+      snapshot,
+      scenario: { ...scenario, crn: true },
+      projectModel: fulfillmentStrategy,
+      dataset: engineDataset(),
+    });
+    // Render the engine output immediately from memory (works with only the
+    // Vercel deploy), then persist best-effort so it also joins DB history.
+    setLocalRun(engineResultToRun(runId, scenarioId, projectId!, result));
+    setLocalReps(engineResultToReps(result));
+    void persistEngineResult(runId, result);
+  };
+
   const onRunSingle = async () => {
     if (!projectId || findings === null || blockCount > 0) {
       toast.warning("Run verification with no blockers first.");
@@ -454,13 +516,17 @@ export function RunValidateStage({
         toast.error("Could not prepare a validation scenario.");
         return;
       }
-      setValidationScenarioId(scenarioId);
-      await dispatchRun(scenarioId, versionId);
       setSingleQueuedAt(new Date());
-      toast.success("Single-seed run queued — watch the engine badge below.");
+      toast.info("Running the engine…");
+      await runValidationScenario(scenarioId, versionId, {
+        seed: singleCfg.seed,
+        horizon_days: singleCfg.horizon_days,
+        replications: 1,
+      });
+      toast.success("Single-seed run complete — engine output is below.");
     } catch (err) {
       console.error(err);
-      toast.error(`Failed to queue single run: ${(err as Error).message ?? err}`);
+      toast.error(`Run failed: ${(err as Error).message ?? err}`);
     } finally {
       setSubmitting(null);
     }
@@ -497,13 +563,17 @@ export function RunValidateStage({
         toast.error("Could not prepare a validation scenario.");
         return;
       }
-      setValidationScenarioId(scenarioId);
-      await dispatchRun(scenarioId, versionId);
       setMultiQueuedAt(new Date());
-      toast.success(`Queued ${seeds.length} replications — watch the engine badge below.`);
+      toast.info(`Running ${seeds.length} replications on the engine…`);
+      await runValidationScenario(scenarioId, versionId, {
+        seed: seeds[0],
+        horizon_days: multiCfg.horizon_days,
+        replications: seeds.length,
+      });
+      toast.success(`${seeds.length} replications complete — engine output is below.`);
     } catch (err) {
       console.error(err);
-      toast.error(`Failed to queue replications: ${(err as Error).message ?? err}`);
+      toast.error(`Run failed: ${(err as Error).message ?? err}`);
     } finally {
       setSubmitting(null);
     }
@@ -1806,7 +1876,60 @@ const SUMMARY_TILES = [
   { id: "max_backlog", label: "Max backlog (u)" },
 ] as const;
 
-/** Persisted engine output for the latest validation run: aggregate KPIs ± CI
+// ── Engine result → UI row shapes (for immediate in-memory rendering) ──────
+// The /api/run_simulation function returns the exact persisted-row shapes;
+// these adapt them to the SimulationRun / Replication types the panels read,
+// so the output renders without waiting on (or requiring) the DB round-trip.
+
+function engineResultToRun(
+  runId: string,
+  scenarioId: string,
+  projectId: string,
+  result: EngineResult,
+): SimulationRun {
+  const u = result.runUpdate as Record<string, unknown>;
+  const nowIso = new Date().toISOString();
+  return {
+    id: runId,
+    scenario_id: scenarioId,
+    project_id: projectId,
+    status: (u.status as SimulationRun["status"]) ?? "done",
+    started_at: nowIso,
+    ended_at: (u.ended_at as string) ?? nowIso,
+    aggregate_kpis: (u.aggregate_kpis as Record<string, number>) ?? {},
+    ci_half_widths: (u.ci_half_widths as Record<string, number>) ?? {},
+    warmup_detected_at: (u.warmup_detected_at as number | null) ?? null,
+    rep_count_target: (u.rep_count_done as number) ?? result.replications.length,
+    rep_count_done: (u.rep_count_done as number) ?? result.replications.length,
+    error_message: null,
+    code_version: (u.code_version as string) ?? `scsim-${result.engineVersion}`,
+    policy_version_id: null,
+    policy_hash: null,
+    mapping_warnings:
+      (u.mapping_warnings as SimulationRun["mapping_warnings"]) ?? null,
+    created_at: nowIso,
+  };
+}
+
+function engineResultToReps(result: EngineResult): Replication[] {
+  return result.replications.map((r) => {
+    const row = r as Record<string, unknown>;
+    return {
+      id: `${row.run_id}:${row.rep_index}`,
+      run_id: String(row.run_id ?? ""),
+      rep_index: Number(row.rep_index ?? 0),
+      seed_used: Number(row.seed_used ?? 0),
+      status: String(row.status ?? "done"),
+      kpis: (row.kpis as Record<string, number>) ?? {},
+      time_series: (row.time_series as Record<string, number[]>) ?? {},
+      warmup_at: (row.warmup_at as number | null) ?? null,
+      started_at: null,
+      ended_at: (row.ended_at as string) ?? null,
+    };
+  });
+}
+
+/** Engine output for the latest validation run: aggregate KPIs ± CI
  *  half-widths (simulation_runs) and real weekly per-replication traces
  *  (run_replications.time_series). Nothing here is synthetic. */
 function EngineOutputSummary({ run, reps }: { run: SimulationRun; reps: Replication[] }) {
