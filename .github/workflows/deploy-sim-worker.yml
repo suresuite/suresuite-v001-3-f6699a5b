@@ -18,6 +18,9 @@ on:
       - "scsim/**"
       - ".github/workflows/deploy-sim-worker.yml"
   workflow_dispatch:
+  # Callable from ops-request.yml (git-native trigger for environments that
+  # can push but cannot reach the Actions API).
+  workflow_call:
 
 jobs:
   deploy:

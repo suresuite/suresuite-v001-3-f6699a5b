@@ -54,6 +54,29 @@ jobs:
       - name: Install supabase-js
         run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@2
 
+      # A push often lands migrations + deploys in sibling workflows; give
+      # them time to settle before dispatching against the new state.
+      - name: Wait for sibling deploys (push trigger only)
+        if: github.event_name == 'push'
+        run: sleep 240
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Read-only worker snapshot so a consumption failure is diagnosable from
+      # the published log: machine states + recent logs (crash loops, redis
+      # errors, "subscribed to sim.cmd.*", per-run activity).
+      - name: Worker diagnostics (pre-run, read-only)
+        run: |
+          {
+            echo "── fly status (pre-run)"
+            flyctl status --app "$FLY_APP" || true
+            echo "── recent worker logs (pre-run)"
+            timeout 30 flyctl logs --app "$FLY_APP" --no-tail 2>/dev/null | tail -40 || true
+          } | tee /tmp/worker-diag-pre.log
+        env:
+          FLY_APP: suresuite-sim-worker
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Run end-to-end verification
         id: verify
         run: |
@@ -67,6 +90,19 @@ jobs:
           ALLOW_MAPPING_WARNINGS: ${{ (github.event_name == 'push' && 'false') || inputs.allow_mapping_warnings }}
           TIMEOUT_MINUTES: "50"
 
+      - name: Worker diagnostics (post-run, read-only)
+        if: always()
+        run: |
+          {
+            echo "── fly status (post-run)"
+            flyctl status --app "$FLY_APP" || true
+            echo "── recent worker logs (post-run)"
+            timeout 30 flyctl logs --app "$FLY_APP" --no-tail 2>/dev/null | tail -60 || true
+          } | tee /tmp/worker-diag-post.log
+        env:
+          FLY_APP: suresuite-sim-worker
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       # Make the outcome readable without Actions API access: the log lands on
       # the verify-results branch (results/latest.log + one file per run).
       - name: Publish result log to verify-results branch
@@ -79,6 +115,9 @@ jobs:
             echo "outcome: ${{ steps.verify.outcome }}"
             echo "──────────────────────────────────────"
             cat /tmp/verify-e2e.log
+            echo "──────────────────────────────────────"
+            cat /tmp/worker-diag-pre.log 2>/dev/null || true
+            cat /tmp/worker-diag-post.log 2>/dev/null || true
           } > /tmp/verify-e2e-full.log
           git config user.name "verify-sim-e2e"
           git config user.email "actions@github.com"

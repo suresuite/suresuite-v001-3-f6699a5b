@@ -513,14 +513,36 @@ async function handleExperimentRun(
     if (JSON.stringify(workerEnvelope).length > 700_000) {
       delete workerEnvelope.policy_snapshot;
     }
-    await upstash([
-      "XADD",
-      `sim.cmd.${cmd.project_id}`,
-      "MAXLEN", "~", "1000",
-      "*",
-      "data",
-      JSON.stringify(workerEnvelope),
-    ]).catch((e) => console.error("xadd failed", e));
+    const stream = `sim.cmd.${cmd.project_id}`;
+    try {
+      // Ensure the consumer group exists BEFORE the XADD: the worker creates
+      // it at "$" when it first discovers a stream, so a message added before
+      // that moment would never be delivered (the first command on any fresh
+      // stream — the classic lost-first-run). BUSYGROUP means it's already
+      // there, which is fine.
+      await upstash([
+        "XGROUP", "CREATE", stream, "sim-workers", "$", "MKSTREAM",
+      ]).catch((e) => {
+        if (!String(e).includes("BUSYGROUP")) throw e;
+      });
+      await upstash([
+        "XADD", stream, "MAXLEN", "~", "1000", "*",
+        "data", JSON.stringify(workerEnvelope),
+      ]);
+    } catch (e) {
+      // A run that never reached the queue must not sit "queued" forever —
+      // that black hole is indistinguishable from a dead worker. Fail loudly.
+      console.error("enqueue failed", e);
+      await (svc as any)
+        .from("simulation_runs")
+        .update({
+          status: "failed",
+          error_message: `enqueue to worker queue failed: ${String(e).slice(0, 300)}`,
+          ended_at: new Date().toISOString(),
+        })
+        .eq("id", run.id);
+      throw new Error(`enqueue to worker queue failed: ${String(e).slice(0, 300)}`);
+    }
   }
 
   // The worker is the SOLE authoritative writer of results: it sets the run to
