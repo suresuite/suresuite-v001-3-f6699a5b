@@ -293,3 +293,48 @@ queued→running→done with replications streaming into the UI via realtime; a 
 run completes without freezing the browser; cancel/add-reps work; the browser engine remains
 a working offline fallback behind a toggle; all local gates + CI green; changes committed to
 the working branch with blueprint traceability.
+
+## State as of 2026-07-09 (branch claude/suresuite-sim-engine-deploy-4mrzj5)
+
+Step 2 executed. What is now true in production, and the operational surfaces
+added to keep it verifiable:
+
+- **Worker live on scsim.** `Deploy sim-worker to Fly` proves it on every run:
+  a read-only preflight fails the deploy if any of UPSTASH_REDIS_URL /
+  SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY is missing from the Fly app (it
+  never writes secrets), and a post-deploy check fails unless the logs show
+  `engine mode: scsim <version>`. `fly.toml` pins `[[restart]] policy =
+  "always"` and the workflow starts stopped non-standby machines — a
+  crashed-out machine parked in "stopped" was why runs once sat queued
+  forever with no error anywhere.
+- **Server is the default compute path.** The Run & Validate stage has a
+  "Run on server (default) / Run in browser (offline)" toggle. Server mode
+  dispatches and stops — the worker is the sole writer, realtime streams the
+  rows in, the status banner mirrors the run row. Browser mode (and the
+  auto-fallback when sim-command is unreachable) is the unchanged Pyodide
+  path, but its dispatch sends `payload.compute = "client"` and sim-command
+  then skips the queue XADD, so the worker and a browser never compute the
+  same run.
+- **Migrations unblocked.** Two faults had silently frozen `db push` since
+  Jul 4: an orphaned remote version `20260704000001` (now in the repair
+  list), and `super_admin_phase1` using an enum value in the transaction that
+  added it while ALSO sharing its version number with `open_logistics_reads`
+  (now split into 20260709000001 + 20260709000002). All migrations through
+  the run-table anon grants are applied.
+- **End-to-end proof is a workflow**: `Verify simulation end-to-end`
+  (verify-sim-e2e.yml → scripts/verify_sim_e2e.mjs) runs the whole loop on
+  the real project with the app's own anon identity — gate → queued →
+  running → done, code_version scsim-*, all replications landed, realtime
+  events observed on BOTH run tables, mapping_warnings empty/info-only,
+  run policy_hash == saved policy_versions.policy_hash, plus a cancel
+  round-trip. Trigger it from the Actions tab, or (from environments that
+  can push but cannot call the Actions API) by changing
+  `.github/verify-e2e-request`; the full log always lands on the
+  `verify-results` branch (`results/latest.log`). The migrations workflow
+  publishes its db push log to `migration-results` the same way.
+- **Gotcha for future agents**: PostgREST's schema cache can lag a freshly
+  added column by minutes — a 42703 "column does not exist" right after a
+  migration is not proof the migration failed. The E2E preflight retries for
+  this reason. And this container's network policy may block Supabase + the
+  GitHub Actions API entirely: the git-native trigger/result branches above
+  are the workaround, and GH_TOKEN in the environment is contents-scope only.
