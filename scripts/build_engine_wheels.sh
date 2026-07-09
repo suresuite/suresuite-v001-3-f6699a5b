@@ -83,8 +83,8 @@ cat > "$OUT/manifest.json" <<JSON
   "engine_version": "${SCSIM_VER}",
   "pyodide_version": "0.26.4",
   "wheels": ["${SCSIM_WHL}", "${WORKER_WHL}"],
-  "pyodide_packages": ["numpy", "scipy", "micropip"],
-  "micropip_packages": ["pydantic"]
+  "pyodide_packages": ["numpy", "scipy", "pydantic", "micropip"],
+  "micropip_packages": []
 }
 JSON
 

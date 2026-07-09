@@ -52,6 +52,9 @@ import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
 import {
+  cancelBrowserRun,
+  EngineCancelledError,
+  ensureEngine,
   fetchPolicySnapshot,
   persistEngineResult,
   runInBrowser,
@@ -240,7 +243,7 @@ export function RunValidateStage({
   type RunPhase =
     | { kind: "idle" }
     | { kind: "loading"; detail: string }
-    | { kind: "computing" }
+    | { kind: "computing"; done?: number; total?: number }
     | { kind: "succeeded"; summary: string; persisted: boolean | null }
     | { kind: "failed"; step: string; message: string };
   const [runPhase, setRunPhase] = useState<RunPhase>({ kind: "idle" });
@@ -337,6 +340,24 @@ export function RunValidateStage({
       /* noop */
     }
   }, [persistKey, projectId, singleCfg, multiCfg, warmCfg]);
+
+  // Eagerly warm the engine when the user reaches the Run step, so the ~20 MB
+  // Pyodide/numpy/scipy first-load overlaps with reading + configuring instead
+  // of starting only after the Run click (which felt like a freeze).
+  const [engineWarming, setEngineWarming] = useState(false);
+  const [engineWarm, setEngineWarm] = useState(false);
+  useEffect(() => {
+    if (step !== 1 || engineWarm || engineWarming) return;
+    let alive = true;
+    setEngineWarming(true);
+    ensureEngine()
+      .then(() => alive && setEngineWarm(true))
+      .catch(() => {/* the actual run re-reports any load error loudly */})
+      .finally(() => alive && setEngineWarming(false));
+    return () => {
+      alive = false;
+    };
+  }, [step, engineWarm, engineWarming]);
 
   const [singleQueuedAt, setSingleQueuedAt] = useState<Date | null>(null);
   const [multiQueuedAt, setMultiQueuedAt] = useState<Date | null>(null);
@@ -552,8 +573,12 @@ export function RunValidateStage({
     }
     if (!snapshot) snapshot = buildClientSnapshot();
 
-    // Step 2 — compute the real engine in the browser.
+    // Step 2 — compute the real engine in the browser (off-thread worker).
+    // Show a preliminary "running" panel so the per-rep grid renders empty and
+    // fills in live; clear any prior run's reps first.
     setRunPhase({ kind: "loading", detail: loadDetail("loading-runtime") });
+    setLocalReps([]);
+    setLocalRun(preliminaryRun(runId, scenarioId, projectId!, scenario.replications));
     let result: EngineResult;
     try {
       result = await runInBrowser(
@@ -565,15 +590,31 @@ export function RunValidateStage({
           projectModel: fulfillmentStrategy,
           dataset: engineDataset(),
         },
-        (p) => setRunPhase(p === "ready" ? { kind: "computing" } : { kind: "loading", detail: loadDetail(p) }),
+        (p) => setRunPhase(p === "ready" ? { kind: "computing", done: 0, total: scenario.replications } : { kind: "loading", detail: loadDetail(p) }),
+        // Live per-replication streaming — each finished rep lands in the grid.
+        (rep, done, total) => {
+          const mapped = engineRepToReplication(runId, rep);
+          setLocalReps((cur) => {
+            const next = cur.filter((r) => r.rep_index !== mapped.rep_index);
+            next.push(mapped);
+            next.sort((a, b) => a.rep_index - b.rep_index);
+            return next;
+          });
+          setLocalRun((r) => (r ? { ...r, rep_count_done: done, rep_count_target: total } : r));
+          setRunPhase({ kind: "computing", done, total });
+        },
       );
-      setRunPhase({ kind: "computing" });
     } catch (err) {
+      if (err instanceof EngineCancelledError) {
+        setRunPhase({ kind: "idle" });
+        setLocalRun((r) => (r ? { ...r, status: "cancelled" } : r));
+        throw err;
+      }
       setRunPhase({ kind: "failed", step: "engine", message: (err as Error).message ?? String(err) });
       throw err;
     }
 
-    // Step 3 — render immediately from memory.
+    // Step 3 — render the authoritative final result from memory.
     setLocalRun(engineResultToRun(runId, scenarioId, projectId!, result));
     setLocalReps(engineResultToReps(result));
 
@@ -630,9 +671,13 @@ export function RunValidateStage({
         replications: 1,
       });
     } catch (err) {
-      console.error(err);
       setSingleQueuedAt(null);
-      toast.error(`Run failed: ${(err as Error).message ?? err}`);
+      if (err instanceof EngineCancelledError) {
+        toast.message("Run cancelled.");
+      } else {
+        console.error(err);
+        toast.error(`Run failed: ${(err as Error).message ?? err}`);
+      }
     } finally {
       setSubmitting(null);
     }
@@ -672,9 +717,13 @@ export function RunValidateStage({
         replications: seeds.length,
       });
     } catch (err) {
-      console.error(err);
       setMultiQueuedAt(null);
-      toast.error(`Run failed: ${(err as Error).message ?? err}`);
+      if (err instanceof EngineCancelledError) {
+        toast.message("Run cancelled.");
+      } else {
+        console.error(err);
+        toast.error(`Run failed: ${(err as Error).message ?? err}`);
+      }
     } finally {
       setSubmitting(null);
     }
@@ -904,6 +953,17 @@ export function RunValidateStage({
                   <AlertOctagon className="h-3.5 w-3.5" /> Engine failed: {selfTestState.error}
                 </span>
               )}
+              {selfTestState.kind === "idle" && engineWarming && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/50 border-t-transparent" />
+                  Preparing engine (one-time ~20 MB download)…
+                </span>
+              )}
+              {selfTestState.kind === "idle" && engineWarm && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Engine ready
+                </span>
+              )}
               <span className="ml-auto text-[10px] font-mono text-muted-foreground/60" title="Deployed build — if this doesn't change after a deploy, the new code isn't live yet">
                 build {String(__BUILD_SHA__)} · {String(__BUILD_TIME__)}
               </span>
@@ -1099,7 +1159,11 @@ export function RunValidateStage({
                   reps={reps}
                   versionLabel={null}
                   onCancel={() => {
-                    if (projectId && latestRun) void cancelRun(projectId, latestRun.id);
+                    // Terminate the in-browser engine worker (the only way to
+                    // interrupt a blocking WASM run); also cancel any DB-backed
+                    // run row if one exists.
+                    cancelBrowserRun();
+                    if (projectId && dbRun) void cancelRun(projectId, dbRun.id);
                   }}
                   onAddReps={(n) => {
                     if (projectId && latestRun) void addReps(projectId, latestRun.id, n);
@@ -2012,18 +2076,25 @@ const SUMMARY_TILES = [
 type RunPhaseT =
   | { kind: "idle" }
   | { kind: "loading"; detail: string }
-  | { kind: "computing" }
+  | { kind: "computing"; done?: number; total?: number }
   | { kind: "succeeded"; summary: string; persisted: boolean | null }
   | { kind: "failed"; step: string; message: string };
 
 function RunStatusBanner({ phase }: { phase: RunPhaseT }) {
   if (phase.kind === "idle") return null;
   if (phase.kind === "loading" || phase.kind === "computing") {
+    const label =
+      phase.kind === "computing"
+        ? phase.total
+          ? `Running the engine — replication ${Math.min((phase.done ?? 0) + 1, phase.total)} / ${phase.total}…`
+          : "Running the engine…"
+        : phase.detail;
     return (
       <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-        <span className="font-medium">
-          {phase.kind === "computing" ? "Running the engine…" : phase.detail}
+        <span className="font-medium">{label}</span>
+        <span className="text-[11px] font-normal text-amber-700/80 dark:text-amber-300/80">
+          the page stays responsive — you can keep working, or Cancel below
         </span>
       </div>
     );
@@ -2106,6 +2177,53 @@ function engineResultToReps(result: EngineResult): Replication[] {
       ended_at: (row.ended_at as string) ?? null,
     };
   });
+}
+
+/** One streamed replication (from the worker's on_replication hook) → the
+ *  Replication row the grid/charts render. */
+function engineRepToReplication(runId: string, rep: Record<string, unknown>): Replication {
+  return {
+    id: `${runId}:${rep.rep_index}`,
+    run_id: runId,
+    rep_index: Number(rep.rep_index ?? 0),
+    seed_used: Number(rep.seed_used ?? 0),
+    status: "done",
+    kpis: (rep.kpis as Record<string, number>) ?? {},
+    time_series: (rep.time_series as Record<string, number[]>) ?? {},
+    warmup_at: (rep.warmup_at as number | null) ?? null,
+    started_at: null,
+    ended_at: null,
+  };
+}
+
+/** A "running" placeholder run so the progress panel + per-rep grid render
+ *  immediately (empty) and fill in live as replications stream in. */
+function preliminaryRun(
+  runId: string,
+  scenarioId: string,
+  projectId: string,
+  total: number,
+): SimulationRun {
+  const now = new Date().toISOString();
+  return {
+    id: runId,
+    scenario_id: scenarioId,
+    project_id: projectId,
+    status: "running",
+    started_at: now,
+    ended_at: null,
+    aggregate_kpis: {},
+    ci_half_widths: {},
+    warmup_detected_at: null,
+    rep_count_target: total,
+    rep_count_done: 0,
+    error_message: null,
+    code_version: null,
+    policy_version_id: null,
+    policy_hash: null,
+    mapping_warnings: null,
+    created_at: now,
+  };
 }
 
 /** Engine output for the latest validation run: aggregate KPIs ± CI

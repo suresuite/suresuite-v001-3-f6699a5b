@@ -22,6 +22,11 @@ export default defineConfig(({ mode }) => ({
     __BUILD_SHA__: JSON.stringify(buildSha()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace("T", " ")),
   },
+  // The simulation engine runs in a module Web Worker (src/lib/sim/engine.worker.ts)
+  // that dynamically imports Pyodide's ESM build — so the worker bundle must be ESM.
+  worker: {
+    format: "es",
+  },
   server: {
     host: "::",
     port: 8080,
