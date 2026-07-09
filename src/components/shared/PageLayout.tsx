@@ -15,7 +15,7 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
     <div className="min-h-screen bg-background">
       <Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       <div className={cn(
-        "dark min-h-screen bg-background pb-10 transition-all duration-300",
+        "min-h-screen bg-[hsl(var(--surface-sunken))] pb-10 transition-all duration-300",
         isCollapsed ? 'ml-14' : 'ml-48'
       )}>
         <PasswordExpiryBanner />
