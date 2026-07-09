@@ -1,15 +1,11 @@
 -- Super Admin Dashboard — Phase 1
 -- Role, organizations, AI catalog, per-user AI permissions, budgets, usage logs, audit logs.
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
-    WHERE t.typname = 'app_role' AND e.enumlabel = 'super_admin'
-  ) THEN
-    ALTER TYPE public.app_role ADD VALUE 'super_admin';
-  END IF;
-END $$;
+--
+-- Renumbered from 20260705000001_super_admin_phase1.sql: that version (a) used
+-- the super_admin enum value in the same transaction that added it (55P04) and
+-- (b) collided with 20260705000001_open_logistics_reads.sql, so once that one
+-- was recorded the CLI treated this file as applied. The enum value now comes
+-- from 20260709000001 (its own transaction); this file only uses it.
 
 CREATE OR REPLACE FUNCTION public.is_super_admin(_user_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
