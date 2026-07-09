@@ -146,7 +146,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
   return (
     <div
       className={cn(
-        "dark fixed left-0 top-0 h-full flex z-[60] overflow-hidden transition-[width] duration-500 ease-in-out",
+        "light fixed left-0 top-0 h-full flex z-[60] overflow-hidden transition-[width] duration-500 ease-in-out",
         isCollapsed ? sizes.collapsedW : `w-full ${sizes.expandedW}`
       )}
     >
