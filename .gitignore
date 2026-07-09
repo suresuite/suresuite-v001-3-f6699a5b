@@ -36,3 +36,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 build/
+
+# Deploy secrets — single source of truth, NEVER commit (see scripts/deploy.env.example)
+scripts/deploy.env
+deploy.env

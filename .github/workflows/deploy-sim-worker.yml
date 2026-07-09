@@ -35,22 +35,13 @@ jobs:
           FLY_APP: ${{ vars.FLY_APP_NAME }}
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-      # Push runtime secrets to Fly, staged so they apply on the deploy below.
-      # Note the worker uses the NATIVE redis URL (rediss://...), which is a
-      # different variable than the edge function's UPSTASH_REDIS_REST_URL —
-      # both must point at the same Upstash database.
-      - name: Sync Fly secrets
-        run: |
-          flyctl secrets set --app "$FLY_APP" --stage \
-            UPSTASH_REDIS_URL="$UPSTASH_REDIS_URL" \
-            SUPABASE_URL="$SUPABASE_URL" \
-            SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
-        env:
-          FLY_APP: ${{ vars.FLY_APP_NAME }}
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # NOTE: runtime secrets (UPSTASH_REDIS_URL / SUPABASE_URL /
+      # SUPABASE_SERVICE_ROLE_KEY) are set ONCE directly on the Fly app and are
+      # deliberately NOT synced here. A previous "Sync Fly secrets" step re-pushed
+      # them from GitHub every deploy, which silently overwrote the live Fly values
+      # with blanks whenever a GitHub secret was unset — a classic drift/reset trap.
+      # Manage them via scripts/setup_secrets.sh (single source of truth) or the Fly
+      # dashboard. CI now only needs FLY_API_TOKEN + the FLY_APP_NAME variable.
 
       # Repo-root build context: the Dockerfile COPYs both sim-worker/ and
       # scsim/ (see sim-worker/Dockerfile). Config + Dockerfile are passed
