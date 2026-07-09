@@ -1,0 +1,53 @@
+name: Verify simulation end-to-end
+
+# Proves the deployed pipeline on the REAL project with the app's own anon
+# identity: sim-command gate → Upstash queue → Fly worker (scsim) → realtime
+# streaming → policy-hash + mapping-warnings fidelity checks.
+# Read/dispatch only — it never touches secrets, schemas, or deploys.
+# See scripts/verify_sim_e2e.mjs for the full list of assertions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      replications:
+        description: "Replications (sim-command clamps at 200)"
+        default: "200"
+      horizon_days:
+        description: "Horizon in days"
+        default: "365"
+      project_id:
+        description: "Project UUID (blank = project of the newest saved policy version)"
+        default: ""
+      test_cancel:
+        description: "Also dispatch + cancel a second run"
+        type: boolean
+        default: true
+      allow_mapping_warnings:
+        description: "Tolerate warn-level mapping entries (fidelity gaps)"
+        type: boolean
+        default: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Only the realtime client is needed — not the app's full node_modules.
+      - name: Install supabase-js
+        run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@2
+
+      - name: Run end-to-end verification
+        run: node scripts/verify_sim_e2e.mjs
+        env:
+          REPLICATIONS: ${{ inputs.replications }}
+          HORIZON_DAYS: ${{ inputs.horizon_days }}
+          PROJECT_ID: ${{ inputs.project_id }}
+          TEST_CANCEL: ${{ inputs.test_cancel }}
+          ALLOW_MAPPING_WARNINGS: ${{ inputs.allow_mapping_warnings }}
+          TIMEOUT_MINUTES: "50"
