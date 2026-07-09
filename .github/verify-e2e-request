@@ -1,4 +1,4 @@
 # Touch this file (any content change) and push to request a full
 # verify-sim-e2e run with defaults (200 reps × 365 days, cancel test on).
 # The result log lands on the verify-results branch: results/latest.log
-request: 2026-07-09T02:55:00Z reason=initial-e2e-proof-after-worker-deploy
+request: 2026-07-09T03:05:00Z reason=retry-after-migrations-log-channel

@@ -109,9 +109,17 @@ console.log(
 );
 
 // ── 2. data-plane preflight: anon SELECT on both run tables ─────────────────
+// Retried for a few minutes: a migrations run triggered by the same push may
+// still be applying, and PostgREST's schema cache can lag a fresh column.
 console.log("── data-plane preflight (anon grants)");
 {
-  const runs = await rest("simulation_runs?select=id,status,gate_skipped&limit=1");
+  let runs = null;
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    runs = await rest("simulation_runs?select=id,status,gate_skipped&limit=1");
+    if (runs.status === 200) break;
+    console.log(`  … attempt ${attempt}/8: HTTP ${runs.status} — waiting 30s for migrations/schema reload`);
+    await sleep(30_000);
+  }
   runs.status === 200
     ? pass("anon SELECT simulation_runs (incl. gate_skipped column)")
     : fail(`anon SELECT simulation_runs → HTTP ${runs.status}: ${JSON.stringify(runs.body)}`);

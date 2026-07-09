@@ -10,6 +10,8 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # publish the db push log to the migration-results branch
     steps:
       - uses: actions/checkout@v4
 
@@ -88,6 +90,31 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Push pending migrations
-        run: supabase db push --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+        id: push
+        run: |
+          set -o pipefail
+          supabase db push --include-all --password ${{ secrets.SUPABASE_DB_PASSWORD }} 2>&1 | tee /tmp/migrations.log
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Outcome readable over plain git (environments here may lack Actions
+      # API access): the db push log lands on the migration-results branch.
+      - name: Publish result log to migration-results branch
+        if: always()
+        run: |
+          [ -f /tmp/migrations.log ] || echo "db push never produced a log" > /tmp/migrations.log
+          {
+            echo "run_id: ${{ github.run_id }}  outcome: ${{ steps.push.outcome }}"
+            echo "trigger: ${{ github.event_name }}  ref: ${{ github.ref_name }}  sha: ${{ github.sha }}"
+            echo "──────────────────────────────────────"
+            cat /tmp/migrations.log
+          } > /tmp/migrations-full.log
+          git config user.name "supabase-migrations"
+          git config user.email "actions@github.com"
+          git checkout --orphan migration-results
+          git rm -rfq . || true
+          mkdir -p results
+          cp /tmp/migrations-full.log results/latest.log
+          git add results
+          git commit -qm "migrations run ${{ github.run_id }}: ${{ steps.push.outcome }}"
+          git push -f origin migration-results
