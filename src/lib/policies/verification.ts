@@ -170,7 +170,14 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
       suppliers: suppliers as unknown as Record<string, unknown>[] | undefined,
       inbound,
       outbound,
-      bom,
+      // Multi-level BOM lanes carry higher_level_component_id instead of
+      // product_id; grade them through the single-level manifest shape the
+      // same way the sim-command gate does, so both §8.1 surfaces agree.
+      bom: (bom ?? []).map((r) =>
+        r.product_id == null && r.higher_level_component_id != null
+          ? { ...r, product_id: r.higher_level_component_id }
+          : r,
+      ),
     }),
   );
 

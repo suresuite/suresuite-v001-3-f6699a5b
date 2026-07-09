@@ -49,21 +49,35 @@ export type { GradingDataset as GateDataset };
  */
 // deno-lint-ignore no-explicit-any
 export async function loadGateDataset(sb: any, projectId: string): Promise<GradingDataset> {
-  const [materials, products, suppliers, inbound, outbound, bom] = await Promise.all([
+  const [materials, products, suppliers, inbound, outbound, bomSingle, bomMulti] = await Promise.all([
     sb.from("materials").select("material_id,cost,moq,holding_cost_pct").eq("project_id", projectId),
     sb.from("products").select("product_id,sell_price,demand_mean,production_capacity,demand_cv").eq("project_id", projectId),
     sb.from("suppliers").select("supplier_id,capacity_per_week,reliability_score").eq("project_id", projectId),
     sb.from("inbound_logistics").select("supplier_id,material_id,unit_price,lead_time,volume,time_unit").eq("project_id", projectId),
     sb.from("outbound_logistics").select("product_id,customer_id,unit_price,volume,time_unit").eq("project_id", projectId),
     sb.from("bom_single_level").select("product_id,material_id").eq("project_id", projectId),
+    sb.from("bom_multi_level").select("material_id,higher_level_component_id").eq("project_id", projectId),
   ]);
+  // Multi-level rows win when they exist — the same rule the engine's
+  // datamap and the frontend lanes apply — graded through the single-level
+  // manifest shape (the parent component stands in for product_id). Grading
+  // the wrong (empty) table once let a run through the gate only to die in
+  // the engine with "bom too_short".
+  // deno-lint-ignore no-explicit-any
+  const multiRows = (bomMulti.data ?? []) as any[];
+  const bom = multiRows.length > 0
+    ? multiRows.map((r) => ({
+        product_id: r.higher_level_component_id,
+        material_id: r.material_id,
+      }))
+    : bomSingle.data ?? [];
   return {
     materials: materials.data ?? [],
     products: products.data ?? [],
     suppliers: suppliers.data ?? [],
     inbound: inbound.data ?? [],
     outbound: outbound.data ?? [],
-    bom: bom.data ?? [],
+    bom,
   };
 }
 

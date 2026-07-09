@@ -31,6 +31,52 @@ def _num(v: Any) -> Optional[float]:
         return None
 
 
+def _flatten_multi_level_bom(rows: list[dict]) -> list[dict]:
+    """bom_multi_level rows → effective single-level rows.
+
+    Each multi-level row is one edge: child ``material_id`` is consumed by
+    parent ``higher_level_component_id`` at ``consumption_rate``. The engine
+    models a single BOM level (product → raw material), so chains are
+    collapsed the same way combine-project propagates demand down the tree:
+    roots are the components that are never anyone's child (the finished
+    products), leaves are the components that are never a parent (the raw
+    materials), and the effective rate of a root→leaf pair is the sum over
+    all paths of the product of edge rates. Rates default to 1.0 exactly like
+    the single-level mapping below.
+    """
+    edges: dict[str, list[tuple[str, float]]] = {}
+    parents: set[str] = set()
+    children: set[str] = set()
+    for r in rows:
+        parent, child = r.get("higher_level_component_id"), r.get("material_id")
+        if not parent or not child:
+            continue
+        parent, child = str(parent), str(child)
+        edges.setdefault(parent, []).append((child, _num(r.get("consumption_rate")) or 1.0))
+        parents.add(parent)
+        children.add(child)
+
+    flat: dict[tuple[str, str], float] = {}
+    for root in sorted(parents - children):
+        stack: list[tuple[str, float, tuple[str, ...]]] = [(root, 1.0, (root,))]
+        while stack:
+            node, eff, path = stack.pop()
+            kids = edges.get(node)
+            if not kids:  # leaf material
+                key = (root, node)
+                flat[key] = flat.get(key, 0.0) + eff
+                continue
+            for child, rate in kids:
+                if child in path:  # cycle guard — drop the looping path
+                    continue
+                stack.append((child, eff * rate, path + (child,)))
+
+    return [
+        {"product_id": product, "material_id": material, "consumption_rate": rate}
+        for (product, material), rate in sorted(flat.items())
+    ]
+
+
 def build_project_data(
     *,
     suppliers: list[dict],
@@ -84,7 +130,19 @@ def build_project_data(
         bom=[
             BomArc(product_id=str(r["product_id"]), material_id=str(r["material_id"]),
                    consumption_rate=_num(r.get("consumption_rate")) or 1.0)
-            for r in bom if r.get("product_id") and r.get("material_id")
+            for r in (
+                # Multi-level rows (child + parent component, no product_id)
+                # are collapsed to effective product→material arcs; single-
+                # level rows pass through unchanged. Both the worker and the
+                # browser dataset funnel through here, so the two paths stay
+                # in lockstep by construction.
+                [r for r in bom if r.get("product_id")]
+                + _flatten_multi_level_bom(
+                    [r for r in bom
+                     if not r.get("product_id") and r.get("higher_level_component_id")]
+                )
+            )
+            if r.get("product_id") and r.get("material_id")
         ],
         outbound=[
             OutboundArc(
@@ -148,12 +206,21 @@ async def load_project_data(
     except Exception:
         pass
 
+    # BOM: multi-level rows win when they exist — the same rule the frontend
+    # lanes apply (src/lib/policies/projectLanes.ts) — so browser and server
+    # read the identical BOM source for a given project.
+    bom = await rows(
+        "bom_multi_level", "material_id,higher_level_component_id,level,consumption_rate"
+    )
+    if not bom:
+        bom = await rows("bom_single_level", "product_id,material_id,consumption_rate")
+
     return build_project_data(
         suppliers=await rows("suppliers"),
         materials=await rows("materials"),
         products=await rows("products"),
         inbound=await rows("inbound_logistics", "supplier_id,material_id,unit_price,lead_time,time_unit,volume"),
-        bom=await rows("bom_single_level", "product_id,material_id,consumption_rate"),
+        bom=bom,
         outbound=await rows("outbound_logistics", "product_id,customer_id,unit_price,volume,time_unit"),
         policies=policies,
         scenario=scenario,

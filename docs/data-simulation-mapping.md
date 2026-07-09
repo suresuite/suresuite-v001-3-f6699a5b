@@ -38,7 +38,7 @@ Supabase (Postgres)                Fly worker                         Supabase (
 | Purpose | Table(s) | Notes |
 |---|---|---|
 | Item economics (authoritative) | `materials`, `products`, `suppliers` (item masters) | cost, sell price, capacity, MOQ, holding, demand shape, fulfillment mode |
-| Network arcs | `inbound_logistics` (supplier→material), `bom_single_level` (material→product), `outbound_logistics` (product→customer) | lead time, volume, consumption rate, fallback prices |
+| Network arcs | `inbound_logistics` (supplier→material), `bom_single_level` (material→product) — or `bom_multi_level` when it has rows (child `material_id` ← parent `higher_level_component_id`), collapsed by `build_project_data` to effective root-product→leaf-material arcs (rate = Σ over paths of ∏ edge rates, matching combine-project's propagation) — `outbound_logistics` (product→customer) | lead time, volume, consumption rate, fallback prices |
 | Operating rules | `policy_defaults` (one row, 7 families) + `policy_overrides` (per node/edge patches) | merged into an effective policy; see §6 |
 | Run settings | `scenarios` | horizon, warmup, replications, seed, CRN, demand_model, disruption_schedule, stopping_rule |
 | Project mode | `projects.supply_chain_model` | Make-To-Stock / Make-To-Order → fulfillment mode |
