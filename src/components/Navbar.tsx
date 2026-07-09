@@ -266,7 +266,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
               side={isCollapsed ? "right" : "top"}
               align={isCollapsed ? "end" : "start"}
               sideOffset={8}
-              className="light w-52 z-[70]"
+              className="dark w-52 z-[70]"
             >
               <DropdownMenuLabel className="flex flex-col gap-0.5">
                 <span className="text-xs font-medium truncate">
