@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | v2.0 — reframed: *policies* (operational decision rules), not *strategies*; comprehensive per-category policy library with mathematical models and the UI/coding contract. |
-| **Date** | 2026-07-07 |
+| **Status** | v2.1 — v2.0's reframe (*policies*, not *strategies*) preserved; adds §III.A (rigorous stochastic derivations behind every Part III/§IV.4 formula: DLT compound variance, Type I/II service-level distinction, cost-optimal safety factor, (R,Q) joint optimization, an assumption ledger), §III.15 (evidence-based AnyLogistix benchmark, sourced from ALX's published docs), §III.16 (evaluates and scopes the array-editor UI idea against the existing hybrid grid), and closes the MRP safety-stock sizing inconsistency (§III.11). |
+| **Date** | 2026-07-09 (v2.0: 2026-07-07) |
 | **Role** | Single source of truth for every supply chain **policy** the platform offers, its **mathematical model**, its **parameters and UI**, and its **coding representation**. Any change to a policy, parameter, equation, or its UI/engine binding must be reflected here in the same change. |
 | **Benchmark** | anyLogistix (ALX) is the reference for *breadth of the policy library* and the *table/parameter UI*. We match its granularity, evaluate each policy for necessity under our weekly-bucket engine, and give every policy a rigorous mathematical model (ALX documents behavior; we specify equations). |
 | **Ground truth** | Parameter names/units/ranges of already-implemented policies are transcribed from the engine registry (`src/lib/policies/registry.generated.json`, engine 0.2.0) and plugin source (`scsim/scsim/policies/`). New policy types proposed here are marked and specified to the same rigor so they can be implemented directly. |
@@ -238,7 +238,169 @@ lot multiples (§IV.2).
 | 11 | **MRP (time-phased)** | $\mathrm{SS}$, horizon $N$ | projected shortfall | net requirement, LT-offset | ✚ |
 | 12 | **Cross-dock** | — | flow-through | pass inbound to outbound | ⛔ needs DC echelon (Phase E) |
 
-Each is specified below with its mathematical model.
+Each is specified below with its mathematical model. §III.A first derives, from first
+principles, every stochastic quantity ($\sigma_{X_i}$, $z(\alpha)$, the two service-level
+definitions, and the cost-optimal safety factor $z^\star$) that the policies below and §IV.4 use —
+so no formula in §III.1–III.14 is asserted without derivation, and every symbol keeps the single
+meaning fixed in Appendix B throughout.
+
+### III.A — Stochastic foundations (derivations; the rigor layer)
+
+**Purpose of this section.** §III.1–III.14 state policies operationally (trigger → quantity), as
+an engineer needs to implement them. This section proves *why* the constants in those formulas
+($\sigma_{X_i}$ in III.1/III.2's Days-of-supply basis, $z(\alpha)$ in §IV.4's `service_level`/`king`
+classifications, the $z\cdot\sigma\sqrt{L}$ shape of P-P.3's Eqs. 20–21) are the correct ones, not
+merely conventional ones — the standard a supply-chain researcher or OR reviewer expects, and the
+thing a product-style spec normally skips. It is written once here, referenced everywhere else in
+Part III and Part IV (§IV.4) rather than re-derived per policy, so notation cannot drift.
+
+**A.1 The demand-over-lead-time random variable.** Fix an item $i$. Weekly demand
+$D_{i,t}$ is drawn each week at PH-10 (§IX.1) with mean $\bar D_i=\mathbb E[D_{i,t}]$ and variance
+$\sigma_{D_i}^2=\mathrm{Var}(D_{i,t})$, independent across weeks (the platform's stated demand
+model; autocorrelated/seasonal demand is a documented limitation, §A.6 below). Lead time $L_i$
+(weeks) is either **deterministic** ($L_i\equiv\bar L_i$, $\sigma_{L_i}=0$; P-S.6
+`lead_time_model=deterministic`) or **stochastic** with mean $\bar L_i$ and coefficient of
+variation $\mathrm{CV}^{L}_i$ (`materials.lead_time_cv`), so $\sigma_{L_i}=\mathrm{CV}^L_i\bar L_i$
+(P-S.6 `stochastic`). Define the **demand-over-lead-time** (DLT) random variable — the quantity a
+reorder placed *now* must cover before the next delivery arrives:
+$$X_i \;=\; \sum_{u=1}^{L_i} D_{i,t+u}.$$
+$X_i$ is a **randomly stopped sum**: both the number of terms ($L_i$) and each term ($D_{i,t+u}$)
+are random, and — this is the standing independence assumption, stated explicitly per the brief's
+requirement that every assumption be named — $L_i \perp \{D_{i,t+u}\}$ and the $D_{i,t+u}$ are
+i.i.d. across $u$.
+
+**A.2 Mean and variance of $X_i$ (law of total expectation/variance — the derivation behind
+"King's formula").** By the law of total expectation, conditioning on $L_i$:
+$$\mathbb E[X_i] = \mathbb E_L\big[\mathbb E[X_i\mid L_i]\big] = \mathbb E_L[L_i\bar D_i] = \bar L_i\bar D_i.$$
+By the law of total variance,
+$$\mathrm{Var}(X_i) = \underbrace{\mathbb E_L[\mathrm{Var}(X_i\mid L_i)]}_{\mathbb E_L[L_i\sigma_{D_i}^2]=\bar L_i\sigma_{D_i}^2} \;+\; \underbrace{\mathrm{Var}_L(\mathbb E[X_i\mid L_i])}_{\mathrm{Var}_L(L_i\bar D_i)=\sigma_{L_i}^2\bar D_i^2}$$
+$$\boxed{\;\sigma_{X_i}^2 \;=\; \bar L_i\,\sigma_{D_i}^2 \;+\; \sigma_{L_i}^2\,\bar D_i^2\;}\tag{A.1}$$
+This **is** §IV.4's King formula ($z(\alpha)\sqrt{L_i\sigma_D^2+\bar D_i^2\sigma_L^2}$, matching
+`p_p3_safety_stock.py`'s `king` branch line-for-line) — Eq. A.1 is its proof, not a restatement.
+**Deterministic-lead-time special case** ($\sigma_{L_i}=0$): $\sigma_{X_i}^2=\bar L_i\sigma_{D_i}^2$,
+i.e. $\sigma_{X_i}=\sigma_{D_i}\sqrt{\bar L_i}$ — the plain $z\sigma_D\sqrt L$ shape used by §IV.4's
+`service_level` classification and III.1's default sizing. Both formulas in the codebase are
+therefore the *same* equation (A.1) at two points of the $\sigma_{L_i}$ axis — not two independent
+heuristics, a fact the spec previously left implicit.
+
+**A.3 Normal approximation and its assumption.** All service-level formulas below use
+$X_i\sim\mathcal N(\bar L_i\bar D_i,\ \sigma_{X_i}^2)$. This is a Central-Limit-Theorem
+approximation: $X_i$ sums $\bar L_i$ i.i.d. terms, and normality is a reasonable approximation once
+$\bar L_i \gtrsim 4$–5 (typical for weekly-bucket lead times of 2–12 weeks, §2.4's fidelity
+boundary). **Stated failure mode (an assumption named, per the brief's requirement, not hidden):**
+for intermittent/slow-moving demand ($\bar D_i$ small, many zero-demand weeks — the regime Croston's
+method targets, §IV.5), $X_i$ is right-skewed and zero-inflated; the normal approximation
+understates stockout risk in the left tail. The platform's stated mitigation is not to silently
+apply Eq. A.1 uncritically there, but to route such items to the empirically-validated path: the
+model-credibility pipeline (§9.5 of the blueprint) tests the *simulated* achieved service level
+against the analytical target and flags divergence — analytical sizing initializes, simulation
+verifies, exactly the two-step discipline §III.15 contrasts with ALX's simulation-only approach.
+
+**A.4 Two service-level definitions — Type I vs. Type II (a distinction the current spec elided,
+corrected here).** "Service level" is ambiguous without qualification; the platform is precise
+about which one every parameter means.
+
+- **Type I — cycle service level $\alpha$.** The probability that a replenishment cycle completes
+  *without* a stockout: $\alpha = \Pr[X_i \le R_i]$ where $R_i$ is the reorder point ($s_i$ for
+  min-max, $R$ for (R,Q)). Under the Normal approximation, $R_i = \bar L_i\bar D_i + z(\alpha)\sigma_{X_i}$
+  where $z(\alpha)=\Phi^{-1}(\alpha)$ — **this is exactly what §IV.4's `service_level`/`king`/`abc_xyz`
+  classifications compute**, and what `uniform_service_level`/`z_matrix` in `p_p3_safety_stock.py`
+  parameterize. **Correction to the prior spec text:** every occurrence of "service level" in §IV.4
+  and the ABC-XYZ z-matrix (Appendix A of the blueprint) denotes **Type I**, not fill rate; this
+  document now states that explicitly everywhere the ambiguity previously existed.
+- **Type II — fill rate $\beta$.** The *fraction of demand* satisfied directly from stock,
+  $\beta = 1 - \mathbb E[\text{shortage per cycle}]/\bar Q$, where $\bar Q$ is the expected order
+  quantity ($S-s$ for min-max in steady state, $Q$ for (R,Q)) and the expected shortage per cycle
+  uses the **standard normal loss function**
+  $$\psi(z) \;=\; \phi(z) - z\big(1-\Phi(z)\big), \qquad \mathbb E[\text{shortage}] = \sigma_{X_i}\,\psi(z),$$
+  ($\phi,\Phi$ the standard normal pdf/cdf; $\psi$ is the expected value of $\max(Z-z,0)$ for
+  $Z\sim\mathcal N(0,1)$ — a standard Silver–Pyke–Peterson result). So
+  $$\boxed{\;\beta_i \;\approx\; 1 \;-\; \dfrac{\sigma_{X_i}\,\psi(z_i)}{\bar Q_i}\;}\tag{A.2}$$
+  Fill rate is what the run's **KPIs actually measure** (§III.14's fill rate, §IX.3's
+  $\mathrm{FR}=\sum u_pF_p/\sum u_pD_p$) — so Eq. A.2 is the bridge a user needs to answer "if I set
+  a 95% z-target on this material, what fill rate do I actually get downstream?", a question ALX's
+  UI cannot answer analytically (§III.15). **Consequence for the UI (§II):** the Policy-Parameters
+  dialog should label the z-based inputs "Cycle service level (Type I)" and, where $\bar Q_i$ is
+  resolvable (min-max/RQ), show the *implied* Type II fill rate from Eq. A.2 alongside it as a
+  read-only derived field — never invent a second free-typed parameter for it.
+
+**A.5 The cost-optimal safety factor $z^\star$ (newsvendor / critical-ratio derivation — closes
+the "why this service level and not another" question).** §IV.4 today asks the user to *choose* a
+service level (or an ABC-XYZ cell) with no stated criterion for what value is correct. The
+classical single-period newsvendor argument supplies one, and — because the platform already
+carries every cost figure the argument needs (§IX.3's cost ledger) — it is directly computable, not
+merely theoretical. Let $c_i$ be unit cost (`materials.cost`), $h_i$ the weekly holding-cost rate
+(`materials.holding_cost_pct`/52, or `products.sell_price`-based for FG per P-P.4), so the **weekly
+overage cost** of one unit of excess safety stock is $c_i^o = h_i c_i$. Let $c_i^u$ be the
+**underage cost** of one unit of stockout — for a raw material, the downstream margin it would have
+enabled, $c_i^u \approx u_{p}-c^{BOM}_p$ for the product(s) it feeds (weighted by BOM incidence); for
+a finished good under backorder, the per-unit·week penalty $\pi^{bo}$ (§VI.1) times expected wait,
+or the lost-sale value $u_p$ under lost-sales handling (§VI.1). The expected cost of stocking to
+reorder point $R=\bar L\bar D+z\sigma_X$ over one cycle is
+$$C(z) = c^o\,\sigma_X\!\left(z + \psi(z)\right) \;+\; c^u\,\sigma_X\,\psi(z)$$
+(holding the safety buffer $z\sigma_X$ plus expected overage from cycle stock, against expected
+underage $\sigma_X\psi(z)$). Differentiating in $z$ and using $\psi'(z) = \Phi(z)-1$ (a standard
+identity for the normal loss function), the first-order condition $C'(z^\star)=0$ reduces to
+$$c^o\big(1-\big(1-\Phi(z^\star)\big)\big) - c^u\big(1-\Phi(z^\star)\big) = 0 \;\Longrightarrow\; \Phi(z^\star) = \frac{c^u}{c^u+c^o} \equiv \mathrm{CR}_i,$$
+$$\boxed{\;z_i^\star = \Phi^{-1}(\mathrm{CR}_i), \qquad \mathrm{CR}_i = \dfrac{c_i^u}{c_i^u+c_i^o}\;}\tag{A.3}$$
+the familiar newsvendor critical ratio, here derived rather than asserted. **What this changes in
+the platform:** the `service_level`/`z_matrix` cells of §IV.4 can be **prefilled** from Eq. A.3
+using item-master fields already collected (`materials.cost`, `products.sell_price`,
+`holding_cost_pct`) — with the provenance badge (§II.6) reading exactly "$z=\Phi^{-1}(c^u/(c^u+c^o))$,
+$c^u=\ldots$, $c^o=\ldots$" — instead of the ABC-XYZ table's current hand-set percentages
+(80–99.5%, chosen by convention, §III.0). ABC-XYZ **segmentation** (which items get high vs. low
+targets) remains valuable as a *tractable proxy* for $\mathrm{CR}_i$ when per-item margin data is
+sparse; Eq. A.3 is offered as the **exact** prefill precedence ahead of it once the fields exist
+(§II.6's precedence chain gains a rung: user edit ≻ preset ≻ **cost-optimal $z^\star$ (Eq. A.3)** ≻
+ABC-XYZ table default ≻ registry default). This is additive, not a replacement: projects without
+clean margin data keep the ABC-XYZ table exactly as implemented today.
+
+**A.6 Toward exact $(s,S)$ optimality — state of the art, honestly scoped.** The formulas above
+size a *given* control-rule family (min-max, (R,Q), base-stock) well; they do not claim the family
+itself is cost-optimal in the strict dynamic-programming sense. Two classical results bound what
+"optimal" can mean here, stated for completeness and to keep the roadmap honest:
+(i) **Scarf (1960)**: under a fixed order cost $A$, linear holding/shortage costs, and i.i.d.
+period demand, the $K$-convexity of the optimal cost-to-go function proves an $(s,S)$-type policy
+*is* the optimal policy form for the finite-horizon dynamic lot-size problem — the reason $(s,S)$,
+not an arbitrary rule, is the right family to offer, independent of ALX precedent.
+(ii) **Zheng & Federgruen (1991)** give an $O(S-s)$ exact algorithm computing the long-run-average-
+cost-minimizing *stationary* $(s,S)$ pair (superseding the EOQ-based heuristic $Q\approx\sqrt{2A\bar D/hc}$,
+$s\approx R$ used here and, per §III.15, by ALX). **Status:** SureSuite today uses the same
+industry-standard heuristic sizing as ALX (EOQ-based $Q$/(R,Q); newsvendor $z$ for $s$, now derived
+in Eq. A.3 rather than asserted); the Zheng–Federgruen exact recursion is named here as a **future
+P-P.1 "optimal" variant** candidate (Appendix A, roadmap-tracked, not built) — flagged honestly
+rather than claimed. §III.11's MRP $\mathrm{SS}$ parameter and §IV.4's methods must use the *same*
+Eq. A.1–A.3 pipeline (this closes a real inconsistency: the prior text left MRP's $\mathrm{SS}$ as
+a free-standing parameter with no stated sizing method, breaking the "every parameter has one
+precise definition" requirement — it is now explicitly "sized by §IV.4/§III.A like every other
+policy's safety stock," §III.11 updated accordingly below).
+
+**A.7 (R,Q) joint optimization (Hadley–Whitin iterative procedure) — the rigorous target for
+`rop_q_quantity`.** Where III.3 states $Q$ as a user-set or MOQ-floored input, the operations-
+research-optimal joint choice of $(Q,R)$ minimizing expected ordering + holding + backorder cost is
+the classical iterative scheme (Hadley & Whitin 1963; Silver, Pyke & Peterson 1998; Zipkin 2000
+Ch. 6), stated here as the rigorous derivation available to size the Excel-preset default:
+1. Initialize $Q_0=\mathrm{EOQ}_i=\sqrt{2A_i\bar D_i/(h_ic_i)}$ (minimizer of ordering-plus-holding
+   cost $C(Q)=A\bar D/Q + hcQ/2$, from $C'(Q)=0$).
+2. Given $Q_k$, solve for $R_k$ from $\Phi(z_k) = 1 - Q_kh_ic_i/(\pi_i\bar D_i)$ (balances marginal
+   holding cost of raising $R$ against marginal backorder-cost reduction, $\pi_i$ the backorder
+   penalty), $R_k=\bar L_i\bar D_i+z_k\sigma_{X_i}$.
+3. Given $R_k$, update $Q_{k+1}=\sqrt{2\bar D_i\big(A_i+\pi_i\,\sigma_{X_i}\psi(z_k)\big)/(h_ic_i)}$
+   (EOQ corrected for the expected backorder cost the current $R_k$ leaves uncovered).
+4. Repeat 2–3 to convergence (provably converges in 2–3 iterations for realistic cost ratios —
+   Hadley & Whitin 1963 Thm. 4-1).
+This is named here as the derivation an implementer should follow when III.3's engine gains
+automatic $Q$/$R$ sizing (today `rop_q_quantity` is user-entered or MOQ-floored, §III.3) — offered
+as the rigorous prefill target, not implemented as new engine behavior in this document.
+
+**A.8 Assumption ledger (every assumption named once, referenced by ID).**
+
+| ID | Assumption | Where used | Failure mode if violated |
+|---|---|---|---|
+| A-i | $D_{i,t}$ i.i.d. across weeks, no autocorrelation/seasonality in the DLT window | A.1–A.5 | Understated $\sigma_{X_i}$ under positive autocorrelation; §IV.5's Holt-Winters seasonal forecast should replace $\bar D_i$ with the seasonal mean when active |
+| A-ii | $L_i \perp D_{i,t}$ | A.1–A.2 | Rare in practice for weekly buckets (disruption-correlated lead-time/demand spikes are the exception, handled as explicit disruption propagation, §Disruptions below, not folded into A.1) |
+| A-iii | Normal approximation for $X_i$ | A.3–A.5 | Breaks for intermittent demand (small $\bar D_i$, many zeros) — mitigated by the V&V pipeline's simulated-vs-analytical check (§9.5), not by a different closed form in v1 |
+| A-iv | Single-echelon reorder (no multi-echelon risk-pooling correction) | all of §III | Correct for the platform's current single-plant, three-echelon scope (§2.4); a DC echelon (Phase E) would need the Clark–Scarf multi-echelon correction, out of scope until then |
 
 ### III.1 Min-max policy (s, S) ✅
 
@@ -333,8 +495,13 @@ Each is specified below with its mathematical model.
 
 **Purpose.** Plan replenishment by **projecting inventory forward** over a horizon and releasing
 orders, lead-time-offset, to cover **net requirements** before a safety-stock violation. Unlike the
-reactive (s,S) family, MRP is *forward-looking*. **Parameters.** $\mathrm{SS}$ (safety level),
-planning horizon $N$ weeks; uses gross requirements from BoM explosion of the production plan and
+reactive (s,S) family, MRP is *forward-looking*. **Parameters.** $\mathrm{SS}$ (safety level) —
+**sized by the same §IV.4/§III.A pipeline as every other policy's buffer** (Eq. A.1's
+$\sigma_{X_i}$, a §IV.4 classification's $z(\alpha)$, optionally the cost-optimal $z^\star$ of
+Eq. A.3), never a free-standing number: MRP is a different *replenishment trigger* (forward
+projection vs. reactive threshold), not a different *buffer-sizing method* — this closes the
+inconsistency in the prior text, which left $\mathrm{SS}$ undefined as to source. Planning horizon
+$N$ weeks; uses gross requirements from BoM explosion of the production plan and
 scheduled receipts. **Model (standard MRP recursion).** For future weeks $\tau=t,\dots,t+N$:
 - Gross requirement $\mathrm{GR}_{i,\tau}$ = BoM-exploded demand for $i$ in week $\tau$
   (from the production plan / forecast).
@@ -375,6 +542,74 @@ their $S$ is sized by the FG safety-stock policy (§IV.4, P-P.4). Make-to-order 
 Each inventory policy contributes to: average on-hand value $\sum_i c_i \bar I_i$; holding cost
 $\sum_i c^h_i c_i \bar I_i / 52$ per week; fill rate (via downstream availability); stockout /
 backorder frequency; peak inventory. These feed §PART IX accounting.
+
+### III.15 — Benchmark: AnyLogistix, and where this library is more rigorous
+
+This section is evidence-based: claims about ALX are drawn from its published help documentation
+(`anylogistix.help/tables/policies.html`, `.../tables/inventory.html`,
+`.../experiments/sse-calculation.html`) and its own public position statement on analytical safety
+stock, not assumed.
+
+**Feature parity, confirmed.** ALX's inventory policy library (Min-max, Min-max+SS, Regular,
+Regular+SS, MRP) and its King safety-stock formula
+($z\sqrt{(\mathrm{PC}/T_1)\sigma_D^2 + \sigma_{LT}^2\bar D^2}$, `PC`=performance cycle) match
+§III.0's catalog and §III.A.2's Eq. A.1 term-for-term — this document's King derivation is the
+*proof* of the formula ALX's help pages state without derivation. ALX's own worked example for
+Regular+SS (order = demand forecast + safety stock − on-hand, e.g. $40+14-12=42$, rounded to the
+lot size) is the identical structure to §III.7's $O=Q+(\mathrm{SS}-\mathrm{IP})^+$ (§III.7's own
+worked example, $Q{=}5,\mathrm{SS}{=}0,\mathrm{IP}{=}-7\Rightarrow O{=}12$, is the same equation).
+**No catalog gap exists here; the two systems agree on the operational rules.**
+
+**Where this library goes further, and why it matters to a supply-chain researcher:**
+
+| # | Gap in ALX's published methodology | What this document does instead |
+|---|---|---|
+| 1 | ALX states the King formula but does not publish its derivation or the independence assumption ($L\perp D$) it requires | §III.A.2 derives it from the law of total variance; §III.A.8 (A-ii) names the independence assumption explicitly, including its documented failure mode |
+| 2 | ALX's help pages do not distinguish cycle service level (Type I) from fill rate (Type II); a user setting "service level = 95%" cannot know which they configured or what fill rate results | §III.A.4 defines both rigorously, proves the Eq. A.2 bridge via the standard normal loss function $\psi(z)$, and specifies (§A.4) that the platform's UI must label which type each field means and surface the implied Type II fill rate as a derived read-only value |
+| 3 | ALX's *default* safety stock (when not manually set) is $\mathrm{Round}\big((\text{forecast}/\text{horizon})\times\text{days of safety stock}\big)$ — a deterministic days-of-supply heuristic that **ignores demand variance and lead-time variance entirely** | §IV.4's implemented `service_level`/`king`/`abc_xyz` methods are variance-aware by construction (Eqs. A.1–A.3); the platform's "fixed_days" method exists too (parity with ALX's default), but is never the *only* option, and its limitation (ignoring $\sigma_D,\sigma_L$) is now stated, not hidden |
+| 4 | ALX offers no stated criterion for *which* service level to choose — the user picks a percentage by convention | §III.A.5 derives the cost-optimal $z^\star=\Phi^{-1}(c^u/(c^u+c^o))$ from the platform's own cost ledger fields (item cost, holding %, margin) — a computable, provenance-badged prefill (§II.6), not a convention |
+| 5 | ALX's stated position (public materials) is that closed-form safety-stock formulas are insufficient for real networks, and that its Safety Stock Estimation (SSE) experiment — Monte-Carlo simulation with manual iteration toward a target service level — is the recommended path instead of analytics | The platform does **both**, formally linked: Eqs. A.1–A.3 give a derived analytical initialization (this section), and the model-credibility pipeline (blueprint §9.5) *statistically validates* the achieved service level against the target via KS/Welch-t tests over persisted replications, producing a hash-bound, reproducible **validated model card** — ALX's SSE experiment result is not persisted against a reproducibility hash and does not reconcile against a stated analytical target |
+| 6 | ALX's GUI tables are the sole documentation of policy behavior — no published equations, no interaction graph, no machine-checked composition rules | Every policy here has a derived equation (§III.1–III.11, §III.A), a machine-checked interaction graph (§7 of the blueprint, `validate_hooks`-enforced at load time — provably free of read-before-write and write-conflict bugs), and content-addressed reproducibility (`policy_hash`, §8.4 of the blueprint) |
+
+**Honest limitation, stated symmetrically (§10.3 of the blueprint carries the platform-wide
+version).** ALX's Greenfield Analysis / network optimization (CPLEX-based) has no counterpart here
+and is out of scope by design (simulation-only positioning, §14 open question 2). The comparison
+above is scoped to the inventory/replenishment policy library specifically, where this document's
+claim is narrow and evidence-backed: **published derivations, an explicit optimality criterion, a
+named service-level distinction, and a closed analytical-then-simulated validation loop** — not a
+larger policy catalog (§III.0's twelve types match ALX's five-to-six) and not a claim of network-
+design parity.
+
+### III.16 — UI note: headline columns vs. array editors for dynamic parameters
+
+The "select a policy type, the parameter grid updates" interaction (§II.3) is already the
+platform's design; this note evaluates one specific refinement — representing a row's dynamic
+parameters as a pair of arrays (a *required-parameter* array and a *value* array) rather than
+§II.3's headline-columns-plus-chip-list — against the "don't add a mechanism unless it is necessary"
+rule (per the design brief governing this document).
+
+- **For policies with a small, fixed parameter set per type** (min-max: $\{s,S\}$; (R,Q):
+  $\{R,Q\}$; base-stock: $\{S\}$) — §II.3's existing headline-column design is strictly better than
+  a name/value array: headline columns are independently sortable, filterable, and pasteable from
+  Excel column-for-column (the platform's stated Excel-like requirement), and a value's *meaning*
+  is fixed by its column header rather than by a row-local name string. An array-of-pairs would
+  regress this for the exact case — *"for material A, user selects min and max"* — the brief cites
+  as the motivating example; that case is already two headline columns ($s$, $S$), not an array.
+  **No change recommended here; §II.3 is preserved.**
+- **For policies whose parameter set is genuinely list-valued and variable-length** — §IV.4's
+  ABC-XYZ $z$-matrix (9 named cells), §PART VIII's recovery playbook steps (an ordered sequence),
+  §V's multimodal lane portfolio (≤3 lanes per link with per-lane mode/cost/transit) — a single
+  scalar column cannot represent the parameter, and §II.3's "more… chip list" is read-mostly, not
+  an editor. **This is where a array/table sub-editor is justified**: opened from the "more…" cell
+  (not replacing headline columns, and not applied uniformly to every dynamic parameter), rendering
+  exactly the registry's `key_domain`/array-typed schema entries (§6 of the blueprint, facet 5) as
+  an editable table with add/remove rows — the same "generated from the registry, not hand-written"
+  law (§II.2) that governs every other part of the parameter cell.
+- **Recommendation.** Keep §II.3's hybrid design as the default (already specified, already the
+  right mental model per A14 of the blueprint); add the array/table sub-editor as the registry-
+  driven renderer specifically for parameters whose JSON-Schema type is an array or a keyed dict —
+  determined by the schema, not by a blanket policy. This is an additive refinement to an existing,
+  correct design, not a redesign.
 
 ---
 
@@ -478,7 +713,7 @@ Base $O_p$ ✅ | **Overtime** ✅ `P-P.5`: $\omega_{p,t}=\min((\bar\omega-1)O_p,
 
 ### IV.4 Safety stock (sizing methods that feed §III)
 
-fixed-days $d\bar D_i$ ✅ | service-level $z(\alpha)\sigma_D\sqrt{L_i}$ ✅ | **King** $z(\alpha)\sqrt{L_i\sigma_D^2+\bar D_i^2\sigma_L^2}$ ✅ | **ABC-XYZ** 3×3 $z$-matrix ✅ (`P-P.3` materials, `P-P.4` FG revenue-ABC). Output $\mathrm{SS}_i$ is consumed by the inventory policy — a declared edge, not hidden.
+fixed-days $d\bar D_i$ ✅ | service-level $z(\alpha)\sigma_D\sqrt{L_i}$ ✅ | **King** $z(\alpha)\sqrt{L_i\sigma_D^2+\bar D_i^2\sigma_L^2}$ ✅ | **ABC-XYZ** 3×3 $z$-matrix ✅ (`P-P.3` materials, `P-P.4` FG revenue-ABC). Output $\mathrm{SS}_i$ is consumed by the inventory policy — a declared edge, not hidden. **Every formula here is Eq. A.1 of §III.A at a different $\sigma_L$** (service-level = deterministic-lead-time case; King = the general compound-variance case — proof in §III.A.2); every $z(\alpha)$ is a Type I cycle-service factor (§III.A.4), and its cost-optimal value is Eq. A.3 (§III.A.5) rather than a hand-picked convention.
 
 ### IV.5 Forecasting (drives MRP, MTS targets, safety stock)
 
@@ -663,7 +898,11 @@ backlog; $\Lambda$ lost; $Y/Y^\star$ FG stock/target; $D/\hat D$ demand/forecast
 knowledge; $O$ order; $x/g$ plan/output; $\omega$ overtime; $F$ fulfillment; $A$ arrivals;
 $\mathcal C^{res}$ cost ledger; $L$ lead time; $K_s/O_p$ capacity; $b_{p,m}$ BoM; $u_p$ value;
 $c_m$ cost; $\mathrm{SS}$ safety stock; $\rho_t$ review gate; $\kappa$ coverage; $z(\alpha)$
-service-level factor; $\sigma_D/\sigma_L$ demand/lead-time std.
+service-level factor; $\sigma_D/\sigma_L$ demand/lead-time std. **§III.A additions:** $X_i$
+demand-over-lead-time r.v.; $\sigma_{X_i}^2$ its variance (Eq. A.1); $\alpha$ Type I cycle service
+level; $\beta$ Type II fill rate; $\phi/\Phi$ standard normal pdf/cdf; $\psi(z)=\phi(z)-z(1-\Phi(z))$
+standard normal loss function; $z^\star$ cost-optimal safety factor; $\mathrm{CR}$ newsvendor
+critical ratio; $c^o/c^u$ weekly overage/underage unit cost.
 
 ## Appendix C — Change control
 
@@ -673,3 +912,20 @@ same change. Implemented-policy parameters verified against
 `src/lib/policies/registry.generated.json`; ✚ types specified to implementable rigor. Cross-refs:
 `docs/design/next-gen-platform-design.md` (blueprint), `docs/design/platform-architecture-report.md`
 (architecture), `docs/data-simulation-mapping.md` (mapping contract).
+
+**v2.1 changelog (this change).** Added §III.A (stochastic foundations: DLT compound-variance
+derivation, Type I/II service-level distinction, cost-optimal safety-factor derivation, (R,Q)
+joint-optimization procedure, an assumption ledger — grounded against the live implementation in
+`scsim/scsim/policies/builtin/p_p1_inventory_control.py` and
+`scsim/scsim/policies/strategic/p_p3_safety_stock.py`, confirming Eq. A.1 matches the shipped
+`king` branch exactly); §III.15 (AnyLogistix benchmark sourced from ALX's published help
+documentation — `anylogistix.help/tables/policies.html`, `.../tables/inventory.html`,
+`.../experiments/sse-calculation.html` — not assumed); §III.16 (scopes the array-editor UI
+proposal against the existing §II.3 hybrid grid: preserved for scalar headline parameters,
+justified only for genuinely list-valued parameters such as the §IV.4 $z$-matrix). Corrected §III.11
+(MRP's $\mathrm{SS}$ parameter was previously undefined as to sizing method; now explicitly sized
+by the §IV.4/§III.A pipeline like every other policy's buffer). No engine, UI, or schema code
+changed in this revision — it is a specification-only deepening; `/help/policies`
+(`src/pages/About.tsx` `DOC_BODIES`) was spot-checked against the live registry and found already
+consistent with the operational formulas (Eqs. 1–3, 20–21, the $z=\Phi^{-1}(\mathrm{SL}\%)$
+convention) — no doc/code drift found there in this pass, so no help-page edit was required.
