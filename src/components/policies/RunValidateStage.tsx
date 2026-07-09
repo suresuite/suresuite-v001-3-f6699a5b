@@ -230,11 +230,11 @@ export function RunValidateStage({
   const [validationScenarioId, setValidationScenarioId] = useState<string | null>(null);
   const { latestRun: dbRun, reps: dbReps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
 
-  // In-memory result of the run just computed on the serverless engine. It
-  // renders the engine output immediately and independently of the DB
-  // round-trip: the /api/run_simulation function is the only thing that must
-  // be deployed for a researcher to SEE the simulation run — persistence
-  // (which needs the anon-write migrations) is best-effort on top.
+  // In-memory result of a run computed by the BROWSER engine (offline
+  // fallback). It renders the engine output immediately and independently of
+  // the DB round-trip — persistence (which needs the anon-write migrations)
+  // is best-effort on top. Server runs never touch this: their rows arrive
+  // through the realtime subscription (dbRun/dbReps) and win the ?? below.
   const [localRun, setLocalRun] = useState<SimulationRun | null>(null);
   const [localReps, setLocalReps] = useState<Replication[]>([]);
 
@@ -332,22 +332,76 @@ export function RunValidateStage({
   const [multiCfg, setMultiCfg] = useState<MultiRunCfg>({ ...DEFAULT_MULTI, ...(persisted?.multi ?? {}) });
   const [warmCfg, setWarmCfg] = useState<WarmupCfg>({ ...DEFAULT_WARMUP, ...(persisted?.warm ?? {}) });
 
+  // Where the engine computes. "server" (default) dispatches to the Fly
+  // worker and lets realtime stream the results in; "browser" is the offline
+  // fallback — the same scsim engine via Pyodide in a Web Worker. Long or
+  // many-replication studies belong on the server: the browser engine is
+  // WASM (2–5× slower, single-threaded) and only exists so a run is always
+  // possible with nothing but the static frontend.
+  type ComputeMode = "server" | "browser";
+  const [computeMode, setComputeMode] = useState<ComputeMode>(
+    persisted?.mode === "browser" ? "browser" : "server",
+  );
+  // Which path the CURRENT run went down (a server-mode click can still fall
+  // back to the browser when sim-command is unreachable) — drives status +
+  // cancel semantics for the run in flight.
+  const [activeRunPath, setActiveRunPath] = useState<ComputeMode | null>(null);
+  const [serverRunId, setServerRunId] = useState<string | null>(null);
+
+  // Server runs: the worker owns the compute, realtime owns the data — this
+  // effect just mirrors the run row (status / rep_count_done / rep_count_target)
+  // into the same loud banner the browser path drives, so "did it run?" reads
+  // identically on both paths.
+  useEffect(() => {
+    if (!serverRunId || !dbRun || dbRun.id !== serverRunId) return;
+    if (dbRun.status === "queued") {
+      setRunPhase({ kind: "loading", detail: "Queued on the simulation server…" });
+    } else if (dbRun.status === "running") {
+      setRunPhase({
+        kind: "computing",
+        done: dbRun.rep_count_done ?? 0,
+        total: dbRun.rep_count_target ?? undefined,
+      });
+    } else if (dbRun.status === "done") {
+      const agg = dbRun.aggregate_kpis ?? {};
+      const fr = agg.fill_rate != null ? `${(agg.fill_rate * 100).toFixed(1)}%` : "—";
+      const rev = agg.revenue != null ? `€${Math.round(agg.revenue).toLocaleString()}` : "—";
+      setRunPhase({
+        kind: "succeeded",
+        summary: `fill rate ${fr} · revenue ${rev} · ${dbRun.rep_count_done} replication(s) · ${dbRun.code_version || "server"} (server)`,
+        persisted: true,
+      });
+    } else if (dbRun.status === "failed") {
+      setRunPhase({
+        kind: "failed",
+        step: "simulation server",
+        message: dbRun.error_message ?? "the worker reported a failure — see the run history",
+      });
+    } else if (dbRun.status === "cancelled") {
+      setRunPhase({ kind: "idle" });
+    }
+  }, [serverRunId, dbRun]);
+
   useEffect(() => {
     if (!projectId) return;
     try {
-      localStorage.setItem(persistKey, JSON.stringify({ single: singleCfg, multi: multiCfg, warm: warmCfg }));
+      localStorage.setItem(
+        persistKey,
+        JSON.stringify({ single: singleCfg, multi: multiCfg, warm: warmCfg, mode: computeMode }),
+      );
     } catch {
       /* noop */
     }
-  }, [persistKey, projectId, singleCfg, multiCfg, warmCfg]);
+  }, [persistKey, projectId, singleCfg, multiCfg, warmCfg, computeMode]);
 
   // Eagerly warm the engine when the user reaches the Run step, so the ~20 MB
   // Pyodide/numpy/scipy first-load overlaps with reading + configuring instead
-  // of starting only after the Run click (which felt like a freeze).
+  // of starting only after the Run click (which felt like a freeze). Only in
+  // browser mode — server runs never need the local runtime.
   const [engineWarming, setEngineWarming] = useState(false);
   const [engineWarm, setEngineWarm] = useState(false);
   useEffect(() => {
-    if (step !== 1 || engineWarm || engineWarming) return;
+    if (step !== 1 || computeMode !== "browser" || engineWarm || engineWarming) return;
     let alive = true;
     setEngineWarming(true);
     ensureEngine()
@@ -357,7 +411,7 @@ export function RunValidateStage({
     return () => {
       alive = false;
     };
-  }, [step, engineWarm, engineWarming]);
+  }, [step, computeMode, engineWarm, engineWarming]);
 
   const [singleQueuedAt, setSingleQueuedAt] = useState<Date | null>(null);
   const [multiQueuedAt, setMultiQueuedAt] = useState<Date | null>(null);
@@ -455,10 +509,16 @@ export function RunValidateStage({
   };
 
   // Dispatch through sim-command (the §8.1 validation gate + the queued
-  // simulation_runs row), returning the new run_id. The actual compute then
-  // runs on the serverless engine (runValidationScenario below) — the Fly
-  // worker the command also enqueues for never deployed.
-  const dispatchRun = async (scenarioId: string, policyVersionId: string): Promise<string> => {
+  // simulation_runs row), returning the new run_id. In server mode the Fly
+  // worker consumes the enqueued command and streams results back over
+  // realtime; in browser mode (`computeClient`) sim-command keeps the gate +
+  // version-bound run row but does NOT enqueue — this client computes and
+  // persists instead, so the two writers never race on one run.
+  const dispatchRun = async (
+    scenarioId: string,
+    policyVersionId: string,
+    computeClient = false,
+  ): Promise<string> => {
     const { data, error } = await supabase.functions.invoke("sim-command", {
       body: {
         project_id: projectId,
@@ -467,7 +527,11 @@ export function RunValidateStage({
         // Runs from this stage always follow a verification pass in which any
         // warn-level manifest findings were displayed — that is the §8.1
         // acknowledgment the sim-command gate requires for `recommended` gaps.
-        payload: { policy_version_id: policyVersionId, acknowledge_warnings: true },
+        payload: {
+          policy_version_id: policyVersionId,
+          acknowledge_warnings: true,
+          ...(computeClient ? { compute: "client" } : {}),
+        },
         client_ts: Date.now(),
       },
     });
@@ -539,10 +603,15 @@ export function RunValidateStage({
     })),
   });
 
-  // Full run: best-effort gate + queued row via sim-command, then compute the
-  // REAL engine in the browser (Pyodide), render immediately, persist
-  // best-effort. The only hard dependency is the static frontend — every
-  // backend step degrades gracefully and is surfaced in runPhase.
+  // Full run, two compute paths behind the toggle:
+  //   • server (default) — dispatch via sim-command and STOP: the Fly worker
+  //     is the sole writer of results, and the realtime subscription streams
+  //     the run row + replications into the panels (dbRun/dbReps already win
+  //     over local state). Nothing is computed in this tab.
+  //   • browser (offline fallback, or auto-fallback when sim-command is
+  //     unreachable) — best-effort gate + run row, then compute the REAL
+  //     engine in the browser (Pyodide), render immediately, persist
+  //     best-effort. Only hard dependency: the static frontend.
   const runValidationScenario = async (
     scenarioId: string,
     versionId: string | null,
@@ -550,13 +619,52 @@ export function RunValidateStage({
   ) => {
     setValidationScenarioId(scenarioId);
 
+    // ── Server path ─────────────────────────────────────────────────────
+    if (computeMode === "server") {
+      // The worker path needs a real scenario row + saved policy version
+      // (sim-command rejects otherwise); if either save failed we can still
+      // deliver a run — in the browser.
+      if (versionId && !scenarioId.startsWith("local:")) {
+        try {
+          setRunPhase({ kind: "loading", detail: "Dispatching to the simulation server…" });
+          const runId = await dispatchRun(scenarioId, versionId);
+          // Clear any previous browser run so stale local rows can't shadow
+          // the incoming realtime rows while rep_count_done is still 0.
+          setLocalRun(null);
+          setLocalReps([]);
+          setActiveRunPath("server");
+          setServerRunId(runId);
+          setRunPhase({ kind: "loading", detail: "Queued on the simulation server…" });
+          return; // realtime drives the UI from here (see the status effect)
+        } catch (err) {
+          // A hard gate rejection (missing required data) stops BOTH paths.
+          const msg = (err as Error).message ?? String(err);
+          if (msg.includes("required-data gate")) {
+            setRunPhase({ kind: "failed", step: "validation gate", message: msg });
+            throw err;
+          }
+          console.warn("sim-command unreachable — falling back to the in-browser engine:", msg);
+          toast.warning("Simulation server unreachable — running in the browser instead.");
+        }
+      } else {
+        toast.warning(
+          "Run not eligible for the server (policy snapshot or scenario could not be saved) — running in the browser instead.",
+        );
+      }
+    }
+
+    // ── Browser path (offline / fallback) ───────────────────────────────
+    setActiveRunPath("browser");
+    setServerRunId(null);
+
     // Step 1 — gate + run row (best-effort; a client UUID keeps us going if
     // sim-command is unavailable, so "see it run" never depends on it).
+    // compute:"client" keeps the deployed worker out of this run.
     let runId: string;
     let snapshot: Record<string, unknown> | null = null;
     if (versionId) {
       try {
-        runId = await dispatchRun(scenarioId, versionId);
+        runId = await dispatchRun(scenarioId, versionId, true);
         snapshot = await fetchPolicySnapshot(versionId);
       } catch (err) {
         // A hard gate rejection (missing required data) must still stop the run.
@@ -969,6 +1077,43 @@ export function RunValidateStage({
               </span>
             </div>
 
+            {/* Compute location. Server is the default — heavy runs must not
+                freeze the tab; the in-browser engine remains the offline
+                fallback and is auto-used when the server can't be reached. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-md border p-0.5" role="group" aria-label="Compute location">
+                <button
+                  type="button"
+                  onClick={() => setComputeMode("server")}
+                  className={cn(
+                    "rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    computeMode === "server"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Run on server (default)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComputeMode("browser")}
+                  className={cn(
+                    "rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    computeMode === "browser"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Run in browser (offline)
+                </button>
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {computeMode === "server"
+                  ? "Runs compute on the simulation server and stream in live — the tab stays free, long runs are safe."
+                  : "Offline fallback — the same engine runs locally (WebAssembly, slower; keep the tab open)."}
+              </span>
+            </div>
+
             {runPhase.kind !== "idle" && <RunStatusBanner phase={runPhase} />}
 
             <Tabs value={runTab} onValueChange={(v) => setRunTab(v as "single" | "multi")} className="w-full">
@@ -1159,11 +1304,15 @@ export function RunValidateStage({
                   reps={reps}
                   versionLabel={null}
                   onCancel={() => {
-                    // Terminate the in-browser engine worker (the only way to
-                    // interrupt a blocking WASM run); also cancel any DB-backed
-                    // run row if one exists.
-                    cancelBrowserRun();
-                    if (projectId && dbRun) void cancelRun(projectId, dbRun.id);
+                    // Browser runs: terminate the engine worker (the only way
+                    // to interrupt a blocking WASM run) and close out the DB
+                    // row if one was created. Server runs: experiment.cancel
+                    // via sim-command — never touch the local engine worker,
+                    // the browser isn't computing anything.
+                    if (activeRunPath !== "server") cancelBrowserRun();
+                    if (projectId && dbRun && (dbRun.status === "queued" || dbRun.status === "running")) {
+                      void cancelRun(projectId, dbRun.id);
+                    }
                   }}
                   onAddReps={(n) => {
                     if (projectId && latestRun) void addReps(projectId, latestRun.id, n);

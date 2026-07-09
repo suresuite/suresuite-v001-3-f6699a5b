@@ -1,0 +1,19 @@
+name: Ops request (git-native deploy trigger)
+
+# Deploys the worker + edge functions from THIS ref when
+# .github/deploy-request changes. Exists for environments that can push to
+# git but cannot call the Actions API (workflow_dispatch). Both deploys are
+# idempotent and never write secrets — see the called workflows.
+
+on:
+  push:
+    paths:
+      - ".github/deploy-request"
+
+jobs:
+  worker:
+    uses: ./.github/workflows/deploy-sim-worker.yml
+    secrets: inherit
+  functions:
+    uses: ./.github/workflows/supabase-functions.yml
+    secrets: inherit

@@ -1,0 +1,131 @@
+name: Verify simulation end-to-end
+
+# Proves the deployed pipeline on the REAL project with the app's own anon
+# identity: sim-command gate → Upstash queue → Fly worker (scsim) → realtime
+# streaming → policy-hash + mapping-warnings fidelity checks.
+# Read/dispatch only against the app — it never touches secrets, schemas, or
+# deploys. See scripts/verify_sim_e2e.mjs for the full list of assertions.
+#
+# Two triggers:
+#   * workflow_dispatch with inputs, or
+#   * pushing a change to .github/verify-e2e-request (for environments that
+#     can push but cannot call the Actions API). Defaults apply on push.
+# The full run log is force-pushed to the `verify-results` branch
+# (results/latest.log) so the outcome is readable over plain git as well.
+
+on:
+  push:
+    paths:
+      - ".github/verify-e2e-request"
+  workflow_dispatch:
+    inputs:
+      replications:
+        description: "Replications (sim-command clamps at 200)"
+        default: "200"
+      horizon_days:
+        description: "Horizon in days"
+        default: "365"
+      project_id:
+        description: "Project UUID (blank = project of the newest saved policy version)"
+        default: ""
+      test_cancel:
+        description: "Also dispatch + cancel a second run"
+        type: boolean
+        default: true
+      allow_mapping_warnings:
+        description: "Tolerate warn-level mapping entries (fidelity gaps)"
+        type: boolean
+        default: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write   # push the result log to the verify-results branch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Only the realtime client is needed — not the app's full node_modules.
+      - name: Install supabase-js
+        run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@2
+
+      # A push often lands migrations + deploys in sibling workflows; give
+      # them time to settle before dispatching against the new state.
+      - name: Wait for sibling deploys (push trigger only)
+        if: github.event_name == 'push'
+        run: sleep 240
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Read-only worker snapshot so a consumption failure is diagnosable from
+      # the published log: machine states + recent logs (crash loops, redis
+      # errors, "subscribed to sim.cmd.*", per-run activity).
+      - name: Worker diagnostics (pre-run, read-only)
+        run: |
+          {
+            echo "── fly status (pre-run)"
+            flyctl status --app "$FLY_APP" || true
+            echo "── recent worker logs (pre-run)"
+            timeout 30 flyctl logs --app "$FLY_APP" --no-tail 2>/dev/null | tail -40 || true
+          } | tee /tmp/worker-diag-pre.log
+        env:
+          FLY_APP: suresuite-sim-worker
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Run end-to-end verification
+        id: verify
+        run: |
+          set -o pipefail
+          node scripts/verify_sim_e2e.mjs 2>&1 | tee /tmp/verify-e2e.log
+        env:
+          REPLICATIONS: ${{ inputs.replications || '200' }}
+          HORIZON_DAYS: ${{ inputs.horizon_days || '365' }}
+          PROJECT_ID: ${{ inputs.project_id || '' }}
+          TEST_CANCEL: ${{ (github.event_name == 'push' && 'true') || inputs.test_cancel }}
+          ALLOW_MAPPING_WARNINGS: ${{ (github.event_name == 'push' && 'false') || inputs.allow_mapping_warnings }}
+          TIMEOUT_MINUTES: "50"
+
+      - name: Worker diagnostics (post-run, read-only)
+        if: always()
+        run: |
+          {
+            echo "── fly status (post-run)"
+            flyctl status --app "$FLY_APP" || true
+            echo "── recent worker logs (post-run)"
+            timeout 30 flyctl logs --app "$FLY_APP" --no-tail 2>/dev/null | tail -60 || true
+          } | tee /tmp/worker-diag-post.log
+        env:
+          FLY_APP: suresuite-sim-worker
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Make the outcome readable without Actions API access: the log lands on
+      # the verify-results branch (results/latest.log + one file per run).
+      - name: Publish result log to verify-results branch
+        if: always()
+        run: |
+          [ -f /tmp/verify-e2e.log ] || echo "verification never produced a log" > /tmp/verify-e2e.log
+          {
+            echo "run_id: ${{ github.run_id }}  attempt: ${{ github.run_attempt }}"
+            echo "trigger: ${{ github.event_name }}  ref: ${{ github.ref_name }}  sha: ${{ github.sha }}"
+            echo "outcome: ${{ steps.verify.outcome }}"
+            echo "──────────────────────────────────────"
+            cat /tmp/verify-e2e.log
+            echo "──────────────────────────────────────"
+            cat /tmp/worker-diag-pre.log 2>/dev/null || true
+            cat /tmp/worker-diag-post.log 2>/dev/null || true
+          } > /tmp/verify-e2e-full.log
+          git config user.name "verify-sim-e2e"
+          git config user.email "actions@github.com"
+          git checkout --orphan verify-results
+          git rm -rfq . || true
+          mkdir -p results
+          cp /tmp/verify-e2e-full.log "results/latest.log"
+          cp /tmp/verify-e2e-full.log "results/run-${{ github.run_id }}.log"
+          git add results
+          git commit -qm "verify-sim-e2e run ${{ github.run_id }}: ${{ steps.verify.outcome }}"
+          git push -f origin verify-results

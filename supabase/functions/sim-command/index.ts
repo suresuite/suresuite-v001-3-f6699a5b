@@ -489,30 +489,61 @@ async function handleExperimentRun(
     .single();
   if (runErr || !run) throw new Error(`run insert failed: ${runErr?.message}`);
 
+  // Browser/offline runs (payload.compute === "client") go through the same
+  // gate + version binding + queued row, but the CLIENT computes and persists
+  // the results itself — so don't wake the worker, or two writers would race
+  // on the same run. Server runs (the default) enqueue for the Fly worker.
+  const clientCompute =
+    (cmd.payload as Record<string, unknown>).compute === "client";
+
   // Push command to worker queue for the real engine. The policy snapshot is
   // embedded so the worker runs the saved version, not the live tables; if the
   // envelope would exceed Upstash limits, the worker fetches it by version id.
-  const workerEnvelope: Record<string, unknown> = {
-    ...cmd,
-    run_id: run.id,
-    scenario,
-    recovery,
-    policy_version_id: policyVersionId,
-    policy_hash: policyHash,
-    policy_snapshot: snapshot,
-    server_ts: Date.now(),
-  };
-  if (JSON.stringify(workerEnvelope).length > 700_000) {
-    delete workerEnvelope.policy_snapshot;
+  if (!clientCompute) {
+    const workerEnvelope: Record<string, unknown> = {
+      ...cmd,
+      run_id: run.id,
+      scenario,
+      recovery,
+      policy_version_id: policyVersionId,
+      policy_hash: policyHash,
+      policy_snapshot: snapshot,
+      server_ts: Date.now(),
+    };
+    if (JSON.stringify(workerEnvelope).length > 700_000) {
+      delete workerEnvelope.policy_snapshot;
+    }
+    const stream = `sim.cmd.${cmd.project_id}`;
+    try {
+      // Ensure the consumer group exists BEFORE the XADD: the worker creates
+      // it at "$" when it first discovers a stream, so a message added before
+      // that moment would never be delivered (the first command on any fresh
+      // stream — the classic lost-first-run). BUSYGROUP means it's already
+      // there, which is fine.
+      await upstash([
+        "XGROUP", "CREATE", stream, "sim-workers", "$", "MKSTREAM",
+      ]).catch((e) => {
+        if (!String(e).includes("BUSYGROUP")) throw e;
+      });
+      await upstash([
+        "XADD", stream, "MAXLEN", "~", "1000", "*",
+        "data", JSON.stringify(workerEnvelope),
+      ]);
+    } catch (e) {
+      // A run that never reached the queue must not sit "queued" forever —
+      // that black hole is indistinguishable from a dead worker. Fail loudly.
+      console.error("enqueue failed", e);
+      await (svc as any)
+        .from("simulation_runs")
+        .update({
+          status: "failed",
+          error_message: `enqueue to worker queue failed: ${String(e).slice(0, 300)}`,
+          ended_at: new Date().toISOString(),
+        })
+        .eq("id", run.id);
+      throw new Error(`enqueue to worker queue failed: ${String(e).slice(0, 300)}`);
+    }
   }
-  await upstash([
-    "XADD",
-    `sim.cmd.${cmd.project_id}`,
-    "MAXLEN", "~", "1000",
-    "*",
-    "data",
-    JSON.stringify(workerEnvelope),
-  ]).catch((e) => console.error("xadd failed", e));
 
   // The worker is the SOLE authoritative writer of results: it sets the run to
   // running, upserts per-replication rows, and writes the aggregates + mapping

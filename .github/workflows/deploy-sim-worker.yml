@@ -18,11 +18,20 @@ on:
       - "scsim/**"
       - ".github/workflows/deploy-sim-worker.yml"
   workflow_dispatch:
+  # Callable from ops-request.yml (git-native trigger for environments that
+  # can push but cannot reach the Actions API).
+  workflow_call:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     concurrency: deploy-sim-worker   # never run two deploys at once
+    env:
+      # Fall back to sim-worker/fly.toml's app name so every step (not just
+      # `flyctl deploy`, which reads --config) still targets the right app
+      # when the FLY_APP_NAME variable is unset. Keep both in sync.
+      FLY_APP: ${{ vars.FLY_APP_NAME || 'suresuite-sim-worker' }}
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,9 +40,6 @@ jobs:
       # Idempotent: create the app on the first run, ignore "already exists".
       - name: Ensure Fly app exists
         run: flyctl apps create "$FLY_APP" || true
-        env:
-          FLY_APP: ${{ vars.FLY_APP_NAME }}
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       # NOTE: runtime secrets (UPSTASH_REDIS_URL / SUPABASE_URL /
       # SUPABASE_SERVICE_ROLE_KEY) are set ONCE directly on the Fly app and are
@@ -42,6 +48,19 @@ jobs:
       # with blanks whenever a GitHub secret was unset — a classic drift/reset trap.
       # Manage them via scripts/setup_secrets.sh (single source of truth) or the Fly
       # dashboard. CI now only needs FLY_API_TOKEN + the FLY_APP_NAME variable.
+      # This read-only preflight fails fast (before the build) if any are absent.
+      - name: Check runtime secrets exist on Fly (read-only)
+        run: |
+          names=$(flyctl secrets list --app "$FLY_APP" --json | python3 -c \
+            'import json,sys; print("\n".join(str(s.get("Name") or s.get("name")) for s in json.load(sys.stdin)))')
+          missing=0
+          for req in UPSTASH_REDIS_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if ! grep -qx "$req" <<<"$names"; then
+              echo "::error::Fly secret $req is not set on $FLY_APP — run scripts/setup_secrets.sh (Step 1). This workflow never writes secrets."
+              missing=1
+            fi
+          done
+          exit $missing
 
       # Repo-root build context: the Dockerfile COPYs both sim-worker/ and
       # scsim/ (see sim-worker/Dockerfile). Config + Dockerfile are passed
@@ -51,6 +70,43 @@ jobs:
           flyctl deploy . --remote-only --app "$FLY_APP" \
             --config sim-worker/fly.toml \
             --dockerfile sim-worker/Dockerfile
-        env:
-          FLY_APP: ${{ vars.FLY_APP_NAME }}
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # A rolling update leaves machines in their prior state — a machine that
+      # crashed out before the deploy stays "stopped" and consumes nothing.
+      # Start every stopped non-standby machine so the worker is actually live.
+      - name: Ensure worker machines are started
+        run: |
+          flyctl machines list --app "$FLY_APP" --json \
+            | jq -r '.[] | select((.config.standbys // []) == []) | select(.state != "started") | .id' \
+            | while read -r id; do
+                echo "starting machine $id"
+                flyctl machine start "$id" --app "$FLY_APP" || true
+              done
+          flyctl status --app "$FLY_APP"
+
+      # Read-only proof the worker booted on the scsim engine: the log line
+      # "engine mode: scsim <version>" (from sim_worker/__main__.py) must
+      # appear. LEGACY here means fly.toml's SCSIM_ENGINE=1 didn't reach the
+      # machine — fail loudly rather than run the frozen engine silently.
+      # On failure the raw log tail is printed so the cause is diagnosable
+      # straight from CI.
+      - name: Verify engine mode in worker logs
+        run: |
+          logs=""
+          for i in 1 2 3 4 5 6; do
+            sleep 10
+            logs=$(timeout 30 flyctl logs --app "$FLY_APP" --no-tail 2>/dev/null || true)
+            if grep -q "engine mode: scsim" <<<"$logs"; then
+              grep -E "engine mode|sim-worker starting" <<<"$logs"
+              echo "OK: worker is on the scsim engine."
+              exit 0
+            fi
+            if grep -q "engine mode: LEGACY" <<<"$logs"; then
+              echo "::error::Worker booted in LEGACY engine mode — SCSIM_ENGINE=1 missing from the machine env."
+              exit 1
+            fi
+          done
+          echo "── raw log tail (for diagnosis) ──"
+          tail -n 80 <<<"$logs"
+          echo "::error::Never saw 'engine mode: scsim' in logs after deploy."
+          exit 1
