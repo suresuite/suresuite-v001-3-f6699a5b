@@ -338,3 +338,30 @@ added to keep it verifiable:
   this reason. And this container's network policy may block Supabase + the
   GitHub Actions API entirely: the git-native trigger/result branches above
   are the workaround, and GH_TOKEN in the environment is contents-scope only.
+- **Realtime publication was never actually applied** until 20260709000003:
+  20260607121406 sits in the migrations workflow's "mark baseline as applied"
+  range, so it was recorded without executing. A SUBSCRIBED channel that
+  receives zero events for a fresh INSERT is the tell.
+
+### Open blocker (needs the human — invalid Upstash credentials)
+
+The third E2E run isolated the last fault to the **Upstash credential values
+themselves** (every code path is now proven up to this point):
+
+- The worker crash-loops at boot: `ValueError: Redis URL must specify one of
+  the following schemes (redis://, rediss://, unix://)` — the Fly secret
+  UPSTASH_REDIS_URL is not a `rediss://…:6379` URL. (`restart = always`
+  means it recovers by itself the moment the secret is fixed.)
+- sim-command's enqueue fails with a DNS error for
+  `viable-calf-117705.upstash.io` — that hostname does not resolve from two
+  independent networks: the Upstash database was deleted/renamed or the URL
+  was mispasted. This was invisible before the loud-enqueue fix; it is why
+  every server run ever sat "queued" forever.
+
+Fix (idempotent, nothing to reset): create/locate the Upstash database, put
+BOTH credential styles for the SAME database into `scripts/deploy.env`, then
+`scripts/preflight_check.sh` (live-catches both faults) and
+`scripts/setup_secrets.sh`. Fly restarts the worker on the secret change;
+touch `.github/deploy-request` to re-verify the deploy end-to-end and
+`.github/verify-e2e-request` to re-run the full proof (result lands on the
+`verify-results` branch).
