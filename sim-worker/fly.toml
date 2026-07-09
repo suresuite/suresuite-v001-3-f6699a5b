@@ -22,5 +22,11 @@ primary_region = "iad"   # set this close to your Supabase region
   cpus = 1
   memory_mb = 1024
 
+# A queue consumer must outlive its own crashes: without this, a boot-time
+# exception exhausts the default on-failure retries and the machine parks in
+# "stopped" — runs then sit "queued" forever with no visible error.
+[[restart]]
+  policy = "always"
+
 # No public HTTP service — this is a background worker.
 # Health check via a tiny TCP listener inside the worker (optional).

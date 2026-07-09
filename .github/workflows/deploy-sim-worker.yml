@@ -68,13 +68,28 @@ jobs:
             --config sim-worker/fly.toml \
             --dockerfile sim-worker/Dockerfile
 
+      # A rolling update leaves machines in their prior state — a machine that
+      # crashed out before the deploy stays "stopped" and consumes nothing.
+      # Start every stopped non-standby machine so the worker is actually live.
+      - name: Ensure worker machines are started
+        run: |
+          flyctl machines list --app "$FLY_APP" --json \
+            | jq -r '.[] | select((.config.standbys // []) == []) | select(.state != "started") | .id' \
+            | while read -r id; do
+                echo "starting machine $id"
+                flyctl machine start "$id" --app "$FLY_APP" || true
+              done
+          flyctl status --app "$FLY_APP"
+
       # Read-only proof the worker booted on the scsim engine: the log line
       # "engine mode: scsim <version>" (from sim_worker/__main__.py) must
       # appear. LEGACY here means fly.toml's SCSIM_ENGINE=1 didn't reach the
       # machine — fail loudly rather than run the frozen engine silently.
+      # On failure the raw log tail is printed so the cause is diagnosable
+      # straight from CI.
       - name: Verify engine mode in worker logs
         run: |
-          flyctl status --app "$FLY_APP"
+          logs=""
           for i in 1 2 3 4 5 6; do
             sleep 10
             logs=$(timeout 30 flyctl logs --app "$FLY_APP" --no-tail 2>/dev/null || true)
@@ -88,5 +103,7 @@ jobs:
               exit 1
             fi
           done
+          echo "── raw log tail (for diagnosis) ──"
+          tail -n 80 <<<"$logs"
           echo "::error::Never saw 'engine mode: scsim' in logs after deploy."
           exit 1
