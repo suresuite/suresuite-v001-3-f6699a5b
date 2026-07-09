@@ -134,24 +134,33 @@ fixture):
 
 ## Step 1 — one-time human setup (an agent cannot do these)
 
-These require the user's own accounts/dashboards. Do **not** invent tokens; stop and hand
-this checklist to the user, then continue once done.
+These require the user's own accounts/dashboards. Do **not** invent tokens. There is a
+**single-source-of-truth** flow so the secrets can't drift across their three homes (Fly,
+GitHub, Supabase):
 
-1. **Upstash Redis** (free tier): create one database. Copy BOTH:
-   - the **native** URL `rediss://default:<token>@<endpoint>.upstash.io:6379` (worker)
-   - the **REST** URL + **REST token** (edge function). *Same database, two credential styles.*
-2. **Fly.io**: create account, `flyctl auth token` → `FLY_API_TOKEN`. Pick a globally
-   unique app name (default in `fly.toml` is `suresuite-sim-worker`; change it there **and**
-   in the GitHub variable if taken).
-3. **GitHub → repo → Settings → Secrets and variables → Actions**:
-   - Secrets: `FLY_API_TOKEN`, `UPSTASH_REDIS_URL` (native `rediss://`), `SUPABASE_URL`,
-     `SUPABASE_SERVICE_ROLE_KEY`.
-   - Variable: `FLY_APP_NAME` (must equal `fly.toml`'s `app`).
-4. **Supabase → Edge Functions → Secrets** (dashboard or `supabase secrets set`):
-   `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `SUPABASE_URL`, and `SUPABASE_ANON_KEY` (or `SUPABASE_PUBLISHABLE_KEY`). Some are
-   auto-injected by Supabase — verify, don't assume. Find `SUPABASE_URL` + keys in
-   Supabase → Project Settings → API.
+1. **Create accounts + one database**: Upstash Redis (free tier, one database) and Fly.io.
+   Get a Fly deploy token: `fly tokens create deploy -a suresuite-sim-worker`.
+2. **Fill `scripts/deploy.env`** once (`cp scripts/deploy.env.example scripts/deploy.env`).
+   From the Upstash console: the **native** `rediss://…:6379` URL (worker) AND the **REST**
+   URL + token (edge function) — same database, two access styles. From Supabase → Project
+   Settings → API: URL + service_role key + project ref.
+3. **Validate then sync**:
+   - `scripts/preflight_check.sh` — live-tests every credential (Upstash REST PING, Supabase
+     service-role read, Fly app reachable) and fails loudly on a typo *before* any deploy.
+   - `scripts/setup_secrets.sh` — pushes from that one file to all three homes: Fly worker
+     secrets (`flyctl`), Supabase function secrets (`supabase`), and the only two GitHub
+     values CI needs (`FLY_API_TOKEN` secret + `FLY_APP_NAME` variable, via `gh`). Idempotent;
+     re-run any time a value changes — nothing to reset.
+
+Notes:
+- **GitHub only needs `FLY_API_TOKEN` + `FLY_APP_NAME`.** The runtime secrets
+  (`UPSTASH_REDIS_URL` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`) live on the Fly app
+  only — the old "Sync Fly secrets" CI step was removed because it re-pushed them from GitHub
+  every deploy and could overwrite good Fly values with blanks (a drift/reset trap).
+- `SCSIM_ENGINE=1` comes from `sim-worker/fly.toml` on every CI deploy — do not set it as a
+  Fly secret (avoids an env/secret name collision) and never run `fly deploy` by hand (the
+  dashboard's minimal `fly.toml` lacks the flag → the worker would silently run the legacy
+  engine).
 
 ## Step 2 — what the agent does
 
