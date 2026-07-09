@@ -146,7 +146,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
   return (
     <div
       className={cn(
-        "dark fixed left-0 top-0 h-full flex z-[60] overflow-hidden transition-[width] duration-500 ease-in-out",
+        "light fixed left-0 top-0 h-full flex z-[60] overflow-hidden transition-[width] duration-500 ease-in-out",
         isCollapsed ? sizes.collapsedW : `w-full ${sizes.expandedW}`
       )}
     >
@@ -266,7 +266,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
               side={isCollapsed ? "right" : "top"}
               align={isCollapsed ? "end" : "start"}
               sideOffset={8}
-              className="dark w-52 z-[70]"
+              className="light w-52 z-[70]"
             >
               <DropdownMenuLabel className="flex flex-col gap-0.5">
                 <span className="text-xs font-medium truncate">
