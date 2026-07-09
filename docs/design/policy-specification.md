@@ -173,7 +173,8 @@ Plant    | MAT-D | mrp           | —   | —    | [safety_stock=25]      | 80 
 ALX's **Policy Basis** is the concept that reconciles absolute parameters with demand-scaled
 parameters, and it is exactly the fix for our long-standing mismatch (the engine ignored absolute
 `reorder_point`/`order_up_to` and used coverage-κ instead). We adopt it explicitly. Every
-inventory-type parameter that denotes a *level* is interpreted under one of two bases:
+inventory-type parameter that denotes a *level* is interpreted under one of **three** bases (the
+third added for our research models):
 
 - **Basis = Quantity.** Parameters are **absolute units**. $s = 50$ means 50 units.
 - **Basis = Days-of-supply (historic).** Parameters are **multipliers on mean demand** over a
@@ -182,12 +183,23 @@ inventory-type parameter that denotes a *level* is interpreted under one of two 
   $\pi$ is realized as
   $$\text{level} = \pi \cdot \bar d_i \cdot 7 \quad\text{(units, per week)}.$$
   Example (ALX): Min-max with $s=2$, $S=5$, $W=10$ ⇒ $s = 2\,\bar d_i\cdot7$, $S = 5\,\bar d_i\cdot7$.
+- **Basis = Forward-visible schedule** *(added for research models).* Coverage windows applied to
+  **forward-visible demand summed over the window**, requiring a **demand-visibility horizon**
+  $\tau^\ast$ (a *customer-stage* input, §III-D.6). For material $m$, lead time $T_s$, protective
+  period $\kappa$: $s_m[t]=\sum_{\tau=t}^{t+T_s}\hat D_m[\tau]$, $S_m[t]=\sum_{\tau=t}^{t+T_s+\kappa}\hat D_m[\tau]$
+  ($T_s{+}\kappa\le\tau^\ast$), with $\hat D_m[\tau]=\sum_p\hat D_p[\tau]\,r_{p,m}$ (BoM-exploded
+  forward demand). Stationary demand ⇒ collapses to Days-of-supply; non-stationary ⇒ differs
+  trajectory-by-trajectory. **This is the WSC-2026 MTO inventory formula.** *Stage ownership:* a
+  two-stage contract — the **customer** supplies $\tau^\ast$ and the forward order book (§III-D.6);
+  the **focal plant** consumes it in material inventory control (§III.1). Selectable only when a
+  customer policy provides $\tau^\ast\ge T_s+\kappa$.
 
-**Mapping to our engine.** Our current P-P.1 implements exactly the Days-of-supply basis with a
-single coverage constant: $s_{m,t} = \bar d_m L_\ell$, $S_{m,t} = \bar d_m (L_\ell + \kappa)$ (κ in
-weeks). Under this reframe, that is the special case **Basis = Days-of-supply** with the level
-parameters expressed relative to lead time. Adding **Basis = Quantity** (honoring absolute $s,S$)
-is the concrete work that closes G1 — both bases are specified in §III so either can be built.
+**Mapping to our engine.** P-P.1 today implements the **Days-of-supply** special case with a single
+coverage constant: $s_{m,t}=\bar D_m L_\ell$, $S_{m,t}=\bar D_m(L_\ell+\kappa)$, using the
+*stationary* material-demand mechanic. The two ✚ additions are **Quantity** (honor absolute $s,S$ →
+closes G1) and **Forward-visible schedule** (sum the customer's forward order book, §II.4 Eq. →
+reproduces the WSC-2026 MTO model trajectory-exactly, not merely in expectation). All three bases
+are specified so any can be built.
 
 ### II.5 Periodic vs perpetual review
 
@@ -446,6 +458,30 @@ Per-row attributes with precise math (not policy types):
   Allowed-Total → order waits ($B\mathrel+=$ unmet).
 - **Inclusion**: include/exclude the row.
 
+### III-D.6 Forward delivery schedule (demand visibility) ✚ — *customer stage*
+
+- **Purpose.** Let a customer commit **future** orders over a visibility horizon, so the focal
+  plant can plan procurement against a known forward order book (the WSC-2026 assumption).
+- **Inputs.** *Sets:* customer $c$, product $p$. *Parameters:*
+
+  | symbol | unit | range | default | meaning |
+  |---|---|---|---|---|
+  | $\tau^\ast$ (`visibility_horizon`) | weeks | ≥1 | 52 | how far ahead the forward schedule is known |
+  | $\{\tilde D_{p,c}[t{+}k]\}_{k=0}^{\tau^\ast}$ | units | ≥0 | — | committed forward quantities (deterministic schedule) or a forward-generating rule |
+
+  *State/data read:* the demand-generation policy (III-D.1–4) may *produce* the forward schedule
+  stochastically; here it is exposed forward rather than only at realization.
+- **Logic.** At week $t$ the plant sees $\tilde D_{p,c}[t..t{+}\tau^\ast]$. Realized demand
+  $D_{p,c}[t]=\tilde D_{p,c}[t]$ is served this week; the tail $\tilde D_{p,c}[t{+}1..t{+}\tau^\ast]$
+  drives material planning. Forward material demand $\hat D_m[\tau]=\sum_p(\sum_c\tilde D_{p,c}[\tau])\,r_{p,m}$
+  feeds the **Forward-visible coverage basis** (§II.4) consumed by plant inventory control (§III.1).
+- **Outputs.** the forward demand tensor $\tilde D_{p,c}[t..t{+}\tau^\ast]$ (a customer-stage output
+  read by the focal plant). KPI: enables MRP/coverage sizing to a committed book rather than a mean.
+- **UI & engine.** ✚. *Necessity:* this is the customer-side half of the Forward-visible basis;
+  without it, only Quantity / Days-of-supply bases are available, and the WSC-2026 MTO model cannot
+  be reproduced trajectory-exactly. *Stage boundary:* the customer **owns** $\tau^\ast$ and the
+  schedule; the plant only **reads** it — a clean cross-stage contract, no hidden coupling.
+
 ---
 
 ## PART IV — Plant-side policy libraries
@@ -530,6 +566,30 @@ output for all types: $O_{\ell,t}=w_{m,s}\,O_{m,t}$ with $\sum_{\ell\in\mathcal 
 - **Logic.** Order backlog by rule — FIFO (arrival), EDD (earliest due), SPT (shortest processing), CR ($=\frac{\text{time to due}}{\text{processing time}}$, smallest first) — serve until capacity/material exhausted.
 - **Outputs.** the served subset (shapes $g_{p,t}$ / $F_{p,t}$). KPI: due-date performance, lateness.
 - **UI & engine.** ✚ `P-P.11` (weekly-bucket priority). Sub-weekly machine scheduling ⛔ (fidelity boundary).
+
+#### IV.2.d Material allocation under scarcity ✅ `P-P.9` — *focal plant*
+
+- **Purpose.** When materials cannot cover all products' plans, decide **how much of each product
+  to actually build** — a constrained allocation of scarce materials across products.
+- **Inputs.** *Parameters:* `objective`∈{max_revenue, max_fill_rate, priority_weighted,
+  fg_replenish, **min_unmet**}; `solver`∈{lp, greedy}; `window_weeks` $W$∈[1,13] (rolling horizon,
+  default 4); `activation`∈{during_disruption, always}; `annual_cost` (planner labor, €6240);
+  `priority_weights`. *State/data read:* product plans $Q_p[t]$ (from §IV.2.a), on-hand $I_m[t]$,
+  BoM $r_{p,m}$, capacity $O_p$, prices $u_p$, $\phi_t$.
+- **Logic.** Solve, over the rolling window, for realized build $R_p[t]\le Q_p[t]$:
+  $$\begin{aligned}
+  \textstyle\max/\min\ & \Phi(R)\ \ \text{per \texttt{objective}}
+  &&\hspace{-2em}\text{(e.g. }\max\sum_p u_p R_p;\ \ \boxed{\min\sum_p (Q_p[t]-R_p[t])}\text{ = \texttt{min\_unmet}}\text{)}\\
+  \text{s.t.}\ & \textstyle\sum_p R_p[t]\,r_{p,m}\le I_m[t] && \forall m\quad(\text{material availability})\\
+  & R_p[t]\le O_p[t],\quad R_p[t]\le Q_p[t] && \forall p\quad(\text{capacity, plan})\\
+  & R_p[t]\in\mathbb N_0 && \forall p.
+  \end{aligned}$$
+  `min_unmet` (Paper 2's objective) $=\min\sum_p(Q_p-R_p)$ is the unweighted dual of `max_fill_rate`;
+  `max_revenue` weights the shortfall by $u_p$. HiGHS LP solver (`greedy` = revenue-ranked heuristic,
+  the R3 fallback). Activates only while $\phi_t{=}1$ under `during_disruption`.
+- **Outputs.** $R_p[t]$ = the feasible build (reshapes `production_plan`); planner cost to $\mathcal C^{res}$.
+- **UI & engine.** ✅ `P-P.9` (PH-40). *Was implemented but undocumented as an entry and unreachable
+  from the UI (gap G3)* — now specified. **`min_unmet` is the ✚ objective needed to reproduce Paper 2's LP.**
 
 ### IV.3 Capacity
 
@@ -798,6 +858,63 @@ lost sales $\sum_p u_p\Lambda_p$; on-hand value $\sum_i c_i\bar I_i$; revenue; *
 resilience** $\mathcal C^{res}$ (holding + backup/multi-source premia + expedite + overtime +
 monitoring, per-policy ledgered); TTR/TTS; service-loss area; resilience index (0–100). Every
 policy's cost is a declared append to $\mathcal C^{res}$ — cost is attributable per policy.
+
+---
+
+## PART X — Disruption injection & propagation (simulation logic, by stage)
+
+**Framing.** A scenario injects **events**; each event names an affected **stage/entity**, an
+**effect type**, a **magnitude**, a start week $t^\ast$, and a **duration** $\Delta t$. At PH-00
+the active events set the disruption state $\delta_t$; at PH-20 firm knowledge $\phi_t\to1$ after
+the detection lag (compressed by P-S.4). **Policies read $\phi_t$, never $\delta_t$** — the firm
+reacts to what it *knows*. This part documents, per stage, what an event modifies and how it
+propagates to the KPIs — the simulation-logic half of this single source of truth, and the exact
+mechanism the research papers rely on. Affected entity marked with $^\ast$.
+
+### X.1 Supplier stage — *the WSC-2026 disruption*
+
+**X.1.a Lead-time extension** (the paper's case). Supplier $s^\ast$ delayed by $\Delta t$ from
+$t^\ast$: effective lead time in the window $T^{disr}_{s^\ast}=T_{s^\ast}+\Delta t$. Scheduled
+receipts of affected material $m^\ast$ in $[t^\ast,t^\ast+\Delta t]$ are pushed back by $\Delta t$:
+$$I^{R,disr}_{m^\ast}[t+\Delta t]=I^R_{m^\ast}[t],\qquad I^{R,disr}_{m^\ast}[t]=0,$$
+and in-transit present in the window propagates forward:
+$$I^{T,disr}_{m^\ast}[t+\tau]=I^T_{m^\ast}[t],\quad \forall\tau\in[1,\Delta t-1].$$
+**Propagation:** delayed arrivals → $I_{m^\ast}\!\downarrow$ (PH-90) → production feasibility
+$\min_m\lfloor I_m/r_{p,m}\rfloor\!\downarrow$ (PH-50) → $Q_p\!\downarrow$ → $F_p\!\downarrow$.
+**KPI:** fill rate ↓, backlog ↑, TTR, revenue loss (the stress-test signal, paper Fig. 3).
+**Bent by:** P-S.1 backup, P-S.2 rebalance, P-T.2 expedite, P-P.5 overtime, P-P.9 allocation.
+
+**X.1.b Capacity reduction.** $K_{s^\ast}\!\downarrow$. Under finite capacity (P-S.5) shipped
+$=\min(\Xi_s,K^{disr}_s)$; residual queues (endogenous lead-time extension) or is rejected
+(lost-inbound). Same downstream chain as X.1.a.
+
+### X.2 Focal-plant stage
+
+**Production capacity reduction.** $O_p\!\downarrow$ (per product or plant-wide) for
+$[t^\ast,t^\ast+\Delta t]$: $\text{cap}_{p,t}\!\downarrow$ →
+$Q_p=\min(D_p,O^{disr}_p,\text{material})\!\downarrow$ → $F_p/Y_p\!\downarrow$. **KPI:** fill rate ↓,
+TTS. **Bent by:** P-P.5 overtime (lifts cap), P-P.9 allocation (reshapes which products absorb the
+shortfall).
+
+### X.3 Transport stage
+
+**Lane transit delay.** Lane $\ell$ transit $+\Delta t$: folds into the effective link lead time
+(as X.1.a, lane-scoped) → arrivals delayed → $I_m\!\downarrow$. **Bent by:** P-T.2 expedite,
+P-T.3 mode-shift.
+
+### X.4 Customer stage
+
+**Demand surge** 🧩. $D_p\!\uparrow$ at PH-10: higher draw → $B_p\!\uparrow$, material demand
+$D_m\!\uparrow$ → procurement ↑. **KPI:** fill rate ↓. Planned event class (needs a demand-side
+effect type, gap G11).
+
+### X.5 Scope — stress testing is an experiment, not a policy
+
+Systematically applying X.1 to **each** supplier and ranking the resulting revenue loss is the
+**vulnerability ranking** (paper Fig. 3). That sweep is an **experiment** (blueprint §9, ST-1
+battery) that *consumes* the propagation model above; it is not a policy and is documented in the
+experiment layer, not here. This single source of truth owns the **propagation mechanism** (X.1–X.4);
+the blueprint owns the **experiment machinery** that drives it.
 
 ---
 
