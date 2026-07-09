@@ -620,36 +620,43 @@ export function RunValidateStage({
     setValidationScenarioId(scenarioId);
 
     // ── Server path ─────────────────────────────────────────────────────
+    // Server mode NEVER silently computes in the browser: the whole point of
+    // "Run on server" is that the run executes on the Fly worker, so a
+    // dispatch failure fails loudly (with the real reason) instead of quietly
+    // producing browser numbers the user thinks came from the server. The
+    // browser engine is reached only by explicitly choosing "Run in browser
+    // (offline)".
     if (computeMode === "server") {
       // The worker path needs a real scenario row + saved policy version
-      // (sim-command rejects otherwise); if either save failed we can still
-      // deliver a run — in the browser.
-      if (versionId && !scenarioId.startsWith("local:")) {
-        try {
-          setRunPhase({ kind: "loading", detail: "Dispatching to the simulation server…" });
-          const runId = await dispatchRun(scenarioId, versionId);
-          // Clear any previous browser run so stale local rows can't shadow
-          // the incoming realtime rows while rep_count_done is still 0.
-          setLocalRun(null);
-          setLocalReps([]);
-          setActiveRunPath("server");
-          setServerRunId(runId);
-          setRunPhase({ kind: "loading", detail: "Queued on the simulation server…" });
-          return; // realtime drives the UI from here (see the status effect)
-        } catch (err) {
-          // A hard gate rejection (missing required data) stops BOTH paths.
-          const msg = (err as Error).message ?? String(err);
-          if (msg.includes("required-data gate")) {
-            setRunPhase({ kind: "failed", step: "validation gate", message: msg });
-            throw err;
-          }
-          console.warn("sim-command unreachable — falling back to the in-browser engine:", msg);
-          toast.warning("Simulation server unreachable — running in the browser instead.");
-        }
-      } else {
-        toast.warning(
-          "Run not eligible for the server (policy snapshot or scenario could not be saved) — running in the browser instead.",
-        );
+      // (sim-command rejects otherwise). If either save failed, that's a
+      // hard stop in server mode — not a reason to switch engines behind the
+      // user's back.
+      if (!versionId || scenarioId.startsWith("local:")) {
+        setRunPhase({
+          kind: "failed",
+          step: "server dispatch",
+          message:
+            "Could not save the policy snapshot / scenario needed to run on the server. " +
+            "Check your connection and try again, or switch to “Run in browser (offline)”.",
+        });
+        throw new Error("server run not eligible: policy snapshot or scenario could not be saved");
+      }
+      try {
+        setRunPhase({ kind: "loading", detail: "Dispatching to the simulation server…" });
+        const runId = await dispatchRun(scenarioId, versionId);
+        // Clear any previous browser run so stale local rows can't shadow
+        // the incoming realtime rows while rep_count_done is still 0.
+        setLocalRun(null);
+        setLocalReps([]);
+        setActiveRunPath("server");
+        setServerRunId(runId);
+        setRunPhase({ kind: "loading", detail: "Queued on the simulation server…" });
+        return; // realtime drives the UI from here (see the status effect)
+      } catch (err) {
+        const msg = (err as Error).message ?? String(err);
+        const step = msg.includes("required-data gate") ? "validation gate" : "server dispatch";
+        setRunPhase({ kind: "failed", step, message: msg });
+        throw err; // no browser fallback in server mode
       }
     }
 
