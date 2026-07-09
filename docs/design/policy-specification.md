@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | v2.2 — v2.0's reframe (*policies*, not *strategies*) preserved. v2.1 added §III.A (inventory's stochastic derivations), §III.15 (AnyLogistix benchmark), §III.16 (UI array-editor scoping). **v2.2 brings §IV (sourcing, production, capacity, forecasting, supplier capacity/lead-time), §V (transport), and §VI (fulfillment) up to the same per-policy template and derivation standard §III already had** — the prior revision left them as one-paragraph stubs, inconsistent with §PART 0's own mandatory-template rule; every policy in §IV–§VI now has Purpose/Inputs/Logic/Outputs and a derived, not asserted, formula. **v2.2 also adds §PART VIII-D**, a formal two-channel disruption-propagation model (physical/state-mediated vs. detection-gated/policy-mediated) worked through the brief's four named disruption types, grounded directly in `scsim/scsim/entities/disruption.py` and `core/context.py` — this was previously undocumented in this file. |
-| **Date** | 2026-07-09 (v2.1 same day; v2.0: 2026-07-07) |
+| **Status** | v2.3 — v2.0's reframe (*policies*, not *strategies*) preserved. v2.1 added §III.A (inventory's stochastic derivations), §III.15 (AnyLogistix benchmark), §III.16 (UI array-editor scoping). v2.2 brought §IV–§VI up to §III's per-policy template and added §PART VIII-D (disruption propagation). **v2.3 grounds every one of the registry's 22 registered policies in its actual `params_schema`** — exact field names/types/units/ranges/defaults transcribed directly from `src/lib/policies/registry.generated.json`, not paraphrased — and corrects several real app-level mismatches this exposed: §III.1's $s,S$ are *computed* from `coverage_weeks`, not user-entered fields, under today's basis; §III.2/III.7's "SS" is not a hand-typed field on either policy but the effect of a second policy's hook composing on top of the first; §III.3's (R,Q) is single-lot in the shipped code, not the multi-lot ceiling previously stated as primary; Eq. B.4's overtime premium is % of *price*, not of production cost; §IV.1 items 1/4/5/6 (single/ranked/capacity-proportional/tiered sourcing) are not registered policies at all — "single sourcing" is an unnamed engine default that should be `P-S.0`; §V.A found P-T.5/P-T.6 are not registered even as 🧩. This is the document doing, for every policy, what the design brief asked for at "the app-wise level": treating the registry export — not this document's prose, not `schemas.ts`, not the help page — as the one ground truth, and fixing every place this document had drifted from it. |
+| **Date** | 2026-07-09 (v2.1/v2.2 same day; v2.0: 2026-07-07) |
 | **Role** | Single source of truth for every supply chain **policy** the platform offers, its **mathematical model**, its **parameters and UI**, and its **coding representation**. Any change to a policy, parameter, equation, or its UI/engine binding must be reflected here in the same change. |
 | **Benchmark** | anyLogistix (ALX) is the reference for *breadth of the policy library* and the *table/parameter UI*. We match its granularity, evaluate each policy for necessity under our weekly-bucket engine, and give every policy a rigorous mathematical model (ALX documents behavior; we specify equations). |
 | **Ground truth** | Parameter names/units/ranges of already-implemented policies are transcribed from the engine registry (`src/lib/policies/registry.generated.json`, engine 0.2.0) and plugin source (`scsim/scsim/policies/`). New policy types proposed here are marked and specified to the same rigor so they can be implemented directly. |
@@ -405,70 +405,153 @@ as the rigorous prefill target, not implemented as new engine behavior in this d
 | A-iii | Normal approximation for $X_i$ | A.3–A.5 | Breaks for intermittent demand (small $\bar D_i$, many zeros) — mitigated by the V&V pipeline's simulated-vs-analytical check (§9.5), not by a different closed form in v1 |
 | A-iv | Single-echelon reorder (no multi-echelon risk-pooling correction) | all of §III | Correct for the platform's current single-plant, three-echelon scope (§2.4); a DC echelon (Phase E) would need the Clark–Scarf multi-echelon correction, out of scope until then |
 
-### III.1 Min-max policy (s, S) ✅
+### III.0-bis — The `inventory_control` engine parameters (ground truth for III.1–III.7)
+
+**This is the single, load-bearing correction §III.1–III.7 needed at the app level.** §III.1–III.5
+are not four separate engine objects — they are **one** registered policy,
+`id: inventory_control`, `catalog_ref: P-P.1`, with **one** Pydantic `Params` schema
+(`InventoryControlParams`), selected by its `policy_type` enum. This is the literal content of
+`src/lib/policies/registry.generated.json` (extracted verbatim below, not paraphrased — this is
+what the grid actually renders today):
+
+| Field | Type | Unit | Range / enum | Default | Scope | Meaning |
+|---|---|---|---|---|---|---|
+| `policy_type` | enum | — | `min_max`, `base_stock`, `rop_q`, `periodic` | `min_max` | M (per material) | selects III.1/III.4/III.3/III.5 below |
+| `coverage_weeks` | `ModeStrip` {`nominal`,`alert`,`crisis`} | weeks | each in $[0,26]$ | `{8,10,12}` | G/M | $\kappa$ — cover beyond lead time, added to $S$; **crisis** value applies while any disruption is firm-visible ($\phi_t=1$, §D.2 Channel 2), **alert** is reserved pending P-S.4 (not yet switched to) |
+| `review_cadence_weeks` | enum (int) | weeks | $\{1,2,4\}$ | 1 | G | perpetual-review interval for `min_max` (§II.5's $\rho_t$, generalized from every-week to every-$k$-weeks) |
+| `rop_q_quantity` | number \| null | units | $>0$ | `null` | M | fixed lot $Q$ for `policy_type=rop_q`; `null` ⇒ engine floors to MOQ only |
+| `periodic_review_weeks` | integer | weeks | $[1,13]$ | 4 | G | review period $T$ for `policy_type=periodic` |
+
+**The correction this table forces onto §III.1's math.** There is **no `s` or `S` field** in this
+schema — under today's sole implemented basis (Days-of-supply, §II.4), $s,S$ are *computed* at
+PH-70 from `coverage_weeks` and live demand/lead-time data
+($s=\bar D_iL_i,\ S=\bar D_i(L_i+\kappa)$, §III.1 below), **not typed by the user**. Presenting
+"$s,S$" as the row's editable parameters (as the prior revision's table did) describes the
+**Quantity basis** — §II.4's other basis, marked ✚, not yet a registered field anywhere in this
+list. This is a real, previously undocumented gap between the math notation and the actual grid:
+today, editing a min-max row means editing the $\kappa$ ModeStrip, and the grid must show $s,S$ as
+**computed, read-only** preview values (with a provenance note: "$s=\bar D_iL_i$"), not as input
+boxes, until Quantity basis ships a real `s_absolute`/`S_absolute` field pair to the registry. §III.1
+below is restated with this distinction explicit.
+
+### III.1 Min-max policy (s, S) ✅ (`policy_type=min_max`)
 
 - **Purpose.** Reorder when position falls below $s$; raise it to $S$ (the classic (s,S) rule).
-- **Inputs.** *Sets:* item $i$ at facility $f$. *Parameters:*
-
-  | symbol | unit | range | default | meaning |
-  |---|---|---|---|---|
-  | $s$ | units or day-mult | $0\le s<S$ | — | reorder point |
-  | $S$ | units or day-mult | $>s$ | — | order-up-to level |
-
-  *State/data read:* $\mathrm{IP}_{i,t}=I_{i,t}+\Pi_{i,t}-B_{i,t}$; MOQ $Q^{\min}_i$; review gate $\rho_t$.
+- **Inputs.** *Sets:* item $i$ at facility $f$. *Parameters (app-wise, per III.0-bis):* the user
+  sets `coverage_weeks` ($\kappa$, a ModeStrip); $s,S$ are **derived**, not entered, under today's
+  Days-of-supply basis:
+  $$s_{i,t}=\bar D_i L_i, \qquad S_{i,t}=\bar D_i(L_i+\kappa),$$
+  where $\bar D_i$ is `material_demand` (PH-10's live projection, not a static field) and $L_i$ is
+  the primary link's lead time. *State/data read:* $\mathrm{IP}_{i,t}=I_{i,t}+\Pi_{i,t}-B_{i,t}$;
+  MOQ $Q^{\min}_i$ (`materials.moq`); review gate $\rho_t$ (`review_cadence_weeks`).
 - **Logic.** Trigger $\mathrm{IP}_{i,t}<s$; order to $S$:
   $$O_{i,t}=\rho_t\,(S-\mathrm{IP}_{i,t})^+\,\mathbf 1[\mathrm{IP}_{i,t}<s],\qquad O_{i,t}\leftarrow\max(O_{i,t},Q^{\min}_i)\ \text{if}\ O_{i,t}>0.$$
-  Under Days-of-supply basis, $s,S$ are converted via §3.4 first. Feasibility: $S>s\ge0$.
-- **Outputs.** $O_{i,t}$ (purchase order / production release, PH-80); levels $s_{i,t},S_{i,t}$ (PH-70). KPI: holding-vs-fill trade-off.
-- **UI & engine.** `P-P.1 policy_type=min_max`; today Days-of-supply with $s=\bar D_iL,\ S=\bar D_i(L+\kappa)$; Quantity basis ✚.
+  Feasibility: $S>s\ge0$, guaranteed by construction under Days-of-supply ($\kappa\ge0$) — this is
+  *why* the current implementation never needs to validate $S>s$ as a separate user-input
+  constraint; it becomes a real constraint only once Quantity basis makes $s,S$ independently
+  editable.
+- **Outputs.** $O_{i,t}$ (`purchase_orders`, PH-80); levels $s_{i,t},S_{i,t}$ (`inventory_levels`,
+  PH-70). KPI: holding-vs-fill trade-off.
+- **UI & engine.** `id=inventory_control`, `policy_type=min_max` (III.0-bis table). **UI action
+  item:** the grid's $s$/$S$ headline columns (§II.3) must render as computed read-only values with
+  a provenance badge under the current basis, and the row's true editable field is `coverage_weeks`
+  — today's grid must not offer $s,S$ as blank input boxes, since no field would receive the value.
 
-### III.2 Min-max with safety stock (s, S, SS) ✚
+### III.2 Min-max with safety stock (s, S, SS) ✚ (not yet a registered `policy_type`)
 
 - **Purpose.** (s,S) with an explicit safety buffer added to both thresholds.
-- **Inputs.** *Parameters:* $s,S,\mathrm{SS}\ge0$. *State read:* $\mathrm{IP}_{i,t}$, $Q^{\min}_i$, $\rho_t$; $\mathrm{SS}$ may instead be supplied by a §IV.4 method (which overrides the manual value).
-- **Logic.** $O_{i,t}=\rho_t\big((S+\mathrm{SS})-\mathrm{IP}_{i,t}\big)^+\mathbf 1[\mathrm{IP}_{i,t}<s+\mathrm{SS}]$. Everything shifts up by $\mathrm{SS}$ (more average stock, higher service).
+- **Inputs.** *Proposed field (naming convention matched to III.0-bis's schema style):* no new
+  `policy_type` enum value needed — this is `policy_type=min_max` **plus** a non-null safety-stock
+  source, i.e. it is what happens whenever `safety_stock_materials` (P-P.3, §IV.4) is *also*
+  active on the same row: $s,S,\mathrm{SS}\ge0$, with $\mathrm{SS}$ supplied by P-P.3's `setup()`
+  (§IV.4), never a manually-typed field — this document previously implied a hand-typed
+  $\mathrm{SS}$, which does not exist as a schema field on either policy; correcting it here.
+- **Logic.** $O_{i,t}=\rho_t\big((S+\mathrm{SS})-\mathrm{IP}_{i,t}\big)^+\mathbf 1[\mathrm{IP}_{i,t}<s+\mathrm{SS}]$
+  — literally P-P.1's `_release` reading `ctx.level_s`/`ctx.level_S` **after** P-P.3's `on_phase`
+  hook (priority 60) has added its buffer on top of P-P.1's (priority 50) — the exact
+  hook-priority composition already implemented in `p_p3_safety_stock.py::on_phase`, not a
+  separate policy type at all. **Correction to Appendix A:** this row should not be listed as a
+  distinct ✚ policy type; it is the (`min_max`, `safety_stock_materials` active) **combination**,
+  already ✅ end-to-end. Retained here only because ALX's own table presents it as one selectable
+  type — §III.15 already notes this framing difference; restated as an app-level fix now.
 - **Outputs.** $O_{i,t}$; raised levels $s+\mathrm{SS},\,S+\mathrm{SS}$. KPI: service ↑, holding ↑.
-- **UI & engine.** ✚ (fuses P-P.1 with the P-P.3 buffer into one selectable type).
+- **UI & engine.** ✅, as the composition above — no engine change needed; a UI-only fix (the grid
+  should present "Min-max + Safety Stock" as one selectable row-preset that turns on both
+  policies, exactly mirroring the actual two-hook composition instead of implying a phantom
+  combined policy type).
 
-### III.3 (R, Q) policy ✅
+### III.3 (R, Q) policy ✅ (`policy_type=rop_q`)
 
 - **Purpose.** Reorder a **fixed lot** $Q$ whenever position drops below $R$.
-- **Inputs.** *Parameters:* $R$ (reorder point), $Q\ge Q^{\min}_i$ (lot). *State read:* $\mathrm{IP}_{i,t}$, $\rho_t$.
-- **Logic.** Multi-lot to clear the deficit: $O_{i,t}=\rho_t\,Q\big\lceil (R-\mathrm{IP}_{i,t})^+/Q\big\rceil\mathbf 1[\mathrm{IP}_{i,t}<R]$; single-lot variant $O_{i,t}=\rho_t Q\,\mathbf 1[\mathrm{IP}_{i,t}<R]$. Position saw-tooths in $[R-\!\text{demand},\,R+Q]$.
+- **Inputs.** *Parameters (registry field):* `rop_q_quantity` ($Q$, nullable — null floors to MOQ
+  only); $R$ is **the same derived $s$** as III.1 (`coverage_weeks`-driven) — (R,Q) and min-max
+  share the identical reorder-point derivation and differ only in the order-quantity rule, a fact
+  the registry schema makes structurally obvious (one `Params` class) but the prior prose did not.
+  *State read:* $\mathrm{IP}_{i,t}$, $\rho_t$.
+- **Logic.** Current implementation (`p_p1_inventory_control.py::_release`, `rop_q` branch):
+  $O_{i,t}=\rho_t\,\max(Q,Q^{\min}_i)\,\mathbf 1[\mathrm{IP}_{i,t}<R]$ — **single-lot**, not the
+  multi-lot ceiling $Q\lceil(R-\mathrm{IP})^+/Q\rceil$ this document previously presented as the
+  primary rule; the multi-lot ceiling is the ✚ refinement, not what ships. Corrected here so the
+  equation matches the code exactly, not the textbook (R,Q) generalization.
 - **Outputs.** $O_{i,t}$ (fixed-lot order). KPI: cycle-stock, order frequency.
-- **UI & engine.** `P-P.1 policy_type=rop_q`, `rop_q_quantity`$=Q$ (engine floors to MOQ); multi-lot ceiling ✚.
+- **UI & engine.** `id=inventory_control`, `policy_type=rop_q`, `rop_q_quantity`$=Q$ (engine floors
+  to MOQ); multi-lot ceiling remains ✚.
 
-### III.4 Base stock / order-up-to (S) ✅
+### III.4 Base stock / order-up-to (S) ✅ (`policy_type=base_stock`)
 
 - **Purpose.** Every review, top the position back up to $S$ (one-parameter order-up-to).
-- **Inputs.** *Parameters:* $S$. *State read:* $\mathrm{IP}_{i,t}$, $\rho_t$.
-- **Logic.** $O_{i,t}=\rho_t\,(S-\mathrm{IP}_{i,t})^+$ (equivalent to (s,S) with $s=S$).
+- **Inputs.** *Parameters:* none beyond III.0-bis's shared `coverage_weeks` — $S$ is the same
+  derived value as III.1 ($S=\bar D_i(L_i+\kappa)$); there is no independent "$S$" field for this
+  variant either. *State read:* $\mathrm{IP}_{i,t}$, $\rho_t\equiv1$ (perpetual — `base_stock`
+  ignores `review_cadence_weeks`, checked every week per the code).
+- **Logic.** $O_{i,t}=(S-\mathrm{IP}_{i,t})^+$ (equivalent to (s,S) with $s=S$).
 - **Outputs.** $O_{i,t}$. KPI: low stockout for steady high-frequency demand.
-- **UI & engine.** `P-P.1 policy_type=base_stock`.
+- **UI & engine.** `id=inventory_control`, `policy_type=base_stock`.
 
-### III.5 Periodic review (R, S) / (T, S) ✅
+### III.5 Periodic review (R, S) / (T, S) ✅ (`policy_type=periodic`)
 
 - **Purpose.** Order-up-to $S$, but only at review epochs spaced $T$ weeks apart.
-- **Inputs.** *Parameters:* $S$; period $T$ (grid column), first check $t_0$. *State read:* $\mathrm{IP}_{i,t}$.
-- **Logic.** $O_{i,t}=\mathbf 1[(t-t_0)\bmod T=0]\,(S-\mathrm{IP}_{i,t})^+$. Between reviews position drifts down with demand.
+- **Inputs.** *Parameters:* `periodic_review_weeks` ($T\in[1,13]$, integer); $S$ derived as III.1/
+  III.4. *State read:* $\mathrm{IP}_{i,t}$.
+- **Logic.** $O_{i,t}=\mathbf 1[t\bmod T=0]\,(S-\mathrm{IP}_{i,t})^+$ (first-check phase $t_0=0$ in
+  the current implementation — a `first_check_week` field does not yet exist on this schema;
+  §II.1's grid column "First Check" is therefore presentation-only today, not yet wired to a
+  registered field — flagged, not silently implied as working).
 - **Outputs.** $O_{i,t}$. KPI: review-cadence vs stock trade-off.
-- **UI & engine.** `P-P.1 policy_type=periodic`, `periodic_review_weeks`$=T$.
+- **UI & engine.** `id=inventory_control`, `policy_type=periodic`, `periodic_review_weeks`$=T$.
 
-### III.6 Regular policy (fixed quantity, periodic) ✚
+### III.6 Regular policy (fixed quantity, periodic) ✚ — proposed registry addition
 
-- **Purpose.** Order a **fixed quantity every period, regardless of stock level** (push/heartbeat). Requires Periodic Check on.
-- **Inputs.** *Parameters:* $Q$ (quantity), period $T$, first check $t_0$. *State read:* none (open-loop).
-- **Logic.** $O_{i,t}=\mathbf 1[(t-t_0)\bmod T=0]\,Q$. No feedback on position — stock can build or deplete.
+- **Purpose.** Order a **fixed quantity every period, regardless of stock level** (push/heartbeat).
+- **Inputs.** *Proposed fields (matching III.0-bis's naming/scope conventions exactly, so
+  implementing this is literally "add a `policy_type=regular` branch plus these two fields to
+  `InventoryControlParams`" — a one-plugin-file change per A2 of the blueprint):*
+
+  | Field | Type | Unit | Range | Default | Scope |
+  |---|---|---|---|---|---|
+  | `regular_quantity` | number | units | $>0$ | — (required when `policy_type=regular`) | M |
+  | *(reuses)* `periodic_review_weeks` | integer | weeks | $[1,13]$ | 4 | G |
+
+  *State read:* none (open-loop).
+- **Logic.** $O_{i,t}=\mathbf 1[t\bmod T=0]\,Q$, $Q=$`regular_quantity`. No feedback on position —
+  stock can build or deplete.
 - **Outputs.** $O_{i,t}$ (standing delivery). KPI: schedule adherence; risk of over/under-stock.
-- **UI & engine.** ✚. *Necessity:* models fixed-schedule supply contracts / heartbeat feeds that the position-triggered family cannot express.
+- **UI & engine.** ✚. *Necessity:* models fixed-schedule supply contracts / heartbeat feeds the
+  position-triggered family cannot express.
 
-### III.7 Regular policy with safety stock ✚
+### III.7 Regular policy with safety stock ✚ — proposed registry addition
 
-- **Purpose.** Regular fixed-quantity ordering **plus** a corrective top-up on safety-level violation.
-- **Inputs.** *Parameters:* $Q,\mathrm{SS}$, period $T$. *State read:* $\mathrm{IP}_{i,t}$.
-- **Logic.** $O_{i,t}=\mathbf 1[(t-t_0)\bmod T=0]\big(Q+(\mathrm{SS}-\mathrm{IP}_{i,t})^+\big)$. **Worked example (ALX):** $Q=5,\mathrm{SS}=0$, position $-7$ ⇒ $O=5+(0-(-7))^+=12$ — so "Regular+SS, SS=0" ≠ "Regular".
+- **Purpose.** Regular fixed-quantity ordering **plus** a corrective top-up on safety-level
+  violation.
+- **Inputs.** *Proposed field, extending III.6:* `regular_quantity` ($Q$) as above, plus SS
+  supplied the **same way as III.2** — by an active `safety_stock_materials` policy on the row, not
+  a hand-typed field (the same correction as III.2 applies here). *State read:* $\mathrm{IP}_{i,t}$.
+- **Logic.** $O_{i,t}=\mathbf 1[t\bmod T=0]\big(Q+(\mathrm{SS}-\mathrm{IP}_{i,t})^+\big)$. **Worked
+  example (ALX, confirmed in §III.15's source review):** $Q=5,\mathrm{SS}=0$, position $-7$ ⇒
+  $O=5+(0-(-7))^+=12$ — so "Regular+SS, SS=0" ≠ "Regular".
 - **Outputs.** $O_{i,t}$. KPI: schedule + shortfall protection.
-- **UI & engine.** ✚. *Necessity:* the only policy combining a standing schedule with shortfall correction.
+- **UI & engine.** ✚. *Necessity:* the only policy combining a standing schedule with shortfall
+  correction.
 
 ### III.8 Order on demand (lot-for-lot / pull) ✚
 
@@ -740,6 +823,47 @@ identically for every policy below (a conservation constraint every split rule m
    allocate the remainder by preference rank; $\sum_s f_s\le1$ is a load-time feasibility check
    (`feasibility()`, facet 9).
 
+**IV.1.B — Engine parameters (registry ground truth) and an app-level correction to the numbered
+list above.** Of the six entries, only **two are registered policies today**: P-S.1
+(`backup_supplier`) and P-S.2 (`proactive_multi_sourcing`); P-S.3 (`capacity_reservation`) is
+registered but 🧩 planned (raises `PolicyNotImplementedError`); items 4/5/6 (ranked selection,
+capacity-proportional, tiered quota) **do not exist as registry entries at all** — they are ✚
+proposals with no `catalog_ref` yet, restated here rather than left implicitly equivalent to (2).
+**Item 1 (single sourcing) is not a policy either** — it is the engine's unconditional default:
+every material routes to `m.primary_link` (`p_p1_inventory_control.py::_release`) unless P-S.1 or
+P-S.2 is active on that row. Per the blueprint's own `.0`-suffix convention for promoted defaults
+(§4.4/§4.2 of `next-gen-platform-design.md`), item 1 should be named **`P-S.0 primary_link_routing`**
+so it is a visible, hashed bundle entry rather than an unnamed absence — this is a real gap this
+document should not paper over: "single sourcing" is currently *invisible* in the UI (no row shows
+it as an active choice), which is exactly the "no hidden behavior" violation §4.4 of the blueprint
+exists to prevent.
+
+| Policy | Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|---|
+| P-S.1 `backup_supplier` | `selection_rule` | enum | — | `min_cost`,`min_leadtime`,`reliability` | `min_cost` | G |
+| | `activation_trigger` | enum | — | `on_disruption`,`coverage_threshold` | `on_disruption` | G |
+| | `coverage_threshold_weeks` | number | weeks-of-supply | $[0.5,26]$ | 4.0 | G — only used when `activation_trigger=coverage_threshold` |
+| | `cooldown_weeks` | integer | weeks | $[0,8]$ | 0 | G |
+| | `backup_lead_time_weeks` | integer \| null | weeks | $[1,26]$ | `null` (⇒ backup link's own LT) | SM |
+| | `enabled_materials` | `"all_multi_sourced"` \| id list | — | — | `all_multi_sourced` | M |
+| P-S.2 `proactive_multi_sourcing` | `weights` | dict (material→supplier→%) | share % | shares sum to 100 per material | `{}` (⇒ equal split) | SM |
+| | `min_share_pct` | number | % | $[5,50]$ | 20.0 | G |
+| | `rebalance_trigger` | enum | — | `none`,`disruption` | `none` | G |
+| | `secondary_premium` | number | €/unit | $\ge0$ | 0.0 | SM |
+| P-S.3 `capacity_reservation` 🧩 | `reserved_capacity` | number (required) | units/wk | $\ge0$ | — | SM |
+| | `reservation_fee` | number (required) | €/unit/wk | $>0$ | — | SM |
+| | `call_leadtime_weeks` | integer | weeks | $[0,4]$ | 0 | SM |
+| P-S.4 `early_warning_failover` | `detection_lag_weeks` | integer | weeks | $[0,4]$ | 1 | G/S |
+| | `monitoring_cost` | number | €/yr | $\ge0$ | 0.0 | G |
+
+**Correction this table forces on §III.2/III.7's cross-reference and on §IV.1's item (3):** P-S.1's
+actual reroute predicate is **not** bare $\phi_{s,t}$ — it is gated by `activation_trigger`, and
+under the (non-default) `coverage_threshold` mode the trigger is
+$\mathrm{IP}_{i,t}/\bar D_i < $ `coverage_threshold_weeks`, a position-coverage test, **not**
+disruption-visibility at all; the two `activation_trigger` values are two different policies
+sharing one selection mechanism, worth distinguishing explicitly since only one of them uses §D.2's
+Channel 2 at all.
+
 **IV.1.A — Mathematical foundation: the optimal sourcing split under disruption risk.** Policies
 1–4 are all instances of one optimization the platform can state explicitly, generalizing the
 newsvendor apparatus of §III.A.5 from *quantity* risk to *supplier* risk. Model each supplier's
@@ -790,6 +914,20 @@ code.
 | **EPQ** | $Q^\ast_{\text{EPQ}}=Q^\ast_{\text{EOQ}}/\sqrt{1-\bar D/P}$ | finite production rate $P>\bar D$: inventory builds at rate $P-\bar D$ during the run, so average inventory is $(Q/2)(1-\bar D/P)$, not $Q/2$; substituting into $C(Q)$ and repeating the EOQ derivation gives the $1/\sqrt{1-\bar D/P}$ correction |
 | **POQ** | $T^\ast=Q^\ast/\bar D$ (periods of cover) | direct restatement of the EOQ quantity as a time-between-orders, for contexts where a review *period* is the natural control (pairs with §II.5's periodic review) |
 
+**Engine parameters (registry ground truth, `id: lot_sizing`, `catalog_ref: P-P.2`, 🧩 planned —
+registered schema, raises `PolicyNotImplementedError` until built).**
+
+| Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|
+| `rule` | enum | — | `lot_for_lot`,`fixed_qty`,`epq` | `lot_for_lot` | M |
+| `fixed_qty` | number \| null | units | $>0$ | `null` | M — `rule=fixed_qty`, $\ge$ MOQ enforced |
+| `epq_setup_cost` | number \| null | €/setup | $>0$ | `null` | M — `rule=epq`, feeds $A$ in the EOQ/EPQ table above |
+
+**Correction this table forces:** the table's POQ row has no corresponding `rule` enum value —
+POQ is a *presentation* of the EOQ quantity as a period, not a distinct engine rule; if it should
+be independently selectable it needs a fourth `rule` value, not just a derived display, flagged
+as a small open item rather than assumed already covered by `rule=epq`.
+
 **IV.2.c Dispatching / scarcity ordering (`P-P.11`) ✚.** *Purpose:* when material or capacity
 binds ($g_{p,t}<x_{p,t}$ for multiple products/orders), decide sequencing of the weekly production
 release — this is intra-week priority among competing demands, not sub-weekly scheduling (⛔
@@ -833,9 +971,26 @@ $g_{p,t}=\min(x_{p,t},\mathrm{cap}_{p,t},\ldots)$ is capacity-clipped, not mater
 B.4 is necessary but not sufficient; the engine's `feasibility()` states the material-binding
 precondition explicitly.
 
+**Engine parameters (registry ground truth, P-P.5 `short_term_capacity`, ✅ implemented).**
+
+| Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|
+| `activation` | enum | — | `revenue_positive`,`always_during_disruption` | `revenue_positive` | G — Eq. B.4 above is exactly the `revenue_positive` branch |
+| `max_overtime_factor` | number | $\times O_p$ | $[1.0,2.0]$ | 1.5 | P — $\bar\omega$ |
+| `overtime_premium_pct_of_price` | number | % of $u_p$ per overtime unit | $[1,25]$ | 5.0 | P — $\pi^o$ |
+
+**Correction:** the premium is stated in the registry as a **percentage of the product's price**
+$u_p$, not of unit production cost $c^{\text{prod}}_p$ as the prior text's Eq. B.4 wrote it —
+correcting Eq. B.4's cost term: $\pi^o$ scales $u_p$, so the activation condition is properly
+$m_p > \pi^o u_p$ (margin exceeds the premium-on-price cost), not $m_p>\pi^o c^{\text{prod}}_p$;
+the qualitative marginal-cost argument is unchanged, only the base the percentage applies to.
+
 **Standing capacity reserve (`P-P.6`) 🧩.** *Purpose:* pre-pay for a capacity buffer
-$O_p(1+\gamma)$ so a disruption never has to activate overtime reactively. *Economic
-justification:* worth its premium $c^{\text{reserve}}_p$ iff the **expected** avoided-stockout
+$O_p(1+\gamma)$ so a disruption never has to activate overtime reactively.
+**Engine parameters (registry ground truth, planned):** `reserve_factor` (number, $\times O_p$,
+range $[0,0.5]$, default 0.2 — this is $\gamma$) and `standing_cost` (number, required, €/wk,
+$\ge0$). *Economic
+justification:* worth its premium $c^{\text{reserve}}_p$ (`standing_cost`) iff the **expected** avoided-stockout
 value exceeds the certain standing cost: $\Pr[\text{disruption binds}]\cdot(\text{avoided
 loss})\ge\gamma\,c^{\text{reserve}}_p$ — a strategic-horizon (pre-commitment) version of Eq. B.4's
 operational-horizon condition; the two differ exactly in *when* the commitment is made (§4.1's
@@ -844,6 +999,33 @@ horizon axis), not in the underlying cost logic.
 ### IV.4 Safety stock (sizing methods that feed §III)
 
 fixed-days $d\bar D_i$ ✅ | service-level $z(\alpha)\sigma_D\sqrt{L_i}$ ✅ | **King** $z(\alpha)\sqrt{L_i\sigma_D^2+\bar D_i^2\sigma_L^2}$ ✅ | **ABC-XYZ** 3×3 $z$-matrix ✅ (`P-P.3` materials, `P-P.4` FG revenue-ABC). Output $\mathrm{SS}_i$ is consumed by the inventory policy — a declared edge, not hidden. **Every formula here is Eq. A.1 of §III.A at a different $\sigma_L$** (service-level = deterministic-lead-time case; King = the general compound-variance case — proof in §III.A.2); every $z(\alpha)$ is a Type I cycle-service factor (§III.A.4), and its cost-optimal value is Eq. A.3 (§III.A.5) rather than a hand-picked convention.
+
+**Engine parameters (registry ground truth).** Two distinct registered policies, not one — an
+app-level distinction worth stating up front: P-P.3 governs **material** buffers (feeds III.1/
+III.2's $\mathrm{SS}$ via the hook-priority composition of III.2), P-P.4 governs **finished-goods**
+buffers (feeds `state.fg_target`, MTS only, ADR 0001) — they are not the same slot, have different
+schemas, and a project can run one, the other, or both without conflict.
+
+| Policy | Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|---|
+| P-P.3 `safety_stock_materials` | `classification` | enum | — | `abc_xyz`,`uniform`,`fixed_days`,`king` | `abc_xyz` | G |
+| | `z_matrix` | dict (9 cells `{A,B,C}×{X,Y,Z}`) | % service level | each $[80,99.9]$ | `{AX:99.5,AY:99,AZ:98,BX:98,BY:95,BZ:90,CX:95,CY:90,CZ:80}` | G — `classification=abc_xyz` |
+| | `abc_breakpoints` | 2-tuple | cumulative value share | — | `(0.80,0.95)` | G |
+| | `xyz_cv_breakpoints` | 2-tuple | demand CV | — | `(0.13,0.25)` | G |
+| | `uniform_service_level` | number | % | $[80,99.9]$ | 95.0 | G — `classification=uniform` |
+| | `fixed_days_cover` | number | days | $[0,84]$ | 14.0 | G — `classification=fixed_days` |
+| P-P.4 `fg_safety_stock` | `sizing` | enum | — | `service_level`,`fixed_days`,`fixed_units` | `service_level` | P |
+| | `service_level_pct` | number | % | $[80,99.9]$ | 95.0 | P — $z^{FG}_p$ |
+| | `segmentation` | enum | — | `uniform`,`abc_by_revenue` | `uniform` | G — A/B/C get `service_level_pct`/$-2$pp/$-5$pp (floor 80) |
+| | `fixed_days_cover` | number | days | $[0,12]$ | 2.0 | P — `sizing=fixed_days` |
+| | `fixed_units` | number \| null | units | $\ge0$ | `null` | P — `sizing=fixed_units` |
+| | `holding_cost_rate` | number | %/yr of COGS | $[5,50]$ | 20.0 | P — $h^{FG}_p$ |
+
+**Correction this table forces on §III.A.5's Eq. A.3 prefill proposal:** P-P.3's `classification`
+enum does **not** include a `cost_optimal` option — Eq. A.3's $z^\star$ is, correctly, proposed
+there as a *future* addition to this exact enum (a fifth `classification` value,
+e.g. `cost_optimal`, computed from `materials.cost`/`holding_cost_pct`/margin rather than typed),
+not something already selectable; this table is the concrete registry change that proposal implies.
 
 ### IV.5 Forecasting (`P-F.0`/`P-F.1`, drives MRP, MTS targets, safety stock)
 
@@ -958,6 +1140,30 @@ indicator $\delta_{\ell,t}\in\{0,1\}$.
    equivalent to substituting $L_i\leftarrow L_i+h$ into every §III.A formula — a direct,
    already-derived application of §III.A, not a new mechanism.
 
+**V.A — Engine parameters (registry ground truth).** Of the seven entries, four are registry
+entries (P-T.1, P-T.2 ✅, P-T.3, P-T.4); **P-T.5 (consolidation) and P-T.6 (frequency) are not
+registered at all** — not even as 🧩 planned schemas — a real breadth gap this document should
+name plainly rather than let the ✚ marker imply "spec-complete, pending implementation" when no
+schema exists yet:
+
+| Policy | Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|---|
+| P-T.1 `multimodal_lane_portfolio` 🧩 | `lanes` | dict (link → list of `LaneSpec`) | — | $\le3$ lanes/link | `{}` | SM |
+| | `LaneSpec.mode` | enum | — | `default`,`sea`,`air`,`road`,`rail` | `default` | E |
+| | `LaneSpec.lead_time_weeks` (required) | integer | weeks | $[0,26]$ | — | E |
+| | `LaneSpec.cost_per_unit` (required) | number | €/unit | $\ge0$ | — | E |
+| | `LaneSpec.capacity_per_week` | number \| null | units/wk | $>0$ | `null` | E |
+| | `mode_split_pct` | dict (link → mode → %) | % | shares sum to 100 | `{}` | SM |
+| P-T.2 `expedited_shipments` ✅ | `decision` | enum | — | `revenue_positive`,`always_during_disruption` | `revenue_positive` | G — Eq. C.1 is the `revenue_positive` branch |
+| | `premium_pct_of_cost` | number | % of $c_m$ per unit | $[1,50]$ | 3.0 | M — $\pi^{exp}$ |
+| | `scope` | enum | — | `disrupted_materials`,`all` | `disrupted_materials` | G |
+| P-T.3 `mode_shift` 🧩 | `upgrade_lane` (required) | string | lane id | — | — | E — requires P-T.1 |
+| | `lt_saving_weeks` (required) | integer | weeks | $\ge1$ | — | E |
+| | `upgrade_cost` (required) | number | €/unit | $>0$ | — | E |
+| P-T.4 `leadtime_hedging` 🧩 | `hedge_weeks` | integer | weeks | $[0,8]$ | 2 | M — this is $h$ |
+| | `applies_to` | enum | — | `all`,`long_lt`,`abc_a_only` | `long_lt` | G |
+| | `long_lt_threshold_weeks` | integer | weeks | $[1,51]$ | 12 | G |
+
 **Deferred, restated.** Route optimization / milk-run design remains ⛔ — network-*design*
 optimization, not a weekly-simulation policy (§10.1 row 1 of the blueprint; consistent with the
 platform's simulation-not-MILP positioning, §14 open question 2).
@@ -990,6 +1196,17 @@ entry $j$; available supply this week $\mathrm{avail}_{p,t}$.
   $(1-\text{partial\_accept\_prob})U_{p,t}$ is lost immediately — a Bernoulli split per unit (or,
   equivalently at weekly-bucket granularity, a deterministic fractional split of the aggregate).
 
+**Engine parameters (registry ground truth, `id: unmet_demand_handling`, one shared schema across
+all three variants above — the same one-schema/enum-selects-behavior pattern as `inventory_control`,
+§III.0-bis).**
+
+| Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|
+| `rule` | enum | — | `lost_sales`,`backorder`,`partial_backorder` | `lost_sales` | P |
+| `backorder_horizon` | integer | weeks | $[0,26]$ | 4 | P |
+| `backorder_penalty` | number | €/unit/wk | $\ge0$ | 0.0 | P — $\pi^{bo}$ |
+| `partial_accept_prob` | number | — | $[0,1]$ | 0.5 | P |
+
 ### VI.2 Customer allocation under scarcity (`P-C.2` ✅)
 
 **General form (an explicit optimization, not just named rules).** When
@@ -1008,6 +1225,30 @@ the *product/customer-facing instance* of the identical mechanism, not a separat
 
 *State/data read:* `outbound_logistics.volume` (per-customer demand shares). *Inert* for
 single-customer MTO (no scarcity split possible with one customer).
+
+**Engine parameters (registry ground truth, `id: customer_allocation`).**
+
+| Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|
+| `rule` | enum | — | `fcfs`,`proportional`,`fair_share`,`priority`,`sla_tier` | `fcfs` | C |
+| `priority_weights` | dict (customer→number) | weight | — | `{}` | C — `rule=priority` |
+| `sla_tiers` | dict (segment→%) | fill floor % | — | `{}` | C — `rule=sla_tier` |
+
+**The material-allocation twin (`id: material_allocation`, `catalog_ref: P-P.9`, ✅, PH-40 —
+the exact LP Eq. C.2 references above).** Same shape, plant/product-side instead of
+customer-side: `objective` enum (`max_revenue`,`max_fill_rate`,`priority_weighted`,`fg_replenish`;
+default `max_revenue`), `solver` enum (`lp`,`greedy`; default `lp`, HiGHS-backed), `window_weeks`
+(integer, $[1,13]$, default 4 — the rolling horizon $W$), `activation` enum
+(`during_disruption`,`always`; default `during_disruption`), `annual_cost` (number, €/yr, default
+6240.0 — planner-labor cost charged regardless of activation), `priority_weights` (dict,
+product→weight). **Consequence for the interaction table (§IX.2 row 8):** P-C.2 and P-P.9 are not
+merely "both instances of the LP" in spirit — they are two separate registered policies with two
+separate parameter schemas that a project can enable independently, so Eq. C.2 must be read as
+*one mathematical shape*, not one engine object; a project can run P-P.9 with `objective=max_revenue`
+and P-C.2 with `rule=fair_share` simultaneously, and the two solve *different* LPs at *different*
+phases (PH-40 vs. PH-60) over *different* decision variables (product output allocation vs.
+customer fulfillment split) that happen to compose (production feeds fulfillment, §7.2 interaction
+8) rather than being the same optimization run twice.
 
 ### VI.3 Minimum split ratio (partial shipment)
 
@@ -1037,6 +1278,14 @@ implemented.
 Substitution offers / delay incentives with accept-probabilities; needs a revenue-elasticity
 model that does not exist in the current data model (§5.8) — 🧩 planned, activation deferred,
 stated here rather than silently no-op'd (the honest-catalog property, A3 of the blueprint).
+
+**Engine parameters (registry ground truth, `id: demand_shaping`, `catalog_ref: P-C.3`, 🧩
+planned).** `substitution_offer` (dict, product→substitute id), `substitution_accept_prob`
+(number, $[0,1]$, default 0.5), `substitution_discount` (number, €/unit, $\ge0$, default 0.0),
+`delay_incentive` (number, €/unit, $\ge0$, default 0.0), `delay_accept_prob` (number, $[0,1]$,
+default 0.3). Confirms the ⏸ activation status: every accept-probability here is a **hand-set
+input**, not derived from a price-elasticity model — the registry schema itself is the evidence
+that §5.8's stated blocker (no revenue-elasticity model) is real, not a documentation gap.
 
 ---
 
@@ -1083,6 +1332,36 @@ orchestration.
 $\phi_t$/coverage and an action that enables+retunes an existing policy's crisis ModeStrip.
 Evaluated every `evaluation_cadence_weeks`; spend capped at `cost_cap`. Replaces the flat
 recovery-response list with a programmable sequence.
+
+**Engine parameters (registry ground truth).**
+
+| Policy | Field | Type | Unit | Range / enum | Default | Scope |
+|---|---|---|---|---|---|---|
+| P-X.1 `recovery_playbook` 🧩 | `steps` (required) | array of `PlaybookStep`, $\le10$ | — | ordered | — | G |
+| | `PlaybookStep.trigger` (required) | enum | — | `disruption_detected`,`coverage_below`,`fill_rate_below`,`backlog_above` | — | — |
+| | `PlaybookStep.policy_ref` (required) | string | policy id | — | — | — |
+| | `PlaybookStep.trigger_value` | number \| null | trigger-specific | — | `null` | — |
+| | `PlaybookStep.param_override` | object (any) | — | — | `{}` | — |
+| | `PlaybookStep.cooldown_weeks` | integer | weeks | $[0,8]$ | 0 | — |
+| | `evaluation_cadence_weeks` | enum (int) | weeks | $\{1,2\}$ | 1 | G |
+| | `cost_cap` | number \| null | € | $>0$ | `null` | G |
+| P-P.7 `process_flexibility` 🧩 | `flexibility_matrix` (required) | dict (line→product list) | — | — | — | P |
+| | `switchover_cost` | number | €/switch | $\ge0$ | 0.0 | P |
+| | `switchover_time_weeks` | integer | weeks | $[0,2]$ | 0 | P |
+| P-P.8 `alternative_bom` 🧩 | `substitute_map` (required) | dict (material→substitute list) | — | — | — | M |
+| | `substitute_rates` | dict (product→material→rate) | units substitute/unit product | — | `{}` | P×M — $r'_{p,m'}>0$ |
+| | `substitution_cost` | number | €/unit | $\ge0$ | 0.0 | M |
+| | `auto_substitute` | boolean | — | — | `true` | G |
+| P-P.10 `repurposing` 🧩 | `conversion_map` (required) | dict (line→capability) | — | — | — | P |
+| | `conversion_cost` (required) | number | €/conversion | $>0$ | — | P |
+| | `conversion_time_weeks` | integer | weeks | $[1,8]$ | 2 | P |
+| | `reversion_time_weeks` | integer | weeks | $[0,4]$ | 1 | P |
+
+**A structural fact this table exposes:** every P-X.1 `PlaybookStep.policy_ref` must resolve to a
+policy id from *this same registry* (the `id` column values used throughout §III–§VIII's tables)
+— the playbook is compositional over the existing catalog by construction, not a parallel
+mechanism; a `policy_ref` that does not match a registered `id` is a load-time validation failure,
+not a silent no-op (consistent with §7.1's `validate_hooks` discipline).
 
 ---
 
@@ -1268,18 +1547,18 @@ policy's cost is a declared append to $\mathcal C^{res}$ — cost is attributabl
 
 ## Appendix A — Engine binding (implemented ✅ · specified ✚ · registered-planned 🧩)
 
-| Category | ✅ today | ✚ to add | 🧩 registered |
+| Category | ✅ today (registered, `status=implemented`) | ✚ to add (no registry entry yet) | 🧩 registered, `status=planned` |
 |---|---|---|---|
-| Inventory | min_max, rop_q, base_stock, periodic | min_max_ss, regular, regular_ss, order_on_demand, unlimited, no_replenishment, MRP, Quantity-basis | — |
-| Sourcing | single, multi (P-S.2), backup (P-S.1), ranked | capacity-proportional, tiered | capacity_reservation (P-S.3) |
-| Production | MTS, MTO | dispatching (P-P.11) | lot_sizing (P-P.2), flex/altBoM/repurpose |
+| Inventory | `inventory_control`/P-P.1: min_max, rop_q, base_stock, periodic (one schema, §III.0-bis) | min_max_ss/regular_ss (compositions, not new schema, §III.2/III.7), regular, order_on_demand, unlimited, no_replenishment, MRP, Quantity-basis | — |
+| Sourcing | backup (P-S.1), multi (P-S.2), early-warning (P-S.4) | single/`P-S.0` (unnamed default, §IV.1.B), ranked, capacity-proportional, tiered | capacity_reservation (P-S.3) |
+| Production | `P-P.0` build discipline (MTS/MTO, unnamed today), material_allocation (P-P.9) | dispatching (P-P.11), fulfillment_discipline (P-P.12) | lot_sizing (P-P.2), process_flexibility (P-P.7), alternative_bom (P-P.8), repurposing (P-P.10) |
 | Capacity | overtime (P-P.5) | supplier-capacity model (P-S.5) | standing reserve (P-P.6) |
-| Safety stock | fixed_days, service_level, king, abc_xyz | — | — |
-| Forecasting | built-in SES-like | SES/Holt/HW/Croston/MA/naive (P-F.1) | — |
-| Transport | expedite (P-T.2) | consolidation (P-T.5), frequency (P-T.6) | lane portfolio/mode-shift/hedge |
-| Fulfillment | lost_sales, backorder, allocation | min_split_ratio, patience (P-C.5) | demand_shaping (P-C.3) |
-| Demand/LT | triangularAV, det/stoch LT | demand_model (P-C.4), lead_time_model (P-S.6) | — |
-| Recovery | early-warning (P-S.4) | — | playbook (P-X.1) |
+| Safety stock | safety_stock_materials (P-P.3): fixed_days, service_level, king, abc_xyz; fg_safety_stock (P-P.4) | cost-optimal `classification` value (Eq. A.3, §III.A.5) | — |
+| Forecasting | built-in SES-like mechanic (unnamed, `P-F.0` per §4.4's convention) | SES/Holt/HW/Croston/MA/naive as a selectable `forecasting_method` (P-F.1) | — |
+| Transport | expedite (P-T.2) | consolidation (P-T.5), frequency (P-T.6) — **not even registered as 🧩**, §V.A | lane portfolio (P-T.1), mode-shift (P-T.3), hedge (P-T.4) |
+| Fulfillment | unmet_demand_handling (P-C.1): lost_sales/backorder/partial_backorder; customer_allocation (P-C.2) | min_split_ratio, patience (P-C.5) | demand_shaping (P-C.3) |
+| Demand/LT | triangularAV, det/stoch LT (engine mechanics, not yet policy slots) | demand_model (P-C.4), lead_time_model (P-S.6), supplier_capacity_model (P-S.5) | — |
+| Recovery | early-warning (P-S.4, listed under Sourcing too — it is a supplier-stage policy with a recovery role) | — | playbook (P-X.1) |
 
 ## Appendix B — Symbol index
 
@@ -1351,3 +1630,30 @@ density was initially written $\phi(z)$, colliding with this document's pre-exis
 avoidable $\rho_s$ overload (disruption probability in §IV.1.A vs. utilization in §IV.6.A) by
 renaming utilization to $\upsilon_s$ — both are documented in Appendix B rather than left implicit.
 No engine, UI, or schema code changed in v2.1 or v2.2 — both are specification-only.
+
+**v2.3 changelog (this change).** Read `src/lib/policies/registry.generated.json` in full (all 22
+`policies[]` entries) and added an **Engine parameters (registry ground truth)** table — exact
+field, type, unit, range/enum, default, scope, transcribed, not paraphrased — to every registered
+policy across §III (`inventory_control`), §IV (`safety_stock_materials`, `fg_safety_stock`,
+`lot_sizing`, `short_term_capacity`, `standing_capacity_reserve`, `backup_supplier`,
+`proactive_multi_sourcing`, `capacity_reservation`, `early_warning_failover`), §V
+(`multimodal_lane_portfolio`, `expedited_shipments`, `mode_shift`, `leadtime_hedging`), §VI
+(`unmet_demand_handling`, `customer_allocation`, `material_allocation`, `demand_shaping`), and
+§PART VIII (`recovery_playbook`, `process_flexibility`, `alternative_bom`, `repurposing`). This
+surfaced and corrected several real prose/registry mismatches (listed in the header table above)
+rather than only adding tables beside unchanged prose: §III.1's $s,S$ were presented as editable
+when they are computed; §III.2/III.7's SS was presented as a field on the policy itself when it is
+a second policy's hook composing on top of the first (`p_p3_safety_stock.py::on_phase` reading
+`ctx.level_s`/`ctx.level_S` after `p_p1`'s priority-50 write); §III.3's (R,Q) equation matched the
+textbook generalization rather than the shipped single-lot branch; §IV.3's Eq. B.4 misattributed
+the overtime premium's base (price, not production cost); §IV.1 corrected which of its six listed
+sourcing rules are actually registered policies (two are — P-S.1, P-S.2 — the rest are ✚ or, for
+"single sourcing," not even a policy but an unnamed engine default proposed here as `P-S.0`); §V.A
+found P-T.5/P-T.6 have no registry entry at all, not even 🧩; Appendix A's category table was
+corrected to reflect all of the above rather than left as the pre-audit summary. This is the
+concrete answer to "the app-wise level": every policy in this document is now traceable to the
+exact Pydantic field a developer would implement against and a user would see in the grid, sourced
+from the one artifact the platform's own doctrine (A6/§6.2 of the blueprint) already declares
+canonical — not re-derived from this document's prose, not from `schemas.ts`, not from the help
+page. No engine, UI, or schema code changed — still specification-only; the next step this
+revision sets up is making the UI/schemas/help page actually match what is now documented here.
