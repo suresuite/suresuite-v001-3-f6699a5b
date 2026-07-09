@@ -497,6 +497,16 @@ def from_project_data(data: ProjectData) -> MappingResult:
     bom = [BomLine(product_id=b.product_id, material_id=b.material_id,
                    rate=float(b.consumption_rate or 1.0))
            for b in data.bom if b.product_id in {p.id for p in products}]
+    if not bom:
+        # Fail with a diagnosis instead of pydantic's opaque "bom too_short":
+        # either the project has no BOM rows at all, or none of its BOM
+        # product ids match a product master (for multi-level BOMs the
+        # flattened roots must be the outbound/finished products).
+        raise ValueError(
+            "no usable BOM arcs: the project's BOM is empty or its product ids "
+            f"match none of the {len(products)} product(s) — upload a BOM whose "
+            "top level is the finished product"
+        )
 
     prod_ids = {p.id for p in products}
     network = Network(
