@@ -12,8 +12,8 @@ const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }
         hasNavBar ? (isCollapsed ? "ml-14" : "ml-0 sm:ml-48") : ""
       }`}
     >
-      Developed by <span className="font-medium text-foreground">Phu Nguyen</span> &{" "}
-      <span className="font-medium text-foreground">Prof. Dmitry Ivanov</span> (HWR Berlin) · WP4 - ACCURATE project, funded by the European Union
+      Developed by <span className="font-medium">Phu Nguyen</span> &{" "}
+      <span className="font-medium">Prof. Dmitry Ivanov</span> (HWR Berlin) · WP4 - ACCURATE project, funded by the European Union
     </div>
   </footer>
 );
