@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | v2.1 — v2.0's reframe (*policies*, not *strategies*) preserved; adds §III.A (rigorous stochastic derivations behind every Part III/§IV.4 formula: DLT compound variance, Type I/II service-level distinction, cost-optimal safety factor, (R,Q) joint optimization, an assumption ledger), §III.15 (evidence-based AnyLogistix benchmark, sourced from ALX's published docs), §III.16 (evaluates and scopes the array-editor UI idea against the existing hybrid grid), and closes the MRP safety-stock sizing inconsistency (§III.11). |
-| **Date** | 2026-07-09 (v2.0: 2026-07-07) |
+| **Status** | v2.2 — v2.0's reframe (*policies*, not *strategies*) preserved. v2.1 added §III.A (inventory's stochastic derivations), §III.15 (AnyLogistix benchmark), §III.16 (UI array-editor scoping). **v2.2 brings §IV (sourcing, production, capacity, forecasting, supplier capacity/lead-time), §V (transport), and §VI (fulfillment) up to the same per-policy template and derivation standard §III already had** — the prior revision left them as one-paragraph stubs, inconsistent with §PART 0's own mandatory-template rule; every policy in §IV–§VI now has Purpose/Inputs/Logic/Outputs and a derived, not asserted, formula. **v2.2 also adds §PART VIII-D**, a formal two-channel disruption-propagation model (physical/state-mediated vs. detection-gated/policy-mediated) worked through the brief's four named disruption types, grounded directly in `scsim/scsim/entities/disruption.py` and `core/context.py` — this was previously undocumented in this file. |
+| **Date** | 2026-07-09 (v2.1 same day; v2.0: 2026-07-07) |
 | **Role** | Single source of truth for every supply chain **policy** the platform offers, its **mathematical model**, its **parameters and UI**, and its **coding representation**. Any change to a policy, parameter, equation, or its UI/engine binding must be reflected here in the same change. |
 | **Benchmark** | anyLogistix (ALX) is the reference for *breadth of the policy library* and the *table/parameter UI*. We match its granularity, evaluate each policy for necessity under our weekly-bucket engine, and give every policy a rigorous mathematical model (ALX documents behavior; we specify equations). |
 | **Ground truth** | Parameter names/units/ranges of already-implemented policies are transcribed from the engine registry (`src/lib/policies/registry.generated.json`, engine 0.2.0) and plugin source (`scsim/scsim/policies/`). New policy types proposed here are marked and specified to the same rigor so they can be implemented directly. |
@@ -312,8 +312,11 @@ about which one every parameter means.
   $\beta = 1 - \mathbb E[\text{shortage per cycle}]/\bar Q$, where $\bar Q$ is the expected order
   quantity ($S-s$ for min-max in steady state, $Q$ for (R,Q)) and the expected shortage per cycle
   uses the **standard normal loss function**
-  $$\psi(z) \;=\; \phi(z) - z\big(1-\Phi(z)\big), \qquad \mathbb E[\text{shortage}] = \sigma_{X_i}\,\psi(z),$$
-  ($\phi,\Phi$ the standard normal pdf/cdf; $\psi$ is the expected value of $\max(Z-z,0)$ for
+  $$\psi(z) \;=\; n(z) - z\big(1-\Phi(z)\big), \qquad \mathbb E[\text{shortage}] = \sigma_{X_i}\,\psi(z),$$
+  ($n,\Phi$ the standard normal pdf/cdf — $n(\cdot)$ used rather than the more common $\phi(\cdot)$
+  glyph specifically to avoid collision with this document's $\phi_t$, the firm-knowledge/crisis
+  indicator used throughout §IV.1/§V/§VIII/§PART VIII-D; one symbol, one meaning, per the
+  document's own rule. $\psi$ is the expected value of $\max(Z-z,0)$ for
   $Z\sim\mathcal N(0,1)$ — a standard Silver–Pyke–Peterson result). So
   $$\boxed{\;\beta_i \;\approx\; 1 \;-\; \dfrac{\sigma_{X_i}\,\psi(z_i)}{\bar Q_i}\;}\tag{A.2}$$
   Fill rate is what the run's **KPIs actually measure** (§III.14's fill rate, §IX.3's
@@ -682,46 +685,222 @@ Per-row attributes with precise math (not policy types):
 
 ## PART IV — Plant-side policy libraries
 
+Parts IV–VI were compressed relative to Part III's per-policy template in the prior revision —
+an inconsistency with §PART 0's own rule ("every policy... identical structure... no policy
+described in prose alone"). This revision brings every policy in §IV–§VI to the same template and
+the same derivation standard as §III: Purpose → Inputs (sets, parameters, state read) → Logic
+(equations) → Outputs → UI & engine, plus a **§X.A mathematical foundation** subsection per
+category deriving the constants the policies use, exactly as §III.A does for inventory.
+
 ### IV.1 Sourcing / Procurement
 
 **Decision governed.** For each *(plant, material)*: which supplier(s) receive the material's
-replenishment order $O_{m,t}$ (produced by the inventory policy, §III), in what split. Links
-$\mathcal L_m=\{(s,m)\}$; cost $c_\ell$, lead time $L_\ell$, reliability $r_s$; weights $w_{m,s}$.
+replenishment order $O_{m,t}$ (produced by the inventory policy, §III), in what split.
+**Notation.** Links $\ell=(s,m)\in\mathcal L_m$; unit cost $c_\ell$; lead time $L_\ell$; supplier
+disruption (Bernoulli, per week) probability $\rho_s$; reliability $r_s=1-\rho_s$; split weight
+$w_{m,s}\in[0,1]$, $\sum_{s}w_{m,s}=1$. **Timing & quantity are not sourcing decisions** — timing
+is the inventory review gate $\rho_t$ (§II.5), quantity is $O_{m,t}$ (§III); sourcing sets only the
+split $w_{m,s}$, so $O_{\ell,t}=w_{m,s}O_{m,t}$ and $\sum_{\ell\in\mathcal L_m}O_{\ell,t}=O_{m,t}$
+identically for every policy below (a conservation constraint every split rule must satisfy).
 
-| # | Policy type | Split rule | Engine |
-|---|---|---|---|
-| 1 | **Single sourcing** | all to cheapest $s^\star$ | ✅ |
-| 2 | **Multi-sourcing (fixed split)** | fixed quotas $w_{m,s}$ | ✅ `P-S.2` |
-| 3 | **Primary + backup (contingent)** | primary unless disrupted → backup | ✅ `P-S.1` |
-| 4 | **Ranked selection** | 100% to min_cost / min_leadtime / reliability | ✅ |
-| 5 | **Capacity-proportional** | $w_{m,s}\propto K_s$ | ✚ |
-| 6 | **Tiered quota with floors** | quotas + minima | ✚ |
+1. **Single sourcing (P-S.x split-rule) ✅.** *Purpose:* minimize procurement cost; no
+   diversification. *Logic:* $s^\star=\arg\min_{s:(s,m)\in\mathcal L_m} c_{s,m}$;
+   $w_{m,s^\star}=1$, else $0$. *Outputs:* $O_{\ell,t}$ on the single link. *Feasibility:* requires
+   $|\mathcal L_m|\ge1$. This is §IV.1.A's Eq. B.1 at $\lambda=0$ (no risk aversion) — not an
+   independent rule, a boundary case of the general split (below).
+2. **Multi-sourcing, fixed split (`P-S.2`) ✅.** *Purpose:* standing risk diversification.
+   *Parameters:* $w_{m,s}$ per supplier, floor `min_share_pct`. *Logic:*
+   $w_{m,s}\ge\text{min\_share\_pct}$ for every active $s$; $O_{\ell,t}=w_{m,s}O_{m,t}$.
+   *Outputs:* split orders; the cost delta vs. single-sourcing
+   $\sum_s w_{m,s}(c_{s,m}-c_{s^\star,m})O_{m,t}$ is logged to $\mathcal C^{res}$ as the
+   diversification premium. *State read:* none beyond $O_{m,t}$.
+3. **Primary + backup, contingent (`P-S.1`) ✅.** *Purpose:* pay nothing while nominal; reroute
+   only when the disruption is *firm-visible*. *Parameters:* backup selection rule
+   ($\min$ cost / $\min$ lead time / reliability), `cooldown_weeks`. *Logic:* let
+   $\phi_{s,t}=\mathbf 1[s\in\text{visible\_disrupted\_suppliers}(t)]$ (§Disruptions below, Eq. D.3
+   — the exact predicate the engine evaluates, `context.py::visible_disrupted_suppliers`).
+   $w_{m,s^\star_{\text{primary}}}=1-\phi_{s^\star_{\text{primary}},t}$;
+   $w_{m,s^\star_{\text{backup}}}=\phi_{s^\star_{\text{primary}},t}$, held through
+   `cooldown_weeks` after $\phi$ returns to 0 (prevents thrashing). *Outputs:* the reroute
+   decision is a KPI event (time-to-switch) in addition to the split orders.
+4. **Ranked selection ✅.** *Purpose:* like single-sourcing, but the rank is **re-evaluated every
+   period** against a live criterion (cost/lead-time/reliability), so an event that changes a
+   link's effective cost or lead time can change $s^\star$ without a contingent-backup rule firing.
+   *Logic:* $s^\star_t=\arg\text{best}_{s}\ \kappa(c_{s,m},L_{s,m},r_s)$ for the chosen criterion
+   $\kappa$; $w_{m,s^\star_t}=1$. *Distinction from (1):* (1) is static (computed once from cost);
+   (4) is dynamic (recomputed from live, possibly disrupted, link state each period).
+5. **Capacity-proportional ✚.** *Purpose:* balance order flow against each supplier's physical
+   throughput, avoiding queueing at any one link. *Logic:*
+   $w_{m,s}=K_s\big/\sum_{s'\in\mathcal L_m}K_{s'}$ (P-S.5's `capacity_per_week`). *Necessity:*
+   the natural complement to §IV.6's finite-capacity supplier model — without it, a fixed split
+   (2) can route more volume to a link than its capacity supports, manufacturing the exact
+   congestion §IV.6.A analyzes.
+6. **Tiered quota with floors ✚.** *Purpose:* contractual minimum-volume commitments layered under
+   a preference order. *Logic:* fill floors $w_{m,s}\ge f_s$ first (contractual minimums), then
+   allocate the remainder by preference rank; $\sum_s f_s\le1$ is a load-time feasibility check
+   (`feasibility()`, facet 9).
 
-**Model.** $O_{\ell,t}=w_{m,s}O_{m,t}$, $\sum_\ell O_{\ell,t}=O_{m,t}$. Fixed split: $w_{m,s}\ge$`min_share_pct`, non-primary premium to $\mathcal C^{res}$. Contingent: 100% primary while $\phi_t=0$; reroute to backup on firm-visible disruption, hold `cooldown_weeks`. **Timing & quantity are not sourcing policies** — timing is the inventory review gate $\rho_t$, quantity is $O_{m,t}$; sourcing sets only the split.
+**IV.1.A — Mathematical foundation: the optimal sourcing split under disruption risk.** Policies
+1–4 are all instances of one optimization the platform can state explicitly, generalizing the
+newsvendor apparatus of §III.A.5 from *quantity* risk to *supplier* risk. Model each supplier's
+weekly disruption state as i.i.d. Bernoulli($\rho_s$) (a stated, simplifying independence
+assumption — correlated disruptions, e.g. a shared upstream tier-2 supplier, are out of scope for
+the current three-echelon model, §2.4). For a split $w=(w_s)_{s\in\mathcal L_m}$, the **expected**
+and **variance** of the shortfall on an order of size $O_{m,t}$ are
+$$\mathbb E[\text{shortfall}] = O_{m,t}\sum_s w_s\rho_s, \qquad \mathrm{Var}(\text{shortfall}) = O_{m,t}^2\sum_s w_s^2\,\rho_s(1-\rho_s)\tag{B.1}$$
+(the second line: $\mathrm{Var}\!\left(\sum_s w_sO_{m,t}\mathbb 1_s\right)=O_{m,t}^2\sum_sw_s^2\mathrm{Var}(\mathbb 1_s)$
+under independence — the same portfolio-variance identity Markowitz uses for asset risk, applied
+here to supply risk; the analogy is structural, not decorative — diversifying across suppliers
+with **uncorrelated** disruption risk reduces $\mathrm{Var}(\text{shortfall})$ by the same
+$1/n$-type mechanism a diversified asset portfolio reduces return variance). The cost-risk
+trade-off is
+$$\min_{w}\ \sum_s w_s c_{s,m}O_{m,t} \;+\; c^u_m\,\mathbb E[\text{shortfall}] \;+\;\lambda\,\mathrm{Var}(\text{shortfall}), \quad \text{s.t. } \sum_s w_s=1,\ w_s\ge0,\tag{B.2}$$
+reusing $c^u_m$ — the **same** underage cost derived in Eq. A.3 — so a project that has priced
+its stockout cost for safety-stock sizing gets a *consistent* sourcing-split objective for free,
+rather than a second, disconnected risk parameter. For the two-supplier case ($w_1=w,\,w_2=1-w$),
+Eq. B.2 is a quadratic in $w$ with closed-form minimizer
+$$w^\star = \frac{(c_{2,m}-c_{1,m})+c^u_m(\rho_2-\rho_1)+2\lambda\rho_2(1-\rho_2)}{2\lambda\big[\rho_1(1-\rho_1)+\rho_2(1-\rho_2)\big]},\ \ \text{clipped to } [0,1].\tag{B.3}$$
+**Reading Eq. B.3:** $w^\star\to1$ (single-source supplier 1) as $\lambda\to0$ (risk-neutral —
+recovers policy (1)); $w^\star$ moves toward the capacity/reliability-weighted interior point as
+$\lambda$ grows — the diversified regime policies (2)/(5)/(6) approximate with hand-set weights.
+**Status:** offered as the derivation behind a future `P-S.2` *auto-split* variant (roadmap-tracked
+like §III.A.6's Zheng–Federgruen note, not built); today's `weights` remain user/preset-set. This
+is exactly the OR argument ALX's GUI-only split entry cannot make (§III.15's benchmark applies
+identically here: a split percentage typed into a table vs. a split derived from stated cost and
+risk parameters).
 
 ### IV.2 Production
 
-**IV.2.a Build discipline.** MTS: $x_{p,t}=(S^{FG}_p-\mathrm{IP}^{FG}_{p,t})^+$ ✅. MTO: $x_{p,t}=D_{p,t}+B_{p,t}$ ✅ (default). ATO ⛔ reserved. Both capacity- and material-clipped at PH-50: $g_{p,t}=\min(x_{p,t},\text{cap}_{p,t},\min_m\lfloor I_{m,t}/b_{p,m}\rfloor)$. (The P-P.0 mechanic, named.)
+**IV.2.a Build discipline (`P-P.0`, promoted default) ✅.** *Purpose:* decide how much to produce
+this week. *Logic:* MTS: $x_{p,t}=(S^{FG}_p-\mathrm{IP}^{FG}_{p,t})^+$; MTO (default):
+$x_{p,t}=D_{p,t}+B_{p,t}$; ATO ⛔ reserved (§5.8 of the blueprint — needs due-date promising, out
+of MTS/MTO scope). *Outputs:* both are clipped at PH-50 by capacity and material feasibility —
+$g_{p,t}=\min\!\big(x_{p,t},\,\mathrm{cap}_{p,t},\,\min_m\lfloor I_{m,t}/b_{p,m}\rfloor\big)$
+(the BoM-feasibility floor over incidence coefficients $b_{p,m}$) — this is Eq. 8/9 of the engine
+reference, named as the P-P.0 mechanic here so it is visible in the catalog rather than only in
+code.
 
-**IV.2.b Lot sizing.** lot-for-lot ✅ | fixed-$Q$ | EOQ $Q^\ast=\sqrt{2A\bar D/(c^h c)}$ | EPQ $=Q^\ast/\sqrt{1-\bar D/P}$ | POQ (cover $T$ periods). 🧩 `P-P.2`.
+**IV.2.b Lot sizing (`P-P.2`) 🧩.**
 
-**IV.2.c Dispatching (scarcity ordering).** FIFO | EDD | SPT | Critical-Ratio ($\frac{\text{time to due}}{\text{proc time}}$). ✚ `P-P.11`. Sub-weekly scheduling ⛔.
+| Policy | Order quantity | Derivation |
+|---|---|---|
+| Lot-for-lot ✅ | $Q=$ net requirement, every period | no setup-cost amortization; correct when $A\approx0$ |
+| Fixed-$Q$ | user-set constant | contractual pack size / MOQ multiple |
+| **EOQ** | $Q^\ast=\sqrt{2A\bar D/(hc)}$ | minimizes $C(Q)=A\bar D/Q + hcQ/2$; $C'(Q)=-A\bar D/Q^2+hc/2=0\Rightarrow Q^{\ast2}=2A\bar D/(hc)$ — the classical Harris (1913) EOQ, re-derived here (§III.A.7 uses it as step 1 of the (R,Q) iteration) |
+| **EPQ** | $Q^\ast_{\text{EPQ}}=Q^\ast_{\text{EOQ}}/\sqrt{1-\bar D/P}$ | finite production rate $P>\bar D$: inventory builds at rate $P-\bar D$ during the run, so average inventory is $(Q/2)(1-\bar D/P)$, not $Q/2$; substituting into $C(Q)$ and repeating the EOQ derivation gives the $1/\sqrt{1-\bar D/P}$ correction |
+| **POQ** | $T^\ast=Q^\ast/\bar D$ (periods of cover) | direct restatement of the EOQ quantity as a time-between-orders, for contexts where a review *period* is the natural control (pairs with §II.5's periodic review) |
+
+**IV.2.c Dispatching / scarcity ordering (`P-P.11`) ✚.** *Purpose:* when material or capacity
+binds ($g_{p,t}<x_{p,t}$ for multiple products/orders), decide sequencing of the weekly production
+release — this is intra-week priority among competing demands, not sub-weekly scheduling (⛔
+below the weekly-bucket boundary, §5.8, per the platform's stated fidelity limit). *Rules and their
+citable optimality properties* (classical single-machine scheduling theory; the properties hold at
+the fidelity of "which backlog entries get this week's constrained output," the level at which the
+engine actually applies them):
+
+- **FIFO** — arrival order; no optimality claim, chosen for perceived fairness/simplicity.
+- **EDD (earliest due date)** — minimizes **maximum lateness** $L_{\max}=\max_j(C_j-d_j)$ among
+  all sequences, for a single resource with deterministic processing times (Jackson's rule, 1955).
+- **SPT (shortest processing time)** — minimizes **mean flow time** $\frac1n\sum_jC_j$ among all
+  sequences (Smith's rule / the classical SPT-optimality result, Conway, Maxwell & Miller 1967).
+- **Critical Ratio** $\mathrm{CR}_j=\dfrac{d_j-t}{\text{proc. time}_j}$ — a heuristic blend
+  ($\mathrm{CR}_j<1$ signals already-late; ascending-$\mathrm{CR}_j$ ordering approximates EDD when
+  processing times are similar and approximates SPT when due dates are similar), used in practice
+  because it degrades gracefully when neither pure objective dominates.
+
+**Necessity check (per the brief's "don't add speculative features" rule):** FIFO/EDD/SPT/CR are
+retained because each has a *distinct, provable* optimality property under a *different* business
+objective (fairness / due-date adherence / throughput / blended) — a real choice, not four labels
+for the same thing.
 
 ### IV.3 Capacity
 
-Base $O_p$ ✅ | **Overtime** ✅ `P-P.5`: $\omega_{p,t}=\min((\bar\omega-1)O_p,(D_{p,t}+B_{p,t}-O_p)^+)\mathbf 1[\text{activation}]$, cost $\pi^o u_p\omega$; **inert when materials bind** | **Standing reserve** $O_p(1+\gamma)$ 🧩 `P-P.6`.
+**Base capacity $O_p$ ✅.** The plant's nominal weekly production capacity (`products.production_capacity`,
+§8.1 of the blueprint — required, not defaulted, once G4 closes).
+
+**Overtime (`P-P.5`) ✅.** *Purpose:* temporarily raise capacity at a cost premium when doing so is
+profitable. *Parameters:* $\bar\omega$ (max overtime multiplier), premium $\pi^o$ (fraction of
+unit production cost). *Logic (mechanism):*
+$$\omega_{p,t}=\min\!\big((\bar\omega-1)O_p,\ (D_{p,t}+B_{p,t}-O_p)^+\big)\cdot\mathbf 1[\text{activation}],\qquad \text{cost}=\pi^o\,c^{\text{prod}}_p\,\omega_{p,t}.$$
+*Logic (activation condition, derived — this was asserted as "revenue-positive" without a stated
+formula in the prior text):* overtime is worth activating for the marginal unit iff the margin it
+unlocks exceeds its premium cost:
+$$\mathbf 1[\text{activation}] = \mathbf 1\big[\,\underbrace{u_p-c^{\text{BOM}}_p}_{\text{margin }m_p}\ >\ \pi^o\,c^{\text{prod}}_p\,\big]\tag{B.4}$$
+— a marginal-cost condition (produce the extra unit iff its contribution exceeds its incremental
+cost), the same economic logic as §III.A.5's newsvendor condition applied to a capacity decision
+instead of an inventory one. **Inert when materials bind:** $\omega_{p,t}$ only helps if
+$g_{p,t}=\min(x_{p,t},\mathrm{cap}_{p,t},\ldots)$ is capacity-clipped, not material-clipped — Eq.
+B.4 is necessary but not sufficient; the engine's `feasibility()` states the material-binding
+precondition explicitly.
+
+**Standing capacity reserve (`P-P.6`) 🧩.** *Purpose:* pre-pay for a capacity buffer
+$O_p(1+\gamma)$ so a disruption never has to activate overtime reactively. *Economic
+justification:* worth its premium $c^{\text{reserve}}_p$ iff the **expected** avoided-stockout
+value exceeds the certain standing cost: $\Pr[\text{disruption binds}]\cdot(\text{avoided
+loss})\ge\gamma\,c^{\text{reserve}}_p$ — a strategic-horizon (pre-commitment) version of Eq. B.4's
+operational-horizon condition; the two differ exactly in *when* the commitment is made (§4.1's
+horizon axis), not in the underlying cost logic.
 
 ### IV.4 Safety stock (sizing methods that feed §III)
 
 fixed-days $d\bar D_i$ ✅ | service-level $z(\alpha)\sigma_D\sqrt{L_i}$ ✅ | **King** $z(\alpha)\sqrt{L_i\sigma_D^2+\bar D_i^2\sigma_L^2}$ ✅ | **ABC-XYZ** 3×3 $z$-matrix ✅ (`P-P.3` materials, `P-P.4` FG revenue-ABC). Output $\mathrm{SS}_i$ is consumed by the inventory policy — a declared edge, not hidden. **Every formula here is Eq. A.1 of §III.A at a different $\sigma_L$** (service-level = deterministic-lead-time case; King = the general compound-variance case — proof in §III.A.2); every $z(\alpha)$ is a Type I cycle-service factor (§III.A.4), and its cost-optimal value is Eq. A.3 (§III.A.5) rather than a hand-picked convention.
 
-### IV.5 Forecasting (drives MRP, MTS targets, safety stock)
+### IV.5 Forecasting (`P-F.0`/`P-F.1`, drives MRP, MTS targets, safety stock)
 
-naive $\hat D_{t+1}=D_t$ | MA-$k$ | **SES** $\alpha D_t+(1-\alpha)\hat D_t$ | **Holt** (level+trend) | **Holt-Winters** (+seasonal $M$) | **Croston** (intermittent). Error KPIs (bias/MAPE/RMSE) exposed. ✚ (promoted PH-10 mechanic).
+Every method below is specified with its exact update equation — not named only — because §III.A's
+$\bar D_i,\sigma_{D_i}$ are read from whichever forecast is active, so an unspecified update
+equation would silently break the "every symbol has one precise meaning" rule.
+
+| Method | Update equation | Forecast $h$ steps ahead |
+|---|---|---|
+| Naive | $\hat D_{t+1}=D_t$ | $\hat D_{t+h}=D_t$ |
+| Moving average ($k$) | $\hat D_{t+1}=\tfrac1k\sum_{u=0}^{k-1}D_{t-u}$ | same, rolled forward |
+| **SES** ✅ | $\hat D_{t+1}=\alpha D_t+(1-\alpha)\hat D_t,\ \alpha\in(0,1]$ | $\hat D_{t+h}=\hat D_{t+1}$ (flat) |
+| **Holt** (level+trend) | $l_t=\alpha D_t+(1-\alpha)(l_{t-1}+b_{t-1});\ \ b_t=\beta(l_t-l_{t-1})+(1-\beta)b_{t-1}$ | $\hat D_{t+h}=l_t+hb_t$ |
+| **Holt-Winters** (level+trend+seasonal, period $M$) | $l_t=\alpha\frac{D_t}{s_{t-M}}+(1-\alpha)(l_{t-1}+b_{t-1});\ b_t=\beta(l_t-l_{t-1})+(1-\beta)b_{t-1};\ s_t=\gamma\frac{D_t}{l_t}+(1-\gamma)s_{t-M}$ | $\hat D_{t+h}=(l_t+hb_t)\,s_{t+h-M}$ |
+| **Croston** (intermittent) | on nonzero-demand periods only: size $\hat z_t=\alpha D_t+(1-\alpha)\hat z_{t-1}$; inter-demand interval $\hat p_t=\alpha q_t+(1-\alpha)\hat p_{t-1}$ ($q_t$=periods since last nonzero) | $\hat D_{t+h}=\hat z_t/\hat p_t$ |
+
+**On SES's optimality (a fact worth stating, not asserted elsewhere):** SES is the minimum-mean-
+squared-error forecast for a demand process following an IMA(1,1) (integrated moving-average)
+model — a classical result (Muth 1960); this is *why* SES, not an arbitrary smoother, is the
+first-line method here and in essentially every commercial planning tool, ALX included.
+
+**Croston's known bias (named, not silently inherited).** Croston's estimator is biased high; the
+standard correction is the Syntetos–Boylan approximation
+$\hat D^{SB}_{t+h}=(1-\alpha/2)\,\hat z_t/\hat p_t$ (Syntetos & Boylan 2005) — flagged here as the
+rigorous refinement target for when Croston is implemented, not claimed as shipped.
+
+**Error KPIs (already exposed).** Bias $=\frac1n\sum(\hat D-D)$; MAPE $=\frac1n\sum|\hat D-D|/D$;
+RMSE $=\sqrt{\frac1n\sum(\hat D-D)^2}$. **Parameter selection.** $\alpha^\star,\beta^\star,\gamma^\star$
+minimize in-sample SSE over the fitting window (grid search or Nelder–Mead) — standard practice,
+stated so "how is $\alpha$ chosen" is never a hidden default.
 
 ### IV.6 Supplier capacity & lead-time models (mechanic → policy)
 
-**Capacity** ✚ `P-S.5`: infinite | finite-queue (wait in $\Xi_s$) | finite-reject; shipped$=\min(\Xi_s,K_s)$ → congestion = endogenous lead-time extension. **Lead-time** ✚ `P-S.6`: deterministic | stochastic (lognormal/gamma, CV `lead_time_cv`) — pairs with King SS.
+**Capacity (`P-S.5`) ✚.** infinite | finite-queue (orders wait in $\Xi_s$, `overflow_rule=queue`)
+| finite-reject (`overflow_rule=reject`, logged as `lost_inbound_units`); shipped
+$=\min(\Xi_{s,t},K_s)$.
+
+**Lead time (`P-S.6`) ✚.** deterministic | stochastic (lognormal/gamma, `lead_time_cv` — this is
+exactly $\mathrm{CV}^L_i$ of §III.A.1, feeding King's formula, Eq. A.1).
+
+**IV.6.A — Mathematical foundation: congestion as endogenous lead time.** §7.2 of the blueprint
+states qualitatively that "congestion in `state.queue` *is* endogenous lead-time extension"; here
+is the closed-form estimate behind that claim, offered as an analytical cross-check (a prefill /
+explainability aid, §II.6) alongside the engine's exact discrete-queue simulation, not a
+replacement for it. Let $\lambda_s=\sum_{m:(s,m)\in\mathcal L}O_{m,t}$ (total weekly order volume
+routed to supplier $s$) and utilization $\upsilon_s=\lambda_s/K_s$. By **Little's Law** (Little, 1961),
+mean queue length and mean wait relate as $\mathbb E[\Xi_s]=\lambda_s\,\mathbb E[W_s]$; under the
+standard M/M/1 approximation (Poisson order arrivals, exponential service — a stated,
+simplifying assumption, not the engine's literal arrival process) the expected queueing delay is
+$$\mathbb E[W_s] \approx \frac{\upsilon_s}{K_s(1-\upsilon_s)} \quad\text{(weeks)}, \qquad L_s^{\text{eff}} = L_s^{\text{nominal}} + \mathbb E[W_s].\tag{B.5}$$
+**Reading Eq. B.5:** as $\upsilon_s\to1$ (demand approaches capacity), $\mathbb E[W_s]\to\infty$ — the
+qualitative "congestion blows up lead time near saturation" behavior every finite-capacity
+system exhibits, now with a specific functional form a user can sanity-check the simulated result
+against. **Consumption:** feeds §IV.1's capacity-proportional split (policy 5) — routing more
+volume to an already-high-$\upsilon_s$ supplier is exactly what Eq. B.5 says worsens effective lead
+time, so policy 5 is the structural fix Eq. B.5 motivates, a genuine cross-policy interaction
+worth stating explicitly (added to §7's interaction table as interaction 7a).
 
 ---
 
@@ -729,68 +908,135 @@ naive $\hat D_{t+1}=D_t$ | MA-$k$ | **SES** $\alpha D_t+(1-\alpha)\hat D_t$ | **
 
 **Decision governed.** For each *(lane)* or *(facility, item)*: mode, consolidation, dispatch
 frequency, and expediting. **Prerequisite for modes:** lanes as first-class entities (gap G7);
-today lane lead time folds into supplier lead time.
+today lane lead time folds into supplier lead time. **Notation.** Lane $\ell$ with mode-specific
+cost $c_\ell$ and transit $L_\ell$; accumulated shipment-ready quantity $A_{\ell,t}$; dispatch
+indicator $\delta_{\ell,t}\in\{0,1\}$.
 
-| # | Policy type | Parameters | Model | Engine |
-|---|---|---|---|---|
-| 1 | **Single-mode (direct)** | mode, cost, transit | fixed $L_\ell$, cost per unit | ✅ (folded) |
-| 2 | **Multimodal lane portfolio** | ≤3 lanes/link, mode split % | $L,c$ blend by share | 🧩 `P-T.1` |
-| 3 | **Mode shift (reactive)** | upgrade lane, LT saving, cost | on $\phi_t=1$, shift to faster mode | 🧩 `P-T.3` |
-| 4 | **Shipment consolidation** | min-fill %, window $W$ | hold until fill $\ge$ threshold or $W$ elapses | ✚ `P-T.5` |
-| 5 | **Shipping frequency** | fixed weekly \| quantity-threshold | dispatch when accumulated $\ge$ threshold | ✚ `P-T.6` |
-| 6 | **Expedited shipments** | premium %, scope, decision | pull pipeline forward at premium | ✅ `P-T.2` |
-| 7 | **Lead-time hedging** | hedge weeks, applies-to | order earlier by a time buffer | 🧩 `P-T.4` |
+1. **Single-mode (direct) ✅ (folded into supplier lead time today).** *Purpose:* the baseline —
+   one mode per lane, fixed $L_\ell,c_\ell$. *Logic:* every shipment on $\ell$ incurs $c_\ell$ per
+   unit and arrives $L_\ell$ weeks later; no decision to make. *Status:* today this is not a
+   separate lane object (G7) — it is folded into the supplier link's `lead_time`/`unit_price`.
+2. **Multimodal lane portfolio (`P-T.1`) 🧩 — prerequisite for 3/6/7 at full generality.**
+   *Purpose:* represent up to 3 lanes per link, each a distinct mode with its own $(L,c,\text{capacity})$.
+   *Logic:* a static split $\sum_\ell \theta_\ell=1$ blends transit and cost:
+   $\bar L=\sum_\ell\theta_\ell L_\ell$, $\bar c=\sum_\ell\theta_\ell c_\ell$ in the deterministic
+   case; the discrete case ships each unit on exactly one lane per the split shares. *Necessity:*
+   every other transport policy that references "a faster mode" or "a cheaper mode" needs at least
+   two lanes to choose between — this is why §5.3 of the blueprint flags it as the activation
+   prerequisite.
+3. **Mode shift (reactive) (`P-T.3`) 🧩.** *Purpose:* while a disruption is firm-visible
+   ($\phi_t=1$, §Disruptions below), shift volume to a faster (costlier) lane. *Logic (the same
+   marginal condition as expedite, generalized to a menu of lanes rather than a binary
+   expedite/not):* shift to lane $\ell'$ iff $u_p^{\text{recovered}}(L_\ell-L_{\ell'}) > (c_{\ell'}-c_\ell)$
+   — the value of the transit-time reduction, in recovered margin, exceeds its cost premium.
+4. **Shipment consolidation (`P-T.5`) ✚.** *Purpose:* trade cycle time for freight economies of
+   scale. *Logic:* dispatch when $A_{\ell,t}\ge\text{min\_fill}\cdot\text{capacity}_\ell$ **or**
+   the accumulation window $W$ elapses, whichever first:
+   $\delta_{\ell,t}=\mathbf 1\big[A_{\ell,t}\ge\text{min\_fill}\cdot\text{cap}_\ell\ \vee\ (t-t_{\text{last}})\ge W\big]$.
+   *Optimality note:* this **quantity-or-time** form is not an arbitrary hybrid — it is the
+   policy class the shipment-consolidation literature identifies as dominant over pure
+   quantity-based or pure time-based triggers (Higginson & Bookbinder 1994, *"Policy
+   recommendations for a shipment-consolidation program"*), because it bounds the worst case of
+   each pure policy (a pure quantity trigger can wait arbitrarily long under low demand; a pure
+   time trigger can dispatch a nearly-empty vehicle). §V's engine implementation already matches
+   the literature-preferred form.
+5. **Shipping frequency (`P-T.6`) ✚.** *Purpose:* the degenerate case of (4) with `min_fill=0` —
+   dispatch on a fixed cadence regardless of fill, or purely on a quantity threshold with $W=\infty$.
+   Kept as a distinct, simpler UI entry because most users reason in "every Monday" or "once we
+   have a truckload" terms, not a joint threshold — same underlying trigger, a different default.
+6. **Expedited shipments (`P-T.2`) ✅.** *Purpose:* while firm-visible disruption is active, pull
+   in-transit units forward. *Logic:* for disrupted (or all) materials, advance delivery by one or
+   more weeks at premium $\pi^{exp}c_m$ per unit, activated iff **revenue-positive**:
+   $$\mathbf 1[\text{expedite}] = \mathbf 1\big[u_p^{\text{recovered}} > \pi^{exp}c_m\big]\tag{C.1}$$
+   — the transport-side instance of the same marginal condition as Eq. B.4 (overtime) and Eq. A.3
+   (safety stock): act iff the recovered margin exceeds the incremental cost. Three independent
+   policies (P-P.5, P-T.2, and the sourcing-split logic of §IV.1) all reduce to variants of one
+   economic rule — stated once here as the general pattern, so a reviewer sees it is one idea
+   applied three times, not three unrelated heuristics.
+7. **Lead-time hedging (`P-T.4`) 🧩 (not v1 priority).** *Purpose:* order earlier by a fixed
+   buffer $h$ weeks, applied to items where a lead-time overrun is especially costly. *Logic:*
+   equivalent to substituting $L_i\leftarrow L_i+h$ into every §III.A formula — a direct,
+   already-derived application of §III.A, not a new mechanism.
 
-**Model (expedite, P-T.2).** While $\phi_t=1$, for disrupted (or all) materials, pull in-transit
-units forward one or more weeks at cost $\pi^{exp} c_m$ per unit, when **revenue-positive**
-($u_p$ recovered $> \pi^{exp}c_m$). **Model (consolidation).** dispatch when
-$\text{accumulated}_{\ell,t}\ge \text{min\_fill}\cdot\text{capacity}$ or window $W$ elapses —
-trades cycle time for freight cost. **Necessity.** Modes/consolidation/frequency justified once
-lanes are first-class; **route optimization / milk-run design is ⛔** (network-design, not
-weekly simulation).
+**Deferred, restated.** Route optimization / milk-run design remains ⛔ — network-*design*
+optimization, not a weekly-simulation policy (§10.1 row 1 of the blueprint; consistent with the
+platform's simulation-not-MILP positioning, §14 open question 2).
 
 ---
 
 ## PART VI — Fulfillment / Customer policy library
 
 **Decision governed.** How unmet demand is handled and how scarce supply is allocated across
-customers. **Scope.** (facility, product) and (customer).
+customers. **Scope.** (facility, product) and (customer). **Notation.** demand $D_{p,c,t}$;
+fulfilled $F_{p,c,t}$; unmet $U_{p,c,t}=(D_{p,c,t}-F_{p,c,t})^+$; backlog age $a_j$ for backorder
+entry $j$; available supply this week $\mathrm{avail}_{p,t}$.
 
 ### VI.1 Unmet-demand handling (`P-C.1` ✅)
 
-| Policy type | Model |
-|---|---|
-| **Lost sales** ✅ | unmet $U_{p,t}=(D_{p,t}-F_{p,t})^+$ becomes lost: $\Lambda_{p,t}\mathrel+=U_{p,t}$ |
-| **Backorder** | $B_{p,t+1}=B_{p,t}+U_{p,t}-\text{(served backlog)}$; entries older than `backorder_horizon` expire → lost; penalty $\pi^{bo}$ per unit·week to $\mathcal C^{res}$ |
-| **Partial backorder** | share `partial_accept_prob` waits, remainder lost |
+- **Lost sales ✅.** *Purpose:* no promise to the customer beyond current stock. *Logic:*
+  $U_{p,t}=(D_{p,t}-F_{p,t})^+$ becomes lost immediately: $\Lambda_{p,t}\mathrel{+}=U_{p,t}$.
+  *Outputs:* $\Lambda_{p,t}$ feeds the fill-rate and lost-revenue KPIs (§IX.3) directly; no state
+  carries to $t+1$.
+- **Backorder.** *Purpose:* the customer waits. *Logic (a proper renewal/aging process, stated
+  explicitly — the prior text left the age dynamic implicit):* each unmet unit enters the backlog
+  with age $a=0$; every week, $a_j\leftarrow a_j+1$ for unserved entries; entries reaching
+  `backorder_horizon` expire to lost sales:
+  $$B_{p,t+1} = B_{p,t} + U_{p,t} - (\text{served backlog}) - (\text{expired, } a_j\ge\text{horizon}),$$
+  penalty $\pi^{bo}$ accrues **per unit·week waited** to $\mathcal C^{res}$ (so a longer horizon is
+  not free — it trades expiry-to-lost-sales risk against accumulating penalty, a real cost
+  trade-off the UI should surface, not a free-form number).
+- **Partial backorder.** *Purpose:* a documented middle ground. *Logic:* share
+  `partial_accept_prob` of $U_{p,t}$ enters the backorder queue (above), the remainder
+  $(1-\text{partial\_accept\_prob})U_{p,t}$ is lost immediately — a Bernoulli split per unit (or,
+  equivalently at weekly-bucket granularity, a deterministic fractional split of the aggregate).
 
 ### VI.2 Customer allocation under scarcity (`P-C.2` ✅)
 
-When supply $<$ demand, split fulfillment $F_{p,t}$ across customers $c$:
+**General form (an explicit optimization, not just named rules).** When
+$\mathrm{avail}_{p,t}<\sum_cD_{p,c,t}$, every rule below is the solution to
+$$\max_{F_{p,c,t}}\ \sum_c \mathrm{obj}_c(F_{p,c,t}) \quad\text{s.t.}\quad \sum_c F_{p,c,t}\le\mathrm{avail}_{p,t},\ \ 0\le F_{p,c,t}\le D_{p,c,t},\tag{C.2}$$
+for a rule-specific objective $\mathrm{obj}_c(\cdot)$ — the same LP shape P-P.9's material
+allocation already solves with HiGHS (§IV.2 of the blueprint's Appendix A), so §VI.2's rules are
+the *product/customer-facing instance* of the identical mechanism, not a separately-invented one:
 
-| Rule | Allocation |
-|---|---|
-| **FCFS / proportional / fair-share** | pro-rata at weekly buckets: $F_{p,c}=D_{p,c}\cdot\frac{\text{available}}{\sum_c D_{p,c}}$ |
-| **Priority** | serve by `priority_weights` descending until supply exhausted |
-| **SLA-tier** | guarantee per-segment fill floors `sla_tiers`; scale down pro-rata if infeasible |
+| Rule | $\mathrm{obj}_c(F)$ (Eq. C.2) | Property |
+|---|---|---|
+| **Proportional / fair-share** | not a linear objective — the direct rationing rule $F_{p,c}=D_{p,c}\cdot\mathrm{avail}_{p,t}/\sum_cD_{p,c,t}$ | the unique allocation satisfying resource-monotonicity and consistency (classical fair-division axioms, cf. Moulin 2003, *Fair Division and Collective Welfare*) — "fair" in a precise, provable sense, not just "spreads the pain" |
+| **FCFS** | proportional at weekly-bucket granularity (order-level sequencing is sub-weekly, ⛔ per §5.8) | approximates arrival-order fairness within the bucket resolution the engine supports |
+| **Priority** | $w_c\cdot F$ (`priority_weights`) | maximizes the priority-weighted throughput $\sum_cw_cF_{p,c}$ — Pareto-*dominant* on that objective, but **not** fair in the §VI.2 axiomatic sense: low-priority customers can be starved ($F_{p,c}=0$) even with ample $w_c>0$ demand. This is a real, named trade-off (business intent: protect key accounts), not a design flaw. |
+| **SLA-tier** | $F$, subject to per-segment fill floors `sla_tiers` before any pro-rata remainder | a constrained variant of proportional: floors are hard constraints in Eq. C.2, scaled down pro-rata only if the floors themselves are jointly infeasible |
 
-Requires `outbound_logistics.volume` (per-customer demand shares). Inert for single-customer MTO.
+*State/data read:* `outbound_logistics.volume` (per-customer demand shares). *Inert* for
+single-customer MTO (no scarcity split possible with one customer).
 
 ### VI.3 Minimum split ratio (partial shipment)
 
-Per row, `min_split_ratio ∈ (0,1]`: if set, an order may ship in parts, each part $\ge
-\text{ratio}\times\text{order}$ — prevents delaying a whole order for a small shortfall
-(ALX semantics). Default: ship-complete.
+Per row, `min_split_ratio` $\mu\in(0,1]$: an order may ship in parts, each part $\ge\mu\times$
+order — prevents delaying a whole order for a small shortfall (matches ALX's stated semantics,
+confirmed in §III.15's source review). **Honest scope note:** unlike §VI.1/§VI.2, this parameter
+is **not** amenable to closed-form optimization from the platform's cost fields — it trades
+customer inconvenience (multiple deliveries, extra freight) against faster partial-revenue
+recognition, a business-judgment parameter with no single "correct" value derivable from cost data
+alone. Stated explicitly so the document does not manufacture a false precision where none exists
+— knowing when *not* to force a derivation is itself part of "every claim justified."
 
 ### VI.4 Backorder / patience behavior (`P-C.5` ✚)
 
-Customer patience window → cancellation; delivery-window flexibility; measured α/β service
-contracts per customer. ✚ (demand-side companion to P-C.1).
+*Purpose:* model customer-side patience as a competing-risk process — an order is resolved by
+whichever happens first, fulfillment or the customer's patience expiring. *Logic (proposed
+model):* patience $\tau_c$ drawn per customer/segment (deterministic threshold, or
+$\tau_c\sim\mathrm{Exp}(1/\bar\tau_c)$ for a stochastic variant); an order waiting since $t_0$
+cancels at $t_0+\tau_c$ if not yet served — the demand-side companion to §VI.1's backorder-horizon
+expiry, now attributed to customer behavior rather than a supplier-side policy choice. Delivery-
+window flexibility and measured $\alpha/\beta$ service contracts per customer (Type I/II, §III.A.4
+— the same two definitions apply on the demand side) round out the parameter set. ✚, not yet
+implemented.
 
-### VI.5 Demand shaping (`P-C.3` 🧩)
+### VI.5 Demand shaping (`P-C.3` 🧩 · ⏸ activation)
 
 Substitution offers / delay incentives with accept-probabilities; needs a revenue-elasticity
-model — 🧩 planned, activation deferred (no-op today).
+model that does not exist in the current data model (§5.8) — 🧩 planned, activation deferred,
+stated here rather than silently no-op'd (the honest-catalog property, A3 of the blueprint).
 
 ---
 
@@ -840,6 +1086,149 @@ recovery-response list with a programmable sequence.
 
 ---
 
+## PART VIII-D — Disruption propagation: a formal model
+
+This part was **entirely absent** from the prior revision: policies were specified, but "how a
+disruption changes them" was left to be inferred from §7's interaction graph and the individual
+`§Model` lines of §IV.1/§V that mention $\phi_t$. The brief requires this made explicit for every
+disruption: which stage, which policy, which variables, how they propagate downstream, and how
+they reach the results. This section closes that gap, grounded in the platform's actual event
+schema (`scsim/scsim/entities/disruption.py`) — nothing here is invented; every symbol below is a
+named field or method in that module or `core/context.py`.
+
+### D.1 The event, formalized
+
+A disruption event is a 9-tuple, exactly `DisruptionEvent`'s fields:
+$$e = \big(\underbrace{\tau}_{\text{target\_type}},\ \underbrace{k}_{\text{target\_id}},\ \underbrace{\eta}_{\text{effect\_type}},\ \underbrace{\varphi}_{\text{capacity\_factor}},\ \underbrace{\xi}_{\text{overflow\_rule}},\ \text{onset/recovery ramp},\ r,\ t^\star,\ \Delta t\big)$$
+- **Target** $\tau\in\{$`node:supplier`✅, `node:plant`✅, `edge:lane`🧩$\}$, identified by $k$.
+  Lane targets are schema-valid but resolve to their supplier today (G7 — lanes are not yet
+  first-class, §8.3 of the blueprint); this is a stated, not hidden, limitation.
+- **Effect** $\eta\in\{$`lead_time_extension`✅, `capacity_reduction`✅$\}$ — **only two effect
+  types exist today**; a demand-surge class is catalogued as missing (G11 of the blueprint) and is
+  named again here because the brief explicitly asks for "every disruption," and honesty about
+  catalog breadth is part of that answer.
+- **Window.** Physical effect is active for $t\in[t^\star,\,t^\star+\Delta t+r)$ (the `ramp_weeks`
+  $r$ extends recovery); this is `events_physical()`'s exact predicate.
+- **Composition.** Same-target events compose by **per-week worst case** — minimum capacity factor,
+  maximum deferral — not by summing effects (avoids double-counting overlapping windows; stated
+  explicitly in `disruption.py`'s docstring, restated here as it is load-bearing for §D.2).
+
+### D.2 Two propagation channels — the unifying structural claim
+
+This is the section's central result, and it is what makes "propagation is explicit, not implicit"
+actually true rather than merely asserted: **every disruption reaches downstream policies through
+exactly one of two channels, and every policy's response is fully determined by which channel(s)
+it participates in — there is no third, ad hoc mechanism anywhere in the catalog.**
+
+**Channel 1 — Physical/state-mediated (unconditional, immediate, no detection required).** The
+disruption directly perturbs the *physical* logistics execution at PH-90, independent of whether
+the firm has detected it yet:
+- `lead_time_extension`: the target ships **nothing** during $[t^\star,t^\star+\Delta t)$; in-
+  transit quantities due to arrive inside the window are deferred to $t^\star+\Delta t$ (Eqs.
+  11–12 of the engine reference — conservation-preserving, units delayed, never destroyed).
+  Formally, `state.pipeline`/`state.queue` realize arrivals as
+  $$\text{arrival}_{m,t} = \begin{cases}0 & t\in[t^\star,\,t^\star+\Delta t)\\ \text{deferred backlog} + \text{scheduled} & t=t^\star+\Delta t\\ \text{scheduled (nominal)} & \text{otherwise.}\end{cases}$$
+- `capacity_reduction`: weekly outbound flow throttles to $\varphi\cdot K_s$ (supplier) or
+  $\varphi\cdot\mathrm{cap}_p$ (plant); overflow either queues (`overflow_rule=queue`, delayed,
+  conservation-preserving) or rejects (`=reject`, logged as `lost_inbound_units`, a genuine
+  destruction of the order — the one place units are *not* conserved, by explicit design).
+- **Why this channel needs no policy code:** every policy in §III–VI reads `state.on_hand`,
+  `state.pipeline`, position $\mathrm{IP}_{i,t}$, or `state.queue` — never the disruption schedule
+  directly. A frozen pipeline or throttled queue changes those state variables; the *same*
+  min-max/base-stock/(R,Q)/MRP equations of §III then react automatically, because they are
+  written in terms of state, not in terms of "is a disruption happening." This is the practical
+  content of §7.2 interaction 7 ("congestion = endogenous lead-time extension, the emergent
+  interaction, not a parameter") — restated here as a general propagation law, not a one-off
+  observation about capacity.
+
+**Channel 2 — Cognitive/policy-mediated (conditional on detection, proactive).** A small,
+enumerable set of policies explicitly query `events_visible()` — the **firm-visible** window,
+gated by `detection_lag_weeks` $\tau_{\text{lag}}$ (or P-S.4's compressed
+`detection_lag_override`):
+$$\text{visible}(e,t) = \mathbf 1\big[t^\star+\tau_{\text{lag}} \le t < t^\star+\Delta t+r\big], \qquad \phi_t = \max_e \text{visible}(e,t)\tag{D.3}$$
+(Eq. D.3 is exactly `context.py::events_visible`'s predicate.) Every policy that reads $\phi_t$ (or
+the per-supplier `visible_disrupted_suppliers()` mask) is listed exhaustively — this is the whole
+set, not a sample:
+
+| Policy | What it reads from Eq. D.3 | What it changes |
+|---|---|---|
+| P-P.1 `coverage_weeks` ModeStrip | $\phi_t$ (any visible event) | switches $\kappa$ from `nominal` to `crisis` (§III.1's Eq. 2–3 sizing) |
+| P-S.1 backup_supplier | `visible_disrupted_suppliers()` (per-supplier) | reroutes the sourcing split $w_{m,s}$ (§IV.1 policy 3) |
+| P-S.4 early_warning_failover | modifies $\tau_{\text{lag}}$ itself | compresses every *other* policy's detection lag — a second-order propagation (a policy that changes when Channel 2 fires for everyone else) |
+| P-T.2 expedited_shipments | $\phi_t$ (gates Eq. C.1's evaluation) | pulls Channel-1-delayed pipeline forward, partially reversing Channel 1's own effect |
+| P-P.5 short_term_capacity | activation condition Eq. B.4, evaluated regardless of $\phi_t$ but typically binds only once demand backs up **from** a Channel-1 effect | raises $\mathrm{cap}_{p,t}$ |
+| P-X.1 recovery_playbook | $\phi_t$/coverage | sequenced triggers that enable/retune the above (an orchestrator over Channel 2, not a third channel) |
+
+**The claim, stated precisely:** for any disruption $e$ and any policy $\pi$ in the catalog, $\pi$'s
+response to $e$ is fully explained by (a) which state keys $\pi$ reads that Channel 1 perturbs, and
+(b) whether $\pi$ appears in the Channel-2 table above. No policy in §III–VIII has a third,
+undocumented disruption-sensing path — a claim made checkable because `validate_hooks` (§7.1)
+already enforces that every state read is declared, so an audit of hook `reads` sets against
+`DISRUPTION_STATE`/`FIRM_KNOWLEDGE` is sufficient to verify it holds, not merely assert it.
+
+### D.3 Worked propagation traces (the brief's four named examples)
+
+Each trace below names: affected stage, affected policy (both channels), modified variables, the
+phase-by-phase path (using Appendix B's phase table), and the downstream KPI effect.
+
+**1. Increased supplier lead time** (`effect_type=lead_time_extension`, `target_type=node:supplier`).
+- *Stage:* supplier. *Channel 1:* PH-90 freezes shipments from $k$ for $\Delta t$ weeks
+  (`lt_block_end[k] = t^\star+\Delta t`, the exact state variable in `context.py`); `state.pipeline`
+  arrivals for links on $k$ defer. *Trace:* PH-90 (frozen arrivals) → `state.on_hand` fails to
+  replenish → PH-70 next week: $\mathrm{IP}_{i,t}$ (§III's inventory position) is lower than
+  nominal because $\Pi_{i,t}$ (pipeline) is depleted, not because $s_i/S_i$ changed — **the trigger
+  fires *more often*, not at a different threshold**, a distinction worth stating because it is
+  easy to (incorrectly) model a lead-time disruption as "raise $s_i$" when the engine's actual
+  mechanism is "starve $\Pi_{i,t}$." *Channel 2 (if visible):* P-P.1's $\kappa\to$crisis (raises
+  $S_i$, §III.1); P-S.1 may reroute to backup (§IV.1 policy 3); P-T.2 may expedite whatever is
+  still in transit on *other* links to compensate. *Downstream KPI:* material stockout → PH-50's
+  BoM-feasibility floor $\lfloor I_{m,t}/b_{p,m}\rfloor$ clips production → PH-60 fulfillment drops
+  → fill rate, backorder/lost-sales KPIs (§IX.3).
+
+**2. Reduced supplier capacity** (`effect_type=capacity_reduction`, `target_type=node:supplier`,
+$\varphi<1$).
+- *Channel 1:* PH-90 throttles shipped $=\min(\Xi_{k,t},\varphi K_k)$ (`cap_factor[k]=φ`); overflow
+  queues or rejects per `overflow_rule`. *Trace:* if `overflow_rule=queue`, this is **exactly**
+  Eq. B.5's congestion mechanism (§IV.6.A) — a capacity cut *raises effective utilization*
+  $\upsilon_k=\lambda_k/(\varphi K_k)$, and Eq. B.5's $\mathbb E[W_k]$ grows accordingly, so a capacity
+  disruption manifests as a *growing*, not fixed, lead-time extension the longer it persists — a
+  qualitatively different signature from case 1's flat block, worth distinguishing in any
+  results dashboard. If `overflow_rule=reject`, the excess is destroyed
+  (`lost_inbound_units`), a harder, immediate effect with no recovery once the window closes (no
+  queued backlog to clear). *Channel 2:* identical menu to case 1.
+
+**3. Reduced production capacity** (`effect_type=capacity_reduction`, `target_type=node:plant`).
+- *Channel 1:* `plant_cap_factor=φ` throttles PH-50's $g_{p,t}=\min(x_{p,t},\varphi\,\mathrm{cap}_{p,t},\ldots)$
+  directly — this is the **one** disruption type that acts on the *production* clip term rather
+  than the *material* clip term of the same equation, so its signature (output falls even when
+  materials are ample) is diagnostically distinguishable from case 1/2's material-driven shortfall
+  using the same PH-50 equation, without new instrumentation. *Channel 2:* P-P.5 overtime's Eq.
+  B.4 activation condition is evaluated *because* backlog $B_{p,t}$ is now rising — overtime is the
+  Channel-2 response purpose-built for this case (raises the effective $\mathrm{cap}_{p,t}$ term
+  Channel 1 just cut). *Downstream KPI:* directly on `production_output` (PH-50) → PH-60
+  fulfillment → same fill-rate/backorder chain as case 1, but with the diagnostic distinction above.
+
+**4. Transportation delays.** *Stated limitation, not modeled around:* today, transport has no
+first-class lane entity (G7), so a "transportation delay" **is** case 1 (`lead_time_extension`) on
+the relevant supplier link — the platform does not currently distinguish "the supplier was late"
+from "the truck was late." §V's multimodal lane portfolio (`P-T.1`, 🧩) is the schema change that
+would let `target_type=edge:lane` carry an independent delay separate from the supplier's own
+processing time; until then, this is honestly the same propagation trace as case 1, not a fifth
+mechanism — stated here rather than glossed over.
+
+### D.4 Why demand-surge disruptions are absent, named rather than silently missing
+
+The brief's disruption list implicitly includes demand-side shocks (a customer surge, a
+promotional spike). **No such `EffectType` exists in the engine today** — `EffectType` has exactly
+two members (§D.1). This is G11 of the blueprint's gap catalog, restated here in this document's
+own terms: a demand-surge event would need a third `effect_type` perturbing `state.demand` at
+PH-10 (Channel 1, a new state-mediated path — the *same* two-channel structure of §D.2 extends to
+it without new architecture, only a new `EffectType` member and a PH-00/PH-10 hook), plus Channel-2
+consumers deciding whether to proactively reforecast. Flagged here as a scoped, well-understood
+extension (not a redesign) rather than left as a silent absence.
+
+---
+
 ## PART IX — Demand generation, interactions, accounting
 
 ### IX.1 Demand generation (`P-C.4` ✚, the world model)
@@ -860,9 +1249,10 @@ every policy responds to; the promoted world-demand mechanic, named as customer 
 | 4 | Procurement → Production | `purchase_orders`→`pipeline`→`arrivals`→`on_hand`→PH-50 feasibility |
 | 5 | Production → Transport | `production_output` → PH-90 |
 | 6 | Transport → Service | `arrivals`→`on_hand`/`fg_on_hand`→PH-60 `fulfillment` |
-| 7 | Capacity → Lead time | finite $K_s$→`queue` congestion = endogenous LT (emergent) |
-| 8 | Allocation → Service | P-P.9 (PH-40) & P-C.2 (PH-60) reshape `fulfillment` |
-| 9 | Disruption → Recovery | `disruption_state`→`firm_knowledge`→P-S.1/S.4/T.2/P.5/X.1 |
+| 7 | Capacity → Lead time | finite $K_s$→`queue` congestion = endogenous LT (emergent), closed form Eq. B.5 (§IV.6.A) |
+| 7a | Sourcing split → Capacity | capacity-proportional split (§IV.1 policy 5) is the structural response to 7's Eq. B.5 |
+| 8 | Allocation → Service | P-P.9 (PH-40) & P-C.2 (PH-60) reshape `fulfillment`, both instances of the Eq. C.2 LP |
+| 9 | Disruption → Recovery | `disruption_state`→`firm_knowledge`→P-S.1/S.4/T.2/P.5/X.1 — the full two-channel propagation model (Channel 1 physical/state, Channel 2 detection-gated) is §PART VIII-D |
 
 Plus: safety-stock→inventory (§IV.4→§III) and sourcing-split→procurement (§IV.1→PH-80).
 
@@ -900,9 +1290,17 @@ $\mathcal C^{res}$ cost ledger; $L$ lead time; $K_s/O_p$ capacity; $b_{p,m}$ BoM
 $c_m$ cost; $\mathrm{SS}$ safety stock; $\rho_t$ review gate; $\kappa$ coverage; $z(\alpha)$
 service-level factor; $\sigma_D/\sigma_L$ demand/lead-time std. **§III.A additions:** $X_i$
 demand-over-lead-time r.v.; $\sigma_{X_i}^2$ its variance (Eq. A.1); $\alpha$ Type I cycle service
-level; $\beta$ Type II fill rate; $\phi/\Phi$ standard normal pdf/cdf; $\psi(z)=\phi(z)-z(1-\Phi(z))$
-standard normal loss function; $z^\star$ cost-optimal safety factor; $\mathrm{CR}$ newsvendor
-critical ratio; $c^o/c^u$ weekly overage/underage unit cost.
+level; $\beta$ Type II fill rate; $n/\Phi$ standard normal pdf/cdf (deliberately not $\phi$ —
+collides with $\phi_t$, firm knowledge, below); $\psi(z)=n(z)-z(1-\Phi(z))$ standard normal loss
+function; $z^\star$ cost-optimal safety factor; $\mathrm{CR}$ newsvendor critical ratio; $c^o/c^u$
+weekly overage/underage unit cost. **§IV.1.A additions:** $\rho_s$ per-supplier weekly disruption
+probability; $\lambda$ risk-aversion weight (Eq. B.2). **§IV.6.A additions:** $\lambda_s$ order
+volume routed to supplier $s$; $\upsilon_s=\lambda_s/K_s$ utilization (a distinct glyph from
+$\rho_s$, deliberately, so the same letter is never reused for disruption probability in §IV.1.A
+and utilization in §IV.6.A). **§PART VIII-D additions:** $e$ disruption
+event tuple; $\tau,k,\eta$ target type/id, effect type; $\varphi$ capacity factor (distinct from
+$\phi_t$); $\xi$ overflow rule; $t^\star,\Delta t,r$ start/duration/ramp; $\tau_{\text{lag}}$
+detection lag.
 
 ## Appendix C — Change control
 
@@ -924,8 +1322,32 @@ documentation — `anylogistix.help/tables/policies.html`, `.../tables/inventory
 proposal against the existing §II.3 hybrid grid: preserved for scalar headline parameters,
 justified only for genuinely list-valued parameters such as the §IV.4 $z$-matrix). Corrected §III.11
 (MRP's $\mathrm{SS}$ parameter was previously undefined as to sizing method; now explicitly sized
-by the §IV.4/§III.A pipeline like every other policy's buffer). No engine, UI, or schema code
-changed in this revision — it is a specification-only deepening; `/help/policies`
+by the §IV.4/§III.A pipeline like every other policy's buffer). `/help/policies`
 (`src/pages/About.tsx` `DOC_BODIES`) was spot-checked against the live registry and found already
 consistent with the operational formulas (Eqs. 1–3, 20–21, the $z=\Phi^{-1}(\mathrm{SL}\%)$
-convention) — no doc/code drift found there in this pass, so no help-page edit was required.
+convention) — no doc/code drift found there, so no help-page edit was required.
+
+**v2.2 changelog (this change).** Brought §IV.1 (sourcing), §IV.2 (production/lot-sizing/
+dispatching), §IV.3 (capacity), §IV.5 (forecasting), §IV.6 (supplier capacity/lead-time), §V
+(transport), and §VI (fulfillment) up to §PART 0's mandatory per-policy template and §III.A's
+derivation standard — the v2.1 revision brought only Part III to that standard and left the rest
+as one-paragraph stubs, which was the core gap in v2.1. Added: §IV.1.A (optimal sourcing split —
+Markowitz-style portfolio-variance derivation, Eqs. B.1–B.3, reusing §III.A.5's underage cost so
+sourcing risk and safety-stock risk share one cost parameter instead of two disconnected ones);
+EPQ derivation in §IV.2.b; the overtime activation condition derived, not asserted (Eq. B.4,
+§IV.3); full forecasting update equations and Muth's (1960) SES-optimality citation (§IV.5);
+§IV.6.A (Little's-Law congestion→lead-time closed form, Eq. B.5, with a stated M/M/1 approximation
+assumption); the shipment-consolidation optimality citation (Higginson & Bookbinder 1994, §V);
+the customer-allocation LP formalization and the fair-share/priority trade-off made explicit via
+fair-division axioms (Eq. C.2, §VI.2); a proper backorder-aging renewal process (§VI.1). **Added
+§PART VIII-D**, entirely new: the two-channel (physical/state-mediated vs. detection-gated/
+policy-mediated) disruption-propagation model, grounded in `scsim/scsim/entities/disruption.py`
+and `core/context.py::events_visible`/`events_physical`, worked through all four disruption types
+named in the brief (lead time, supplier capacity, plant capacity, transport delay) plus an honest
+statement of what is not yet modeled (demand-surge disruptions, G11). **Fixed a real notation
+collision introduced in drafting v2.1's edit and caught before commit:** the standard normal
+density was initially written $\phi(z)$, colliding with this document's pre-existing $\phi_t$
+(firm-knowledge/crisis indicator); changed to $n(z)$ throughout §III.A.4–A.5. Also eliminated an
+avoidable $\rho_s$ overload (disruption probability in §IV.1.A vs. utilization in §IV.6.A) by
+renaming utilization to $\upsilon_s$ — both are documented in Appendix B rather than left implicit.
+No engine, UI, or schema code changed in v2.1 or v2.2 — both are specification-only.
