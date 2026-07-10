@@ -62,6 +62,7 @@ CONSUMER_GROUP = "sim-workers"
 PROJECT_DISCOVERY_KEY = "sim.active_projects"  # set populated by edge function (future)
 DEFAULT_PROJECTS_REFRESH = 5.0  # seconds
 EVICT_INTERVAL = 60.0
+XREAD_BLOCK_MS = 5000
 
 
 class SimWorker:
@@ -72,7 +73,20 @@ class SimWorker:
         service_role_key: str,
         idle_ttl: int = 600,
     ):
-        self._redis = redis.from_url(redis_url, decode_responses=True)
+        # socket_timeout MUST exceed the XREADGROUP block window: redis-py 8
+        # changed its default from None to 5 s — equal to the block — so every
+        # idle poll's read died with a TimeoutError before the server's empty
+        # reply arrived (requirements.txt doesn't pin the redis major). The
+        # keepalive + health check hold the connection across Upstash's
+        # idle-connection reaping between commands.
+        self._redis = redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_timeout=XREAD_BLOCK_MS / 1000 + 10,
+            socket_connect_timeout=10,
+            socket_keepalive=True,
+            health_check_interval=30,
+        )
         self._supabase_url = supabase_url.rstrip("/")
         self._service_role_key = service_role_key
         self._cache = GraphCache(supabase_url, service_role_key, idle_ttl)
@@ -128,7 +142,7 @@ class SimWorker:
             try:
                 resp = await self._redis.xreadgroup(
                     CONSUMER_GROUP, self._consumer_name, {stream: ">"},
-                    count=10, block=5000,
+                    count=10, block=XREAD_BLOCK_MS,
                 )
                 if not resp:
                     continue
@@ -137,6 +151,11 @@ class SimWorker:
                         await self._handle(stream, msg_id, fields)
             except asyncio.CancelledError:
                 raise
+            except (redis.ConnectionError, redis.TimeoutError) as e:
+                # Transient network trouble: one line, not a stack trace per
+                # poll — the loop reconnects on the next iteration anyway.
+                log.warning("redis unavailable for %s: %s — retrying", stream, e)
+                await asyncio.sleep(1.0)
             except Exception:
                 log.exception("consume loop failed for %s", stream)
                 await asyncio.sleep(1.0)
