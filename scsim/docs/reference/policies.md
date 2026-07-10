@@ -10,6 +10,7 @@ Twenty-two policies in five classes. ✅ = validated manuscript core, runnable t
 | P-C.1 | [`unmet_demand_handling`](#unmet_demand_handling) | customer | built_in | demand_side | ✅ implemented |
 | P-C.2 | [`customer_allocation`](#customer_allocation) | customer | improvisation | demand_side | ✅ implemented |
 | P-C.3 | [`demand_shaping`](#demand_shaping) | customer | improvisation | demand_side | 🧩 planned |
+| P-C.6 | [`forward_visibility`](#forward_visibility) | customer | anticipation | demand_side | ✅ implemented |
 | P-P.1 | [`inventory_control`](#inventory_control) | plant | built_in | material_availability | ✅ implemented |
 | P-P.10 | [`repurposing`](#repurposing) | plant | improvisation | production_capacity | 🧩 planned |
 | P-P.2 | [`lot_sizing`](#lot_sizing) | plant | built_in | material_availability | 🧩 planned |
@@ -87,6 +88,24 @@ Move demand instead of fighting supply — substitution offers, delay incentives
 | `delay_incentive` | €/unit | P | 0.0 | [0, ∞] |  |
 | `delay_accept_prob` | - | P | 0.3 | [0.0, 1.0] |  |
 
+## `forward_visibility`
+
+**P-C.6** · customer · anticipation · constraint: demand_side · ✅ implemented · requires pre-deployment
+
+Customer commits future orders over a visibility horizon τ* (§III-D.6), so the plant can size coverage against the forward order book instead of a stationary mean — the customer-side half of the Forward-visible basis (§II.4). Hook: PH-10.
+
+**Hooks**
+
+| Phase | Priority | Reads | Writes | Resolution |
+|---|---|---|---|---|
+| PH-10 | 60 | demand | — | — |
+
+**Parameters**
+
+| Parameter | Unit | Scope | Default | Range | Notes |
+|---|---|---|---|---|---|
+| `visibility_horizon` | weeks | G/C | — | see schema | τ* — how far ahead the committed order book is visible to the plant. None → settings.visibility_horizon (the schedule length); must not exceed it. |
+
 ## `inventory_control`
 
 **P-P.1** · plant · built_in · constraint: material_availability · ✅ implemented
@@ -105,6 +124,7 @@ Everyday replenishment rule (min-max / base-stock / (R,Q) / periodic). The basel
 | Parameter | Unit | Scope | Default | Range | Notes |
 |---|---|---|---|---|---|
 | `policy_type` | enum | M | 'min_max' | {min_max, base_stock, rop_q, periodic} | min_max ✅ (manuscript). |
+| `basis` | enum | G/M | 'days_of_supply' | {days_of_supply, forward_visible} | Policy Basis (§II.4): days_of_supply sizes levels from the stationary mean (s = E[D_m]·T_s); forward_visible sums the committed forward order book over the coverage window (WSC-2026 MTO) — requires the P-C.6 forward_visibility customer policy. |
 | `coverage_weeks` | weeks | G/M | — | [0, 26] | κ — order-up-to cover beyond lead time. Strip 8/10/12. |
 | `review_cadence_weeks` | weeks | G | 1 | {1, 2, 4} |  |
 | `rop_q_quantity` | units | M | — | see schema | Fixed (R,Q) lot; ≥ MOQ enforced. |

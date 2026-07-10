@@ -416,7 +416,7 @@ class SimContext:
         # P-S.4 early_warning_failover: monitored detection lag. None → the
         # scenario's settings.detection_lag_weeks applies unchanged.
         self.detection_lag_override: Optional[int] = None
-        # P-C.4 forward_visibility: weeks of committed forward order book the
+        # P-C.6 forward_visibility: weeks of committed forward order book the
         # plant may read (τ*, §III-D.6). 0 = no customer visibility policy.
         self.visibility_horizon: int = 0
         self._forward_mat_cum: Optional[np.ndarray] = None

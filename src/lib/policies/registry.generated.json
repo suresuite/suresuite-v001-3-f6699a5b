@@ -1490,6 +1490,53 @@
       "summary": "Move demand instead of fighting supply \u2014 substitution offers, delay incentives; cheap when customers accept. Hook: PH-60."
     },
     {
+      "catalog_ref": "P-C.6",
+      "constraint_targeted": "demand_side",
+      "data_requirements": [],
+      "hooks": [
+        {
+          "phase": "PH-10",
+          "priority": 60,
+          "reads": [
+            "demand"
+          ],
+          "resolution": null,
+          "writes": []
+        }
+      ],
+      "id": "forward_visibility",
+      "milestone": null,
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "visibility_horizon": {
+            "anyOf": [
+              {
+                "maximum": 104,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "notes": "\u03c4* \u2014 how far ahead the committed order book is visible to the plant. None \u2192 settings.visibility_horizon (the schedule length); must not exceed it.",
+            "scope": "G/C",
+            "title": "Visibility Horizon",
+            "unit": "weeks"
+          }
+        },
+        "title": "ForwardVisibilityParams",
+        "type": "object"
+      },
+      "requires_predeployment": true,
+      "stage": "customer",
+      "status": "implemented",
+      "strategy_class": "anticipation",
+      "summary": "Customer commits future orders over a visibility horizon \u03c4* (\u00a7III-D.6), so the plant can size coverage against the forward order book instead of a stationary mean \u2014 the customer-side half of the Forward-visible basis (\u00a7II.4). Hook: PH-10."
+    },
+    {
       "catalog_ref": "P-P.1",
       "constraint_targeted": "material_availability",
       "data_requirements": [
@@ -1569,6 +1616,18 @@
         },
         "additionalProperties": false,
         "properties": {
+          "basis": {
+            "default": "days_of_supply",
+            "enum": [
+              "days_of_supply",
+              "forward_visible"
+            ],
+            "notes": "Policy Basis (\u00a7II.4): days_of_supply sizes levels from the stationary mean (s = E[D_m]\u00b7T_s); forward_visible sums the committed forward order book over the coverage window (WSC-2026 MTO) \u2014 requires the P-C.6 forward_visibility customer policy.",
+            "scope": "G/M",
+            "title": "Basis",
+            "type": "string",
+            "unit": "enum"
+          },
           "coverage_weeks": {
             "$ref": "#/$defs/ModeStrip",
             "notes": "\u03ba \u2014 order-up-to cover beyond lead time. Strip 8/10/12.",

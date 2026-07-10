@@ -35,6 +35,7 @@ EXPECTED_CATALOG = {
     "P-T.3": ("planned", "transport"),
     "P-C.2": ("implemented", "customer"),
     "P-C.3": ("planned", "customer"),
+    "P-C.6": ("implemented", "customer"),
     "P-P.10": ("planned", "plant"),
     "P-X.1": ("planned", "cross"),
 }
@@ -51,7 +52,7 @@ def test_full_part_iv_catalog_registered():
 def test_registry_payload_complete():
     reg = build_registry()
     assert reg["engine_version"]
-    assert len(reg["policies"]) == 22
+    assert len(reg["policies"]) == 23
     for pol in reg["policies"]:
         assert pol["params_schema"].get("properties") is not None or \
             pol["params_schema"].get("type") == "object"
