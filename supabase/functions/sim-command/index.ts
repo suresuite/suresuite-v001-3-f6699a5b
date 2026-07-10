@@ -14,6 +14,7 @@ import {
   runValidationGate,
   type GateResult,
 } from "../_shared/validationGate.ts";
+import { cleanEnv } from "../_shared/env.ts";
 
 // Inline like every other function in this repo — supabase-js has no "/cors"
 // subpath export; importing one fails at boot, which breaks even the OPTIONS
@@ -24,11 +25,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const UPSTASH_URL = Deno.env.get("UPSTASH_REDIS_REST_URL")!;
-const UPSTASH_TOKEN = Deno.env.get("UPSTASH_REDIS_REST_TOKEN")!;
+// All secrets go through cleanEnv: a value pasted into a dashboard with
+// wrapping quotes must not take the dispatcher down (see _shared/env.ts).
+const SUPABASE_URL = cleanEnv("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = cleanEnv("SUPABASE_PUBLISHABLE_KEY") ?? cleanEnv("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_ROLE_KEY = cleanEnv("SUPABASE_SERVICE_ROLE_KEY")!;
+const UPSTASH_URL = cleanEnv("UPSTASH_REDIS_REST_URL")!;
+const UPSTASH_TOKEN = cleanEnv("UPSTASH_REDIS_REST_TOKEN")!;
 
 const CommandSchema = z.object({
   project_id: z.string().uuid(),

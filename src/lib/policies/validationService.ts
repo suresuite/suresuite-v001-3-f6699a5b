@@ -69,7 +69,8 @@ export interface ManifestInput {
   inbound?: Row[];
   /** Raw outbound_logistics rows. */
   outbound?: Row[];
-  /** Raw bom_single_level rows — powers the unsourced-BOM hard block. */
+  /** Raw bom_single_level OR bom_multi_level rows — the shared grader
+   * normalizes the shape; powers the unsourced-BOM hard block. */
   bom?: Row[];
 }
 

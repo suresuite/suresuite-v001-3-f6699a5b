@@ -32,7 +32,8 @@ export interface GradingDataset {
   suppliers: Row[];
   inbound: Row[];
   outbound: Row[];
-  /** bom_single_level rows — powers the unsourced-BOM hard block. */
+  /** bom_single_level OR bom_multi_level rows — gradeManifest normalizes the
+   * shape itself (normalizeBomRows); powers the unsourced-BOM hard block. */
   bom: Row[];
 }
 
@@ -218,6 +219,83 @@ const REDUCERS: Record<string, (id: string, ctx: ReducerCtx) => number | undefin
   twice_demand_floor_1000: (id, c) =>
     Math.max((c.effectiveDemand.get(id) ?? 0) * 2, 1000),
 };
+
+/**
+ * Normalize BOM rows to the single-level shape the grader reads. Multi-level
+ * rows (bom_multi_level: child `material_id` under a parent
+ * `higher_level_component_id`, no `product_id`) are FLATTENED to effective
+ * root-product → leaf-material rows — a faithful port of the engine's
+ * datamap._flatten_multi_level_bom (sim-worker/sim_worker/datamap.py): roots
+ * are components that are never anyone's child, leaves are components that
+ * are never a parent, and the effective rate of a root→leaf pair is the sum
+ * over all paths of the product of edge rates. Single-level rows pass
+ * through unchanged.
+ *
+ * Flattening (not a per-edge parent→product_id stand-in) matters for the
+ * unsourced-BOM hard block: the engine demands a supplier link only for LEAF
+ * materials — intermediate components are produced from their own children
+ * and must NOT be flagged — while a raw material sitting under an
+ * intermediate must still trace up to its root product and block.
+ *
+ * Lives INSIDE the shared grader (gradeManifest calls it) so every surface —
+ * the browser verification and the sim-command gate — normalizes identically:
+ * the two once graded different BOMs because each adapter carried its own
+ * mapping and the browser dropped multi-level rows entirely.
+ */
+export function normalizeBomRows(rows: Row[]): Row[] {
+  const single = rows.filter((r) => r.product_id != null);
+  const multi = rows.filter(
+    (r) => r.product_id == null && r.higher_level_component_id != null,
+  );
+  if (multi.length === 0) return single;
+
+  const edges = new Map<string, Array<[string, number]>>();
+  const parents = new Set<string>();
+  const children = new Set<string>();
+  for (const r of multi) {
+    const parent = String(r.higher_level_component_id ?? "");
+    const child = String(r.material_id ?? "");
+    if (!parent || !child) continue;
+    const rate = num(r.consumption_rate) || 1.0;
+    if (!edges.has(parent)) edges.set(parent, []);
+    edges.get(parent)!.push([child, rate]);
+    parents.add(parent);
+    children.add(child);
+  }
+
+  // product → (leaf material → summed effective rate). Nested maps: ids may
+  // contain any printable character, so no composite string keys.
+  const flat = new Map<string, Map<string, number>>();
+  for (const root of [...parents].filter((p) => !children.has(p)).sort()) {
+    const leaves = new Map<string, number>();
+    flat.set(root, leaves);
+    const stack: Array<[string, number, string[]]> = [[root, 1.0, [root]]];
+    while (stack.length > 0) {
+      const [node, eff, path] = stack.pop()!;
+      const kids = edges.get(node);
+      if (!kids || kids.length === 0) {
+        leaves.set(node, (leaves.get(node) ?? 0) + eff);
+        continue;
+      }
+      for (const [child, rate] of kids) {
+        if (path.includes(child)) continue; // cycle guard — drop the looping path
+        stack.push([child, eff * rate, [...path, child]]);
+      }
+    }
+  }
+
+  const flattened: Row[] = [];
+  for (const [product, leaves] of flat) {
+    for (const material of [...leaves.keys()].sort()) {
+      flattened.push({
+        product_id: product,
+        material_id: material,
+        consumption_rate: leaves.get(material),
+      });
+    }
+  }
+  return [...single, ...flattened];
+}
 
 // ── Policy activation (mirror of project_map.py::_map_policies keys) ────────
 
@@ -439,7 +517,7 @@ export function gradeManifest(
   );
   const unsourced = [
     ...new Set(
-      dataset.bom
+      normalizeBomRows(dataset.bom)
         .filter((b) => productIds.has(String(b.product_id ?? "")))
         .map((b) => String(b.material_id ?? ""))
         .filter((m) => m && !arcMaterials.has(m)),

@@ -29,6 +29,22 @@ jobs:
       # configured repo still deploys. GitHub masks the values in logs.
       - name: Set function secrets
         run: |
+          # A secret pasted into GitHub with wrapping quotes would be pushed
+          # verbatim and break the function at runtime (Invalid URL / bad
+          # Authorization header). Strip one pair of matching quotes first;
+          # the functions also tolerate quotes (_shared/env.ts), belt+braces.
+          strip_quotes() {
+            local v="$1"
+            case "$v" in
+              '"'*'"') v="${v#\"}"; v="${v%\"}" ;;
+              "'"*"'") v="${v#\'}"; v="${v%\'}" ;;
+            esac
+            printf '%s' "$v"
+          }
+          for name in GEMINI_API_KEY OPENAI_API_KEY DEEPSEEK_API_KEY \
+                      UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN; do
+            printf -v "$name" '%s' "$(strip_quotes "${!name}")"
+          done
           args=()
           [ -n "$GEMINI_API_KEY" ]   && args+=("GEMINI_API_KEY=$GEMINI_API_KEY")
           [ -n "$OPENAI_API_KEY" ]   && args+=("OPENAI_API_KEY=$OPENAI_API_KEY")

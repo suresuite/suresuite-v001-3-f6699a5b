@@ -59,18 +59,14 @@ export async function loadGateDataset(sb: any, projectId: string): Promise<Gradi
     sb.from("bom_multi_level").select("material_id,higher_level_component_id").eq("project_id", projectId),
   ]);
   // Multi-level rows win when they exist — the same rule the engine's
-  // datamap and the frontend lanes apply — graded through the single-level
-  // manifest shape (the parent component stands in for product_id). Grading
-  // the wrong (empty) table once let a run through the gate only to die in
-  // the engine with "bom too_short".
-  // deno-lint-ignore no-explicit-any
-  const multiRows = (bomMulti.data ?? []) as any[];
-  const bom = multiRows.length > 0
-    ? multiRows.map((r) => ({
-        product_id: r.higher_level_component_id,
-        material_id: r.material_id,
-      }))
-    : bomSingle.data ?? [];
+  // datamap and the frontend lanes apply. Rows pass through RAW: shape
+  // normalization (the parent component standing in for product_id) happens
+  // inside gradeManifest (normalizeBomRows), shared with the browser grader,
+  // so the two surfaces cannot normalize differently. Grading the wrong
+  // (empty) table once let a run through the gate only to die in the engine
+  // with "bom too_short".
+  const multiRows = bomMulti.data ?? [];
+  const bom = multiRows.length > 0 ? multiRows : bomSingle.data ?? [];
   return {
     materials: materials.data ?? [],
     products: products.data ?? [],
