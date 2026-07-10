@@ -45,9 +45,25 @@ def redis_url_problem(url: str | None) -> str | None:
     return None
 
 
+def _strip_wrapping_quotes(name: str) -> None:
+    """Normalize one env var in place: trim whitespace and one pair of matching
+    wrapping quotes. Secrets pasted into a dashboard as `"rediss://…"` otherwise
+    fail the scheme check (or worse, reach redis-py and crash-loop opaquely).
+    Mirrors _shared/env.ts on the edge-function side."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return
+    v = raw.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        v = v[1:-1].strip()
+    os.environ[name] = v
+
+
 def validate_env() -> None:
     """Fail fast with a one-line, human-readable reason instead of a traceback
     when a required secret is missing or malformed."""
+    for var in ("UPSTASH_REDIS_URL", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"):
+        _strip_wrapping_quotes(var)
     problem = redis_url_problem(os.environ.get("UPSTASH_REDIS_URL"))
     if problem:
         log.error("config error: %s", problem)
