@@ -72,7 +72,13 @@ class SimWorker:
         service_role_key: str,
         idle_ttl: int = 600,
     ):
-        self._redis = redis.from_url(redis_url, decode_responses=True)
+        self._redis = redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_timeout=30.0,
+            socket_connect_timeout=10.0,
+            socket_keepalive=True,
+        )
         self._supabase_url = supabase_url.rstrip("/")
         self._service_role_key = service_role_key
         self._cache = GraphCache(supabase_url, service_role_key, idle_ttl)
@@ -124,6 +130,7 @@ class SimWorker:
             if "BUSYGROUP" not in str(e):
                 raise
 
+        backoff = 0.5
         while True:
             try:
                 resp = await self._redis.xreadgroup(
@@ -131,15 +138,18 @@ class SimWorker:
                     count=10, block=5000,
                 )
                 if not resp:
+                    backoff = 0.5  # Reset on successful read
                     continue
+                backoff = 0.5  # Reset on successful read
                 for _stream, messages in resp:
                     for msg_id, fields in messages:
                         await self._handle(stream, msg_id, fields)
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as e:
                 log.exception("consume loop failed for %s", stream)
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30.0)  # Cap at 30s
 
     # --------------------------------------------------------------- handlers
 
