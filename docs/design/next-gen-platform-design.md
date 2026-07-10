@@ -679,6 +679,23 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 
 **Roadmap placement:** the card, inheritance, and badges are the first workstream of Phase B (§13), alongside the registry-driven picker — together they are the platform's CORE loop. Sequential-CI replication service and CRN-paired validation experiments join in Phase C, where they reuse the experiment machinery (§9.1–9.3).
 
+> **Design addendum (Phase B0, approved): the card made concrete.** The approved design and
+> executable schema live in `docs/design/phase-b0-core-loop.md` and
+> `supabase/migrations/20260710000001_model_validations.sql`. Three refinements to the sketch
+> above: (1) the card's `scenario_hash` is a **baseline fingerprint** — canonical world-model
+> fields (horizon, time step, demand model) *excluding* disruption schedules, recovery
+> overrides, and estimation settings (warm-up/replications/seed/stopping rule), mirroring
+> `SnapshotStore`'s events-excluded family digest (A8) — so stress scenarios run on a validated
+> baseline inherit its credibility; the stricter events-*included* scenario hash remains the
+> Phase C RunKey component (§9.2), and the two share a canonicalization module but not a field
+> list. (2) The database stores an immutable **outcome** (`verdict` validated/rejected, with
+> `basis` statistical/face and a drillable evidence-run reference; supersede-not-edit, A5);
+> `validated` / `stale` / `unvalidated` are **derived** at read time by hash comparison —
+> staleness is never stored, so reverting a drift self-heals to validated without a new card.
+> (3) The engine fingerprint is recorded from the evidence run's `code_version` and checked
+> post-run (it cannot gate at dispatch, where the worker hasn't stamped it yet); the full §9.2
+> fingerprint strengthens this check in Phase C.
+
 ---
 
 ## 10. Benchmark: AnyLogistix
@@ -855,6 +872,14 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 - V&V credibility pipeline completion (§9.5): `model_validations` card persisted on the provenance triple; Lab scenarios inherit adopted warm-up + replication counts; credibility badges (`validated` / `stale` / `unvalidated`) on every run surface; staleness on any hash drift.
 - **B0 exit:** selecting any implemented policy shows exactly its engine parameters and its data demands live; a model validated in Run & Validate carries its warm-up and replication settings into every Lab scenario automatically, and validation status is visible on every result. **Closes:** G13; the UI half of G1.
 
+> **Design addendum (B0, approved):** `docs/design/phase-b0-core-loop.md` is the approved
+> implementation design for this workstream — registry payload v2 (decision slots, exported
+> activation table, `x-ui` form metadata), the RegistryAccess contract laws, the
+> `model_validations` lifecycle + RPCs (executable in migration
+> `20260710000001_model_validations.sql`), badge derivation, Lab inheritance, and the rollout
+> order. It also records the §14 open-question-1 decision (families as substrate, bundles as
+> a derived view) and the §9.5 refinements noted there.
+
 **B1 — Catalog and bundles:**
 - v1 catalog (§5) implemented/activated: extended P-P.1 parameterization; unreachable policies (P-S.2, P-P.4, P-P.9) wired; new supplier/customer/transport slots; promoted defaults (P-P.0, P-F.x, P-C.4, P-S.5/6).
 - PolicyBundles: node-type default layer, per-node resolution, bundle-aware snapshots (§4.3); horizon lens in `/policies` (§4.1).
@@ -928,7 +953,7 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 
 ### Open questions
 
-1. **Storage shape for bundles:** keep the seven JSONB family columns as the storage substrate with bundles as a resolved view (recommended — zero migration risk), or migrate storage to bundle-native rows? Decide in Phase B design review.
+1. **Storage shape for bundles — decided (B0 design review, 2026-07-10):** the seven JSONB family columns stay the storage substrate; bundles are a **resolved view** — a pure function of (snapshot v2, exported activation table), computed identically in TS and Python, with `(policy_hash, engine_fingerprint)` jointly fingerprinting the resolved bundle (`docs/design/phase-b0-core-loop.md` §1.5). Snapshot v3 (embedding the resolved bundle) lands with B1's node-type default layer; bundle-native storage is reconsidered only if that layer demands it.
 2. **Network optimization:** build a MILP/heuristic optimizer, integrate an open solver, or deliberately stay simulation-pure and interoperate? (§10.1 row 1.) Decide after Phase C, informed by user demand.
 3. **Warehouse echelon math:** how does the DC echelon interact with the single-plant Part-III formulation — extension or second model class?
 4. **Surrogate sharing:** are surrogates strictly per-project, or shareable across projects with compatible feature specs (data governance implications)?
