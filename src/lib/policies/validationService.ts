@@ -15,9 +15,12 @@ import bridge from "../../../supabase/functions/_shared/engineBridge.json";
 import registry from "./registry.generated.json";
 import {
   activeEnginePolicies as sharedActivePolicies,
+  flattenFindings,
   gradeManifest,
+  scenarioCapacityFindings,
   type BridgeTables,
   type GradedField,
+  type GradedFinding,
   type GradingDataset,
   type RegistryPayload,
   type Row,
@@ -38,6 +41,8 @@ export interface Finding {
   hint?: string;
   /** Catalog ref of the policy demanding the datum ("engine" for base reqs). */
   policy?: string;
+  /** Affected entity ids (aggregated findings) — feeds per-row remediation. */
+  rows?: string[];
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -142,6 +147,67 @@ export function compileRequiredDataFindings(input: ManifestInput): Finding[] {
     out.push(...findingsForField(g));
   }
   return out;
+}
+
+// ── Gate mirror (Lab pre-run panel) ─────────────────────────────────────────
+
+export type { GradedFinding };
+
+/**
+ * The EXACT findings the sim-command pre-dispatch gate would return for this
+ * dataset + policy configuration + scenario: manifest grading via the shared
+ * module, flattened to the gate's aggregated per-field shape, plus the
+ * scenario-conditional capacity check. The Lab renders these before dispatch
+ * (and re-renders the server's own copy after a 422) — same vocabulary, same
+ * grader, no second validation surface.
+ */
+export function compileGateFindings(
+  input: ManifestInput,
+  disruptionSchedule: Row[] = [],
+): GradedFinding[] {
+  const dataset: GradingDataset = {
+    materials: input.materials ?? [],
+    products: input.products ?? [],
+    suppliers: input.suppliers ?? [],
+    inbound: input.inbound ?? [],
+    outbound: input.outbound ?? [],
+    bom: input.bom ?? [],
+  };
+  const graded = gradeManifest(
+    dataset,
+    input.defaults as unknown as Row,
+    registry as unknown as RegistryPayload,
+    bridge as unknown as BridgeTables,
+  );
+  return [
+    ...flattenFindings(graded),
+    ...scenarioCapacityFindings(dataset.suppliers, disruptionSchedule),
+  ];
+}
+
+/**
+ * Adapt gate-shaped findings (ours pre-dispatch, or the server's from a 422
+ * response body) to the UI `Finding` vocabulary the shared findings list
+ * renders — one row per field with the affected-row count in the message.
+ */
+export function gateFindingsToFindings(
+  gate: Array<Pick<GradedFinding, "severity" | "field" | "policy" | "rows" | "message"> & { reason?: string }>,
+): Finding[] {
+  return gate.map((g, i) => {
+    const dataset = g.field.split(".")[0];
+    return {
+      id: `gate-${g.field}-${g.severity}-${i}`,
+      severity: (g.severity as Severity) ?? "info",
+      stage: STAGE_BY_DATASET[dataset] ?? "run_validate",
+      field: g.field,
+      policy: g.policy,
+      rows: g.rows,
+      message: g.message,
+      hint: g.rows?.length
+        ? `Affected: ${g.rows.slice(0, 6).join(", ")}${g.rows.length > 6 ? ", …" : ""}`
+        : undefined,
+    };
+  });
 }
 
 function findingsForField(g: GradedField): Finding[] {

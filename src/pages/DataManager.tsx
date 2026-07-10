@@ -1,5 +1,6 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -48,11 +49,23 @@ interface DataManagerProps {
 }
 
 const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
+  // Walk-to deep link (§8.2 findings → data): ?project=<id> expands the
+  // project's data card; &item_master=<materials|products|suppliers> also
+  // opens the Item Master editor on that tab (see fieldWalkToRoute).
+  const [searchParams] = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [uploadingProject, setUploadingProject] = useState<Project | null>(null);
   const [itemMasterProjectId, setItemMasterProjectId] = useState<string | null>(null);
+  const walkToTable = searchParams.get('item_master');
+  useEffect(() => {
+    const walkToProject = searchParams.get('project');
+    if (!walkToProject) return;
+    setExpandedProjectId(walkToProject);
+    if (walkToTable) setItemMasterProjectId(walkToProject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const { globalSelectedProjectId, setGlobalSelectedProjectId, selectedProject, setSelectedProject } = useGlobalProject();
   const [newProjectName, setNewProjectName] = useState('');
   const [plantName, setPlantName] = useState('');
@@ -952,6 +965,11 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                     <div className="mt-4 ml-4 pl-4 border-l-2 border-border">
                       <ItemMasterEditor
                         projectId={project.id}
+                        initialTab={
+                          walkToTable === 'materials' || walkToTable === 'products' || walkToTable === 'suppliers'
+                            ? walkToTable
+                            : undefined
+                        }
                         onClose={() => setItemMasterProjectId(null)}
                       />
                     </div>

@@ -20,7 +20,7 @@ import bridge from "./engineBridge.json" with { type: "json" };
 import {
   flattenFindings,
   gradeManifest,
-  num,
+  scenarioCapacityFindings,
   type BridgeTables,
   type GradingDataset,
   type RegistryPayload,
@@ -100,30 +100,14 @@ export function runValidationGate(args: {
       ({ severity, field, policy, rows, message }),
   );
 
-  // Scenario-conditional (not a manifest field): a partial-magnitude supplier
-  // disruption needs a finite supplier capacity to throttle — else the mapper
-  // degrades it to a full outage (project_map.py::_map_events).
-  const capBySupplier = new Map(
-    dataset.suppliers.map((s) => [String(s.supplier_id ?? ""), num(s.capacity_per_week)]),
+  // Scenario-conditional check — shared with the Lab pre-run panel via the
+  // grading module (one definition, two surfaces).
+  findings.push(
+    ...scenarioCapacityFindings(dataset.suppliers, disruptionSchedule ?? []).map(
+      ({ severity, field, policy, rows, message }) =>
+        ({ severity, field, policy, rows, message }),
+    ),
   );
-  for (const ev of disruptionSchedule ?? []) {
-    const magnitude = num(ev.magnitude_pct ?? ev.magnitude ?? 100);
-    if (magnitude >= 100) continue;
-    const raw = String(ev.target ?? ev.target_id ?? "");
-    const target = raw.includes(":") ? raw.slice(raw.lastIndexOf(":") + 1) : raw;
-    if (!capBySupplier.has(target)) continue; // plant/unknown targets: not this check
-    if ((capBySupplier.get(target) ?? 0) <= 0) {
-      findings.push({
-        severity: "warn",
-        field: "suppliers.capacity_per_week",
-        policy: "engine",
-        rows: [target],
-        message:
-          `Scenario cuts supplier "${target}" to ${magnitude}% capacity, but the supplier ` +
-          `has no capacity_per_week — the engine will degrade this to a full outage.`,
-      });
-    }
-  }
 
   const blocks = findings.filter((f) => f.severity === "block");
   const warns = findings.filter((f) => f.severity === "warn");

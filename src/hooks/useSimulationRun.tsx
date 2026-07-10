@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 /** Engine fallback report (scsim MappingWarning, written by the worker). */
@@ -28,13 +27,36 @@ export interface SimulationRun {
   policy_hash: string | null;
   mapping_warnings: MappingWarning[] | null;
   created_at: string;
+  /** Baseline fingerprint stamped at dispatch (Phase B0 / G13 / §9.5). */
+  scenario_hash?: string | null;
+  /** The model-validation card in force at dispatch — immutable history. */
+  model_validation_id?: string | null;
+}
+
+/** One finding of a sim-command 422 — the §8.1 gate's typed shape. */
+export interface GateResponseFinding {
+  severity: "block" | "warn" | "info";
+  field: string;
+  policy: string;
+  rows: string[];
+  message: string;
 }
 
 /** Body of a sim-command 422 — the §8.1 required-data gate result. */
 interface GateErrorBody {
   validation?: "blocked" | "ack_required";
   ack_required?: boolean;
-  findings?: Array<{ severity: string; field: string; policy: string; message: string }>;
+  findings?: GateResponseFinding[];
+}
+
+/** Typed dispatch outcome: queued, or rejected with the gate's findings so
+ *  the Lab renders them structurally instead of concatenating a toast. */
+export interface RunDispatchResult {
+  queued: boolean;
+  /** Set when queued=false — the gate's rejection class. */
+  status?: "blocked" | "ack_required";
+  /** Set when queued=false — the gate's typed findings. */
+  findings?: GateResponseFinding[];
 }
 
 async function parseFunctionError(error: unknown): Promise<GateErrorBody | null> {
@@ -131,8 +153,12 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
   }, [scenarioId, loadLatest, scheduleReload]);
 
   const runExperiment = useCallback(
-    async (projectId: string, policyVersionId: string, acknowledgeWarnings = false) => {
-      if (!scenarioId) return;
+    async (
+      projectId: string,
+      policyVersionId: string,
+      acknowledgeWarnings = false,
+    ): Promise<RunDispatchResult> => {
+      if (!scenarioId) throw new Error("no scenario selected");
       const { error } = await supabase.functions.invoke("sim-command", {
         body: {
           project_id: projectId,
@@ -145,32 +171,19 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
           client_ts: Date.now(),
         },
       });
-      if (!error) return;
+      if (!error) return { queued: true };
 
       // §8.1 required-data gate: sim-command returns 422 with typed findings
-      // instead of dispatching a run on silently-defaulted data.
+      // instead of dispatching a run on silently-defaulted data. Hand them
+      // back to the caller — the Lab renders them in the pre-run panel with
+      // walk-to links and the acknowledgment control (no string toast).
       const body = await parseFunctionError(error);
       if (body?.validation) {
-        const summary = (body.findings ?? [])
-          .slice(0, 3)
-          .map((f) => f.message)
-          .join("\n");
-        if (body.ack_required) {
-          toast.warning("Run paused — data the engine would default", {
-            description: summary,
-            duration: 12000,
-            action: {
-              label: "Run anyway",
-              onClick: () => void runExperiment(projectId, policyVersionId, true),
-            },
-          });
-          return;
-        }
-        toast.error("Run blocked — required data is missing", {
-          description: summary,
-          duration: 12000,
-        });
-        return;
+        return {
+          queued: false,
+          status: body.validation,
+          findings: body.findings ?? [],
+        };
       }
       throw error;
     },

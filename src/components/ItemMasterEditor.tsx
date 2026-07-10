@@ -92,6 +92,8 @@ type Drafts = Record<string, Record<string, string | null>>;
 
 interface ItemMasterEditorProps {
   projectId: string;
+  /** Tab to open on mount (walk-to deep link from the findings surfaces). */
+  initialTab?: ItemMasterTable;
   onClose?: () => void;
 }
 
@@ -125,10 +127,10 @@ const derivedLookup = (
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-const ItemMasterEditor = ({ projectId, onClose }: ItemMasterEditorProps) => {
+const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorProps) => {
   const { materials, products, suppliers, loading, error, missingCounts, derived, saveRows } =
     useItemMasters(projectId);
-  const [activeTab, setActiveTab] = useState<ItemMasterTable>("materials");
+  const [activeTab, setActiveTab] = useState<ItemMasterTable>(initialTab ?? "materials");
   // drafts[table] = { [rowId]: { [field]: raw input value } }
   const [drafts, setDrafts] = useState<Record<ItemMasterTable, Drafts>>({
     materials: {},
