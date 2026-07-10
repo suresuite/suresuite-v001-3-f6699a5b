@@ -1,4 +1,4 @@
 # Touch this file (any content change) and push to request a full
 # verify-sim-e2e run with defaults (200 reps × 365 days, cancel test on).
 # The result log lands on the verify-results branch: results/latest.log
-request: 2026-07-10T11:00:00Z reason=e2e-test-after-acl-disabled
+request: 2026-07-10T11:30:00Z reason=e2e-test-after-acl-disabled-retry
