@@ -1,4 +1,4 @@
 # Touch this file (any content change) and push to request a full
 # verify-sim-e2e run with defaults (200 reps × 365 days, cancel test on).
 # The result log lands on the verify-results branch: results/latest.log
-request: 2026-07-10T10:35:00Z reason=verify-seamless-connection-final
+request: 2026-07-10T10:50:00Z reason=final-e2e-test-with-correct-redis
