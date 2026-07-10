@@ -255,6 +255,34 @@ class CompiledModel:
         return out
 
 
+def draw_week_demand(model: CompiledModel, rng: np.random.Generator, out: np.ndarray) -> None:
+    """Draw one week of product demand into ``out``.
+
+    The per-group draw sequence is the world-stream consumption contract:
+    golden traces byte-compare on it, so schedule pre-generation and the
+    former per-week loop must consume ``rng`` in exactly this order.
+    """
+    for model_type, idx in model.demand_groups:
+        if model_type == DemandModel.TRIANGULAR:
+            a, b, c = model.demand_a[idx], model.demand_b[idx], model.demand_c[idx]
+            spread = c > a + 1e-12
+            vals = np.where(spread, 0.0, b)
+            if spread.any():
+                vals[spread] = rng.triangular(a[spread], b[spread], c[spread])
+            out[idx] = vals
+        elif model_type == DemandModel.DETERMINISTIC:
+            out[idx] = model.demand_b[idx]
+        elif model_type == DemandModel.POISSON:
+            out[idx] = rng.poisson(model.demand_b[idx]).astype(float)
+        elif model_type == DemandModel.NEGBIN:
+            b, k = model.demand_b[idx], model.negbin_k[idx]
+            p = k / (k + np.maximum(b, 1e-12))
+            out[idx] = rng.negative_binomial(k, p).astype(float)
+        else:  # BOOTSTRAP
+            for j in idx:
+                out[j] = float(rng.choice(model.demand_history[j]))
+
+
 class CostLedger:
     def __init__(self, horizon: int):
         self.weekly = np.zeros((len(COST_COMPONENTS), horizon))
@@ -349,6 +377,17 @@ class SimContext:
         self.demand_history_n = 0
         self.forecast_smooth = model.mean_demand_p.copy()
 
+        # World demand schedule (§II.4 / §III-D.6): the realized trajectory
+        # plus a τ*-week forward tail, drawn up front. Weeks 0..H−1 are drawn
+        # first, in the exact order the week loop consumed the stream before,
+        # so realized demand stays bit-identical; the tail draws come after.
+        # The schedule depends only on settings + network + world seed, never
+        # on the policy portfolio (G-RNG invariance).
+        lookahead = model.settings.visibility_horizon
+        self.demand_schedule = np.zeros((model.n_prods, T + lookahead))
+        for t in range(T + lookahead):
+            draw_week_demand(model, streams.demand, self.demand_schedule[:, t])
+
         # Weekly transients (rebound each week by the engine/mechanics).
         self.week: int = 0
         self.demand = np.zeros(model.n_prods)
@@ -377,6 +416,10 @@ class SimContext:
         # P-S.4 early_warning_failover: monitored detection lag. None → the
         # scenario's settings.detection_lag_weeks applies unchanged.
         self.detection_lag_override: Optional[int] = None
+        # P-C.4 forward_visibility: weeks of committed forward order book the
+        # plant may read (τ*, §III-D.6). 0 = no customer visibility policy.
+        self.visibility_horizon: int = 0
+        self._forward_mat_cum: Optional[np.ndarray] = None
 
         self.trace = WeeklyTrace(T, model.n_prods, model.n_mats, keep_matrices)
         self._active_hook: Optional[BoundHook] = None
@@ -428,6 +471,27 @@ class SimContext:
             slots = np.arange(start_week, end_week) % W
             per_link = self.pipeline[:, slots].sum(axis=1)
         return np.asarray(self.model.link_to_mat @ per_link).ravel()
+
+    def forward_material_demand(self, start_week: int, cover_weeks) -> np.ndarray:
+        """Per-material forward-visible demand summed INCLUSIVELY over
+        τ = start_week .. start_week + cover_weeks (§II.4): BoM-exploded
+        D̂_m[τ] = Σ_p D̂_p[τ]·r_{p,m} over the coverage window.
+
+        ``cover_weeks`` is an int or an (n_mats,) int array (per-material
+        lead times). Windows are clamped to the schedule edge; feasibility
+        (T_s + κ ≤ τ*) guarantees full windows for every simulated week.
+        """
+        if self._forward_mat_cum is None:
+            mat_sched = np.asarray(self.model.bom.T @ self.demand_schedule)
+            cum = np.zeros((self.model.n_mats, mat_sched.shape[1] + 1))
+            np.cumsum(mat_sched, axis=1, out=cum[:, 1:])
+            self._forward_mat_cum = cum
+        cum = self._forward_mat_cum
+        width = cum.shape[1] - 1
+        lo = min(max(start_week, 0), width)
+        hi = np.clip(start_week + np.asarray(cover_weeks, dtype=int) + 1, lo, width)
+        rows = np.arange(self.model.n_mats)
+        return cum[rows, hi] - cum[rows, lo]
 
     # ------------------------------------------------------- guarded writers
 

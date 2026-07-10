@@ -54,7 +54,6 @@ from scsim.core.phases import (
 from scsim.disruption.injector import any_stochastic, resolve_events, validate_events
 from scsim.entities.config import StatisticsReport, WarmupReport
 from scsim.entities.enums import (
-    DemandModel,
     EffectType,
     FulfillmentMode,
     LeadTimeDist,
@@ -121,32 +120,14 @@ def _mech_week_start(model: CompiledModel, ctx: SimContext) -> None:
 
 
 def _mech_demand(model: CompiledModel, ctx: SimContext) -> None:
-    # Forecast BEFORE drawing the week (information timing, ADR 0001):
+    # Forecast BEFORE reading the week (information timing, ADR 0001):
     # forecast_t = f(D_{t-window..t-1}); falls back to the model mean cold.
     _update_forecast(model, ctx)
-    rng = ctx.streams.demand
-    D = ctx.demand
-    for model_type, idx in model.demand_groups:
-        if model_type == DemandModel.TRIANGULAR:
-            a, b, c = model.demand_a[idx], model.demand_b[idx], model.demand_c[idx]
-            spread = c > a + 1e-12
-            vals = np.where(spread, 0.0, b)
-            if spread.any():
-                vals[spread] = rng.triangular(a[spread], b[spread], c[spread])
-            D[idx] = vals
-        elif model_type == DemandModel.DETERMINISTIC:
-            D[idx] = model.demand_b[idx]
-        elif model_type == DemandModel.POISSON:
-            D[idx] = rng.poisson(model.demand_b[idx]).astype(float)
-        elif model_type == DemandModel.NEGBIN:
-            b, k = model.demand_b[idx], model.negbin_k[idx]
-            p = k / (k + np.maximum(b, 1e-12))
-            D[idx] = rng.negative_binomial(k, p).astype(float)
-        else:  # BOOTSTRAP
-            for j in idx:
-                D[j] = float(rng.choice(model.demand_history[j]))
+    # Realized demand is this week's column of the pre-drawn world schedule
+    # (§III-D.6: D_{p}[t] = D̃_{p}[t] — the committed order book realizes).
+    ctx.demand = ctx.demand_schedule[:, ctx.week].copy()
     # Append the realization to the history ring (consumed by next week's forecast).
-    ctx.demand_history[:, ctx.demand_history_n % 26] = D
+    ctx.demand_history[:, ctx.demand_history_n % 26] = ctx.demand
     ctx.demand_history_n += 1
 
 
