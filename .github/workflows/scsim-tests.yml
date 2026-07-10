@@ -113,5 +113,5 @@ jobs:
           deno-version: v2.x
 
       - name: Grader contract tests (golden fixture + gate semantics)
-        run: deno test --allow-read grading_test.ts
+        run: deno test --allow-read grading_test.ts env_test.ts
         working-directory: supabase/functions/_shared
