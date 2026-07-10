@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 
 import numpy as np
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from scsim.core.context import SimContext
 from scsim.core.phases import (
@@ -29,15 +29,56 @@ from scsim.core.phases import (
     Hook,
     PhaseId,
 )
-from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
-from scsim.policies.base import DataRequirement, ModeStrip, PolicyParams, PolicyPlugin
+from scsim.entities.enums import (
+    ConstraintTag,
+    FulfillmentMode,
+    PolicyStatus,
+    Stage,
+    StrategyClass,
+    TransportMode,
+)
+from scsim.entities.network import Network
+from scsim.entities.scenario import Scenario
+from scsim.policies.base import (
+    DataRequirement,
+    FeasibilityIssue,
+    FeasibilityResult,
+    ModeStrip,
+    PolicyParams,
+    PolicyPlugin,
+)
 from scsim.policies.registry import register_plugin
+
+
+def _primary_link_lts(net: Network) -> dict[str, int]:
+    """Effective primary-link lead time per material id, mirroring
+    CompiledModel's (cost, lt, supplier) primary selection and edge
+    lead-time folding — kept in lockstep by a drift test."""
+    lane_extra: dict[str, int] = {}
+    for lane in sorted(net.lanes, key=lambda l: (l.mode != TransportMode.DEFAULT, l.id)):
+        lane_extra.setdefault(lane.supplier_id, int(lane.lead_time_weeks))
+    out: dict[str, int] = {}
+    for link in sorted(net.supplier_links,
+                       key=lambda l: (l.cost, l.lead_time_weeks, l.supplier_id)):
+        out.setdefault(link.material_id,
+                       int(link.lead_time_weeks) + lane_extra.get(link.supplier_id, 0))
+    return out
 
 
 class InventoryControlParams(PolicyParams):
     policy_type: Literal["min_max", "base_stock", "rop_q", "periodic"] = Field(
         "min_max",
         json_schema_extra={"unit": "enum", "scope": "M", "notes": "min_max ✅ (manuscript)."},
+    )
+    basis: Literal["days_of_supply", "forward_visible"] = Field(
+        "days_of_supply",
+        json_schema_extra={
+            "unit": "enum", "scope": "G/M",
+            "notes": "Policy Basis (§II.4): days_of_supply sizes levels from the stationary "
+                     "mean (s = E[D_m]·T_s); forward_visible sums the committed forward "
+                     "order book over the coverage window (WSC-2026 MTO) — requires the "
+                     "P-C.6 forward_visibility customer policy.",
+        },
     )
     coverage_weeks: ModeStrip = Field(
         default_factory=lambda: ModeStrip(nominal=8, alert=10, crisis=12),
@@ -65,6 +106,18 @@ class InventoryControlParams(PolicyParams):
             if not (0 <= k <= 26):
                 raise ValueError(f"coverage_weeks.{mode} must be in [0, 26]")
         return v
+
+    @model_validator(mode="after")
+    def _forward_needs_integral_kappa(self) -> "InventoryControlParams":
+        if self.basis == "forward_visible":
+            for mode in ("nominal", "alert", "crisis"):
+                k = getattr(self.coverage_weeks, mode)
+                if k != int(k):
+                    raise ValueError(
+                        f"basis='forward_visible' sums whole forward weeks: "
+                        f"coverage_weeks.{mode} must be integral, got {k}"
+                    )
+        return self
 
 
 @register_plugin
@@ -110,6 +163,43 @@ class InventoryControl(PolicyPlugin):
             ),
         ]
 
+    # ------------------------------------------------------------ feasibility
+
+    def feasibility(self, scenario: Scenario) -> FeasibilityResult:
+        p: InventoryControlParams = self.params
+        if p.basis != "forward_visible":
+            return FeasibilityResult.ok()
+        # §II.4 two-stage contract: the forward basis is selectable only when
+        # a customer policy provides τ* ≥ T_s + κ, and only for MTO worlds.
+        fv = scenario.policies.get("forward_visibility")
+        if fv is None:
+            return FeasibilityResult(False, (FeasibilityIssue(
+                "error", "forward_basis_needs_visibility",
+                "basis='forward_visible' requires the forward_visibility customer policy "
+                "(P-C.6): the plant can only read a forward order book a customer commits",
+            ),))
+        mts = [pr.id for pr in scenario.network.products
+               if pr.fulfillment_mode == FulfillmentMode.MTS]
+        if mts:
+            return FeasibilityResult(False, (FeasibilityIssue(
+                "error", "forward_basis_is_mto_only",
+                f"basis='forward_visible' is MTO-only (§II.4): MTS products plan material "
+                f"demand from the forecast, not the committed book — found MTS: {mts[:5]}",
+            ),))
+        tau = fv.get("visibility_horizon") or scenario.settings.visibility_horizon
+        max_lt = max(_primary_link_lts(scenario.network).values(), default=0)
+        kappa_crisis = int(p.coverage_weeks.crisis)
+        if max_lt + kappa_crisis > tau:
+            return FeasibilityResult(False, (FeasibilityIssue(
+                "error", "coverage_beyond_visibility",
+                f"forward windows must fit the visible book (T_s + κ ≤ τ*, §II.4): "
+                f"max primary lead time {max_lt}w + crisis κ {kappa_crisis}w exceeds "
+                f"τ* = {tau}w",
+            ),))
+        return FeasibilityResult.ok()
+
+    # ---------------------------------------------------------------- runtime
+
     def _kappa(self, ctx: SimContext) -> float:
         strip: ModeStrip = self.params.coverage_weeks
         return strip.crisis if ctx.events_visible() else strip.nominal
@@ -121,11 +211,20 @@ class InventoryControl(PolicyPlugin):
             self._release(ctx)
 
     def _set_levels(self, ctx: SimContext) -> None:
-        # Eqs. 2–3: s_m = E[D_m]·T_s ; S_m = E[D_m]·(T_s + κ). P-P.3 adds SS after us.
         m = ctx.model
+        kappa = self._kappa(ctx)
+        if self.params.basis == "forward_visible":
+            # §II.4 Forward-visible schedule (WSC-2026 MTO), inclusive windows:
+            # s_m[t] = Σ_{τ=t}^{t+T_s} D̂_m[τ]; S_m[t] = Σ_{τ=t}^{t+T_s+κ} D̂_m[τ].
+            lt = m.link_lt[m.primary_link]
+            t = ctx.week
+            s = ctx.forward_material_demand(t, lt)
+            S = ctx.forward_material_demand(t, lt + int(kappa))
+            ctx.write_levels(s, S)
+            return
+        # Eqs. 2–3: s_m = E[D_m]·T_s ; S_m = E[D_m]·(T_s + κ). P-P.3 adds SS after us.
         exp_d = ctx.material_demand
         lt = m.link_lt[m.primary_link].astype(float)
-        kappa = self._kappa(ctx)
         s = exp_d * lt
         S = exp_d * (lt + kappa)
         ctx.write_levels(s, S)

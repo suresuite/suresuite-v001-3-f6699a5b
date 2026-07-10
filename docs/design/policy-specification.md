@@ -6,7 +6,7 @@
 | **Date** | 2026-07-07 |
 | **Role** | Single source of truth for every supply chain **policy** the platform offers, its **mathematical model**, its **parameters and UI**, and its **coding representation**. Any change to a policy, parameter, equation, or its UI/engine binding must be reflected here in the same change. |
 | **Benchmark** | anyLogistix (ALX) is the reference for *breadth of the policy library* and the *table/parameter UI*. We match its granularity, evaluate each policy for necessity under our weekly-bucket engine, and give every policy a rigorous mathematical model (ALX documents behavior; we specify equations). |
-| **Ground truth** | Parameter names/units/ranges of already-implemented policies are transcribed from the engine registry (`src/lib/policies/registry.generated.json`, engine 0.2.0) and plugin source (`scsim/scsim/policies/`). New policy types proposed here are marked and specified to the same rigor so they can be implemented directly. |
+| **Ground truth** | Parameter names/units/ranges of already-implemented policies are transcribed from the engine registry (`src/lib/policies/registry.generated.json`, engine 0.2.1) and plugin source (`scsim/scsim/policies/`). New policy types proposed here are marked and specified to the same rigor so they can be implemented directly. |
 
 **Status legend.** ✅ implemented and executes today · ✚ specified here, not yet in the engine
 (implementable directly from this spec) · 🧩 registered engine schema, raises until built ·
@@ -188,18 +188,26 @@ third added for our research models):
   $\tau^\ast$ (a *customer-stage* input, §III-D.6). For material $m$, lead time $T_s$, protective
   period $\kappa$: $s_m[t]=\sum_{\tau=t}^{t+T_s}\hat D_m[\tau]$, $S_m[t]=\sum_{\tau=t}^{t+T_s+\kappa}\hat D_m[\tau]$
   ($T_s{+}\kappa\le\tau^\ast$), with $\hat D_m[\tau]=\sum_p\hat D_p[\tau]\,r_{p,m}$ (BoM-exploded
-  forward demand). Stationary demand ⇒ collapses to Days-of-supply; non-stationary ⇒ differs
-  trajectory-by-trajectory. **This is the WSC-2026 MTO inventory formula.** *Stage ownership:* a
-  two-stage contract — the **customer** supplies $\tau^\ast$ and the forward order book (§III-D.6);
-  the **focal plant** consumes it in material inventory control (§III.1). Selectable only when a
-  customer policy provides $\tau^\ast\ge T_s+\kappa$.
+  forward demand). Windows are **inclusive** at both ends ($T_s{+}1$ resp. $T_s{+}\kappa{+}1$
+  terms, the paper's convention), so stationary demand collapses to
+  $\bar D_m\,(T_s{+}1)$ / $\bar D_m\,(T_s{+}\kappa{+}1)$ — Days-of-supply plus exactly one
+  boundary term; non-stationary demand differs trajectory-by-trajectory. **This is the WSC-2026
+  MTO inventory formula.** *Stage ownership:* a two-stage contract — the **customer** supplies
+  $\tau^\ast$ and the forward order book (§III-D.6); the **focal plant** consumes it in material
+  inventory control (§III.1). Selectable only when a customer policy provides
+  $\tau^\ast\ge T_s+\kappa$; MTO-only (MTS material demand is forecast-projected, §3.3).
 
-**Mapping to our engine.** P-P.1 today implements the **Days-of-supply** special case with a single
-coverage constant: $s_{m,t}=\bar D_m L_\ell$, $S_{m,t}=\bar D_m(L_\ell+\kappa)$, using the
-*stationary* material-demand mechanic. The two ✚ additions are **Quantity** (honor absolute $s,S$ →
-closes G1) and **Forward-visible schedule** (sum the customer's forward order book, §II.4 Eq. →
-reproduces the WSC-2026 MTO model trajectory-exactly, not merely in expectation). All three bases
-are specified so any can be built.
+**Mapping to our engine.** P-P.1 implements the basis switch as the `basis` parameter
+(`days_of_supply` default | `forward_visible`). **Days-of-supply** ✅ is the single-coverage
+special case: $s_{m,t}=\bar D_m L_\ell$, $S_{m,t}=\bar D_m(L_\ell+\kappa)$, from the *stationary*
+material-demand mechanic. **Forward-visible schedule** ✅ sums the customer's committed order book
+(pre-drawn world demand schedule, exposed by P-C.6 §III-D.6) via
+`ctx.forward_material_demand` — reproduces the WSC-2026 MTO model trajectory-exactly, not merely
+in expectation (golden test #6, `scsim/tests/test_forward_visibility.py`). Feasibility gates:
+requires P-C.6; MTO-only; $\max_m T_s+\kappa_{crisis}\le\tau^\ast$; integral $\kappa$. MOQ
+flooring, the review gate $\rho_t$, and P-P.3 safety-stock stacking apply identically under
+either basis (PH-80 is untouched). The remaining ✚ addition is **Quantity** (honor absolute
+$s,S$ → closes G1). All three bases are specified so any can be built.
 
 ### II.5 Periodic vs perpetual review
 
@@ -261,6 +269,7 @@ Each is specified below with its mathematical model.
   |---|---|---|---|---|
   | $s$ | units or day-mult | $0\le s<S$ | — | reorder point |
   | $S$ | units or day-mult | $>s$ | — | order-up-to level |
+  | `basis` | enum | days_of_supply \| forward_visible | days_of_supply | Policy Basis (§II.4) under which $s,S$ are realized |
 
   *State/data read:* $\mathrm{IP}_{i,t}=I_{i,t}+\Pi_{i,t}-B_{i,t}$; MOQ $Q^{\min}_i$; review gate $\rho_t$.
 - **Logic.** Trigger $\mathrm{IP}_{i,t}<s$; order to $S$:
@@ -458,7 +467,7 @@ Per-row attributes with precise math (not policy types):
   Allowed-Total → order waits ($B\mathrel+=$ unmet).
 - **Inclusion**: include/exclude the row.
 
-### III-D.6 Forward delivery schedule (demand visibility) ✚ — *customer stage*
+### III-D.6 Forward delivery schedule (demand visibility) ✅ `P-C.6` — *customer stage*
 
 - **Purpose.** Let a customer commit **future** orders over a visibility horizon, so the focal
   plant can plan procurement against a known forward order book (the WSC-2026 assumption).
@@ -477,10 +486,16 @@ Per-row attributes with precise math (not policy types):
   feeds the **Forward-visible coverage basis** (§II.4) consumed by plant inventory control (§III.1).
 - **Outputs.** the forward demand tensor $\tilde D_{p,c}[t..t{+}\tau^\ast]$ (a customer-stage output
   read by the focal plant). KPI: enables MRP/coverage sizing to a committed book rather than a mean.
-- **UI & engine.** ✚. *Necessity:* this is the customer-side half of the Forward-visible basis;
-  without it, only Quantity / Days-of-supply bases are available, and the WSC-2026 MTO model cannot
-  be reproduced trajectory-exactly. *Stage boundary:* the customer **owns** $\tau^\ast$ and the
-  schedule; the plant only **reads** it — a clean cross-stage contract, no hidden coupling.
+- **UI & engine.** ✅ engine (`forward_visibility`, P-C.6, ANTICIPATION, PH-10 resident); UI ✚.
+  *Engine binding:* the world demand schedule is pre-drawn for the full horizon plus a
+  `settings.visibility_horizon` forward tail (realized demand is bit-identical to per-week
+  draws — an information lever, never a world change); P-C.6 publishes $\tau^\ast$ as
+  `ctx.visibility_horizon` (param override, default = the settings value, never beyond it) and
+  the plant reads BoM-exploded window sums through `ctx.forward_material_demand`. *Necessity:*
+  this is the customer-side half of the Forward-visible basis; without it, only Quantity /
+  Days-of-supply bases are available, and the WSC-2026 MTO model cannot be reproduced
+  trajectory-exactly. *Stage boundary:* the customer **owns** $\tau^\ast$ and the schedule; the
+  plant only **reads** it — a clean cross-stage contract, no hidden coupling.
 
 ---
 
@@ -922,7 +937,7 @@ the blueprint owns the **experiment machinery** that drives it.
 
 | Category | ✅ today | ✚ to add | 🧩 registered |
 |---|---|---|---|
-| Inventory | min_max, rop_q, base_stock, periodic | min_max_ss, regular, regular_ss, order_on_demand, unlimited, no_replenishment, MRP, Quantity-basis | — |
+| Inventory | min_max, rop_q, base_stock, periodic; bases: days_of_supply, forward_visible (P-C.6 book) | min_max_ss, regular, regular_ss, order_on_demand, unlimited, no_replenishment, MRP, Quantity-basis | — |
 | Sourcing | single, multi (P-S.2), backup (P-S.1), ranked | capacity-proportional, tiered | capacity_reservation (P-S.3) |
 | Production | MTS, MTO | dispatching (P-P.11) | lot_sizing (P-P.2), flex/altBoM/repurpose |
 | Capacity | overtime (P-P.5) | supplier-capacity model (P-S.5) | standing reserve (P-P.6) |
@@ -930,7 +945,7 @@ the blueprint owns the **experiment machinery** that drives it.
 | Forecasting | built-in SES-like | SES/Holt/HW/Croston/MA/naive (P-F.1) | — |
 | Transport | expedite (P-T.2) | consolidation (P-T.5), frequency (P-T.6) | lane portfolio/mode-shift/hedge |
 | Fulfillment | lost_sales, backorder, allocation | min_split_ratio, patience (P-C.5) | demand_shaping (P-C.3) |
-| Demand/LT | triangularAV, det/stoch LT | demand_model (P-C.4), lead_time_model (P-S.6) | — |
+| Demand/LT | triangularAV, det/stoch LT; forward schedule τ* (P-C.6) | demand_model (P-C.4), lead_time_model (P-S.6) | — |
 | Recovery | early-warning (P-S.4) | — | playbook (P-X.1) |
 
 ## Appendix B — Symbol index
