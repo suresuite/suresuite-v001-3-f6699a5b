@@ -1,9 +1,12 @@
-// Stage 4 — Run & Validate. 4 ordered sub-steps:
-//   1. Verification  →  2. Run simulation  →  3. Warm-up detection  →  4. Validation
+// Stage 4 — Run & Validate. 5 ordered sub-steps (B0b added the fifth):
+//   1. Verification → 2. Run simulation → 3. Warm-up detection → 4. Validation
+//   → 5. Adopt ("Mark model valid" — persists the credibility card, §9.5/G13)
 //
 // Run-simulation has two tabs (single run / multi-run). Warm-up detection
 // has two sub-steps (replication adequacy + warm-up estimation). Validation
-// is a CSV upload + KS/Welch comparison panel.
+// is a CSV upload + KS/Welch comparison panel. Adopt records the outcome to
+// model_validations (docs/design/phase-b0-core-loop.md §2.5/§3.3) so Lab
+// scenarios inherit it — localStorage keeps UI ergonomics only, never results.
 import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -24,15 +27,14 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertOctagon,
-  AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Database,
   Gauge,
-  Info,
   PlayCircle,
   Repeat,
   ShieldCheck,
@@ -44,13 +46,18 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
+import { useModelValidation } from "@/hooks/useModelValidation";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
+import { fieldWalkToRoute } from "@/lib/policies/dataMap";
+import { FindingsList } from "./FindingsList";
+import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import {
   cancelBrowserRun,
   EngineCancelledError,
@@ -83,6 +90,9 @@ interface Props {
   overrides: OverrideRow[];
   fulfillmentStrategy: FulfillmentStrategy;
   saveSnapshot: (label?: string) => Promise<string | null>;
+  /** Version context for the Adopt step (§2.5): which snapshot the card binds. */
+  selectedVersionId: string | null;
+  isDirty: boolean;
 }
 
 // Engine KPI vocabulary (scsim_bridge _BRIDGE_KEYS / kpi/compute.py) — every
@@ -151,18 +161,12 @@ const DEFAULT_MULTI: MultiRunCfg = {
 };
 const DEFAULT_WARMUP: WarmupCfg = { warmup_days: 30, method: "engine", target_precision: 0.05 };
 
-const SEV_ICON = { block: AlertOctagon, warn: AlertTriangle, info: Info } as const;
-const SEV_COLOR = {
-  block: "text-destructive border-destructive/40 bg-destructive/10",
-  warn: "text-amber-700 dark:text-amber-300 border-amber-500/40 bg-amber-500/10",
-  info: "text-muted-foreground border-border bg-muted/40",
-} as const;
-
 const STEPS = [
   { id: "verify", label: "Verification", description: "Catch input issues" },
   { id: "run", label: "Run simulation", description: "Single + replications" },
   { id: "warmup", label: "Warm-up detection", description: "Adequacy + estimation" },
   { id: "validate", label: "Validation", description: "Compare with empirical" },
+  { id: "adopt", label: "Adopt", description: "Mark model valid" },
 ];
 
 // --- tiny deterministic PRNG for preview traces (mulberry32) ----------------
@@ -216,6 +220,8 @@ export function RunValidateStage({
   overrides,
   fulfillmentStrategy,
   saveSnapshot,
+  selectedVersionId,
+  isDirty,
 }: Props) {
   const supRows = useStageRows({ projectId, plantName, stage: "supplier" });
   const plantRowsQ = useStageRows({ projectId, plantName, stage: "plant" });
@@ -223,6 +229,8 @@ export function RunValidateStage({
   const itemMasters = useItemMasters(projectId);
   const dataset = useDatasetVersion(projectId);
   const { unit: timeUnit } = useTimeUnit(projectId);
+  const { user } = useAuth();
+  const modelValidation = useModelValidation(projectId);
 
   // Reuse the working experiment.run pipeline (same as Simulation Lab): a saved
   // policy version + a scenario bound to the run, dispatched to the Fly worker.
@@ -441,6 +449,98 @@ export function RunValidateStage({
   const blockCount = useMemo(() => (findings ?? []).filter((f) => f.severity === "block").length, [findings]);
   const warnCount = useMemo(() => (findings ?? []).filter((f) => f.severity === "warn").length, [findings]);
 
+  // ── B0b Adopt step (§2.5/§3.3): persist the V&V outcome as a card ────────
+  const [faceAck, setFaceAck] = useState(false);
+  const [adopting, setAdopting] = useState(false);
+  const [adoptedCardId, setAdoptedCardId] = useState<string | null>(null);
+  const validationScenario = useMemo(
+    () => scenarios.find((s) => s.id === validationScenarioId) ?? null,
+    [scenarios, validationScenarioId],
+  );
+  // Live badge for the stage banner — derived, never stored (§2.4).
+  const stageCredibility = modelValidation.resolve(selectedVersionId, validationScenario, {
+    dirty: isDirty,
+  });
+
+  /** Per-KPI replication adequacy incl. n* (the count that would meet the
+   *  target half-width) — the Adopt step's recommended_replications basis. */
+  const adequacy = useMemo(() => {
+    return multiCfg.kpis.map((kpi) => {
+      const values = doneReps
+        .map((r) => Number(r.kpis[kpi]))
+        .filter((n) => Number.isFinite(n));
+      const stats = meanCI(values, multiCfg.confidence);
+      const rel = stats.mean !== 0 ? stats.half / Math.abs(stats.mean) : 0;
+      // n* from the CI half-width formula (half ∝ 1/√n): n* = n · (rel/target)².
+      const nStar =
+        rel > warmCfg.target_precision
+          ? Math.ceil(stats.n * (rel / warmCfg.target_precision) ** 2)
+          : stats.n;
+      return { kpi, ...stats, rel, nStar };
+    });
+  }, [multiCfg.kpis, multiCfg.confidence, doneReps, warmCfg.target_precision]);
+  const recommendedReps = Math.max(1, ...adequacy.map((a) => a.nStar));
+
+  const statisticalBasis = validationResult !== null && validationResult.some((r) => r.pass);
+  const adoptReady =
+    findings !== null && blockCount === 0 && hasRealData && warmupComputed && warmCfg.warmup_days > 0;
+
+  const markValid = async () => {
+    if (!projectId || !validationScenarioId || !dbRun?.id) {
+      toast.warning("Run replications through the pipeline first — the card needs a persisted evidence run.");
+      return;
+    }
+    setAdopting(true);
+    try {
+      // 1. The exact snapshot the card certifies (§2.5 step 1).
+      const versionId =
+        isDirty || !selectedVersionId ? await saveSnapshot("Validated model") : selectedVersionId;
+      if (!versionId) throw new Error("could not save the policy snapshot");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      // 2. The exact world (dedup-or-insert, §8.4).
+      const { data: datasetVersionId, error: dsErr } = await sb.rpc("snapshot_dataset", {
+        p_project_id: projectId,
+      });
+      if (dsErr || !datasetVersionId) {
+        throw new Error(dsErr?.message ?? "snapshot_dataset returned no version");
+      }
+      // 3. Record the card (supersedes the same-triple active card).
+      const { data: cardId, error } = await sb.rpc("record_model_validation", {
+        p_project_id: projectId,
+        p_policy_version_id: versionId,
+        p_dataset_version_id: datasetVersionId,
+        p_scenario_id: validationScenarioId,
+        p_adopted_warmup_days: warmCfg.warmup_days,
+        p_warmup_method: warmCfg.method,
+        p_recommended_replications: recommendedReps,
+        p_replication_basis: {
+          confidence: multiCfg.confidence,
+          target_precision: warmCfg.target_precision,
+          per_kpi: Object.fromEntries(
+            adequacy.map((a) => [a.kpi, { mean: a.mean, half: a.half, rel: a.rel, n: a.n, n_star: a.nStar }]),
+          ),
+        },
+        p_validation_tests: validationResult ?? [],
+        p_findings: findings ?? [],
+        p_verdict: "validated",
+        p_basis: statisticalBasis ? "statistical" : "face",
+        p_evidence_run_id: dbRun.id,
+        p_user_id: user?.id ?? null,
+        p_user_email: user?.email ?? null,
+      });
+      if (error) throw error;
+      setAdoptedCardId((cardId as string | null) ?? null);
+      await modelValidation.refresh();
+      toast.success("Model card recorded — Lab scenarios now inherit this validation.");
+    } catch (e) {
+      console.error("record_model_validation failed", e);
+      toast.error(`Mark valid failed: ${(e as Error).message ?? e}`);
+    } finally {
+      setAdopting(false);
+    }
+  };
+
   const completed = useMemo(() => {
     const s = new Set<number>();
     if (findings !== null && blockCount === 0) s.add(0);
@@ -449,8 +549,9 @@ export function RunValidateStage({
     if (multiQueuedAt || hasRealData) s.add(1);
     if (warmupComputed && warmCfg.warmup_days > 0) s.add(2);
     if (validationResult) s.add(3);
+    if (adoptedCardId || stageCredibility.state === "validated") s.add(4);
     return s;
-  }, [findings, blockCount, multiQueuedAt, hasRealData, warmupComputed, warmCfg.warmup_days, validationResult]);
+  }, [findings, blockCount, multiQueuedAt, hasRealData, warmupComputed, warmCfg.warmup_days, validationResult, adoptedCardId, stageCredibility.state]);
 
   const canContinue = (i: number): boolean => {
     if (i === 0) return findings !== null && blockCount === 0;
@@ -951,6 +1052,20 @@ export function RunValidateStage({
   // --- render --------------------------------------------------------------
   return (
     <div className="flex flex-col gap-4">
+      {/* Stage banner: the live credibility state of the selected version ×
+          current network × baseline scenario (derived, §2.4). */}
+      <div className="rounded-md border bg-card px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+        <BadgeCheck className="h-3.5 w-3.5 text-primary" />
+        <span className="font-semibold">Model credibility</span>
+        <CredibilityBadge credibility={stageCredibility} />
+        <span className="text-[11px] text-muted-foreground">
+          {stageCredibility.state === "validated"
+            ? "Lab scenarios inherit this validation's warm-up and replication count."
+            : stageCredibility.state === "stale"
+            ? "Something drifted since the last validation — re-run the pipeline and re-adopt."
+            : "Complete the five steps and Mark model valid to persist a credibility card."}
+        </span>
+      </div>
       {warmupComputed && (
         <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
           <Timer className="h-3.5 w-3.5 text-primary" />
@@ -1017,25 +1132,11 @@ export function RunValidateStage({
                   {warnCount > 0 && <Badge variant="secondary" className="h-5">{warnCount} warning(s)</Badge>}
                   {verifiedAt && <span>· verified {verifiedAt.toLocaleTimeString()}</span>}
                 </div>
-                <div className="max-h-60 overflow-auto rounded-md border">
-                  <ul className="text-xs divide-y">
-                    {findings.map((f) => {
-                      const Icon = SEV_ICON[f.severity];
-                      return (
-                        <li key={f.id} className={cn("flex items-start gap-2 px-2.5 py-1.5 border-l-2", SEV_COLOR[f.severity])}>
-                          <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium">{f.message}</div>
-                            {(f.rowKey || f.field) && (
-                              <div className="text-[10px] opacity-70 font-mono">{f.rowKey} · {f.field}</div>
-                            )}
-                            {f.hint && <div className="text-[10px] opacity-80 mt-0.5">{f.hint}</div>}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
+                <FindingsList
+                  findings={findings}
+                  className="max-h-60"
+                  walkTo={(f) => (f.field ? fieldWalkToRoute(f.field, projectId) : null)}
+                />
               </div>
             )}
           </StepShell>
@@ -1593,6 +1694,111 @@ export function RunValidateStage({
                   )}
                 </>
               )}
+            </div>
+          </StepShell>
+        )}
+
+        {/* 5 — ADOPT (B0b §2.5/§3.3: persist the credibility card) */}
+        {step === 4 && (
+          <StepShell
+            icon={BadgeCheck}
+            title="Adopt — mark the model valid"
+            subtitle="Records warm-up, replication adequacy and validation evidence as a persisted card; Lab scenarios on this model inherit it automatically."
+          >
+            <div className="flex flex-col gap-3">
+              {/* What the card will assert — all from real persisted run output. */}
+              <div className="rounded-md border bg-card p-3 flex flex-col gap-1.5 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Timer className="h-3.5 w-3.5 text-primary" />
+                  <span>
+                    Warm-up: <b>{warmCfg.warmup_days} days</b> ({warmCfg.method})
+                  </span>
+                  {!warmupComputed && (
+                    <Badge variant="secondary" className="h-5 text-[10px]">not detected yet — step 3</Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Gauge className="h-3.5 w-3.5 text-primary" />
+                  <span>
+                    Recommended replications: <b>n = {recommendedReps}</b>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      (max n* over {adequacy.length} focal KPI(s) at ±
+                      {(warmCfg.target_precision * 100).toFixed(0)}% half-width,{" "}
+                      {(multiCfg.confidence * 100).toFixed(0)}% confidence)
+                    </span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  {validationResult ? (
+                    <span>
+                      Statistical validation:{" "}
+                      <b>
+                        {validationResult.filter((r) => r.pass).length}/{validationResult.length} KPIs passed
+                      </b>{" "}
+                      (KS + Welch t) — basis: <b>statistical</b>
+                    </span>
+                  ) : (
+                    <span>
+                      No empirical comparison ran — the card records a <b>face validation</b> (a
+                      legitimate outcome for greenfield models; disclosed on the badge).
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Database className="h-3.5 w-3.5 text-primary" />
+                  <span>
+                    Evidence run:{" "}
+                    {dbRun?.id ? (
+                      <code className="font-mono">#{dbRun.id.slice(0, 8)}</code>
+                    ) : (
+                      <b className="text-destructive">none persisted — run on the server first</b>
+                    )}
+                    {" · "}model version:{" "}
+                    <b>{isDirty || !selectedVersionId ? "will be snapshotted on adopt" : selectedVersionId.slice(0, 8)}</b>
+                  </span>
+                </div>
+              </div>
+
+              {!validationResult && (
+                <label className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 cursor-pointer text-xs">
+                  <Switch checked={faceAck} onCheckedChange={setFaceAck} className="mt-0.5" />
+                  <span>
+                    <b>I accept a face validation.</b> No empirical series were uploaded in step 4;
+                    I confirm the model behavior was reviewed and is credible for its purpose.
+                  </span>
+                </label>
+              )}
+
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={!adoptReady || (!statisticalBasis && !faceAck) || adopting || !dbRun?.id}
+                  onClick={() => void markValid()}
+                  title={
+                    !adoptReady
+                      ? "Steps 1–3 must be green (no blockers, real replications, warm-up detected)"
+                      : !statisticalBasis && !faceAck
+                      ? "Run the statistical validation, or acknowledge a face validation"
+                      : undefined
+                  }
+                >
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  {adopting ? "Recording…" : "Mark model valid"}
+                </Button>
+                {(adoptedCardId || stageCredibility.state === "validated") && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Card recorded — Lab scenarios under this model inherit warm-up and replications.
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Re-validating the same policy version × network × baseline supersedes the previous
+                card (history stays drillable). Revoking or superseding never edits rows.
+              </p>
             </div>
           </StepShell>
         )}

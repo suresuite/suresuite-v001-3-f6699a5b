@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Scenario } from "@/hooks/useScenarios";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
@@ -27,7 +28,10 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
   const { unit, fromDays, toDays } = useTimeUnit(projectId);
   const displayUnit = unit ?? "day";
 
-  useEffect(() => setLocal(scenario), [scenario.id]);
+  // Re-sync on server-side updates too (inheritance writes warm-up/replications
+  // through the apply_validation_to_scenario RPC, not through this form).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setLocal(scenario), [scenario.id, scenario.updated_at]);
 
   const patch = <K extends keyof Scenario>(key: K, val: Scenario[K]) => {
     setLocal((s) => ({ ...s, [key]: val }));
@@ -79,20 +83,54 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
             />
           </div>
 
-          {/* Steady-state & confidence — read only */}
-          <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 flex flex-col gap-1">
+          {/* Steady-state & confidence — inherited from the model-validation
+              card when one covers this triple (B0b / G13 / §2.6); hand-editing
+              either value clears inherited_validation_id so divergence from
+              the validated settings is explicit, never silent. */}
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 flex flex-col gap-2">
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
               Steady-state &amp; confidence
             </span>
-            <span className="text-xs">
-              Steady state starts at:{" "}
-              <strong>
-                {Math.round(fromDays(local.warmup_days))} {UNIT_LABEL_PLURAL[displayUnit]}
-              </strong>
-            </span>
-            <span className="text-xs">
-              Replications for statistical significance: <strong>{local.replications}</strong>
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Label className="text-xs w-44 shrink-0">
+                Steady state starts at ({UNIT_LABEL_PLURAL[displayUnit]})
+              </Label>
+              <Input
+                type="number"
+                className="max-w-[110px] h-8"
+                value={Math.round(fromDays(local.warmup_days))}
+                onChange={(e) => {
+                  patch("warmup_days", Math.round(toDays(+e.target.value)));
+                  patch("warmup_mode", "manual");
+                  patch("inherited_validation_id", null);
+                }}
+                onBlur={commit}
+              />
+              {local.inherited_validation_id && (
+                <Badge variant="outline" className="text-[10px] gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
+                  <ShieldCheck className="h-3 w-3" /> inherited from validation
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Label className="text-xs w-44 shrink-0">Replications</Label>
+              <Input
+                type="number"
+                min={1}
+                className="max-w-[110px] h-8"
+                value={local.replications}
+                onChange={(e) => {
+                  patch("replications", Math.max(1, parseInt(e.target.value, 10) || 1));
+                  patch("inherited_validation_id", null);
+                }}
+                onBlur={commit}
+              />
+              {local.inherited_validation_id && (
+                <Badge variant="outline" className="text-[10px] gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
+                  <ShieldCheck className="h-3 w-3" /> inherited from validation
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Primary KPI */}

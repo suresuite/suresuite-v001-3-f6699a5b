@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,8 @@ import { useProjects } from "@/hooks/useProjects";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import { usePolicies } from "@/hooks/usePolicies";
+import { useItemMasters } from "@/hooks/useItemMasters";
+import { useModelValidation } from "@/hooks/useModelValidation";
 import { ScenarioRail } from "@/components/sim/ScenarioRail";
 import { ScenarioSetupForm } from "@/components/sim/ScenarioSetupForm";
 import { ScenarioLibraryPanel } from "@/components/sim/ScenarioLibraryPanel";
@@ -22,6 +24,13 @@ import { ResultsDashboard } from "@/components/sim/ResultsDashboard";
 import { CompareScenariosPanel } from "@/components/sim/CompareScenariosPanel";
 import { DisruptionRecoveryPane } from "@/components/sim/DisruptionRecoveryPane";
 import { StressTestCard, type StressTestPreset } from "@/components/sim/StressTestCard";
+import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
+import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
+import {
+  compileGateFindings,
+  gateFindingsToFindings,
+  type Finding,
+} from "@/lib/policies/validationService";
 import type { RecoveryConfig } from "@/lib/sim/recoveryScore";
 
 interface Props {
@@ -76,30 +85,115 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   );
   const { latestRun, reps, runExperiment, cancelRun, addReps } = useSimulationRun(selectedId);
 
-  const handleRun = async () => {
-    if (!projectId || !selected || !policyVersionId || policyDirty) return;
+  // ── §8.1 required-data gate, surfaced PRE-dispatch (Phase B0 / G6) ────────
+  // Grade the same manifest the sim-command gate grades, client-side through
+  // the shared module, so the findings are visible (and fixable) before the
+  // Run click — and render the server's own typed copy after a 422.
+  const itemMasters = useItemMasters(projectId);
+  const clientFindings = useMemo<Finding[] | null>(() => {
+    if (!projectId || itemMasters.loading || !itemMasters.lanes.loaded) return null;
+    const gate = compileGateFindings(
+      {
+        defaults: policyDefaults,
+        materials: itemMasters.materials as unknown as Record<string, unknown>[],
+        products: itemMasters.products as unknown as Record<string, unknown>[],
+        suppliers: itemMasters.suppliers as unknown as Record<string, unknown>[],
+        inbound: itemMasters.lanes.inbound,
+        outbound: itemMasters.lanes.outbound,
+        // Multi-level BOM lanes carry higher_level_component_id — grade them
+        // through the single-level shape exactly as the edge gate does.
+        bom: itemMasters.lanes.bom.map((r) =>
+          r.product_id == null && r.higher_level_component_id != null
+            ? { ...r, product_id: r.higher_level_component_id }
+            : r,
+        ),
+      },
+      (selected?.disruption_schedule as unknown as Record<string, unknown>[]) ?? [],
+    );
+    return gateFindingsToFindings(gate);
+    // Depend on the hook's stable state slices — the result object itself is
+    // rebuilt every render and would wipe the acknowledgment state below.
+  }, [
+    projectId,
+    itemMasters.loading,
+    itemMasters.materials,
+    itemMasters.products,
+    itemMasters.suppliers,
+    itemMasters.lanes,
+    policyDefaults,
+    selected?.disruption_schedule,
+  ]);
+
+  // The server's findings (from a 422) win until the underlying data changes,
+  // at which point the live client grading takes over again.
+  const [serverFindings, setServerFindings] = useState<Finding[] | null>(null);
+  const [ackWarnings, setAckWarnings] = useState(false);
+  useEffect(() => {
+    setServerFindings(null);
+    setAckWarnings(false);
+  }, [selectedId, clientFindings]);
+
+  const gateFindings = serverFindings ?? clientFindings;
+  const gateBlocks = (gateFindings ?? []).filter((f) => f.severity === "block").length;
+  const gateWarns = (gateFindings ?? []).filter((f) => f.severity === "warn").length;
+  const runBlockedReason =
+    gateBlocks > 0
+      ? "Blocking findings below must be fixed before the run can dispatch"
+      : gateWarns > 0 && !ackWarnings
+      ? "Acknowledge the warnings below to run with engine defaults"
+      : null;
+
+  // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
+  const cred = useModelValidation(projectId);
+  const credibility = cred.resolve(policyVersionId, selected, { dirty: policyDirty });
+  // Inheritance on first render of a never-touched scenario under a validated
+  // triple (§2.6) — creation-time inheritance happens in onCreate below.
+  const inheritTried = useRef(new Set<string>());
+  useEffect(() => {
+    if (!selected || !policyVersionId || policyDirty) return;
+    if (selected.inherited_validation_id) return;
+    if (selected.warmup_mode !== "auto") return; // hand-set → never override
+    if (inheritTried.current.has(selected.id)) return;
+    inheritTried.current.add(selected.id);
+    void cred.applyIfValidated(selected, policyVersionId).then((cardId) => {
+      if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
+    });
+  }, [selected, policyVersionId, policyDirty, cred]);
+
+  const dispatchRun = async (versionId: string) => {
+    if (!projectId || !selected) return;
     try {
-      await runExperiment(projectId, policyVersionId);
-      toast.success(`Queued: ${selected.name}`);
+      const result = await runExperiment(projectId, versionId, ackWarnings);
+      if (result.queued) {
+        toast.success(`Queued: ${selected.name}`);
+        setPane("run");
+        return;
+      }
+      // Typed 422: render the gate's findings structurally in the run pane.
+      setServerFindings(gateFindingsToFindings(result.findings ?? []));
       setPane("run");
+      toast.warning(
+        result.status === "blocked"
+          ? "Run rejected — blocking data gaps. See the findings panel."
+          : "Run paused — acknowledge the warnings in the findings panel to run.",
+      );
     } catch (e) {
       toast.error(`Failed to queue run: ${(e as Error).message}`);
     }
   };
 
+  const handleRun = async () => {
+    if (!projectId || !selected || !policyVersionId || policyDirty) return;
+    await dispatchRun(policyVersionId);
+  };
+
   const handleSaveVersionAndRun = async () => {
     if (!projectId || !selected) return;
-    try {
-      const versionId = await savePolicySnapshot(
-        `Run: ${selected.name} — ${new Date().toLocaleString()}`,
-      );
-      if (!versionId) return;
-      await runExperiment(projectId, versionId);
-      toast.success(`Queued: ${selected.name}`);
-      setPane("run");
-    } catch (e) {
-      toast.error(`Failed to queue run: ${(e as Error).message}`);
-    }
+    const versionId = await savePolicySnapshot(
+      `Run: ${selected.name} — ${new Date().toLocaleString()}`,
+    );
+    if (!versionId) return;
+    await dispatchRun(versionId);
   };
 
   const handleCancel = async () => {
@@ -168,6 +262,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     description: preset.description,
                     disruption_schedule: preset.disruption_schedule,
                   });
+                  // Stress scenarios share the baseline world (events are
+                  // excluded from the fingerprint, §2.3) — they inherit too.
+                  inheritTried.current.add(s.id);
+                  void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty });
                   setSelectedId(s.id);
                   setPane("recovery");
                   toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
@@ -177,10 +275,22 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                 scenarios={scenarios}
                 selectedId={selectedId}
                 loading={loading}
+                credibilityFor={(s) => cred.resolve(policyVersionId, s, { dirty: policyDirty })}
                 onSelect={setSelectedId}
                 onCreate={async () => {
                   const s = await create(`Scenario ${scenarios.length + 1}`);
-                  if (s) setSelectedId(s.id);
+                  if (!s) return;
+                  // §2.6: scenarios created under a validated triple inherit
+                  // the adopted warm-up + replication count at birth.
+                  inheritTried.current.add(s.id);
+                  void cred
+                    .applyIfValidated(s, policyVersionId, { dirty: policyDirty })
+                    .then((cardId) => {
+                      if (cardId) {
+                        toast.message("Warm-up & replications inherited from the model validation.");
+                      }
+                    });
+                  setSelectedId(s.id);
                 }}
                 onDuplicate={async (s) => {
                   const d = await duplicate(s);
@@ -255,7 +365,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-3 flex-wrap rounded-md border bg-card px-3 py-2.5">
                     <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-xs font-medium">
+                      <span className="text-xs font-medium flex items-center gap-2 flex-wrap">
                         {policyDirty
                           ? policyVersionId
                             ? `Policy settings changed since version "${
@@ -267,21 +377,42 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                               policyVersions.find((v) => v.id === policyVersionId)?.label ??
                               policyVersionId?.slice(0, 8)
                             }`}
+                        <CredibilityBadge credibility={credibility} />
                       </span>
                       <span className="text-[11px] text-muted-foreground">
                         Policies are versioned; network data is current.
                       </span>
                     </div>
                     {policyDirty ? (
-                      <Button size="sm" className="h-8 text-xs" onClick={handleSaveVersionAndRun}>
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={handleSaveVersionAndRun}
+                        disabled={runBlockedReason !== null}
+                        title={runBlockedReason ?? undefined}
+                      >
                         Save version &amp; run
                       </Button>
                     ) : (
-                      <Button size="sm" className="h-8 text-xs" onClick={handleRun}>
-                        Run
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={handleRun}
+                        disabled={runBlockedReason !== null}
+                        title={runBlockedReason ?? undefined}
+                      >
+                        {gateWarns > 0 && ackWarnings ? "Acknowledge & run" : "Run"}
                       </Button>
                     )}
                   </div>
+                  <PreRunValidationPanel
+                    projectId={projectId}
+                    findings={gateFindings}
+                    source={serverFindings ? "gate rejection" : "pre-run check"}
+                    acknowledged={ackWarnings}
+                    onAcknowledgedChange={setAckWarnings}
+                    supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
+                  />
                   <RunProgressPanel
                     run={latestRun}
                     reps={reps}
@@ -291,12 +422,19 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                           latestRun.policy_version_id.slice(0, 8)
                         : null
                     }
+                    credibility={cred.resolveRun(latestRun)}
                     onCancel={handleCancel}
                     onAddReps={handleAddReps}
                   />
                 </div>
               ) : pane === "results" ? (
-                <ResultsDashboard run={latestRun} reps={reps} primaryKpi={selected.primary_kpi} scenario={selected} />
+                <ResultsDashboard
+                  run={latestRun}
+                  reps={reps}
+                  primaryKpi={selected.primary_kpi}
+                  scenario={selected}
+                  credibility={cred.resolveRun(latestRun)}
+                />
               ) : (
                 <CompareScenariosPanel />
               )}

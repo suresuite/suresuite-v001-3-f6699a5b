@@ -6,16 +6,20 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, Play, Square, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MappingWarning, SimulationRun, Replication } from "@/hooks/useSimulationRun";
+import { CredibilityBadge } from "./CredibilityBadge";
+import type { Credibility } from "@/hooks/useModelValidation";
 
 interface Props {
   run: SimulationRun | null;
   reps: Replication[];
   versionLabel?: string | null;
+  /** B0b (§9.5): the run's stamped model-validation state — immutable history. */
+  credibility?: Credibility | null;
   onCancel: () => void;
   onAddReps: (n: number) => void;
 }
 
-export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps }: Props) {
+export function RunProgressPanel({ run, reps, versionLabel, credibility, onCancel, onAddReps }: Props) {
   if (!run) {
     return (
       <Card>
@@ -75,6 +79,7 @@ export function RunProgressPanel({ run, reps, versionLabel, onCancel, onAddReps 
               <Badge variant="outline" className={`text-[10px] ${engine.cls}`}>
                 {engine.label}
               </Badge>
+              {credibility && <CredibilityBadge credibility={credibility} />}
             </CardTitle>
             <div className="flex gap-2">
               {(run.status === "running" || run.status === "queued") && (

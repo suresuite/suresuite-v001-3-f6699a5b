@@ -463,6 +463,35 @@ async function handleExperimentRun(
     console.error("snapshot_dataset failed (run continues unbound)", e);
   }
 
+  // Stamp the credibility provenance (Phase B0 / G13 / §9.5): the scenario's
+  // baseline fingerprint hash and — when the exact triple has an active card —
+  // the model_validation in force at dispatch. Best-effort like the dataset
+  // binding above: a missing card (or a DB without the migration) never
+  // blocks a run; it just runs labeled unvalidated (§9.5 labels, not gates).
+  let scenarioHash: string | null = null;
+  let modelValidationId: string | null = null;
+  try {
+    // deno-lint-ignore no-explicit-any
+    const { data: sh, error: shErr } = await (sb as any).rpc("scenario_fingerprint_hash", {
+      p_scenario_id: scenario.id,
+    });
+    if (shErr) throw shErr;
+    scenarioHash = (sh as string | null) ?? null;
+    if (scenarioHash && graphHash) {
+      // deno-lint-ignore no-explicit-any
+      const { data: card, error: cardErr } = await (sb as any).rpc("active_model_validation", {
+        p_policy_version_id: policyVersionId,
+        p_graph_hash: graphHash,
+        p_scenario_hash: scenarioHash,
+      });
+      if (cardErr) throw cardErr;
+      const row = Array.isArray(card) ? card[0] : card;
+      modelValidationId = (row?.id as string | null) ?? null;
+    }
+  } catch (e) {
+    console.error("model-validation stamp failed (run continues unstamped)", e);
+  }
+
   // Insert run row (queued) with the SERVICE ROLE: sim-command is the
   // authoritative creator of the queued row (as the worker is of results),
   // and an RLS/migration-ordering gap must never 500 a dispatch. The anon
@@ -483,6 +512,9 @@ async function handleExperimentRun(
       dataset_version_id: datasetVersionId,
       graph_hash: graphHash,
       created_by: userId,
+      // Spread-guarded so a database without the B0 migration still inserts.
+      ...(scenarioHash ? { scenario_hash: scenarioHash } : {}),
+      ...(modelValidationId ? { model_validation_id: modelValidationId } : {}),
       ...(gateSkipped ? { gate_skipped: true } : {}),
     })
     .select()
