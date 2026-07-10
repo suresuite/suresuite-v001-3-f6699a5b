@@ -15,6 +15,7 @@ import {
   activeEnginePolicies,
   flattenFindings,
   gradeManifest,
+  normalizeBomRows,
   type BridgeTables,
   type GradingDataset,
   type RegistryPayload,
@@ -57,6 +58,85 @@ Deno.test("an unsourced BOM material is the hard block (engine ValueError mirror
   assertEquals(blocks.length, 1, "exactly one block expected");
   assertEquals(blocks[0].field, "materials.supplier_link", "block field");
   assertEquals(blocks[0].rows, ["M_UNSOURCED"], "blocked material");
+});
+
+// ── Multi-level BOM golden variant (§8.2) ────────────────────────────────────
+// The SAME BOM in bom_multi_level shape must grade exactly like the
+// single-level fixture. Both the browser verification and the sim-command
+// gate pass their BOM rows RAW into gradeManifest, which normalizes the shape
+// itself (normalizeBomRows) — so these tests pin BOTH surfaces at once: the
+// two can never again grade different BOMs.
+
+const MULTI_BOM = fixture.multi_level_variant.bom as Row[];
+const MULTI_UNSOURCED_BOM = fixture.multi_level_variant.unsourced_bom as Row[];
+
+Deno.test("multi-level BOM grades identically to the same BOM in single-level shape", () => {
+  const multi = flattenFindings(
+    gradeManifest({ ...DATASET, bom: MULTI_BOM }, DEFAULTS, REG, BRIDGE),
+  );
+  const single = flattenFindings(gradeManifest(DATASET, DEFAULTS, REG, BRIDGE));
+  assertEquals(multi, single, "the two BOM shapes graded differently");
+  assertEquals(multi, expected, "multi-level grading drifted from the golden snapshot");
+});
+
+Deno.test("multi-level BOM: an unsourced material raises the same hard block", () => {
+  const extraMaterials = fixture.unsourced_extra.materials as Row[];
+  const multiVariant: GradingDataset = {
+    ...DATASET,
+    materials: [...DATASET.materials, ...extraMaterials],
+    bom: [...MULTI_BOM, ...MULTI_UNSOURCED_BOM],
+  };
+  const findings = flattenFindings(gradeManifest(multiVariant, DEFAULTS, REG, BRIDGE));
+  const blocks = findings.filter((f) => f.severity === "block");
+  assertEquals(blocks.length, 1, "exactly one block expected");
+  assertEquals(blocks[0].field, "materials.supplier_link", "block field");
+  assertEquals(blocks[0].rows, ["M_UNSOURCED"], "blocked material");
+
+  // Finding-for-finding parity with the single-level unsourced variant.
+  const singleVariant: GradingDataset = {
+    ...DATASET,
+    materials: [...DATASET.materials, ...extraMaterials],
+    bom: [...DATASET.bom, ...(fixture.unsourced_extra.bom as Row[])],
+  };
+  assertEquals(
+    findings,
+    flattenFindings(gradeManifest(singleVariant, DEFAULTS, REG, BRIDGE)),
+    "multi- and single-level unsourced variants graded differently",
+  );
+});
+
+Deno.test("gate: a multi-level unsourced BOM material blocks the dispatch", () => {
+  const gate = runValidationGate({
+    dataset: {
+      ...DATASET,
+      materials: [...DATASET.materials, ...(fixture.unsourced_extra.materials as Row[])],
+      bom: [...MULTI_BOM, ...MULTI_UNSOURCED_BOM],
+    },
+    snapshotDefaults: DEFAULTS,
+    disruptionSchedule: [],
+    acknowledgeWarnings: true,
+  });
+  if (gate?.status !== "blocked") {
+    throw new Error(`expected blocked, got ${JSON.stringify(gate?.status)}`);
+  }
+  const block = gate.findings.find((f) => f.severity === "block");
+  assertEquals(block?.field, "materials.supplier_link", "block field");
+  assertEquals(block?.rows, ["M_UNSOURCED"], "blocked material");
+});
+
+Deno.test("normalizeBomRows: parent stands in for product_id; single-level passes through", () => {
+  const pairs = (rows: Row[]) =>
+    rows.map((r) => ({ product_id: r.product_id, material_id: r.material_id }));
+  assertEquals(
+    pairs(normalizeBomRows(MULTI_BOM)),
+    pairs(DATASET.bom),
+    "normalized multi rows must carry the single-level (product_id, material_id) pairs",
+  );
+  assertEquals(
+    normalizeBomRows(DATASET.bom),
+    DATASET.bom,
+    "single-level rows must pass through unchanged",
+  );
 });
 
 Deno.test("gate: warns require acknowledgment, acknowledged warns dispatch", () => {

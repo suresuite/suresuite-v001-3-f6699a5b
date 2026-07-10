@@ -92,7 +92,10 @@ interface UseItemMastersResult {
   lanes: {
     inbound: Record<string, unknown>[];
     outbound: Record<string, unknown>[];
+    /** Single- OR multi-level rows — bomLevel tells consumers the shape. */
     bom: Record<string, unknown>[];
+    /** projects.bom_level — 'single' or 'multi'/'multi_level'. */
+    bomLevel: string;
     loaded: boolean;
   };
   reload: () => Promise<void>;
@@ -115,6 +118,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const [inboundArcs, setInboundArcs] = useState<Record<string, unknown>[]>([]);
   const [outboundArcs, setOutboundArcs] = useState<Record<string, unknown>[]>([]);
   const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
+  const [bomLevel, setBomLevel] = useState<string>("single");
   const [lanesLoaded, setLanesLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +132,12 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     const lanes = await fetchProjectLanes(projectId, user);
     setInboundArcs(lanes.inbound);
     setOutboundArcs(lanes.outbound);
-    setBomRows(lanes.bomLevel === "single" ? lanes.bom : []);
+    // BOTH BOM shapes pass through raw — the shared grader normalizes
+    // multi-level rows itself. Dropping them here once made "Verify your
+    // inputs" grade an empty BOM on multi-level projects and miss the
+    // materials.supplier_link blocks the sim-command gate then raised.
+    setBomRows(lanes.bom);
+    setBomLevel(lanes.bomLevel);
     setLanesLoaded(true);
   }, [projectId, user]);
 
@@ -259,8 +268,8 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   };
 
   const lanes = useMemo(
-    () => ({ inbound: inboundArcs, outbound: outboundArcs, bom: bomRows, loaded: lanesLoaded }),
-    [inboundArcs, outboundArcs, bomRows, lanesLoaded],
+    () => ({ inbound: inboundArcs, outbound: outboundArcs, bom: bomRows, bomLevel, loaded: lanesLoaded }),
+    [inboundArcs, outboundArcs, bomRows, bomLevel, lanesLoaded],
   );
 
   return { materials, products, suppliers, loading, error, missingCounts, derived, lanes, reload, saveRows };

@@ -8,6 +8,7 @@
     "  P_PRICE_FALLBACK  no sell_price/demand_mean, priced outbound → info ×2; no capacity → WARN",
     "  P_NO_DEMAND       no sell_price/demand_mean, no outbound     → WARN ×2 (neutral constants); no capacity → WARN",
     "  unsourced_extra   BOM material with no supplier arc → BLOCK (engine ValueError)",
+    "  multi_level_variant  the SAME BOM in bom_multi_level shape → must grade identically",
     "The deno test locks the grader to expected_findings.json; the pytest runs",
     "this same dataset through datamap→from_project_data and asserts the",
     "engine's WARN-level MappingWarnings match the grader's warn findings.",
@@ -173,6 +174,57 @@
       {
         "product_id": "P_OK",
         "material_id": "M_UNSOURCED",
+        "consumption_rate": 1.0
+      }
+    ]
+  },
+  "multi_level_variant": {
+    "_comment": [
+      "dataset.bom re-expressed in bom_multi_level shape: child material_id under",
+      "parent higher_level_component_id, NO product_id. grading_test.ts asserts it",
+      "grades IDENTICALLY to the single-level fixture — pinning the shared",
+      "normalizeBomRows path that BOTH the browser verification and the sim-command",
+      "gate run through gradeManifest — and that unsourced_bom raises the same",
+      "materials.supplier_link block. The browser once passed bom: [] for",
+      "multi-level projects, so Verify missed blocks the gate then caught."
+    ],
+    "bom": [
+      {
+        "material_id": "M_OK",
+        "higher_level_component_id": "P_OK",
+        "level": 1,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_DERIVED",
+        "higher_level_component_id": "P_OK",
+        "level": 1,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_UNPRICED",
+        "higher_level_component_id": "P_OK",
+        "level": 1,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_OK",
+        "higher_level_component_id": "P_PRICE_FALLBACK",
+        "level": 1,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_OK",
+        "higher_level_component_id": "P_NO_DEMAND",
+        "level": 1,
+        "consumption_rate": 1.0
+      }
+    ],
+    "unsourced_bom": [
+      {
+        "material_id": "M_UNSOURCED",
+        "higher_level_component_id": "P_OK",
+        "level": 1,
         "consumption_rate": 1.0
       }
     ]

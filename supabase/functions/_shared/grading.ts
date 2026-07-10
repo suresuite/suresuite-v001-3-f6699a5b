@@ -32,7 +32,8 @@ export interface GradingDataset {
   suppliers: Row[];
   inbound: Row[];
   outbound: Row[];
-  /** bom_single_level rows — powers the unsourced-BOM hard block. */
+  /** bom_single_level OR bom_multi_level rows — gradeManifest normalizes the
+   * shape itself (normalizeBomRows); powers the unsourced-BOM hard block. */
   bom: Row[];
 }
 
@@ -218,6 +219,26 @@ const REDUCERS: Record<string, (id: string, ctx: ReducerCtx) => number | undefin
   twice_demand_floor_1000: (id, c) =>
     Math.max((c.effectiveDemand.get(id) ?? 0) * 2, 1000),
 };
+
+/**
+ * Normalize BOM rows to the single-level shape the grader reads. Multi-level
+ * rows (bom_multi_level: child `material_id` under a parent
+ * `higher_level_component_id`, no `product_id`) grade with the parent
+ * standing in for product_id — the same stand-in the engine's datamap applies
+ * when it flattens chains. Single-level rows pass through unchanged.
+ *
+ * Lives INSIDE the shared grader (gradeManifest calls it) so every surface —
+ * the browser verification and the sim-command gate — normalizes identically:
+ * the two once graded different BOMs because each adapter carried its own
+ * mapping and the browser dropped multi-level rows entirely.
+ */
+export function normalizeBomRows(rows: Row[]): Row[] {
+  return rows.map((r) =>
+    r.product_id == null && r.higher_level_component_id != null
+      ? { ...r, product_id: r.higher_level_component_id }
+      : r,
+  );
+}
 
 // ── Policy activation (mirror of project_map.py::_map_policies keys) ────────
 
@@ -439,7 +460,7 @@ export function gradeManifest(
   );
   const unsourced = [
     ...new Set(
-      dataset.bom
+      normalizeBomRows(dataset.bom)
         .filter((b) => productIds.has(String(b.product_id ?? "")))
         .map((b) => String(b.material_id ?? ""))
         .filter((m) => m && !arcMaterials.has(m)),

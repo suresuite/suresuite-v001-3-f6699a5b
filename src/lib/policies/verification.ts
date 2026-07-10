@@ -32,6 +32,7 @@ interface VerifyInput {
    */
   inbound?: Record<string, unknown>[];
   outbound?: Record<string, unknown>[];
+  /** Single- OR multi-level BOM rows — the shared grader normalizes shape. */
   bom?: Record<string, unknown>[];
   /**
    * False while the hooks are still fetching masters/lanes. Grading with
@@ -170,14 +171,11 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
       suppliers: suppliers as unknown as Record<string, unknown>[] | undefined,
       inbound,
       outbound,
-      // Multi-level BOM lanes carry higher_level_component_id instead of
-      // product_id; grade them through the single-level manifest shape the
-      // same way the sim-command gate does, so both §8.1 surfaces agree.
-      bom: (bom ?? []).map((r) =>
-        r.product_id == null && r.higher_level_component_id != null
-          ? { ...r, product_id: r.higher_level_component_id }
-          : r,
-      ),
+      // BOM rows pass through RAW in either shape — the shared grader itself
+      // normalizes multi-level rows (grading.ts::normalizeBomRows), the exact
+      // code path the sim-command gate runs, so both §8.1 surfaces grade the
+      // identical BOM.
+      bom,
     }),
   );
 
