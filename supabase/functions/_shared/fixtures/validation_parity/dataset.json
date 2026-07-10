@@ -8,6 +8,7 @@
     "  P_PRICE_FALLBACK  no sell_price/demand_mean, priced outbound → info ×2; no capacity → WARN",
     "  P_NO_DEMAND       no sell_price/demand_mean, no outbound     → WARN ×2 (neutral constants); no capacity → WARN",
     "  unsourced_extra   BOM material with no supplier arc → BLOCK (engine ValueError)",
+    "  multi_level_variant  the SAME BOM in bom_multi_level shape → must grade identically",
     "The deno test locks the grader to expected_findings.json; the pytest runs",
     "this same dataset through datamap→from_project_data and asserts the",
     "engine's WARN-level MappingWarnings match the grader's warn findings.",
@@ -173,6 +174,70 @@
       {
         "product_id": "P_OK",
         "material_id": "M_UNSOURCED",
+        "consumption_rate": 1.0
+      }
+    ]
+  },
+  "multi_level_variant": {
+    "_comment": [
+      "dataset.bom re-expressed in bom_multi_level shape (child material_id under",
+      "parent higher_level_component_id, NO product_id), with P_OK's materials",
+      "routed through the INTERMEDIATE assembly SUB_OK — so flattening root→leaf",
+      "yields exactly the single-level pairs. grading_test.ts asserts the variant",
+      "grades IDENTICALLY to the single-level fixture: this pins (a) the shared",
+      "normalizeBomRows flatten that BOTH the browser verification and the",
+      "sim-command gate run through gradeManifest, and (b) that SUB_OK — an",
+      "intermediate with no supplier arc — is NOT flagged unsourced (the engine",
+      "demands supplier links only for leaf materials). unsourced_bom hangs",
+      "M_UNSOURCED under the intermediate: the DEEP leaf must still trace up to",
+      "P_OK and raise the same materials.supplier_link block. The browser once",
+      "passed bom: [] for multi-level projects, so Verify missed blocks the gate",
+      "then caught; the gate's old per-edge mapping also false-blocked",
+      "intermediates and missed deep leaves."
+    ],
+    "bom": [
+      {
+        "material_id": "SUB_OK",
+        "higher_level_component_id": "P_OK",
+        "level": 0,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_OK",
+        "higher_level_component_id": "SUB_OK",
+        "level": 1,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_DERIVED",
+        "higher_level_component_id": "SUB_OK",
+        "level": 1,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_UNPRICED",
+        "higher_level_component_id": "SUB_OK",
+        "level": 1,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_OK",
+        "higher_level_component_id": "P_PRICE_FALLBACK",
+        "level": 0,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_OK",
+        "higher_level_component_id": "P_NO_DEMAND",
+        "level": 0,
+        "consumption_rate": 1.0
+      }
+    ],
+    "unsourced_bom": [
+      {
+        "material_id": "M_UNSOURCED",
+        "higher_level_component_id": "SUB_OK",
+        "level": 1,
         "consumption_rate": 1.0
       }
     ]
