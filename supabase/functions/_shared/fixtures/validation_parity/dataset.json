@@ -180,50 +180,63 @@
   },
   "multi_level_variant": {
     "_comment": [
-      "dataset.bom re-expressed in bom_multi_level shape: child material_id under",
-      "parent higher_level_component_id, NO product_id. grading_test.ts asserts it",
-      "grades IDENTICALLY to the single-level fixture — pinning the shared",
-      "normalizeBomRows path that BOTH the browser verification and the sim-command",
-      "gate run through gradeManifest — and that unsourced_bom raises the same",
-      "materials.supplier_link block. The browser once passed bom: [] for",
-      "multi-level projects, so Verify missed blocks the gate then caught."
+      "dataset.bom re-expressed in bom_multi_level shape (child material_id under",
+      "parent higher_level_component_id, NO product_id), with P_OK's materials",
+      "routed through the INTERMEDIATE assembly SUB_OK — so flattening root→leaf",
+      "yields exactly the single-level pairs. grading_test.ts asserts the variant",
+      "grades IDENTICALLY to the single-level fixture: this pins (a) the shared",
+      "normalizeBomRows flatten that BOTH the browser verification and the",
+      "sim-command gate run through gradeManifest, and (b) that SUB_OK — an",
+      "intermediate with no supplier arc — is NOT flagged unsourced (the engine",
+      "demands supplier links only for leaf materials). unsourced_bom hangs",
+      "M_UNSOURCED under the intermediate: the DEEP leaf must still trace up to",
+      "P_OK and raise the same materials.supplier_link block. The browser once",
+      "passed bom: [] for multi-level projects, so Verify missed blocks the gate",
+      "then caught; the gate's old per-edge mapping also false-blocked",
+      "intermediates and missed deep leaves."
     ],
     "bom": [
       {
-        "material_id": "M_OK",
+        "material_id": "SUB_OK",
         "higher_level_component_id": "P_OK",
+        "level": 0,
+        "consumption_rate": 1.0
+      },
+      {
+        "material_id": "M_OK",
+        "higher_level_component_id": "SUB_OK",
         "level": 1,
         "consumption_rate": 1.0
       },
       {
         "material_id": "M_DERIVED",
-        "higher_level_component_id": "P_OK",
+        "higher_level_component_id": "SUB_OK",
         "level": 1,
         "consumption_rate": 1.0
       },
       {
         "material_id": "M_UNPRICED",
-        "higher_level_component_id": "P_OK",
+        "higher_level_component_id": "SUB_OK",
         "level": 1,
         "consumption_rate": 1.0
       },
       {
         "material_id": "M_OK",
         "higher_level_component_id": "P_PRICE_FALLBACK",
-        "level": 1,
+        "level": 0,
         "consumption_rate": 1.0
       },
       {
         "material_id": "M_OK",
         "higher_level_component_id": "P_NO_DEMAND",
-        "level": 1,
+        "level": 0,
         "consumption_rate": 1.0
       }
     ],
     "unsourced_bom": [
       {
         "material_id": "M_UNSOURCED",
-        "higher_level_component_id": "P_OK",
+        "higher_level_component_id": "SUB_OK",
         "level": 1,
         "consumption_rate": 1.0
       }

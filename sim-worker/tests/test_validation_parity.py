@@ -131,6 +131,34 @@ def test_unsourced_bom_material_is_the_hard_block():
         from_project_data(_project_data(ds, fx))
 
 
+def test_multi_level_variant_flattens_to_the_single_level_bom():
+    """The fixture's multi_level_variant (P_OK's materials routed through the
+    intermediate SUB_OK) must flatten to exactly dataset.bom's product→material
+    pairs — the Python half of the normalizeBomRows parity grading_test.ts pins
+    on the TS side. The intermediate must be collapsed away, never sourced."""
+    fx = _fixture()
+    data = _project_data({**fx["dataset"], "bom": fx["multi_level_variant"]["bom"]}, fx)
+    assert sorted((b.product_id, b.material_id) for b in data.bom) == sorted(
+        (b["product_id"], b["material_id"]) for b in fx["dataset"]["bom"]
+    )
+    from_project_data(data)  # engine maps it — no unsourced ValueError
+
+
+def test_multi_level_unsourced_deep_leaf_raises_like_single_level():
+    """A leaf material under the intermediate (not directly under a product)
+    must still trace up to its root and raise the engine's hard failure —
+    the case the gate's old per-edge parent→product_id mapping missed."""
+    fx = _fixture()
+    mlv = fx["multi_level_variant"]
+    ds = {
+        **fx["dataset"],
+        "materials": fx["dataset"]["materials"] + fx["unsourced_extra"]["materials"],
+        "bom": mlv["bom"] + mlv["unsourced_bom"],
+    }
+    with pytest.raises(ValueError, match="M_UNSOURCED"):
+        from_project_data(_project_data(ds, fx))
+
+
 def test_policy_activation_matches_shared_grader():
     """The fixture's activation_variant pins _map_policies' activation keys to
     the TS activeEnginePolicies mirror (grading_test.ts asserts the TS half)."""

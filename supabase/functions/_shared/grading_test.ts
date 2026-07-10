@@ -61,11 +61,15 @@ Deno.test("an unsourced BOM material is the hard block (engine ValueError mirror
 });
 
 // ── Multi-level BOM golden variant (§8.2) ────────────────────────────────────
-// The SAME BOM in bom_multi_level shape must grade exactly like the
-// single-level fixture. Both the browser verification and the sim-command
-// gate pass their BOM rows RAW into gradeManifest, which normalizes the shape
-// itself (normalizeBomRows) — so these tests pin BOTH surfaces at once: the
-// two can never again grade different BOMs.
+// The SAME BOM in bom_multi_level shape — P_OK's materials routed through the
+// intermediate assembly SUB_OK — must grade exactly like the single-level
+// fixture. Both the browser verification and the sim-command gate pass their
+// BOM rows RAW into gradeManifest, which flattens the multi-level shape
+// itself (normalizeBomRows, the datamap._flatten_multi_level_bom port) — so
+// these tests pin BOTH surfaces at once: the two can never again grade
+// different BOMs, intermediates are never flagged unsourced (the engine
+// demands supplier links only for leaf materials), and an unsourced leaf
+// under an intermediate still blocks.
 
 const MULTI_BOM = fixture.multi_level_variant.bom as Row[];
 const MULTI_UNSOURCED_BOM = fixture.multi_level_variant.unsourced_bom as Row[];
@@ -124,14 +128,26 @@ Deno.test("gate: a multi-level unsourced BOM material blocks the dispatch", () =
   assertEquals(block?.rows, ["M_UNSOURCED"], "blocked material");
 });
 
-Deno.test("normalizeBomRows: parent stands in for product_id; single-level passes through", () => {
+Deno.test("normalizeBomRows: flattens to root→leaf pairs; single-level passes through", () => {
   const pairs = (rows: Row[]) =>
-    rows.map((r) => ({ product_id: r.product_id, material_id: r.material_id }));
+    rows
+      .map((r) => `${r.product_id}→${r.material_id}`)
+      .sort();
   assertEquals(
     pairs(normalizeBomRows(MULTI_BOM)),
     pairs(DATASET.bom),
-    "normalized multi rows must carry the single-level (product_id, material_id) pairs",
+    "flattened multi rows must carry the single-level (product_id, material_id) pairs",
   );
+  // The intermediate assembly is collapsed away — it is neither a product
+  // nor a material in any flattened pair (the engine never sources it).
+  const flat = normalizeBomRows([...MULTI_BOM, ...MULTI_UNSOURCED_BOM]);
+  if (flat.some((r) => r.product_id === "SUB_OK" || r.material_id === "SUB_OK")) {
+    throw new Error("intermediate SUB_OK leaked into the flattened BOM");
+  }
+  // The deep leaf traces up to its root product.
+  if (!flat.some((r) => r.product_id === "P_OK" && r.material_id === "M_UNSOURCED")) {
+    throw new Error("deep leaf M_UNSOURCED did not flatten up to P_OK");
+  }
   assertEquals(
     normalizeBomRows(DATASET.bom),
     DATASET.bom,
