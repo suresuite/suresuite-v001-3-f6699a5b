@@ -628,15 +628,16 @@ field on save/edit (persisted on the version record, distinct from the label).
 
 ### Scene 6 — build checklist (for the new UX/UI section)
 
-- [ ] Grid → discriminated-union **Policy Type** column + dynamic parameter renderer from
-      `registry.generated.json` (6.A)
-- [ ] Add spec structural columns: Initial Stock · Policy Basis · Periodic Check / Period (6.A)
-- [ ] Per-parameter transparency side-sheet: unit/range/default/meaning + formula + engine-consumed
+- [x] Grid → discriminated-union **Policy Type** column + dynamic parameter renderer from
+      `registry.generated.json` (6.A — Inventory category, supplier + plant stages; presentation
+      reframe over the transitional bundle, see policy-specification §II.2 status note)
+- [x] Add spec structural columns: Initial Stock · Policy Basis · Periodic Check / Period (6.A)
+- [x] Per-parameter transparency side-sheet: unit/range/default/meaning + formula + engine-consumed
       flag (6.B)
 - [ ] Persist per-material / per-FG inventory, FG output, per-cost time series (6.C)
 - [ ] Run panel **indicator picker** for single & multi run (6.C)
-- [ ] Version history: **Export**, **Delete**, **Notes** (6.D)
-- [ ] Run & job-queue console: show all jobs, per-job cancel (6.E)
+- [x] Version history: **Export**, **Delete**, **Notes** (6.D)
+- [x] Run & job-queue console: show all jobs, per-job cancel (6.E)
 
 ### 6.E — Run & job-queue UI (single + multiple run): "is it working, and can I cancel it?"
 

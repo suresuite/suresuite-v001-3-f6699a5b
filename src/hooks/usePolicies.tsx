@@ -5,20 +5,28 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   DEFAULT_BUNDLE,
   parseFamily,
+  PolicyFamily as PolicyFamilyEnum,
   type FulfillmentStrategy,
   type PolicyBundle,
   type PolicyFamily,
 } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
+import { exportStageWorkbook, downloadWorkbook } from "@/lib/policies/excel";
 
 export interface PolicyVersion {
   id: string;
   label: string | null;
+  /** Free-text description of the model (6.D) — distinct from `label`. */
+  notes: string | null;
   author_email: string | null;
   author_name: string | null;
   parent_version_id: string | null;
   policy_hash: string | null;
   created_at: string;
+  /** How many simulation runs / model cards reference this version — a
+   *  version with either is delete-guarded (6.D). Absent on the RLS fallback. */
+  run_count?: number;
+  card_count?: number;
 }
 
 interface UsePoliciesResult {
@@ -46,7 +54,13 @@ interface UsePoliciesResult {
   upsertOverride: (row: OverrideRow) => Promise<void>;
   bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
   deleteOverride: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
-  saveSnapshot: (label?: string) => Promise<string | null>;
+  saveSnapshot: (label?: string, notes?: string) => Promise<string | null>;
+  /** 6.D — edit a version's free-text notes (distinct from its label). */
+  updateVersionNotes: (versionId: string, notes: string) => Promise<void>;
+  /** 6.D — delete a version; refused server-side if bound to a run/model card. */
+  deleteVersion: (versionId: string) => Promise<boolean>;
+  /** 6.D — download a saved version's policy bundle as an .xlsx workbook. */
+  exportVersion: (version: PolicyVersion) => Promise<void>;
 }
 
 /**
@@ -403,7 +417,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     }
     const { data, error } = await sb
       .from("policy_versions")
-      .select("id,label,author_email,author_name,parent_version_id,policy_hash,created_at")
+      .select("id,label,notes,author_email,author_name,parent_version_id,policy_hash,created_at")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
     if (error) {
@@ -418,7 +432,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   }, [refreshVersions]);
 
   const saveSnapshot = useCallback(
-    async (label?: string): Promise<string | null> => {
+    async (label?: string, notes?: string): Promise<string | null> => {
       if (!projectId) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
@@ -429,6 +443,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         p_user_email: user?.email ?? null,
         p_user_name: user?.display_name ?? user?.name ?? null,
         p_parent_version_id: selectedVersionId,
+        p_notes: notes ?? null,
       });
       if (error) {
         console.error("saveSnapshot failed", error);
@@ -485,6 +500,85 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     [projectId, refreshCurrentHash],
   );
 
+  // 6.D — edit a version's free-text notes (a description of the model),
+  // persisted on the version record and distinct from the short label.
+  const updateVersionNotes = useCallback(
+    async (versionId: string, notes: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { error } = await sb.rpc("update_policy_version_notes", {
+        p_version_id: versionId,
+        p_notes: notes,
+      });
+      if (error) {
+        console.error("updateVersionNotes failed", error);
+        toast.error(`Could not save notes: ${error.message ?? error}`);
+        return;
+      }
+      toast.success("Notes saved");
+      void refreshVersions();
+    },
+    [refreshVersions],
+  );
+
+  // 6.D — delete a saved version. The RPC refuses (foreign_key_violation) when
+  // the version is bound to a simulation run or a validated model card, so a
+  // referenced version can never be silently destroyed. Returns whether the
+  // delete happened.
+  const deleteVersion = useCallback(
+    async (versionId: string): Promise<boolean> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { error } = await sb.rpc("delete_policy_version", { p_version_id: versionId });
+      if (error) {
+        console.error("deleteVersion failed", error);
+        toast.error(error.message ?? "Could not delete this version");
+        return false;
+      }
+      if (selectedVersionId === versionId) setSelectedVersionId(null);
+      toast.success("Version deleted");
+      void refreshVersions();
+      return true;
+    },
+    [selectedVersionId, refreshVersions],
+  );
+
+  // 6.D — download a saved version's policy bundle as an .xlsx workbook,
+  // reusing the stage Excel writer (one sheet per family). Reads the stored v2
+  // snapshot { defaults, fulfillment_strategy, overrides }; v1 snapshots (a
+  // flat family map, no `defaults` key) are handled too.
+  const exportVersion = useCallback(async (version: PolicyVersion) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    const { data, error } = await sb.rpc("get_policy_version_snapshot", {
+      p_version_id: version.id,
+    });
+    if (error || !data) {
+      console.error("exportVersion failed", error);
+      toast.error("Could not load this version to export");
+      return;
+    }
+    const snap = data as Record<string, unknown>;
+    const rawDefaults = (snap.defaults ?? snap) as Record<string, unknown>;
+    const families = PolicyFamilyEnum.options;
+    const bundle = Object.fromEntries(
+      families.map((f) => [f, parseFamily(f, rawDefaults[f])]),
+    ) as PolicyBundle;
+    const overrides = (Array.isArray(snap.overrides) ? snap.overrides : []).map(
+      (o: Record<string, unknown>) => ({
+        scope: o.scope,
+        target_key: o.target_key,
+        family: o.family,
+        patch: (o.patch ?? {}) as Record<string, unknown>,
+      }),
+    ) as OverrideRow[];
+    const name = version.label || `version-${version.id.slice(0, 8)}`;
+    const wb = exportStageWorkbook(`Policy ${name}`, [...families], bundle, overrides);
+    const safe = name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 48);
+    downloadWorkbook(wb, `policy-${safe}.xlsx`);
+    toast.success("Version exported");
+  }, []);
+
   const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? null;
   const isDirty =
     !selectedVersion ||
@@ -514,5 +608,8 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     bulkUpsertOverrides,
     deleteOverride,
     saveSnapshot,
+    updateVersionNotes,
+    deleteVersion,
+    exportVersion,
   };
 }

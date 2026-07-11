@@ -57,11 +57,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
-import { useModelValidation } from "@/hooks/useModelValidation";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
-import { useAuth } from "@/hooks/useAuth";
 import {
   fetchScenarioFingerprintHash,
   useModelValidation,
@@ -71,7 +69,6 @@ import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
 import { fieldWalkToRoute } from "@/lib/policies/dataMap";
 import { FindingsList } from "./FindingsList";
-import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import {
   cancelBrowserRun,
   EngineCancelledError,
@@ -90,7 +87,8 @@ import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { PolicyBundle, FulfillmentStrategy } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import { PolicyRunStepper } from "./PolicyRunStepper";
-import { RunProgressPanel } from "@/components/sim/RunProgressPanel";
+import { MappingWarningsCard } from "@/components/sim/RunProgressPanel";
+import { RunQueueConsole } from "@/components/sim/RunQueueConsole";
 
 // Runs launched from the policies stage all reuse this single auto-managed
 // scenario so the Lab's scenario list doesn't fill up with validation runs.
@@ -257,7 +255,14 @@ export function RunValidateStage({
   // policy version + a scenario bound to the run, dispatched to the Fly worker.
   const { scenarios, create: createScenario, update: updateScenario } = useScenarios(projectId);
   const [validationScenarioId, setValidationScenarioId] = useState<string | null>(null);
-  const { latestRun: dbRun, reps: dbReps, cancelRun, addReps } = useSimulationRun(validationScenarioId);
+  const {
+    latestRun: dbRun,
+    reps: dbReps,
+    history,
+    cancelRun,
+    addReps,
+    loadReps,
+  } = useSimulationRun(validationScenarioId);
 
   // In-memory result of a run computed by the BROWSER engine (offline
   // fallback). It renders the engine output immediately and independently of
@@ -297,6 +302,58 @@ export function RunValidateStage({
   // Prefer freshly persisted DB output; fall back to the in-memory result.
   const latestRun = dbRun ?? localRun;
   const reps = dbReps.length > 0 ? dbReps : localReps;
+
+  // ── Run-queue console (6.E) ───────────────────────────────────────────────
+  // All jobs, newest-first: the persisted history plus, when a browser run
+  // hasn't been persisted, the in-memory localRun (so an offline run still
+  // shows as its own job row). cancelRun already cancels any run by id.
+  const jobs = useMemo<SimulationRun[]>(() => {
+    const list = [...history];
+    if (localRun && !list.some((r) => r.id === localRun.id)) list.unshift(localRun);
+    return list;
+  }, [history, localRun]);
+
+  // Which job the inspection dashboard below the queue shows. Null = the
+  // latest run (default). "View" on a completed row selects it; its reps are
+  // loaded on demand (the realtime path only keeps the latest run's reps hot).
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedReps, setSelectedReps] = useState<Replication[]>([]);
+  const inspectedRun = useMemo(
+    () => (selectedRunId ? jobs.find((r) => r.id === selectedRunId) ?? latestRun : latestRun),
+    [selectedRunId, jobs, latestRun],
+  );
+  // Reps for the inspected run: reuse the hot latest-run reps when it IS the
+  // latest, else the on-demand-loaded set.
+  const inspectedReps =
+    inspectedRun && inspectedRun.id === latestRun?.id ? reps : selectedReps;
+
+  const onViewRun = (job: SimulationRun) => {
+    if (job.id === latestRun?.id) {
+      setSelectedRunId(null);
+      setSelectedReps([]);
+      return;
+    }
+    setSelectedRunId(job.id);
+    setSelectedReps([]);
+    void loadReps(job.id).then(setSelectedReps);
+  };
+
+  // Cancel one job — the semantics already supported by the stack: a browser
+  // run terminates the Pyodide worker; a server run is cancelled by id via
+  // experiment.cancel (works for ANY queued/running run, not just the latest).
+  const cancelJob = (job: SimulationRun) => {
+    const isBrowserInFlight =
+      job.id === localRun?.id || (activeRunPath === "browser" && job.id === latestRun?.id);
+    if (isBrowserInFlight) cancelBrowserRun();
+    if (
+      projectId &&
+      history.some((r) => r.id === job.id) &&
+      (job.status === "queued" || job.status === "running")
+    ) {
+      void cancelRun(projectId, job.id);
+    }
+  };
+  const cancelAllActive = (active: SimulationRun[]) => active.forEach(cancelJob);
 
   // Re-attach to the auto-managed validation scenario on mount, so engine
   // output persisted by earlier sessions renders immediately — previously the
@@ -1498,28 +1555,39 @@ export function RunValidateStage({
                 <h4 className="text-xs font-semibold">
                   Engine run — live status &amp; persisted output
                 </h4>
-                <RunProgressPanel
-                  run={latestRun}
-                  reps={reps}
-                  versionLabel={null}
+                {/* Run-queue console (6.E): every job from history, not just
+                    the latest — per-row Cancel/View/Retry, status tally, filter
+                    and bulk Cancel-all / Clear-finished. cancelJob reuses the
+                    existing cancelRun / cancelBrowserRun; no backend change. */}
+                <RunQueueConsole
+                  jobs={jobs}
+                  activeReps={reps}
+                  activeRepsRunId={latestRun?.id ?? null}
+                  selectedRunId={inspectedRun?.id ?? null}
                   credibility={runCredibility}
-                  onCancel={() => {
-                    // Browser runs: terminate the engine worker (the only way
-                    // to interrupt a blocking WASM run) and close out the DB
-                    // row if one was created. Server runs: experiment.cancel
-                    // via sim-command — never touch the local engine worker,
-                    // the browser isn't computing anything.
-                    if (activeRunPath !== "server") cancelBrowserRun();
-                    if (projectId && dbRun && (dbRun.status === "queued" || dbRun.status === "running")) {
-                      void cancelRun(projectId, dbRun.id);
-                    }
-                  }}
-                  onAddReps={(n) => {
-                    if (projectId && latestRun) void addReps(projectId, latestRun.id, n);
-                  }}
+                  onCancel={cancelJob}
+                  onCancelAllActive={cancelAllActive}
+                  onView={onViewRun}
+                  onRetry={(job) => ((job.rep_count_target ?? 1) > 1 ? onRunMulti() : onRunSingle())}
                 />
-                {latestRun && hasRealData && (
-                  <EngineOutputSummary run={latestRun} reps={doneReps} warmupWeeks={adoptedWarmupWeeks} />
+                {/* Inspection detail for the selected run (defaults to latest):
+                    the engine's mapping report + the model-behaviour dashboard. */}
+                {inspectedRun && (
+                  <MappingWarningsCard
+                    warnings={inspectedRun.mapping_warnings}
+                    status={inspectedRun.status}
+                  />
+                )}
+                {inspectedRun && inspectedReps.some((r) => r.status === "done" && r.kpis) && (
+                  <EngineOutputSummary
+                    run={inspectedRun}
+                    reps={inspectedReps.filter((r) => r.status === "done" && r.kpis)}
+                    warmupWeeks={
+                      inspectedRun.id === latestRun?.id
+                        ? adoptedWarmupWeeks
+                        : inspectedRun.warmup_detected_at ?? null
+                    }
+                  />
                 )}
               </div>
             )}

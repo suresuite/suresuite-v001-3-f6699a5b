@@ -98,14 +98,23 @@ export const SafetyStockMethod = z.enum([
   "demand_variability",
   "king_method",
 ]);
+// Policy Basis (§II.4) — the level-parameter interpretation switch. The engine
+// (inventory_control.basis, P-P.1) implements days_of_supply and
+// forward_visible; absolute "Quantity" basis is the ✚ addition (not offered
+// until it lands in the engine).
+export const PolicyBasis = z.enum(["days_of_supply", "forward_visible"]);
 export const ABCClass = z.enum(["A", "B", "C"]);
 export const StockRotation = z.enum(["FIFO", "LIFO", "FEFO"]);
 export const FgSafetyStockSizing = z.enum(["none", "service_level", "fixed_days"]);
 
 export const InventoryPolicy = z.object({
   type: InventoryPolicyType.default("min_max"),
+  // Policy Basis (§II.4) under which level params (s, S, R) are realized.
+  basis: PolicyBasis.default("days_of_supply"),
   reorder_point: z.number().min(0).default(50),
   order_up_to: z.number().min(0).default(200),
+  // (R, Q) fixed lot — the Q of the rop policy type (§III.3).
+  rop_q_quantity: z.number().min(0).default(0),
   max_stock: z.number().min(0).default(500),
   min_stock: z.number().min(0).default(0),
   safety_stock_method: SafetyStockMethod.default("fixed_days"),
@@ -371,6 +380,7 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   order_consolidation: ConsolidationCadence.options,
   // inventory
   type: InventoryPolicyType.options,
+  basis: PolicyBasis.options,
   safety_stock_method: SafetyStockMethod.options,
   abc_class: ABCClass.options,
   rotation: StockRotation.options,
@@ -484,7 +494,10 @@ export const FIELD_LABELS: Record<string, string> = {
   max_lead_time_variance_days: "Max lead-time variance (days)",
   contract_type: "Contract type",
   order_consolidation: "Order consolidation",
-  type: "Policy type",
+  type: "Policy Type",
+  basis: "Policy Basis",
+  initial_on_hand: "Initial Stock",
+  rop_q_quantity: "Order quantity (Q)",
   reorder_point: "Reorder point (s)",
   order_up_to: "Order-up-to (S)",
   max_stock: "Max stock",

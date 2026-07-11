@@ -86,6 +86,17 @@ const wantsMaterialAllocation: ColSpec["visibleWhen"] = ({ effective }) =>
 const fgStockOn: ColSpec["visibleWhen"] = (ctx) =>
   plantNeedsInventory(ctx) && String(ctx.effective?.fg_safety_stock ?? "none") !== "none";
 
+// 6.A — a level/lot parameter is editable only for the inventory Policy Types
+// that use it (§II.3): picking a type changes which params show. The row's
+// chosen type is `effective.type` (min_max | base_stock | rop | periodic_review).
+const invTypeIn = (...types: string[]): ColSpec["visibleWhen"] =>
+  ({ effective }) => types.includes(String(effective?.type ?? "min_max"));
+
+// Plant inventory params only apply when the product carries finished-goods
+// inventory (MTS/ATO/CTO) AND its type uses the param.
+const plantInvType = (...types: string[]): ColSpec["visibleWhen"] =>
+  (ctx) => plantNeedsInventory(ctx) && invTypeIn(...types)(ctx);
+
 export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
   // ----------------------------- SUPPLIER -----------------------------
   supplier: {
@@ -120,7 +131,20 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
         master: { table: "suppliers", field: "reliability_score", idFrom: "supplier_id" },
       }),
 
+      // Policy Type → dynamic parameters (§II.1–II.3). The type drives which
+      // level/lot params below are editable; the params' schemas come from the
+      // engine registry (registryPolicyTypes / inventory_control). s, S and R,Q
+      // are stored + versioned now and consumed once the Quantity basis lands
+      // (§II.4) — the info button (6.B) discloses this per parameter.
       col("type", "inventory"),
+      col("basis", "inventory"),
+      col("reorder_point", "inventory", { visibleWhen: invTypeIn("min_max", "rop"), defaultWhenMissing: 50 }),
+      col("order_up_to", "inventory", { visibleWhen: invTypeIn("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200 }),
+      col("rop_q_quantity", "inventory", { visibleWhen: invTypeIn("rop"), defaultWhenMissing: 0 }),
+      col("review_period_days", "inventory", { visibleWhen: invTypeIn("periodic_review"), defaultWhenMissing: 1 }),
+      col("initial_on_hand", "inventory", {
+        master: { table: "materials", field: "initial_on_hand", idFrom: "material_id" },
+      }),
       col("safety_stock_days", "inventory", { defaultWhenMissing: 0 }),
       col("holding_cost_pct", "inventory", { defaultWhenMissing: 0.2 }),
 
@@ -155,7 +179,17 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
       col("backorder_cost_per_day", "fulfillment", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
 
+      // Policy Type → dynamic parameters for finished goods (§II.1–II.3, §III.13).
       col("type", "inventory", { visibleWhen: plantNeedsInventory }),
+      col("basis", "inventory", { visibleWhen: plantNeedsInventory }),
+      col("reorder_point", "inventory", { visibleWhen: plantInvType("min_max", "rop"), defaultWhenMissing: 50 }),
+      col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200 }),
+      col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0 }),
+      col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1 }),
+      col("initial_on_hand", "inventory", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "initial_on_hand", idFrom: "product_id" },
+      }),
       col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
       col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
       col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
