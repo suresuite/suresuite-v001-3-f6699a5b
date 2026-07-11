@@ -493,6 +493,150 @@ then multiple replications with seeds/confidence/focal KPIs, on server or in-bro
 empirical data (KS + Welch t-test on steady-state) → 5) adopt a versioned, hash-bound model
 card.**
 
+---
+
+## Scene 6 — reality check & build spec (start the redesign here)
+
+> The four items below are the concrete "this is not what I asked for" points on `/policies`,
+> each measured against the **authoritative spec** `docs/design/policy-specification.md` and the
+> **actual code**. Written as a build ledger so a fresh *Policies UX/UI redesign* work-stream can
+> begin from it directly. Format per item: **what you asked for → what the code does today
+> (file-referenced) → the gap → the target to build.**
+
+### 6.A — The policy grid is a flat field-dump, not the "Policy Type → dynamic parameters" table
+
+**What you asked for (and what the spec already mandates).** `policy-specification.md` §II.1–§II.3:
+each category is a table whose rows are *(facility, item)* pairs and whose **central cell is a
+Policy Type** dropdown that drives a **dynamic Policy Parameters** cell — verbatim: *"choosing a
+type changes which parameters are shown and editable — exactly the user's core idea."* The spec's
+canonical column model is:
+
+`Facility | Item | Policy Type | Policy Parameters | Initial Stock | Policy Basis | Stock Calc. Window | Periodic Check | Period / First Check | Min Split Ratio | Inclusion`
+
+The parameter cell renders **from the selected type's schema**: the type's 1–3 headline params get
+their own columns (e.g. `min_max → s, S`), the rest appear as a compact `param = value` chip list
+(spec §II.3). That is precisely your "**one column shows the parameters the policy needs, one
+column lets me input them**."
+
+**What the code does today** — `src/components/policies/StagePolicyTable.tsx` +
+`src/lib/policies/columnSpecs.ts`. The grid is a **wide spreadsheet with one fixed column per
+policy field**, grouped into coloured **family bands** (sourcing / inventory / transport /
+production / fulfillment). There is **no Policy Type cell that swaps the parameter set.** Headings
+are flattened field labels from `FIELD_LABELS` — e.g. the **Supplier** stage renders columns
+`Primary · Share (%) · Supply share (P-S.2) · Material price · Lead time mean (days) · Material
+cost (master) · MOQ (master) · Supplier capacity (units/wk) · Reliability (0–1) · Policy type ·
+Safety stock (days, 0–84) · Holding cost (%/yr) · Mode · Lead time mean (days) · Cost / km`; the
+row keys are `Material · Supplier` (plant: `Focal plant · Product`; customer: `Customer ·
+Product`). The only "dynamics" is per-cell **`visibleWhen`** gating that renders an inapplicable
+cell as `—` (e.g. `supply_share` only when `strategy = multi`; FG fields only under MTS). Inventory
+`type` (min_max / base_stock / rop / periodic_review) is just another dropdown column — choosing
+`min_max` does **not** reveal `s, S`; choosing `rop` does **not** reveal `R, Q`. The whole per-type
+parameter library of spec §III (s, S, R, Q, review period, Initial Stock, **Policy Basis**, MRP
+horizon, …) is **absent from the grid.** The spec itself flags this: *"today the grid still uses a
+transitional 7-family Zod schema — the reframe here is the target the grid migrates to."*
+
+**The gap (your 1.1 + 1.2).**
+- **Wrong column headings** — flattened engine-field names, not the spec's column model; no Policy
+  Type / Policy Parameters / Policy Basis / Initial Stock / Periodic Check columns at all.
+- **Not dynamic** — parameters don't follow the chosen policy type; you can't pick "(R,Q)" and get
+  `R` and `Q` inputs. The selectable **policy library** (§III inventory ×12, §IV sourcing /
+  production / capacity, …) simply isn't there.
+
+**Target to build.** Migrate the grid to the discriminated-union model generated from
+`src/lib/policies/registry.generated.json` (blueprint §6.2): a **Policy Type** column per category;
+a **dynamic parameter renderer** (headline params → columns, remainder → chip list) built from the
+selected type's JSON-Schema, each editor carrying unit/min/max and inline `feasibility()`
+validation; plus the spec's structural columns (Initial Stock, **Policy Basis**, Periodic Check /
+Period). Keep the existing provenance dots and the Excel round-trip.
+
+### 6.B — Transparency: good on data-provenance, missing at the policy/parameter level
+
+**What you asked for (1.3, repeatedly).** Settings must be transparent: which parameter belongs to
+which policy, its unit/range/meaning, where its value came from, and what the engine actually does
+with it — *"no hidden heuristics"* (spec §II.6).
+
+**What exists today.** The grid does **data provenance** well: a per-cell corner-dot legend — *from
+project data (sky) · imputed average, verify (red) · derived fallback ≈ (amber) · saved override
+(emerald) · edited (primary)* — plus banners ("Policies seeded from your uploaded project data",
+"N rows use estimated values — please review") and **engine-status badges** on fields not yet
+consumed by the engine (shown disabled with their milestone). The value precedence is real
+(draft → project data → override → default).
+
+**The gap.** That transparency answers *where a number came from*, not *what the policy is*. Absent
+from the UI: each parameter's **unit / range / default / meaning** (the spec's per-parameter
+tables), the **decision rule / equation** the policy executes (spec §III gives one per type), and
+clear disclosure that entire families (**transport, demand**) and many fields are
+**stored-but-not-consumed** (`SCSIM_VISIBLE_FIELDS` in `schemas.ts` — only a subset is live). You
+cannot currently answer "what does this policy do, and which of these numbers matter?" from the
+grid.
+
+**Target to build.** A per-policy **parameter side-sheet** generated from the schema: symbol · unit
+· range · default · meaning (verbatim from the spec tables) + the decision-rule formula + an
+explicit "consumed by engine ✅ / stored-only 🧩" flag per parameter.
+
+### 6.C — Single / multiple run: charts exist, but only at aggregate level
+
+**What you asked for (point 2).** Right in the single run, let me pick main indicators and **see
+them over time** — **material inventory**, **finished-goods inventory**, **finished-goods output
+(production)**, and **financial indicators** — as visualisations, so I can eyeball abnormalities.
+
+**What the code does today** — `RunValidateStage.tsx` → `EngineOutputSummary`, `WeeklySeriesChart`,
+`FinancialStatement`, `MultiRunResultsPanel`. After a single run you get a genuine inspection
+dashboard: headline KPI tiles (Fill rate · Revenue · Lost sales · Max backlog, ± CI); an
+**"Inventory dynamics — on-hand value (€)"** weekly line chart (up to 8 replication traces, warm-up
+cut line); a **Financial statement** (Revenue − each cost component = Margin, + lost-sales memo);
+the other weekly series (**fill rate · backlog units · revenue €/week**); and sanity scalars
+(capacity utilisation, lost inbound units). Multiple runs add per-KPI **convergence** (running
+mean ± CI).
+
+**The gap.** The engine only persists **four aggregate weekly series** on
+`run_replications.time_series`: `fill_rate, backlog_units, on_hand_value, revenue_value`. Therefore:
+- Inventory-over-time is a **single aggregate € number** — you **cannot** separate **material**
+  inventory from **finished-goods** inventory, nor see any **per-item** trajectory.
+- **Finished-goods output / production** over time is **not a series at all.**
+- The **financial statement is scalar** (means over reps), not a time series — you can't watch a
+  cost line move week to week.
+- You can only chart the fixed KPI list; there is no "**pick an indicator**" (e.g. material M1's
+  stock) to inspect for abnormalities — which is exactly the check you keep asking for.
+
+**Target to build.** (1) Persist richer weekly series from the engine — per-echelon inventory
+(material vs FG), production output, per-component cost — then (2) add an **indicator picker** to
+the run panel so single-run inspection can plot per-material / per-product / financial trajectories
+(where abnormalities actually surface), not just four aggregates.
+
+### 6.D — Model version history: save/load only; no export, delete, or notes
+
+**What you asked for (point 3).** In model version history: **export** a version's data,
+**delete** a version, and attach **notes** to a model (a description of the model — *not* a
+changelog/label).
+
+**What the code does today** — `src/components/policies/PolicyVersionBar.tsx`. It supports:
+**Save model version** with a single optional **Label** ("e.g. Pre-Q4 freeze"), a **History**
+side-sheet listing snapshots (label · timestamp · author · parent version), **Select**, and
+**Load** (restore). Nothing else.
+
+**The gap.**
+- **No export** — a saved version can't be downloaded (no JSON/Excel export of the policy bundle).
+- **No delete** — versions only accumulate; there's no remove/confirm.
+- **No notes** — only a one-line *label*; there is no free-text **notes/description** field for the
+  model (the save dialog offers "Label (optional)" only, and the `PolicyVersion` record carries no
+  notes column).
+
+**Target to build.** On each history entry add **Export** (download the bundle, reusing the Excel
+exporter in `src/lib/policies/excel.ts`), **Delete** (with confirm), and a **Notes** free-text
+field on save/edit (persisted on the version record, distinct from the label).
+
+### Scene 6 — build checklist (for the new UX/UI section)
+
+- [ ] Grid → discriminated-union **Policy Type** column + dynamic parameter renderer from
+      `registry.generated.json` (6.A)
+- [ ] Add spec structural columns: Initial Stock · Policy Basis · Periodic Check / Period (6.A)
+- [ ] Per-parameter transparency side-sheet: unit/range/default/meaning + formula + engine-consumed
+      flag (6.B)
+- [ ] Persist per-material / per-FG inventory, FG output, per-cost time series (6.C)
+- [ ] Run panel **indicator picker** for single & multi run (6.C)
+- [ ] Version history: **Export**, **Delete**, **Notes** (6.D)
+
 ### Scene 7 — Simulation Lab (`/simulation-lab`)
 
 Header **"Simulation Lab — Scenarios, replications, warm-up auto-detection, and
