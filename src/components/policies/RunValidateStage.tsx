@@ -4,6 +4,10 @@
 // Run-simulation has two tabs (single run / multi-run). Warm-up detection
 // has two sub-steps (replication adequacy + warm-up estimation). Validation
 // is a CSV upload + KS/Welch comparison panel.
+//
+// §9.5.1 law for this surface: everything rendered is persisted engine output
+// (run_replications / simulation_runs) — synthetic or illustrative data is
+// banned here, even labeled. Pre-run states are empty states.
 import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -20,7 +24,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertOctagon,
@@ -69,7 +72,6 @@ import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { PolicyBundle, FulfillmentStrategy } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import { PolicyRunStepper } from "./PolicyRunStepper";
-import { MaterialFlowAnimated } from "./MaterialFlowAnimated";
 import { RunProgressPanel } from "@/components/sim/RunProgressPanel";
 
 // Runs launched from the policies stage all reuse this single auto-managed
@@ -85,33 +87,72 @@ interface Props {
   saveSnapshot: (label?: string) => Promise<string | null>;
 }
 
-// Engine KPI vocabulary (scsim_bridge _BRIDGE_KEYS / kpi/compute.py) — every
-// option here is a real key on run_replications.kpis.
+// Engine KPI vocabulary (kpi/compute.py::compute_replication_kpis) — every
+// option here is a real key on run_replications.kpis. The first five are the
+// defaults. Omitted on purpose: produced_value (identical to revenue) and
+// ttr/tts/pre_disruption_fill_rate (only present on disruption runs, and
+// validation runs are baseline — no disruption schedule).
 const KPI_OPTIONS = [
   { id: "fill_rate", label: "Fill rate", unit: "%" },
   { id: "max_backlog", label: "Max backlog", unit: "units" },
   { id: "avg_on_hand_value", label: "On-hand value", unit: "€" },
   { id: "revenue", label: "Revenue", unit: "€" },
   { id: "lost_sales_value", label: "Lost sales", unit: "€" },
+  { id: "demand_value", label: "Demand value", unit: "€" },
+  { id: "lost_units", label: "Lost units", unit: "units" },
+  { id: "lost_inbound_units", label: "Lost inbound units", unit: "units" },
+  { id: "capacity_utilization", label: "Capacity utilization", unit: "%" },
+  { id: "cost_of_resilience", label: "Cost of resilience", unit: "€" },
+  { id: "cost_ss_holding", label: "Cost — safety-stock holding", unit: "€" },
+  { id: "cost_backup_premium", label: "Cost — backup premium", unit: "€" },
+  { id: "cost_multi_sourcing_premium", label: "Cost — multi-sourcing premium", unit: "€" },
+  { id: "cost_expediting", label: "Cost — expediting", unit: "€" },
+  { id: "cost_overtime", label: "Cost — overtime", unit: "€" },
+  { id: "cost_lost_sales", label: "Cost — lost sales", unit: "€" },
+  { id: "cost_allocation_labor", label: "Cost — allocation labor", unit: "€" },
+  { id: "cost_fg_ss_holding", label: "Cost — FG safety-stock holding", unit: "€" },
+  { id: "cost_backorder_penalty", label: "Cost — backorder penalty", unit: "€" },
+  { id: "cost_monitoring", label: "Cost — monitoring", unit: "€" },
 ] as const;
 type KpiId = (typeof KPI_OPTIONS)[number]["id"];
 
+// The per-component cost lines of the financial statement (§9.5.1 step 1b) —
+// mirrors scsim core.context.COST_COMPONENTS, persisted as kpis.cost_<name>.
+const COST_COMPONENT_OPTIONS = KPI_OPTIONS.filter(
+  (k) => k.id.startsWith("cost_") && k.id !== "cost_of_resilience",
+);
+
+// The four weekly per-replication series the worker persists on
+// run_replications.time_series (scsim engine ProgressFn contract).
+const SERIES_CHARTS = [
+  { key: "fill_rate", label: "Fill rate", unit: "fraction" },
+  { key: "backlog_units", label: "Backlog", unit: "units" },
+  { key: "on_hand_value", label: "On-hand value", unit: "€" },
+  { key: "revenue_value", label: "Revenue", unit: "€/week" },
+] as const;
+type SeriesKey = (typeof SERIES_CHARTS)[number]["key"];
+
 // Weekly per-rep series persisted by the worker (run_replications.time_series
 // keys) per KPI. lost_sales has no weekly trace → per-rep scalars only.
-const SERIES_KEY: Partial<Record<KpiId, string>> = {
+const SERIES_KEY: Partial<Record<KpiId, SeriesKey>> = {
   fill_rate: "fill_rate",
   max_backlog: "backlog_units",
   avg_on_hand_value: "on_hand_value",
   revenue: "revenue_value",
 };
 
+/** Weekly per-rep traces for one persisted time_series key. */
+function rawSeries(reps: Replication[], key: SeriesKey): number[][] {
+  return reps
+    .map((r) => r.time_series?.[key])
+    .filter((s): s is number[] => Array.isArray(s) && s.length > 0);
+}
+
 /** Weekly per-rep series for a KPI from completed replications. */
 function repsSeries(reps: Replication[], kpi: KpiId): number[][] {
   const key = SERIES_KEY[kpi];
   if (!key) return [];
-  return reps
-    .map((r) => r.time_series?.[key])
-    .filter((s): s is number[] => Array.isArray(s) && s.length > 0);
+  return rawSeries(reps, key);
 }
 
 interface MultiRunCfg {
@@ -164,38 +205,6 @@ const STEPS = [
   { id: "warmup", label: "Warm-up detection", description: "Adequacy + estimation" },
   { id: "validate", label: "Validation", description: "Compare with empirical" },
 ];
-
-// --- tiny deterministic PRNG for preview traces (mulberry32) ----------------
-function rng(seed: number) {
-  let t = seed >>> 0;
-  return () => {
-    t += 0x6d2b79f5;
-    let r = t;
-    r = Math.imul(r ^ (r >>> 15), r | 1);
-    r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// PRE-RUN illustration only — every rendered use is labeled "illustrative
-// preview"; all statistics/validation use persisted run output instead.
-function simulateKpiTrace(seed: number, horizon: number, kpi: KpiId): { t: number; v: number }[] {
-  const r = rng(seed * 9301 + kpi.length);
-  const base =
-    kpi === "fill_rate" ? 0.85 : kpi === "max_backlog" ? 12 : kpi === "avg_on_hand_value" ? 250 : kpi === "revenue" ? 5000 : 40;
-  const amp = kpi === "fill_rate" ? 0.08 : base * 0.2;
-  const transient = Math.max(10, horizon * 0.08);
-  const out: { t: number; v: number }[] = [];
-  // sample ~120 points
-  const step = Math.max(1, Math.floor(horizon / 120));
-  for (let t = 0; t <= horizon; t += step) {
-    // initial transient drift to steady state
-    const drift = t < transient ? (1 - t / transient) * amp * 1.5 * (kpi === "fill_rate" ? -1 : 1) : 0;
-    const noise = (r() - 0.5) * amp * 0.6;
-    out.push({ t, v: Number((base + drift + noise).toFixed(4)) });
-  }
-  return out;
-}
 
 function meanCI(values: number[], confidence: number) {
   const n = values.length;
@@ -417,11 +426,17 @@ export function RunValidateStage({
   const [multiQueuedAt, setMultiQueuedAt] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState<"single" | "multi" | null>(null);
   const [runTab, setRunTab] = useState<"single" | "multi">("single");
-  const [showTopology, setShowTopology] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // Warm-up
   const [indicators, setIndicators] = useState<IndicatorUpload[]>([]);
   const [warmupComputed, setWarmupComputed] = useState(false);
+
+  // The adopted warm-up cut in weeks — the user-adopted estimate once one is
+  // computed, else the engine's detected week. Drawn on every weekly chart.
+  const adoptedWarmupWeeks = warmupComputed
+    ? Math.round(warmCfg.warmup_days / 7)
+    : latestRun?.warmup_detected_at ?? null;
 
   // Validation
   const [empirical, setEmpirical] = useState<Record<string, { fileName: string; values: number[] }>>({});
@@ -942,12 +957,6 @@ export function RunValidateStage({
     );
   };
 
-  // --- preview traces for multi-run chart ---------------------------------
-  const previewSeeds = useMemo(() => {
-    if (multiCfg.seeds_mode === "auto") return Array.from({ length: Math.min(multiCfg.replications, 10) }, (_, i) => i + 1);
-    return multiCfg.seeds_list.split(/[\s,]+/).map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n)).slice(0, 10);
-  }, [multiCfg.seeds_mode, multiCfg.replications, multiCfg.seeds_list]);
-
   // --- render --------------------------------------------------------------
   return (
     <div className="flex flex-col gap-4">
@@ -1047,8 +1056,22 @@ export function RunValidateStage({
             icon={PlayCircle}
             title="Run the simulation"
           >
-            {/* Engine self-test + build marker: prove the engine works in THIS
-                browser, independent of data/DB, and show which build is live. */}
+            {/* Diagnostics: engine self-test + build marker. Real signals, but
+                not model evidence — collapsed so the step reads as engine
+                output only (§9.5.1). */}
+            <button
+              type="button"
+              onClick={() => setShowDiagnostics((v) => !v)}
+              className="self-start flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showDiagnostics ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+              Diagnostics — engine self-test &amp; build info
+            </button>
+            {showDiagnostics && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
               <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
                 onClick={onSelfTest} disabled={selfTestState.kind === "running"}>
@@ -1083,6 +1106,7 @@ export function RunValidateStage({
                 build {String(__BUILD_SHA__)} · {String(__BUILD_TIME__)}
               </span>
             </div>
+            )}
 
             {/* Compute location. Server is the default — heavy runs must not
                 freeze the tab; the in-browser engine remains the offline
@@ -1137,9 +1161,11 @@ export function RunValidateStage({
 
               <TabsContent value="single" className="mt-3 flex flex-col gap-3">
                 <p className="text-[11px] text-muted-foreground">
-                  Single run validates one deterministic trajectory. Real engine output —
-                  status, KPIs and weekly traces persisted by the worker — appears in the
-                  panel below the moment the run finishes.
+                  Single run validates one deterministic trajectory. When it finishes, the
+                  panel below reads as a model-behavior inspection dashboard — inventory
+                  dynamics, the financial statement, every persisted weekly series, and
+                  sanity-check scalars — all computed from the run output the worker
+                  persisted.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <Field label="Seed">
@@ -1165,29 +1191,6 @@ export function RunValidateStage({
                     </Button>
                   </div>
                 </div>
-                {/* The animation is decorative topology only — collapsed by
-                    default so it can't be mistaken for simulation output. */}
-                <button
-                  type="button"
-                  onClick={() => setShowTopology((v) => !v)}
-                  className="self-start flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showTopology ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  )}
-                  Topology preview (illustrative animation — not simulation output)
-                </button>
-                {showTopology && (
-                  <MaterialFlowAnimated
-                    suppliers={supRows.rows}
-                    plants={plantRowsQ.rows}
-                    customers={custRows.rows}
-                    seed={singleCfg.seed}
-                    horizonDays={singleCfg.horizon_days}
-                  />
-                )}
               </TabsContent>
 
               <TabsContent value="multi" className="mt-3 flex flex-col gap-3">
@@ -1282,15 +1285,13 @@ export function RunValidateStage({
                     </Button>
                   </div>
 
-                  {/* Preview panel: real run data when available, labeled
-                      synthetic preview before the first run. */}
-                  <MultiRunPreviewPanel
+                  {/* Results panel: persisted run data only — weekly traces,
+                      per-KPI convergence. Empty state before the first run. */}
+                  <MultiRunResultsPanel
                     kpis={multiCfg.kpis}
-                    seeds={previewSeeds}
-                    horizon={multiCfg.horizon_days}
                     confidence={multiCfg.confidence}
                     reps={doneReps}
-                    warmupWeeks={latestRun?.warmup_detected_at ?? null}
+                    warmupWeeks={adoptedWarmupWeeks}
                   />
                 </div>
               </TabsContent>
@@ -1326,7 +1327,7 @@ export function RunValidateStage({
                   }}
                 />
                 {latestRun && hasRealData && (
-                  <EngineOutputSummary run={latestRun} reps={doneReps} />
+                  <EngineOutputSummary run={latestRun} reps={doneReps} warmupWeeks={adoptedWarmupWeeks} />
                 )}
               </div>
             )}
@@ -1476,7 +1477,7 @@ export function RunValidateStage({
                         method: <b className="text-foreground">{warmCfg.method}</b>
                       </span>
                       <span className="text-[11px] text-muted-foreground">
-                        reps: <b className="text-foreground">{previewSeeds.length}</b>
+                        reps: <b className="text-foreground">{doneReps.length}</b>
                       </span>
                       <div className="flex-1" />
                       <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(3)}>
@@ -1485,7 +1486,7 @@ export function RunValidateStage({
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {(indicators.length > 0 ? indicators.map((i) => i.id) : multiCfg.kpis).map((kpi) => (
-                        <KpiPreviewChart
+                        <KpiWeeklyChart
                           key={kpi}
                           kpi={kpi}
                           reps={doneReps}
@@ -1665,110 +1666,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// Lightweight Sankey-style material flow diagram (pure SVG).
-function MaterialFlowSankey({
-  suppliers,
-  plants,
-  customers,
-}: {
-  suppliers: any[];
-  plants: any[];
-  customers: any[];
-}) {
-  const sup = suppliers.slice(0, 6);
-  const pl = plants.slice(0, 4);
-  const cu = customers.slice(0, 6);
-  const empty = sup.length + pl.length + cu.length === 0;
-  if (empty) {
-    return (
-      <div className="rounded-md border border-dashed p-3 text-[11px] text-muted-foreground">
-        Material flow diagram will appear here once supplier / plant / customer data is loaded.
-      </div>
-    );
-  }
-  const W = 720;
-  const H = 220;
-  const colX = [40, W / 2 - 30, W - 40];
-  const rowsY = (n: number) =>
-    Array.from({ length: n }, (_, i) => 30 + (i * (H - 60)) / Math.max(1, n - 1 || 1));
-  const sY = rowsY(sup.length);
-  const pY = rowsY(pl.length);
-  const cY = rowsY(cu.length);
-  return (
-    <div className="rounded-md border bg-card overflow-x-auto">
-      <div className="p-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        Material flow preview
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[220px]">
-        {/* edges sup → plant */}
-        {sup.map((s, i) =>
-          pl.map((_, j) => (
-            <path
-              key={`sp-${i}-${j}`}
-              d={`M ${colX[0] + 60} ${sY[i]} C ${(colX[0] + colX[1]) / 2} ${sY[i]}, ${(colX[0] + colX[1]) / 2} ${pY[j]}, ${colX[1]} ${pY[j]}`}
-              fill="none"
-              stroke="hsl(var(--primary))"
-              strokeOpacity={0.25}
-              strokeWidth={2}
-            />
-          )),
-        )}
-        {/* edges plant → cust */}
-        {pl.map((_, i) =>
-          cu.map((_, j) => (
-            <path
-              key={`pc-${i}-${j}`}
-              d={`M ${colX[1] + 80} ${pY[i]} C ${(colX[1] + colX[2]) / 2} ${pY[i]}, ${(colX[1] + colX[2]) / 2} ${cY[j]}, ${colX[2] - 60} ${cY[j]}`}
-              fill="none"
-              stroke="hsl(var(--primary))"
-              strokeOpacity={0.18}
-              strokeWidth={2}
-            />
-          )),
-        )}
-        {/* nodes */}
-        {sup.map((s, i) => (
-          <g key={`s-${i}`}>
-            <rect x={colX[0]} y={sY[i] - 10} width={60} height={20} rx={4} fill="hsl(var(--muted))" stroke="hsl(var(--border))" />
-            <text x={colX[0] + 30} y={sY[i] + 4} textAnchor="middle" fontSize={9} fill="hsl(var(--foreground))">
-              {String((s as any).supplier_id ?? (s as any).key ?? `S${i + 1}`).slice(0, 8)}
-            </text>
-          </g>
-        ))}
-        {pl.map((p, i) => (
-          <g key={`p-${i}`}>
-            <rect x={colX[1]} y={pY[i] - 12} width={80} height={24} rx={4} fill="hsl(var(--primary) / 0.15)" stroke="hsl(var(--primary))" />
-            <text x={colX[1] + 40} y={pY[i] + 4} textAnchor="middle" fontSize={9} fill="hsl(var(--foreground))" fontWeight={600}>
-              {String((p as any).plant_name ?? (p as any).key ?? `P${i + 1}`).slice(0, 10)}
-            </text>
-          </g>
-        ))}
-        {cu.map((c, i) => (
-          <g key={`c-${i}`}>
-            <rect x={colX[2] - 60} y={cY[i] - 10} width={60} height={20} rx={4} fill="hsl(var(--muted))" stroke="hsl(var(--border))" />
-            <text x={colX[2] - 30} y={cY[i] + 4} textAnchor="middle" fontSize={9} fill="hsl(var(--foreground))">
-              {String((c as any).customer_id ?? (c as any).key ?? `C${i + 1}`).slice(0, 8)}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-/** Real per-replication weekly traces for KPIs with a persisted weekly
- *  series; scalar-only KPIs get an explanatory note. Warm-up line in weeks. */
-function KpiPreviewChart({
-  kpi,
+/** Per-replication weekly traces for one persisted time_series key, with the
+ *  adopted warm-up cut line (in weeks). The §9.5.1 dashboard building block. */
+function WeeklySeriesChart({
+  seriesKey,
+  title,
+  unit,
   reps,
-  warmup,
+  warmupWeeks,
+  height = 140,
 }: {
-  kpi: KpiId;
+  seriesKey: SeriesKey;
+  title: string;
+  unit: string;
   reps: Replication[];
-  warmup?: number;
+  warmupWeeks?: number | null;
+  height?: number;
 }) {
-  const meta = KPI_OPTIONS.find((x) => x.id === kpi)!;
-  const traces = useMemo(() => repsSeries(reps, kpi).slice(0, 8), [reps, kpi]);
+  const traces = useMemo(() => rawSeries(reps, seriesKey).slice(0, 8), [reps, seriesKey]);
   const data = useMemo(() => {
     if (traces.length === 0) return [];
     const n = Math.min(...traces.map((s) => s.length));
@@ -1781,38 +1696,29 @@ function KpiPreviewChart({
     });
   }, [traces]);
 
-  if (!SERIES_KEY[kpi]) {
-    return (
-      <div className="rounded-md border border-dashed bg-card p-3 text-[11px] text-muted-foreground">
-        <b className="text-foreground">{meta.label}</b>: no weekly series persisted for this KPI
-        — it is validated from per-replication values instead.
-      </div>
-    );
-  }
   if (data.length === 0) {
     return (
       <div className="rounded-md border border-dashed bg-card p-3 text-[11px] text-muted-foreground">
-        <b className="text-foreground">{meta.label}</b>: run replications to see the real weekly
+        <b className="text-foreground">{title}</b>: run the simulation to see the real weekly
         traces here.
       </div>
     );
   }
-  const warmupWeeks = warmup !== undefined ? Math.round(warmup / 7) : undefined;
   return (
     <div className="rounded-md border bg-card p-2">
       <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
-        {meta.label} <span className="font-normal opacity-70">({meta.unit})</span>
+        {title} <span className="font-normal opacity-70">({unit})</span>
         <span className="ml-2 font-normal normal-case tracking-normal text-emerald-600 dark:text-emerald-400">
           engine data · {traces.length} rep(s)
         </span>
       </div>
-      <ResponsiveContainer width="100%" height={140}>
+      <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeOpacity={0.15} />
           <XAxis dataKey="week" tick={{ fontSize: 9 }} />
           <YAxis tick={{ fontSize: 9 }} width={36} domain={["auto", "auto"]} />
           <RTooltip contentStyle={{ fontSize: 10 }} />
-          {warmupWeeks !== undefined && warmupWeeks > 0 && (
+          {warmupWeeks != null && warmupWeeks > 0 && (
             <ReferenceLine x={warmupWeeks} stroke="hsl(var(--destructive))" strokeDasharray="4 3" label={{ value: "warm-up", fontSize: 9, fill: "hsl(var(--destructive))" }} />
           )}
           {traces.map((_, i) => (
@@ -1832,6 +1738,38 @@ function KpiPreviewChart({
   );
 }
 
+/** Weekly traces for a KPI with a persisted weekly series; scalar-only KPIs
+ *  get an explanatory note. Warm-up passed in days (charts draw weeks). */
+function KpiWeeklyChart({
+  kpi,
+  reps,
+  warmup,
+}: {
+  kpi: KpiId;
+  reps: Replication[];
+  warmup?: number;
+}) {
+  const meta = KPI_OPTIONS.find((x) => x.id === kpi)!;
+  const key = SERIES_KEY[kpi];
+  if (!key) {
+    return (
+      <div className="rounded-md border border-dashed bg-card p-3 text-[11px] text-muted-foreground">
+        <b className="text-foreground">{meta.label}</b>: no weekly series persisted for this KPI
+        — it is validated from per-replication values instead.
+      </div>
+    );
+  }
+  return (
+    <WeeklySeriesChart
+      seriesKey={key}
+      title={meta.label}
+      unit={meta.unit}
+      reps={reps}
+      warmupWeeks={warmup !== undefined ? Math.round(warmup / 7) : null}
+    />
+  );
+}
+
 function ReplicationAdequacy({
   kpis,
   reps,
@@ -1847,16 +1785,24 @@ function ReplicationAdequacy({
   onAddReps: (n: number) => void;
   onTargetChange: (v: number) => void;
 }) {
-  // REAL per-replication KPI values from run_replications.kpis.
+  // REAL per-replication KPI values from run_replications.kpis. Beyond the
+  // focal KPIs, adequacy always covers the cost KPIs (§9.5.1 step 1d): cost
+  // estimates gate the financial statement's trustworthiness. Cost components
+  // at zero on every replication are skipped.
   const rows = useMemo(() => {
     if (kpis.length === 0 || reps.length === 0) return [];
-    return kpis.map((kpi) => {
-      const values = reps
-        .map((r) => Number(r.kpis[kpi]))
-        .filter((n) => Number.isFinite(n));
+    const sample = (kpi: KpiId) =>
+      reps.map((r) => Number(r.kpis[kpi])).filter((n) => Number.isFinite(n));
+    const ids: KpiId[] = [...kpis];
+    for (const cost of ["cost_of_resilience" as const, ...COST_COMPONENT_OPTIONS.map((c) => c.id)]) {
+      if (ids.includes(cost)) continue;
+      if (cost === "cost_of_resilience" || sample(cost).some((v) => v !== 0)) ids.push(cost);
+    }
+    return ids.map((kpi) => {
+      const values = sample(kpi);
       const stats = meanCI(values, confidence);
       const rel = stats.mean !== 0 ? stats.half / Math.abs(stats.mean) : 0;
-      return { kpi, ...stats, rel, adequate: rel <= target };
+      return { kpi, ...stats, rel, adequate: rel <= target, focal: kpis.includes(kpi) };
     });
   }, [kpis, reps, confidence, target]);
 
@@ -1907,8 +1853,13 @@ function ReplicationAdequacy({
             {rows.map((r) => {
               const meta = KPI_OPTIONS.find((x) => x.id === r.kpi)!;
               return (
-                <tr key={r.kpi}>
-                  <td className="px-2 py-1.5">{meta.label}</td>
+                <tr key={r.kpi} className={r.focal ? undefined : "text-muted-foreground"}>
+                  <td className="px-2 py-1.5">
+                    {meta.label}
+                    {!r.focal && (
+                      <span className="ml-1.5 text-[9px] uppercase tracking-widest opacity-70">cost</span>
+                    )}
+                  </td>
                   <td className="text-right px-2 py-1.5 font-mono">{r.mean.toFixed(3)}</td>
                   <td className="text-right px-2 py-1.5 font-mono">{r.std.toFixed(3)}</td>
                   <td className="text-right px-2 py-1.5 font-mono">{r.n}</td>
@@ -1936,20 +1887,17 @@ function ReplicationAdequacy({
   );
 }
 
-// Focused multi-run panel: REAL run data when replications exist (weekly
-// fill-rate traces / running-mean convergence for scalar KPIs), else a
-// clearly-labeled synthetic preview.
-function MultiRunPreviewPanel({
+// Multi-run results panel (§9.5.1 step 1d): persisted run data ONLY — weekly
+// per-replication traces with the adopted warm-up cut, plus a running-mean
+// convergence plot per focal KPI. Before the first run it is an empty state;
+// nothing synthetic is ever rendered here.
+function MultiRunResultsPanel({
   kpis,
-  seeds,
-  horizon,
   confidence,
   reps,
   warmupWeeks,
 }: {
   kpis: KpiId[];
-  seeds: number[];
-  horizon: number;
   confidence: number;
   reps: Replication[];
   warmupWeeks: number | null;
@@ -1963,103 +1911,28 @@ function MultiRunPreviewPanel({
   if (kpis.length === 0 || !activeKpi) {
     return (
       <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground flex items-center justify-center">
-        Pick at least one focal KPI to preview traces.
+        Pick at least one focal KPI to analyse.
+      </div>
+    );
+  }
+
+  if (reps.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground flex items-center justify-center">
+        No replications yet — run replications to see the persisted weekly traces and
+        convergence here. Every chart on this surface is real engine output.
       </div>
     );
   }
 
   const meta = KPI_OPTIONS.find((k) => k.id === activeKpi)!;
-
-  // ── REAL data branch ──────────────────────────────────────────────────
-  if (reps.length > 0) {
-    const values = reps
-      .map((r) => Number(r.kpis[activeKpi]))
-      .filter((n) => Number.isFinite(n));
-    const overallReal = meanCI(values, confidence);
-    const weekly = repsSeries(reps, activeKpi);
-    return (
-      <div className="rounded-md border bg-card flex flex-col">
-        <div className="flex items-center gap-1 border-b px-2 py-1.5 overflow-x-auto">
-          {kpis.map((id) => {
-            const k = KPI_OPTIONS.find((x) => x.id === id)!;
-            const active = id === activeKpi;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveKpi(id)}
-                className={cn(
-                  "h-7 px-2.5 rounded-md text-[11px] border transition-colors whitespace-nowrap",
-                  active
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-transparent hover:bg-muted/50 border-transparent",
-                )}
-              >
-                {k.label}
-              </button>
-            );
-          })}
-          <span className="ml-auto text-[10px] text-emerald-600 dark:text-emerald-400 whitespace-nowrap pr-1">
-            engine data · {reps.length} rep(s)
-          </span>
-        </div>
-        <div className="grid grid-cols-4 gap-2 border-b px-3 py-2 text-[11px]">
-          <Stat label="Mean" value={overallReal.mean.toFixed(3)} unit={meta.unit} />
-          <Stat label="Std" value={overallReal.std.toFixed(3)} />
-          <Stat label="CI half-width" value={overallReal.half.toFixed(3)} />
-          <Stat label="n reps" value={String(values.length)} />
-        </div>
-        <div className="p-2">
-          {weekly.length > 0 ? (
-            <RealWeeklyTraces frSeries={weekly} confidence={confidence} warmupWeeks={warmupWeeks} />
-          ) : (
-            <ConvergencePlot reps={reps} primaryKpi={activeKpi} warmupAt={null} />
-          )}
-        </div>
-        <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">
-          {weekly.length > 0
-            ? "Weekly per-replication series (engine output) with cross-rep mean ± CI."
-            : "Running mean ± 95% CI as replications accumulate — no weekly series persisted for this KPI."}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Synthetic pre-run preview (clearly labeled) ───────────────────────
-  if (seeds.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground flex items-center justify-center">
-        Provide at least one seed to preview.
-      </div>
-    );
-  }
-  const traces = seeds.map((s) => simulateKpiTrace(s, horizon, activeKpi));
-  const ts = traces[0].map((p) => p.t);
-
-  // mean ± CI band at each timepoint
-  const data = ts.map((t, idx) => {
-    const vals = traces.map((tr) => tr[idx]?.v ?? 0);
-    const stats = meanCI(vals, confidence);
-    const row: Record<string, number> = {
-      t,
-      mean: stats.mean,
-      lower: stats.mean - stats.half,
-      upper: stats.mean + stats.half,
-    };
-    seeds.forEach((s, i) => { row[`s${s}`] = vals[i]; });
-    return row;
-  });
-
-  // overall summary from per-seed time-average (skip first 20% warmup)
-  const tailMeans = traces.map((tr) => {
-    const tail = tr.slice(Math.floor(tr.length * 0.2));
-    return tail.reduce((a, b) => a + b.v, 0) / Math.max(1, tail.length);
-  });
-  const overall = meanCI(tailMeans, confidence);
-
+  const values = reps
+    .map((r) => Number(r.kpis[activeKpi]))
+    .filter((n) => Number.isFinite(n));
+  const overall = meanCI(values, confidence);
+  const weekly = repsSeries(reps, activeKpi);
   return (
     <div className="rounded-md border bg-card flex flex-col">
-      {/* KPI tab strip */}
       <div className="flex items-center gap-1 border-b px-2 py-1.5 overflow-x-auto">
         {kpis.map((id) => {
           const k = KPI_OPTIONS.find((x) => x.id === id)!;
@@ -2080,73 +1953,26 @@ function MultiRunPreviewPanel({
             </button>
           );
         })}
-        <span className="ml-auto text-[10px] text-amber-600 dark:text-amber-400 whitespace-nowrap pr-1">
-          illustrative preview — run to see real data
+        <span className="ml-auto text-[10px] text-emerald-600 dark:text-emerald-400 whitespace-nowrap pr-1">
+          engine data · {reps.length} rep(s)
         </span>
       </div>
-
-      {/* summary strip */}
       <div className="grid grid-cols-4 gap-2 border-b px-3 py-2 text-[11px]">
         <Stat label="Mean" value={overall.mean.toFixed(3)} unit={meta.unit} />
         <Stat label="Std" value={overall.std.toFixed(3)} />
         <Stat label="CI half-width" value={overall.half.toFixed(3)} />
-        <Stat label="n seeds" value={String(seeds.length)} />
+        <Stat label="n reps" value={String(values.length)} />
       </div>
-
-      {/* main chart */}
-      <div className="p-2">
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-            <defs>
-              <linearGradient id="ciBand" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeOpacity={0.15} />
-            <XAxis dataKey="t" tick={{ fontSize: 10 }} label={{ value: "day", fontSize: 10, position: "insideBottom", offset: -2 }} />
-            <YAxis tick={{ fontSize: 10 }} width={40} />
-            <RTooltip contentStyle={{ fontSize: 11 }} />
-            {/* CI band rendered as upper/lower lines with subtle fill via stack */}
-            <Line type="monotone" dataKey="upper" stroke="hsl(var(--primary) / 0.2)" strokeWidth={1} dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="lower" stroke="hsl(var(--primary) / 0.2)" strokeWidth={1} dot={false} isAnimationActive={false} />
-            {seeds.slice(0, 10).map((s, i) => (
-              <Line
-                key={s}
-                type="monotone"
-                dataKey={`s${s}`}
-                stroke={`hsl(${(i * 47) % 360} 65% 55%)`}
-                strokeOpacity={0.4}
-                strokeWidth={0.8}
-                dot={false}
-                isAnimationActive={false}
-              />
-            ))}
-            <Line
-              type="monotone"
-              dataKey="mean"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2.2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      <div className="p-2 flex flex-col gap-2">
+        {weekly.length > 0 && (
+          <RealWeeklyTraces frSeries={weekly} confidence={confidence} warmupWeeks={warmupWeeks} />
+        )}
+        <ConvergencePlot reps={reps} primaryKpi={activeKpi} warmupAt={null} />
       </div>
-
-      {/* per-seed legend */}
-      <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2 text-[10px] text-muted-foreground">
-        <span className="font-semibold uppercase tracking-widest">Seeds</span>
-        {seeds.slice(0, 10).map((s, i) => (
-          <span key={s} className="inline-flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: `hsl(${(i * 47) % 360} 65% 55%)` }} />
-            {s}
-          </span>
-        ))}
-        {seeds.length > 10 && <span>+{seeds.length - 10} more</span>}
-        <span className="ml-auto inline-flex items-center gap-1">
-          <span className="inline-block h-0.5 w-4 bg-primary" /> mean
-        </span>
+      <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">
+        {weekly.length > 0
+          ? "Weekly per-replication series (engine output) with cross-rep mean ± CI and the adopted warm-up cut, plus the running mean ± 95% CI vs. replication count."
+          : "No weekly series persisted for this KPI — running mean ± 95% CI of the per-replication values as replications accumulate."}
       </div>
     </div>
   );
@@ -2214,8 +2040,13 @@ function RealWeeklyTraces({
 
 function fmtKpi(id: string, v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
-  if (id === "fill_rate") return `${(v * 100).toFixed(1)}%`;
+  if (id === "fill_rate" || id === "capacity_utilization") return `${(v * 100).toFixed(1)}%`;
   return Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2);
+}
+
+function fmtEuro(v: number | null): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return `€${Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2)}`;
 }
 
 const SUMMARY_TILES = [
@@ -2382,13 +2213,22 @@ function preliminaryRun(
   };
 }
 
-/** Engine output for the latest validation run: aggregate KPIs ± CI
- *  half-widths (simulation_runs) and real weekly per-replication traces
- *  (run_replications.time_series). Nothing here is synthetic. */
-function EngineOutputSummary({ run, reps }: { run: SimulationRun; reps: Replication[] }) {
+/** Model-behavior inspection dashboard (§9.5.1 step 1c) for the latest
+ *  validation run, everything read from simulation_runs / run_replications:
+ *  headline KPIs ± CI, inventory dynamics first, then the financial
+ *  statement, then every persisted weekly series, then sanity-check scalars.
+ *  Nothing here is synthetic. */
+function EngineOutputSummary({
+  run,
+  reps,
+  warmupWeeks,
+}: {
+  run: SimulationRun;
+  reps: Replication[];
+  warmupWeeks: number | null;
+}) {
   const agg = run.aggregate_kpis ?? {};
   const ci = run.ci_half_widths ?? {};
-  const warmupDays = run.warmup_detected_at != null ? run.warmup_detected_at * 7 : undefined;
   const streaming = run.status === "running" || run.status === "queued";
   return (
     <div className="rounded-md border bg-card">
@@ -2436,10 +2276,117 @@ function EngineOutputSummary({ run, reps }: { run: SimulationRun; reps: Replicat
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
-        {(["fill_rate", "max_backlog", "avg_on_hand_value", "revenue"] as KpiId[]).map((kpi) => (
-          <KpiPreviewChart key={kpi} kpi={kpi} reps={reps} warmup={warmupDays} />
-        ))}
+      <div className="flex flex-col gap-2 p-2">
+        {/* 1 — inventory dynamics: does stock settle where the policies say
+            it should? The first thing a modeler checks. */}
+        <WeeklySeriesChart
+          seriesKey="on_hand_value"
+          title="Inventory dynamics — on-hand value"
+          unit="€"
+          reps={reps}
+          warmupWeeks={warmupWeeks}
+          height={180}
+        />
+        {/* 2 — the financial statement from the persisted per-rep KPIs. */}
+        <FinancialStatement reps={reps} />
+        {/* 3 — the remaining persisted weekly series. */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          {SERIES_CHARTS.filter((s) => s.key !== "on_hand_value").map((s) => (
+            <WeeklySeriesChart
+              key={s.key}
+              seriesKey={s.key}
+              title={s.label}
+              unit={s.unit}
+              reps={reps}
+              warmupWeeks={warmupWeeks}
+            />
+          ))}
+        </div>
+        {/* 4 — sanity-check scalars. */}
+        <SanityScalars reps={reps} />
+      </div>
+    </div>
+  );
+}
+
+/** Financial statement (§9.5.1 step 1b): revenue, minus each engine cost
+ *  component as its own line, = margin, plus lost-sales value as a memo line.
+ *  Values are means over completed replications of run_replications.kpis. */
+function FinancialStatement({ reps }: { reps: Replication[] }) {
+  const avg = (id: KpiId): number | null => {
+    const v = reps.map((r) => Number(r.kpis[id])).filter((n) => Number.isFinite(n));
+    return v.length > 0 ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const revenue = avg("revenue");
+  const totalCost = avg("cost_of_resilience");
+  const margin = revenue != null && totalCost != null ? revenue - totalCost : null;
+  const lostSales = avg("lost_sales_value");
+  return (
+    <div className="rounded-md border bg-card">
+      <div className="px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        Financial statement
+        <span className="ml-2 font-normal normal-case tracking-normal text-emerald-600 dark:text-emerald-400">
+          engine data · mean over {reps.length} rep(s)
+        </span>
+      </div>
+      <table className="w-full text-xs">
+        <tbody className="divide-y">
+          <tr>
+            <td className="px-3 py-1.5 font-medium">Revenue</td>
+            <td className="px-3 py-1.5 text-right font-mono tabular-nums">{fmtEuro(revenue)}</td>
+          </tr>
+          {COST_COMPONENT_OPTIONS.map((c) => {
+            const v = avg(c.id);
+            const zero = v === 0;
+            return (
+              <tr key={c.id} className={zero ? "text-muted-foreground/60" : "text-muted-foreground"}>
+                <td className="px-3 py-1.5 pl-6">− {c.label.replace("Cost — ", "")}</td>
+                <td className="px-3 py-1.5 text-right font-mono tabular-nums">{fmtEuro(v)}</td>
+              </tr>
+            );
+          })}
+          <tr className="border-t-2">
+            <td className="px-3 py-1.5 font-semibold">= Margin (revenue − cost of resilience)</td>
+            <td className="px-3 py-1.5 text-right font-mono tabular-nums font-semibold">
+              {fmtEuro(margin)}
+            </td>
+          </tr>
+          <tr className="text-muted-foreground">
+            <td className="px-3 py-1.5 italic">Lost-sales value (demand not served)</td>
+            <td className="px-3 py-1.5 text-right font-mono tabular-nums">{fmtEuro(lostSales)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Sanity-check scalars (§9.5.1 step 1c): quantities read for plausibility
+ *  rather than optimized — a surprise here means a model-specification issue. */
+function SanityScalars({ reps }: { reps: Replication[] }) {
+  const avg = (id: KpiId): number | null => {
+    const v = reps.map((r) => Number(r.kpis[id])).filter((n) => Number.isFinite(n));
+    return v.length > 0 ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const util = avg("capacity_utilization");
+  const lostInbound = avg("lost_inbound_units");
+  return (
+    <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/20 px-3 py-2 text-[11px]">
+      <div className="flex flex-col">
+        <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+          Capacity utilization (sanity check)
+        </span>
+        <span className="font-mono tabular-nums">
+          {util != null ? fmtKpi("capacity_utilization", util) : "not recorded on this run (needs debug trace)"}
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+          Lost inbound units (sanity check)
+        </span>
+        <span className="font-mono tabular-nums">
+          {lostInbound != null ? fmtKpi("lost_inbound_units", lostInbound) : "—"}
+        </span>
       </div>
     </div>
   );

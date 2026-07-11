@@ -170,6 +170,7 @@ Numbered gaps, each cited to evidence. Later sections reference these IDs; §13'
 | **G11** | **Narrow disruption model.** Supplier-targeted only (plant targets hard-error; material/customer/edge presets in `StressTestCard` silently degrade), ≤5 events, two effect types (lead-time extension, capacity reduction), no demand-surge class | `project_map.py::_map_events`, `scsim/docs/roadmap.md` | Stress-testing scope far below research needs |
 | **G12** | **No surrogate/ML layer.** No metamodels, no run-result reuse for training, no model registry (the former ml-service was removed) | repo-wide search | Every question costs a full simulation; large-scale stress testing is computationally prohibitive |
 | **G13** | **V&V outcomes are not persisted — no model-credibility artifact.** *(added in v0.2)* The Run & Validate stage detects warm-up and checks replication adequacy, but the adopted warm-up, replication recommendation, and validation verdict live only in browser `localStorage`; `scenarios.warmup_mode/warmup_days` keep their defaults; nothing marks a `policy_versions` snapshot as validated | `src/components/policies/RunValidateStage.tsx` (persistKey → localStorage), `scenarios` schema defaults, `policy_versions` columns | The credibility established in `/policies` never reaches the Simulation Lab: decision runs neither inherit the adopted warm-up/replication settings nor show validation status — users can unknowingly base decisions on an unvalidated or drifted configuration. §9.5 defines the fix |
+| **G14a** | **The Run & Validate surface under-uses persisted evidence and dilutes it with synthetic content.** *(added with §9.5.1)* Only 5 of the ~20 per-replication KPIs the engine persists were offered as focal KPIs; the cost decomposition and financial view were never shown; pre-run panels rendered invented traces (a client-side PRNG) and a decorative topology animation next to real engine output | `src/components/policies/RunValidateStage.tsx` (KPI_OPTIONS, `simulateKpiTrace`, `MaterialFlowAnimated`) | The trust-building surface undersells the model and — worse — teaches users that some of what they see there is invented, so they discount the rest. §9.5.1 defines the fix; steps (1)+(2) shipped in Phase B0 |
 
 ### 2.4 Assumptions currently embedded in the simulation
 
@@ -696,6 +697,42 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 > post-run (it cannot gate at dispatch, where the worker hasn't stamped it yet); the full §9.2
 > fingerprint strengthens this check in Phase C.
 
+#### 9.5.1 The Run & Validate surface: trust before persistence *(closes G14a)*
+
+The §9.5 pipeline is delivered through one surface — Run & Validate
+(`src/components/policies/RunValidateStage.tsx`) — and that surface is **the** trust-building
+instrument of the platform: every design decision on it is judged by a single criterion —
+*does it help the user verify and validate the model?* Two laws follow:
+
+- **Surface everything the engine persisted.** `run_replications` already carries the full
+  per-replication KPI vocabulary (`scsim/scsim/kpi/compute.py::compute_replication_kpis`:
+  demand/revenue values, `cost_of_resilience` and every `cost_<component>` of
+  `COST_COMPONENTS`, capacity utilization, lost units/inbound) and four weekly series
+  (`fill_rate`, `backlog_units`, `on_hand_value`, `revenue_value`). Persisted evidence that
+  is not shown is trust left on the table.
+- **Anti-goal: no synthetic data, ever.** Illustrative traces, decorative animations, and
+  placeholder numbers are banned from this surface *even when labeled* — a user who has once
+  seen invented data on the trust surface discounts everything else on it. Pre-run states are
+  empty states, not previews. Diagnostics (engine self-test, build SHA) stay available but
+  collapsed by default.
+
+Incremental plan (steps 1–2 are frontend-only — no engine or schema changes):
+
+1. **Surface what `run_replications` already persists** — the full KPI vocabulary as
+   focal-KPI options (the original five remain the defaults); a financial statement
+   (revenue, minus each cost component as its own line, = margin, plus lost-sales value)
+   computed from the completed run's persisted KPIs; the single-run step reads as a
+   model-behavior inspection dashboard (inventory dynamics first, then the financial report,
+   then charts of the four persisted weekly series, with capacity utilization and lost
+   inbound units as sanity-check scalars); the multi-run step gains a running-mean ± CI
+   convergence plot per focal KPI, the adopted warm-up cut line on all weekly series charts,
+   and cost KPIs in the replication-adequacy table. **Shipped (Phase B0).**
+2. **Remove synthetic data** — the client-side KPI trace generator (`simulateKpiTrace`) and
+   every preview built from it, and the decorative topology animation, deleted — removed,
+   not relabeled. **Shipped (Phase B0).**
+3. **Adopt and persist the pipeline outcome** — the validated model card of §9.5 (G13),
+   per `docs/design/phase-b0-core-loop.md`. **(Phase B0, in progress.)**
+
 ---
 
 ## 10. Benchmark: AnyLogistix
@@ -870,7 +907,8 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 **B0 — The CORE loop (first):**
 - Registry-driven policy picker (§6.3 interaction contract): per-slot policy selection with parameter forms rendered from `params_schema`; planned policies visible-but-disabled; hand-written Zod vocabulary and `engineBridge.json` retired.
 - V&V credibility pipeline completion (§9.5): `model_validations` card persisted on the provenance triple; Lab scenarios inherit adopted warm-up + replication counts; credibility badges (`validated` / `stale` / `unvalidated`) on every run surface; staleness on any hash drift.
-- **B0 exit:** selecting any implemented policy shows exactly its engine parameters and its data demands live; a model validated in Run & Validate carries its warm-up and replication settings into every Lab scenario automatically, and validation status is visible on every result. **Closes:** G13; the UI half of G1.
+- Run & Validate trust-surface hardening (§9.5.1): the persisted KPI/cost vocabulary and weekly series fully surfaced (financial statement, inspection dashboard, per-KPI convergence, warm-up cuts, cost adequacy); all synthetic previews and decorative animation removed. *(Steps 1–2 shipped.)*
+- **B0 exit:** selecting any implemented policy shows exactly its engine parameters and its data demands live; a model validated in Run & Validate carries its warm-up and replication settings into every Lab scenario automatically, and validation status is visible on every result. **Closes:** G13, G14a; the UI half of G1.
 
 > **Design addendum (B0, approved):** `docs/design/phase-b0-core-loop.md` is the approved
 > implementation design for this workstream — registry payload v2 (decision slots, exported
@@ -1039,4 +1077,4 @@ Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs
 
 **Glossary.** *PolicyBundle*: a node instance's resolved `{slot → (policy_id, params)}` map (§4.3). *Slot*: a decision domain a node role must fill (§4.4). *Promoted default*: an engine mechanic given a policy ID and UI visibility (`.0` convention). *Registry export*: the single JSON payload (`registry_export.py`) from which forms, validators, and docs are generated. *Required-data manifest*: the compiled set of entity fields the selected policies demand (§8.1). *RunKey*: content-addressed run identity (§9.2). *Family digest*: `SnapshotStore`'s hash over network+settings+policies excluding events (A8). *Dual reliability gate*: interval-width + novelty test that routes surrogate predictions back to simulation (§11.2). *Three-hash provenance*: `graph_hash` + `policy_hash` + `scenario_hash` binding every run (§8.4). *Validated model card*: the persisted V&V outcome (adopted warm-up, replication recommendation, validation verdict) bound to a provenance triple; Lab scenarios inherit it and runs display its status (§9.5).
 
-**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D. G13 unpersisted V&V outcomes → §9.5, Phase B0.
+**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D. G13 unpersisted V&V outcomes → §9.5, Phase B0. G14a Run & Validate trust surface → §9.5.1, Phase B0.
