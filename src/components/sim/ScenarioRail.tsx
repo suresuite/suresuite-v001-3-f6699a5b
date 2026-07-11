@@ -3,6 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Copy, Trash2, AlertTriangle, CircleDot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Scenario } from "@/hooks/useScenarios";
+import type { Credibility } from "@/hooks/useModelValidation";
 
 interface Props {
   scenarios: Scenario[];
@@ -12,7 +13,15 @@ interface Props {
   onDuplicate: (s: Scenario) => void;
   onDelete: (id: string) => void;
   loading?: boolean;
+  /** B0b (§2.6): per-row credibility dot — derived, never stored. */
+  credibilityFor?: (s: Scenario) => Credibility;
 }
+
+const CRED_DOT: Record<Credibility["state"], { cls: string; label: string }> = {
+  validated: { cls: "bg-emerald-500", label: "model validated" },
+  stale: { cls: "bg-amber-500", label: "validation stale — something drifted" },
+  unvalidated: { cls: "bg-muted-foreground/40", label: "model unvalidated" },
+};
 
 function formatRelative(iso: string | undefined): string {
   if (!iso) return "";
@@ -33,6 +42,7 @@ export function ScenarioRail({
   onDuplicate,
   onDelete,
   loading,
+  credibilityFor,
 }: Props) {
   return (
     <div className="flex flex-col border border-border bg-card w-64 shrink-0">
@@ -63,6 +73,7 @@ export function ScenarioRail({
           {scenarios.map((s) => {
             const disruptions = s.disruption_schedule?.length ?? 0;
             const isSelected = selectedId === s.id;
+            const cred = credibilityFor?.(s) ?? null;
             return (
               <div
                 key={s.id}
@@ -77,13 +88,19 @@ export function ScenarioRail({
                 <div className="flex flex-col min-w-0 gap-1 flex-1">
                   <span
                     className={cn(
-                      "text-sm leading-tight truncate",
+                      "text-sm leading-tight truncate flex items-center gap-1.5",
                       isSelected
                         ? "font-semibold text-foreground"
                         : "font-medium text-foreground/90",
                     )}
                   >
-                    {s.name || "Untitled scenario"}
+                    {cred && (
+                      <span
+                        className={cn("h-1.5 w-1.5 rounded-full shrink-0", CRED_DOT[cred.state].cls)}
+                        title={CRED_DOT[cred.state].label}
+                      />
+                    )}
+                    <span className="truncate">{s.name || "Untitled scenario"}</span>
                   </span>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {disruptions > 0 ? (

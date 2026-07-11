@@ -34,7 +34,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertOctagon,
-  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
@@ -43,7 +42,6 @@ import {
   ChevronRight,
   Database,
   Gauge,
-  Info,
   PlayCircle,
   Repeat,
   ShieldCheck,
@@ -55,9 +53,11 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
+import { useModelValidation } from "@/hooks/useModelValidation";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
@@ -69,6 +69,9 @@ import {
 } from "@/hooks/useModelValidation";
 import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
+import { fieldWalkToRoute } from "@/lib/policies/dataMap";
+import { FindingsList } from "./FindingsList";
+import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import {
   cancelBrowserRun,
   EngineCancelledError,
@@ -210,13 +213,6 @@ const DEFAULT_MULTI: MultiRunCfg = {
   confidence: 0.95,
 };
 const DEFAULT_WARMUP: WarmupCfg = { warmup_days: 30, method: "engine", target_precision: 0.05 };
-
-const SEV_ICON = { block: AlertOctagon, warn: AlertTriangle, info: Info } as const;
-const SEV_COLOR = {
-  block: "text-destructive border-destructive/40 bg-destructive/10",
-  warn: "text-amber-700 dark:text-amber-300 border-amber-500/40 bg-amber-500/10",
-  info: "text-muted-foreground border-border bg-muted/40",
-} as const;
 
 const STEPS = [
   { id: "verify", label: "Verification", description: "Catch input issues" },
@@ -1235,25 +1231,11 @@ export function RunValidateStage({
                   {warnCount > 0 && <Badge variant="secondary" className="h-5">{warnCount} warning(s)</Badge>}
                   {verifiedAt && <span>· verified {verifiedAt.toLocaleTimeString()}</span>}
                 </div>
-                <div className="max-h-60 overflow-auto rounded-md border">
-                  <ul className="text-xs divide-y">
-                    {findings.map((f) => {
-                      const Icon = SEV_ICON[f.severity];
-                      return (
-                        <li key={f.id} className={cn("flex items-start gap-2 px-2.5 py-1.5 border-l-2", SEV_COLOR[f.severity])}>
-                          <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium">{f.message}</div>
-                            {(f.rowKey || f.field) && (
-                              <div className="text-[10px] opacity-70 font-mono">{f.rowKey} · {f.field}</div>
-                            )}
-                            {f.hint && <div className="text-[10px] opacity-80 mt-0.5">{f.hint}</div>}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
+                <FindingsList
+                  findings={findings}
+                  className="max-h-60"
+                  walkTo={(f) => (f.field ? fieldWalkToRoute(f.field, projectId) : null)}
+                />
               </div>
             )}
           </StepShell>

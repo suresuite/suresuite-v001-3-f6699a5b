@@ -6,12 +6,16 @@ import { ConvergencePlot } from "./ConvergencePlot";
 import { RecoveryImpactCard } from "./RecoveryImpactCard";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { RecoveryConfig, DisruptionEvent } from "@/lib/sim/recoveryScore";
+import { CredibilityBadge } from "./CredibilityBadge";
+import type { Credibility } from "@/hooks/useModelValidation";
 
 interface Props {
   run: SimulationRun | null;
   reps: Replication[];
   primaryKpi: string;
   scenario?: { disruption_schedule?: DisruptionEvent[]; horizon_days?: number } | null;
+  /** B0b (§9.5): badge from the run's stamped card + engine-fingerprint check. */
+  credibility?: Credibility | null;
 }
 
 interface RunMeta {
@@ -29,7 +33,7 @@ function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | 
   return fromRep ?? null;
 }
 
-export function ResultsDashboard({ run, reps, primaryKpi, scenario }: Props) {
+export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility }: Props) {
   if (!run) {
     return (
       <Card>
@@ -66,6 +70,7 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario }: Props) {
             Monte Carlo result · {run?.rep_count_done ?? 0} replications
           </Badge>
         )}
+        {credibility && <CredibilityBadge credibility={credibility} />}
       </div>
 
       {meta?.scsim_notes && meta.scsim_notes.length > 0 && (

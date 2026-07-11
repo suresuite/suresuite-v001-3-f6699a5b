@@ -58,6 +58,39 @@ export interface DataMapContractRow {
   statusKey: StatusKey;
 }
 
+/**
+ * Walk-to link for a `dataset.column` manifest field (§6.3 rule 3 / §8.2):
+ * the /project-manager route that opens the editor closest to the gap.
+ * Item-master datasets deep-open the Item Master editor on the right tab;
+ * lane/BOM datasets (fixed by re-upload or the supplier-assignment RPC)
+ * expand the project's data card. `materials.supplier_link` is the synthetic
+ * unsourced-BOM field — its fix lives on the inbound lanes, not the master.
+ */
+export function fieldWalkToRoute(
+  field: string,
+  projectId: string | null | undefined,
+): string | null {
+  if (!projectId) return null;
+  const dataset = field.split(".")[0];
+  const column = field.split(".")[1] ?? "";
+  const base = `/project-manager?project=${projectId}`;
+  if (
+    (dataset === "materials" || dataset === "products" || dataset === "suppliers") &&
+    column !== "supplier_link"
+  ) {
+    return `${base}&item_master=${dataset}`;
+  }
+  if (
+    dataset === "inbound_logistics" ||
+    dataset === "outbound_logistics" ||
+    dataset === "bom_single_level" ||
+    field === "materials.supplier_link"
+  ) {
+    return base;
+  }
+  return base;
+}
+
 export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   // ── inbound_logistics ──────────────────────────────────────────────────
   { dataset: "inbound_logistics", field: "supplier_id", engineField: "SupplierLink.supplier_id", chain: "identity — builds the supplier→material sourcing arc", statusKey: "identity" },

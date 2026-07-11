@@ -24,6 +24,9 @@ export interface Scenario {
   recovery_overrides: Record<string, unknown>;
   stopping_rule: { kind: "fixed_horizon" | "ci_halfwidth"; epsilon?: number; max_wall_seconds?: number };
   primary_kpi: string;
+  /** Model-validation card that seeded warm-up/replications (B0 / G13 / §9.5);
+   *  null once the user hand-edits either — divergence is explicit. */
+  inherited_validation_id?: string | null;
   created_at: string;
   updated_at: string;
 }

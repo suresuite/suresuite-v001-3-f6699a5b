@@ -543,6 +543,47 @@ export function gradeManifest(
   return out;
 }
 
+// ── Scenario-conditional checks (shared by the gate and the Lab pre-run
+//    panel — one definition, per the §8.2 single-grader law) ─────────────────
+
+/**
+ * A partial-magnitude supplier disruption needs a finite supplier capacity to
+ * throttle — else the mapper degrades it to a full outage
+ * (project_map.py::_map_events). Not a manifest field: it depends on the
+ * scenario, so it is graded here beside the manifest rather than inside it.
+ */
+export function scenarioCapacityFindings(
+  suppliers: Row[],
+  disruptionSchedule: Row[],
+): GradedFinding[] {
+  const capBySupplier = new Map(
+    suppliers.map((s) => [String(s.supplier_id ?? ""), num(s.capacity_per_week)]),
+  );
+  const out: GradedFinding[] = [];
+  for (const ev of disruptionSchedule ?? []) {
+    const magnitude = num(ev.magnitude_pct ?? ev.magnitude ?? 100);
+    if (magnitude >= 100) continue;
+    const raw = String(ev.target ?? ev.target_id ?? "");
+    const target = raw.includes(":") ? raw.slice(raw.lastIndexOf(":") + 1) : raw;
+    if (!capBySupplier.has(target)) continue; // plant/unknown targets: not this check
+    if ((capBySupplier.get(target) ?? 0) <= 0) {
+      out.push({
+        severity: "warn",
+        field: "suppliers.capacity_per_week",
+        policy: "engine",
+        rows: [target],
+        message:
+          `Scenario cuts supplier "${target}" to ${magnitude}% capacity, but the supplier ` +
+          `has no capacity_per_week — the engine will degrade this to a full outage.`,
+        reason:
+          "Partial-magnitude supplier disruptions throttle a finite capacity; " +
+          "without one the mapper degrades the event to a full outage.",
+      });
+    }
+  }
+  return out;
+}
+
 // ── Flattening (shared finding shape for the gate + UI adapters) ────────────
 
 const LEVEL_WHEN_MISSING: Record<string, Severity> = {
