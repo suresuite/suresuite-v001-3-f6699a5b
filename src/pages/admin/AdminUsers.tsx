@@ -127,7 +127,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       isCollapsed={isCollapsed}
       setIsCollapsed={setIsCollapsed}
       title="Users"
-      description="Every account across every organization."
+      description="Every account across every organization. Click a person (or their Access button) to control that individual user's pages, features, AI models & budget."
       actions={
         <div className="flex items-center gap-2">
           <Input
@@ -176,7 +176,16 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 const remaining = budget != null ? budget - Number(r.mtd_cost_usd) : null;
                 return (
                   <TableRow key={r.user_id}>
-                    <TableCell className="font-medium">{r.name || '—'}</TableCell>
+                    <TableCell className="font-medium">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/users/${r.user_id}`)}
+                        className="text-left font-medium text-primary underline-offset-2 hover:underline"
+                        title={`Manage ${r.name || r.email}'s individual access`}
+                      >
+                        {r.name || '—'}
+                      </button>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{r.email}</TableCell>
                     <TableCell>{r.organization || '—'}</TableCell>
                     <TableCell>
@@ -228,10 +237,10 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => navigate(`/admin/users/${r.user_id}`)}
-                        title="Manage pages, features, AI models & budget"
+                        title="Manage this individual user's pages, features, AI models & budget"
                       >
                         <SlidersHorizontal className="mr-1 h-3 w-3" /> Access
                       </Button>
