@@ -66,6 +66,21 @@ def test_material_cost_falls_back_to_cheapest_link_with_warning():
     assert any(w.entity == "material:m1" and w.field == "cost" for w in res.warnings)
 
 
+def test_duplicate_supplier_material_arcs_deduped_to_cheapest():
+    d = _base()
+    d.supply_arcs = [
+        SupplyArc("s1", "m1", unit_price=5.0, lead_time=2, lead_time_unit="week"),
+        SupplyArc("s1", "m1", unit_price=3.0, lead_time=4, lead_time_unit="week"),
+        SupplyArc("s1", "m1", unit_price=3.0, lead_time=1, lead_time_unit="week"),
+    ]
+    res = from_project_data(d)
+    links = res.scenario.network.supplier_links
+    assert len(links) == 1
+    assert links[0].cost == 3.0
+    assert links[0].lead_time_weeks == 1  # tie broken by shortest lead time
+    assert any(w.field == "duplicate_arc" for w in res.warnings)
+
+
 def test_missing_price_defaults_to_one_and_warns():
     d = _base()
     d.products[0].sell_price = None
