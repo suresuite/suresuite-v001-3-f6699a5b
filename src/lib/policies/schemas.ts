@@ -497,6 +497,7 @@ export const FIELD_LABELS: Record<string, string> = {
   order_consolidation: "Order consolidation",
   type: "Policy Type",
   basis: "Policy Basis",
+  initial_on_hand: "Initial Stock",
   rop_q_quantity: "Order quantity (Q)",
   reorder_point: "Reorder point (s)",
   order_up_to: "Order-up-to (S)",

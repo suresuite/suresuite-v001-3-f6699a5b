@@ -136,6 +136,11 @@ export function policyTypeOption(categoryKey: string, storedValue: string): Poli
   return CATEGORIES[categoryKey]?.types.find((t) => t.value === storedValue);
 }
 
+/** Human label for a stored policy-type value, from the registry library. */
+export function policyTypeLabel(categoryKey: string, storedValue: string): string {
+  return policyTypeOption(categoryKey, storedValue)?.label ?? storedValue;
+}
+
 /** Feasibility for one param value against its registry range — the same gate
  *  the server applies, surfaced inline (§II.3). Returns null when valid. */
 export function paramFeasibility(param: RegistryParam, value: unknown): string | null {

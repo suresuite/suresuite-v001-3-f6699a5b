@@ -149,6 +149,14 @@ export const PARAM_META: Record<string, ParamMeta> = {
     formula: "O_{i,t} = 1[(t − t₀) mod T = 0]·(S − IP_{i,t})⁺",
     specRef: "§III.5",
   },
+  initial_on_hand: {
+    symbol: "I_{i,0}",
+    unit: "units",
+    range: "≥ 0",
+    meaning:
+      "On-hand inventory at t = 0 (item master). The starting stock the policy draws down before its first replenishment arrives.",
+    specRef: "§II.1",
+  },
   type: {
     meaning:
       "The replenishment policy type for this item — it decides WHEN to reorder and HOW MUCH. Choosing a type sets which parameters matter (the target of 6.A's dynamic parameter cell).",

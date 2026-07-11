@@ -92,6 +92,11 @@ const fgStockOn: ColSpec["visibleWhen"] = (ctx) =>
 const invTypeIn = (...types: string[]): ColSpec["visibleWhen"] =>
   ({ effective }) => types.includes(String(effective?.type ?? "min_max"));
 
+// Plant inventory params only apply when the product carries finished-goods
+// inventory (MTS/ATO/CTO) AND its type uses the param.
+const plantInvType = (...types: string[]): ColSpec["visibleWhen"] =>
+  (ctx) => plantNeedsInventory(ctx) && invTypeIn(...types)(ctx);
+
 export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
   // ----------------------------- SUPPLIER -----------------------------
   supplier: {
@@ -137,6 +142,9 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("order_up_to", "inventory", { visibleWhen: invTypeIn("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200 }),
       col("rop_q_quantity", "inventory", { visibleWhen: invTypeIn("rop"), defaultWhenMissing: 0 }),
       col("review_period_days", "inventory", { visibleWhen: invTypeIn("periodic_review"), defaultWhenMissing: 1 }),
+      col("initial_on_hand", "inventory", {
+        master: { table: "materials", field: "initial_on_hand", idFrom: "material_id" },
+      }),
       col("safety_stock_days", "inventory", { defaultWhenMissing: 0 }),
       col("holding_cost_pct", "inventory", { defaultWhenMissing: 0.2 }),
 
@@ -171,7 +179,17 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
       col("backorder_cost_per_day", "fulfillment", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
 
+      // Policy Type → dynamic parameters for finished goods (§II.1–II.3, §III.13).
       col("type", "inventory", { visibleWhen: plantNeedsInventory }),
+      col("basis", "inventory", { visibleWhen: plantNeedsInventory }),
+      col("reorder_point", "inventory", { visibleWhen: plantInvType("min_max", "rop"), defaultWhenMissing: 50 }),
+      col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200 }),
+      col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0 }),
+      col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1 }),
+      col("initial_on_hand", "inventory", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "initial_on_hand", idFrom: "product_id" },
+      }),
       col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
       col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
       col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
