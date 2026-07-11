@@ -19,6 +19,16 @@ interface Props {
   onAddReps: (n: number) => void;
 }
 
+/** Engine chip from a run's code_version — shared by the Latest-run card and
+ *  the Run-queue console (6.E) so both label the engine identically. */
+export function engineLabel(codeVersion: string | null | undefined): { label: string; cls: string } {
+  const cv = codeVersion ?? "";
+  if (cv.startsWith("scsim-"))
+    return { label: `scsim engine ${cv.slice("scsim-".length)}`, cls: "border-green-500 text-green-700" };
+  if (cv.startsWith("worker")) return { label: "worker engine", cls: "border-green-500 text-green-700" };
+  return { label: "preliminary (stub)", cls: "border-yellow-400 text-yellow-700" };
+}
+
 export function RunProgressPanel({ run, reps, versionLabel, credibility, onCancel, onAddReps }: Props) {
   if (!run) {
     return (
@@ -53,12 +63,7 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
       ? { card: "border-destructive ring-1 ring-destructive/40", badge: "", Icon: AlertTriangle }
       : { card: "", badge: "", Icon: null as typeof CheckCircle2 | null };
 
-  const cv = run.code_version ?? "";
-  const engine = cv.startsWith("scsim-")
-    ? { label: `scsim engine ${cv.slice("scsim-".length)}`, cls: "border-green-500 text-green-700" }
-    : cv.startsWith("worker")
-    ? { label: "worker engine", cls: "border-green-500 text-green-700" }
-    : { label: "preliminary (stub)", cls: "border-yellow-400 text-yellow-700" };
+  const engine = engineLabel(run.code_version);
 
   return (
     <div className="flex flex-col gap-3">
@@ -173,7 +178,7 @@ const WARN_META = {
  * project data. A fully specified project produces zero of these
  * (docs/design blueprint §8.2 / Phase A exit criterion).
  */
-function MappingWarningsCard({
+export function MappingWarningsCard({
   warnings,
   status,
 }: {

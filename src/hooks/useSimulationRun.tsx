@@ -205,6 +205,18 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
     [],
   );
 
+  // Load one run's replications on demand — for the Run-queue console's
+  // "View" (6.E), which inspects a historical run other than the latest (the
+  // realtime path only keeps the latest run's reps hot). Read-only.
+  const loadReps = useCallback(async (runId: string): Promise<Replication[]> => {
+    const { data } = await sb
+      .from("run_replications")
+      .select("*")
+      .eq("run_id", runId)
+      .order("rep_index", { ascending: true });
+    return (data ?? []) as Replication[];
+  }, []);
+
   const addReps = useCallback(async (projectId: string, runId: string, n: number) => {
     const { error } = await supabase.functions.invoke("sim-command", {
       body: {
@@ -217,5 +229,5 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
     if (error) throw error;
   }, []);
 
-  return { latestRun, reps, history, runExperiment, cancelRun, addReps, refresh: loadLatest };
+  return { latestRun, reps, history, runExperiment, cancelRun, addReps, loadReps, refresh: loadLatest };
 }
