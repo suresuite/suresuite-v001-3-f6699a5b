@@ -64,6 +64,23 @@ interface UsePoliciesResult {
 }
 
 /**
+ * True when a Supabase RPC error means PostgREST could not resolve a function
+ * overload matching the sent arguments — i.e. the frontend is calling a newer
+ * signature than the deployed schema (a migration hasn't been applied). Lets
+ * callers retry an older signature instead of hard-failing on deploy ordering.
+ */
+function isMissingRpcSignature(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "PGRST202") return true;
+  const msg = (error.message ?? "").toLowerCase();
+  return (
+    msg.includes("could not find the function") ||
+    msg.includes("no function matches") ||
+    (msg.includes("function") && msg.includes("does not exist"))
+  );
+}
+
+/**
  * Load + mutate policy defaults and overrides for a project.
  * After every successful mutation, dispatches a `policy.changed` command into
  * the existing sim-command pipeline so KPIs update live.
@@ -436,15 +453,23 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       if (!projectId) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
-      const { data, error } = await sb.rpc("snapshot_policy", {
+      const baseArgs = {
         p_project_id: projectId,
         p_label: label ?? null,
         p_user_id: user?.id ?? null,
         p_user_email: user?.email ?? null,
         p_user_name: user?.display_name ?? user?.name ?? null,
         p_parent_version_id: selectedVersionId,
-        p_notes: notes ?? null,
-      });
+      };
+      // p_notes (6.D) ships in migration 20260711000001. If that migration is
+      // not deployed yet, PostgREST can't resolve the 7-arg overload — fall back
+      // to the original 6-arg call so saving a snapshot (and therefore server
+      // runs / model adoption, which snapshot first) keeps working. Notes are
+      // dropped until the migration lands.
+      let { data, error } = await sb.rpc("snapshot_policy", { ...baseArgs, p_notes: notes ?? null });
+      if (error && isMissingRpcSignature(error)) {
+        ({ data, error } = await sb.rpc("snapshot_policy", baseArgs));
+      }
       if (error) {
         console.error("saveSnapshot failed", error);
         toast.error(`Snapshot failed: ${error.message ?? error}`);
