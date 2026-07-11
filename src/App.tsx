@@ -38,6 +38,12 @@ const queryClient = new QueryClient();
 function App() {
   const [isCollapsed, setIsCollapsed] = useState(true);
 
+  useEffect(() => {
+    (window as any).__triggerTestToast = () => {
+      toast.success('Verification complete — 76 finding(s).');
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
