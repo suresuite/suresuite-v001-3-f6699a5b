@@ -150,6 +150,8 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                   applyResolvedPreset={applyResolvedPreset}
                   clearActivePreset={clearActivePreset}
                   saveSnapshot={saveSnapshot}
+                  selectedVersionId={selectedVersionId}
+                  policyDirty={isDirty}
                 />
 
                 {loading && <p className="text-xs text-muted-foreground">Loading policies…</p>}
