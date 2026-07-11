@@ -11,8 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { OrgAccessDrawer } from '@/components/admin/OrgAccessDrawer';
 
 interface Props {
   isCollapsed: boolean;
@@ -35,6 +36,7 @@ const db = supabase as any;
 export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Props) {
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessOrg, setAccessOrg] = useState<OrgRow | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -146,6 +148,9 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                     {new Date(o.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => setAccessOrg(o)} title="Access defaults">
+                      <ShieldCheck className="mr-1 h-3 w-3" /> Access
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => toggleStatus(o)}>
                       {o.status === 'active' ? 'Suspend' : 'Reactivate'}
                     </Button>
@@ -156,6 +161,15 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
           </TableBody>
         </Table>
       </div>
+
+      {accessOrg && (
+        <OrgAccessDrawer
+          orgId={accessOrg.id}
+          orgName={accessOrg.name}
+          open={!!accessOrg}
+          onClose={() => setAccessOrg(null)}
+        />
+      )}
     </AdminLayout>
   );
 }

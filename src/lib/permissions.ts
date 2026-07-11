@@ -12,6 +12,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/network/product-level': ['admin', 'modeler', 'user', 'super_admin'],
   '/network/process-level': ['admin', 'modeler', 'user', 'super_admin'],
   '/network/interactive-space': ['admin', 'modeler', 'user', 'super_admin'],
+  '/policies': ['admin', 'modeler', 'user', 'super_admin'],
+  '/simulation-lab': ['admin', 'modeler', 'user', 'super_admin'],
   '/project-intelligence': ['admin', 'modeler', 'user', 'super_admin'],
   // Developer API keys: matches who can mint keys (_api_key_management_org)
   '/developer': ['admin', 'modeler', 'super_admin'],

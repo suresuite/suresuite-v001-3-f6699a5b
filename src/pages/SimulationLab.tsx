@@ -9,6 +9,7 @@ import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { BookOpen } from "lucide-react";
 import { toast } from "sonner";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjects } from "@/hooks/useProjects";
 import { useScenarios } from "@/hooks/useScenarios";
@@ -133,11 +134,14 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     setAckWarnings(false);
   }, [selectedId, clientFindings]);
 
+  const { canFeature } = useCapabilities();
+  const canRunSimulations = canFeature("simulation_lab");
   const gateFindings = serverFindings ?? clientFindings;
   const gateBlocks = (gateFindings ?? []).filter((f) => f.severity === "block").length;
   const gateWarns = (gateFindings ?? []).filter((f) => f.severity === "warn").length;
-  const runBlockedReason =
-    gateBlocks > 0
+  const runBlockedReason = !canRunSimulations
+    ? "Running simulations isn't enabled for your account. Contact an administrator."
+    : gateBlocks > 0
       ? "Blocking findings below must be fixed before the run can dispatch"
       : gateWarns > 0 && !ackWarnings
       ? "Acknowledge the warnings below to run with engine defaults"
@@ -162,6 +166,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   const dispatchRun = async (versionId: string) => {
     if (!projectId || !selected) return;
+    if (!canRunSimulations) {
+      toast.error("Running simulations isn't enabled for your account.");
+      return;
+    }
     try {
       const result = await runExperiment(projectId, versionId, ackWarnings);
       if (result.queued) {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Input } from '@/components/ui/input';
@@ -19,9 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Settings2 } from 'lucide-react';
+import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
-import { UserAiConfigDrawer } from '@/components/admin/UserAiConfigDrawer';
 
 interface Props {
   isCollapsed: boolean;
@@ -44,10 +44,10 @@ const db = supabase as any;
 const ROLES = ['user', 'modeler', 'admin', 'super_admin'];
 
 export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
-  const [drawerUser, setDrawerUser] = useState<Row | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -230,10 +230,10 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDrawerUser(r)}
-                        title="Configure AI access & budget"
+                        onClick={() => navigate(`/admin/users/${r.user_id}`)}
+                        title="Manage pages, features, AI models & budget"
                       >
-                        <Settings2 className="mr-1 h-3 w-3" /> AI
+                        <SlidersHorizontal className="mr-1 h-3 w-3" /> Access
                       </Button>
                       <Button
                         variant="ghost"
@@ -250,15 +250,6 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
           </TableBody>
         </Table>
       </div>
-
-      {drawerUser && (
-        <UserAiConfigDrawer
-          user={drawerUser}
-          open={!!drawerUser}
-          onClose={() => setDrawerUser(null)}
-          onSaved={load}
-        />
-      )}
     </AdminLayout>
   );
 }

@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { QUICK_THREAD_ID } from "@/hooks/useChatThreads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjectChat } from "@/hooks/useProjectChat";
 import { useProjects } from "@/hooks/useProjects";
 import { MessageBubble } from "./MessageBubble";
 import { AssistantMascot } from "./AssistantMascot";
-import { ModelPicker, getModelLabel, getStoredModel, setStoredModel } from "./ModelPicker";
+import { CHAT_MODELS, ModelPicker, getModelLabel, getStoredModel, setStoredModel } from "./ModelPicker";
 
 const SUGGESTIONS = [
   "Which suppliers carry the highest risk?",
@@ -94,6 +95,7 @@ export function FloatingChatBubble() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { canFeature, isModelAllowed } = useCapabilities();
   const { selectedProject, globalSelectedProjectId, setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const projectId = selectedProject?.id ?? globalSelectedProjectId ?? null;
   const { projects, loading: projectsLoading } = useProjects();
@@ -116,7 +118,17 @@ export function FloatingChatBubble() {
 
   const { messages, loading, error, send, clear } = useProjectChat(QUICK_THREAD_ID);
 
-  const hidden = !user || location.pathname.startsWith("/auth");
+  // Keep the selected model within the user's allowed set.
+  useEffect(() => {
+    if (isModelAllowed(model).ok) return;
+    const firstAllowed = CHAT_MODELS.find((m) => isModelAllowed(m.id).ok);
+    if (firstAllowed && firstAllowed.id !== model) {
+      setModel(firstAllowed.id);
+      setStoredModel(firstAllowed.id);
+    }
+  }, [model, isModelAllowed]);
+
+  const hidden = !user || location.pathname.startsWith("/auth") || !canFeature("ai_chat");
 
   useEffect(() => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

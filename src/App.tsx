@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProvider } from '@/hooks/useAuth';
+import { CapabilitiesProvider } from '@/hooks/useCapabilities';
 import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
@@ -27,6 +28,8 @@ import HelpPage from './pages/help/HelpPage';
 import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminUserAccess from './pages/admin/AdminUserAccess';
+import AdminRoles from './pages/admin/AdminRoles';
 import AdminOrganizations from './pages/admin/AdminOrganizations';
 import AdminProjects from './pages/admin/AdminProjects';
 import AdminModels from './pages/admin/AdminModels';
@@ -42,6 +45,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <AuthProvider>
+          <CapabilitiesProvider>
           <GlobalProjectProvider>
             <Router>
               <Routes>
@@ -165,6 +169,8 @@ function App() {
                 {/* Super Admin routes */}
                 <Route path="/admin" element={<ProtectedRoute><RoleGuard><AdminDashboard isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/users" element={<ProtectedRoute><RoleGuard><AdminUsers isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/users/:userId" element={<ProtectedRoute><RoleGuard><AdminUserAccess isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/roles" element={<ProtectedRoute><RoleGuard><AdminRoles isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/organizations" element={<ProtectedRoute><RoleGuard><AdminOrganizations isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/projects" element={<ProtectedRoute><RoleGuard><AdminProjects isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/models" element={<ProtectedRoute><RoleGuard><AdminModels isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
@@ -174,6 +180,7 @@ function App() {
               <FloatingChatBubble />
             </Router>
           </GlobalProjectProvider>
+          </CapabilitiesProvider>
         </AuthProvider>
       </ThemeProvider>
       <Toaster />

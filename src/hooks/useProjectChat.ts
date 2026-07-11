@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { useChatThreads } from "@/hooks/useChatThreads";
 
 export type ChatRole = "user" | "assistant";
@@ -50,6 +51,7 @@ interface SendOptions {
  */
 export function useProjectChat(threadId: string | null) {
   const { user } = useAuth();
+  const caps = useCapabilities();
   const threads = useChatThreads();
   const thread = threads.threads.find((t) => t.id === threadId) ?? null;
 
@@ -94,6 +96,25 @@ export function useProjectChat(threadId: string | null) {
       const withUser = [...messages, userMsg];
       setMessages(withUser);
       persist(withUser);
+
+      // Access control: block disallowed features/models and over-budget calls
+      // before we ever reach the LLM, with a clear, actionable reason.
+      const modelId = opts.model ?? "gemini-2.5-flash";
+      if (!caps.can("ai_chat")) {
+        setError("The AI assistant isn't enabled for your account. Contact an administrator.");
+        return;
+      }
+      const modelGate = caps.isModelAllowed(modelId);
+      if (!modelGate.ok) {
+        setError(modelGate.reason ?? "That model isn't available for your account.");
+        return;
+      }
+      const budgetGate = caps.checkBudget();
+      if (!budgetGate.ok) {
+        setError(budgetGate.reason ?? "Your AI budget for this period has been reached.");
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -165,7 +186,7 @@ export function useProjectChat(threadId: string | null) {
         setLoading(false);
       }
     },
-    [loading, messages, user, thread, persist],
+    [loading, messages, user, thread, persist, caps],
   );
 
   return { messages, loading, error, send, clear };

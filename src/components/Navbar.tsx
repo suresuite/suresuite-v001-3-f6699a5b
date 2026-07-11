@@ -20,9 +20,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { canAccessRoute } from "@/lib/permissions";
-import type { UserRole } from "@/hooks/useUserRole";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -129,14 +128,14 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
 
 const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
   const { user, logout } = useAuth();
+  const { canAccessPage } = useCapabilities();
 
   const handleLogout = () => logout();
 
-  const role = (user?.role as UserRole | undefined) ?? undefined;
   const visibleSections = NAV_SECTIONS
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => canAccessRoute(item.to, role)),
+      items: section.items.filter((item) => canAccessPage(item.to)),
     }))
     .filter((section) => section.items.length > 0);
 

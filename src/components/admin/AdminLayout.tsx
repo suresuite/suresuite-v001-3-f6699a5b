@@ -8,6 +8,7 @@ import {
   Cpu,
   Activity,
   ScrollText,
+  ShieldCheck,
 } from 'lucide-react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ interface AdminLayoutProps {
 const ADMIN_NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/roles', label: 'Role Defaults', icon: ShieldCheck },
   { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { to: '/admin/models', label: 'AI Models', icon: Cpu },
