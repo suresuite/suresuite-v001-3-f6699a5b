@@ -103,6 +103,52 @@ export const PARAM_META: Record<string, ParamMeta> = {
   },
 
   // —— Inventory / replenishment (§III) ——
+  basis: {
+    symbol: "basis",
+    meaning:
+      "Policy Basis (§II.4) — how the level parameters (s, S, R) are interpreted. Days-of-supply sizes levels from mean demand over the lead time; forward-visible sums the customer's committed forward order book (WSC-2026 MTO, needs the P-C.6 forward_visibility customer policy).",
+    specRef: "§II.4",
+    options: [
+      { value: "days_of_supply", meaning: "Levels = coverage × mean demand: s = D̄·L, S = D̄·(L+κ)." },
+      { value: "forward_visible", meaning: "Levels sum the committed forward material demand over the coverage window (requires P-C.6)." },
+    ],
+  },
+  reorder_point: {
+    symbol: "s / R",
+    unit: "units",
+    range: "0 ≤ s < S",
+    meaning:
+      "Reorder point — when inventory position falls below it, a replenishment fires. Used by Min-max (s) and (R,Q) (R). Stored & versioned; consumed once the Quantity basis lands (§II.4).",
+    formula: "order when IP_{i,t} < s",
+    specRef: "§III.1 / §III.3",
+  },
+  order_up_to: {
+    symbol: "S",
+    unit: "units",
+    range: "> s",
+    meaning:
+      "Order-up-to level — replenishment raises the inventory position back up to S. Used by Min-max, Base-stock and Periodic-review. Stored & versioned; consumed once the Quantity basis lands (§II.4).",
+    formula: "O_{i,t} = ρ_t·(S − IP_{i,t})⁺",
+    specRef: "§III.1 / §III.4 / §III.5",
+  },
+  rop_q_quantity: {
+    symbol: "Q",
+    unit: "units",
+    range: "≥ MOQ",
+    meaning:
+      "Fixed lot size for the (R,Q) policy — each replenishment orders whole multiples of Q to clear the deficit below R. Floored to the material MOQ.",
+    formula: "O_{i,t} = ρ_t·Q·⌈(R − IP_{i,t})⁺ / Q⌉",
+    specRef: "§III.3",
+  },
+  review_period_days: {
+    symbol: "T",
+    unit: "days",
+    range: "≥ 1",
+    meaning:
+      "Review period for the Periodic-review (T,S) policy — the position is topped up to S only every T days; between reviews it drifts down with demand.",
+    formula: "O_{i,t} = 1[(t − t₀) mod T = 0]·(S − IP_{i,t})⁺",
+    specRef: "§III.5",
+  },
   type: {
     meaning:
       "The replenishment policy type for this item — it decides WHEN to reorder and HOW MUCH. Choosing a type sets which parameters matter (the target of 6.A's dynamic parameter cell).",
