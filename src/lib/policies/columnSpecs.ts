@@ -111,11 +111,9 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
     // their milestone badge — never silently hidden (G1 visibility).
     cols: [
       col("primary_source", "sourcing"),
-      col("share_pct", "sourcing", { readOnly: true, format: (n) => `${n}%` }),
       // P-S.2 standing split: this row's share of its material (0–1).
       col("supply_share", "sourcing", { visibleWhen: multiSourcing, defaultWhenMissing: 0 }),
       col("material_price", "sourcing", { defaultWhenMissing: 0 }),
-      col("lead_time_mean_days", "sourcing", { readOnly: true, format: (n) => `${n} d` }),
       col("material_cost", "sourcing", {
         master: { table: "materials", field: "cost", idFrom: "material_id" },
       }),
@@ -150,8 +148,9 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
 
       // Transport family: stored + versioned today, consumed when the P-T.x
       // catalog policies land — visible-disabled with the milestone badge.
+      // (Lead time is not restated here — the engine reads inbound lead time
+      // via the sourcing arc, so a transport lead-time column would duplicate it.)
       pendingCol("mode", "transport"),
-      pendingCol("lead_time_mean_days", "transport"),
       pendingCol("cost_per_km", "transport"),
     ],
     targetKey: (r) => `${r.supplier_id}::${r.material_id ?? ""}`,
@@ -177,7 +176,9 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
         master: { table: "products", field: "demand_mean", idFrom: "product_id" },
       }),
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
-      col("backorder_cost_per_day", "fulfillment", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
+      // Fulfillment (backorder, allocation, service level) is a customer-stage
+      // concern only — the engine reads it from the project fulfillment default,
+      // never from a plant node — so no fulfillment column is offered here.
 
       // Policy Type → dynamic parameters for finished goods (§II.1–II.3, §III.13).
       col("type", "inventory", { visibleWhen: plantNeedsInventory }),
@@ -212,14 +213,14 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       { id: "product_id", label: "Product" },
     ],
     // scsim alignment: demand-shape fields are not consumed by the engine
-    // (demand comes from product/graph data); only fulfillment settings remain.
+    // (demand comes from product/graph data), and the fulfillment family
+    // (allocation, backorder, service level) is consumed at the PROJECT default
+    // scope only — never per customer×product — so those are edited in the
+    // fulfillment defaults card, not per-row here. What remains per-row is the
+    // firm-routing choice for a customer×product lane.
     cols: [
       col("primary_source", "fulfillment"),
       col("sourcing_firm", "fulfillment"),
-      col("price", "fulfillment", { defaultWhenMissing: 0 }),
-      col("mean_per_day", "fulfillment", { readOnly: true, format: (n) => `${Math.round(n * 100) / 100}/d` }),
-      col("delivery_window_days", "fulfillment", { readOnly: true, format: (n) => `${n} d` }),
-      col("backorder_cost_per_day", "fulfillment", { defaultWhenMissing: 0 }),
     ],
     targetKey: (r) => `${r.customer_id}::${r.product_id ?? ""}`,
   },
@@ -236,13 +237,27 @@ export function familiesForStage(stage: StageKey): PolicyFamily[] {
   return Array.from(fams);
 }
 
+/** Drop later cols that repeat an already-seen `field` (first declaration wins).
+ * Cell values are keyed by field, so two cols sharing a field would render the
+ * same value twice with duplicate React keys — this guarantees one col per field. */
+function dedupeByField(cols: ColSpec[]): ColSpec[] {
+  const seen = new Set<string>();
+  const out: ColSpec[] = [];
+  for (const c of cols) {
+    if (seen.has(c.field)) continue;
+    seen.add(c.field);
+    out.push(c);
+  }
+  return out;
+}
+
 /** No-row col visibility — used as a fallback only. Prefer `headerColsUnion`. */
 export function visibleCols(
   stage: StageKey,
   ctx: { fulfillmentStrategy?: string },
 ): ColSpec[] {
-  return STAGE_TABLE_SPEC[stage].cols.filter(
-    (c) => !c.visibleWhen || c.visibleWhen(ctx),
+  return dedupeByField(
+    STAGE_TABLE_SPEC[stage].cols.filter((c) => !c.visibleWhen || c.visibleWhen(ctx)),
   );
 }
 
@@ -282,5 +297,5 @@ export function headerColsUnion(
   for (const ctx of rowsCtx) {
     for (const c of visibleColsForRow(stage, ctx)) want.add(c.field);
   }
-  return STAGE_TABLE_SPEC[stage].cols.filter((c) => want.has(c.field));
+  return dedupeByField(STAGE_TABLE_SPEC[stage].cols.filter((c) => want.has(c.field)));
 }

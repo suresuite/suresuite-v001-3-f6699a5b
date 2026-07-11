@@ -265,6 +265,71 @@ def test_unsourced_material_raises():
         from_project_data(d)
 
 
+def test_extended_fulfillment_mode_collapses_to_mto_with_warning():
+    """CTO/ETO are valid UI strategies the engine doesn't model — they must
+    collapse to MTO loudly, not silently (audit finding G)."""
+    d = _base()
+    d.products[0].fulfillment_mode = "configure_to_order"
+    res = from_project_data(d)
+    assert res.scenario.network.products[0].fulfillment_mode == FulfillmentMode.MTO
+    assert any(w.level == "warn" and w.field == "fulfillment_mode" for w in res.warnings)
+
+
+def test_fg_safety_stock_gated_on_actual_product_mode():
+    """FG safety stock is gated on the products' real engine mode, not the
+    separate `fulfillment_strategy` string: an MTS product enables it even when
+    fulfillment_strategy is unset."""
+    d = _base()
+    d.project_model = "make_to_stock"  # products resolve to MTS
+    d.products[0].fulfillment_mode = None
+    d.policies = {"default": {"inventory": {
+        "fg_safety_stock": "service_level", "fg_service_level_target": 0.95}}}
+    res = from_project_data(d)
+    assert "fg_safety_stock" in res.scenario.policies
+
+
+def test_fg_safety_stock_skipped_when_no_mts_product_despite_strategy():
+    """The two fulfillment-mode fields disagree: fulfillment_strategy claims MTS
+    but no product is actually MTS → FG stock skipped, disagreement warned."""
+    d = _base()  # products default to MTO
+    d.policies = {"default": {
+        "fulfillment_strategy": "make_to_stock",
+        "inventory": {"fg_safety_stock": "fixed_days"},
+    }}
+    res = from_project_data(d)
+    assert "fg_safety_stock" not in res.scenario.policies
+    assert any(w.level == "warn" and w.field == "fulfillment_strategy" for w in res.warnings)
+
+
+def test_per_node_fulfillment_override_is_warned_not_dropped_silently():
+    """Fulfillment is consumed at the project default scope only; a per-node
+    backorder override must surface a warning (doc §4/§6)."""
+    d = _base()
+    d.policies = {
+        "default": {"fulfillment": {"backorder_allowed": True}},
+        "node:c1::p1": {"fulfillment": {"backorder_cost_per_day": 5.0}},
+    }
+    res = from_project_data(d)
+    assert any(
+        w.level == "warn" and w.entity == "policy:unmet_demand_handling"
+        and w.field == "fulfillment"
+        for w in res.warnings
+    )
+
+
+def test_per_node_routing_hint_does_not_trigger_fulfillment_warning():
+    """primary_source / sourcing_firm are firm-routing hints, not fulfillment
+    params — a node patch carrying only those must NOT warn."""
+    d = _base()
+    d.policies = {"node:c1::p1": {"fulfillment": {
+        "sourcing_firm": "PlantA", "primary_source": True}}}
+    res = from_project_data(d)
+    assert not any(
+        w.entity == "policy:unmet_demand_handling" and w.field == "fulfillment"
+        for w in res.warnings
+    )
+
+
 def test_e1_fully_specified_project_has_no_silent_fallbacks():
     """Engine-retirement gate E1 (blueprint §3): a fully-specified project
     maps with ZERO warn-level MappingWarnings — every warn is a silent

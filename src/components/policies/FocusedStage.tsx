@@ -10,6 +10,7 @@ import { ChevronDown, Download, Sparkles, Upload, AlertCircle } from "lucide-rea
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { StagePolicyTable } from "./StagePolicyTable";
+import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
 import { ApplyPresetDialog } from "./ApplyPresetDialog";
 import { PresetDiffBanner } from "./PresetDiffBanner";
 import { RunValidateStage } from "./RunValidateStage";
@@ -254,6 +255,18 @@ export function FocusedStage({
         saveSnapshot={saveSnapshot}
         leftActions={tableLeftActions}
       />
+
+      {/* Fulfillment (allocation, backorder, service level) is consumed by the
+          engine at the PROJECT scope only (P-C.1/P-C.2), never per customer×product.
+          So it is edited here as a project-wide default rather than a grid column —
+          which is why the customer grid above no longer carries backorder/price cells. */}
+      {stageKey === "customer" && (
+        <PolicyDefaultsCard
+          family="fulfillment"
+          value={defaults.fulfillment}
+          onSave={(v) => saveDefault("fulfillment", v as PolicyBundle["fulfillment"])}
+        />
+      )}
 
       <ApplyPresetDialog
         open={presetDraft != null}

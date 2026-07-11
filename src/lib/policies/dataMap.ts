@@ -105,7 +105,7 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "outbound_logistics", field: "unit_price", engineField: "Product.unit_price fallback", chain: "demand-weighted average per product when products.sell_price is empty", statusKey: "outbound_unit_price" },
   { dataset: "outbound_logistics", field: "volume", engineField: "Product.demand fallback", chain: "Σ weekly volume per product when products.demand_mean is empty", statusKey: "outbound_volume" },
   { dataset: "outbound_logistics", field: "time_unit", engineField: "unit normalizer", chain: "volume period only (day/week/month/yearly…); unknown → week", statusKey: "identity" },
-  { dataset: "outbound_logistics", field: "expected_lead_time", engineField: null, chain: "shown in the customer stage table; the engine does not read it", statusKey: "outbound_expected_lead_time" },
+  { dataset: "outbound_logistics", field: "expected_lead_time", engineField: null, chain: "uploaded but not consumed — the engine does not model a customer delivery lead time", statusKey: "outbound_expected_lead_time" },
   // ── bom_single_level ───────────────────────────────────────────────────
   { dataset: "bom_single_level", field: "product_id", engineField: "BomLine.product_id", chain: "identity — links product to its components", statusKey: "identity" },
   { dataset: "bom_single_level", field: "material_id", engineField: "BomLine.material_id", chain: "identity — a BOM material without a supplier link fails the run", statusKey: "identity" },

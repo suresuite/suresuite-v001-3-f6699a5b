@@ -93,7 +93,7 @@ SureSuite is a four-tier system:
 **Two policy vocabularies.** The platform currently speaks two different policy languages, connected by a translation layer:
 
 - The **UI/database vocabulary**: seven policy *families* — sourcing, inventory, transport, fulfillment, production, recovery, demand — hand-written as Zod schemas in `src/lib/policies/schemas.ts`, mirrored as Pydantic in `sim-worker/sim_worker/policies.py`, stored per project in `policy_defaults` (JSONB per family) with sparse per-node/per-edge patches in `policy_overrides`, edited on `/policies` through a four-stage flow (supplier → plant → customer → run & validate, `src/lib/policies/stages.ts`), gated by fulfillment strategy (`src/lib/policies/strategyGating.ts`), seeded by eight data-aware presets (`src/lib/policies/presets/`), and snapshotted immutably into `policy_versions` with a SHA-256 `policy_hash`.
-- The **engine vocabulary**: a catalog of ~22 named policy plugins with IDs `P-S.x` (supplier), `P-P.x` (plant), `P-T.x` (transport), `P-C.x` (customer), `P-X.x` (cross-cutting), registered in `scsim/scsim/policies/registry.py`. Nine are implemented and runnable; thirteen are *planned* — registered with full parameter schemas but raising `PolicyNotImplementedError` when enabled, never silently no-oping.
+- The **engine vocabulary**: a catalog of 21 named policy plugins with IDs `P-S.x` (supplier), `P-P.x` (plant), `P-T.x` (transport), `P-C.x` (customer), `P-X.x` (cross-cutting), registered in `scsim/scsim/policies/registry.py`. Nine are implemented and runnable; twelve are *planned* — registered with full parameter schemas but raising `PolicyNotImplementedError` when enabled, never silently no-oping.
 
 - The **translation layer**: `scsim/scsim/io/project_map.py::_map_policies` converts family dictionaries into plugin activations. It is lossy (§2.3, G1).
 
@@ -276,7 +276,7 @@ flowchart TD
 
 Storage is additive: `policy_defaults` and `policy_overrides` remain; a node-type default layer slots between them. The resolved bundle — not the raw layers — is what gets snapshotted into `policy_versions`, so the `policy_hash` covers exactly what will execute (see §6 facet 12).
 
-This answers the design brief's requirement directly: a supplier node owns its capacity model, lead-time model, allocation discipline, and shipment discipline; a plant owns forecasting, inventory control, production planning, fulfillment discipline, and procurement; a customer owns its demand model and unmet-demand behavior. Two suppliers in the same project can run different allocation disciplines without any engine change.
+This answers the design brief's requirement directly: a supplier node owns its capacity model, lead-time model, allocation discipline, and shipment discipline; a plant owns forecasting, inventory control, production planning, and procurement; a customer owns its demand model and its unmet-demand / fulfillment discipline (backorder vs. lost sales and cross-customer allocation, P-C.1/P-C.2). Two suppliers in the same project can run different allocation disciplines without any engine change. Fulfillment discipline lives at the **customer** stage only — the engine has no plant-side fulfillment slot (the earlier P-P.12 proposal is retired, §5.2).
 
 ### 4.4 Slot-and-default: no hidden behavior
 
@@ -287,7 +287,7 @@ Every role defines a **required slot set**, and every slot is **always filled** 
 | Greedy production plan (PH-40 default, `core/engine.py::_MECHANIC_HOOKS`) | `P-P.0 greedy_production_plan` | plant / production planning |
 | Built-in forecast update (PH-10, ADR 0001) | `P-F.0 builtin_forecast` (variants graduate into P-F.1, §5.3) | plant / forecasting |
 | World demand generator (PH-10 demand draw) | `P-C.4 demand_model` variants | customer / demand modeling |
-| FIFO fulfillment ordering (PH-60 default inside P-C.1) | explicit `release_order` parameter of P-P.12 | plant / order management |
+| FIFO fulfillment ordering (PH-60 default inside P-C.1) | stays inside `P-C.1 unmet_demand_handling` at the customer stage | customer / order management |
 | Infinite supplier capacity assumption | `P-S.5 supplier_capacity_model = infinite` | supplier / capacity |
 | Deterministic supplier lead time | `P-S.6 lead_time_model = deterministic` | supplier / lead time |
 
@@ -337,8 +337,9 @@ Covers: demand management, production, fulfillment, FG inventory, MPS, MRP, disp
 | P-P.6 | `standing_capacity_reserve` | capacity | strategic | 🧩 | pre-paid capacity buffer | reserve size, cost |
 | P-P.9 | `material_allocation` | allocation | operational | ✅ (unreachable today — G3) | rolling-horizon LP (HiGHS) · greedy; objectives max_revenue / max_fill_rate / priority_weighted / fg_replenish | product priorities/prices |
 | P-P.11 | `dispatching_rule` | order management | operational | ✚ | FIFO · EDD · priority_class · smallest-remaining — MTO backlog sequencing at weekly-bucket fidelity | order due dates / priority tiers |
-| P-P.12 | `fulfillment_discipline` | order management | operational | ✚ | ship_complete vs. partial to customers; backorder release ordering; order splitting rules | none |
 | — | procurement timing & quantity | — | — | covered | procurement timing/quantity/prioritization are the PH-80 outputs of P-P.1 (+P-P.2 lots, +P-S.2 splits, +P-S.1 reroutes) — not separate policies | — |
+
+> **Retired: P-P.12 `fulfillment_discipline` (plant-side).** An earlier draft placed a plant "fulfillment discipline" slot here (ship-complete vs. partial, backorder release ordering, order splitting). Those responsibilities already live at the **customer** stage inside P-C.1 `unmet_demand_handling` at PH-60 (partial/backorder rule + FIFO release order) and P-C.2 `customer_allocation` — a second PH-60 writer of the same fulfillment/backlog state would only duplicate them. Fulfillment stays customer-side (§4.3, §5.4); no plant fulfillment policy is defined, and the UI collects fulfillment at the project default scope only, not per plant node.
 
 **MPS/MRP, named for what they are.** The brief asks for MPS and MRP policies. The engine already computes them at weekly granularity: **PH-40 production planning is the MPS-lite** (master schedule per product per week, adjusted by P-P.5/P-P.9), and **PH-70 material planning — the D_m projection (Eq. 1) exploded through the BOM with s_m/S_m levels — is the MRP-lite**. The design names this correspondence rather than inventing parallel policies: MPS behavior is configured through P-F.1 + P-P.0/P-P.2, MRP behavior through P-P.1 + P-P.3. A future finite-capacity MPS optimizer is just another occupant of the production-planning slot.
 
@@ -1050,7 +1051,6 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-P.9 | material_allocation | plant | allocation | operational | ✅ | PH-40; rolling LP (HiGHS) / greedy — wire to UI (G3) |
 | P-P.10 | repurposing | plant | production planning | operational | 🧩 M8 | |
 | P-P.11 | dispatching_rule | plant | order management | operational | ✚ | FIFO / EDD / priority (weekly buckets) |
-| P-P.12 | fulfillment_discipline | plant | order management | operational | ✚ | complete vs. partial; release order; splitting |
 | P-T.1 | multimodal_lane_portfolio | transport | transport | strategic | 🧩 M7 | prerequisite: lanes first-class (§8.3) |
 | P-T.2 | expedited_shipments | transport | transport | operational | ✅ | PH-90; premium pull-forward |
 | P-T.3 | mode_shift | transport | transport | operational | 🧩 M7 | needs P-T.1 |
@@ -1076,10 +1076,10 @@ Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs
 | PH-00 | week_start | `disruption_state` | — (engine mechanic) |
 | PH-10 | demand_realization | `demand`, `forecast` | P-C.4, P-F.0/P-F.1 |
 | PH-20 | detection | `firm_knowledge` | P-S.4, P-X.1 |
-| PH-30 | fulfill_from_stock (MTS) | `fg_fulfillment` | P-P.12 |
+| PH-30 | fulfill_from_stock (MTS) | `fg_fulfillment` | — (engine mechanic) |
 | PH-40 | production_planning | `production_plan`, `overtime_capacity`, `substitutions` | P-P.0, P-P.2, P-P.5, P-P.8, P-P.9, P-P.11 |
 | PH-50 | production_execute | `production_output` | — (pure mechanics, Eq. 8/9) |
-| PH-60 | fulfillment | `fulfillment` | P-C.1, P-C.2, P-C.3, P-P.12 |
+| PH-60 | fulfillment | `fulfillment` | P-C.1, P-C.2, P-C.3 |
 | PH-70 | material_planning | `material_demand`, `inventory_levels` | P-P.1, P-P.3, P-P.4 |
 | PH-80 | procurement | `purchase_orders` | P-P.1, P-S.1, P-S.2 |
 | PH-90 | logistics | `arrivals` | P-S.5–S.8, P-T.2, P-T.3, P-T.5, P-T.6 |
