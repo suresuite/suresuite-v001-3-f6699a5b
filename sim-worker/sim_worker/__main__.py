@@ -59,11 +59,32 @@ def _strip_wrapping_quotes(name: str) -> None:
     os.environ[name] = v
 
 
+def normalize_supabase_url(url: str) -> str:
+    """Reduce SUPABASE_URL to the bare project origin. The worker appends
+    /rest/v1 and /realtime/v1 itself, but Supabase's dashboard surfaces the
+    REST endpoint (…supabase.co/rest/v1) — pasting that here doubles the path
+    on every PostgREST call (…/rest/v1/rest/v1/… → PGRST125 404), which reads
+    every table as empty and fails runs with 'no products to simulate'."""
+    v = url.strip().rstrip("/")
+    for suffix in ("/rest/v1", "/realtime/v1", "/auth/v1"):
+        if v.endswith(suffix):
+            v = v[: -len(suffix)].rstrip("/")
+    return v
+
+
 def validate_env() -> None:
     """Fail fast with a one-line, human-readable reason instead of a traceback
     when a required secret is missing or malformed."""
     for var in ("UPSTASH_REDIS_URL", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"):
         _strip_wrapping_quotes(var)
+    raw_supabase = os.environ.get("SUPABASE_URL", "")
+    normalized = normalize_supabase_url(raw_supabase)
+    if normalized != raw_supabase:
+        log.warning(
+            "SUPABASE_URL contained an API path suffix — using %s "
+            "(the worker appends /rest/v1 itself)", normalized,
+        )
+        os.environ["SUPABASE_URL"] = normalized
     problem = redis_url_problem(os.environ.get("UPSTASH_REDIS_URL"))
     if problem:
         log.error("config error: %s", problem)
