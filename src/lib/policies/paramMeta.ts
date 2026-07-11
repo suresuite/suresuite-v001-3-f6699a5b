@@ -106,7 +106,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
   basis: {
     symbol: "basis",
     meaning:
-      "Policy Basis (§II.4) — how the level parameters (s, S, R) are interpreted. Days-of-supply sizes levels from mean demand over the lead time; forward-visible sums the customer's committed forward order book (WSC-2026 MTO, needs the P-C.6 forward_visibility customer policy).",
+      "Policy Basis (§II.4) — how the level parameters (s, S, R) are interpreted. Days-of-supply sizes levels from mean demand over the lead time; forward-visible sums the customer's committed forward order book (WSC-2026 MTO, needs the P-C.6 forward_visibility customer policy). Stored & versioned; the engine reads it once project_map passes the basis through (today it defaults to days_of_supply / coverage-κ).",
     specRef: "§II.4",
     options: [
       { value: "days_of_supply", meaning: "Levels = coverage × mean demand: s = D̄·L, S = D̄·(L+κ)." },

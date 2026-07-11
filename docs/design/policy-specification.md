@@ -146,6 +146,24 @@ edge-function validator are generated from that. Adding a policy type = one plug
 row; the grid gains the option automatically. (Blueprint §6.2; today the grid still uses a
 transitional 7-family Zod schema — the reframe here is the target the grid migrates to.)
 
+> **Implementation status (Phase D / 6.A).** The **Inventory** category has migrated to this model
+> on the supplier and focal-plant stages: a **Policy Type** cell (`inventory.type`, labelled from the
+> registry library — Min-max (s,S) / Base stock (S) / (R,Q) / Periodic review (T,S)) drives which
+> level/lot parameters are editable (`s = reorder_point`, `S = order_up_to`, `Q = rop_q_quantity`,
+> `T = review_period_days`), alongside the structural columns **Policy Basis** (`inventory.basis`),
+> **Initial Stock** (item-master `initial_on_hand`) and Periodic Check (the periodic_review type +
+> its period). Realized as a **presentation reframe over the existing transitional bundle**
+> (persistence, provenance, Excel round-trip and resolution precedence unchanged), not a storage
+> migration to the tagged union above. Deviation from the literal target, bridged when the engine
+> work lands: `project_map._map_policies` passes only `inventory.type → policy_type` today, so
+> `basis`, `s, S, R, Q` and the review period are **stored + versioned but not yet consumed** — the
+> engine sizes levels from coverage-κ until the **Quantity basis** (§II.4, ✚) and the basis/level
+> pass-through land; the per-parameter side-sheet (6.B) discloses each parameter's consumed vs
+> stored-only status (`SCSIM_VISIBLE_FIELDS`, the parity contract with `project_map`, is unchanged).
+> The registry access layer `src/lib/policies/registryPolicyTypes.ts` exposes the registry-faithful
+> engine params (`coverage_weeks`, `periodic_review_weeks`) too, so the two framings converge with no
+> schema re-write. The remaining categories (sourcing/fulfillment/…) still use the flat family columns.
+
 ### II.3 The dynamic parameter cell (hybrid rendering, as agreed)
 
 When the user picks a `policy_type` for a row, the **Policy Parameters** cell renders that type's

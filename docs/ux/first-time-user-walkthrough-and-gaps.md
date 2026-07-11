@@ -628,9 +628,10 @@ field on save/edit (persisted on the version record, distinct from the label).
 
 ### Scene 6 — build checklist (for the new UX/UI section)
 
-- [ ] Grid → discriminated-union **Policy Type** column + dynamic parameter renderer from
-      `registry.generated.json` (6.A)
-- [ ] Add spec structural columns: Initial Stock · Policy Basis · Periodic Check / Period (6.A)
+- [x] Grid → discriminated-union **Policy Type** column + dynamic parameter renderer from
+      `registry.generated.json` (6.A — Inventory category, supplier + plant stages; presentation
+      reframe over the transitional bundle, see policy-specification §II.2 status note)
+- [x] Add spec structural columns: Initial Stock · Policy Basis · Periodic Check / Period (6.A)
 - [x] Per-parameter transparency side-sheet: unit/range/default/meaning + formula + engine-consumed
       flag (6.B)
 - [ ] Persist per-material / per-FG inventory, FG output, per-cost time series (6.C)

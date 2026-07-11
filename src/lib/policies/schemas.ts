@@ -427,7 +427,6 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
   sourcing: new Set(["strategy", "ratios", "supply_share"]),
   inventory: new Set([
     "type",
-    "basis",
     "safety_stock_method",
     "safety_stock_days",
     "service_level_target",
