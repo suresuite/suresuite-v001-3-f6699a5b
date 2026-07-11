@@ -40,6 +40,9 @@ interface Props {
   applyResolvedPreset: (slug: string, families: PolicyFamily[], bundle: PolicyBundle) => Promise<void>;
   clearActivePreset: () => Promise<void>;
   saveSnapshot: (label?: string) => Promise<string | null>;
+  /** Policy-version context for the Run & Validate credibility card (§9.5). */
+  selectedVersionId: string | null;
+  policyDirty: boolean;
 }
 
 export function FocusedStage({
@@ -58,6 +61,8 @@ export function FocusedStage({
   applyResolvedPreset,
   clearActivePreset,
   saveSnapshot,
+  selectedVersionId,
+  policyDirty,
 }: Props) {
   const stage = getStage(stageKey);
   const presets = useMemo(() => getStagePresets(stageKey), [stageKey]);
@@ -139,6 +144,8 @@ export function FocusedStage({
           overrides={overrides}
           fulfillmentStrategy={fulfillmentStrategy}
           saveSnapshot={saveSnapshot}
+          selectedVersionId={selectedVersionId}
+          policyDirty={policyDirty}
         />
       </div>
     );

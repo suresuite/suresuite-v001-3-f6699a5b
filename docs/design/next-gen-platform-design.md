@@ -731,7 +731,10 @@ Incremental plan (steps 1–2 are frontend-only — no engine or schema changes)
    every preview built from it, and the decorative topology animation, deleted — removed,
    not relabeled. **Shipped (Phase B0).**
 3. **Adopt and persist the pipeline outcome** — the validated model card of §9.5 (G13),
-   per `docs/design/phase-b0-core-loop.md`. **(Phase B0, in progress.)**
+   per `docs/design/phase-b0-core-loop.md`. **(Phase B0: the RVS Adopt step, card
+   persistence through `record_model_validation`, and the derived credibility badge on the
+   Run & Validate header and run panels shipped; Lab-side inheritance and Lab-surface
+   badges are the next increment.)**
 
 ---
 
