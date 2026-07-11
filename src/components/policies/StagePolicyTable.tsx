@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
+import { ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown, Info } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/lib/policies/columnSpecs";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
+import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
@@ -411,6 +412,9 @@ export function StagePolicyTable({
 
   // Per-stage collapsed family set persisted in localStorage.
   const collapseKey = `policy.table.collapsed.${stageKey}`;
+  // 6.B — per-parameter transparency side-sheet (opened from a column header).
+  const [paramSheetCol, setParamSheetCol] = useState<ColSpec | null>(null);
+
   const [collapsed, setCollapsed] = useState<Set<PolicyFamily>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -1108,6 +1112,15 @@ export function StagePolicyTable({
                   >
                     <span className="inline-flex items-center gap-1">
                       {renderSortFilter(col.field, adaptLabel(col.label))}
+                      <button
+                        type="button"
+                        title={`What is “${adaptLabel(col.label)}”? — unit, range, meaning & engine use`}
+                        aria-label={`Explain ${adaptLabel(col.label)}`}
+                        className="text-muted-foreground/60 hover:text-primary transition-colors"
+                        onClick={() => setParamSheetCol(col)}
+                      >
+                        <Info className="h-3 w-3" />
+                      </button>
                       {col.engineStatus && (
                         <span
                           className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-[9px] text-amber-700 dark:text-amber-300 cursor-help"
@@ -1494,6 +1507,13 @@ export function StagePolicyTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 6.B — per-parameter transparency side-sheet. */}
+      <ParameterSheet
+        col={paramSheetCol}
+        open={paramSheetCol !== null}
+        onOpenChange={(v) => !v && setParamSheetCol(null)}
+      />
     </div>
   );
 }
