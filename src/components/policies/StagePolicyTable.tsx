@@ -460,8 +460,17 @@ export function StagePolicyTable({
   }, [stageKey, projectId]);
 
   /** Effective value lookup: data prefill → override → default.
-   *  Master-backed columns resolve draft → item-master value → derived fallback. */
-  const getEffective = (rowKey: string, dataRow: Record<string, unknown>, field: string): unknown => {
+   *  Master-backed columns resolve draft → item-master value → derived fallback.
+   *  `family` is the column's declared family: when a field name is shared across
+   *  families, resolve it from the column's OWN family first so the value matches
+   *  the header (otherwise the flattened first-wins order could show a sibling
+   *  family's value under the wrong label). */
+  const getEffective = (
+    rowKey: string,
+    dataRow: Record<string, unknown>,
+    field: string,
+    family?: PolicyFamily,
+  ): unknown => {
     const draft = drafts[rowKey]?.[field];
     if (draft !== undefined) return draft;
     const mcol = masterColByField.get(field);
@@ -470,8 +479,13 @@ export function StagePolicyTable({
       return mv !== undefined ? mv : derivedValueFor(mcol, dataRow);
     }
     if (dataRow[field] !== undefined && dataRow[field] !== null) return dataRow[field];
+    const bundle = effectivePolicy(defaults, overrides, spec.scope, rowKey);
+    if (family) {
+      const own = bundle[family] as Record<string, unknown> | undefined;
+      if (own && own[field] !== undefined) return own[field];
+    }
     for (const fam of families) {
-      const eff = effectivePolicy(defaults, overrides, spec.scope, rowKey)[fam] as Record<string, unknown>;
+      const eff = bundle[fam] as Record<string, unknown>;
       if (eff[field] !== undefined) return eff[field];
     }
     return undefined;
@@ -487,7 +501,8 @@ export function StagePolicyTable({
   /** Comparable cell value for any column (key col or value col). */
   const cellValueFor = (r: Record<string, unknown>, colId: string): unknown => {
     if (spec.keyCols.some((c) => c.id === colId)) return r[colId];
-    return getEffective(String(r.key), r, colId);
+    const spec2 = specFor(stageKey).cols.find((c) => c.field === colId);
+    return getEffective(String(r.key), r, colId, spec2?.family);
   };
 
   /** Toggle sort on a column: asc → desc → none. */
@@ -755,7 +770,7 @@ export function StagePolicyTable({
         // not data (silently freezing them poisoned projects before).
         if ((r.__imputed as Record<string, true> | undefined)?.[col.field]) continue;
         // draft → project-data prefill → effective default
-        const v = getEffective(rowKey, r, col.field);
+        const v = getEffective(rowKey, r, col.field, col.family);
         if (v === undefined || v === null) continue;
         const bucket = byFamily.get(col.family) ?? {};
         bucket[col.field] = v;
@@ -1356,13 +1371,19 @@ export function StagePolicyTable({
                             </td>
                           );
                         }
-                        const cellValue = getEffective(rowKey, r, col.field);
+                        const cellValue = getEffective(rowKey, r, col.field, col.family);
                         // Master-backed columns: value from the item master, with
                         // the engine's derived fallback (≈) shown when unset.
                         const masterSet = col.master ? masterValueFor(col, r) !== undefined : false;
                         const derivedVal = col.master && !masterSet ? derivedValueFor(col, r) : undefined;
-                        // live default = bundle value > spec.defaultWhenMissing > family raw default
-                        const bundleVal = eff?.[col.field];
+                        // live default = bundle value > spec.defaultWhenMissing > family raw default.
+                        // Read from the column's own family (not the flattened first-wins
+                        // map) so a name shared across families resolves to this header's value.
+                        const bundleVal = (
+                          effectivePolicy(defaults, overrides, spec.scope, rowKey)[col.family] as
+                            | Record<string, unknown>
+                            | undefined
+                        )?.[col.field];
                         const liveDefault = col.master
                           ? derivedVal ?? 0
                           : bundleVal !== undefined

@@ -135,7 +135,20 @@ the cheapest `unit_price` wins, ties broken by shortest lead time ⚠.
 - `inventory.type` → `inventory_control.policy_type` (min_max / base_stock / rop_q / periodic). The
   legacy absolute `order_up_to` is replaced by scsim's coverage-based κ (≈8 weeks) ⚠.
 - `inventory.safety_stock_method` → `safety_stock_materials` (uniform service level / king / fixed_days).
-- `fulfillment.backorder_allowed` → `unmet_demand_handling` (backorder vs lost_sales).
+- `fulfillment.backorder_allowed` / `backorder_cost_per_day` → `unmet_demand_handling` (backorder vs
+  lost_sales), and `fulfillment.allocation` / `tier_overrides` → `customer_allocation` (P-C.2). The
+  fulfillment family is a **customer-stage, project-default** concern: it is read from
+  `policy_defaults.fulfillment` only — there is no plant-side fulfillment slot, and there are no
+  per-customer or per-plant fulfillment parameters. The `/policies` UI reflects this: fulfillment is
+  edited in the customer-stage defaults card, not as grid columns. A per-node fulfillment patch
+  carrying a consumed field (backorder / allocation / service level) is **not applied and is reported**
+  as a `warn` (the customer grid's `sourcing_firm` / `primary_source` firm-routing hints are not
+  fulfillment parameters and never warn).
+- **Finished-goods safety stock (P-P.4)** is gated on the products' actual engine `fulfillment_mode`
+  (`products.fulfillment_mode` → `projects.supply_chain_model`), not on the separate policy
+  `fulfillment_strategy` string; when the two disagree the mapper emits a warning instead of silently
+  mis-gating. Extended UI modes `configure_to_order` / `engineer_to_order` are not modeled and collapse
+  to MTO with a warning.
 - `sourcing.strategy` / `recovery.response` → enable `backup_supplier`, `expedited_shipments`,
   `short_term_capacity`.
 

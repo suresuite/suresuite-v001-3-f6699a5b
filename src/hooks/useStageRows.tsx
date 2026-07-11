@@ -267,17 +267,6 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             const meta = matMeta.get(String(material));
             const count = meta?.count ?? 1;
             const isSuggested = meta?.primary === String(supplier);
-            // Share % per (material, supplier) pair. Single source → 100%.
-            // Numerator and denominator both come from the deduped volByPair map,
-            // so a material's suppliers always sum to 100%.
-            const laneVolume = volByPair.get(key) ?? 0;
-            const totalVolume = meta?.total ?? 0;
-            const sharePct =
-              count <= 1
-                ? 100
-                : totalVolume > 0
-                ? (laneVolume / totalVolume) * 100
-                : 100 / count;
             const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
             const material_price = resolveField(
               prov,
@@ -285,27 +274,18 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               enrich.unit_price,
               impute(inPriceByMaterial, String(material), inPriceGlobal),
             );
-            const lead_time_mean_days = resolveField(
-              prov,
-              "lead_time_mean_days",
-              enrich.lead_time_days,
-              impute(inLeadByMaterial, String(material), inLeadGlobal),
-            );
             seen.set(key, {
               key,
               supplier_id: supplier,
               material_id: material,
               // Real uploaded data where available, else smart-average imputed.
               material_price,
-              lead_time_mean_days,
               lead_time_distribution: "normal",
               // No capacity exists in uploads → unlimited (documented default).
               supplier_capacity_per_day: 999_999_999,
               ordering_cost: 0,
               moq: 0,
               safety_stock_days: 0,
-              // Read-only allocation share for this material/supplier pair.
-              share_pct: Math.round(sharePct * 10) / 10,
               // Single source → auto-lock. Multi-source → auto-enable the
               // suggested supplier, leave the rest off (user can still change).
               primary_source: count === 1 ? true : isSuggested,
@@ -475,33 +455,10 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             const firms = meta?.firms ?? [];
             const suggestedFirm = meta?.firm ?? "";
             const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
-            const price = resolveField(
-              prov,
-              "price",
-              enrich.unit_price,
-              impute(outPriceByProduct, String(product), outPriceGlobal),
-            );
-            const mean_per_day = resolveField(
-              prov,
-              "mean_per_day",
-              enrich.volume_per_day,
-              impute(outVolByProduct, String(product), outVolGlobal),
-            );
-            const delivery_window_days = resolveField(
-              prov,
-              "delivery_window_days",
-              enrich.expected_lead_time_days,
-              impute(outLeadByProduct, String(product), outLeadGlobal),
-            );
             seen.set(key, {
               key,
               customer_id: customer,
               product_id: product,
-              // Real uploaded data where available, else smart-average imputed.
-              price,
-              mean_per_day,
-              delivery_window_days,
-              backorder_cost_per_day: 0,
               // Prefill the suggested sourcing firm; single firm → only option.
               sourcing_firm: suggestedFirm || undefined,
               // Single firm → lock primary. Multi-firm → auto-enable the

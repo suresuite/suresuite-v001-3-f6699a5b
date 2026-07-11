@@ -288,12 +288,26 @@ def _merged_policy(policies: dict, node_id: str, family: str) -> dict:
     return {**default, **override}
 
 
-def _fulfillment_mode(raw: Optional[str], project_model: Optional[str]) -> FulfillmentMode:
+# Extended fulfillment strategies the UI offers (FulfillmentStrategy) that the
+# engine does not model — they collapse to MTO. Warned so the collapse is never silent.
+_MODE_COLLAPSED_TO_MTO = {"cto", "configure_to_order", "eto", "engineer_to_order"}
+
+
+def _fulfillment_mode(
+    raw: Optional[str],
+    project_model: Optional[str],
+    w: Optional[list["MappingWarning"]] = None,
+    product_id: Optional[str] = None,
+) -> FulfillmentMode:
     token = (raw or project_model or "").strip().lower().replace("-", "_").replace(" ", "_")
     if token in ("mts", "make_to_stock"):
         return FulfillmentMode.MTS
     if token in ("ato", "assemble_to_order"):
         return FulfillmentMode.ATO
+    if token in _MODE_COLLAPSED_TO_MTO and w is not None:
+        w.append(MappingWarning(
+            "warn", f"product:{product_id or '?'}", "fulfillment_mode",
+            f"fulfillment mode {token!r} is not modeled by the engine — treated as make_to_order (MTO)"))
     return FulfillmentMode.MTO
 
 
@@ -466,6 +480,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
 
     # ── Products ──
     products: list[Product] = []
+    product_modes: set[FulfillmentMode] = set()
     for p in data.products:
         prod_pol = _merged_policy(data.policies, p.id, "production")
         # price
@@ -499,7 +514,8 @@ def from_project_data(data: ProjectData) -> MappingResult:
             cap = max(mean * 2.0, 1000.0)
             w.append(MappingWarning("warn", f"product:{p.id}", "production_capacity",
                                     "no capacity source → defaulted (capacity will not bind)"))
-        mode = _fulfillment_mode(p.fulfillment_mode, data.project_model)
+        mode = _fulfillment_mode(p.fulfillment_mode, data.project_model, w, p.id)
+        product_modes.add(mode)
         cv = float(p.demand_cv) if p.demand_cv is not None else (
             float((sc.demand_model or {}).get("cv")) if (sc.demand_model or {}).get("cv") is not None else _DEFAULT_CV
         )
@@ -540,7 +556,8 @@ def from_project_data(data: ProjectData) -> MappingResult:
     for link in links:
         sups_by_mat.setdefault(link.material_id, set()).add(link.supplier_id)
     policies = _map_policies(data.policies, w, n_customers=len(customers),
-                             sups_by_mat=sups_by_mat)
+                             sups_by_mat=sups_by_mat,
+                             has_mts=(FulfillmentMode.MTS in product_modes))
 
     scenario = Scenario(name=sc.name or "scenario", network=network,
                         settings=settings, events=events, policies=policies)
@@ -668,9 +685,22 @@ def _multi_sourcing_weights(
     return weights
 
 
+# Fulfillment fields the engine consumes at the PROJECT default scope only
+# (P-C.1 unmet_demand_handling + P-C.2 customer_allocation). A per-node override
+# carrying any of these is not applied — warned rather than dropped silently (doc §6).
+# (primary_source / sourcing_firm are firm-routing hints, never engine params, so
+# they are deliberately excluded here and never trigger the warning.)
+_FULFILLMENT_DEFAULT_ONLY = frozenset({
+    "backorder_allowed", "max_backorder_days", "backorder_cost_per_day",
+    "lost_sales_cost_per_unit", "allocation", "tier_overrides",
+    "service_level_alpha", "service_level_beta", "price",
+})
+
+
 def _map_policies(
     policies: dict, w: list[MappingWarning], n_customers: int = 0,
     sups_by_mat: Optional[dict[str, set[str]]] = None,
+    has_mts: bool = False,
 ) -> dict[str, dict]:
     out: dict[str, dict] = {}
     default = policies.get("default") or {}
@@ -679,6 +709,18 @@ def _map_policies(
     sourcing = default.get("sourcing") or {}
     recovery = default.get("recovery") or {}
     sups_by_mat = sups_by_mat or {}
+
+    # Surface per-node fulfillment overrides the engine will not apply.
+    dropped_fulfil = sum(
+        1 for k, fams in policies.items()
+        if isinstance(k, str) and k.startswith("node:")
+        and any(f in (fams.get("fulfillment") or {}) for f in _FULFILLMENT_DEFAULT_ONLY)
+    )
+    if dropped_fulfil:
+        w.append(MappingWarning(
+            "warn", "policy:unmet_demand_handling", "fulfillment",
+            f"{dropped_fulfil} per-node fulfillment override(s) not applied — backorder, "
+            "allocation and service level are consumed at the project default scope only"))
 
     type_map = {
         "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
@@ -746,10 +788,15 @@ def _map_policies(
                 "P-S.2 skipped (add a second qualified supplier arc)"))
 
     # P-P.4 finished-goods safety stock — MTS only (MTO builds no FG stock).
+    # Gate on the engine's ACTUAL product mode (`has_mts`, resolved from
+    # products.fulfillment_mode / supply_chain_model), not the separate policy
+    # `fulfillment_strategy` string; warn when the two disagree so the split
+    # between the two "fulfillment mode" fields can never silently mis-gate.
     fg = str(inv.get("fg_safety_stock", "none") or "none")
     if fg != "none":
-        mode = str(default.get("fulfillment_strategy", "")).strip().lower()
-        if mode in ("mts", "make_to_stock"):
+        strat = str(default.get("fulfillment_strategy", "")).strip().lower()
+        strat_is_mts = strat in ("mts", "make_to_stock")
+        if has_mts:
             if fg == "service_level":
                 out["fg_safety_stock"] = {
                     "sizing": "service_level",
@@ -763,6 +810,16 @@ def _map_policies(
                     "fixed_days_cover": _clamp(float(inv.get("fg_safety_stock_days", 2.0)), 0.0, 12.0),
                     "segmentation": "uniform",
                 }
+            if strat and not strat_is_mts:
+                w.append(MappingWarning(
+                    "info", "policy:fg_safety_stock", "fulfillment_strategy",
+                    f"fulfillment_strategy={strat!r} but MTS products exist — FG safety "
+                    "stock applied per the products' actual fulfillment mode"))
+        elif strat_is_mts:
+            w.append(MappingWarning(
+                "warn", "policy:fg_safety_stock", "fulfillment_strategy",
+                "fulfillment_strategy=make_to_stock but no product is make_to_stock "
+                "(products.fulfillment_mode / supply_chain_model) — FG safety stock skipped"))
         else:
             w.append(MappingWarning(
                 "warn", "policy:fg_safety_stock", "fg_safety_stock",
