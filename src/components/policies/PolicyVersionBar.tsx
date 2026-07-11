@@ -23,8 +23,18 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { History, Save, GitBranch, RotateCcw } from "lucide-react";
+import {
+  History,
+  Save,
+  GitBranch,
+  RotateCcw,
+  Download,
+  Trash2,
+  Pencil,
+  Lock,
+} from "lucide-react";
 import type { PolicyVersion } from "@/hooks/usePolicies";
 
 interface Props {
@@ -32,8 +42,14 @@ interface Props {
   selectedVersionId: string | null;
   isDirty?: boolean;
   onSelect: (id: string | null) => void;
-  onSave: (label?: string) => Promise<string | null>;
+  onSave: (label?: string, notes?: string) => Promise<string | null>;
   onRestore: (id: string) => Promise<void>;
+  /** 6.D — export a saved version's bundle to Excel. */
+  onExport?: (version: PolicyVersion) => Promise<void>;
+  /** 6.D — delete a version (guarded server-side against bound runs/cards). */
+  onDelete?: (versionId: string) => Promise<boolean>;
+  /** 6.D — edit a version's free-text notes. */
+  onUpdateNotes?: (versionId: string, notes: string) => Promise<void>;
 }
 
 function formatWhen(iso: string) {
@@ -53,10 +69,18 @@ export function PolicyVersionBar({
   onSelect,
   onSave,
   onRestore,
+  onExport,
+  onDelete,
+  onUpdateNotes,
 }: Props) {
   const [saveOpen, setSaveOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [label, setLabel] = useState("");
+  const [notes, setNotes] = useState("");
+  // Inline notes editing in the history sheet (6.D).
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const current = versions.find((v) => v.id === selectedVersionId) ?? null;
   const parentLabel = (id: string | null) =>
@@ -146,6 +170,7 @@ export function PolicyVersionBar({
         className="h-8 text-xs gap-1"
         onClick={() => {
           setLabel("");
+          setNotes("");
           setSaveOpen(true);
         }}
       >
@@ -177,12 +202,26 @@ export function PolicyVersionBar({
               Captures the current policy bundle, the model you started from, and your identity.
             </DialogDescription>
           </DialogHeader>
-          <Input
-            autoFocus
-            placeholder="Label (optional) — e.g. Pre-Q4 freeze"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Label</label>
+            <Input
+              autoFocus
+              placeholder="Label (optional) — e.g. Pre-Q4 freeze"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-muted-foreground">
+              Notes <span className="font-normal">(optional) — a description of this model</span>
+            </label>
+            <Textarea
+              placeholder="What is this model? assumptions, scope, what changed and why…"
+              value={notes}
+              rows={3}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
           {current && (
             <p className="text-[11px] text-muted-foreground">
               Parent: <span className="font-medium">{current.label || current.id.slice(0, 8)}</span>
@@ -196,7 +235,7 @@ export function PolicyVersionBar({
               size="sm"
               onClick={async () => {
                 setSaveOpen(false);
-                await onSave(label.trim() || undefined);
+                await onSave(label.trim() || undefined, notes.trim() || undefined);
               }}
             >
               Save
@@ -221,6 +260,9 @@ export function PolicyVersionBar({
             )}
             {versions.map((v) => {
               const isSelected = v.id === selectedVersionId;
+              const refCount = (v.run_count ?? 0) + (v.card_count ?? 0);
+              const referenced = refCount > 0;
+              const editing = editingNotesId === v.id;
               return (
                 <div
                   key={v.id}
@@ -232,11 +274,22 @@ export function PolicyVersionBar({
                     <span className="font-medium">
                       {v.label || `Version ${v.id.slice(0, 8)}`}
                     </span>
-                    {isSelected && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        Selected
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {referenced && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] gap-1"
+                          title={`Referenced by ${v.run_count ?? 0} run(s) and ${v.card_count ?? 0} model card(s)`}
+                        >
+                          <Lock className="h-2.5 w-2.5" /> in use
+                        </Badge>
+                      )}
+                      {isSelected && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Selected
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     {formatWhen(v.created_at)} · by{" "}
@@ -245,7 +298,77 @@ export function PolicyVersionBar({
                   <div className="text-[11px] text-muted-foreground">
                     Parent: {parentLabel(v.parent_version_id)}
                   </div>
-                  <div className="flex gap-2 mt-1">
+
+                  {/* Notes (6.D) — free-text model description, inline-editable. */}
+                  {editing ? (
+                    <div className="flex flex-col gap-1.5 mt-1">
+                      <Textarea
+                        autoFocus
+                        rows={3}
+                        value={notesDraft}
+                        onChange={(e) => setNotesDraft(e.target.value)}
+                        placeholder="Describe this model…"
+                        className="text-xs"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-6 text-[11px]"
+                          disabled={busyId === v.id}
+                          onClick={async () => {
+                            setBusyId(v.id);
+                            await onUpdateNotes?.(v.id, notesDraft);
+                            setBusyId(null);
+                            setEditingNotesId(null);
+                          }}
+                        >
+                          Save notes
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[11px]"
+                          onClick={() => setEditingNotesId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : v.notes ? (
+                    <div className="mt-1 flex items-start gap-1.5">
+                      <p className="text-[11px] text-foreground/80 whitespace-pre-wrap flex-1">
+                        {v.notes}
+                      </p>
+                      {onUpdateNotes && (
+                        <button
+                          type="button"
+                          title="Edit notes"
+                          className="text-muted-foreground hover:text-foreground shrink-0"
+                          onClick={() => {
+                            setEditingNotesId(v.id);
+                            setNotesDraft(v.notes ?? "");
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    onUpdateNotes && (
+                      <button
+                        type="button"
+                        className="mt-0.5 self-start text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                        onClick={() => {
+                          setEditingNotesId(v.id);
+                          setNotesDraft("");
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" /> Add notes
+                      </button>
+                    )
+                  )}
+
+                  <div className="flex flex-wrap gap-2 mt-1.5">
                     <Button
                       variant="outline"
                       size="sm"
@@ -267,6 +390,48 @@ export function PolicyVersionBar({
                     >
                       <RotateCcw className="h-3 w-3" /> Load
                     </Button>
+                    {onExport && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px] gap-1"
+                        disabled={busyId === v.id}
+                        onClick={async () => {
+                          setBusyId(v.id);
+                          await onExport(v);
+                          setBusyId(null);
+                        }}
+                      >
+                        <Download className="h-3 w-3" /> Export
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-[11px] gap-1 text-destructive hover:text-destructive ml-auto disabled:opacity-40"
+                        disabled={referenced || busyId === v.id}
+                        title={
+                          referenced
+                            ? `Can't delete — referenced by ${v.run_count ?? 0} run(s) and ${v.card_count ?? 0} model card(s)`
+                            : "Delete this version"
+                        }
+                        onClick={async () => {
+                          if (
+                            typeof window !== "undefined" &&
+                            !window.confirm(
+                              `Delete version "${v.label || v.id.slice(0, 8)}"? This cannot be undone.`,
+                            )
+                          )
+                            return;
+                          setBusyId(v.id);
+                          await onDelete(v.id);
+                          setBusyId(null);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" /> Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               );

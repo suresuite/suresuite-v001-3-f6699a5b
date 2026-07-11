@@ -635,7 +635,7 @@ field on save/edit (persisted on the version record, distinct from the label).
       flag (6.B)
 - [ ] Persist per-material / per-FG inventory, FG output, per-cost time series (6.C)
 - [ ] Run panel **indicator picker** for single & multi run (6.C)
-- [ ] Version history: **Export**, **Delete**, **Notes** (6.D)
+- [x] Version history: **Export**, **Delete**, **Notes** (6.D)
 - [x] Run & job-queue console: show all jobs, per-job cancel (6.E)
 
 ### 6.E — Run & job-queue UI (single + multiple run): "is it working, and can I cancel it?"

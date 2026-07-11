@@ -60,6 +60,9 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     bulkUpsertOverrides,
     deleteOverride,
     saveSnapshot,
+    updateVersionNotes,
+    deleteVersion,
+    exportVersion,
   } = usePolicies(projectId);
 
   const { ctx, hasData } = useProjectContext({ projectId, fulfillmentStrategy });
@@ -121,6 +124,9 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                   onSelect={setSelectedVersionId}
                   onSave={saveSnapshot}
                   onRestore={restoreVersion}
+                  onExport={exportVersion}
+                  onDelete={deleteVersion}
+                  onUpdateNotes={updateVersionNotes}
                 />
                 <TimeUnitBar
                   projectId={projectId}
