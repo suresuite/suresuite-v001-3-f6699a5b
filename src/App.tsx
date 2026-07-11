@@ -8,6 +8,7 @@ import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import RoleGuard from '@/components/RoleGuard';
+import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 
 // Import pages
 import Auth from './pages/Auth';
@@ -48,6 +49,7 @@ function App() {
           <CapabilitiesProvider>
           <GlobalProjectProvider>
             <Router>
+              <RouteErrorBoundary>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
               <Route path="/forbidden" element={<Forbidden />} />
@@ -177,6 +179,7 @@ function App() {
                 <Route path="/admin/usage" element={<ProtectedRoute><RoleGuard><AdminUsage isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/audit" element={<ProtectedRoute><RoleGuard><AdminAudit isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
               </Routes>
+              </RouteErrorBoundary>
               <FloatingChatBubble />
             </Router>
           </GlobalProjectProvider>
