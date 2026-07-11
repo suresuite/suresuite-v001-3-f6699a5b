@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -11,7 +14,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Loader2, Plus, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { OrgAccessDrawer } from '@/components/admin/OrgAccessDrawer';
 
@@ -34,9 +45,11 @@ interface OrgRow {
 const db = supabase as any;
 
 export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Props) {
+  const { user: actor } = useAuth();
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessOrg, setAccessOrg] = useState<OrgRow | null>(null);
+  const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
   const load = async () => {
     setLoading(true);
@@ -86,15 +99,13 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
 
   const toggleStatus = async (row: OrgRow) => {
     const next = row.status === 'active' ? 'suspended' : 'active';
-    const { error } = await db.from('organizations').update({ status: next }).eq('id', row.id);
-    if (error) return toast.error(error.message);
-    await db.rpc('log_admin_action', {
-      p_action: 'org.set_status',
-      p_target_type: 'organizations',
-      p_target_id: row.id,
-      p_before: { status: row.status },
-      p_after: { status: next },
+    const { error } = await db.rpc('admin_set_org_status', {
+      ...actorArgs(),
+      p_org_id: row.id,
+      p_status: next,
     });
+    if (error) return toast.error(error.message);
+    toast.success(next === 'active' ? 'Reactivated' : 'Suspended');
     load();
   };
 
@@ -105,9 +116,12 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
       title="Organizations"
       description="Every organization on the platform."
       actions={
-        <Button variant="outline" size="sm" onClick={load}>
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={load}>
+            Refresh
+          </Button>
+          <AddOrgDialog actorArgs={actorArgs} onCreated={load} />
+        </div>
       }
     >
       <div className="rounded-md border border-border bg-card">
@@ -171,5 +185,88 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
         />
       )}
     </AdminLayout>
+  );
+}
+
+function AddOrgDialog({
+  actorArgs,
+  onCreated,
+}: {
+  actorArgs: () => { p_actor_id?: string; p_actor_email?: string };
+  onCreated: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+
+  const create = async () => {
+    if (!name.trim()) return toast.error('Name is required');
+    setSaving(true);
+    const { error } = await db.rpc('admin_create_organization', {
+      ...actorArgs(),
+      p_name: name.trim(),
+      p_slug: slug.trim() || null,
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Organization "${name.trim()}" created`);
+    setName('');
+    setSlug('');
+    setOpen(false);
+    onCreated();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) {
+          setName('');
+          setSlug('');
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="mr-1 h-4 w-4" /> Add organization
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add organization</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div>
+            <Label className="text-xs">Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1"
+              placeholder="Acme Robotics"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Slug (optional)</Label>
+            <Input
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              className="mt-1"
+              placeholder="auto-generated from name"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={create} disabled={saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Create organization
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
