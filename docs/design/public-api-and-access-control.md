@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.1 — plan for exposing the simulation platform as programmatically-accessible software with a hardened access-control layer |
-| **Date** | 2026-07-11 |
+| **Status** | v0.2 — **adopted**; the Phase 0–2 foundation is implemented: gateway `supabase/functions/api` (/v1), migration `20260711000001_api_access_control.sql` (keys/logs/quotas/RPCs), shared dispatch `supabase/functions/_shared/dispatch.ts`, key-management UI at `/developer`, reference docs `docs/api/README.md`. The §16 blueprint edits are applied (G15). Outstanding: webhooks/realtime tokens, OpenAPI generation + SDKs, sandbox seeding, OAuth tokens, pre-launch pen-test (Phases 3–4). |
+| **Date** | 2026-07-11 (v0.1 and adoption same day) |
 | **Altitude** | Platform capability design: a public, versioned HTTP API over the existing control plane, plus the authentication, authorization, quota, and audit machinery that makes it safe to expose |
 | **Authority** | Governed by `docs/design/next-gen-platform-design.md`. This document proposes a **new capability and a new gap (G15)** the blueprint does not yet cover; §16 lists the exact blueprint edits to apply when this plan is adopted, per the "document and code move together" rule in `CLAUDE.md`. |
 | **Non-goals** | SQL DDL, finished code, dated schedules, a public billing/pricing system, a GraphQL surface (REST first) |
@@ -180,7 +180,16 @@ sk_test_<keyid8>_<secret32>      # sandbox / non-billable / rate-limited harder
 | `status`, `expires_at`, `last_used_at`, `revoked_at`, `revoked_by` | lifecycle |
 | `created_at`, `name`, `note` | management/UX |
 
-RLS: only `current_is_super_admin()` or the key's `org` admins can read/manage rows for their org; **`secret_hash` is never exposed to any read path** (served through a view that omits it). Writes go through SECURITY DEFINER RPCs (`create_api_key`, `revoke_api_key`, `rotate_api_key`) that return the plaintext exactly once, on creation, and log to `admin_audit_logs`.
+RLS: only `current_is_super_admin()` or the key's `org` admins can read/manage rows for their org — **plus app-role `modeler`** *(v0.2 implementation decision: modelers are this app's developer persona, and a modeler-led org would otherwise have nobody who can mint a key; plain `user` accounts cannot)*; **`secret_hash` is never exposed to any read path** (the table has no anon/authenticated grants at all — every UI read goes through `list_api_keys`, which omits the hash). Writes go through SECURITY DEFINER RPCs (`create_api_key`, `revoke_api_key`, `rotate_api_key`) that return the plaintext exactly once, on creation, and log to `admin_audit_logs`.
+
+> **Residual risk (documented, accepted for v1):** the key-management RPCs are called from the
+> browser tier and therefore inherit its client-asserted identity (`p_user_id` +
+> `set_current_user_context`, §2.1) — the same trust model as `list_projects` and every other
+> write RPC in the app. This adds no *new* capability to an anon-key holder (who can already
+> assert identity against all of those), and every mint/rotate/revoke is audited with the
+> asserted actor — but Q2 (migrating the browser app to a server-verified identity) is what
+> ultimately closes it. **The API path itself is unaffected:** `/v1` identity comes only from
+> the hashed key.
 
 ### 5.3 Verification flow (gateway step 2)
 
@@ -419,7 +428,7 @@ The API is **cross-cutting infrastructure**, not a single blueprint phase. Its n
 
 ## 16. Blueprint integration & traceability (edits to apply on adoption)
 
-Per `CLAUDE.md` ("the document and the code move together; the blueprint is never allowed to go stale"), adopting this plan entails these edits to `docs/design/next-gen-platform-design.md`, made in the same PR as the first API code:
+Per `CLAUDE.md` ("the document and the code move together; the blueprint is never allowed to go stale"), adopting this plan entails these edits to `docs/design/next-gen-platform-design.md`, made in the same PR as the first API code *(✅ all five applied with the Phase 0–2 implementation)*:
 
 1. **Gap catalog (§2.3):** add **G15 — "No programmatic API or external access-control layer."** Evidence: `sim-command` authorizes by project-existence with the service role (`index.ts:653-664`); identity is client-asserted (`set_current_user_context`); a single hardcoded anon key fronts all traffic (`client.ts:6`). Consequence: the platform cannot be driven as software by external systems, and cannot be safely exposed as-is.
 2. **Roadmap (§13):** add an **"API & Access Control"** workstream noting the foundation begins alongside Phase B and the dispatch surface GAs with Phase C; cross-reference this document.

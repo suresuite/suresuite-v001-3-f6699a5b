@@ -20,6 +20,7 @@ import ProjectPolicies from './pages/ProjectPolicies';
 import SimulationLab from './pages/SimulationLab';
 import ProjectIntelligence from './pages/ProjectIntelligence';
 import Profile from './pages/Profile';
+import DeveloperApi from './pages/DeveloperApi';
 import Forbidden from './pages/Forbidden';
 import DocsLayout from '@/components/docs/DocsLayout';
 import HelpPage from './pages/help/HelpPage';
@@ -136,6 +137,14 @@ function App() {
                         isCollapsed={isCollapsed} 
                         setIsCollapsed={setIsCollapsed} 
                     /></RoleGuard>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/developer"
+                  element={
+                    <ProtectedRoute>
+                      <RoleGuard><DeveloperApi isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard>
                     </ProtectedRoute>
                   }
                 />

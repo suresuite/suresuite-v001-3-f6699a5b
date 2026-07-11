@@ -27,6 +27,7 @@ Section map against the design brief:
 | 7. AnyLogistix benchmark | §10 |
 | 8/9. Stress testing, surrogate model, data/model/version management | §9 (experimentation), §11 (surrogate architecture) |
 | Verification & validation → confident decision support (v0.2 review) | §9.5 (model-credibility pipeline), G13 |
+| Programmatic access & access control (API workstream) | G15, §13 cross-cutting workstream, `docs/design/public-api-and-access-control.md` |
 | Roadmap | §13 |
 
 Companion descriptive document: `docs/design/platform-architecture-report.md` — the platform described *as built* from technical and supply-chain-management viewpoints, framed as a scientific report skeleton. This blueprint stays normative (what to build and why); the report is descriptive (what exists and how to present it).
@@ -171,6 +172,7 @@ Numbered gaps, each cited to evidence. Later sections reference these IDs; §13'
 | **G12** | **No surrogate/ML layer.** No metamodels, no run-result reuse for training, no model registry (the former ml-service was removed) | repo-wide search | Every question costs a full simulation; large-scale stress testing is computationally prohibitive |
 | **G13** | **V&V outcomes are not persisted — no model-credibility artifact.** *(added in v0.2)* The Run & Validate stage detects warm-up and checks replication adequacy, but the adopted warm-up, replication recommendation, and validation verdict live only in browser `localStorage`; `scenarios.warmup_mode/warmup_days` keep their defaults; nothing marks a `policy_versions` snapshot as validated | `src/components/policies/RunValidateStage.tsx` (persistKey → localStorage), `scenarios` schema defaults, `policy_versions` columns | The credibility established in `/policies` never reaches the Simulation Lab: decision runs neither inherit the adopted warm-up/replication settings nor show validation status — users can unknowingly base decisions on an unvalidated or drifted configuration. §9.5 defines the fix |
 | **G14a** | **The Run & Validate surface under-uses persisted evidence and dilutes it with synthetic content.** *(added with §9.5.1)* Only 5 of the ~20 per-replication KPIs the engine persists were offered as focal KPIs; the cost decomposition and financial view were never shown; pre-run panels rendered invented traces (a client-side PRNG) and a decorative topology animation next to real engine output | `src/components/policies/RunValidateStage.tsx` (KPI_OPTIONS, `simulateKpiTrace`, `MaterialFlowAnimated`) | The trust-building surface undersells the model and — worse — teaches users that some of what they see there is invented, so they discount the rest. §9.5.1 defines the fix; steps (1)+(2) shipped in Phase B0 |
+| **G15** | **No programmatic API or external access-control layer.** *(added with the API workstream)* The platform cannot be driven as software by external systems, and cannot be safely exposed as-is: `sim-command` authorizes by project-existence with the service role (`index.ts` — *"access control lives in that RPC layer, not here"*); identity is client-asserted (`set_current_user_context`); a single hardcoded anon key fronts all traffic (`src/integrations/supabase/client.ts`); no per-caller rate limits or compute quotas exist on the dispatch path | `supabase/functions/sim-command/index.ts`, `src/hooks/useAuth.tsx`, `src/integrations/supabase/client.ts` | Partners, CI jobs, and notebooks cannot integrate; exposing the current control plane directly would be an open door (spoofing, IDOR on `project_id`, cost amplification). `docs/design/public-api-and-access-control.md` defines the fix: a key-authenticated `/v1` gateway adding identity, scopes, tenancy, quotas, and audit in front of the existing operations |
 
 ### 2.4 Assumptions currently embedded in the simulation
 
@@ -884,7 +886,7 @@ Kept short and grounded — each item anchors to an existing artifact, and all o
 
 Engineering discipline: agents are stateless per task (context assembled from project artifacts, not conversation memory — reproducible, auditable); every action lands as a reviewable artifact, so the platform's immutability/single-writer disciplines contain agent error by construction; a golden task suite per agent gates roster changes in CI, mirroring the golden-trace gate on engine changes. Success metrics are product metrics: time-to-complete-model (A1), accepted-proposal rate (A2), models reaching validated state (A3), question-to-brief latency (A4), citation coverage (A5).
 
-**Guardrail (platform law):** LLM output is always a *proposal* that passes the same validation gates as human input; simulation results, KPIs, and rankings are never LLM-generated. The AI layer sits beside the provenance fabric, never inside it. No agent has a privileged path: every tool surface is a subset of the platform's existing public interfaces.
+**Guardrail (platform law):** LLM output is always a *proposal* that passes the same validation gates as human input; simulation results, KPIs, and rankings are never LLM-generated. The AI layer sits beside the provenance fabric, never inside it. No agent has a privileged path: every tool surface is a subset of the platform's existing public interfaces. **The same law governs the public API (G15):** every `/v1` endpoint is a subset of the platform's existing, already-guarded operations — the gateway adds identity, authorization, quotas, and audit, and never adds a privileged path the UI does not already have (`docs/design/public-api-and-access-control.md` §0).
 
 ---
 
@@ -973,6 +975,24 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 - Multimodal transport at full fidelity (P-T.1/T.3 across lanes with mode capacity/cost).
 - Network-design/optimization exploration (build-vs-integrate, §14).
 - **Exit criteria set when Phase C/D learnings land.** Extends the platform beyond the assumptions inventoried in §2.4.
+
+### Cross-cutting workstream — API & Access Control (G15)
+
+Not a phase of its own: the public `/v1` API rides the phases above. Its **security
+foundation (API Phases 0–1: key-authenticated gateway, scopes + tenancy, rate limits,
+request audit, key-management UI) begins alongside Phase B** — it depends only on
+artifacts that already exist (tenancy tables, audit pattern, Upstash, the dispatch
+path). The **write/dispatch surface (API Phase 2) GAs with Phase C**, whose
+experimentation machinery and content-addressed run cache (§9.2) are the API's headline
+value; experiment/surrogate endpoints follow their capabilities (Phases C/D).
+
+> **Design addendum (approved):** `docs/design/public-api-and-access-control.md` is the
+> companion design doc for this workstream — credential model (hashed show-once API
+> keys), scope/tenancy authorization, quotas and idempotency, the STRIDE threat model,
+> endpoint surface, and rollout phases 0–4. The gateway
+> (`supabase/functions/api`), key RPCs (migration `20260711000001_api_access_control.sql`),
+> the shared dispatch extraction (`_shared/dispatch.ts`), and the `/developer`
+> key-management page implement its Phases 0–2 foundation.
 
 ---
 
@@ -1080,4 +1100,4 @@ Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs
 
 **Glossary.** *PolicyBundle*: a node instance's resolved `{slot → (policy_id, params)}` map (§4.3). *Slot*: a decision domain a node role must fill (§4.4). *Promoted default*: an engine mechanic given a policy ID and UI visibility (`.0` convention). *Registry export*: the single JSON payload (`registry_export.py`) from which forms, validators, and docs are generated. *Required-data manifest*: the compiled set of entity fields the selected policies demand (§8.1). *RunKey*: content-addressed run identity (§9.2). *Family digest*: `SnapshotStore`'s hash over network+settings+policies excluding events (A8). *Dual reliability gate*: interval-width + novelty test that routes surrogate predictions back to simulation (§11.2). *Three-hash provenance*: `graph_hash` + `policy_hash` + `scenario_hash` binding every run (§8.4). *Validated model card*: the persisted V&V outcome (adopted warm-up, replication recommendation, validation verdict) bound to a provenance triple; Lab scenarios inherit it and runs display its status (§9.5).
 
-**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D. G13 unpersisted V&V outcomes → §9.5, Phase B0. G14a Run & Validate trust surface → §9.5.1, Phase B0.
+**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D. G13 unpersisted V&V outcomes → §9.5, Phase B0. G14a Run & Validate trust surface → §9.5.1, Phase B0. G15 API & access control → `docs/design/public-api-and-access-control.md`, API Phases 0–4 (§13 cross-cutting workstream).
