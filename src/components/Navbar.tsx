@@ -15,6 +15,7 @@ import {
   Brain,
   SlidersHorizontal,
   Shield,
+  Code2,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,12 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
         icon: Brain,
         label: "Project Intelligence",
         tooltip: "AI-powered project insights",
+      },
+      {
+        to: "/developer",
+        icon: Code2,
+        label: "Developer API",
+        tooltip: "API keys, scopes, and quickstarts for programmatic access",
       },
     ],
   },

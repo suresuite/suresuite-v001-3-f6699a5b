@@ -28,3 +28,9 @@ verify_jwt = false
 # The function validates the caller's JWT itself (RLS-aware createClient with
 # the forwarded Authorization header); platform verification stays on too.
 verify_jwt = true
+
+[functions.api]
+# Public /v1 gateway (API Phase 0 / G15). Callers authenticate with hashed
+# API keys (`Authorization: Bearer sk_…`), not Supabase JWTs, so platform JWT
+# verification must be off — the function fails closed on its own auth.
+verify_jwt = false

@@ -6,6 +6,7 @@ on:
     paths:
       - 'supabase/functions/project-ai-chat/**'
       - 'supabase/functions/sim-command/**'
+      - 'supabase/functions/api/**'
       - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
@@ -78,5 +79,13 @@ jobs:
       # "Failed to send a request to the Edge Function" on Run.
       - name: Deploy sim-command
         run: supabase functions deploy sim-command --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Deploy the public /v1 API gateway (API Phase 0 / G15). verify_jwt is
+      # off in config.toml — the gateway authenticates hashed API keys itself
+      # and fails closed on auth/authz/quota.
+      - name: Deploy api gateway
+        run: supabase functions deploy api --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
