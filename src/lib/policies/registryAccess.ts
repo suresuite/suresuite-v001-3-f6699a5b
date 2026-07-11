@@ -82,6 +82,14 @@ export const catalogRef = (id: string): string | undefined => BY_ID.get(id)?.cat
 
 export const isImplemented = (id: string): boolean => BY_ID.get(id)?.status === "implemented";
 
+/** Full JSON-Schema prop for a policy parameter (type/unit/range/default/…). */
+export const paramProp = (policyId: string, field: string): RegistryParamProp | undefined =>
+  BY_ID.get(policyId)?.params_schema?.properties?.[field];
+
+/** Ordered param field names declared for a policy. */
+export const paramFields = (policyId: string): string[] =>
+  Object.keys(BY_ID.get(policyId)?.params_schema?.properties ?? {});
+
 /** Enum values the engine accepts for a policy parameter, or undefined. */
 export const paramEnum = (policyId: string, field: string): string[] | undefined =>
   BY_ID.get(policyId)?.params_schema?.properties?.[field]?.enum;
