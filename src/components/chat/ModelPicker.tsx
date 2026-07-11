@@ -1,4 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 export const CHAT_MODELS = [
   { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
@@ -31,6 +32,12 @@ interface Props {
 }
 
 export function ModelPicker({ value, onChange, className }: Props) {
+  const { isModelAllowed } = useCapabilities();
+  // Only surface models this user is permitted to call. Keep the current value
+  // visible even if disallowed, so the trigger never renders blank (the send
+  // path blocks a disallowed model with a clear reason).
+  const visible = CHAT_MODELS.filter((m) => isModelAllowed(m.id).ok || m.id === value);
+  const options = visible.length > 0 ? visible : CHAT_MODELS;
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
@@ -39,7 +46,7 @@ export function ModelPicker({ value, onChange, className }: Props) {
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="end" className="z-[110] min-w-[200px]">
-        {CHAT_MODELS.map((m) => (
+        {options.map((m) => (
           <SelectItem key={m.id} value={m.id} className="text-[13px]">
             {m.label}
           </SelectItem>
