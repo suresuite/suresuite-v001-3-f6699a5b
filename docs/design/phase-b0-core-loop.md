@@ -597,9 +597,9 @@ onCreate: async () => {
 
 | # | Lands | Depends on | Risk posture |
 |---|---|---|---|
-| 1 | Migration `20260710000001` (table + RPCs + columns) | — | additive, nullable, no behavior change |
-| 2 | RVS Adopt step + `record_model_validation` wiring | 1 | new UI step; existing steps untouched |
-| 3 | `useModelValidation` + badges on Lab/RVS surfaces | 1–2 | display-only |
+| 1 | Migration `20260710000001` (table + RPCs + columns) | — | additive, nullable, no behavior change. **Shipped.** |
+| 2 | RVS Adopt step + `record_model_validation` wiring | 1 | new UI step; existing steps untouched. **Shipped** (with the RVS half of 3: `useModelValidation` + badges on the RVS header and run panel; the RVS run config in `localStorage` demoted to a draft cache — the active card seeds the adopted warm-up / target precision on load) |
+| 3 | `useModelValidation` + badges on Lab/RVS surfaces | 1–2 | display-only. **RVS surfaces shipped**; Lab surfaces next |
 | 4 | `sim-command` stamps `scenario_hash` + `model_validation_id`; `apply_validation_to_scenario` on create | 1–3 | best-effort like dataset binding |
 | 5 | Registry export v2 + regenerated snapshots + gates | — (parallel to 1–4) | additive payload |
 | 6 | `registryAccess` v2 + `registryColumns.ts` + picker, per-stage flag | 5 | flag-gated parity flips |

@@ -1,85 +1,77 @@
-// The one credibility badge — Phase B0 / G13 / §9.5
-// (design: docs/design/phase-b0-core-loop.md §3.2).
-//
-// Rendered on the Lab run pane header, RunProgressPanel, the ResultsDashboard
-// header and the RVS banner. States are DERIVED (useModelValidation.resolve /
-// resolveRun) — this component only displays. The tooltip is the drill-in:
-// validated-when / by-whom, warm-up, n, tests, evidence run; the stale
-// variant names which component drifted.
 import { Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { Credibility, DriftComponent, ModelValidationCard } from "@/hooks/useModelValidation";
+import type {
+  Credibility,
+  DriftComponent,
+  ModelValidationCard,
+} from "@/hooks/useModelValidation";
 
-const STATE = {
-  unvalidated: {
-    Icon: Shield,
-    label: "unvalidated",
-    cls: "border-border text-muted-foreground bg-muted/40",
-  },
+// The ONE credibility badge (Phase B0 / G13 / §9.5(6); design §3.2) — rendered
+// on the Run & Validate header and run panels now, Lab surfaces next
+// increment. Everything in the tooltip is read straight off the card; the
+// state itself is derived at read time (deriveCredibility), never stored.
+
+const STATE_META = {
   validated: {
-    Icon: ShieldCheck,
     label: "validated",
-    cls: "border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10",
+    Icon: ShieldCheck,
+    cls: "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   },
   stale: {
-    Icon: ShieldAlert,
     label: "stale",
-    cls: "border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-500/10",
+    Icon: ShieldAlert,
+    cls: "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  },
+  unvalidated: {
+    label: "unvalidated",
+    Icon: Shield,
+    cls: "border-border bg-muted/40 text-muted-foreground",
   },
 } as const;
 
-const DRIFT_PROSE: Record<DriftComponent, string> = {
-  policy: "Policy settings changed since validation",
-  data: "Network data changed since validation (graph hash drifted)",
-  scenario: "Scenario world-model settings changed since validation",
-  engine: "Engine version differs from the validation evidence run",
+const DRIFT_LABEL: Record<DriftComponent, string> = {
+  policy: "policy settings changed since validation",
+  data: "network data changed since validation (graph hash drifted)",
+  scenario: "baseline scenario changed since validation",
+  engine: "engine version differs from the validation evidence run",
 };
 
-function CardDetails({ card }: { card: ModelValidationCard }) {
-  const tests = (card.validation_tests ?? []) as Array<{
-    kpi?: string;
-    ksP?: number;
-    ks_p?: number;
-    tP?: number;
-    t_p?: number;
-    pass?: boolean;
-  }>;
+function CardFacts({ card }: { card: ModelValidationCard }) {
+  const tests = card.validation_tests ?? [];
+  const passed = tests.filter((t) => t.pass).length;
   return (
-    <div className="flex flex-col gap-0.5 text-[11px]">
-      <div className="font-semibold">
-        Model validated · {new Date(card.validated_at).toLocaleDateString()}
+    <div className="flex flex-col gap-0.5">
+      <div>
+        {card.verdict === "validated" ? "Model validated" : "Model rejected"} ·{" "}
+        {new Date(card.validated_at).toLocaleString()}
         {card.author_email ? ` by ${card.author_email}` : ""}
       </div>
-      <div className="text-muted-foreground">
-        Policy {card.policy_hash.slice(0, 8)} · network {card.graph_hash.slice(0, 8)} · scenario{" "}
-        {card.scenario_hash.slice(0, 8)}
-      </div>
       <div>
-        Warm-up: <b>{card.adopted_warmup_days} days</b> ({card.warmup_method}) · Replications:{" "}
-        <b>n = {card.recommended_replications}</b>
+        Warm-up: {card.adopted_warmup_days} days ({card.warmup_method}) ·
+        Replications: n = {card.recommended_replications}
       </div>
-      {tests.length > 0 ? (
+      {tests.length > 0 && (
         <div>
-          Tests:{" "}
-          {tests
-            .slice(0, 4)
-            .map(
-              (t) =>
-                `${t.kpi ?? "kpi"} KS p=${Number(t.ksP ?? t.ks_p ?? NaN).toFixed(2)} ` +
-                `t p=${Number(t.tP ?? t.t_p ?? NaN).toFixed(2)} ${t.pass ? "✓" : "✗"}`,
-            )
-            .join(" · ")}
+          Tests: {passed}/{tests.length} KPI(s) passed (KS + Welch-t)
         </div>
-      ) : (
-        <div>Tests: none (face validation)</div>
       )}
       <div>
-        Basis: <b>{card.basis}</b>
+        Basis: {card.basis}
+        {card.basis === "face" && " (no empirical series — user-acknowledged)"}
         {card.evidence_run_id && (
-          <span className="text-muted-foreground"> · evidence: run #{card.evidence_run_id.slice(0, 8)}…</span>
+          <> · Evidence: run {card.evidence_run_id.slice(0, 8)}…</>
         )}
+      </div>
+      <div className="font-mono text-[10px] opacity-70">
+        policy {card.policy_hash.slice(0, 8)} · graph {card.graph_hash.slice(0, 8)} ·
+        scenario {card.scenario_hash.slice(0, 8)}
       </div>
     </div>
   );
@@ -92,32 +84,34 @@ export function CredibilityBadge({
   credibility: Credibility;
   className?: string;
 }) {
-  const meta = STATE[credibility.state];
+  const meta = STATE_META[credibility.state];
   const Icon = meta.Icon;
   return (
-    <TooltipProvider delayDuration={200}>
+    <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge variant="outline" className={cn("h-5 gap-1 text-[10px] cursor-default", meta.cls, className)}>
+          <Badge
+            variant="outline"
+            className={cn("h-5 gap-1 text-[10px] font-medium", meta.cls, className)}
+          >
             <Icon className="h-3 w-3" />
             {meta.label}
           </Badge>
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="start" className="max-w-sm">
+        <TooltipContent side="bottom" className="max-w-sm text-[11px]">
           {credibility.state === "unvalidated" ? (
-            <div className="text-[11px]">
-              No model-validation card covers this policy version + network + scenario. Run the
-              Run &amp; Validate stage on /policies and click <b>Mark model valid</b> to record one.
-            </div>
+            <span>
+              No validated model card for this configuration — run the
+              verification → validation pipeline in Run &amp; Validate and mark
+              the model valid.
+            </span>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <CardDetails card={credibility.card} />
+              <CardFacts card={credibility.card} />
               {credibility.state === "stale" && (
-                <div className="border-t pt-1 text-[11px] text-amber-700 dark:text-amber-300">
-                  {credibility.drift.map((d) => (
-                    <div key={d}>⚠ {DRIFT_PROSE[d]}.</div>
-                  ))}
-                  <div>Re-validate on /policies to trust results.</div>
+                <div className="border-t pt-1.5 text-amber-700 dark:text-amber-300">
+                  ⚠ {credibility.drift.map((d) => DRIFT_LABEL[d]).join("; ")}.
+                  Re-validate to trust results.
                 </div>
               )}
             </div>

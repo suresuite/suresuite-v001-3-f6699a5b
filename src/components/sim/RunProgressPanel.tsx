@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, Play, Square, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MappingWarning, SimulationRun, Replication } from "@/hooks/useSimulationRun";
-import { CredibilityBadge } from "./CredibilityBadge";
+import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import type { Credibility } from "@/hooks/useModelValidation";
 
 interface Props {
   run: SimulationRun | null;
   reps: Replication[];
   versionLabel?: string | null;
-  /** B0b (§9.5): the run's stamped model-validation state — immutable history. */
+  /** Derived credibility of the model this run executes (§9.5 badge). */
   credibility?: Credibility | null;
   onCancel: () => void;
   onAddReps: (n: number) => void;
