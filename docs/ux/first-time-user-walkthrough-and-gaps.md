@@ -636,6 +636,71 @@ field on save/edit (persisted on the version record, distinct from the label).
 - [ ] Persist per-material / per-FG inventory, FG output, per-cost time series (6.C)
 - [ ] Run panel **indicator picker** for single & multi run (6.C)
 - [ ] Version history: **Export**, **Delete**, **Notes** (6.D)
+- [ ] Run & job-queue console: show all jobs, per-job cancel (6.E)
+
+### 6.E — Run & job-queue UI (single + multiple run): "is it working, and can I cancel it?"
+
+**What you asked for (point 2, continued).** For single and *especially* multiple runs: I must be
+able to (a) tell at a glance whether it **worked or not**, (b) **see all queued/running jobs**, not
+just the last one, and (c) **cancel any job** from the UI, easily.
+
+**What the code does today.** `RunValidateStage.tsx` renders only the **single latest run**
+(`latestRun = dbRun ?? localRun`) through `RunProgressPanel` — a "Latest run" card with one status
+badge, one progress bar, a per-replication cell grid, and a single **Cancel** button that only acts
+on that one run. Everything else about the run history is invisible.
+
+**The important part — the data is already there.** `src/hooks/useSimulationRun.tsx` **already
+loads `history`** = the last **20 `simulation_runs`** rows for the scenario (id, status ∈
+`queued | running | done | cancelled | failed`, `rep_count_done / rep_count_target`, engine
+`code_version`, `aggregate_kpis`, `error_message`, timestamps) and keeps it live over realtime — but
+the return value's `history` field is **never rendered**. And `cancelRun(projectId, runId)`
+**already cancels any run by id** (server → `experiment.cancel`; browser → `cancelBrowserRun()`).
+So a full job queue with per-job cancel is a **UI gap, not a data or backend gap.**
+
+**The gap.**
+- Queued jobs are **invisible** — if you click Run twice, or a run is waiting on the worker, you see
+  nothing about the second job.
+- You can only cancel the **latest** run, not a specific queued/running one.
+- No at-a-glance "how many running / queued / done / failed"; the "did it work?" signal is a single
+  banner that a new run overwrites.
+
+**The design — a Run Queue console.** (Rendered mockup: see the artifact linked from the PR /
+chat.)
+
+1. **Run status hero (top).** The persistent "did it run?" banner, five states — *idle · queued ·
+   running (n/N) · succeeded (fill rate · revenue · engine) · failed (which step, why)* — with loud
+   terminal chrome (emerald ring on success, destructive ring on failure). It reports the **active**
+   job; it never silently vanishes.
+
+2. **Run queue panel (the centrepiece).** A live list of **all** jobs, driven by `history`:
+   - **Toolbar:** status tally (`● 1 running · ◷ 2 queued · ✓ 2 done · ✕ 1 failed`), a filter
+     segmented control (**All / Active / Done / Failed**), a **"Cancel all active"** button (with
+     confirm), and **"Clear finished."**
+   - **Each job row** encodes state in *form*, not just colour (colour-blind safe: icon + label):
+     - **Type** badge — `Single` or `×N` (replications).
+     - **Status pill** — Queued (clock, blue) · Running (pulse, amber) · Done (check, emerald) ·
+       Failed (octagon, rose) · Cancelled (slash, slate).
+     - **Progress** — a **segmented replication bar** (one cell per replication: done = filled,
+       running = pulsing, pending = outline) + `n / N replications`. Single run = one cell — the
+       fastest "is it working" read there is.
+     - **Engine** chip (server / browser), **started** relative time, and either the **result**
+       (primary KPI ± CI · revenue) when done or the **error line** when failed.
+     - **Actions** — **Cancel** (queued/running) · **View** (done, opens the inspection dashboard) ·
+       **Retry** (failed). Queued rows also show their **queue position**.
+   - **Empty state:** "No runs yet — configure a single or multiple run above and launch it."
+
+3. **Single run** = a one-row queue focused on that job, plus the inspection dashboard (6.C, with the
+   indicator picker). **Multiple run** = the N-cell bar filling live, the replication-adequacy table
+   (`n` vs `n*`), a convergence sparkline, and **"+ add replications"** on the completed job.
+
+4. **Cancel semantics (already supported):** server jobs → `cancelRun` → `experiment.cancel(run_id)`;
+   browser job → terminate the Pyodide worker (`cancelBrowserRun()`) and close its row. "Cancel all
+   active" iterates the queued/running rows.
+
+**Target to build.** Replace the single "Latest run" card with the **Run Queue console** above:
+render `useSimulationRun().history`, add per-row **Cancel** (reusing `cancelRun`), the status tally
++ filter, and bulk **Cancel all / Clear finished**. No backend change is required for the first
+cut — only surfacing data and wiring the existing cancel.
 
 ### Scene 7 — Simulation Lab (`/simulation-lab`)
 
