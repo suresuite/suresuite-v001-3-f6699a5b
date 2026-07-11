@@ -71,6 +71,9 @@ assume week.
 Priority = first non-null wins. A ⚠ default emits a `warn`; a derived value emits `info`.
 
 ### SupplierLink (per supplier × material) — from `inbound_logistics`
+Duplicate rows for the same (supplier, material) pair are reduced to one link: the arc with
+the cheapest `unit_price` wins, ties broken by shortest lead time ⚠.
+
 | scsim param | Source | Reducer / unit | Default |
 |---|---|---|---|
 | `cost` c_{m,s} | `inbound_logistics.unit_price` | per arc | 1.0 ⚠ |

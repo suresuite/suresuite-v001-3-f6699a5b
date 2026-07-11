@@ -358,7 +358,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
     sup_ids = {s.id for s in data.suppliers}
 
     # ── Supplier links (per supplier×material) + per-material cheapest cost ──
-    links: list[SupplierLink] = []
+    # Duplicate (supplier, material) inbound rows are reduced to one link:
+    # cheapest unit_price wins, ties broken by shortest lead time.
+    links_by_key: dict[tuple[str, str], SupplierLink] = {}
     cheapest_cost: dict[str, float] = {}
     mat_lt_dist = {m.id: m for m in data.materials}
     for arc in data.supply_arcs:
@@ -379,14 +381,27 @@ def from_project_data(data: ProjectData) -> MappingResult:
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
                                     "lead_time", "missing lead_time → defaulted to 2 weeks"))
         mrow = mat_lt_dist.get(arc.material_id)
-        links.append(SupplierLink(
+        link = SupplierLink(
             supplier_id=arc.supplier_id, material_id=arc.material_id,
             cost=cost, lead_time_weeks=int(_clamp(round(lt_weeks), 1, 51)),
             lead_time_dist=LeadTimeDist((mrow.lead_time_dist or "deterministic")) if mrow and mrow.lead_time_dist else LeadTimeDist.DETERMINISTIC,
             lead_time_cv=float(mrow.lead_time_cv) if mrow and mrow.lead_time_cv else 0.0,
             moq=float(mrow.moq) if mrow and mrow.moq else 0.0,
-        ))
+        )
+        key = (arc.supplier_id, arc.material_id)
+        prev = links_by_key.get(key)
+        if prev is None:
+            links_by_key[key] = link
+        else:
+            w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
+                                    "duplicate_arc",
+                                    "duplicate (supplier, material) inbound rows → kept "
+                                    "cheapest unit_price (tie: shortest lead time)"))
+            if (link.cost, link.lead_time_weeks) < (prev.cost, prev.lead_time_weeks):
+                links_by_key[key] = link
         cheapest_cost[arc.material_id] = min(cheapest_cost.get(arc.material_id, cost), cost)
+
+    links = list(links_by_key.values())
 
     # BOM materials with no source link cannot be simulated.
     bom_mat_ids = {b.material_id for b in data.bom if b.product_id in prod_ids}
