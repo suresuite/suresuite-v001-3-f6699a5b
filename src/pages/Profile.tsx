@@ -10,10 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertCircle, Loader2, Upload } from 'lucide-react';
+import { PAGE_CAPABILITIES, FEATURE_CAPABILITIES } from '@/lib/capabilities';
+import { AlertCircle, Ban, Check, Loader2, Upload } from 'lucide-react';
 
 interface ProfileProps {
   isCollapsed: boolean;
@@ -149,6 +152,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setParams(v === 'password' ? { tab: 'password' } : {}, { replace: true }); }} className="max-w-3xl">
         <TabsList>
           <TabsTrigger value="profile" disabled={forced}>Profile</TabsTrigger>
+          <TabsTrigger value="access" disabled={forced}>My Access</TabsTrigger>
           <TabsTrigger value="password">Change Password</TabsTrigger>
         </TabsList>
 
@@ -207,6 +211,10 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="access">
+          <MyAccessTab />
+        </TabsContent>
+
         <TabsContent value="password">
           <Card>
             <CardHeader>
@@ -241,5 +249,176 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
 
   );
 };
+
+function prettyModel(code: string): string {
+  // "google/gemini-2.5-flash" → "Gemini 2.5 Flash"
+  const tail = code.includes('/') ? code.split('/').slice(1).join('/') : code;
+  return tail
+    .replace(/[-_]/g, ' ')
+    .replace(/\bgpt\b/gi, 'GPT')
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function MyAccessTab() {
+  const { capabilities, loading } = useCapabilities();
+
+  if (loading && !capabilities) {
+    return (
+      <Card>
+        <CardContent className="flex h-40 items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!capabilities) return null;
+
+  const allowedPages = PAGE_CAPABILITIES.filter((c) => capabilities.pages[c.key]);
+  const budgets = capabilities.budgets;
+  const money = (n: number | null) => (n == null ? null : `$${Number(n).toFixed(2)}`);
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>What you can access</CardTitle>
+          <CardDescription>
+            A read-only summary of your current access. To request changes, contact your administrator.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Pages */}
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">Pages you can open</h3>
+            <div className="flex flex-wrap gap-2">
+              {allowedPages.length === 0 ? (
+                <span className="text-sm text-muted-foreground">No pages available.</span>
+              ) : (
+                allowedPages.map((p) => (
+                  <span
+                    key={p.key}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-sm"
+                  >
+                    <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    {p.label}
+                  </span>
+                ))
+              )}
+            </div>
+          </section>
+
+          {/* Features */}
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">Features</h3>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {FEATURE_CAPABILITIES.map((f) => {
+                const on = !!capabilities.features[f.key];
+                return (
+                  <div
+                    key={f.key}
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm"
+                  >
+                    <span className={on ? '' : 'text-muted-foreground'}>{f.label}</span>
+                    {on ? (
+                      <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400">
+                        <Check className="mr-0.5 h-3 w-3" /> On
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-muted-foreground">
+                        <Ban className="mr-0.5 h-3 w-3" /> Off
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* AI models */}
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">AI models you can use</h3>
+            {capabilities.models.all_allowed ? (
+              <span className="text-sm text-muted-foreground">All enabled models are available to you.</span>
+            ) : capabilities.models.allowed_codes.length === 0 ? (
+              <span className="text-sm text-muted-foreground">No AI models are enabled for your account.</span>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {capabilities.models.allowed_codes.map((code) => (
+                  <Badge key={code} variant="outline">
+                    {prettyModel(code)}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {capabilities.models.default_code && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Default: {prettyModel(capabilities.models.default_code)}
+                {capabilities.models.fallback_code
+                  ? ` · Fallback: ${prettyModel(capabilities.models.fallback_code)}`
+                  : ''}
+              </p>
+            )}
+          </section>
+        </CardContent>
+      </Card>
+
+      {/* Budget & usage */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI budget &amp; usage</CardTitle>
+          <CardDescription>Your spend caps and current usage this month.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <UsageBox
+              label="Spent this month"
+              value={money(budgets.mtd_cost_usd) ?? '$0.00'}
+              cap={budgets.monthly_usd != null ? `of ${money(budgets.monthly_usd)}` : 'no monthly cap'}
+              over={budgets.monthly_usd != null && budgets.mtd_cost_usd >= budgets.monthly_usd}
+            />
+            <UsageBox
+              label="Spent today"
+              value={money(budgets.today_cost_usd) ?? '$0.00'}
+              cap={budgets.daily_usd != null ? `of ${money(budgets.daily_usd)}` : 'no daily cap'}
+              over={budgets.daily_usd != null && budgets.today_cost_usd >= budgets.daily_usd}
+            />
+            <UsageBox label="Requests this month" value={budgets.mtd_requests.toLocaleString()} />
+            <UsageBox
+              label="Requests today"
+              value={budgets.today_requests.toLocaleString()}
+              cap={budgets.rpd != null ? `of ${budgets.rpd}` : undefined}
+              over={budgets.rpd != null && budgets.today_requests >= budgets.rpd}
+            />
+          </div>
+          {budgets.monthly_usd == null && budgets.daily_usd == null && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              No budget limit is set on your account — usage is tracked but not capped.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function UsageBox({
+  label,
+  value,
+  cap,
+  over,
+}: {
+  label: string;
+  value: string;
+  cap?: string;
+  over?: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`text-lg font-semibold tabular-nums ${over ? 'text-destructive' : ''}`}>{value}</div>
+      {cap && <div className="text-[11px] text-muted-foreground tabular-nums">{cap}</div>}
+    </div>
+  );
+}
 
 export default Profile;
