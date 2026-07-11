@@ -312,28 +312,186 @@ On **Create Scenario**, it writes the scenario (`create_disruption_scenario_v2` 
 action that deep-links to `/simulation-lab?scenario_id=…&pane=recovery`. This is the intended
 hand-off from "explore the network" to "simulate a disruption."
 
-### Scene 6 — Policies (`/policies`)
+### Scene 6 — Policies (`/policies`) — the deep walkthrough
 
-Header **"Supply chain policies."** Its subtitle is a live **context strip** — Plant · Model ·
-BOM · #suppliers · #plants · #customers — read from the selected project. The header's right
-side has *yet another* project `Select` dropdown (bound to the global project). If no project
-is selected: an alert *"Select a project to configure policies."*
+This is the analytical core of the product, and it is far denser than any other page. I'll
+narrate it in full — the page frame, then how I *set* a policy, then the entire
+**Run & Validate** trail (verification → single run → multiple runs → warm-up detection →
+validation → adopt), because that pipeline is the whole point of the page and was badly
+under-described before.
 
-With a project chosen, the body is a three-tab control:
+#### 6.0 — The page frame
 
-- **Stages** (default). Shows a **PolicyVersionBar** (pick/save/restore versioned policy
-  snapshots, with a dirty indicator), a **TimeUnitBar** (the simulation calendar), a
-  **StageRail** to move between the pipeline stages, and a **FocusedStage** editor. The stages
-  are: **Supplier** (per supplier × material: sourcing strategy & safety stock), **Focal plant**
-  (per product: capacity, production cost, lead time; inventory if MTS), **Customer** (per
-  customer × product: sourcing firm, price, backorder handling), and **Run & validate** (verify,
-  auto-detect warm-up, set replications, then launch). Here I set defaults and per-entity
-  overrides.
-- **Guide me** — a `GuidePanel` that can jump me to a specific stage.
-- **Data map** — a `DataMapGrid` showing how uploaded data maps into policy inputs.
+Header **"Supply chain policies."** The subtitle is a live **context strip**
+(`ProjectContextStrip`): **Plant · Model (MTO/MTS) · BOM · #suppliers · #plants · #customers**,
+read from the selected project's combined data. The header's right side has *another* project
+`Select` (bound to the global project). No project selected → an alert *"Select a project to
+configure policies."*
 
-Policies are **versioned**, and — importantly for the next scene — a **saved version is
-required to run a simulation.**
+With a project chosen, the body is a **three-tab** control:
+
+- **Stages** (default) — the editor (6.1–6.6 below).
+- **Guide me** — a `GuidePanel` narrative that can deep-jump me straight to a specific stage.
+- **Data map** — a `DataMapGrid` showing, field by field, how my uploaded data (BOM / inbound /
+  outbound / item masters) maps into the parameters the engine actually reads. This is the
+  "where does this number come from" reference.
+
+On the **Stages** tab, above the editor, three persistent bars:
+
+- **PolicyVersionBar** — policies are **versioned snapshots**. I can pick a saved version from a
+  dropdown, **Save** a new snapshot (label it), and **Restore** an older one. A **dirty**
+  indicator lights up the moment my live edits drift from the selected version. This matters
+  downstream: **a run requires a saved policy version**, and an unsaved edit is "dirty."
+- **TimeUnitBar** — the simulation calendar (the project's start/end and the time unit the
+  engine steps in — the model runs on a **weekly phase pipeline**).
+- **StageRail** — the four ordered stages, with badges showing how many overrides each carries
+  and whether its data is present.
+
+#### 6.1 — The four stages (what I'm actually configuring)
+
+The pipeline mirrors the physical supply chain, focal-plant-centric:
+
+| Stage | Scope | What I set | Override families |
+|---|---|---|---|
+| **Supplier** | per **supplier × material** | sourcing strategy & safety stock (transport comes from network edge data, not here) | sourcing, inventory |
+| **Focal plant** | per **product** | capacity, production cost, lead time (+ finished-goods inventory if Make-To-Stock) | production, inventory |
+| **Customer** | per **customer × product** | sourcing firm, price, backorder handling (demand comes from product data) | fulfillment |
+| **Run & validate** | whole model | verify inputs → run → detect warm-up → validate → adopt | — |
+
+There are **seven policy families** in the schema — *sourcing, inventory, transport,
+fulfillment, production, recovery, demand* — but the GUI deliberately **only exposes the fields
+the scsim engine actually consumes** (`SCSIM_VISIBLE_FIELDS`). Two entire families are hidden:
+**transport** (driven by network edge attributes) and **demand** (driven by product/graph data).
+So although the schema defines dozens of parameters per family, what I can edit is the engine-
+relevant subset, e.g.:
+
+- **Sourcing:** `strategy` (single / multi / primary_backup / dual_sourcing / tiered),
+  per-supplier `ratios`, `supply_share`.
+- **Inventory:** `type` (min_max / base_stock / rop / periodic_review), `safety_stock_method`
+  (fixed_days / service_level / king_method), `safety_stock_days`, `service_level_target`,
+  `holding_cost_pct`, and — for MTS — finished-goods safety stock (`fg_safety_stock`,
+  `fg_service_level_target`, `fg_safety_stock_days`).
+- **Fulfillment:** `allocation` (priority / fair_share / proportional / revenue_max / sla_tier),
+  `backorder_allowed`, `max_backorder_days`, `backorder_cost_per_day`, `tier_overrides`.
+- **Production:** `capacity_units_per_day`, `allocation_priority_weight`.
+- **Recovery:** `response` playbook (reroute / dual_source_activate / mode_shift / capacity_flex
+  / early_warning / allocate_materials), `detection_lag_days`.
+
+#### 6.2 — How I actually set a policy (the StagePolicyTable)
+
+Picking a stage renders a **StagePolicyTable** with a heading like *"Supplier policies"* and a
+one-line role description. Two layers of settings:
+
+1. **Defaults** — the baseline value for every visible field, grouped into accordion sections
+   (Basics / Safety stock / Costs, etc.). Editing a default is a project-wide setting for that
+   family. Saving a default calls `saveDefault(family, value)`.
+2. **Overrides** — per-entity exceptions. Each row is a specific supplier×material (or product,
+   or customer×product) whose value differs from the default. I can bulk-edit overrides
+   (`BulkEditDialog`), and delete an override to fall back to the default.
+
+Above the table, two power tools:
+
+- **Excel** (dropdown) — **Export** the whole stage (defaults + overrides) to an `.xlsx`
+  workbook, edit offline in a spreadsheet, and **Import** it back (with per-cell error
+  reporting). This is the realistic way to configure hundreds of entities.
+- **Apply preset** (dropdown, sparkle icon) — pick a curated **stage preset** (e.g. a resilience
+  posture). It opens an `ApplyPresetDialog` that resolves the preset against my project context
+  and shows what will change; after applying, a **PresetDiffBanner** sits atop the table showing
+  *"preset X applied, N changes"* with **Revert**. Presets carry **provenance** (a
+  `ProvenanceBadge`) so I can see a value came from a preset vs. my own edit.
+
+If the project has no combined data, a yellow banner tells me to *"upload and combine datasets
+in Data Manager"* first.
+
+#### 6.3 — Stage 4: "Run & validate" — the five-step scientific trail
+
+Selecting the **Run & validate** stage replaces the table with a **`PolicyRunStepper`** — a
+five-step, ordered pipeline with a "Continue"/"Back" footer (*Step N of 5*) and a persistent
+**Model-credibility badge** at the top reading **validated / stale / unvalidated**. Each step
+gates the next; the badge and warm-up chips update live. The five steps are literally:
+
+**Step 1 — Verification ("Catch input issues").**
+I click **Run checks**. This runs `verifyProjectPolicies` over my defaults, overrides,
+fulfillment strategy, all stage rows, item masters, and lanes (inbound/outbound/BOM). It returns
+a list of **findings**, each with a severity — **block** (red octagon), **warn** (amber
+triangle), or **info** — a message, the offending row/field, and a hint. A header line shows
+*"N findings · M blockers · K warnings · verified HH:MM."* The step also shows my **dataset
+hash** and whether it's *not snapshotted / changed since last snapshot / up to date* (a snapshot
+is captured automatically when I run). **I cannot proceed while any blocker exists.** If data is
+still loading it refuses to grade partial data (*"try Run checks again in a moment"*).
+
+**Step 2 — Run simulation ("Single + replications").**
+First a **compute-location toggle**: **"Run on server (default)"** — dispatches to the Fly.io
+worker via `sim-command`; results stream back live over realtime and the tab stays free — vs.
+**"Run in browser (offline)"** — the *same* scsim engine compiled to WebAssembly (Pyodide,
+~20 MB one-time download, slower, single-threaded) so a run is possible with nothing but the
+static frontend. A collapsible **Diagnostics** row offers a **Test engine** self-test (fixed
+input, no data) that reports *"Engine works — scsim vX, fill rate …%"* plus the deployed build
+SHA. A **persistent run-status banner** (not a vanishing toast) is the single "did it run?"
+signal: *loading → computing (done/total) → succeeded (fill rate · revenue · N reps · engine
+version) → or failed (which step, why)*.
+
+Then a **two-tab run control**:
+
+- **Single run** — validates *one deterministic trajectory*. Fields: **Seed** and
+  **Horizon (days)** (default 365). I click **Run single**. When it finishes, the panel below
+  becomes a model-behavior inspection dashboard: inventory dynamics, the financial statement
+  (per-component cost lines), every persisted weekly series (fill rate, backlog, on-hand value,
+  revenue), and sanity-check scalars — all from real persisted run output.
+- **Multiple runs** — *"ensure statistical significance."* A Setup card: **Seeds** (Auto → N
+  replications with seeds 1..N, or List → explicit comma-separated seeds), **Simulation time
+  (days)**, **Confidence** (90 / 95 / 99%), and **Focal KPIs** (multi-select chips from the real
+  engine KPI vocabulary — fill_rate, max_backlog, on-hand value, revenue, lost sales, capacity
+  utilization, and the whole cost-of-resilience family). I click **Run replications**. A
+  **MultiRunResultsPanel** renders per-KPI **convergence** and weekly traces (mean ± CI), empty
+  until the first run.
+
+Below both tabs, a **"Engine run — live status & persisted output"** section shows the
+`RunProgressPanel` (cancel; **add replications**) and, once reps land, an `EngineOutputSummary`.
+Runs launched from here all reuse one auto-managed scenario named *"Policy validation (auto)"* so
+the Lab's scenario list doesn't fill with validation runs.
+
+**Step 3 — Warm-up detection ("Adequacy + estimation").** Two sub-steps:
+- **(a) Replication adequacy** — from the real replications it computes, per focal KPI, the
+  mean ± confidence-interval half-width and **n\*** = the replications needed to hit a **target
+  half-width** (default ≤ 5% of the mean). If I'm short, it offers **+ add replications** on the
+  real run. I can tune the target precision here.
+- **(b) Warm-up estimation** — I pick **indicators** (which KPI series to analyze) and a
+  **Method**: **Engine (most conservative)** — the week the engine itself flagged; **Welch
+  moving average**; or **MSER-5**. I click **Auto-detect** and it computes the warm-up cut in
+  weeks/days from the persisted weekly fill-rate series (falling back Welch→MSER if the engine
+  didn't record one). A **"Warm-up detected: X days (method)"** chip appears, and every weekly
+  chart draws a reference line at the cut so I can see steady state begin. (I can also type the
+  warm-up days by hand.) I can optionally upload an empirical time-series per indicator here too.
+
+**Step 4 — Validation ("Compare with empirical").**
+Subtitle: *"Steady-state (t > warm-up days) · KS + Welch t-test."* For each focal KPI I **upload
+an empirical CSV** (real-world observations). Clicking **Run validation** compares my
+**steady-state simulated sample** (weekly values after the warm-up cut, or per-rep scalars) with
+the empirical values using a **Kolmogorov–Smirnov statistic** and a **Welch t-test**. A results
+table shows **KS D, KS p, t, t p, n, source, and pass/fail** per KPI — a KPI **passes** when both
+p-values ≥ 0.05 (distributions statistically indistinguishable). If I have no empirical data,
+this step can be skipped in favor of **face validation** (step 5).
+
+**Step 5 — Adopt ("Persist the model card").**
+A prerequisites checklist makes the gate visible: **Verification** (no blockers) · **Evidence
+run** (N completed replications + engine version + run id) · **Warm-up** (X days, method) ·
+**Replication adequacy** (recommended n\*) · **Validation** (statistical pass, or an explicit
+**face-validation acknowledgment** checkbox when no empirical series were uploaded). When ready,
+**Mark model valid** snapshots the *exact* policy version + dataset + baseline scenario and
+records a **model card** (`record_model_validation`) bound to a **provenance triple** (policy
+version hash · dataset/graph hash · scenario fingerprint hash). The **credibility badge** then
+flips to **validated**. Everything on the card is *computed* from real run output — nothing is
+asserted. If I later edit a policy, change data, or the scenario, the badge derives **stale** at
+read time (hashes no longer match) and offers **Re-validate →**. Lab scenarios can inherit this
+validated model.
+
+So the "trail" you asked about is, precisely: **set policies (defaults + per-entity overrides,
+optionally from presets or Excel) → Run & validate → 1) Verify → 2) Run (single trajectory,
+then multiple replications with seeds/confidence/focal KPIs, on server or in-browser) →
+3) detect warm-up (replication adequacy + Welch/MSER/engine estimation) → 4) validate against
+empirical data (KS + Welch t-test on steady-state) → 5) adopt a versioned, hash-bound model
+card.**
 
 ### Scene 7 — Simulation Lab (`/simulation-lab`)
 
@@ -509,6 +667,40 @@ against normal first-run expectations, here are the gaps, grouped by severity.
 20. The account/identity lives only in `localStorage`; there's no server session, so opening a new
     device/browser silently requires a fresh login with no "remember me" or session list.
 
+### H. The Policies / Run & Validate surface (the analytical core)
+
+21. **The whole scientific pipeline is buried as the 4th stage of the Policies page.** Verification,
+    single/multiple runs, warm-up detection, validation, and model adoption — the most valuable
+    part of the product — live inside `/policies` under "Run & validate," not on the page called
+    **Simulation Lab** where a user would look to "run" a model. There are effectively **two run
+    entry points that behave differently**: the Policies "Run & validate" trail (auto-managed
+    "Policy validation (auto)" scenario, full verify/warm-up/validate/adopt) and the Lab's
+    per-scenario Run (setup/recovery/run/results/compare). Nothing on either page explains the
+    relationship or points between them.
+22. **The rich policy schema over-promises vs. what's editable.** The schema defines seven families
+    and dozens of parameters, but the GUI only exposes the `scsim`-consumed subset, and **hides
+    the transport and demand families entirely**. A user reading the schema (or docs) expects to
+    tune transport modes, routing, demand patterns, forecasting — none of which are editable here.
+    What's shown is correct for the engine, but the gap between "documented policy catalog" and
+    "editable fields" is unexplained in the UI.
+23. **Warm-up and validation quietly require empirical CSVs the user rarely has.** Step 4
+    (Validation) is meaningful only if I upload real-world empirical time-series per KPI; without
+    them the pipeline falls back to a "face validation" acknowledgment checkbox. The UI doesn't
+    set that expectation up front, so a first-timer hits an upload wall at the most important step.
+24. **The server/browser compute toggle leaks infrastructure into the user's face.** Choosing
+    "Run on server (Fly worker)" vs "Run in browser (Pyodide WASM, ~20 MB, slower)" — plus a
+    build-SHA diagnostics row and an engine self-test — are power/debug affordances surfaced inline
+    in the primary run step. Useful for operators, noise (and a source of doubt: "did it really
+    run on the server?") for an analyst.
+25. **"Dirty policy" gating is implicit and easy to trip.** A run needs a *saved* policy version;
+    any live edit makes the model "dirty," which silently changes the run button to "Save version &
+    run," can invalidate an adopted model card to "stale," and is only explained in fine print. The
+    coupling between editing a policy and the credibility of a prior run isn't obvious.
+26. **Six-plus context bars stacked on one screen.** The Stages tab stacks the version bar, the
+    time-unit bar, the stage rail, the preset/diff banner, the no-data banner, and the credibility
+    badge above the actual editor. It's information-dense to the point of intimidating on first
+    contact, with no progressive disclosure.
+
 ---
 
 ## Suggested priority for closing gaps
@@ -524,3 +716,9 @@ against normal first-run expectations, here are the gaps, grouped by severity.
    buttons) so the marketing surface doesn't erode trust on first impression. (B)
 5. **Add password-reset + fix the "Username/Email" mismatch**, and surface the orphaned
    Interactive Network Space (or intentionally retire it). (C, D)
+6. **Clarify (or unify) the two run surfaces.** Make the Simulation Lab and the Policies
+   "Run & validate" trail one coherent story: either promote the verify → run → warm-up →
+   validate → adopt pipeline into the Lab, or clearly cross-link them and explain that Policies
+   validates the *model* while the Lab runs *scenarios* against a validated model. Move the
+   server/browser + self-test controls behind an "advanced" disclosure, and make the
+   dirty-policy → stale-credibility coupling explicit. (H)
