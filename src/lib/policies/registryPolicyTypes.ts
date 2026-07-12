@@ -17,6 +17,13 @@ import {
   policyById,
   type RegistryParamProp,
 } from "./registryAccess";
+import { ENUM_OPTIONS, FIELD_LABELS, InventoryPolicy, SCSIM_ENUM_OPTIONS } from "./schemas";
+
+// Frontend Zod defaults for inventory params not (yet) in the engine registry —
+// reorder_point/order_up_to/review_period_days are stored + versioned on the
+// frontend ahead of the engine's coverage-based κ (§II.4), so their schema lives
+// here, not in registry.generated.json.
+const INVENTORY_DEFAULTS = InventoryPolicy.parse({}) as Record<string, unknown>;
 
 /** One editable policy parameter, resolved from the registry schema. */
 export interface RegistryParam {
@@ -60,8 +67,24 @@ export interface PolicyCategory {
 const TITLE_CASE = (s: string) =>
   s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+// A param the engine registry doesn't declare (frontend-only stored field):
+// resolve its label/enum/default from the frontend Zod schema instead.
+function frontendParam(field: string): RegistryParam {
+  const enumVals = SCSIM_ENUM_OPTIONS[field] ?? ENUM_OPTIONS[field];
+  return {
+    field,
+    label: FIELD_LABELS[field] ?? TITLE_CASE(field),
+    type: enumVals ? "string" : "number",
+    enum: enumVals ? [...enumVals] : undefined,
+    default: INVENTORY_DEFAULTS[field],
+    min: 0,
+  };
+}
+
 function toParam(policyId: string, field: string): RegistryParam {
-  const p: RegistryParamProp = paramProp(policyId, field) ?? {};
+  const p: RegistryParamProp | undefined = paramProp(policyId, field);
+  // Fall back to the frontend schema for stored fields the engine doesn't expose.
+  if (!p) return frontendParam(field);
   const t = (p.type ?? "unknown") as RegistryParam["type"];
   return {
     field,
@@ -78,13 +101,16 @@ function toParam(policyId: string, field: string): RegistryParam {
 
 // ── Inventory / replenishment (§III) ────────────────────────────────────────
 // inventory_control (P-P.1) exposes policy_type ∈ {min_max, base_stock, rop_q,
-// periodic}. Which params each type uses is spec-structure (§III.1–III.5); the
-// param schemas are pulled from the registry. `review_cadence_weeks` and the
-// periodic `Period` are surfaced as structural grid columns (Policy Basis /
-// Periodic Check, §II.1), not as dynamic params, so they're excluded here.
+// periodic}. Which params each type uses is spec-structure (§III.1–III.5). The
+// grid stores absolute level/lot fields (reorder_point s, order_up_to S,
+// rop_q_quantity Q, review_period_days T) ahead of the engine's coverage-based κ
+// (§II.4); `basis` and `rop_q_quantity` schemas come from the registry, the
+// remaining level fields from the frontend Zod schema (see frontendParam).
 const INVENTORY_POLICY = "inventory_control";
 
-// registry policy_type  →  { stored Zod `type` value, headline params, chips }
+// registry policy_type  →  { stored Zod `type` value, per-type param vector }.
+// headline+rest are the params rendered in the row's "Replenishment parameters"
+// vector cell — only the params that type actually needs (§II.3).
 const INVENTORY_TYPES: Array<{
   registryValue: string;
   storedValue: string;
@@ -92,10 +118,10 @@ const INVENTORY_TYPES: Array<{
   headline: string[];
   rest: string[];
 }> = [
-  { registryValue: "min_max", storedValue: "min_max", label: "Min-max (s, S)", headline: ["coverage_weeks"], rest: ["basis"] },
-  { registryValue: "base_stock", storedValue: "base_stock", label: "Base stock (S)", headline: ["coverage_weeks"], rest: ["basis"] },
-  { registryValue: "rop_q", storedValue: "rop", label: "(R, Q)", headline: ["rop_q_quantity", "coverage_weeks"], rest: ["basis"] },
-  { registryValue: "periodic", storedValue: "periodic_review", label: "Periodic review (T, S)", headline: ["periodic_review_weeks", "coverage_weeks"], rest: ["basis"] },
+  { registryValue: "min_max", storedValue: "min_max", label: "Min-max (s, S)", headline: ["reorder_point", "order_up_to"], rest: ["basis"] },
+  { registryValue: "base_stock", storedValue: "base_stock", label: "Base stock (S)", headline: ["order_up_to"], rest: ["basis"] },
+  { registryValue: "rop_q", storedValue: "rop", label: "(R, Q)", headline: ["rop_q_quantity", "reorder_point"], rest: ["basis"] },
+  { registryValue: "periodic", storedValue: "periodic_review", label: "Periodic review (T, S)", headline: ["review_period_days", "order_up_to"], rest: ["basis"] },
 ];
 
 function buildInventoryCategory(): PolicyCategory {
@@ -134,6 +160,14 @@ export function policyCategories(): PolicyCategory[] {
 /** The selected type's option (headline + chip params) within a category. */
 export function policyTypeOption(categoryKey: string, storedValue: string): PolicyTypeOption | undefined {
   return CATEGORIES[categoryKey]?.types.find((t) => t.value === storedValue);
+}
+
+/** The ordered inventory parameter vector for a stored policy-type value —
+ *  exactly the params that type requires, in display order (§II.3). Falls back
+ *  to the default (min_max) vector for an unknown/empty type. */
+export function inventoryParamsForType(storedType: string): RegistryParam[] {
+  const opt = policyTypeOption("inventory", storedType) ?? policyTypeOption("inventory", "min_max");
+  return opt ? [...opt.headline, ...opt.rest] : [];
 }
 
 /** Human label for a stored policy-type value, from the registry library. */
