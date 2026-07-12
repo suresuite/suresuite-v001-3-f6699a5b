@@ -596,6 +596,17 @@ Conceptual additions to the input model, each unblocking policies from §5:
 | **Warehouse/DC node type** — reserved | `P-W.x`, DRP (Phase E) | Schema reserves the node type and echelon links now so IDs and views do not churn later |
 | **Customer entities with tiers/SLAs** | P-C.2, P-C.5 | today customers exist only as outbound-arc endpoints |
 
+> **Implementation note (Phase B0, delivered): explicit triangular demand bounds.**
+> `products.demand_min` / `demand_max` (nullable; migration `20260712000001`) carry an
+> asymmetric empirical demand distribution — b = historical median, c = historical max —
+> through the whole data path (`bulk_upsert_products` → `ProjectRow` →
+> `from_project_data`), overriding the symmetric triangularAV derivation when present.
+> The engine's `Product` entity always supported the bounds; only the data path could
+> not express them. NULL keeps the prior behavior exactly. Driven by the first
+> real-project onboarding (Project TRON - ver2, the WSC 2026 model — see
+> `docs/projects/project-tron-ver2.md`); contract updated in
+> `docs/data-simulation-mapping.md` §4/§5.
+
 ### 8.4 Dataset versioning and the three-hash provenance triangle
 
 Policies are versioned and hashed; the network and economics are not (G5) — re-uploading a CSV silently rewrites history. The fix mirrors the pattern the platform already trusts (A5):
@@ -923,6 +934,19 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 > `20260710000001_model_validations.sql`), badge derivation, Lab inheritance, and the rollout
 > order. It also records the §14 open-question-1 decision (families as substrate, bundles as
 > a derived view) and the §9.5 refinements noted there.
+
+> **Milestone (B0, delivered): first real-project onboarding — Project TRON - ver2.**
+> The WSC 2026 make-to-order network (17 products × 560 materials × 60 suppliers) is
+> onboarded end-to-end through the app's own lifecycle and validated against the paper's
+> reference snapshot; the run is a production-path proof of the whole §8 contract (zero
+> warn-level mapping entries on real data). The onboarding surfaced and closed one data-path
+> gap (explicit demand bounds, §8.3 note) and one broken consumer (the SimulationLab ↔
+> `useModelValidation` API drift, §9.5). Artifacts: `scripts/tron_ver2/` (reproducible
+> dataset build + committed dataset), `scripts/seed_project_tron_ver2.mjs` (app-lifecycle
+> seeder), `.github/workflows/seed-project.yml` (git-native seed + e2e verify).
+> Documentation: `docs/projects/project-tron-ver2.md` (implementation record),
+> `docs/project-onboarding-guide.md` (the generalized onboarding workflow),
+> `docs/ai-modeling-workflow.md` (the AI-assisted modeling workflow it seeds).
 
 **B1 — Catalog and bundles:**
 - v1 catalog (§5) implemented/activated: extended P-P.1 parameterization; unreachable policies (P-S.2, P-P.4, P-P.9) wired; new supplier/customer/transport slots; promoted defaults (P-P.0, P-F.x, P-C.4, P-S.5/6).
