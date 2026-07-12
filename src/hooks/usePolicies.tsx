@@ -588,7 +588,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     const families = PolicyFamilyEnum.options;
     const bundle = Object.fromEntries(
       families.map((f) => [f, parseFamily(f, rawDefaults[f])]),
-    ) as PolicyBundle;
+    ) as unknown as PolicyBundle;
     const overrides = (Array.isArray(snap.overrides) ? snap.overrides : []).map(
       (o: Record<string, unknown>) => ({
         scope: o.scope,

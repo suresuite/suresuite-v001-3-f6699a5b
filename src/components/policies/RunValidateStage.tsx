@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertOctagon,
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
