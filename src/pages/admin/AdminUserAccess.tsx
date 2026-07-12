@@ -315,34 +315,26 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
           <div className="space-y-6">
 
             {/* ── Pages ─────────────────────────────────────────────── */}
-            <Section
-              title="Pages"
-              subtitle="Which pages this user can open. Each shows the role default and a per-user override."
-            >
+            <Section title="Pages">
               <CapMatrix rows={pages} isSuper={isSuper} onSet={setOverride} />
             </Section>
 
             {/* ── Features ──────────────────────────────────────────── */}
-            <Section
-              title="Features"
-              subtitle="Cross-page abilities (AI, simulation, data editing, export)."
-            >
+            <Section title="Features">
               <CapMatrix rows={features} isSuper={isSuper} onSet={setOverride} />
             </Section>
 
             {/* ── AI models ─────────────────────────────────────────── */}
             <Section
               title="AI models"
-              subtitle="Which LLM models this user may call, grouped by provider."
+              badge={
+                isSuper
+                  ? 'All enabled'
+                  : data.models.all_allowed
+                    ? 'No restriction'
+                    : undefined
+              }
             >
-              {data.models.all_allowed && !isSuper && (
-                <p className="mb-3 text-xs text-muted-foreground">
-                  No restriction set — this user may call every enabled model. Check specific models below to restrict them.
-                </p>
-              )}
-              {isSuper && (
-                <p className="mb-3 text-xs text-muted-foreground">Super admins may call every enabled model.</p>
-              )}
               <div className="space-y-4">
                 {modelsByProvider.map(([provider, models]) => (
                   <div key={provider}>
