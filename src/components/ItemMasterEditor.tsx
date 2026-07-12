@@ -73,6 +73,8 @@ const COLUMNS: Record<ItemMasterTable, ColumnSpec[]> = {
     { field: "demand_distribution", label: "Demand dist.", kind: "enum" },
     { field: "demand_mean", label: "Demand mean", hint: "units/week", kind: "number" },
     { field: "demand_cv", label: "Demand CV", kind: "number" },
+    { field: "demand_min", label: "Demand min", hint: "units/week — empty = mean·(1−CV)", kind: "number" },
+    { field: "demand_max", label: "Demand max", hint: "units/week — empty = mean·(1+CV)", kind: "number" },
   ],
   suppliers: [
     { field: "name", label: "Name", kind: "text" },

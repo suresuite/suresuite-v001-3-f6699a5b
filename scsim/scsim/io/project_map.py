@@ -107,6 +107,12 @@ class ProductRow:
     demand_distribution: Optional[str] = None  # else scenario demand_model
     demand_mean: Optional[float] = None        # b_p (master); else Σ outbound volume
     demand_cv: Optional[float] = None
+    # Explicit triangular bounds (a_p, c_p). When set they override the
+    # symmetric triangularAV form — this is how an asymmetric empirical
+    # distribution (b = historical median, c = historical max ≫ b·(1+cv))
+    # reaches the engine. Ignored for non-triangular demand kinds.
+    demand_min: Optional[float] = None         # a_p (master); else b·(1−cv)
+    demand_max: Optional[float] = None         # c_p (master); else b·(1+cv)
 
 
 @dataclass
@@ -339,8 +345,25 @@ def _build_product(
     )
     if kind in ("triangular", "triangular_av", "triangularav", ""):
         a, b, c = triangular_av(max(mean, 0.0), max(cv, 0.0))
+        # Master-supplied explicit bounds win over the symmetric AV form
+        # (docs/data-simulation-mapping.md §5). Inconsistent bounds are
+        # clamped to the mode and reported instead of failing the run.
+        if row.demand_min is not None:
+            a = float(row.demand_min)
+            if a > b:
+                warnings.append(MappingWarning(
+                    "warn", f"product:{row.id}", "demand_min",
+                    f"demand_min {a:g} > demand mode {b:g} — clamped to the mode"))
+                a = b
+        if row.demand_max is not None:
+            c = float(row.demand_max)
+            if c < b:
+                warnings.append(MappingWarning(
+                    "warn", f"product:{row.id}", "demand_max",
+                    f"demand_max {c:g} < demand mode {b:g} — clamped to the mode"))
+                c = b
         return Product(demand_model=DemandModel.TRIANGULAR,
-                       demand_mode=b, demand_min=a, demand_max=c, **common)
+                       demand_mode=b, demand_min=max(a, 0.0), demand_max=c, **common)
     if kind == "deterministic":
         return Product(demand_model=DemandModel.DETERMINISTIC, demand_mode=mean, **common)
     if kind == "poisson":
