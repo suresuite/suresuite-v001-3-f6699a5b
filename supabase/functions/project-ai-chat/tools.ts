@@ -4,7 +4,9 @@
 
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-export type ToolKind = "table" | "kpi" | "bullets" | "text";
+// "proposal" is the Layer B draft-tool envelope kind (ai-agents.md §4.5):
+// rendered by ProposalCard; no Stage 0 tool emits it yet.
+export type ToolKind = "table" | "kpi" | "bullets" | "text" | "proposal";
 
 export interface ToolEnvelope {
   kind: ToolKind;
@@ -33,6 +35,15 @@ function empty(tool: string, note = "No data available for this project."): Tool
 }
 
 // ---------- Gemini function declarations (server-side only) ----------
+
+// Shape of one function declaration as the providers send it. Layer B agent
+// turns pass least-privilege subsets of these through runChat's optional
+// `tools` parameter (bridge 1, ai-agents.md §3.2).
+export interface ToolDeclaration {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
 
 export const toolDeclarations = [
   {

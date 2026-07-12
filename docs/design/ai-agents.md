@@ -390,6 +390,15 @@ BEGIN
    LIMIT 1;
   IF v_id IS NOT NULL THEN RETURN v_id; END IF;
 
+  -- §8 T10: per-user live-proposal cap (DEFAULT 20) — mass drafting cannot
+  -- bloat the fabric or spam cards.
+  IF (SELECT count(*) FROM public.proposals
+       WHERE project_id = p_project_id
+         AND created_by IS NOT DISTINCT FROM p_user_id
+         AND status IN ('draft','proposed','approved')) >= 20 THEN
+    RAISE EXCEPTION 'too_large: live-proposal cap (20) reached for this project';
+  END IF;
+
   INSERT INTO public.proposals (
     project_id, agent_id, artifact_type, title, payload, citations,
     provenance, grounding, idempotency_key, thread_id,
@@ -1420,6 +1429,8 @@ Numbered; each marked **[owner decision needed]** (blocks a stage entry until de
 16. **[default taken] Chat/memory retrieval is Postgres FTS only (§14.5).** Vector retrieval (pgvector + an embedding model from an already-configured provider) is deferred: per-message embedding cost + a new model dependency for a corpus FTS serves at current scale. Revisit trigger: search-miss complaints in triage or > 100k messages per active org.
 17. **[owner decision needed] MCP exposure of the read-tool registry** through the `/v1` gateway (§12.2) — lets external agent hosts consume the identical least-privilege tool surface. Not before public-api Phase 3 (webhooks/tokens) and never as a parallel stack; needs a decision on scopes-to-tools mapping.
 18. **[owner decision needed] Org-level chat retention policy.** Default taken meanwhile: user-owned threads, no automatic deletion, hard user-initiated delete (§14.2, §14.6). An org-mandated retention window (e.g. 24 months) is a compliance knob to decide before enterprise rollout.
+19. **[default taken — Stage 0/M0 landing] `chat_history_sync` seeds OFF for every role in `20260717000001_chat_store.sql`**, overriding the §14.7 "DEFAULT on where `ai_chat` is on" for the landing PR only: Stage 0 and M0 land together under the §9 global kill switch, whose exit criterion is byte-identical default behavior (golden-transcript test), and a capability seeded on would flip the sidebar/store behavior on deploy. Flipping to the §14.7 default at M0 GA is a `role_capabilities` update (via `admin_set_capability` or a one-line follow-up migration). Revisit: at M0 GA.
+20. **[default taken — custom-auth adaptation, Stage 0/M0 as-built]** (a) The chat-store write RPCs (§14.1) and `record_proposal_viewed` (§7.1) carry an explicit `p_user_id` parameter (the `20260711000002` resolver idiom — never a session GUC), and the store adds owner-scoped **read** RPCs (`list_chat_folders`, `list_chat_threads`, `list_chat_messages`, plus `chat_quick_thread_id` for the deterministic Quick-thread id) because the browser's custom-auth reads cannot rely on RLS-derived identity; the RLS owner policies remain as defense in depth. (b) `create_agent_proposal` enforces the §8 T10 live-proposal cap (20/user/project, DEFAULT) at draft time — reflected in the §4.1 DDL. (c) The §14.2 sidebar adds one "Recent" catch-all group for live threads that are in no pinned/project/folder view, which the rule list implies but does not name. Revisit: (a) collapses into public-api Q2 (server-verified identity) when it lands.
 
 ---
 
@@ -1715,7 +1726,7 @@ Default (Stage M0): Postgres FTS (`chat_messages.fts`, `search_chat_messages`) +
 
 | Stage | Scope | Files | Flags | Exit criteria |
 |---|---|---|---|---|
-| **M0** (targets Stage 1 timeframe) | chat store DDL + RPCs; sidebar folders/pinned/archive/search; localStorage one-time import (`import_local_threads`, idempotent by thread id) then localStorage demoted to cache; `useChatThreads` rewritten over the store with optimistic writes | `20260717000001_chat_store.sql`, `src/hooks/useChatThreads.ts`, `src/components/intelligence/ChatSidebar.tsx`, `index.ts` (server appends assistant messages so history survives client crashes) | server `CHAT_STORE_ENABLED`; capability `chat_history_sync` (DEFAULT on where `ai_chat` is on) | threads visible cross-device; import verified lossless on seeded fixtures; flag off ⇒ localStorage behavior exactly |
+| **M0** (targets Stage 1 timeframe) | chat store DDL + RPCs; sidebar folders/pinned/archive/search; localStorage one-time import (`import_local_threads`, idempotent by thread id) then localStorage demoted to cache; `useChatThreads` rewritten over the store with optimistic writes | `20260717000001_chat_store.sql`, `src/hooks/useChatThreads.ts`, `src/components/intelligence/ChatSidebar.tsx`, `index.ts` (server appends assistant messages so history survives client crashes) | server `CHAT_STORE_ENABLED`; capability `chat_history_sync` (DEFAULT on where `ai_chat` is on; seeded OFF at the landing PR — §10 Q19) | threads visible cross-device; import verified lossless on seeded fixtures; flag off ⇒ localStorage behavior exactly |
 | **M1** | rolling summaries (§14.3) + thread-info panel | `index.ts` (summary queue), `providers.ts` (summary block), `20260717000001` already carries columns | `CHAT_SUMMARY_ENABLED` | summaries maintained at the 24/8 thresholds; deletable; persona answers reference >8-turn-old user statements in eval transcripts |
 | **M2** | `project_memory` + `get_project_memory` + memory chips + sidebar panel | `20260717000002_project_memory.sql`, `tools.ts` (tool registration), `draftTools.ts` context builders (+8 KB budget), UI panel | `PROJECT_MEMORY_ENABLED`; capability `project_memory` | consent-only writes verified by fixtures (no silent-write path exists); memories retrieved by both personas and agents in eval fixtures; stale chips render on hash drift |
 

@@ -1,0 +1,18 @@
+{
+  "//": [
+    "Eval-harness config (ai-agents.md §7.4 deterministic tier).",
+    "Run from inside this directory so Deno discovers this config:",
+    "  cd supabase/functions/project-ai-chat/eval && deno test --allow-env --allow-read --allow-write --allow-run .",
+    "The import map swaps the esm.sh supabase-js client for a local stub so the",
+    "deterministic tier runs fully offline (no network, no live Supabase).",
+    "It applies ONLY to eval runs — production functions never load this config."
+  ],
+  "imports": {
+    "https://esm.sh/@supabase/supabase-js@2.45.0": "./stubs/supabase-js.ts",
+    "https://deno.land/std@0.168.0/http/server.ts": "./stubs/deno_std_http_server.ts",
+    "https://deno.land/x/xhr@0.1.0/mod.ts": "./stubs/xhr.ts"
+  },
+  "tasks": {
+    "eval": "deno test --allow-env --allow-read --allow-write --allow-run ."
+  }
+}

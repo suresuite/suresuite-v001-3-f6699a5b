@@ -4,6 +4,7 @@ import { DataTable } from "./DataTable";
 import { KpiCards } from "./KpiCards";
 import { BulletList } from "./BulletList";
 import { ToolCallBadge } from "./ToolCallBadge";
+import { ProposalCard } from "./ProposalCard";
 
 export function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
@@ -28,6 +29,9 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
           if (p.kind === "table") return <DataTable key={i} data={p.data} />;
           if (p.kind === "kpi") return <KpiCards key={i} data={p.data} />;
           if (p.kind === "bullets") return <BulletList key={i} data={p.data} />;
+          if (p.kind === "proposal") {
+            return <ProposalCard key={i} proposalId={(p.data as { proposal_id?: string })?.proposal_id} />;
+          }
           return null;
         })}
         {message.toolCalls && message.toolCalls.length > 0 && (

@@ -1,0 +1,59 @@
+{
+  "description": "Seeded localStorage export for the M0 import-losslessness check (ai-agents.md §14.7): quick thread, uuid thread with typed parts + tool calls, and a legacy (non-uuid id) thread.",
+  "threads": [
+    {
+      "id": "quick",
+      "projectId": null,
+      "agentId": null,
+      "title": "Quick chat",
+      "updatedAt": 1720000300000,
+      "messages": [
+        { "id": "m1a", "role": "user", "content": "What is safety stock?", "createdAt": 1720000100000 },
+        {
+          "id": "m1b",
+          "role": "assistant",
+          "content": "Safety stock is the buffer you hold against variability.",
+          "parts": [{ "kind": "bullets", "data": ["demand variability", "supply variability"] }],
+          "toolCalls": [],
+          "createdAt": 1720000200000
+        }
+      ]
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "projectId": "11111111-1111-4111-8111-111111111111",
+      "agentId": "risk-analyst",
+      "title": "Supplier exposure review",
+      "updatedAt": 1720003000000,
+      "messages": [
+        { "id": "m2a", "role": "user", "content": "Which suppliers are single-source for a critical material?", "createdAt": 1720001000000 },
+        {
+          "id": "m2b",
+          "role": "assistant",
+          "content": "S1 is the sole supplier of MAT-9, and MAT-9 feeds your top product.",
+          "parts": [
+            {
+              "kind": "table",
+              "data": { "columns": ["Supplier", "Sole-sourced"], "rows": [["S1", 1], ["S2", 0]] }
+            }
+          ],
+          "toolCalls": [
+            { "name": "get_supplier_risk", "args": { "top_n": 5 }, "ok": true, "row_count": 2 }
+          ],
+          "createdAt": 1720002000000
+        },
+        { "id": "m2c", "role": "user", "content": "Thanks — and what about tier 2?", "createdAt": 1720003000000 }
+      ]
+    },
+    {
+      "id": "k3xy9ab2",
+      "projectId": null,
+      "agentId": null,
+      "title": "Legacy thread",
+      "updatedAt": 1719990000000,
+      "messages": [
+        { "id": "m3a", "role": "user", "content": "The quick brown fox asked about supplier lead times.", "createdAt": 1719990000000 }
+      ]
+    }
+  ]
+}

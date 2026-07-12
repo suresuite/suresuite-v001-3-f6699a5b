@@ -36,6 +36,14 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
     newThread,
     deleteThread,
     updateThread,
+    syncEnabled,
+    folders,
+    createFolder,
+    deleteFolder,
+    moveThreadToFolder,
+    setPinned,
+    setArchived,
+    searchMessages,
   } = useChatThreads();
 
   useEffect(() => {
@@ -121,6 +129,14 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
             onDeleteThread={deleteThread}
             onRenameThread={(id, title) => updateThread(id, { title })}
             onAttachProject={(id, projectId) => updateThread(id, { projectId })}
+            syncEnabled={syncEnabled}
+            folders={folders}
+            onCreateFolder={createFolder}
+            onDeleteFolder={deleteFolder}
+            onMoveToFolder={moveThreadToFolder}
+            onTogglePin={setPinned}
+            onToggleArchive={setArchived}
+            onSearchMessages={searchMessages}
           />
           <ChatWorkspace
             threadId={activeThreadId}

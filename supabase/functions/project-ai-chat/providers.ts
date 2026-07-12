@@ -1,7 +1,7 @@
 // Multi-provider chat dispatcher with shared tool-calling.
 // Supports Gemini, OpenAI (gpt-5 family), and DeepSeek (OpenAI-compatible).
 
-import { executeTool, ToolContext, toolDeclarations, ToolEnvelope } from "./tools.ts";
+import { executeTool, ToolContext, ToolDeclaration, toolDeclarations, ToolEnvelope } from "./tools.ts";
 import { resolveAgent } from "./agents.ts";
 
 export type ProviderId = "gemini" | "openai" | "deepseek";
@@ -26,6 +26,15 @@ export function resolveModel(id: string | undefined | null): ModelSpec {
 }
 
 export interface ChatTurn { role: "user" | "assistant"; content: string }
+
+// Bridge 1 (ai-agents.md §3.2): Layer B agent turns reuse this exact loop with
+// an agent system prompt in place of buildSystemPrompt and a least-privilege
+// tool subset in place of the full toolDeclarations. Omitting both yields
+// byte-identical Layer A behavior (pinned by the golden-transcript suite).
+export interface RunChatOptions {
+  system?: string;
+  tools?: ReadonlyArray<ToolDeclaration>;
+}
 
 export interface ChatRunResult {
   reply: string;
@@ -95,6 +104,7 @@ interface GeminiContent { role: "user" | "model" | "function"; parts: GeminiPart
 async function runGemini(
   apiKey: string, model: ModelSpec, system: string,
   userMessage: string, history: ChatTurn[], ctx: ToolContext | null,
+  tools: ReadonlyArray<ToolDeclaration>,
 ): Promise<ChatRunResult> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`;
   const contents: GeminiContent[] = [];
@@ -113,7 +123,7 @@ async function runGemini(
       body: JSON.stringify({
         systemInstruction: { role: "system", parts: [{ text: system }] },
         contents,
-        ...(ctx ? { tools: [{ functionDeclarations: toolDeclarations }] } : {}),
+        ...(ctx ? { tools: [{ functionDeclarations: tools }] } : {}),
         generationConfig: { temperature: 0.4, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
       }),
     });
@@ -154,8 +164,8 @@ async function runGemini(
 
 // ---------------- OpenAI-compatible (OpenAI + DeepSeek) ----------------
 
-function toOpenAITools() {
-  return toolDeclarations.map((t) => ({
+function toOpenAITools(tools: ReadonlyArray<ToolDeclaration>) {
+  return tools.map((t) => ({
     type: "function" as const,
     function: { name: t.name, description: t.description, parameters: t.parameters },
   }));
@@ -164,6 +174,7 @@ function toOpenAITools() {
 async function runOpenAICompatible(
   baseUrl: string, apiKey: string, model: ModelSpec, system: string,
   userMessage: string, history: ChatTurn[], ctx: ToolContext | null,
+  tools: ReadonlyArray<ToolDeclaration>,
 ): Promise<ChatRunResult> {
   const messages: any[] = [{ role: "system", content: system }];
   for (const h of history.slice(-8)) messages.push({ role: h.role, content: h.content.slice(0, 2000) });
@@ -176,7 +187,7 @@ async function runOpenAICompatible(
     const body: any = {
       model: model.apiModel,
       messages,
-      ...(ctx ? { tools: toOpenAITools(), tool_choice: "auto" } : {}),
+      ...(ctx ? { tools: toOpenAITools(tools), tool_choice: "auto" } : {}),
     };
     // gpt-5 family uses max_completion_tokens and rejects temperature; others use the classic params.
     // For gpt-5, reasoning tokens count against max_completion_tokens, so keep reasoning low and
@@ -239,24 +250,26 @@ export async function runChat(
   history: ChatTurn[],
   ctx: ToolContext | null,
   agentId?: string | null,
+  opts?: RunChatOptions,
 ): Promise<ChatRunResult> {
   const model = resolveModel(modelId);
-  const system = buildSystemPrompt(model.label, agentId, !!ctx);
+  const system = opts?.system ?? buildSystemPrompt(model.label, agentId, !!ctx);
+  const tools = opts?.tools ?? toolDeclarations;
 
   if (model.provider === "gemini") {
     const key = Deno.env.get("GEMINI_API_KEY");
     if (!key) throw new Error("GEMINI_API_KEY is not configured.");
-    return runGemini(key, model, system, userMessage, history, ctx);
+    return runGemini(key, model, system, userMessage, history, ctx, tools);
   }
   if (model.provider === "openai") {
     const key = Deno.env.get("OPENAI_API_KEY");
     if (!key) throw new Error("OPENAI_API_KEY is not configured.");
-    return runOpenAICompatible("https://api.openai.com/v1", key, model, system, userMessage, history, ctx);
+    return runOpenAICompatible("https://api.openai.com/v1", key, model, system, userMessage, history, ctx, tools);
   }
   if (model.provider === "deepseek") {
     const key = Deno.env.get("DEEPSEEK_API_KEY");
     if (!key) throw new Error("DEEPSEEK_API_KEY is not configured.");
-    return runOpenAICompatible("https://api.deepseek.com/v1", key, model, system, userMessage, history, ctx);
+    return runOpenAICompatible("https://api.deepseek.com/v1", key, model, system, userMessage, history, ctx, tools);
   }
   throw new Error(`Unsupported provider: ${(model as any).provider}`);
 }

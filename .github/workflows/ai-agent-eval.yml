@@ -1,0 +1,43 @@
+# Deterministic eval tier for the AI-agent layer (ai-agents.md §7.4 tier 1).
+# Gates every PR touching the agent path, the way golden traces gate engine
+# changes (asset A13). No LLM calls: providers are fetch-mocked and the
+# proposal/chat-store RPCs run on a scratch Postgres built from the real
+# migration files (EVAL_REQUIRE_DB=1 turns a missing Postgres into a failure).
+
+name: AI Agent Eval (deterministic tier)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/project-ai-chat/**'
+      - 'supabase/functions/project-ai-health/**'
+      - 'supabase/migrations/**'
+      - 'src/lib/chat/**'
+      - '.github/workflows/ai-agent-eval.yml'
+  pull_request:
+    paths:
+      - 'supabase/functions/project-ai-chat/**'
+      - 'supabase/functions/project-ai-health/**'
+      - 'supabase/migrations/**'
+      - 'src/lib/chat/**'
+      - '.github/workflows/ai-agent-eval.yml'
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # ubuntu-latest ships Postgres server binaries (initdb/pg_ctl/psql);
+      # the harness boots its own throwaway cluster — no service container.
+      - name: Run deterministic eval tier
+        working-directory: supabase/functions/project-ai-chat/eval
+        env:
+          EVAL_REQUIRE_DB: '1'
+        run: deno test --allow-env --allow-read --allow-write --allow-run .

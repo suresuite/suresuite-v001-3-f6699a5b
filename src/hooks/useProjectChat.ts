@@ -7,7 +7,9 @@ import { useChatThreads } from "@/hooks/useChatThreads";
 export type ChatRole = "user" | "assistant";
 
 export interface ChatPart {
-  kind: "table" | "kpi" | "bullets" | "text";
+  // "proposal" carries {proposal_id} and renders as a ProposalCard
+  // (ai-agents.md §4.5/§4.6); older clients ignore unknown kinds.
+  kind: "table" | "kpi" | "bullets" | "text" | "proposal";
   data: unknown;
 }
 
@@ -33,6 +35,9 @@ interface ChatApiResponse {
   toolCalls?: ChatToolCall[];
   blocked?: boolean;
   error?: string;
+  /** True when the server already appended the assistant message to the
+   * chat store (CHAT_STORE_ENABLED, ai-agents.md §14.7 M0). */
+  persisted?: boolean;
 }
 
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -96,6 +101,9 @@ export function useProjectChat(threadId: string | null) {
       const withUser = [...messages, userMsg];
       setMessages(withUser);
       persist(withUser);
+      // Chat store (M0): the client owns the user-message append; the server
+      // appends the assistant reply. No-op while chat_history_sync is off.
+      if (threadId) void threads.appendMessageToStore(threadId, userMsg);
 
       // Access control: block disallowed features/models and over-budget calls
       // before we ever reach the LLM, with a clear, actionable reason.
@@ -121,6 +129,7 @@ export function useProjectChat(threadId: string | null) {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
       try {
+        const serverThreadId = threadId ? threads.getServerThreadId(threadId) : null;
         const payload = {
           mode: "tools",
           projectId,
@@ -130,6 +139,7 @@ export function useProjectChat(threadId: string | null) {
           userId: user.id,
           userEmail: user.email,
           model: opts.model ?? "gemini-2.5-flash",
+          ...(serverThreadId ? { threadId: serverThreadId } : {}),
         };
 
         const { data, error: invokeError } = await supabase.functions.invoke<ChatApiResponse>(
@@ -179,6 +189,9 @@ export function useProjectChat(threadId: string | null) {
         const withAssistant = [...withUser, assistant];
         setMessages(withAssistant);
         persist(withAssistant);
+        // If the server didn't persist the assistant reply (CHAT_STORE_ENABLED
+        // off), the client covers it so the store stays complete.
+        if (threadId && !data2.persisted) void threads.appendMessageToStore(threadId, assistant);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Something went wrong.";
         setError(msg);
@@ -186,7 +199,7 @@ export function useProjectChat(threadId: string | null) {
         setLoading(false);
       }
     },
-    [loading, messages, user, thread, persist, caps],
+    [loading, messages, user, thread, persist, caps, threadId, threads],
   );
 
   return { messages, loading, error, send, clear };
