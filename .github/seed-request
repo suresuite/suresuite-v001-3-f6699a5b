@@ -8,3 +8,4 @@
 user_email=pnguyen@dmrg.ai
 request: 2026-07-12T00:00:00Z reason=initial-tron-ver2-seed
 request: 2026-07-12T04:05:00Z reason=retry-after-migration-version-collision-fix
+request: 2026-07-12T05:00:00Z reason=reseed-after-nan-persistence-fix

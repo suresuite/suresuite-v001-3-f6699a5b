@@ -29,6 +29,21 @@ _BRIDGE_KEYS = (
 )
 
 
+def _finite(v: Any, ndigits: int) -> Any:
+    """Round a numeric value, mapping non-finite floats (NaN/±inf) to None.
+
+    The engine uses NaN as a deliberate "not measured" sentinel (e.g.
+    capacity_utilization without full-debug matrices), but json.dumps emits a
+    literal ``NaN`` token for it — invalid JSON that PostgREST rejects, which
+    once silently dropped EVERY run_replications upsert of an otherwise green
+    run. None serializes to null and survives the trip."""
+    import math
+    f = float(v)
+    if not math.isfinite(f):
+        return None
+    return round(f, ndigits)
+
+
 def scsim_enabled() -> bool:
     return os.getenv("SCSIM_ENGINE", "").lower() in ("1", "true", "yes")
 
@@ -72,10 +87,10 @@ def compute_kpis_scsim(
         agg = result.aggregates.get(key)
         if agg is None:
             continue
-        out[f"mean_{key}"] = round(agg["mean"], 4)
-        out[f"ci_{key}"] = round(agg["ci_halfwidth"], 4)
-        out[f"min_{key}"] = round(agg["min"], 4)
-        out[f"max_{key}"] = round(agg["max"], 4)
+        out[f"mean_{key}"] = _finite(agg["mean"], 4)
+        out[f"ci_{key}"] = _finite(agg["ci_halfwidth"], 4)
+        out[f"min_{key}"] = _finite(agg["min"], 4)
+        out[f"max_{key}"] = _finite(agg["max"], 4)
 
     # Back-compat aliases consumed by the existing broadcast handler.
     out["fill_rate"] = out.get("mean_fill_rate", 0.0)
@@ -108,9 +123,9 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
             on_replication({
                 "rep_index": done - 1,
                 "seed_used": project_seed * 1000 + int(row.get("model_rep", done - 1)),
-                "kpis": {k: round(float(v), 6) for k, v in row.items()},
+                "kpis": {k: _finite(v, 6) for k, v in row.items()},
                 "time_series": {
-                    k: [round(float(x), 5) for x in v.tolist()] for k, v in series.items()
+                    k: [_finite(x, 5) for x in v.tolist()] for k, v in series.items()
                 },
                 "warmup_at": None,  # known only at run end; final upsert fills it
             }, done, total)
@@ -132,10 +147,10 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         agg = result.aggregates.get(key)
         if agg is None:
             continue
-        out[f"mean_{key}"] = round(agg["mean"], 4)
-        out[f"ci_{key}"] = round(agg["ci_halfwidth"], 4)
-        out[f"min_{key}"] = round(agg["min"], 4)
-        out[f"max_{key}"] = round(agg["max"], 4)
+        out[f"mean_{key}"] = _finite(agg["mean"], 4)
+        out[f"ci_{key}"] = _finite(agg["ci_halfwidth"], 4)
+        out[f"min_{key}"] = _finite(agg["min"], 4)
+        out[f"max_{key}"] = _finite(agg["max"], 4)
     out["fill_rate"] = out.get("mean_fill_rate", 0.0)
     out["otif"] = out.get("mean_fill_rate", 0.0)
     out["revenue"] = out.get("mean_revenue", 0.0)
@@ -150,17 +165,17 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
     def _series_for(i: int) -> dict:
         if i >= len(result.fr_series):
             return {}
-        ts = {"fill_rate": [round(float(x), 5) for x in result.fr_series[i].tolist()]}
+        ts = {"fill_rate": [_finite(x, 5) for x in result.fr_series[i].tolist()]}
         for key, rows in extra.items():
             if i < len(rows):
-                ts[key] = [round(float(x), 5) for x in rows[i].tolist()]
+                ts[key] = [_finite(x, 5) for x in rows[i].tolist()]
         return ts
 
     out["replications"] = [
         {
             "rep_index": i,
             "seed_used": seed * 1000 + int(cells[i][0]) if i < len(cells) else seed,
-            "kpis": {k: round(float(v), 6) for k, v in row.items()},
+            "kpis": {k: _finite(v, 6) for k, v in row.items()},
             "time_series": _series_for(i),
             "warmup_at": out["warmup_detected_at"],
         }

@@ -276,8 +276,20 @@ class SimWorker:
                             })
                             raise
                         kpis["run_id"] = run_id
-                        await self._write_replications(
+                        # The final authoritative write. Streamed upserts are
+                        # best-effort (liveness), but losing THIS one loses
+                        # data — mark the run failed instead of reporting a
+                        # green run with zero persisted replications.
+                        reps_ok = await self._write_replications(
                             run_id, cmd.project_id, kpis.get("replications") or [])
+                        if not reps_ok:
+                            await self._update_run(run_id, {
+                                "status": "failed",
+                                "error_message": "replication rows failed to persist "
+                                                 "(see worker logs) — run aborted to avoid "
+                                                 "reporting results with no evidence rows",
+                            })
+                            raise RuntimeError("run_replications upsert failed")
                         await self._update_run(
                             run_id, build_run_update(kpis, int(kpis.get("n_reps", n_reps))))
                     else:
@@ -366,10 +378,12 @@ class SimWorker:
 
     async def _write_replications(
         self, run_id: str, project_id: str, reps: list[dict[str, Any]]
-    ) -> None:
-        """Idempotently UPSERT per-replication rows on (run_id, rep_index)."""
+    ) -> bool:
+        """Idempotently UPSERT per-replication rows on (run_id, rep_index).
+        Returns True on success — the caller decides whether a failure is
+        best-effort (mid-run streaming) or fatal (the final write)."""
         if not reps:
-            return
+            return True
         rows = [{
             "run_id": run_id, "project_id": project_id,
             "rep_index": r["rep_index"], "seed_used": r["seed_used"],
@@ -391,8 +405,11 @@ class SimWorker:
             )
             if resp.status_code >= 300:
                 log.warning("replication upsert failed %s %s", resp.status_code, resp.text[:200])
+                return False
+            return True
         except Exception:
             log.exception("failed to upsert replications for run %s", run_id)
+            return False
 
     async def _update_run(self, run_id: str, patch: dict[str, Any]) -> None:
         """PATCH a simulation_runs row via PostgREST (service role)."""
