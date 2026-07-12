@@ -22,7 +22,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Loader2, Plus, ShieldCheck } from 'lucide-react';
+import { Loader2, Pencil, Plus, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { OrgAccessDrawer } from '@/components/admin/OrgAccessDrawer';
 
@@ -49,45 +49,26 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessOrg, setAccessOrg] = useState<OrgRow | null>(null);
+  const [renameOrg, setRenameOrg] = useState<OrgRow | null>(null);
   const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
   const load = async () => {
     setLoading(true);
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-    const [orgsRes, memRes, projRes, useRes] = await Promise.all([
-      db.from('organizations').select('*').order('name'),
-      db.from('organization_members').select('org_id'),
-      db.from('projects').select('organization_id'),
-      db
-        .from('ai_usage_logs')
-        .select('org_id,cost_usd')
-        .gte('created_at', monthStart.toISOString()),
-    ]);
-    const memCount = new Map<string, number>();
-    (memRes.data ?? []).forEach((r: any) => {
-      memCount.set(r.org_id, (memCount.get(r.org_id) || 0) + 1);
-    });
-    const projCount = new Map<string, number>();
-    (projRes.data ?? []).forEach((r: any) => {
-      if (r.organization_id)
-        projCount.set(r.organization_id, (projCount.get(r.organization_id) || 0) + 1);
-    });
-    const cost = new Map<string, number>();
-    (useRes.data ?? []).forEach((r: any) => {
-      if (r.org_id) cost.set(r.org_id, (cost.get(r.org_id) || 0) + Number(r.cost_usd || 0));
-    });
+    // Read through a super-admin RPC: direct table reads run as anon without
+    // the transaction-local user context, so RLS filters everything out and
+    // the page looks empty (same reason the admin mutations are RPCs).
+    const { data, error } = await db.rpc('admin_list_organizations', actorArgs());
+    if (error) toast.error(error.message);
     setRows(
-      ((orgsRes.data ?? []) as any[]).map((o) => ({
+      ((data ?? []) as any[]).map((o) => ({
         id: o.id,
         name: o.name,
         slug: o.slug,
         status: o.status,
         created_at: o.created_at,
-        members: memCount.get(o.id) || 0,
-        projects: projCount.get(o.id) || 0,
-        cost_mtd: cost.get(o.id) || 0,
+        members: Number(o.members || 0),
+        projects: Number(o.projects || 0),
+        cost_mtd: Number(o.cost_mtd || 0),
       }))
     );
     setLoading(false);
@@ -162,6 +143,9 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                     {new Date(o.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => setRenameOrg(o)} title="Rename">
+                      <Pencil className="mr-1 h-3 w-3" /> Rename
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setAccessOrg(o)} title="Access defaults">
                       <ShieldCheck className="mr-1 h-3 w-3" /> Access
                     </Button>
@@ -184,7 +168,69 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
           onClose={() => setAccessOrg(null)}
         />
       )}
+
+      {renameOrg && (
+        <RenameOrgDialog
+          org={renameOrg}
+          actorArgs={actorArgs}
+          onClose={() => setRenameOrg(null)}
+          onDone={load}
+        />
+      )}
     </AdminLayout>
+  );
+}
+
+function RenameOrgDialog({
+  org,
+  actorArgs,
+  onClose,
+  onDone,
+}: {
+  org: OrgRow;
+  actorArgs: () => { p_actor_id?: string; p_actor_email?: string };
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [name, setName] = useState(org.name);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!name.trim()) return toast.error('Name is required');
+    setSaving(true);
+    const { error } = await db.rpc('admin_update_organization', {
+      ...actorArgs(),
+      p_org_id: org.id,
+      p_name: name.trim(),
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Renamed to "${name.trim()}"`);
+    onClose();
+    onDone();
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename “{org.name}”</DialogTitle>
+        </DialogHeader>
+        <div>
+          <Label className="text-xs">New name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" autoFocus />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Rename
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

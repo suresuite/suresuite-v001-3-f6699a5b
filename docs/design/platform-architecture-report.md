@@ -1272,8 +1272,8 @@ platform's existing public interfaces* — no privileged path exists for AI.
 
 | # | Agent | Room | Consumes (read) | Produces (proposal) | Hard gate before effect | Phase |
 |---|---|---|---|---|---|---|
-| A1 | **Data Steward** | Project Manager | Dataset status, data map, manifest findings, uploaded files | Item-master value drafts with source citations; mapping-fix diffs | Same validated mutations as manual edits; diff review; provenance badge shows agent origin | B (manifest exists ✅) |
-| A2 | **Policy Configurator** | Policies | Registry catalog + schemas, presets, project data | Bundle diffs from natural-language intent ("resilient to a 6-week outage of supplier X, budget-neutral") as candidate policy versions | Registry schema validation + `feasibility()` + portfolio checks + required-data manifest; user applies the version | B (the blueprint's LLM diff proposer, M8) |
+| A1 | **Data Steward** | Project Manager | Dataset status, data map, manifest findings, uploaded files | Item-master value drafts with source citations; mapping-fix diffs; create/seed-project proposals | Same validated mutations as manual edits; diff review; provenance badge shows agent origin; **+ the run-readiness contract when the proposal creates/populates a project** (org-correct, complete dataset, pre-run gate green) | B (manifest exists ✅) |
+| A2 | **Policy Configurator** | Policies | Registry catalog + schemas, presets, project data | Bundle diffs from natural-language intent ("resilient to a 6-week outage of supplier X, budget-neutral") as candidate policy versions | Registry schema validation + `feasibility()` + portfolio checks + required-data manifest; user applies the version; **+ the run-readiness contract — persisted primary-supplier / primary-sourcing-firm / time-unit selections, not just a valid diff** | B (the blueprint's LLM diff proposer, M8) |
 | A3 | **V&V Analyst** | Run & Validate | Pipeline outputs: findings, traces, warm-up estimates, test statistics | Interpretation and next-step recommendations (lengthen horizon, more replications, estimator-divergence flags); drafted model-card narrative | Card content is computed, never asserted, by the agent; adoption is a user action | B0/B (needs the card) |
 | A4 | **Experiment Designer** | Simulation Lab | Validated model card, scenario library, KPI dictionary, run history | Typed experiment specs (comparison/DOE/battery) with CRN pairing; decision briefs where every number carries its run identity | Specs execute through `sim-command`'s gate like any run; briefs cite only persisted results | C (typed experiments) |
 | A5 | **Explainer** | Cross-cutting | Decision-trace records (facet 11), KPI definitions, policy docs, run provenance | Grounded answers ("why did fill rate drop in week 37?") with citations to actual policy firings | Citation-mandatory; refuses when the trace does not support an answer | B/C (needs facet-11 traces) |
@@ -1301,6 +1301,30 @@ immutability and single-writer disciplines (§5-D7/D8) therefore contain the bla
 any agent error by construction. Evaluation mirrors the platform's own CI philosophy: a
 golden task suite per agent (fixed project, fixed intent, expected proposal properties)
 gates roster changes the way golden traces gate engine changes.
+
+**The run-readiness contract (blueprint §12, gap G16).** For the one case where an agent
+*creates or populates a project* (A1's create/seed proposals; any A2 configuration that first
+stands a project up), "reviewable proposal that passes the same gate as human input" is made
+concrete: the proposal is **not done — it is incomplete, not merely imperfect — until the
+project passes the SAME pre-run gate a human's project passes** (`verifyProjectPolicies` /
+the `sim-command` dispatch gate, one shared grader) with **zero blocking findings, in the
+correct organization**. Five named obligations, each an existing check the contract composes,
+never invents: org-correct stamping (the project inherits the agent's *resolved* org via
+`set_project_defaults`, so it is visible to its owner under `list_projects`); a complete
+dataset (bom + inbound + outbound, graded by the required-data manifest); one persisted
+primary supplier per material; one persisted primary sourcing firm per customer/product; a
+planning time unit. The last three are **persisted policy selections** (`policy_overrides`
+via `bulk_upsert_policy_overrides`) that arcs and graph do *not* imply — seeding that stops
+before them yields a project that loads yet fails "Run & Validate," which under this contract
+is an incomplete proposal. The agent then **self-verifies** through the app's own read paths —
+`list_projects` (visible in the intended org), `get_project_dataset_status` (dataset
+complete), the pre-run gate (zero blocks) — before presenting the result as done. Creating and
+seeding are idempotent (resolve-by-name / upsert-on-key, reusing the existing lifecycle) and
+every agent write is attributed to its resolving principal through the existing API audit log
+— no agent-only write path and no new provenance system, which is the guardrail (neither the
+surrogate loop nor any agent writes to the provenance fabric) applied to project creation.
+Agent identity is resolved through the access-control layer
+(`docs/design/public-api-and-access-control.md` §5–§6.4), never asserted.
 
 ---
 

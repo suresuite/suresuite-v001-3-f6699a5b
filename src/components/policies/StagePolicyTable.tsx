@@ -21,13 +21,14 @@ import {
   specFor,
   familiesForStage,
   headerColsUnion,
+  vectorParamCols,
   flattenBundle,
   type ColSpec,
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
-import { policyTypeLabel } from "@/lib/policies/registryPolicyTypes";
+import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
@@ -494,6 +495,75 @@ export function StagePolicyTable({
   const getDefault = (field: string, family: PolicyFamily): unknown =>
     ((defaults[family] ?? {}) as Record<string, unknown>)[field];
 
+  // Full field→col map (includes vectorized inventory params hidden from the
+  // header) so save/prefill can resolve a param's family even though it renders
+  // inside the "Replenishment parameters" vector cell rather than its own column.
+  const specColByField = useMemo(() => {
+    const m = new Map<string, ColSpec>();
+    for (const c of specFor(stageKey).cols) m.set(c.field, c);
+    return m;
+  }, [stageKey]);
+
+  // The type-specific inventory params grouped into the per-row vector cell.
+  const invParamColByField = useMemo(() => {
+    const m = new Map<string, ColSpec>();
+    for (const c of vectorParamCols(stageKey)) m.set(c.field, c);
+    return m;
+  }, [stageKey]);
+
+  /** The dynamic "Replenishment parameters" cell: a 2-column (parameter → value)
+   *  vector showing ONLY the params the row's chosen policy type needs (§II.3).
+   *  Reshapes live when the `type` dropdown changes. */
+  const renderInvParamsCell = (rowKey: string, r: Record<string, unknown>) => {
+    const rowDraft = drafts[rowKey] ?? {};
+    const type = String(getEffective(rowKey, r, "type", "inventory") ?? "min_max");
+    const params = inventoryParamsForType(type);
+    const bundleInv = effectivePolicy(defaults, overrides, spec.scope, rowKey).inventory as
+      | Record<string, unknown>
+      | undefined;
+    return (
+      <div className="flex flex-col divide-y divide-border/50 min-w-[220px]">
+        {params.map((p) => {
+          const pcol = invParamColByField.get(p.field);
+          if (!pcol) return null;
+          const value = getEffective(rowKey, r, p.field, "inventory");
+          const bundleVal = bundleInv?.[p.field];
+          const liveDefault =
+            bundleVal !== undefined
+              ? bundleVal
+              : pcol.defaultWhenMissing !== undefined
+                ? pcol.defaultWhenMissing
+                : getDefault(p.field, "inventory");
+          const edited = rowDraft[p.field] !== undefined;
+          const feas = paramFeasibility(p, value ?? undefined);
+          return (
+            <div key={p.field} className="flex items-center gap-1.5 px-1.5 py-0.5">
+              <span
+                className="flex-1 text-[10px] text-muted-foreground truncate"
+                title={pcol.label}
+              >
+                {adaptLabel(pcol.label)}
+              </span>
+              <div className={cn("w-24 shrink-0 rounded", edited && "bg-primary/10")}>
+                <ValueCell
+                  spec={pcol}
+                  value={value}
+                  defaultValue={liveDefault}
+                  onChange={(v) => onCellChange(rowKey, p.field, v)}
+                />
+              </div>
+              {feas && (
+                <span className="shrink-0 text-[9px] text-destructive cursor-help" title={feas}>
+                  !
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // Detect whether a row currently has any existing override (vs default).
   const hasOverride = (rowKey: string): boolean =>
     overrides.some((o) => o.target_key === rowKey);
@@ -502,6 +572,7 @@ export function StagePolicyTable({
   const cellValueFor = (r: Record<string, unknown>, colId: string): unknown => {
     if (spec.keyCols.some((c) => c.id === colId)) return r[colId];
     const spec2 = specFor(stageKey).cols.find((c) => c.field === colId);
+    if (spec2?.synthetic) return ""; // vector cell — not sortable/filterable
     return getEffective(String(r.key), r, colId, spec2?.family);
   };
 
@@ -607,8 +678,11 @@ export function StagePolicyTable({
         | undefined;
       const byFamily = new Map<PolicyFamily, Record<string, unknown>>();
       for (const [field, v] of Object.entries(draft)) {
-        const col = allCols.find((c) => c.field === field);
-        if (!col) continue;
+        // Resolve from the FULL spec (not the header union) so vectorized
+        // inventory params — which render inside the vector cell, not their own
+        // column — still save under their family.
+        const col = specColByField.get(field);
+        if (!col || col.synthetic) continue;
         const mcol = col.master;
         if (mcol && dataRow) {
           const id = String(dataRow[mcol.idFrom] ?? "");
@@ -762,10 +836,23 @@ export function StagePolicyTable({
         continue;
       }
       const byFamily = new Map<PolicyFamily, Record<string, unknown>>();
-      for (const col of allCols) {
-        if (col.readOnly) continue;
+      // Iterate the FULL spec (incl. vectorized inventory params rendered in the
+      // vector cell), honoring each col's per-row gate so only params the row's
+      // policy type actually uses are persisted.
+      for (const col of specFor(stageKey).cols) {
+        if (col.synthetic || col.readOnly) continue;
         // Master-backed fields live in the item masters, never in overrides.
         if (col.master) continue;
+        if (
+          col.visibleWhen &&
+          !col.visibleWhen({
+            fulfillmentStrategy,
+            row: r,
+            draft: drafts[rowKey],
+            effective: rowEffective.get(rowKey),
+          })
+        )
+          continue;
         // Never persist imputed averages — they are estimates to verify,
         // not data (silently freezing them poisoned projects before).
         if ((r.__imputed as Record<string, true> | undefined)?.[col.field]) continue;
@@ -1130,6 +1217,13 @@ export function StagePolicyTable({
                     key={col.field}
                     className="py-1.5 px-2 text-left text-[10px] font-medium text-muted-foreground border-b border-r whitespace-nowrap bg-muted/70"
                   >
+                    {col.synthetic ? (
+                      // Vector cell anchor: a plain label (no sort/filter/info) —
+                      // its params carry their own meaning inside the cell.
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {adaptLabel(col.label)}
+                      </span>
+                    ) : (
                     <span className="inline-flex items-center gap-1">
                       {renderSortFilter(col.field, adaptLabel(col.label))}
                       <button
@@ -1150,6 +1244,7 @@ export function StagePolicyTable({
                         </span>
                       )}
                     </span>
+                    )}
                   </th>
                 ));
               })}
@@ -1368,6 +1463,17 @@ export function StagePolicyTable({
                               title="Not applicable for the current policy choice"
                             >
                               —
+                            </td>
+                          );
+                        }
+                        // The dynamic "Replenishment parameters" vector cell.
+                        if (col.synthetic && col.field === "__inv_params") {
+                          return (
+                            <td
+                              key={col.field}
+                              className="border-b border-r p-0 min-w-[240px] align-top group-hover:bg-accent/30"
+                            >
+                              {renderInvParamsCell(rowKey, r as Record<string, unknown>)}
                             </td>
                           );
                         }

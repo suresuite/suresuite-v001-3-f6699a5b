@@ -22,7 +22,7 @@ export const STAGES: StageDef[] = [
     key: "plant",
     title: "Focal plant",
     role: "Per product: capacity, production cost, lead time (inventory if MTS).",
-    families: ["production", "inventory", "fulfillment"],
+    families: ["production", "inventory"],
     overrideFamilies: ["production", "inventory"],
   },
   {
