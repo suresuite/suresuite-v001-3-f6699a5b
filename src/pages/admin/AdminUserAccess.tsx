@@ -268,13 +268,28 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
   }, [data]);
 
   const title = data ? data.name || data.email || 'User access' : 'User access';
+  const subtitle = data ? (
+    <span className="inline-flex items-center gap-2">
+      <span>{data.email}</span>
+      <Badge variant="secondary" className="text-[10px] font-medium capitalize">
+        {data.role.replace('_', ' ')}
+      </Badge>
+      {data.is_super_admin && (
+        <Badge className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px] font-medium">
+          <ShieldCheck className="mr-0.5 h-3 w-3" /> Super admin
+        </Badge>
+      )}
+    </span>
+  ) : (
+    'Loading…'
+  );
 
   return (
     <AdminLayout
       isCollapsed={isCollapsed}
       setIsCollapsed={setIsCollapsed}
       title={title}
-      description={data ? `${data.email ?? ''} · role: ${data.role}` : 'Loading…'}
+      description={subtitle as unknown as string}
       actions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setPreview((p) => !p)}>
@@ -282,7 +297,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
             {preview ? 'Hide preview' : 'Preview as user'}
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/admin/users')}>
-            <ArrowLeft className="mr-1 h-4 w-4" /> Back to users
+            <ArrowLeft className="mr-1 h-4 w-4" /> Back
           </Button>
         </div>
       }
@@ -297,13 +312,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
         </div>
       ) : !data ? null : (
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-8">
-            {isSuper && (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-                This user is a super admin and always has full access. Overrides below are informational.
-              </div>
-            )}
+          <div className="space-y-6">
 
             {/* ── Pages ─────────────────────────────────────────────── */}
             <Section
