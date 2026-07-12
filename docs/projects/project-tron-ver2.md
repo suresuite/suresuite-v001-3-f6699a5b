@@ -126,6 +126,37 @@ disruption** (8-week inbound delay at the paper's top-impact supplier).
    mid-restore and left the dataset half-seeded) — the workflow now runs in a
    serial concurrency group and the seeder retries transient RPC faults
    (safe: each RPC is one transaction).
+7. **Per-row completion triggers amplified every bulk arc write** (migration
+   `20260712100000`): the completion-status trigger fired FOR EACH ROW on all
+   five dataset tables — 4 EXISTS probes + a projects-row UPDATE per row, so
+   a 1,156-row `delete_project_dataset` fired 1,156 full recomputes. Rewritten
+   as statement-level triggers with transition tables + `project_id` indexes.
+   This also speeds up the app's own UploadWizard CSV path.
+8. **A cartesian-join staleness check killed every completion flip**
+   (migration `20260712110000`): `should_recalculate_network_metrics` — which
+   runs inside the projects AFTER-UPDATE trigger whenever `completed` flips
+   true — cross-joined `supply_chain_data × bom × inbound × outbound`
+   (≈ 6.8 × 10⁹ intermediate rows for TRON's graph) and probed
+   `supply_chain_data` with an un-indexable OR. It was only ever fast for
+   projects with an empty `supply_chain_data`, i.e. before their FIRST
+   combine — any re-uploaded project hit a guaranteed statement timeout.
+   Rewritten with index-served EXISTS probes and independent per-table MAXes.
+
+## 8. Final end-to-end verification (deployed pipeline, 2026-07-12)
+
+Run `f3e2b1ff…` on project `0a7040e1…` (org DMRG), dispatched through
+sim-command with saved policy version `0af48ec6…`:
+
+- queued → running → **done in 22 s** (30 reps × 156 weeks, server-side)
+- `code_version scsim-0.2.2` — exact match with this ref (stale-worker pin)
+- 30/30 `run_replications` rows persisted; 60 realtime replication events +
+  33 run events streamed to the UI channels
+- engine mapping report: **1 info entry, zero warn/error** — the real dataset
+  transferred with no silent defaulting
+- `policy_hash` round-trip: run == saved version (policy fidelity)
+- §8.1 gate graded the dispatch (`gate_skipped=false`)
+
+Full log: `seed-results` branch, `results/latest.log`.
 
 ## 6. Validation & debugging playbook used
 
