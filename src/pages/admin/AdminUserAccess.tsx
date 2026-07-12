@@ -404,10 +404,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
             </Section>
 
             {/* ── Budgets & limits ──────────────────────────────────── */}
-            <Section
-              title="Budgets & limits"
-              subtitle="Spend caps and rate limits, with live month-to-date usage."
-            >
+            <Section title="Budgets & limits">
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <UsageStat label="Cost (MTD)" value={`$${data.budgets.mtd_cost_usd.toFixed(2)}`}
                   cap={data.budgets.monthly_usd != null ? `of $${data.budgets.monthly_usd.toFixed(2)}` : undefined}
