@@ -29,6 +29,10 @@ jobs:
       # 20260704000001 was applied straight to the remote (no local file) and, until
       # repaired, made every `db push` abort — which silently left all later
       # migrations (incl. the simulation_runs/run_replications anon grants) unapplied.
+      # 20260711000004 repeats the pattern: policy_version_notes_delete was applied to
+      # the remote under that version from its feature branch, then merged to main
+      # renumbered as 20260711000001, leaving 20260711000004 orphaned in remote history
+      # and blocking every db push. Its DDL is idempotent, so reverting is safe.
       - name: Repair remote migration history
         run: |
           supabase migration repair --status reverted \
@@ -70,7 +74,7 @@ jobs:
             20250917094432 20250918111400 20250919023824 20250919092145 20250919092203 \
             20250919092719 20250919125030 20250921084858 20250923102619 20250923103122 \
             20250923105655 20250923120307 20250924125121 20250925030727 20250925034018 \
-            20250925044453 20260527011426 20260610000003 20260704000001
+            20250925044453 20260527011426 20260610000003 20260704000001 20260711000004
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
