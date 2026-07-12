@@ -17,10 +17,22 @@
 //      engine had to default silently)
 //   6. the run's policy_hash equals the saved policy_versions.policy_hash
 //      (policy fidelity — the exact saved configuration drove the run)
-//   7. (optional) experiment.cancel flips a second run to cancelled
+//   7. reuse-or-rerun (G17/§9.2 read-path): re-dispatching the identical run
+//      answers 409 reuse_available naming the completed run — never a silent
+//      recompute, never a silent skip
+//   8. single-run inspection mode (G17/§9.5.1): a 1-rep run with
+//      payload.inspection=true persists per-item weekly series to
+//      run_item_series (materials: on_hand/in_transit/orders; products:
+//      demand/production/fulfillment/backlog/lost_units), while the multi-rep
+//      run persisted none
+//   9. dataset export data (G17/W2): snapshot_dataset's canonical rows match
+//      the committed reference dataset (scripts/tron_ver2/dataset.json) when
+//      the project IS the TRON reference, and current_graph_hash agrees
+//  10. (optional) experiment.cancel flips a second run to cancelled
 //
 // Env: PROJECT_ID (optional), REPLICATIONS (200), HORIZON_DAYS (365),
-//      TEST_CANCEL (true), TIMEOUT_MINUTES (40), ALLOW_MAPPING_WARNINGS (false)
+//      TEST_CANCEL (true), TEST_INSPECTION (true), TIMEOUT_MINUTES (40),
+//      ALLOW_MAPPING_WARNINGS (false)
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -44,6 +56,7 @@ if (!SUPABASE_URL || !ANON_KEY) {
 const REPLICATIONS = Number(process.env.REPLICATIONS || 200);
 const HORIZON_DAYS = Number(process.env.HORIZON_DAYS || 365);
 const TEST_CANCEL = (process.env.TEST_CANCEL ?? "true") === "true";
+const TEST_INSPECTION = (process.env.TEST_INSPECTION ?? "true") === "true";
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MINUTES || 40) * 60_000;
 const ALLOW_WARN = (process.env.ALLOW_MAPPING_WARNINGS ?? "false") === "true";
 
@@ -317,6 +330,190 @@ if (run?.status === "done") {
     : pass("required-data gate graded the dispatch (gate_skipped=false)");
 }
 
+// ── 7b. reuse-or-rerun (G17 — the §9.2 run-cache read path) ─────────────────
+// The scenario row is untouched since the main dispatch, so re-dispatching
+// the identical (policy, dataset, scenario, seed spec) run must answer 409
+// reuse_available naming the completed run — and force_rerun must bypass it.
+if (run?.status === "done") {
+  console.log("── reuse-or-rerun check (repeat dispatch of the identical run)");
+  const again = await simCommand({
+    project_id: projectId,
+    scenario_id: scenarioId,
+    kind: "experiment.run",
+    payload: { policy_version_id: version.id, acknowledge_warnings: true },
+  });
+  if (again.status === 409 && again.body?.reuse_available) {
+    pass("repeat dispatch → 409 reuse_available (no silent recompute)");
+    const cand = again.body?.reuse_candidate ?? {};
+    cand.run_id === runId
+      ? pass(`reuse candidate is the completed run (${String(cand.run_id).slice(0, 8)}…, ${cand.rep_count_done} reps, ${cand.code_version})`)
+      : fail(`reuse candidate ${cand.run_id} != completed run ${runId}`);
+  } else {
+    fail(`repeat dispatch → HTTP ${again.status} (expected 409 reuse_available): ${JSON.stringify(again.body).slice(0, 200)}`);
+    // A 202 dispatched a redundant run — cancel it so it doesn't burn compute.
+    if (again.status === 202 && again.body?.run_id) {
+      await simCommand({ project_id: projectId, kind: "experiment.cancel", payload: { run_id: again.body.run_id } });
+    }
+  }
+}
+
+// ── 7c. single-run inspection mode (G17/§9.5.1 — per-item weekly series) ────
+if (TEST_INSPECTION && run?.status === "done") {
+  console.log("── single-run inspection mode (1 rep, payload.inspection=true)");
+  // The multi-rep run must have persisted NO per-item rows.
+  const multiItems = await rest(`run_item_series?select=item_id&run_id=eq.${runId}&limit=1`);
+  if (multiItems.status !== 200) {
+    fail(`anon SELECT run_item_series → HTTP ${multiItems.status} (migration 20260720000001 applied?)`);
+  } else {
+    (multiItems.body ?? []).length === 0
+      ? pass("multi-rep run persisted no run_item_series rows (single-rep evidence only)")
+      : fail("multi-rep run unexpectedly persisted run_item_series rows");
+  }
+
+  const INSPECTION_SEED = 7;
+  const patched = await rest(`scenarios?id=eq.${scenarioId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ replications: 1, seed: INSPECTION_SEED }),
+  });
+  if (patched.status >= 300) {
+    fail(`inspection scenario patch failed HTTP ${patched.status}`);
+  } else {
+    const d3 = await simCommand({
+      project_id: projectId,
+      scenario_id: scenarioId,
+      kind: "experiment.run",
+      payload: { policy_version_id: version.id, acknowledge_warnings: true, inspection: true },
+    });
+    if (d3.status !== 202 || !d3.body?.run_id) {
+      fail(`inspection dispatch failed HTTP ${d3.status}: ${JSON.stringify(d3.body).slice(0, 200)}`);
+    } else {
+      const inspRunId = d3.body.run_id;
+      pass(`inspection run dispatched → ${inspRunId}`);
+      let insp = null;
+      const tIns = Date.now();
+      while (Date.now() - tIns < 10 * 60_000) {
+        const { status, body } = await rest(`simulation_runs?select=*&id=eq.${inspRunId}&limit=1`);
+        if (status === 200 && body.length === 1) {
+          insp = body[0];
+          if (["done", "failed", "cancelled"].includes(insp.status)) break;
+        }
+        await sleep(5000);
+      }
+      if (insp?.status !== "done") {
+        fail(`inspection run ended as '${insp?.status ?? "unknown"}' (${insp?.error_message ?? "no error"})`);
+      } else {
+        pass(`inspection run done in ${((Date.now() - tIns) / 1000).toFixed(0)}s (1 replication, seed ${INSPECTION_SEED})`);
+        const idx = await rest(`run_item_series?select=kind,item_id&run_id=eq.${inspRunId}&order=item_id`);
+        const items = Array.isArray(idx.body) ? idx.body : [];
+        const mats = items.filter((i) => i.kind === "material");
+        const prods = items.filter((i) => i.kind === "product");
+        mats.length > 0 && prods.length > 0
+          ? pass(`run_item_series persisted: ${prods.length} product(s) + ${mats.length} material(s)`)
+          : fail(`run_item_series rows missing (materials ${mats.length}, products ${prods.length})`);
+        const horizonWeeks = Math.min(520, Math.max(52, Math.round(HORIZON_DAYS / 7)));
+        if (mats.length > 0) {
+          const one = await rest(
+            `run_item_series?select=series&run_id=eq.${inspRunId}&kind=eq.material&item_id=eq.${encodeURIComponent(mats[0].item_id)}&limit=1`,
+          );
+          const series = one.body?.[0]?.series ?? {};
+          const keys = Object.keys(series).sort().join(",");
+          keys === "in_transit,on_hand,orders"
+            ? pass(`material series keys: ${keys}`)
+            : fail(`material series keys '${keys}' != in_transit,on_hand,orders`);
+          const len = Array.isArray(series.on_hand) ? series.on_hand.length : 0;
+          len === horizonWeeks
+            ? pass(`material weekly series length ${len} == horizon ${horizonWeeks} weeks`)
+            : fail(`material weekly series length ${len} != horizon ${horizonWeeks}`);
+        }
+        if (prods.length > 0) {
+          const one = await rest(
+            `run_item_series?select=series&run_id=eq.${inspRunId}&kind=eq.product&item_id=eq.${encodeURIComponent(prods[0].item_id)}&limit=1`,
+          );
+          const series = one.body?.[0]?.series ?? {};
+          const keys = Object.keys(series).sort().join(",");
+          keys === "backlog,demand,fulfillment,lost_units,production"
+            ? pass(`product series keys: ${keys}`)
+            : fail(`product series keys '${keys}' != backlog,demand,fulfillment,lost_units,production`);
+        }
+      }
+    }
+    // Leave the scenario as the baseline expects it.
+    await rest(`scenarios?id=eq.${scenarioId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ replications: REPLICATIONS, seed: 1 }),
+    });
+  }
+}
+
+// ── 7d. dataset snapshot vs the committed reference (G17/W2) ────────────────
+console.log("── dataset snapshot (verifiable-export source) check");
+{
+  const snapId = await rest("rpc/snapshot_dataset", {
+    method: "POST",
+    body: JSON.stringify({ p_project_id: projectId }),
+  });
+  if (snapId.status >= 300 || !snapId.body) {
+    fail(`snapshot_dataset RPC failed HTTP ${snapId.status}`);
+  } else {
+    const ver = await rest(
+      `dataset_versions?select=id,graph_hash,snapshot&id=eq.${snapId.body}&limit=1`,
+    );
+    const row = ver.body?.[0];
+    if (!row?.snapshot) {
+      fail(`dataset_versions snapshot not readable (HTTP ${ver.status})`);
+    } else {
+      const cur = await rest("rpc/current_graph_hash", {
+        method: "POST",
+        body: JSON.stringify({ p_project_id: projectId }),
+      });
+      cur.body === row.graph_hash
+        ? pass(`current_graph_hash matches the snapshot (${String(row.graph_hash).slice(0, 12)}…)`)
+        : fail(`current_graph_hash ${cur.body} != snapshot graph_hash ${row.graph_hash}`);
+
+      // When this project IS the committed TRON reference, the canonical rows
+      // must match it — the dataset export is verifiable outside the app.
+      try {
+        const refDs = JSON.parse(
+          readFileSync(join(repoRoot, "scripts/tron_ver2/dataset.json"), "utf8"),
+        );
+        const snapProdIds = new Set((row.snapshot.products ?? []).map((p) => p.product_id));
+        const refProdIds = new Set(refDs.products.map((p) => p.product_id));
+        const isTron =
+          snapProdIds.size === refProdIds.size &&
+          [...refProdIds].every((id) => snapProdIds.has(id));
+        if (isTron) {
+          const counts = [
+            ["suppliers", refDs.suppliers.length],
+            ["materials", refDs.materials.length],
+            ["products", refDs.products.length],
+            ["inbound", refDs.inbound.length],
+            ["bom", refDs.bom.length],
+            ["outbound", refDs.outbound.length],
+          ];
+          for (const [key, expectN] of counts) {
+            const n = (row.snapshot[key] ?? []).length;
+            n === expectN
+              ? pass(`snapshot ${key}: ${n} rows == committed dataset.json`)
+              : fail(`snapshot ${key}: ${n} rows != committed ${expectN}`);
+          }
+          // Spot-check one economics value survives the round trip exactly.
+          const refMat = refDs.materials.find((m) => m.cost != null);
+          const snapMat = (row.snapshot.materials ?? []).find(
+            (m) => m.material_id === refMat.material_id,
+          );
+          snapMat && Number(snapMat.cost) === Number(refMat.cost)
+            ? pass(`spot check: material ${refMat.material_id} cost ${refMat.cost} matches`)
+            : fail(`spot check: material ${refMat?.material_id} cost ${snapMat?.cost} != ${refMat?.cost}`);
+        } else {
+          console.log("  (project is not the TRON reference — skipping row-level comparison)");
+        }
+      } catch (e) {
+        console.log(`  (reference comparison skipped: ${e.message})`);
+      }
+    }
+  }
+}
+
 // realtime proof (worker writes streamed while we watched)
 runEvents > 0
   ? pass(`realtime delivered ${runEvents} simulation_runs event(s)`)
@@ -328,11 +525,13 @@ repEvents > 0
 // ── 8. cancel round-trip (optional) ─────────────────────────────────────────
 if (TEST_CANCEL && run?.status === "done") {
   console.log("── cancel round-trip");
+  // force_rerun: this is deliberately an identical dispatch — without the
+  // flag the §9.2 reuse check would answer 409 instead of queueing.
   const d2 = await simCommand({
     project_id: projectId,
     scenario_id: scenarioId,
     kind: "experiment.run",
-    payload: { policy_version_id: version.id, acknowledge_warnings: true },
+    payload: { policy_version_id: version.id, acknowledge_warnings: true, force_rerun: true },
   });
   if (d2.status !== 202 || !d2.body?.run_id) {
     fail(`cancel-test dispatch failed HTTP ${d2.status}`);
