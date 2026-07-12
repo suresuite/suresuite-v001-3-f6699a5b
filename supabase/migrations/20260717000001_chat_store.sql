@@ -83,7 +83,7 @@ CREATE OR REPLACE FUNCTION public.chat_quick_thread_id(p_user_id uuid)
 RETURNS uuid
 LANGUAGE sql IMMUTABLE
 AS $$
-  SELECT encode(substring(digest('suresuite.quick.' || p_user_id::text, 'sha256') from 1 for 16), 'hex')::uuid;
+  SELECT encode(substring(extensions.digest('suresuite.quick.' || p_user_id::text, 'sha256') from 1 for 16), 'hex')::uuid;
 $$;
 GRANT EXECUTE ON FUNCTION public.chat_quick_thread_id(uuid) TO anon, authenticated, service_role;
 
