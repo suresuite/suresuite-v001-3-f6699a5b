@@ -1,0 +1,249 @@
+name: Seed project (TRON ver2)
+
+# Seeds "Project TRON - ver2" through the app's own RPC lifecycle
+# (scripts/seed_project_tron_ver2.mjs) and then proves the deployed pipeline
+# end-to-end on THAT project (scripts/verify_sim_e2e.mjs — gate → queue →
+# worker → realtime → fidelity checks).
+#
+# Two triggers, same as verify-sim-e2e.yml:
+#   * workflow_dispatch with inputs, or
+#   * pushing a change to .github/seed-request (for environments that can push
+#     but cannot call the Actions API). The request file carries the modeler
+#     identity as a `user_email=<email>` line — identity is always explicit
+#     (projects are organization-scoped; seeding under the wrong identity
+#     hides the project from the intended modeler).
+#
+# The modeler's approved_users id is resolved from that email via the Supabase
+# Management API (SUPABASE_ACCESS_TOKEN — the same secret the migrations
+# workflow uses). The full run log lands on the `seed-results` branch
+# (results/latest.log) so the outcome is readable over plain git.
+
+# Seeding is not concurrency-safe against itself (two runs deleting and
+# re-inserting the same project's arcs interleave — observed as a statement
+# timeout on the loser and a half-restored dataset). Serialize the workflow.
+concurrency:
+  group: seed-project
+  cancel-in-progress: false
+
+on:
+  push:
+    paths:
+      - ".github/seed-request"
+  workflow_dispatch:
+    inputs:
+      user_email:
+        description: "approved_users email of the modeler who should own the project"
+        required: true
+      user_id:
+        description: "approved_users id (blank = resolve from email via the Management API)"
+        default: ""
+      verify:
+        description: "Run the end-to-end verification (dispatch a real run) after seeding"
+        type: boolean
+        default: true
+      replications:
+        description: "Verify-run replications"
+        default: "30"
+      horizon_days:
+        description: "Verify-run horizon in days (1092 = 156 weeks)"
+        default: "1092"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write   # push the result log to the seed-results branch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Only the realtime client (for the verify step) — not the app's node_modules.
+      - name: Install supabase-js
+        run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@2
+
+      - name: Resolve parameters
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            EMAIL=$(grep -oP '^user_email=\K.+' .github/seed-request | tail -1 || true)
+            echo "user_email=${EMAIL}" >> "$GITHUB_OUTPUT"
+            echo "user_id=" >> "$GITHUB_OUTPUT"
+            echo "verify=true" >> "$GITHUB_OUTPUT"
+            echo "replications=30" >> "$GITHUB_OUTPUT"
+            echo "horizon_days=1092" >> "$GITHUB_OUTPUT"
+          else
+            echo "user_email=${{ inputs.user_email }}" >> "$GITHUB_OUTPUT"
+            echo "user_id=${{ inputs.user_id }}" >> "$GITHUB_OUTPUT"
+            echo "verify=${{ inputs.verify }}" >> "$GITHUB_OUTPUT"
+            echo "replications=${{ inputs.replications }}" >> "$GITHUB_OUTPUT"
+            echo "horizon_days=${{ inputs.horizon_days }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A push usually lands migrations in a sibling workflow. The seed needs
+      # the products.demand_min/demand_max columns (20260712000001), so poll
+      # PostgREST until the column is visible instead of sleeping blind.
+      - name: Wait for migrations (products.demand_min visible)
+        run: |
+          URL=$(grep -oP 'SUPABASE_URL = "\K[^"]+' src/integrations/supabase/client.ts)
+          KEY=$(grep -oP 'SUPABASE_PUBLISHABLE_KEY = "\K[^"]+' src/integrations/supabase/client.ts)
+          for i in $(seq 1 20); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              "$URL/rest/v1/products?select=demand_min&limit=1" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+            if [ "$CODE" = "200" ]; then
+              echo "column visible (attempt $i)"; exit 0
+            fi
+            echo "attempt $i/20: HTTP $CODE — waiting 30s for migrations/schema reload"
+            sleep 30
+          done
+          echo "::error::products.demand_min never became visible — apply supabase-migrations.yml first"
+          exit 1
+
+      - name: Resolve modeler identity
+        id: identity
+        run: |
+          set -o pipefail
+          EMAIL="${{ steps.params.outputs.user_email }}"
+          USER_ID="${{ steps.params.outputs.user_id }}"
+          if [ -z "$EMAIL" ]; then
+            echo "::error::no user_email — add a 'user_email=<email>' line to .github/seed-request or pass the input"
+            exit 1
+          fi
+          if [ -z "$USER_ID" ]; then
+            REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+            SQL=$(printf 'select id from public.approved_users where lower(email) = lower(%s)' "'$EMAIL'")
+            USER_ID=$(curl -sf "https://api.supabase.com/v1/projects/$REF/database/query" \
+              -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$(printf '{"query": "%s"}' "$SQL")" | node -e '
+                let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+                  const rows=JSON.parse(s); const id=rows?.[0]?.id ?? "";
+                  process.stdout.write(id);
+                });')
+          fi
+          if [ -z "$USER_ID" ]; then
+            echo "::error::no approved_users row for $EMAIL — the project owner must be an approved user"
+            exit 1
+          fi
+          echo "user_id=$USER_ID" >> "$GITHUB_OUTPUT"
+          echo "resolved $EMAIL → $USER_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Read-only DB facts so a slow/failed seed is diagnosable from the log:
+      # dataset-table sizes, project_id indexes, role timeouts, and any
+      # in-flight sessions that could hold locks on the arc tables.
+      - name: Database diagnostics (read-only)
+        run: |
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+          q() {
+            printf '── %s\n' "$1"
+            node -e '
+              const [ref, token, sql] = process.argv.slice(1);
+              fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ query: sql }),
+              }).then(async (r) => console.log(JSON.stringify(await r.json())))
+                .catch((e) => console.log("query failed:", e.message));
+            ' "$REF" "$SUPABASE_ACCESS_TOKEN" "$2"
+          }
+          q "dataset table sizes" "select relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) as size from pg_stat_user_tables where relname in ('inbound_logistics','outbound_logistics','bom_single_level','bom_multi_level','multi_tier_supply_chain','projects') order by relname"
+          q "project_id indexes" "select tablename, indexname from pg_indexes where tablename in ('inbound_logistics','outbound_logistics','bom_single_level','bom_multi_level','multi_tier_supply_chain') order by tablename, indexname"
+          q "role timeouts" "select rolname, rolconfig from pg_roles where rolname in ('anon','authenticated','authenticator','postgres')"
+          q "active sessions" "select pid, state, wait_event_type, wait_event, now()-xact_start as xact_age, left(query,120) as query from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid() order by xact_start"
+          # ALL live triggers on the arc tables — dashboard-created webhooks
+          # (pg_net) never appear in the repo's migrations, only here.
+          q "live triggers on arc tables" "select c.relname as tbl, t.tgname, p.proname from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_proc p on p.oid=t.tgfoid where c.relname in ('inbound_logistics','outbound_logistics','bom_single_level','multi_tier_supply_chain') and not t.tgisinternal order by c.relname, t.tgname"
+          q "live triggers on projects" "select t.tgname, p.proname from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_proc p on p.oid=t.tgfoid where c.relname='projects' and not t.tgisinternal order by t.tgname"
+          q "pg_cron jobs" "select jobid, jobname, schedule, active, left(command,120) as command from cron.job order by jobid"
+          # Per-trigger timing on a real single-row insert (Management API runs
+          # untimed as postgres): EXPLAIN ANALYZE names the slow trigger.
+          q "outbound insert trigger timing" "explain (analyze, buffers) insert into public.outbound_logistics (customer_id, product_id, volume, time_unit, expected_lead_time, unit_price, plant_name, project_id) select 'DIAG-CUST','DIAG-PROD',1,'week',1,1,p.plant_name,p.id from public.projects p where p.name='Project TRON - ver2' limit 1"
+          q "bom insert trigger timing (control)" "explain (analyze, buffers) insert into public.bom_single_level (product_id, material_id, consumption_rate, plant_name, project_id) select 'DIAG-PROD','DIAG-MAT',1,p.plant_name,p.id from public.projects p where p.name='Project TRON - ver2' limit 1"
+          q "cleanup diag rows" "with a as (delete from public.outbound_logistics where customer_id='DIAG-CUST' returning 1), b as (delete from public.bom_single_level where product_id='DIAG-PROD' returning 1) select (select count(*) from a) as outbound_removed, (select count(*) from b) as bom_removed"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        # tee'd into the published log via the seed step below
+        continue-on-error: true
+
+      - name: Seed Project TRON - ver2
+        id: seed
+        run: |
+          set -o pipefail
+          node scripts/seed_project_tron_ver2.mjs 2>&1 | tee /tmp/seed.log
+        env:
+          USER_ID: ${{ steps.identity.outputs.user_id }}
+          USER_EMAIL: ${{ steps.params.outputs.user_email }}
+          # Optional: lets the seeder dump blocking sessions the moment a
+          # statement timeout fires (read-only Management API query).
+          DIAG_MANAGEMENT_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Post-failure lock diagnostics (read-only)
+        if: failure() && steps.seed.outcome == 'failure'
+        run: |
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+          node -e '
+            const [ref, token] = process.argv.slice(1);
+            const sql = `select a.pid, a.state, a.wait_event_type, a.wait_event, now()-a.xact_start as xact_age, left(a.query,160) as query from pg_stat_activity a where a.pid <> pg_backend_pid() and (a.state <> $$idle$$ or a.xact_start is not null) order by a.xact_start`;
+            fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ query: sql }),
+            }).then(async (r) => console.log(JSON.stringify(await r.json(), null, 1)))
+              .catch((e) => console.log("query failed:", e.message));
+          ' "$REF" "$SUPABASE_ACCESS_TOKEN" | tee -a /tmp/seed.log
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true
+
+      # A push that lands engine changes also redeploys the worker via a
+      # sibling workflow (ops-request.yml — docker build ≈ 5–10 min). Give it
+      # time to settle; the EXPECTED_CODE_VERSION assert below is the hard
+      # net: a stale worker fails the verify instead of silently ignoring
+      # newly added mapping fields.
+      - name: Wait for sibling worker deploy (push trigger only)
+        if: github.event_name == 'push' && steps.params.outputs.verify == 'true'
+        run: sleep 480
+
+      - name: Verify end-to-end on the seeded project
+        id: verify
+        if: steps.params.outputs.verify == 'true'
+        run: |
+          set -o pipefail
+          ENGINE_VERSION=$(grep -oP 'ENGINE_VERSION = "\K[^"]+' scsim/scsim/__init__.py)
+          EXPECTED_CODE_VERSION="scsim-$ENGINE_VERSION" node scripts/verify_sim_e2e.mjs 2>&1 | tee /tmp/verify.log
+        env:
+          PROJECT_ID: ${{ steps.seed.outputs.project_id }}
+          REPLICATIONS: ${{ steps.params.outputs.replications }}
+          HORIZON_DAYS: ${{ steps.params.outputs.horizon_days }}
+          TEST_CANCEL: "false"
+          ALLOW_MAPPING_WARNINGS: "false"
+          TIMEOUT_MINUTES: "60"
+
+      - name: Publish result log to seed-results branch
+        if: always()
+        run: |
+          {
+            echo "run_id: ${{ github.run_id }}  attempt: ${{ github.run_attempt }}"
+            echo "trigger: ${{ github.event_name }}  ref: ${{ github.ref_name }}  sha: ${{ github.sha }}"
+            echo "seed outcome: ${{ steps.seed.outcome }}   verify outcome: ${{ steps.verify.outcome }}"
+            echo "──────────────────────────────────────"
+            cat /tmp/seed.log 2>/dev/null || echo "seed never produced a log"
+            echo "──────────────────────────────────────"
+            cat /tmp/verify.log 2>/dev/null || echo "(verify skipped or never produced a log)"
+          } > /tmp/seed-full.log
+          git config user.name "seed-project"
+          git config user.email "actions@github.com"
+          git checkout --orphan seed-results
+          git rm -rfq . || true
+          mkdir -p results
+          cp /tmp/seed-full.log "results/latest.log"
+          cp /tmp/seed-full.log "results/run-${{ github.run_id }}.log"
+          git add results
+          git commit -qm "seed-project run ${{ github.run_id }}: seed=${{ steps.seed.outcome }} verify=${{ steps.verify.outcome }}"
+          git push -f origin seed-results

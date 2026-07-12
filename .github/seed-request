@@ -1,0 +1,15 @@
+# Touch this file (any content change) and push to seed "Project TRON - ver2"
+# through the app's own RPC lifecycle and verify the deployed pipeline on it
+# (see .github/workflows/seed-project.yml). The result log lands on the
+# seed-results branch: results/latest.log
+#
+# The user_email line below names the modeler who will OWN the project
+# (projects are organization-scoped — identity must be explicit).
+user_email=pnguyen@dmrg.ai
+request: 2026-07-12T00:00:00Z reason=initial-tron-ver2-seed
+request: 2026-07-12T04:05:00Z reason=retry-after-migration-version-collision-fix
+request: 2026-07-12T05:00:00Z reason=reseed-after-nan-persistence-fix
+request: 2026-07-12T05:40:00Z reason=reseed-after-arc-write-performance-migration
+request: 2026-07-12T08:30:00Z reason=reseed-with-orphan-repair-trigger-diagnostics-small-outbound-batches
+request: 2026-07-12T08:45:00Z reason=reseed-orphan-repair-cron-diag-live-blocker-dump
+request: 2026-07-12T09:00:00Z reason=reseed-after-metrics-check-performance-fix

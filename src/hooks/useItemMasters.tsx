@@ -32,6 +32,8 @@ export interface ProductRow {
   demand_distribution: string | null; // triangular | deterministic | poisson | negbin
   demand_mean: number | null; // units/week
   demand_cv: number | null;
+  demand_min: number | null; // a_p — explicit triangular lower bound (null → mean·(1−cv))
+  demand_max: number | null; // c_p — explicit triangular upper bound, e.g. historical max (null → mean·(1+cv))
 }
 
 export interface SupplierRow {

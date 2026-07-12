@@ -150,6 +150,42 @@ def test_triangular_av_from_mean_and_cv():
     assert (p.demand_min, p.demand_mode, p.demand_max) == (70.0, 100.0, 130.0)
 
 
+def test_explicit_demand_bounds_override_triangular_av():
+    """Master demand_min/demand_max carry an asymmetric empirical triangular
+    (b = historical median, c = historical max) — the WSC/TRON form."""
+    d = _base()
+    d.products[0].demand_mean = 100.0
+    d.products[0].demand_cv = 0.30
+    d.products[0].demand_min = 70.0
+    d.products[0].demand_max = 400.0  # right tail far beyond mean·1.3
+    res = from_project_data(d)
+    p = res.scenario.network.products[0]
+    assert (p.demand_min, p.demand_mode, p.demand_max) == (70.0, 100.0, 400.0)
+    assert not [w for w in res.warnings if w.field in ("demand_min", "demand_max")]
+
+
+def test_partial_explicit_bound_keeps_av_for_the_other():
+    d = _base()
+    d.products[0].demand_mean = 100.0
+    d.products[0].demand_cv = 0.30
+    d.products[0].demand_max = 250.0
+    res = from_project_data(d)
+    p = res.scenario.network.products[0]
+    assert (p.demand_min, p.demand_mode, p.demand_max) == (70.0, 100.0, 250.0)
+
+
+def test_inconsistent_demand_bounds_clamped_with_warning():
+    d = _base()
+    d.products[0].demand_mean = 100.0
+    d.products[0].demand_min = 120.0  # > mode
+    d.products[0].demand_max = 80.0   # < mode
+    res = from_project_data(d)
+    p = res.scenario.network.products[0]
+    assert (p.demand_min, p.demand_mode, p.demand_max) == (100.0, 100.0, 100.0)
+    fields = {w.field for w in res.warnings if w.level == "warn"}
+    assert {"demand_min", "demand_max"} <= fields
+
+
 def test_partial_cut_becomes_capacity_reduction_when_capacity_finite():
     d = _base()
     d.suppliers = [SupplierRow(id="s1", capacity_per_week=500.0)]
