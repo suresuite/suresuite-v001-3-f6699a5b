@@ -116,10 +116,30 @@ async function rest(path, init = {}) {
   return { status: res.status, body };
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function rpc(fn, args) {
-  const { status, body } = await rest(`rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });
-  if (status >= 300) throw new Error(`rpc ${fn} → HTTP ${status}: ${JSON.stringify(body)}`);
-  return body;
+  // Each RPC is a single transaction, so a failed call leaves no partial
+  // state — retrying transient faults (statement timeout 57014, 5xx, network)
+  // is safe. Non-transient errors (4xx) fail immediately.
+  let lastErr;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    let status, body;
+    try {
+      ({ status, body } = await rest(`rpc/${fn}`, { method: "POST", body: JSON.stringify(args) }));
+    } catch (err) {
+      lastErr = new Error(`rpc ${fn} → network error: ${err.message ?? err}`);
+      await sleep(2000 * attempt);
+      continue;
+    }
+    if (status < 300) return body;
+    lastErr = new Error(`rpc ${fn} → HTTP ${status}: ${JSON.stringify(body)}`);
+    const transient = status >= 500 || body?.code === "57014";
+    if (!transient) throw lastErr;
+    console.log(`  … transient ${fn} failure (attempt ${attempt}/4): HTTP ${status} ${body?.code ?? ""} — retrying`);
+    await sleep(2000 * attempt);
+  }
+  throw lastErr;
 }
 
 async function rpcBatched(fn, rows, argsOf) {

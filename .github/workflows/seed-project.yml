@@ -18,6 +18,13 @@ name: Seed project (TRON ver2)
 # workflow uses). The full run log lands on the `seed-results` branch
 # (results/latest.log) so the outcome is readable over plain git.
 
+# Seeding is not concurrency-safe against itself (two runs deleting and
+# re-inserting the same project's arcs interleave — observed as a statement
+# timeout on the loser and a half-restored dataset). Serialize the workflow.
+concurrency:
+  group: seed-project
+  cancel-in-progress: false
+
 on:
   push:
     paths:
