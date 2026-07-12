@@ -36,7 +36,9 @@
 //
 // Env:
 //   USER_ID       (required for a live run) approved_users.id of the modeler
-//   USER_EMAIL    (default phu.nguyen.gd@gmail.com) that user's email
+//   USER_EMAIL    (required for a live run) that user's email — the project's
+//                 organization is stamped from this identity, so it decides who
+//                 can see the project. No default, on purpose (see auth model).
 //   USER_NAME     (default "Example Seed") modeler display name on create
 //   PROJECT_NAME  (default "Example — 1P/2M/3S")
 //   PLANT_NAME    (default "Example Plant")
@@ -61,7 +63,14 @@ if (!SUPABASE_URL || !ANON_KEY) {
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const USER_ID = process.env.USER_ID || null;
-const USER_EMAIL = process.env.USER_EMAIL || "phu.nguyen.gd@gmail.com";
+// USER_EMAIL carries the modeler identity. The project's `organization` (and
+// therefore who can SEE it via list_projects) is stamped at create time from
+// this caller's approved_users row — so it must be the SAME user you want the
+// project to belong to. There is deliberately NO person-specific default: a
+// baked-in default silently seeds the example under the wrong org, and an
+// org-scoped list_projects then hides it from the intended modeler. A live run
+// must state the identity explicitly.
+const USER_EMAIL = process.env.USER_EMAIL || null;
 const USER_NAME = process.env.USER_NAME || "Example Seed";
 const PROJECT_NAME = process.env.PROJECT_NAME || "Example — 1P/2M/3S";
 const PLANT_NAME = process.env.PLANT_NAME || "Example Plant";
@@ -236,15 +245,20 @@ async function main() {
     return;
   }
 
-  if (!USER_ID) {
+  if (!USER_ID || !USER_EMAIL) {
     console.error(
-      "\n✗ a LIVE run needs USER_ID (approved_users.id of the project modeler).\n" +
+      "\n✗ a LIVE run needs BOTH USER_ID and USER_EMAIL — the approved_users id\n" +
+      "  AND email of the modeler the project should belong to. The project's\n" +
+      "  `organization` is stamped from this identity at create time, and\n" +
+      "  list_projects only returns rows in the caller's org, so seeding under\n" +
+      "  the wrong user hides the project from the intended modeler.\n" +
       "  Re-run with:  USER_ID=<uuid> USER_EMAIL=<email> node scripts/seed_example_project.mjs\n" +
       "  (or use --dry-run to validate and print payloads without writing).",
     );
     process.exit(2);
   }
   const auth = { p_user_id: USER_ID, p_user_email: USER_EMAIL };
+  console.log(`  modeler identity: ${USER_EMAIL} (${USER_ID})`);
 
   // 1) Resolve project by name for this modeler (idempotent create-or-reuse).
   console.log("\n── resolving project (create or reuse)");
@@ -294,16 +308,45 @@ async function main() {
 
   // 6) Report dataset status.
   const status = await rpc("get_project_dataset_status", { p_project_id: projectId, ...auth });
+
+  // 7) Visibility check — re-list AS THIS MODELER via the exact RPC the app's
+  //    /project-manager and /policies screens call (list_projects), then read
+  //    back the stamped organization / modeler_id. This is the org-scoping
+  //    check: if the project is not returned here, it will be invisible in the
+  //    app too, and the most likely cause is that `organization` was stamped
+  //    under a different caller's org than USER_ID's. Fail loudly instead of
+  //    reporting a false success.
+  console.log("── verifying visibility for the seeding modeler (list_projects)");
+  const listAfter = await rpc("list_projects", { ...auth });
+  const seen = Array.isArray(listAfter)
+    ? listAfter.find((p) => p.id === projectId)
+    : null;
+
   console.log("\n════════ seed complete ════════");
   console.log(`project_id: ${projectId}`);
   console.log(`open in app: /project-manager?project=${projectId}`);
+  if (seen) {
+    console.log(`organization: ${seen.organization ?? "(null)"}`);
+    console.log(`modeler_id:   ${seen.modeler_id ?? "(null)"}`);
+  }
   console.log(`dataset status: ${JSON.stringify(status)}`);
-  if (status && status.has_bom && status.has_inbound && status.has_outbound) {
+
+  const datasetComplete = !!(status && status.has_bom && status.has_inbound && status.has_outbound);
+  if (datasetComplete) {
     console.log("✓ dataset complete (bom + inbound + outbound present)");
   } else {
     console.error("✗ dataset NOT complete — check the status above");
-    process.exit(1);
   }
+  if (seen) {
+    console.log(`✓ visible to ${USER_EMAIL} via list_projects (org "${seen.organization ?? "(null)"}") — the app's /project-manager and /policies pickers will show it`);
+  } else {
+    console.error(
+      `✗ NOT visible to ${USER_EMAIL} via list_projects — the project exists but\n` +
+      "  is outside this modeler's organization (org-scoping hides it). Re-seed\n" +
+      "  with the USER_ID/USER_EMAIL of the modeler who should own it.",
+    );
+  }
+  if (!datasetComplete || !seen) process.exit(1);
 }
 
 main().catch((err) => {
