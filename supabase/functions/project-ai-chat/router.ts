@@ -1,8 +1,10 @@
-// Intent router — the SEAM lands in Stage 0, classification activates in
-// Stage 1 (ai-agents.md §6). With AGENT_ROUTER_ENABLED unset/false every
-// message routes "advisory" without any LLM call, which restores Layer A
-// byte-for-byte (§3.3). All fallbacks/tie-breaks below are deterministic and
-// unit-tested in eval/ (§6.5 tier 1).
+// Intent router — the SEAM landed in Stage 0; classification is LIVE as of
+// Stage 1 (ai-agents.md §6): one structured-output LLM call through the
+// session's own model (makeClassifier below), wrapped by the deterministic
+// decision function. With AGENT_ROUTER_ENABLED unset/false every message
+// routes "advisory" without any LLM call, which restores Layer A byte-for-byte
+// (§3.3). All fallbacks/tie-breaks below are deterministic and unit-tested in
+// eval/ (§6.5 tier 1).
 
 export type Route = "advisory" | "artifact" | "mixed";
 
@@ -223,4 +225,135 @@ export async function classifyIntent(
 ): Promise<RouteDecision> {
   const { short_circuit: _sc, ...decision } = await decideRoute(message, ctx, classify);
   return decision;
+}
+
+// ── Stage 1: the live classifier (§6.2 step 2, §12.2 structured outputs) ─────
+
+/** §6.2 step 3: appended to the persona reply on a low-confidence route so the
+ * user can opt in explicitly (rendered as plain text). */
+export const OFFER_CHIP_TEXT =
+  `I can draft this for you — say "do it" to get a reviewable proposal.`;
+
+/** The "do it" follow-up (§6.2 step 3): re-routes with the prior utterance as
+ * the artifact part. Deliberately narrow — anything else re-classifies fresh. */
+export const CONFIRMATION_RE =
+  /^\s*(do it|yes[,!]?\s*do it|yes[,!]?\s*please(\s+do(\s+it)?)?|please do(\s+it)?|go ahead)\s*[.!]*\s*$/i;
+
+/** Resolve the utterance the router should classify: a bare confirmation
+ * follow-up re-routes the previous user message (§6.2 step 3). */
+export function resolveRoutedUtterance(
+  message: string,
+  history: Array<{ role: string; content: string }>,
+): string {
+  if (!CONFIRMATION_RE.test(message)) return message;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const h = history[i];
+    if (h?.role === "user" && typeof h.content === "string" && h.content.trim()) {
+      return h.content;
+    }
+  }
+  return message;
+}
+
+/** Minimal model shape the classifier needs (providers.ts::ModelSpec). */
+export interface ClassifierModel {
+  id: string;
+  provider: "gemini" | "openai" | "deepseek";
+  apiModel: string;
+}
+
+// The §6.1 RouteDecision as a JSON Schema, in each provider's structured-output
+// dialect (§12.2: Gemini responseSchema; OpenAI json_schema; DeepSeek
+// json_object best-effort). The deterministic parser stays the actual gate.
+const ROUTE_ENUM = ["advisory", "artifact", "mixed"];
+
+const GEMINI_ROUTE_SCHEMA = {
+  type: "object",
+  properties: {
+    route: { type: "string", enum: ROUTE_ENUM },
+    agent_id: { type: "string", nullable: true },
+    intent: { type: "string", nullable: true },
+    confidence: { type: "number" },
+    advisory_part: { type: "string", nullable: true },
+    artifact_part: { type: "string", nullable: true },
+  },
+  required: ["route", "confidence"],
+};
+
+const OPENAI_ROUTE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    route: { type: "string", enum: ROUTE_ENUM },
+    agent_id: { type: ["string", "null"] },
+    intent: { type: ["string", "null"] },
+    confidence: { type: "number" },
+    advisory_part: { type: ["string", "null"] },
+    artifact_part: { type: ["string", "null"] },
+  },
+  required: ["route", "agent_id", "intent", "confidence", "advisory_part", "artifact_part"],
+};
+
+/** One classification call: temperature 0, ≤ 300 output tokens, no tools
+ * (§6.2 step 2). Returns null when the provider key is not configured —
+ * decideRoute then falls back to advisory (`classifier_unavailable`). */
+export function makeClassifier(model: ClassifierModel): ClassifierCall | null {
+  if (model.provider === "gemini") {
+    const key = Deno.env.get("GEMINI_API_KEY");
+    if (!key) return null;
+    return async (prompt) => {
+      const endpoint =
+        `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`;
+      const res = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 300,
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: "application/json",
+            responseSchema: GEMINI_ROUTE_SCHEMA,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error(`classifier request failed (${res.status})`);
+      const data = await res.json();
+      const parts: Array<{ text?: string }> = data?.candidates?.[0]?.content?.parts ?? [];
+      return parts.map((p) => p.text ?? "").join("");
+    };
+  }
+
+  const isOpenAI = model.provider === "openai";
+  const key = Deno.env.get(isOpenAI ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY");
+  if (!key) return null;
+  const baseUrl = isOpenAI ? "https://api.openai.com/v1" : "https://api.deepseek.com/v1";
+  return async (prompt) => {
+    // deno-lint-ignore no-explicit-any
+    const body: any = {
+      model: model.apiModel,
+      messages: [{ role: "user", content: prompt }],
+      response_format: isOpenAI
+        ? { type: "json_schema", json_schema: { name: "route_decision", strict: true, schema: OPENAI_ROUTE_SCHEMA } }
+        : { type: "json_object" }, // DeepSeek: best-effort JSON mode
+    };
+    if (isOpenAI && model.apiModel.startsWith("gpt-5")) {
+      // gpt-5 rejects temperature; reasoning tokens share the completion
+      // budget, so keep reasoning minimal to fit the 300-token contract.
+      body.max_completion_tokens = 300;
+      body.reasoning_effort = "minimal";
+    } else {
+      body.temperature = 0;
+      body.max_tokens = 300;
+    }
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`classifier request failed (${res.status})`);
+    const data = await res.json();
+    return String(data?.choices?.[0]?.message?.content ?? "");
+  };
 }

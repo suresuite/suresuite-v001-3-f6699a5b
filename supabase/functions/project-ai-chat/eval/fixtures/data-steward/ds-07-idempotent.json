@@ -1,0 +1,13 @@
+{
+  "id": "ds-07-idempotent",
+  "description": "Fixture ds-01 executed twice → the second run returns the SAME proposal_id via the duplicate path (ai-agents.md §5.1 #7, §4.5 idempotency).",
+  "project_snapshot": { "reuse": "ds-01-fill-costs" },
+  "utterance": "Fill in the missing material costs for me",
+  "mocked_llm": { "reuse": "ds-01-fill-costs" },
+  "expect": {
+    "rerun_same_proposal": true,
+    "second_run_note": "duplicate",
+    "proposal_count": 1
+  },
+  "retired_reason": null
+}

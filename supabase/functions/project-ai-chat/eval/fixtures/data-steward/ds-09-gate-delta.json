@@ -1,0 +1,18 @@
+{
+  "id": "ds-09-gate-delta",
+  "description": "Apply fixture ds-01's proposal → applied_result.findings_after strictly ⊂ findings_before; before snapshot present; re-verification after apply stays green (retry idempotent) (ai-agents.md §5.1 #9, §4.4).",
+  "project_snapshot": { "reuse": "ds-01-fill-costs" },
+  "utterance": "Fill in the missing material costs for me",
+  "mocked_llm": { "reuse": "ds-01-fill-costs" },
+  "expect": {
+    "apply": {
+      "before_tables": ["materials"],
+      "before_rows": 3,
+      "after_counts": { "materials": 3 },
+      "findings_after_strict_subset": true,
+      "materials_costs_after": { "MAT-1": 3.75, "MAT-2": 2, "MAT-3": 7.25 },
+      "reapply_idempotent": true
+    }
+  },
+  "retired_reason": null
+}

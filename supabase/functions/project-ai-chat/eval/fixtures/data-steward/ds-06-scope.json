@@ -1,0 +1,33 @@
+{
+  "id": "ds-06-scope",
+  "description": "Utterance names an entity id from another project → project_scope_violation; no proposal (ai-agents.md §5.1 #6, §8 T3).",
+  "project_snapshot": {
+    "materials": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "MAT-1", "name": "Resin A", "cost": null, "holding_cost_pct": 0.2, "moq": 100, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null }
+    ],
+    "products": [],
+    "suppliers": [],
+    "inbound_logistics": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "material_id": "MAT-1", "unit_price": 4.5, "lead_time": 2, "volume": 100, "time_unit": "week" }
+    ],
+    "outbound_logistics": [],
+    "bom_single_level": [],
+    "bom_multi_level": [],
+    "policy_defaults": [ { "project_id": "11111111-1111-4111-8111-111111111111" } ]
+  },
+  "utterance": "Set MAT-999's cost to 9.99",
+  "mocked_llm": {
+    "tool": "draft_item_master_update",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "MAT-999", "field": "cost", "value": 9.99, "source": "user_supplied" }
+      ]
+    }
+  },
+  "expect": {
+    "error_code": "project_scope_violation",
+    "message_includes": "MAT-999",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

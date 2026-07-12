@@ -14,10 +14,25 @@ export interface ToolEnvelope {
   meta: { tool: string; row_count: number; note?: string };
 }
 
+/** Attribution + authorization the draft_* tool family needs beyond the read
+ * scope (ai-agents.md §4.5, §13.2 checkpoint 3). Layer A persona turns never
+ * set it — a draft handler invoked without it refuses `agent_disabled`. */
+export interface DraftAttribution {
+  userEmail: string | null;
+  threadId: string | null;
+  modelCode: string | null;
+  providerCode: string | null;
+  /** `agent_proposals` capability resolved server-side (checkpoint 3). */
+  canProposals: boolean;
+  /** The routed utterance — cited on user_supplied rows (kind user_message). */
+  utterance: string;
+}
+
 export interface ToolContext {
   projectId: string;
   userId: string;
   supabase: SupabaseClient;
+  draft?: DraftAttribution;
 }
 
 function envelope(
@@ -507,6 +522,17 @@ const handlers: Record<string, Handler> = {
   get_material_risk: getMaterialRisk,
   recommend_disruption_strategy: recommendDisruptionStrategy,
 };
+
+export type ToolHandler = Handler;
+
+/** Registration seam for the staged Layer B tools (ai-agents.md §3.2 bridge 2,
+ * §9.2): draftTools.ts registers `get_data_completeness` and the draft_* family
+ * here so the shared runChat loop dispatches them through the same
+ * executeTool path. Layer A behavior is untouched — the new tools are never in
+ * `toolDeclarations`, so no persona turn can call them. */
+export function registerToolHandler(name: string, handler: Handler): void {
+  handlers[name] = handler;
+}
 
 export async function executeTool(
   name: string,

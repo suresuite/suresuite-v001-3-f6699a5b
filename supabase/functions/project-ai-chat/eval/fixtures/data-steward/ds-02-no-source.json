@@ -1,0 +1,31 @@
+{
+  "id": "ds-02-no-source",
+  "description": "1 material NULL cost, NO inbound rows; same ask → no deterministic candidate exists, the reply names the material as still-missing, NO proposal is created. A (misbehaving) draft attempt is refused not_grounded (ai-agents.md §5.1 #2).",
+  "project_snapshot": {
+    "materials": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "MAT-9", "name": "Orphan material", "cost": null, "holding_cost_pct": 0.2, "moq": 10, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null }
+    ],
+    "products": [],
+    "suppliers": [],
+    "inbound_logistics": [],
+    "outbound_logistics": [],
+    "bom_single_level": [],
+    "bom_multi_level": [],
+    "policy_defaults": [ { "project_id": "11111111-1111-4111-8111-111111111111" } ]
+  },
+  "utterance": "Fill in the missing material costs for me",
+  "mocked_llm": {
+    "tool": "draft_item_master_update",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "MAT-9", "field": "cost", "value": 1, "source": "reducer", "reducer": "cheapest_inbound_price" }
+      ]
+    }
+  },
+  "expect": {
+    "completeness_no_candidate": [ { "field": "materials.cost", "entity_id": "MAT-9" } ],
+    "error_code": "not_grounded",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

@@ -1,0 +1,11 @@
+{
+  "id": "mm-02-summary-agent-isolation",
+  "description": "The rolling summary is persona-only recall (§14.3 consumption / statelessness law): it is never present in an agent turn's context — runChat ignores opts.summary whenever an explicit system prompt is passed, and the Steward's §5.1 template carries no summary slot. Deleting the summary clears it (summary NULL, upto 0; SQL semantics pinned in db_rpc_test).",
+  "summary_text": "Supplier S3 is strategic for MAT-17; target service level is 95%.",
+  "expect": {
+    "persona_prompt_includes": "CONVERSATION SUMMARY (older context)",
+    "agent_prompt_excludes": "CONVERSATION SUMMARY",
+    "explicit_system_ignores_summary": true
+  },
+  "retired_reason": null
+}
