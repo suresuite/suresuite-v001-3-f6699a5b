@@ -34,6 +34,19 @@ export interface ColSpec {
    * (docs/data-simulation-mapping.md §4).
    */
   master?: { table: "materials" | "products" | "suppliers"; field: string; idFrom: string };
+  /**
+   * Type-specific inventory level/lot params (reorder point, order-up-to, lot Q,
+   * review period, basis) are not rendered as their own columns. Instead they are
+   * grouped into a single per-row "Replenishment parameters" vector cell that
+   * shows only the params the row's chosen policy type needs (§II.3). Tagged cols
+   * are excluded from the header union; their value/default/save wiring is reused
+   * inside the vector cell. The per-type selection is the registry-driven
+   * `inventoryParamsForType` (registryPolicyTypes), which mirrors these `visibleWhen`
+   * gates — kept here so prefill only persists type-relevant params.
+   */
+  vectorGroup?: "invParams";
+  /** A render-only anchor column with no stored field (holds the vector cell). */
+  synthetic?: boolean;
 }
 
 export interface StageTableSpec {
@@ -48,11 +61,14 @@ const col = (
   field: string,
   family: PolicyFamily,
   opts: {
+    label?: string;
     visibleWhen?: ColSpec["visibleWhen"];
     defaultWhenMissing?: ColSpec["defaultWhenMissing"];
     readOnly?: boolean;
     format?: ColSpec["format"];
     master?: ColSpec["master"];
+    vectorGroup?: ColSpec["vectorGroup"];
+    synthetic?: ColSpec["synthetic"];
   } = {},
 ): ColSpec => ({ field, family, label: lbl(field), ...opts });
 
@@ -135,11 +151,15 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // are stored + versioned now and consumed once the Quantity basis lands
       // (§II.4) — the info button (6.B) discloses this per parameter.
       col("type", "inventory"),
-      col("basis", "inventory"),
-      col("reorder_point", "inventory", { visibleWhen: invTypeIn("min_max", "rop"), defaultWhenMissing: 50 }),
-      col("order_up_to", "inventory", { visibleWhen: invTypeIn("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200 }),
-      col("rop_q_quantity", "inventory", { visibleWhen: invTypeIn("rop"), defaultWhenMissing: 0 }),
-      col("review_period_days", "inventory", { visibleWhen: invTypeIn("periodic_review"), defaultWhenMissing: 1 }),
+      // Type-specific level/lot params render inside this one dynamic vector cell
+      // (§II.3) — only the params the chosen type needs; the discrete gated
+      // columns below feed it (vectorGroup) and are hidden from the header.
+      col("__inv_params", "inventory", { synthetic: true, label: "Replenishment parameters" }),
+      col("basis", "inventory", { vectorGroup: "invParams" }),
+      col("reorder_point", "inventory", { visibleWhen: invTypeIn("min_max", "rop"), defaultWhenMissing: 50, vectorGroup: "invParams" }),
+      col("order_up_to", "inventory", { visibleWhen: invTypeIn("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200, vectorGroup: "invParams" }),
+      col("rop_q_quantity", "inventory", { visibleWhen: invTypeIn("rop"), defaultWhenMissing: 0, vectorGroup: "invParams" }),
+      col("review_period_days", "inventory", { visibleWhen: invTypeIn("periodic_review"), defaultWhenMissing: 1, vectorGroup: "invParams" }),
       col("initial_on_hand", "inventory", {
         master: { table: "materials", field: "initial_on_hand", idFrom: "material_id" },
       }),
@@ -181,12 +201,14 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // never from a plant node — so no fulfillment column is offered here.
 
       // Policy Type → dynamic parameters for finished goods (§II.1–II.3, §III.13).
+      // Type-specific level/lot params render in the one dynamic vector cell.
       col("type", "inventory", { visibleWhen: plantNeedsInventory }),
-      col("basis", "inventory", { visibleWhen: plantNeedsInventory }),
-      col("reorder_point", "inventory", { visibleWhen: plantInvType("min_max", "rop"), defaultWhenMissing: 50 }),
-      col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200 }),
-      col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0 }),
-      col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1 }),
+      col("__inv_params", "inventory", { synthetic: true, label: "Replenishment parameters", visibleWhen: plantNeedsInventory }),
+      col("basis", "inventory", { visibleWhen: plantNeedsInventory, vectorGroup: "invParams" }),
+      col("reorder_point", "inventory", { visibleWhen: plantInvType("min_max", "rop"), defaultWhenMissing: 50, vectorGroup: "invParams" }),
+      col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200, vectorGroup: "invParams" }),
+      col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0, vectorGroup: "invParams" }),
+      col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1, vectorGroup: "invParams" }),
       col("initial_on_hand", "inventory", {
         visibleWhen: plantNeedsInventory,
         master: { table: "products", field: "initial_on_hand", idFrom: "product_id" },
@@ -251,13 +273,16 @@ function dedupeByField(cols: ColSpec[]): ColSpec[] {
   return out;
 }
 
-/** No-row col visibility — used as a fallback only. Prefer `headerColsUnion`. */
+/** No-row col visibility — used as a fallback only. Prefer `headerColsUnion`.
+ * Vectorized inventory params are excluded — they render inside the vector cell. */
 export function visibleCols(
   stage: StageKey,
   ctx: { fulfillmentStrategy?: string },
 ): ColSpec[] {
   return dedupeByField(
-    STAGE_TABLE_SPEC[stage].cols.filter((c) => !c.visibleWhen || c.visibleWhen(ctx)),
+    STAGE_TABLE_SPEC[stage].cols.filter(
+      (c) => !c.vectorGroup && (!c.visibleWhen || c.visibleWhen(ctx)),
+    ),
   );
 }
 
@@ -266,8 +291,15 @@ export function visibleColsForRow(
   ctx: ColSpecCtx,
 ): ColSpec[] {
   return STAGE_TABLE_SPEC[stage].cols.filter(
-    (c) => !c.visibleWhen || c.visibleWhen(ctx),
+    (c) => !c.vectorGroup && (!c.visibleWhen || c.visibleWhen(ctx)),
   );
+}
+
+/** The type-specific inventory params grouped into the "Replenishment parameters"
+ * vector cell for a stage (in declared order). The cell renders the subset the
+ * row's chosen type needs via `inventoryParamsForType`. */
+export function vectorParamCols(stage: StageKey): ColSpec[] {
+  return STAGE_TABLE_SPEC[stage].cols.filter((c) => c.vectorGroup === "invParams");
 }
 
 /** Flatten a PolicyBundle into a single { field: value } map across families. */
@@ -297,5 +329,7 @@ export function headerColsUnion(
   for (const ctx of rowsCtx) {
     for (const c of visibleColsForRow(stage, ctx)) want.add(c.field);
   }
-  return dedupeByField(STAGE_TABLE_SPEC[stage].cols.filter((c) => want.has(c.field)));
+  return dedupeByField(
+    STAGE_TABLE_SPEC[stage].cols.filter((c) => !c.vectorGroup && want.has(c.field)),
+  );
 }
