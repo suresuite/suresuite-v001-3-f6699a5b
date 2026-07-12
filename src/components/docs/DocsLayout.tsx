@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Search, Moon, Sun, ChevronRight, ArrowLeft, ArrowRight, X,
-  PanelLeftClose, PanelLeftOpen, BookText, CornerUpLeft,
+  PanelLeftClose, PanelLeftOpen, BookText,
 } from "lucide-react";
 import {
   ALL_PAGES, DEFAULT_SLUG, DOC_GROUPS, getPage, prevNext, searchPages,
