@@ -149,7 +149,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
   const cred = useModelValidation(projectId);
-  const credibility = cred.resolve(policyVersionId, selected, { dirty: policyDirty });
+  const credibility = cred.resolveScenario(policyVersionId, selected, { dirty: policyDirty });
   // Inheritance on first render of a never-touched scenario under a validated
   // triple (§2.6) — creation-time inheritance happens in onCreate below.
   const inheritTried = useRef(new Set<string>());
@@ -283,7 +283,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                 scenarios={scenarios}
                 selectedId={selectedId}
                 loading={loading}
-                credibilityFor={(s) => cred.resolve(policyVersionId, s, { dirty: policyDirty })}
+                credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
                 onSelect={setSelectedId}
                 onCreate={async () => {
                   const s = await create(`Scenario ${scenarios.length + 1}`);
