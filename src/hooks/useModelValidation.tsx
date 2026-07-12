@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Model-validation cards — Phase B0 / G13 / §9.5(6).
@@ -141,13 +141,51 @@ export function deriveCredibility(
     : { state: "stale", card, drift };
 }
 
+/** The scenario fields the baseline fingerprint depends on (§2.3). Used as a
+ *  client-side cache key only — the hash itself always comes from the
+ *  scenario_fingerprint_hash RPC (single canonicalization point). */
+export interface ScenarioFingerprintInput {
+  id: string;
+  horizon_days: number;
+  time_step: string;
+  demand_model: Record<string, unknown>;
+}
+
+const fingerprintKey = (s: ScenarioFingerprintInput) =>
+  `${s.id}:${s.horizon_days}:${s.time_step}:${JSON.stringify(s.demand_model ?? {})}`;
+
 interface UseModelValidationResult {
   /** All ACTIVE cards for the project, newest first. */
   cards: ModelValidationCard[];
+  /** current_graph_hash of the project's dataset (live; null while loading). */
+  currentGraphHash: string | null;
   loading: boolean;
   refresh: () => Promise<void>;
   /** Derive the badge for a context against the loaded active cards. */
   resolve: (ctx: CredibilityContext) => Credibility;
+  /** Scenario-first convenience over resolve(): fetches + caches the
+   *  scenario's fingerprint hash and the current graph hash itself
+   *  (SimulationLab's rail/badge surfaces — §2.4). */
+  resolveScenario: (
+    policyVersionId: string | null | undefined,
+    scenario: ScenarioFingerprintInput | null | undefined,
+    opts?: { dirty?: boolean },
+  ) => Credibility;
+  /** Immutable-history badge for a completed run (stamped card + advisory
+   *  engine check) — superseded cards still resolve here (§2.4). */
+  resolveRun: (run: {
+    model_validation_id?: string | null;
+    code_version?: string | null;
+  } | null | undefined) => Credibility;
+  /** Inheritance (§2.6): when the exact active triple (policy version ×
+   *  current graph × this scenario's fingerprint) is validated and the policy
+   *  is not dirty, apply the card to the scenario via the ONE server-side
+   *  inheritance RPC. Returns the applied card id, or null. */
+  applyIfValidated: (
+    scenario: ScenarioFingerprintInput,
+    policyVersionId: string | null | undefined,
+    opts?: { dirty?: boolean },
+  ) => Promise<string | null>;
   /** record_model_validation RPC — supersedes the same-triple active card. */
   record: (args: RecordValidationArgs) => Promise<string>;
   /** revoke_model_validation RPC — status flip, never a delete. */
@@ -157,8 +195,15 @@ interface UseModelValidationResult {
 export function useModelValidation(
   projectId: string | null | undefined,
 ): UseModelValidationResult {
-  const [cards, setCards] = useState<ModelValidationCard[]>([]);
+  // ALL statuses are loaded (run badges resolve superseded cards too, §2.4);
+  // `cards` exposes the active subset the live surfaces derive against.
+  const [allCards, setAllCards] = useState<ModelValidationCard[]>([]);
+  const [currentGraphHash, setCurrentGraphHash] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // fingerprintKey(scenario) → scenario_fingerprint_hash (RPC result). State,
+  // so a resolved fingerprint re-renders every consumer of resolveScenario().
+  const [fingerprints, setFingerprints] = useState<Record<string, string>>({});
+  const pendingFp = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
     if (!projectId) return;
@@ -167,19 +212,27 @@ export function useModelValidation(
     const sb = supabase as any;
     // Direct SELECT (the table is SELECT-only to clients) — the full-row shape
     // list_model_validations trims is needed here (fingerprint, basis jsonb).
-    const { data, error } = await sb
-      .from("model_validations")
-      .select("*")
-      .eq("project_id", projectId)
-      .eq("status", "active")
-      .order("validated_at", { ascending: false });
+    const [{ data, error }, { data: gHash }] = await Promise.all([
+      sb
+        .from("model_validations")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("validated_at", { ascending: false }),
+      sb.rpc("current_graph_hash", { p_project_id: projectId }),
+    ]);
     if (error) {
       console.error("model_validations load failed", error);
     } else {
-      setCards((data ?? []) as ModelValidationCard[]);
+      setAllCards((data ?? []) as ModelValidationCard[]);
     }
+    setCurrentGraphHash((gHash as string | null) ?? null);
     setLoading(false);
   }, [projectId]);
+
+  const cards = useMemo(
+    () => allCards.filter((c) => c.status === "active"),
+    [allCards],
+  );
 
   useEffect(() => {
     void refresh();
@@ -210,6 +263,91 @@ export function useModelValidation(
   const resolve = useCallback(
     (ctx: CredibilityContext) => deriveCredibility(cards, ctx),
     [cards],
+  );
+
+  // Lazily fetch + cache a scenario's fingerprint hash (RPC-canonicalized).
+  const ensureFingerprint = useCallback(
+    (scenario: ScenarioFingerprintInput) => {
+      const key = fingerprintKey(scenario);
+      if (fingerprints[key] !== undefined || pendingFp.current.has(key)) return;
+      pendingFp.current.add(key);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      void sb
+        .rpc("scenario_fingerprint_hash", { p_scenario_id: scenario.id })
+        .then(({ data, error }: { data: string | null; error: unknown }) => {
+          pendingFp.current.delete(key);
+          if (error || !data) return;
+          setFingerprints((cur) => ({ ...cur, [key]: data }));
+        });
+    },
+    [fingerprints],
+  );
+
+  const resolveScenario = useCallback<UseModelValidationResult["resolveScenario"]>(
+    (policyVersionId, scenario, opts) => {
+      let scenarioHash: string | null = null;
+      if (scenario) {
+        scenarioHash = fingerprints[fingerprintKey(scenario)] ?? null;
+        if (scenarioHash === null) ensureFingerprint(scenario);
+      }
+      return deriveCredibility(cards, {
+        policyVersionId: policyVersionId ?? null,
+        policyDirty: opts?.dirty === true,
+        graphHash: currentGraphHash,
+        scenarioHash,
+      });
+    },
+    [cards, currentGraphHash, fingerprints, ensureFingerprint],
+  );
+
+  const resolveRun = useCallback<UseModelValidationResult["resolveRun"]>(
+    (run) => {
+      const cardId = run?.model_validation_id ?? null;
+      if (!cardId) return { state: "unvalidated" };
+      const card = allCards.find((c) => c.id === cardId);
+      if (!card) return { state: "unvalidated" };
+      // Advisory engine fingerprint (§2.4): the worker stamps code_version on
+      // completion; a mismatch with the card's evidence engine renders stale.
+      const cv = run?.code_version ?? null;
+      if (cv && card.engine_fingerprint && cv !== card.engine_fingerprint) {
+        return { state: "stale", card, drift: ["engine"] };
+      }
+      return { state: "validated", card };
+    },
+    [allCards],
+  );
+
+  const applyIfValidated = useCallback<UseModelValidationResult["applyIfValidated"]>(
+    async (scenario, policyVersionId, opts) => {
+      if (!policyVersionId || opts?.dirty === true || currentGraphHash === null) return null;
+      const candidates = cards.filter(
+        (c) =>
+          c.verdict === "validated" &&
+          c.policy_version_id === policyVersionId &&
+          c.graph_hash === currentGraphHash,
+      );
+      if (candidates.length === 0) return null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { data: hash, error: fpErr } = await sb.rpc("scenario_fingerprint_hash", {
+        p_scenario_id: scenario.id,
+      });
+      if (fpErr || !hash) return null;
+      setFingerprints((cur) => ({ ...cur, [fingerprintKey(scenario)]: hash as string }));
+      const card = candidates.find((c) => c.scenario_hash === hash);
+      if (!card) return null;
+      const { error } = await sb.rpc("apply_validation_to_scenario", {
+        p_scenario_id: scenario.id,
+        p_validation_id: card.id,
+      });
+      if (error) {
+        console.error("apply_validation_to_scenario failed", error);
+        return null;
+      }
+      return card.id;
+    },
+    [cards, currentGraphHash],
   );
 
   const record = useCallback(
@@ -253,5 +391,16 @@ export function useModelValidation(
     [refresh],
   );
 
-  return { cards, loading, refresh, resolve, record, revoke };
+  return {
+    cards,
+    currentGraphHash,
+    loading,
+    refresh,
+    resolve,
+    resolveScenario,
+    resolveRun,
+    applyIfValidated,
+    record,
+    revoke,
+  };
 }
