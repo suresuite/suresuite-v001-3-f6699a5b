@@ -134,6 +134,33 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # Read-only DB facts so a slow/failed seed is diagnosable from the log:
+      # dataset-table sizes, project_id indexes, role timeouts, and any
+      # in-flight sessions that could hold locks on the arc tables.
+      - name: Database diagnostics (read-only)
+        run: |
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+          q() {
+            printf '── %s\n' "$1"
+            node -e '
+              const [ref, token, sql] = process.argv.slice(1);
+              fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ query: sql }),
+              }).then(async (r) => console.log(JSON.stringify(await r.json())))
+                .catch((e) => console.log("query failed:", e.message));
+            ' "$REF" "$SUPABASE_ACCESS_TOKEN" "$2"
+          }
+          q "dataset table sizes" "select relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) as size from pg_stat_user_tables where relname in ('inbound_logistics','outbound_logistics','bom_single_level','bom_multi_level','multi_tier_supply_chain','projects') order by relname"
+          q "project_id indexes" "select tablename, indexname from pg_indexes where tablename in ('inbound_logistics','outbound_logistics','bom_single_level','bom_multi_level','multi_tier_supply_chain') order by tablename, indexname"
+          q "role timeouts" "select rolname, rolconfig from pg_roles where rolname in ('anon','authenticated','authenticator','postgres')"
+          q "active sessions" "select pid, state, wait_event_type, wait_event, now()-xact_start as xact_age, left(query,120) as query from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid() order by xact_start"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        # tee'd into the published log via the seed step below
+        continue-on-error: true
+
       - name: Seed Project TRON - ver2
         id: seed
         run: |
@@ -142,6 +169,24 @@ jobs:
         env:
           USER_ID: ${{ steps.identity.outputs.user_id }}
           USER_EMAIL: ${{ steps.params.outputs.user_email }}
+
+      - name: Post-failure lock diagnostics (read-only)
+        if: failure() && steps.seed.outcome == 'failure'
+        run: |
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+          node -e '
+            const [ref, token] = process.argv.slice(1);
+            const sql = `select a.pid, a.state, a.wait_event_type, a.wait_event, now()-a.xact_start as xact_age, left(a.query,160) as query from pg_stat_activity a where a.pid <> pg_backend_pid() and (a.state <> $$idle$$ or a.xact_start is not null) order by a.xact_start`;
+            fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ query: sql }),
+            }).then(async (r) => console.log(JSON.stringify(await r.json(), null, 1)))
+              .catch((e) => console.log("query failed:", e.message));
+          ' "$REF" "$SUPABASE_ACCESS_TOKEN" | tee -a /tmp/seed.log
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true
 
       # A push that lands engine changes also redeploys the worker via a
       # sibling workflow (ops-request.yml — docker build ≈ 5–10 min). Give it
