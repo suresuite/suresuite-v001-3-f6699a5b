@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | v1.0 — authoritative for all AI-agent work (Layer A hardening, the proposal fabric, and the Layer B artifact-agent roster) |
-| **Date** | 2026-07-12 |
+| **Status** | v1.1 — authoritative for all AI-agent work (Layer A hardening, the proposal fabric, and the Layer B artifact-agent roster). v1.1 adds §12 (state-of-the-art alignment against the four industrial-trust pillars), §13 (rights-checked authorization incl. agent-driven simulation/analytics), §14 (memory architecture + chat organization, workstream M); decides §10 Q3; adds Q14–Q18 |
+| **Date** | 2026-07-12 (v1.0 and v1.1 same day) |
 | **Authority** | Governed by `docs/design/next-gen-platform-design.md` (the blueprint). **This document supersedes the roster sketch that blueprint §12 carried**; §12 is rewritten in the same change to frame the two layers and point here (per the `CLAUDE.md` doc-and-code law). The blueprint's §12 platform law and the agent run-readiness contract (G16) remain stated in the blueprint and are restated here verbatim where they bind. `docs/design/public-api-and-access-control.md` remains authoritative for identity/tenancy/quota; `docs/design/policy-specification.md` for policy semantics; `docs/design/phase-b0-core-loop.md` for the model-validation card. |
 | **Altitude** | Implementation-deterministic: executable DDL, JSON Schemas, verbatim prompt templates, literal file/table/tool/flag/event names, numeric thresholds. Two independent implementers reading this document must produce interchangeable systems. |
 | **Non-goals** | Adding LLM providers or models (explicitly out of scope — §3.4); autonomous/background agents; LLM-generated simulation results; replacing the persona chat UX |
@@ -23,6 +23,9 @@
 | What ships in which stage, exact files and flags | §9 |
 | Open decisions and defaults taken | §10 |
 | Blueprint traceability, glossary, fixture index | §11 |
+| How this compares to the state of the art (adopt/adapt/reject) | §12 |
+| Who may make an agent act — rights, gated simulation/analytics, quotas | §13 |
+| Long memory, chat folders, project memory | §14 |
 
 **Conventions used throughout.**
 
@@ -135,7 +138,7 @@ sequenceDiagram
     H->>U: MessageBubble renders markdown + typed parts + ToolCallBadge
 ```
 
-Threads live entirely client-side in `localStorage` (`src/hooks/useChatThreads.ts`, keys `projectChat.threads.v2` / `projectChat.activeThread.v2`); the server keeps no conversation state — each request carries its own history. Errors are returned as HTTP 200 with `{error, type}` because `supabase-js invoke` discards non-2xx bodies (`index.ts:49-58`).
+Threads live entirely client-side in `localStorage` (`src/hooks/useChatThreads.ts`, keys `projectChat.threads.v2` / `projectChat.activeThread.v2`); the server keeps no conversation state — each request carries its own history. (§14 / workstream M moves the thread store server-side with folders, search, and rolling summaries; this paragraph remains the as-built baseline it migrates from.) Errors are returned as HTTP 200 with `{error, type}` because `supabase-js invoke` discards non-2xx bodies (`index.ts:49-58`).
 
 ### 2.5 Adjacent as-built facts the design must respect
 
@@ -1347,7 +1350,7 @@ Flag conventions: server flags are edge-function env vars (like `SCSIM_ENGINE`);
 
 | | |
 |---|---|
-| Scope | proposals store + RPCs; telemetry store + writer; router *seam* (flag-off passthrough); ProposalCard + `"proposal"` part kind (renders nothing until proposals exist); server-side model-allowlist/budget re-check; provider-registry health hardening; legacy non-tools mode removal |
+| Scope | proposals store + RPCs; telemetry store + writer; router *seam* (flag-off passthrough); ProposalCard + `"proposal"` part kind (renders nothing until proposals exist); server-side model-allowlist/budget re-check; agent capability seeds (§13.1 feature rows in the `capabilities` registry); provider-registry health hardening; legacy non-tools mode removal |
 | Files | new: `supabase/migrations/20260715000001_agent_proposals.sql`, `supabase/migrations/20260715000002_agent_telemetry.sql`, `supabase/functions/project-ai-chat/router.ts`, `supabase/functions/project-ai-chat/telemetry.ts`, `src/components/chat/ProposalCard.tsx`, `src/hooks/useProposals.tsx`, `supabase/functions/project-ai-chat/eval/` (harness + routing set seed). modified: `index.ts` (remove legacy mode; add access re-check, telemetry calls, router seam), `providers.ts` (optional `system`/`tools` params — bridge 1), `tools.ts` (`ToolKind` + `"proposal"`), `MessageBubble.tsx` (part switch), `project-ai-health/index.ts` (registry-driven probes) |
 | Flags | `AGENT_TELEMETRY_ENABLED` (server), `AGENT_ROUTER_ENABLED=false` (seam stays off) |
 | Exit criteria | golden-transcript equivalence with flags off; telemetry events flowing for ordinary chats (`chat.request/reply`, `tool.call`); deterministic eval tier green in CI; legacy mode gone; health endpoint reports all three configured providers |
@@ -1401,7 +1404,7 @@ Numbered; each marked **[owner decision needed]** (blocks a stage entry until de
 
 1. **[default taken] Proposal read posture is project-open, like `policy_versions`/`model_validations`** (RLS `USING (true)` for SELECT). Consistent with the platform's current custom-auth reality; tightens automatically when public-api Q2 (server-verified identity) lands. Revisit: with Q2.
 2. **[default taken] Agent identity rides the Layer A client-asserted model until the access-control layer's principal resolution is adopted** (public-api §6.4). The fabric adds attribution + audit but not authentication. Revisit: mandatory at Stage 1b (create/seed-project proposals), which **requires** resolved principals for org-correct stamping (G16) — Stage 1b cannot ship on asserted identity.
-3. **[owner decision needed] Per-org agent enablement.** Flags above are deployment-global. Should `AGENT_ENABLED_IDS` become a capabilities-managed per-org grant (like model allowlists)? Default if undecided by Stage 1 GA: global flags + the existing `agent_proposals` capability key as the per-org client gate.
+3. **[DECIDED — v1.1, §13.1] Per-org agent enablement is capabilities-managed:** per-agent feature keys in the existing `capabilities` / `org_capabilities` / `user_capabilities` system, resolved server-side; `AGENT_ENABLED_IDS` remains the deployment-wide kill switch above the grants (flags gate existence, capabilities gate access).
 4. **[default taken] Router cost/latency: one extra LLM call per message once `AGENT_ROUTER_ENABLED`.** Accepted (temperature-0, 300-token call); mitigation if p50 overhead > 800 ms: classify only messages with an imperative-verb prefilter (a deterministic, testable regex allowlist — added to `router.ts` behind `ROUTER_PREFILTER=true`). Revisit: Stage 1 latency data.
 5. **[default taken] `trace_explanation` participates in the proposals table** despite having no apply, for one card UX + one acceptance metric. Alternative (separate `explanations` store) rejected as a second fabric. Revisit: if explanation volume dwarfs actionable proposals (> 10× rate sustained).
 6. **[default taken] No auto-approve, ever, in this document's scope** — including for `provenance:'deterministic'` diffs whose values are recomputed at apply. Rationale: the human gate is the platform law's containment for *selection* errors, not just value errors. Revisit trigger: ≥ 3 consecutive months of per-agent accepted-proposal rate ≥ 0.9 AND an org explicitly requesting it AND resolved principals (Q2) — then design a per-org opt-in as a new decision, not a flag flip.
@@ -1412,6 +1415,11 @@ Numbered; each marked **[owner decision needed]** (blocks a stage entry until de
 11. **[owner decision needed] `docs/design/platform-architecture-report.md` §10** still presents the roster under the old A1–A5 numbering with no Layer A/Layer B framing. It is a *descriptive* companion (report of the as-built + blueprint) and this task's guardrail permits only the blueprint §12 edit; the report's next revision should adopt the B-numbering and cite this document. Until then it is *consistent but stale in naming* — flagged here so it cannot silently drift further.
 12. **[default taken] Numeric defaults** not otherwise sourced: proposal TTL 14 days; apply retry cap 3; live-proposal cap 20/user/project; router confidence min 0.70; context budgets §5; telemetry retention 180 days. All marked DEFAULT at their definition sites; changing any is a one-line change with no contract impact.
 13. **[repo-vs-assumption flags]** Two places the shipped code differs from what a reader of blueprint §12 might assume, followed per the repo: (a) Layer A tool scoping is explicit-filter under the **service role**, not RLS (§2.3, §8 T3); (b) model allowlist/budget enforcement is client-side only until Stage 0 (§2.5, §8 T5). Both are stated as-built and both have staged closures.
+14. **[default taken] Agent capability seeding defaults (§13.1):** `agent_proposals` follows `ai_chat`; `agent_apply` seeds on for `modeler`/`admin`/`super_admin` and off for `user`; per-agent keys seed on as each stage GAs. Org/user rows override per the existing precedence. Revisit: per-org feedback after Stage 1.
+15. **[default taken] Agent apply compute quotas (§13.4):** 3 concurrent + 10/day agent-applied runs per user per project, beneath org-level quotas from the public-api workstream. Revisit: with public-api Phase 2 quota tiers.
+16. **[default taken] Chat/memory retrieval is Postgres FTS only (§14.5).** Vector retrieval (pgvector + an embedding model from an already-configured provider) is deferred: per-message embedding cost + a new model dependency for a corpus FTS serves at current scale. Revisit trigger: search-miss complaints in triage or > 100k messages per active org.
+17. **[owner decision needed] MCP exposure of the read-tool registry** through the `/v1` gateway (§12.2) — lets external agent hosts consume the identical least-privilege tool surface. Not before public-api Phase 3 (webhooks/tokens) and never as a parallel stack; needs a decision on scopes-to-tools mapping.
+18. **[owner decision needed] Org-level chat retention policy.** Default taken meanwhile: user-owned threads, no automatic deletion, hard user-initiated delete (§14.2, §14.6). An org-mandated retention window (e.g. 24 months) is a compliance knob to decide before enterprise rollout.
 
 ---
 
@@ -1435,12 +1443,15 @@ Numbered; each marked **[owner decision needed]** (blocks a stage entry until de
 | §8 threat model | public-api-and-access-control.md §10 pattern; §12 no-privileged-path law | G15, G16 |
 | §9 rollout | §13 roadmap (B0/B1/C/D placements per stage entry gates) | staged: G4→G1→G13→G8/G9→facet-11 |
 | §10 | §14 risks/open-questions discipline | — |
+| §12 SOTA alignment | §12 platform law (gates over model trust); A13 eval-gate pattern | — (evidence structure) |
+| §13 authorization | public-api-and-access-control.md §6 (tenancy/scopes idiom); unified capability layer (`20260711000002`) | G15 adjacency; G16 identity precondition |
+| §14 memory & chat | §12 statelessness law (memory as explicit artifacts); A5 supersede-not-edit (memory edits) | pillar 04; workstream M |
 
 Commit/PR trailer for work under this document: `Phase B / §12 / AI agents: <slice> (ai-agents.md §<n>)`.
 
 ### 11.2 Glossary
 
-**Layer A / Layer B** — §0 conventions. **Persona** — a voice + advisory competence in the chat (`agents.ts`); never mutates. **Artifact agent (B1–B5)** — a stateless task executor owning one artifact class, emitting proposals only. **Proposal** — a row in `proposals`; the unit of agent output (§4). **Proposal fabric** — table + lifecycle + `agent-apply` + card UX. **`draft_*` tool** — the single tool through which an agent files its artifact class (§4.5). **Provenance (proposal)** — `deterministic` / `llm_drafted` / `user_supplied` (§4.1). **Grounding drift** — mismatch between a proposal's recorded hashes and the project's current `current_policy_hash`/`current_graph_hash`; expires the proposal (§4.2). **Intent router** — §6 classifier + deterministic wrapper. **Reducer** — a named deterministic derivation from project data (the `grading.ts` fallback-reducer library). **Run-readiness contract** — blueprint §12 (G16): agent-created/populated projects must pass the same pre-run gate as human projects, in the correct org, self-verified. **Two-tier eval** — deterministic CI tier + model-scored nightly tier (§7.4). **Platform law** — the five-clause §12 guardrail restated in §0.
+**Layer A / Layer B** — §0 conventions. **Persona** — a voice + advisory competence in the chat (`agents.ts`); never mutates. **Artifact agent (B1–B5)** — a stateless task executor owning one artifact class, emitting proposals only. **Proposal** — a row in `proposals`; the unit of agent output (§4). **Proposal fabric** — table + lifecycle + `agent-apply` + card UX. **`draft_*` tool** — the single tool through which an agent files its artifact class (§4.5). **Provenance (proposal)** — `deterministic` / `llm_drafted` / `user_supplied` (§4.1). **Grounding drift** — mismatch between a proposal's recorded hashes and the project's current `current_policy_hash`/`current_graph_hash`; expires the proposal (§4.2). **Intent router** — §6 classifier + deterministic wrapper. **Reducer** — a named deterministic derivation from project data (the `grading.ts` fallback-reducer library). **Run-readiness contract** — blueprint §12 (G16): agent-created/populated projects must pass the same pre-run gate as human projects, in the correct org, self-verified. **Two-tier eval** — deterministic CI tier + model-scored nightly tier (§7.4). **Platform law** — the five-clause §12 guardrail restated in §0. **Agent capability keys** — the §13.1 feature rows (`agent_proposals`, `agent_apply`, per-agent keys) in the unified capability registry. **Rolling summary** — the per-thread ≤300-word running summary maintained at the 24/8 thresholds (§14.3). **Project memory** — consent-only, provenance-cited `project_memory` rows retrieved via `get_project_memory` (§14.4). **Memory chip** — the persona's save-this offer; the only non-verbal path into project memory. **Workstream M** — the memory/chat-organization stages M0–M2 (§14.7), parallel to agent Stages 0–5.
 
 ### 11.3 Golden fixtures index
 
@@ -1452,5 +1463,260 @@ Commit/PR trailer for work under this document: `Phase B / §12 / AI agents: <sl
 | B3 V&V Analyst | `fixtures/vv-analyst/` | vv-01 … vv-08 | §5.3 |
 | B4 Experiment Designer | `fixtures/experiment-designer/` | ed-01 … ed-08 | §5.4 |
 | B5 Explainer | `fixtures/explainer/` | ex-01 … ex-08 | §5.5 |
+| Memory (workstream M) | `fixtures/memory/` | mm-01 … mm-06 | §14.7 |
 
 Fixture file contract: `{id, description, project_snapshot: <minimal table rows>, utterance, mocked_llm?: <tool-call args for the deterministic tier>, expect: {route?, proposal?: <schema assertions>, error_code?, reply_assertions?: <regex list>}, retired_reason?: null}`.
+
+---
+
+## 12. State-of-the-art alignment — the four industrial-trust pillars *(added v1.1)*
+
+This section makes the design's relationship to the current (early-2026) state of the art in agentic LLM systems **explicit and auditable**: which techniques we adopt, which we adapt, which we reject — with rationale tied to this platform's constraints (Deno edge runtime, multi-provider by product decision, the §0 platform law). The organizing frame is the four trustworthiness pillars industrial AI is judged by: **better answers, robust reasoning, richer context, longer memory.**
+
+### 12.1 Pillar → limitation → mechanism map
+
+| Pillar | Known FM limitation (industrial) | This design's mechanism | Where |
+|---|---|---|---|
+| **01 Better answers** | hallucination; unsafe autonomous behavior; low trust in critical operations | grounding-or-refusal rule + mandatory citations (`AGENT_COMMON`); deterministic recomputation of every numeric claim that matters (reducers, computed blocks); **no autonomous mutation path exists** — proposal → human approval → existing gate; no auto-approve (§10 Q6); citation-coverage metric ≥ 0.90 | §4, §5, §7.2 |
+| **02 Robust reasoning** | poor generalization; rigid task adaptation; weak scenario transferability | model-agnostic safety (gates enforce, prompts assist); the full eval matrix runs on **every** enabled model before any flag flip; agents adapt to new policies/KPIs automatically because their vocabulary is generated from the registry SSOT, not hand-taught; deterministic wrappers around every LLM decision (router fallbacks, tie-breaks, schema validation) | §6.2, §7.4, §5.2 |
+| **03 Richer context** | weak fusion of heterogeneous factory data; disconnected intelligence; inconsistent decisions | context is **typed project artifacts** (item masters, registry schemas, persisted runs, validation cards, weekly series, and — Stage 5 — per-decision traces), assembled by deterministic per-agent builders with declared budgets; tool results are structured envelopes, never prose blobs; cross-room consistency comes from every agent reading the same provenance-hashed artifacts | §5 grounding contexts, §2.3 |
+| **04 Longer memory** | weak long-term memory; poor cross-process continuity; knowledge fragmentation | the three-tier memory architecture of §14: server-side organized chat history with rolling summaries (continuity beyond the 8-turn window), explicit provenance-cited **project memory** (knowledge that persists across threads and users), and staleness-hashed grounding so remembered context can never silently outlive the data it described | §14 |
+
+### 12.2 Technique survey: adopt / adapt / reject
+
+| Technique / framework (state of the art) | Verdict | Rationale |
+|---|---|---|
+| **ReAct-style tool loop** (reason → act → observe) | **Adopted (shipped)** | `providers.ts::runChat` is a bounded ReAct loop (`MAX_HOPS = 5`) with typed observations; Layer B reuses it (bridge 1) |
+| **Provider-native structured outputs / constrained decoding** (OpenAI structured outputs, Gemini `responseSchema`) | **Adopt — Stage 1** | the router's JSON (§6.3) and every `draft_*` argument object are requested through the provider's structured-output mechanism where the provider supports it (Gemini `responseSchema`; OpenAI `response_format: json_schema`; DeepSeek `json_object` best-effort), with the §5 JSON Schemas as the constraint. Parsing failures then become rare instead of routine; the deterministic validators stay as the actual gate (defense in depth, not replaced) |
+| **Orchestrator–worker / handoff patterns** (OpenAI Agents SDK handoffs, LangGraph supervisor) | **Adapted** | our orchestrator is `index.ts` + `router.ts`: one deterministic supervisor, single-agent turns, handoff = §6.4's typed envelope. Multi-agent *collaboration* (agent calling agent) is deliberately rejected for v1 — dependency-ordered stages + the human between proposals is the coordination mechanism |
+| **Graph/state-machine agent frameworks** (LangGraph, AutoGen, CrewAI) as runtime dependencies | **Rejected** | the state machine this system needs is the *proposal lifecycle*, which must live in Postgres (durable, RLS-governed, auditable), not in an in-process framework object; Deno edge functions favor the thin first-party loop we already ship; multi-provider dispatch is already solved in 260 lines we fully control. We adopt the **patterns** (typed state, checkpointing = proposals + `ai_chat_events`, interrupts = human approval) without the dependency |
+| **Reflection / self-critique loops** (Reflexion-style) | **Adapted** | where a check can be deterministic, it is (recomputation, schema, gates) — a critic LLM would be weaker than the gate it imitates. LLM-as-judge appears only where determinism cannot reach: nightly faithfulness/citation scoring in the model-scored eval tier (§7.4) |
+| **LLM-as-judge evaluation** | **Adopted (nightly tier)** | §7.4 tier 2; judge prompts versioned in `eval/`; judge disagreement sampled into human triage (§7.3) |
+| **RAG / hybrid retrieval** | **Adapted** | grounding is *structured* retrieval (SQL over typed artifacts), which beats vector RAG for tabular operational data; text retrieval enters only for chat-history/memory search (§14.5), full-text first, vectors as a flagged option (§10 Q16) |
+| **Hierarchical agent memory** (MemGPT/Letta-style core/archival tiers; Mem0/Zep-style extracted memories) | **Adapted — §14** | the tiering is adopted (working / conversational / long-term); the *implementation* is adapted to platform law: long-term memories are explicit, user-visible, provenance-cited artifacts written only with user consent — never an opaque store the model silently writes to |
+| **MCP (Model Context Protocol) tool exposure** | **Adapt later — decision §10 Q17** | our in-process tool registry stays the runtime; once the public `/v1` API GAs (public-api doc Phase 3+), the same read tools can be exposed as an MCP server *through the gateway* so external agent hosts get the identical least-privilege surface. No parallel tool stack before that |
+| **OpenTelemetry GenAI semantic conventions** | **Adapted** | `ai_chat_events` columns map 1:1 onto OTel GenAI attributes (`model_code`→`gen_ai.request.model`, `provider_code`→`gen_ai.system`, `tool.call` payload→`gen_ai.tool.name`, `latency_ms`→span duration; `request_id` is the trace correlator). An OTLP exporter reading `ai_chat_events` is therefore a mechanical adapter, not a redesign — recorded as the integration path if/when the org adopts an observability backend |
+| **Governance frames: NIST AI RMF / ISO/IEC 42001 / EU AI Act transparency** | **Adopted as evidence structure** | MAP = §2 as-built inventory + §8 threat model; MEASURE = §7 metrics + golden suites; MANAGE = §9 flags/kill switches + §10 decision log; GOVERN = blueprint §12 platform law + CLAUDE.md traceability. AI-output disclosure: every card carries the provenance chip and drafting `model_code` (§4.6) — the transparency artifact regulators ask for |
+
+The one-line summary a reviewer should test us against: **we adopt the state of the art where it strengthens determinism (structured outputs, evals, telemetry conventions, memory tiering) and reject it where it would move authority from auditable gates into framework or model internals.**
+
+---
+
+## 13. Authorization: rights-checked agents, gated simulation and analytics *(added v1.1)*
+
+The user-facing promise this section specifies: **an agent first checks what you are allowed to do; only if you hold the right can it act — including running simulations and advanced analytics through conversation — and everything it does is attributed, quota-bounded, and audited.** No agent widens anyone's access (platform law: subset of existing interfaces — this section is that law projected onto *who may call them*).
+
+### 13.1 Grant vocabulary (extends the shipped capability system, no new machinery)
+
+Authorization reuses the unified capability layer (`supabase/migrations/20260711000002_unified_access_control.sql`: `capabilities` registry + `role_capabilities` / `org_capabilities` / `user_capabilities`, resolved by `get_my_capabilities`). Stage 0 seeds new **feature** rows (same migration style as the existing five):
+
+| New `capabilities.key` (kind `feature`) | Grants | Default seeding (DEFAULT) |
+|---|---|---|
+| `agent_proposals` | see proposal cards; receive routed agent drafts | on for roles that have `ai_chat` |
+| `agent_apply` | Approve/Reject on cards (i.e. cause mutations) | on for `modeler`, `admin`, `super_admin`; off for `user` |
+| `agent_data_steward` · `agent_policy_configurator` · `agent_vv_analyst` · `agent_experiment_designer` · `agent_explainer` | per-agent routing eligibility | staged: seeded on as each agent's stage GAs |
+
+Client `FeatureKey` union (`src/lib/capabilities.ts:41-46`) extends with the same literals. **§10 Q3 is hereby decided:** per-org agent enablement is capabilities-managed (org admins toggle `org_capabilities` rows exactly as they toggle `simulation_lab`), with the `AGENT_ENABLED_IDS` env flag remaining the deployment-wide kill switch *above* the grants — flags gate existence, capabilities gate access.
+
+### 13.2 Enforcement points (server-side, fail closed)
+
+The effective agent set for a request is computed **server-side** in `index.ts`, never trusted from the client:
+
+```
+enabledAgents(request) =
+      AGENT_ENABLED_IDS                      (deployment kill switch)
+    ∩ { a : capabilities.features["agent_" + slug(a)] }   (role/org/user grants via get_my_capabilities)
+    ∩ { a : stage-dependency present }        (e.g. explainer needs traces)
+```
+
+| # | Checkpoint | Where | Checks | On failure |
+|---|---|---|---|---|
+| 1 | Chat entry | `project-ai-chat/index.ts` | `ai_chat` feature; model allowlist + `ai_budgets` (server-side re-check, §9.1); project access via `get_project_dataset_counts` when a project is attached | typed error, no LLM call |
+| 2 | Routing | `router.ts` short-circuit | `enabledAgents` formula above — an agent the caller may not use is **invisible to the router** (routes to advisory with the persona explaining the capability is not enabled for this account) | advisory route |
+| 3 | Draft | `draftTools.ts` handlers | per-agent read tools run under the same project scoping as checkpoint 1; `agent_proposals` required to create a card | `agent_disabled` |
+| 4 | Review | `review_agent_proposal` RPC | `agent_apply` feature required for `approve` (resolved server-side via `get_my_capabilities(p_user_id)` inside the RPC — Stage 1 adds this check to the §4.1 RPC); anyone with `agent_proposals` may `reject` their own view | RPC exception, card unchanged |
+| 5 | Apply | `agent-apply/index.ts` | re-verifies: proposal `approved`; project ownership; `agent_apply`; **plus the underlying operation's own right** (next table); **plus quota** (§13.4); then delegates to the existing gate | `apply_error` with a typed code; nothing mutated |
+
+### 13.3 The operation-rights matrix (what "yes, you can" means per artifact)
+
+Apply never demands *less* than the equivalent manual action demands — the agent path re-states the UI's own requirements:
+
+| Artifact apply | Underlying operation | Required grants (all of) | Same-as-UI proof |
+|---|---|---|---|
+| `item_master_diff` | `bulk_upsert_materials/products/suppliers` | `agent_apply` + `data_editing` | `data_editing` is the feature gating manual item-master edits |
+| `policy_bundle_diff` | `save_policy_defaults` + `bulk_upsert_policy_overrides` + `snapshot_policy` | `agent_apply` + `data_editing` + page `/policies` | the grants a user needs to do this by hand on `/policies` |
+| `model_card_draft` | `record_model_validation` | `agent_apply` + page `/policies` | adoption lives on Run & Validate (a `/policies` stage) |
+| `experiment_spec` | scenario write + `dispatchExperimentRun` | `agent_apply` + `simulation_lab` + page `/simulation-lab` | **this is the "agents can run simulations" right**: exactly the feature that gates the Lab's own Run button |
+| `trace_explanation` | none (terminal) | `agent_proposals` only | read-only |
+
+Advanced analytics follow the same rule as capabilities land: when Phase C typed experiments (comparison/DOE/battery) reach `dispatchExperimentRun`, B4's spec vocabulary grows (`AGENT_EXPERIMENT_TYPES`, §9.5) and the rights column is unchanged — `simulation_lab` remains the gate, because the *operation* is the same operation.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Card (ProposalCard)
+    participant A as agent-apply (service role)
+    participant G as Existing gate (dispatch.ts)
+    U->>C: Approve experiment proposal
+    C->>A: POST apply {proposal_id, userId}
+    A->>A: status == approved? project owned? agent_apply? simulation_lab? quota ok?
+    alt any check fails
+        A-->>C: apply_error (typed, fail closed) — nothing dispatched
+    else all pass
+        A->>G: dispatchExperimentRun (validation gate, snapshot, credibility stamp, enqueue)
+        G-->>A: run_id
+        A-->>C: applied {run_id} — run visible in /simulation-lab like any other
+    end
+```
+
+### 13.4 Quotas (agents cannot amplify cost)
+
+Reusing the shapes that exist: LLM spend is already bounded per user/org by `ai_budgets` (checkpoint 1). Compute is bounded at apply for `experiment_spec`: max **3 concurrent** queued/running agent-applied runs per user per project and **10 per day** per project (DEFAULT; counted on `simulation_runs` rows joined through `proposals.applied_result→run_id`), beneath whatever org-level compute quotas the public-api workstream sets (its §7.2 table remains the superset authority). Exceeding ⇒ `apply_error: quota_exceeded` (added to the §4.4 apply-time code set) with the human-readable remaining allowance.
+
+### 13.5 Identity honesty (unchanged, restated)
+
+These checks resolve grants for the **asserted** `userId` — the platform-wide Layer A trust model (§8 T4). They are real authorization (a user with a weaker role genuinely cannot make an agent mutate or dispatch), while the *authentication* hardening remains the public-api workstream's Q2; Stage 1b (agent-created projects) still cannot ship before resolved principals (§10 Q2, G16). Nothing in this section pretends otherwise.
+
+---
+
+## 14. Memory architecture and chat organization *(added v1.1)*
+
+Pillar 04 (§12.1) made concrete. Design constraint first: the platform law says agents are **stateless per task, context from project artifacts, not chat memory**. Memory therefore enters this system only one way: **as first-class, user-visible, provenance-cited artifacts that a deterministic context builder chooses to read** — never as hidden state accreted inside a model or a framework. Three tiers:
+
+| Tier | Name | Lives in | Written by | Read by |
+|---|---|---|---|---|
+| M-1 | **Working context** | per-request context builders (§5 budgets) | deterministic builders | the one agent/persona turn |
+| M-2 | **Conversational memory** | `chat_threads` / `chat_messages` / rolling summaries (server-side, §14.1) | the chat surface itself | personas (history window + summary); agents only via explicit `user_message` citations |
+| M-3 | **Project memory** | `project_memory` (§14.4) | user-consented writes only | personas and agents via `get_project_memory` |
+
+### 14.1 Server-side chat store (replaces localStorage as source of truth)
+
+Today threads live in `localStorage` (§2.4) — invisible across devices, unsearchable, un-organizable, and lost with the browser profile. Stage M0 moves them server-side; the localStorage layer becomes a cache. Migration: `supabase/migrations/20260717000001_chat_store.sql`:
+
+```sql
+CREATE TABLE IF NOT EXISTS public.chat_folders (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL,
+  name       text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
+  position   integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS public.chat_threads (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL,
+  folder_id     uuid REFERENCES public.chat_folders(id) ON DELETE SET NULL,
+  project_id    uuid REFERENCES public.projects(id) ON DELETE SET NULL,
+  persona_id    text,                          -- 'risk-analyst' | ... | null
+  title         text NOT NULL DEFAULT 'New chat' CHECK (char_length(title) <= 120),
+  pinned        boolean NOT NULL DEFAULT false,
+  archived      boolean NOT NULL DEFAULT false,
+  -- rolling summary (§14.3): covers messages [1 .. summary_upto_seq]
+  summary            text CHECK (char_length(summary) <= 4000),
+  summary_upto_seq   integer NOT NULL DEFAULT 0,
+  last_message_at    timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS chat_threads_user_recent
+  ON public.chat_threads (user_id, archived, pinned DESC, last_message_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id   uuid NOT NULL REFERENCES public.chat_threads(id) ON DELETE CASCADE,
+  seq         integer NOT NULL,                -- 1-based, dense per thread
+  role        text NOT NULL CHECK (role IN ('user','assistant')),
+  content     text NOT NULL CHECK (char_length(content) <= 32000),
+  parts       jsonb NOT NULL DEFAULT '[]'::jsonb,   -- the ChatPart[] the UI renders
+  tool_calls  jsonb NOT NULL DEFAULT '[]'::jsonb,
+  proposal_id uuid REFERENCES public.proposals(id) ON DELETE SET NULL,
+  model_code  text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (thread_id, seq),
+  -- full-text search vector (§14.5) — default retrieval, no new model needed
+  fts tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
+);
+CREATE INDEX IF NOT EXISTS chat_messages_fts ON public.chat_messages USING gin (fts);
+```
+
+Access posture (consistent with the app's custom auth): tables carry RLS with owner-read policies (`user_id = public.get_current_user_id()` for folders/threads; messages via their thread), and **all writes go through SECURITY DEFINER RPCs**: `upsert_chat_thread`, `append_chat_message` (assigns `seq`, stamps `last_message_at`, enforces the 32 KB content cap), `move_chat_thread(p_thread_id, p_folder_id)`, `set_thread_flags(p_thread_id, p_pinned, p_archived)`, `create_chat_folder`, `delete_chat_thread` (hard delete, cascades messages — the user's right to erase their history), `import_local_threads(p_threads jsonb)` (the one-time §14.7 migration), `search_chat_messages(p_query, p_project_id?)` (FTS, owner-scoped, ≤ 50 hits). Signatures are contracts; bodies follow the §4.1 RPC idiom.
+
+### 14.2 Folder arrangement — the organizing rules (deterministic UX contract)
+
+The sidebar (`ChatSidebar.tsx`, extended in Stage M0) renders exactly this hierarchy, in this order:
+
+1. **Quick chat** — the permanent scratch thread (today's `QUICK_THREAD_ID` behavior preserved).
+2. **Pinned** — pinned threads across all folders, `last_message_at` desc.
+3. **By project (automatic)** — one virtual group per project the user's threads reference, labeled with the project name; threads inside sorted `last_message_at` desc. Virtual = derived from `chat_threads.project_id`; attaching a project to a thread (the existing + button) *is* the filing action — zero user effort for the common case.
+4. **My folders (manual)** — user-created `chat_folders` (`position` asc), for cross-project groupings ("Q3 stress review", "Board prep"). A thread shows under its folder *and* its project group; both are views over the same row, so nothing is ever "in two places" in storage.
+5. **Archive** — `archived = true`, collapsed by default; searchable, excluded from routing context.
+
+Search is global (FTS across the user's own messages, filterable by project) with results deep-linking to the thread anchored at the hit message. Retention: threads are the user's — no automatic deletion (DEFAULT); org-level retention policy is a §10 Q18 knob.
+
+### 14.3 Longer memory in-conversation: rolling summaries
+
+The 8-turn window (§2.2) stays the token-cost spine; continuity beyond it comes from a **rolling summary** maintained per thread:
+
+- **Trigger:** after an assistant reply, if `max_seq − summary_upto_seq ≥ 24` (DEFAULT), the server queues a summary refresh (fire-and-forget, like `logAiUsage`).
+- **Computation:** one LLM call (the thread's current model, temperature 0, ≤ 800 output tokens) over `messages[summary_upto_seq+1 .. max_seq−8]` prepended by the previous summary, using this verbatim template:
+
+```
+Update the running summary of this supply-chain conversation.
+Keep: decisions made, entities discussed (ids verbatim), numbers the user
+stated, open questions, and what the user is trying to achieve.
+Drop: pleasantries, superseded drafts, tool mechanics.
+Write <= 300 words, plain prose, no headers. Do not invent anything not in
+the transcript.
+
+PREVIOUS SUMMARY:
+{{previous_summary_or_"(none)"}}
+
+NEW MESSAGES:
+{{messages_block}}
+```
+
+- **Consumption:** `buildSystemPrompt` gains one optional block — `CONVERSATION SUMMARY (older context): {{summary}}` — injected for persona turns when a summary exists. **Agents do not receive it** (statelessness law): an artifact agent sees only the routed utterance + artifacts; if older conversation content matters to a draft, the router's `artifact_part` carries it or the user restates it — the summary never smuggles unvetted context into a proposal.
+- **Integrity:** the summary is stored, visible in a thread-info panel ("What the assistant remembers about this conversation"), and user-deletable (delete ⇒ `summary = NULL`, `summary_upto_seq = 0`). Summaries are conversation *recall*, never a source of factual claims — the `AGENT_COMMON`/data rules still require tool-grounded facts.
+
+### 14.4 Project memory (M-3): knowledge that outlives the thread
+
+`supabase/migrations/20260717000002_project_memory.sql`:
+
+```sql
+CREATE TABLE IF NOT EXISTS public.project_memory (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id  uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  kind        text NOT NULL CHECK (kind IN ('fact','preference','decision')),
+  content     text NOT NULL CHECK (char_length(content) <= 500),
+  citations   jsonb NOT NULL DEFAULT '[]'::jsonb,   -- §4.3 shape; source thread/message or artifact
+  grounding   jsonb NOT NULL DEFAULT '{}'::jsonb,   -- optional {policy_hash, graph_hash} for staleness display
+  status      text NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+  created_by  uuid,
+  source_thread_id uuid,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS project_memory_active
+  ON public.project_memory (project_id, status, created_at DESC);
+```
+
+- **Write policy — consent-only, the industrial-trust adaptation of extracted-memory systems (§12.2):** a memory row is created only when (a) the user says so ("remember that S3 is our strategic supplier"), or (b) the user accepts a **memory chip** the persona offers after a decision-shaped exchange ("Save this for the project? [Save] [Dismiss]"). The model never writes memory silently. Writes go through `save_project_memory(p_project_id, p_kind, p_content, p_citations, p_source_thread_id, p_user_id)`; archive via `archive_project_memory(p_id)`. Cap: 200 active memories per project (DEFAULT; oldest-archive prompt beyond it).
+- **Read path:** a new registered read tool `get_project_memory` — parameters `{ kind?: "fact"|"preference"|"decision", limit?: 1..50 (default 20) }`, returns kind `table` cols `[kind, content, created_at]`, project-scoped like every tool — available to **all personas and all agents** (it reads user-approved, citable artifacts, so the statelessness law is satisfied: this *is* a project artifact). Context builders append active memories under a fixed budget (≤ 8 KB, newest-first truncation).
+- **Visibility:** a "Project memory" panel in the Project Intelligence sidebar lists, edits (edit = archive + new row, A5 discipline), and archives entries — the user always sees exactly what the system remembers, per entry, with its source link. Memories carrying `grounding` hashes render a `stale` chip when hashes drift (display-only; stale memories are still shown to the model *with* the stale marker text).
+
+### 14.5 Retrieval and search
+
+Default (Stage M0): Postgres FTS (`chat_messages.fts`, `search_chat_messages`) + the structured reads that already exist — right-sized for operational text volumes and zero new model dependencies. Vector retrieval (pgvector + an embedding model from an **already-configured provider**) is deliberately deferred to §10 Q16: it adds a per-message embedding cost and a model dependency for a corpus that FTS serves well at current scale; the schema reserves nothing (adding an `embedding` column later is additive).
+
+### 14.6 Privacy, retention, and the §7.5 boundary — unchanged
+
+`chat_messages` stores conversation content **as product data owned by the user** (that is its purpose), with owner-scoped read policies and hard delete. The §7.5 telemetry rule is untouched: `ai_chat_events` still never carries message text — telemetry and history are different stores with different postures. Summaries and memories inherit the thread/project posture respectively. Provider exposure is unchanged (history already flows to the chosen model; summaries add one more bounded call under the same `ai_budgets`).
+
+### 14.7 Migration and staging (workstream M, parallel to agent stages)
+
+| Stage | Scope | Files | Flags | Exit criteria |
+|---|---|---|---|---|
+| **M0** (targets Stage 1 timeframe) | chat store DDL + RPCs; sidebar folders/pinned/archive/search; localStorage one-time import (`import_local_threads`, idempotent by thread id) then localStorage demoted to cache; `useChatThreads` rewritten over the store with optimistic writes | `20260717000001_chat_store.sql`, `src/hooks/useChatThreads.ts`, `src/components/intelligence/ChatSidebar.tsx`, `index.ts` (server appends assistant messages so history survives client crashes) | server `CHAT_STORE_ENABLED`; capability `chat_history_sync` (DEFAULT on where `ai_chat` is on) | threads visible cross-device; import verified lossless on seeded fixtures; flag off ⇒ localStorage behavior exactly |
+| **M1** | rolling summaries (§14.3) + thread-info panel | `index.ts` (summary queue), `providers.ts` (summary block), `20260717000001` already carries columns | `CHAT_SUMMARY_ENABLED` | summaries maintained at the 24/8 thresholds; deletable; persona answers reference >8-turn-old user statements in eval transcripts |
+| **M2** | `project_memory` + `get_project_memory` + memory chips + sidebar panel | `20260717000002_project_memory.sql`, `tools.ts` (tool registration), `draftTools.ts` context builders (+8 KB budget), UI panel | `PROJECT_MEMORY_ENABLED`; capability `project_memory` | consent-only writes verified by fixtures (no silent-write path exists); memories retrieved by both personas and agents in eval fixtures; stale chips render on hash drift |
+
+Golden-suite additions ride the existing harness: `eval/fixtures/memory/` (mm-01 summary-recall · mm-02 consent-required · mm-03 memory-cited-in-draft · mm-04 stale-memory-marked · mm-05 delete-erases · mm-06 injection-via-memory-content treated as data).
