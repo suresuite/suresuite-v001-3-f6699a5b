@@ -289,7 +289,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
       isCollapsed={isCollapsed}
       setIsCollapsed={setIsCollapsed}
       title={title}
-      description={subtitle as unknown as string}
+      description={subtitle}
       actions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setPreview((p) => !p)}>
