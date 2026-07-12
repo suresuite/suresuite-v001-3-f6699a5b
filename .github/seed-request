@@ -1,0 +1,9 @@
+# Touch this file (any content change) and push to seed "Project TRON - ver2"
+# through the app's own RPC lifecycle and verify the deployed pipeline on it
+# (see .github/workflows/seed-project.yml). The result log lands on the
+# seed-results branch: results/latest.log
+#
+# The user_email line below names the modeler who will OWN the project
+# (projects are organization-scoped — identity must be explicit).
+user_email=pnguyen@dmrg.ai
+request: 2026-07-12T00:00:00Z reason=initial-tron-ver2-seed

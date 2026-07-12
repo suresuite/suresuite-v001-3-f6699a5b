@@ -1,3 +1,3 @@
 # Touch this file (any content change) and push to deploy the sim-worker AND
 # the edge functions from the CURRENT ref (see ops-request.yml).
-request: 2026-07-09T13:05:00Z reason=ship-multilevel-bom-flattening
+request: 2026-07-12T00:00:00Z reason=ship-demand-bounds-mapping-for-tron-ver2
