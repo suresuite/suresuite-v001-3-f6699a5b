@@ -142,11 +142,11 @@ async function rpc(fn, args) {
   throw lastErr;
 }
 
-async function rpcBatched(fn, rows, argsOf) {
+async function rpcBatched(fn, rows, argsOf, batch = BATCH) {
   let total = 0;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const n = await rpc(fn, argsOf(rows.slice(i, i + BATCH)));
-    total += typeof n === "number" ? n : rows.slice(i, i + BATCH).length;
+  for (let i = 0; i < rows.length; i += batch) {
+    const n = await rpc(fn, argsOf(rows.slice(i, i + batch)));
+    total += typeof n === "number" ? n : rows.slice(i, i + batch).length;
   }
   return total;
 }
@@ -228,8 +228,11 @@ async function main() {
     (rows) => ({ p_rows: arcRows(rows, projectId), ...auth }))} row(s)`);
   console.log(`  inbound:  ${await rpcBatched("bulk_insert_inbound_logistics", ds.inbound,
     (rows) => ({ p_rows: arcRows(rows, projectId), ...auth }))} row(s)`);
+  // Outbound inserts have shown ~100× the per-row trigger cost of the other
+  // arc tables on the live DB (anon statement_timeout is 3s) — tiny batches
+  // keep each RPC statement safely under it while the root cause is fixed.
   console.log(`  outbound: ${await rpcBatched("bulk_insert_outbound_logistics", ds.outbound,
-    (rows) => ({ p_rows: arcRows(rows, projectId), ...auth }))} row(s)`);
+    (rows) => ({ p_rows: arcRows(rows, projectId), ...auth }), 5)} row(s)`);
 
   // 4) Combine into the supply-chain graph + rebuild node list.
   console.log("── combining + rebuilding node list");

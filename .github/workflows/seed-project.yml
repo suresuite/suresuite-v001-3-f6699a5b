@@ -156,6 +156,14 @@ jobs:
           q "project_id indexes" "select tablename, indexname from pg_indexes where tablename in ('inbound_logistics','outbound_logistics','bom_single_level','bom_multi_level','multi_tier_supply_chain') order by tablename, indexname"
           q "role timeouts" "select rolname, rolconfig from pg_roles where rolname in ('anon','authenticated','authenticator','postgres')"
           q "active sessions" "select pid, state, wait_event_type, wait_event, now()-xact_start as xact_age, left(query,120) as query from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid() order by xact_start"
+          # ALL live triggers on the arc tables — dashboard-created webhooks
+          # (pg_net) never appear in the repo's migrations, only here.
+          q "live triggers on arc tables" "select c.relname as tbl, t.tgname, p.proname from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_proc p on p.oid=t.tgfoid where c.relname in ('inbound_logistics','outbound_logistics','bom_single_level','multi_tier_supply_chain') and not t.tgisinternal order by c.relname, t.tgname"
+          # Per-trigger timing on a real single-row insert (Management API runs
+          # untimed as postgres): EXPLAIN ANALYZE names the slow trigger.
+          q "outbound insert trigger timing" "explain (analyze, buffers) insert into public.outbound_logistics (customer_id, product_id, volume, time_unit, expected_lead_time, unit_price, plant_name, project_id) select 'DIAG-CUST','DIAG-PROD',1,'week',1,1,p.plant_name,p.id from public.projects p where p.name='Project TRON - ver2' limit 1"
+          q "bom insert trigger timing (control)" "explain (analyze, buffers) insert into public.bom_single_level (product_id, material_id, consumption_rate, plant_name, project_id) select 'DIAG-PROD','DIAG-MAT',1,p.plant_name,p.id from public.projects p where p.name='Project TRON - ver2' limit 1"
+          q "cleanup diag rows" "with a as (delete from public.outbound_logistics where customer_id='DIAG-CUST' returning 1), b as (delete from public.bom_single_level where product_id='DIAG-PROD' returning 1) select (select count(*) from a) as outbound_removed, (select count(*) from b) as bom_removed"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         # tee'd into the published log via the seed step below
