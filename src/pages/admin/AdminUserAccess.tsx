@@ -456,12 +456,16 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+function Section({ title, badge, children }: { title: string; badge?: string; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
-      <div className="mb-3">
+    <section className="rounded-lg border border-border bg-card p-4 shadow-xs">
+      <div className="mb-3 flex items-center gap-2">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+        {badge && (
+          <Badge variant="secondary" className="text-[10px] font-medium">
+            {badge}
+          </Badge>
+        )}
       </div>
       {children}
     </section>
