@@ -14,6 +14,7 @@ import { StageRail } from "@/components/policies/StageRail";
 import { FocusedStage } from "@/components/policies/FocusedStage";
 import { GuidePanel } from "@/components/policies/GuidePanel";
 import { PolicyVersionBar } from "@/components/policies/PolicyVersionBar";
+import { VerifiableExportsSection } from "@/components/policies/VerifiableExportsSection";
 import { DataMapGrid } from "@/components/policies/DataMapGrid";
 import { TimeUnitBar } from "@/components/policies/TimeUnitBar";
 import type { StageKey } from "@/lib/policies/stages";
@@ -127,6 +128,12 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                   onExport={exportVersion}
                   onDelete={deleteVersion}
                   onUpdateNotes={updateVersionNotes}
+                  exportsSection={
+                    <VerifiableExportsSection
+                      projectId={projectId}
+                      projectName={selectedProject?.name ?? null}
+                    />
+                  }
                 />
                 <TimeUnitBar
                   projectId={projectId}

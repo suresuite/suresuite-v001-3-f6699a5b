@@ -174,6 +174,7 @@ Numbered gaps, each cited to evidence. Later sections reference these IDs; §13'
 | **G14a** | **The Run & Validate surface under-uses persisted evidence and dilutes it with synthetic content.** *(added with §9.5.1)* Only 5 of the ~20 per-replication KPIs the engine persists were offered as focal KPIs; the cost decomposition and financial view were never shown; pre-run panels rendered invented traces (a client-side PRNG) and a decorative topology animation next to real engine output | `src/components/policies/RunValidateStage.tsx` (KPI_OPTIONS, `simulateKpiTrace`, `MaterialFlowAnimated`) | The trust-building surface undersells the model and — worse — teaches users that some of what they see there is invented, so they discount the rest. §9.5.1 defines the fix; steps (1)+(2) shipped in Phase B0 |
 | **G15** | **No programmatic API or external access-control layer.** *(added with the API workstream)* The platform cannot be driven as software by external systems, and cannot be safely exposed as-is: `sim-command` authorizes by project-existence with the service role (`index.ts` — *"access control lives in that RPC layer, not here"*); identity is client-asserted (`set_current_user_context`); a single hardcoded anon key fronts all traffic (`src/integrations/supabase/client.ts`); no per-caller rate limits or compute quotas exist on the dispatch path | `supabase/functions/sim-command/index.ts`, `src/hooks/useAuth.tsx`, `src/integrations/supabase/client.ts` | Partners, CI jobs, and notebooks cannot integrate; exposing the current control plane directly would be an open door (spoofing, IDOR on `project_id`, cost amplification). `docs/design/public-api-and-access-control.md` defines the fix: a key-authenticated `/v1` gateway adding identity, scopes, tenancy, quotas, and audit in front of the existing operations |
 | **G16** | **An agent that creates or populates a project can leave it un-runnable or invisible by construction.** *(added with the agent run-readiness contract, §12)* Two failure modes observed while driving the project-creation RPC lifecycle as an agent: **(a) wrong-org invisibility** — a project's `organization` is stamped at create time from the *caller's* identity by the `set_project_defaults` trigger (`NEW.organization := get_current_user_org()`), and `list_projects` returns only rows where `organization = get_current_user_org()`; an agent acting under the wrong/ambiguous identity creates a project its intended owner cannot see. **(b) not run-ready** — masters + arcs + graph are *not* sufficient: the pre-run gate (`verifyProjectPolicies`, mirrored server-side by `grading.ts`) blocks unless the project also carries **persisted policy selections** — exactly one primary supplier per material, one primary sourcing firm per customer/product, and a planning time unit — written as `policy_overrides` via `bulk_upsert_policy_overrides`; arcs alone don't imply them, so a freshly-seeded project *loads* but fails "Run & Validate" (e.g. *"Customer/product C1::P1 has no primary sourcing firm"*) | `supabase/migrations/20250820163748_…` (`set_project_defaults`, `list_projects`, `get_current_user_org`), `src/lib/policies/verification.ts`, `supabase/functions/_shared/grading.ts` | Agents cannot be enabled to create/populate projects until "done" means the SAME pre-run gate a human passes, in the correct org. §12 defines the fix: an **agent run-readiness contract** binding org-correct stamping + a complete gate-passing dataset + self-verification through the app's own read paths, with agent identity resolved through the access-control layer (`docs/design/public-api-and-access-control.md` §5–§6), never a parallel agent-only path |
+| **G17** | **Run results are aggregate-only, non-exportable, and never reused.** *(added with the B0 follow-on trust-surface workstream)* Per-replication evidence exists in `run_replications` (per-rep KPIs, `seed_used`, four weekly series) but no figure could be filtered to a single seed; the version-history export (`usePolicies.exportVersion`) downloaded only the policy bundle and rendered unset fields with registry schema defaults — users mistake placeholders for real data; no export made the model (dataset) or its results verifiable outside the app; per-product/per-material weekly series never left the engine (the full-debug trace keeps them — `WeeklyTrace.D/Q/F/B/L/I_mat` — but the bridge exported only network-aggregate series); and identical runs were always recomputed on Fly — `policy_hash`/`graph_hash`/`scenario_hash` are stamped on every run (§8.4) yet were never queried for reuse (the run-identity read path of G10) | `src/components/policies/RunValidateStage.tsx`, `src/hooks/usePolicies.tsx::exportVersion`, `sim-worker/sim_worker/scsim_bridge.py`, `supabase/functions/_shared/dispatch.ts` | The persisted evidence stays under-used (G14a's residue): per-seed drill-down, external verification by a reviewer or an AI, and item-level inspection are impossible, and compute is wasted on identical re-runs. Closed by the four-part B0 follow-on workstream (§13); the reuse check is the first delivered slice of §9.2 |
 
 ### 2.4 Assumptions currently embedded in the simulation
 
@@ -660,6 +661,22 @@ The design brief's resource-efficiency requirement — *"do not spend a lot of c
 
 A **`run_cache`** consults the key before dispatch: an exact hit returns stored replication statistics instead of recomputing (the "someone already asked this" case — common in stress sweeps and in teams). A **partial hit** exploits the existing warm-state mechanism: `SnapshotStore` (A8) already keys snapshots by a family digest over network + settings + policies *excluding events* — precisely the reuse class stress testing needs. Battery cells and disruption scenarios that share a family resume from the warm state at the disruption week instead of re-simulating warm-up. §11.3 quantifies where this matters. Invalidation requires no bookkeeping: keys are content-addressed, so nothing is ever invalidated — superseded entries are simply never requested again (garbage-collected by age/usage).
 
+> **Implementation note (B0 follow-on, delivered): the cache's READ path.** The reuse-or-rerun
+> check at dispatch (G17) is the first slice of this design: before inserting the queued run,
+> the shared dispatcher (`supabase/functions/_shared/dispatch.ts` — one code path behind both
+> front doors, sim-command and `/v1`) looks up the newest **completed** run matching
+> `(policy_hash, graph_hash, scenario fingerprint hash)` with the seed spec and disruption
+> schedule guaranteed identical by requiring the scenario row unchanged since that run was
+> dispatched (the stamped `scenario_hash` is the events-excluded baseline fingerprint — the
+> row-unchanged guard closes exactly that gap until the events-included hash lands). A hit
+> answers **409 `reuse_available`** with the candidate (run id, finished-at, replication count,
+> engine `code_version`) — **never a silent skip: reuse is a user choice**. On reuse the client
+> surfaces the stored run without enqueuing; on re-run it re-dispatches with
+> `payload.force_rerun=true`. What remains for Phase C: the content-addressed `run_cache` store
+> keyed by the full RunKey (engine fingerprint included, so stale-engine candidates stop
+> relying on the user reading `code_version` in the prompt), cross-scenario/cross-project hits
+> on normalized `ProjectData` hashes (§8.4 refinement (a)), and warm-state partial hits.
+
 ### 9.3 Comparison semantics
 
 Two runs are *comparable* iff they are CRN-paired (same seed spec) and their RunKeys differ in **exactly one** component — different policies on the same world (policy evaluation), different graphs under the same policies (network redesign), different scenarios (disruption impact). The Compare UI enforces this: it is not a chart of two arbitrary runs, it is a paired experiment with valid statistics. This turns A7 from an engine property into a product guarantee.
@@ -973,6 +990,50 @@ Capability-level phases, not dated, not code-level. Each phase lists exit criter
 > `docs/project-onboarding-guide.md` (the generalized onboarding workflow),
 > `docs/ai-modeling-workflow.md` (the AI-assisted modeling workflow it seeds).
 
+**B0 follow-on — run-results trust surface completion (G17, delivered):**
+
+Extends B0's trust surface (§9.5.1: "persisted evidence that is not shown is trust left on
+the table") from *showing* the evidence to making it **addressable, exportable, inspectable,
+and reusable** — and pulls the first slice of Phase C's run-identity work (§9.2) forward.
+Four items, delivered together:
+
+1. **Per-seed filter on result figures** *(frontend only)* — `run_replications` already
+   carries `rep_index`/`seed_used`/per-rep KPIs/weekly series; the Run & Validate charts and
+   the Simulation Lab results dashboard gain a replication/seed selector
+   (`src/components/sim/ReplicationSeedExplorer.tsx`): default stays "all reps (mean + CI
+   band)", selecting a seed overlays or isolates that replication's weekly traces and shows
+   its KPI row against the cross-rep mean. No schema, worker, or engine changes.
+2. **Verifiable exports from Model version history** — three workbooks
+   (`src/lib/policies/verifiableExports.ts`, wired into the version-history sheet): (a) the
+   policy export gains per-cell **provenance** (values equal to the schema default are marked
+   as such — placeholders are no longer mistakable for data) and a `_meta` scope statement
+   ("policy snapshot only"); (b) a **dataset export** — the exact canonical rows of the six
+   engine-read tables that `graph_hash` was computed over (`dataset_versions.snapshot`),
+   stamped with the hash; (c) a **results export per run** — run metadata (the full
+   provenance triple, seed spec, complete `disruption_schedule`, `code_version`), aggregate
+   KPIs ± CI half-widths, one KPI row per `seed_used`, and one weeks×seeds sheet per
+   persisted weekly series. Purpose: externally verifiable data an AI reviewer can check
+   against the model.
+3. **Single-run inspection mode: per-item weekly series** — opt-in, exactly 1 replication
+   with a user-chosen seed; the mapper raises `trace_verbosity` to `full_debug`
+   (`ScenarioSettings.inspection`, warn-and-ignore for multi-rep), the engine exposes the
+   per-material on-hand/in-transit/orders and per-product demand/production/fulfillment/
+   backlog/lost-units matrices on `ScenarioResult.item_series` (ENGINE_VERSION 0.2.3, Tier 2,
+   behavior-neutral), and the bridge/worker persist them to the new `run_item_series` table
+   (sibling of `run_replications`, migration `20260720000001`; deliberately never populated
+   for multi-rep runs). A product/material picker
+   (`src/components/sim/ItemSeriesExplorer.tsx`) renders the chosen item's series in both
+   results surfaces. Browser/server parity held: the Pyodide path runs the same
+   `build_project_data → compute_run_from_project` pipeline and persists the same rows.
+4. **Reuse-or-rerun check at dispatch** — the §9.2 read-path slice; see the implementation
+   note in §9.2. Implemented in the shared dispatcher so all clients (browser + `/v1`)
+   benefit; never silent.
+
+**Exit (met):** a single-seed inspection run's per-material series render in the UI; the
+three exports round-trip against the committed reference dataset; the seed filter works on a
+30-replication baseline; a repeat dispatch of an identical run offers reuse. **Closes:** G17;
+first slice of G10/§9.2.
+
 **B1 — Catalog and bundles:**
 - v1 catalog (§5) implemented/activated: extended P-P.1 parameterization; unreachable policies (P-S.2, P-P.4, P-P.9) wired; new supplier/customer/transport slots; promoted defaults (P-P.0, P-F.x, P-C.4, P-S.5/6).
 - PolicyBundles: node-type default layer, per-node resolution, bundle-aware snapshots (§4.3); horizon lens in `/policies` (§4.1).
@@ -1150,4 +1211,4 @@ Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs
 
 **Glossary.** *PolicyBundle*: a node instance's resolved `{slot → (policy_id, params)}` map (§4.3). *Slot*: a decision domain a node role must fill (§4.4). *Promoted default*: an engine mechanic given a policy ID and UI visibility (`.0` convention). *Registry export*: the single JSON payload (`registry_export.py`) from which forms, validators, and docs are generated. *Required-data manifest*: the compiled set of entity fields the selected policies demand (§8.1). *RunKey*: content-addressed run identity (§9.2). *Family digest*: `SnapshotStore`'s hash over network+settings+policies excluding events (A8). *Dual reliability gate*: interval-width + novelty test that routes surrogate predictions back to simulation (§11.2). *Three-hash provenance*: `graph_hash` + `policy_hash` + `scenario_hash` binding every run (§8.4). *Validated model card*: the persisted V&V outcome (adopted warm-up, replication recommendation, validation verdict) bound to a provenance triple; Lab scenarios inherit it and runs display its status (§9.5).
 
-**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D. G13 unpersisted V&V outcomes → §9.5, Phase B0. G14a Run & Validate trust surface → §9.5.1, Phase B0. G15 API & access control → `docs/design/public-api-and-access-control.md`, API Phases 0–4 (§13 cross-cutting workstream). G16 agent run-readiness (agent-created projects org-visible + gate-green by construction) → §12 (run-readiness contract), Phase B; identity via `docs/design/public-api-and-access-control.md` §5–§6.
+**Gap index.** G1 lossy mapping → §3(E1), §5, §6.2, Phase B. G2 two engines → §3, Phases A–B. G3 unreachable policies → §5, Phase B. G4 item-master entry → §8.1–8.3, Phase A. G5 unversioned graph → §8.4, Phase A. G6 validation misalignment → §8.2, Phase A. G7 missing entities → §8.3, Phases B/E. G8 orphaned frontend → §9.1, Phase C. G9 unproductized engine riches → §9, Phase C. G10 no run caching → §9.2, Phase C. G11 narrow disruptions → §9.1, Phase C. G12 no surrogate layer → §11, Phase D. G13 unpersisted V&V outcomes → §9.5, Phase B0. G14a Run & Validate trust surface → §9.5.1, Phase B0. G15 API & access control → `docs/design/public-api-and-access-control.md`, API Phases 0–4 (§13 cross-cutting workstream). G16 agent run-readiness (agent-created projects org-visible + gate-green by construction) → §12 (run-readiness contract), Phase B; identity via `docs/design/public-api-and-access-control.md` §5–§6. G17 run results aggregate-only / non-exportable / never reused → §9.2 (implementation note), §9.5.1, §13 B0 follow-on workstream (delivered).

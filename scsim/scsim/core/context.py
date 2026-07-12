@@ -323,6 +323,11 @@ class WeeklyTrace:
     B: Optional[np.ndarray] = None
     L: Optional[np.ndarray] = None
     I_mat: Optional[np.ndarray] = None
+    # Per-material in-transit (pipeline content) and weekly purchase orders,
+    # aggregated over supplier links — the inspection-mode companions of
+    # I_mat (single-run inspection surface, platform blueprint §9.5.1/G17).
+    I_transit: Optional[np.ndarray] = None
+    O_mat: Optional[np.ndarray] = None
 
     def __post_init__(self) -> None:
         T = self.horizon
@@ -338,6 +343,8 @@ class WeeklyTrace:
             self.B = np.zeros((self.n_prods, T))
             self.L = np.zeros((self.n_prods, T))
             self.I_mat = np.zeros((self.n_mats, T))
+            self.I_transit = np.zeros((self.n_mats, T))
+            self.O_mat = np.zeros((self.n_mats, T))
 
 
 class WriteGuardError(RuntimeError):

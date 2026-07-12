@@ -50,6 +50,9 @@ interface Props {
   onDelete?: (versionId: string) => Promise<boolean>;
   /** 6.D — edit a version's free-text notes. */
   onUpdateNotes?: (versionId: string, notes: string) => Promise<void>;
+  /** W2/G17 — the dataset + run-results export controls rendered at the top
+   *  of the history sheet (the policy export stays per-version below). */
+  exportsSection?: React.ReactNode;
 }
 
 function formatWhen(iso: string) {
@@ -72,6 +75,7 @@ export function PolicyVersionBar({
   onExport,
   onDelete,
   onUpdateNotes,
+  exportsSection,
 }: Props) {
   const [saveOpen, setSaveOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -253,6 +257,7 @@ export function PolicyVersionBar({
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4 flex flex-col gap-2 overflow-y-auto max-h-[80vh]">
+            {exportsSection}
             {versions.length === 0 && (
               <p className="text-xs text-muted-foreground py-6 text-center">
                 No saved versions yet. Click "Save model version" to capture the current setup.

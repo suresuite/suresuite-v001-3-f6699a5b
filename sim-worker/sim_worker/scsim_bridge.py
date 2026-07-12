@@ -181,4 +181,25 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         }
         for i, row in enumerate(result.kpis)
     ]
+
+    # Single-run inspection surface (G17/§9.5.1): per-item weekly series rows,
+    # ready for the run_item_series persistence shape. Present ONLY when the
+    # engine produced them (trace full_debug + exactly 1 replication).
+    # getattr-guarded so an older engine wheel keeps working.
+    item_series = getattr(result, "item_series", None)
+    item_ids = getattr(result, "item_ids", None)
+    if item_series and item_ids:
+        rows_by_item: dict[tuple[str, str], dict[str, list]] = {}
+        for series_key, matrix in item_series.items():
+            kind, _, name = series_key.partition(".")
+            ids = item_ids.get(kind) or []
+            for idx, item_id in enumerate(ids):
+                if idx >= len(matrix):
+                    continue
+                bucket = rows_by_item.setdefault((kind, str(item_id)), {})
+                bucket[name] = [_finite(x, 5) for x in matrix[idx].tolist()]
+        out["item_series"] = [
+            {"kind": kind, "item_id": item_id, "series": series}
+            for (kind, item_id), series in sorted(rows_by_item.items())
+        ]
     return out

@@ -89,9 +89,16 @@ def _run(payload_json, on_rep=None):
         "warmup_at": r.get("warmup_at"),
     } for r in (kpis.get("replications") or [])]
 
+    # Inspection runs (G17/§9.5.1): per-item weekly series rows in the
+    # run_item_series persistence shape — empty for every multi-rep run.
+    item_rows = [{
+        "kind": r["kind"], "item_id": r["item_id"], "series": r.get("series", {}),
+    } for r in (kpis.get("item_series") or [])]
+
     return json.dumps({
         "engine_version": kpis.get("engine_version"),
         "run_update": run_update, "replications": reps,
+        "item_series": item_rows,
     })
 `;
 
