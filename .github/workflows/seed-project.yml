@@ -137,6 +137,38 @@ jobs:
       # Read-only DB facts so a slow/failed seed is diagnosable from the log:
       # dataset-table sizes, project_id indexes, role timeouts, and any
       # in-flight sessions that could hold locks on the arc tables.
+      # G16 "wrong-org invisibility" self-heal: list_projects filters by
+      # projects.organization = get_current_user_org() (the owner's CURRENT
+      # approved_users.organization). If the owner's org was renamed/changed
+      # after the project was stamped, the project silently drops out of the
+      # owner's own list — and the seeder's create-or-reuse resolve then hits
+      # the (modeler_id, plant_name, name) unique key with a 409 (observed
+      # 2026-07-12, run 29214103179). Diagnose the two org values, then
+      # re-stamp the project to its OWNER's current org — the same value
+      # set_project_defaults would stamp if the project were created today.
+      # Scoped strictly to this project name + this modeler's email.
+      - name: Org-visibility diagnosis + repair (G16)
+        run: |
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+          EMAIL="${{ steps.params.outputs.user_email }}"
+          q() {
+            printf '── %s\n' "$1"
+            node -e '
+              const [ref, token, sql] = process.argv.slice(1);
+              fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ query: sql }),
+              }).then(async (r) => console.log(JSON.stringify(await r.json())))
+                .catch((e) => console.log("query failed:", e.message));
+            ' "$REF" "$SUPABASE_ACCESS_TOKEN" "$2"
+          }
+          q "project org vs owner org (before)" "select p.id, p.name, p.organization as project_org, au.organization as owner_org, au.email as owner_email from public.projects p join public.approved_users au on au.id = p.modeler_id where p.name = 'Project TRON - ver2' and lower(au.email) = lower('$EMAIL')"
+          q "repair (re-stamp project to owner's current org)" "update public.projects p set organization = au.organization, updated_at = now() from public.approved_users au where au.id = p.modeler_id and p.name = 'Project TRON - ver2' and lower(au.email) = lower('$EMAIL') and p.organization is distinct from au.organization returning p.id, p.organization as project_org_now"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true
+
       - name: Database diagnostics (read-only)
         run: |
           REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
