@@ -17,7 +17,7 @@ interface AdminLayoutProps {
   isCollapsed: boolean;
   setIsCollapsed: (v: boolean) => void;
   title: string;
-  description?: string;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }
@@ -48,7 +48,7 @@ export function AdminLayout({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
             {description && (
-              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+              <div className="mt-1 text-sm text-muted-foreground">{description}</div>
             )}
           </div>
           {actions}

@@ -31,6 +31,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Loader2, Plus, SlidersHorizontal } from 'lucide-react';
+import { TableEmpty } from '@/components/shared/TableEmpty';
 import { toast } from 'sonner';
 
 interface Props {
@@ -130,7 +131,6 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       isCollapsed={isCollapsed}
       setIsCollapsed={setIsCollapsed}
       title="Users"
-      description="Every account across every organization. Click a person (or their Access button) to control that individual user's pages, features, AI models & budget."
       actions={
         <div className="flex items-center gap-2">
           <Input
@@ -169,11 +169,17 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                  No users match.
-                </TableCell>
-              </TableRow>
+              <TableEmpty
+                colSpan={9}
+                message={q ? 'No users match these filters.' : 'No users yet.'}
+                action={
+                  q ? (
+                    <Button variant="ghost" size="sm" onClick={() => setQ('')}>
+                      Clear search
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               filtered.map((r) => {
                 const budget = r.monthly_budget_usd ?? null;

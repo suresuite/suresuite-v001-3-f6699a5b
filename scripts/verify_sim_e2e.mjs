@@ -267,6 +267,15 @@ if (run?.status === "done") {
     ? pass(`code_version ${cv} (scsim engine, not legacy/stub)`)
     : fail(`code_version '${cv}' — expected scsim-*`);
 
+  // Optional exact-version pin: proves the worker runs the engine at THIS
+  // ref (a stale worker silently ignores newly added mapping fields).
+  const expected = process.env.EXPECTED_CODE_VERSION || "";
+  if (expected) {
+    cv === expected
+      ? pass(`code_version matches this ref (${expected})`)
+      : fail(`code_version ${cv} != expected ${expected} — worker not redeployed with this engine`);
+  }
+
   run.rep_count_done === REPLICATIONS
     ? pass(`rep_count_done ${run.rep_count_done} == requested ${REPLICATIONS}`)
     : fail(`rep_count_done ${run.rep_count_done} != requested ${REPLICATIONS}`);

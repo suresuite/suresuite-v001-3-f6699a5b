@@ -158,6 +158,8 @@ export function useDataMap(projectId: string | null | undefined) {
       product_fulfillment_mode: masterField(prods, "fulfillment_mode", { status: "default", detail: "project supply-chain model (MTS/MTO)" }),
       product_demand_distribution: masterField(prods, "demand_distribution", { status: "default", detail: "triangular" }),
       product_demand_cv: masterField(prods, "demand_cv", { status: "default", detail: "0.30" }),
+      product_demand_min: masterField(prods, "demand_min", { status: "default", detail: "demand_mean·(1−cv)" }),
+      product_demand_max: masterField(prods, "demand_max", { status: "default", detail: "demand_mean·(1+cv)" }),
       supplier_capacity:
         sups.length === 0
           ? { status: "missing", detail: "no rows yet" }

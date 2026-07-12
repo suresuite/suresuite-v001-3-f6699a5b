@@ -41,7 +41,7 @@ interface NavbarProps {
 const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
   {
     items: [
-      { to: "/", icon: Home, label: "Getting Started", tooltip: "Getting Started" },
+      { to: "/app", icon: Home, label: "Getting Started", tooltip: "Getting Started" },
       {
         to: "/project-manager",
         icon: Database,

@@ -30,13 +30,13 @@ jobs:
       # repaired, made every `db push` abort — which silently left all later
       # migrations (incl. the simulation_runs/run_replications anon grants) unapplied.
       # 20260711000004 repeats the pattern: policy_version_notes_delete was applied to
-      # the remote under that version from its feature branch, then merged to main
-      # renumbered as 20260711000001 — which COLLIDED with api_access_control's version
-      # (schema_migrations' PK is the bare version), so pushing it could never succeed.
-      # The file now lives at 20260711000005. 20260712000001 is the same story again:
-      # product_demand_bounds was applied from its feature branch under a version that
-      # admin_project_management also used (that file now lives at 20260712000002).
-      # All of these migrations are idempotent DDL, so reverting them here is safe —
+      # the remote under that version from its feature branch; the file now lives at
+      # 20260711000005 (both versions are recorded remotely — only the file-less
+      # 20260711000004 needs reverting). 20260712000001 (product_demand_bounds) and
+      # 20260712000002 (admin_project_management) both have local files again after
+      # the TRON-ver2 merge, so they are NOT in the revert list — recorded versions
+      # with matching local files are simply skipped by db push.
+      # All of these migrations are idempotent DDL, so reverting here is safe —
       # worst case they re-apply as no-ops when their branch merges.
       - name: Repair remote migration history
         run: |
@@ -79,8 +79,8 @@ jobs:
             20250917094432 20250918111400 20250919023824 20250919092145 20250919092203 \
             20250919092719 20250919125030 20250921084858 20250923102619 20250923103122 \
             20250923105655 20250923120307 20250924125121 20250925030727 20250925034018 \
-            20250925044453 20260527011426 20260610000003 20260704000001 20260711000004 \
-            20260712000001
+            20250925044453 20260527011426 20260610000003 20260704000001 \
+            20260711000004
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 

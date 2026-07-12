@@ -99,18 +99,48 @@ def test_run_from_project_streams_each_replication():
     assert [d for _, d, _ in streamed] == [1, 2, 3]
     assert all(t == 3 for _, _, t in streamed)
     assert len(out["replications"]) == 3
-    import math
 
     for (rep, done, _), final in zip(streamed, out["replications"]):
         assert rep["rep_index"] == done - 1 == final["rep_index"]
         assert rep["seed_used"] == final["seed_used"]
         assert set(rep["kpis"]) == set(final["kpis"])
-        for k, v in rep["kpis"].items():  # NaN-aware: inert KPIs report NaN
-            fv = final["kpis"][k]
-            assert v == fv or (math.isnan(v) and math.isnan(fv))
+        for k, v in rep["kpis"].items():  # engine NaN sentinels arrive as None
+            assert v == final["kpis"][k]
         assert rep["time_series"]["fill_rate"] == final["time_series"]["fill_rate"]
         # warmup is only known at run end — the final upsert fills it in.
         assert rep["warmup_at"] is None
+
+
+def test_replication_payloads_are_strict_json():
+    """The engine reports unmeasured KPIs as NaN (e.g. capacity_utilization
+    without full-debug matrices); json.dumps would emit a literal NaN token —
+    invalid JSON that PostgREST rejects, silently dropping every
+    run_replications upsert. The bridge must map non-finite floats to None so
+    every persisted payload is strict-JSON round-trippable."""
+    import json
+    import math
+
+    from sim_worker.scsim_bridge import compute_run_from_project
+
+    streamed: list[dict] = []
+    out = compute_run_from_project(
+        _project_data(replications=2),
+        on_replication=lambda rep, done, total: streamed.append(rep),
+    )
+
+    def assert_strict(payload):
+        s = json.dumps(payload, allow_nan=False)  # raises on NaN/inf
+        json.loads(s)
+
+    for rep in streamed + out["replications"]:
+        assert_strict(rep["kpis"])
+        assert_strict(rep["time_series"])
+    # sentinel KPIs survive as None, not NaN
+    for rep in out["replications"]:
+        for v in rep["kpis"].values():
+            assert v is None or math.isfinite(v)
+    # the aggregate broadcast shape is strict-JSON too
+    assert_strict({k: v for k, v in out.items() if k != "replications"})
 
 
 def test_run_from_project_observer_errors_do_not_break_the_run():

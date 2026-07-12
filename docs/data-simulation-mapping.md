@@ -89,6 +89,7 @@ the cheapest `unit_price` wins, ties broken by shortest lead time ⚠.
 ### Product — from `products` master, else outbound/policy
 | `unit_price` u_p | `products.sell_price` → **demand-weighted average** of `outbound_logistics.unit_price` → 1.0 ⚠ | weighted by weekly volume |
 | `demand_mode` b_p | `products.demand_mean` → Σ weekly outbound volume → 0 ⚠ | normalize all units |
+| `demand_min` a_p / `demand_max` c_p | `products.demand_min` / `products.demand_max` (explicit bounds, e.g. historical max) → derived from `demand_mean ± demand_cv` | triangular only; inconsistent bound (a>b or c<b) clamps to the mode ⚠ |
 | `demand_model` (+params) | `scenarios.demand_model.kind` → `products.demand_distribution` → triangular | see §5 |
 | `production_capacity` O_p | `products.production_capacity` → policy `capacity_units_per_day`×7×util → max(2·demand,1000) ⚠ | units/week |
 | `fulfillment_mode` | `products.fulfillment_mode` → `projects.supply_chain_model` → mto | MTS/MTO/ATO |
@@ -119,7 +120,7 @@ the cheapest `unit_price` wins, ties broken by shortest lead time ⚠.
 
 | kind | scsim | params |
 |---|---|---|
-| triangular / triangular_av | `triangular` | `triangularAV(mean, cv)` → (mean·(1−cv), mean, mean·(1+cv)) |
+| triangular / triangular_av | `triangular` | `triangularAV(mean, cv)` → (mean·(1−cv), mean, mean·(1+cv)); explicit `products.demand_min`/`demand_max` override the derived bounds (asymmetric empirical distributions — b = historical median, c = historical max) |
 | deterministic | `deterministic` | `demand_mode = mean` |
 | poisson | `poisson` | λ = mean |
 | negbin | `negbin` | `demand_mode = mean`, `negbin_dispersion = mean²/((cv·mean)²−mean)` |

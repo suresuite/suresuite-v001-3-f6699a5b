@@ -115,6 +115,7 @@ def build_project_data(
                 fulfillment_mode=r.get("fulfillment_mode"),
                 demand_distribution=r.get("demand_distribution"),
                 demand_mean=_num(r.get("demand_mean")), demand_cv=_num(r.get("demand_cv")),
+                demand_min=_num(r.get("demand_min")), demand_max=_num(r.get("demand_max")),
             )
             for r in products if r.get("product_id")
         ],

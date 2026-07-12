@@ -43,6 +43,8 @@ export type StatusKey =
   | "product_fulfillment_mode"
   | "product_demand_distribution"
   | "product_demand_cv"
+  | "product_demand_min"
+  | "product_demand_max"
   | "supplier_capacity"
   | "supplier_reliability"
   | "name"; // display-only
@@ -125,6 +127,8 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "products", field: "fulfillment_mode", engineField: "Product.fulfillment_mode", chain: "master → projects.supply_chain_model → mto", statusKey: "product_fulfillment_mode" },
   { dataset: "products", field: "demand_distribution", engineField: "Product.demand_model", chain: "scenario demand_model.kind → master → triangular", statusKey: "product_demand_distribution" },
   { dataset: "products", field: "demand_cv", engineField: "demand variability", chain: "master → scenario demand_model.cv → 0.30", statusKey: "product_demand_cv" },
+  { dataset: "products", field: "demand_min", engineField: "Product.demand_min (a_p)", chain: "master (explicit bound) → demand_mean·(1−cv)", statusKey: "product_demand_min" },
+  { dataset: "products", field: "demand_max", engineField: "Product.demand_max (c_p)", chain: "master (explicit bound, e.g. historical max) → demand_mean·(1+cv)", statusKey: "product_demand_max" },
   // ── suppliers master ───────────────────────────────────────────────────
   { dataset: "suppliers", field: "name", engineField: "Supplier.name", chain: "display only → id", statusKey: "name" },
   { dataset: "suppliers", field: "capacity_per_week", engineField: "Supplier.capacity_per_week", chain: "master → unlimited (empty is a valid choice; finite enables capacity cuts)", statusKey: "supplier_capacity" },
