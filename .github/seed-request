@@ -12,3 +12,4 @@ request: 2026-07-12T05:00:00Z reason=reseed-after-nan-persistence-fix
 request: 2026-07-12T05:40:00Z reason=reseed-after-arc-write-performance-migration
 request: 2026-07-12T08:30:00Z reason=reseed-with-orphan-repair-trigger-diagnostics-small-outbound-batches
 request: 2026-07-12T08:45:00Z reason=reseed-orphan-repair-cron-diag-live-blocker-dump
+request: 2026-07-12T09:00:00Z reason=reseed-after-metrics-check-performance-fix
