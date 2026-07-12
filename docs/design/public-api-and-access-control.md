@@ -70,7 +70,7 @@ An honest assessment, grounded in the code, because the security plan is only as
 
 ### 2.2 The one-sentence conclusion
 
-**Exposing today's control plane as an API — anon key + client-asserted identity + "project exists" authorization + no quotas — *is* the "getting hacked" scenario.** The API therefore needs its own identity (API keys), its own authorization (tenant/project scopes enforced at the edge), and its own quotas — layered *in front of* the existing operations, which stay unchanged.
+**Exposing today's control plane as an API — anon key + client-asserted identity + "project exists" authorization + no quotas — *is* the "getting hacked" scenario.** The API therefore needs its own identity (API keys), its own authorization (tenant/project scopes enforced at the edge), and its own quotas — layered *in front of* the existing operations, which stay unchanged. The same client-asserted-identity flaw is the reason an **agent** (blueprint §12) must resolve its identity through this layer and never assert `p_user_id`/`p_user_email`: an agent stamping a project's org from asserted identity is how a project ends up in the wrong tenant, invisible to its owner (blueprint gap G16, contract in §6.4).
 
 ### 2.3 What we can reuse (the good news)
 
@@ -153,7 +153,7 @@ flowchart LR
 
 ### 5.1 Credential model
 
-API keys are the v1 credential. They are **independent of the `approved_users` login** — issued to a principal (a user and/or an org), never derived from a browser session.
+API keys are the v1 credential. They are **independent of the `approved_users` login** — issued to a principal (a user and/or an org), never derived from a browser session. **A service-principal *agent* (blueprint §12 roster) is one such principal:** it holds its own org-anchored, narrowly-scoped key, so an agent's identity — and therefore the org its created projects inherit and are visible under — is resolved here, not asserted (§6.4).
 
 Key string format (shown to the caller **once**, at creation):
 
@@ -247,6 +247,23 @@ Tenancy reuses `organizations` / `projects.organization_id` directly — no new 
 - **Edge:** scope + tenancy (above).
 - **DB:** new `api_*` RPCs are SECURITY DEFINER but take the resolved `org_id` and re-verify project ownership; they never accept a caller-asserted user_id (the `set_current_user_context` anti-pattern is *not* reachable from the API path).
 - **RLS backstop:** tables keep RLS on; the gateway's service-role delegation is deliberate and audited, not a blanket bypass — reads that *can* be expressed under RLS use the anon/authenticated role scoped to the resolved org where feasible.
+
+### 6.4 Agent principals and project tenancy
+
+*(added with the blueprint's agent run-readiness contract — `next-gen-platform-design.md` §12, gap G16.)*
+
+The five-agent roster (blueprint §12) is not a new trust model: **an agent is just another principal driving the platform's existing operations, and it resolves to a real `(principal, org, project, scope)` through this access-control layer — never through free-form asserted identity.** This is the load-bearing link between "who the agent is" and "which project it creates," and it is what makes an agent-created project *visible to its intended owner* rather than stranded in the wrong tenant.
+
+**Two principal shapes, one resolution path:**
+
+- **On behalf of a user (delegated).** The agent runs inside a user's authenticated context and acts with that user's org and scopes — the same `(principal, org)` the user would act under directly. The agent's writes are the user's writes, gated identically.
+- **As a service principal.** The agent is issued its own API key (§5) anchored to a specific `org_id`, with the narrowest `scopes[]` its task needs (e.g. A1 Data Steward: `write:data`; A2 Policy Configurator: `write:policies`, `write:runs` only if it also dispatches) and, where possible, a restricted `project_ids[]`. It is a first-class key holder, minted, rotatable, and revocable like any other.
+
+Either way, **the org the agent acts in is the org its created project inherits.** Project creation flows through the same lifecycle RPC a human uses, whose `set_project_defaults` trigger stamps `organization := get_current_user_org()` from the *resolving* identity at create time; and `list_projects` returns only rows where `organization = get_current_user_org()`. So the identity the access-control layer resolves for the agent **is** the identity that governs its project's visibility. An agent that asserted `p_user_id`/`p_user_email` free-form (the §2.1 anti-pattern) could stamp — and then fail to see — a project in an unintended org; the API path forbids exactly this (§6.3), which is why agents must ride it.
+
+**`api_can_access_project` gates every agent read and write.** Each agent operation naming a `project_id` passes the same tenancy check as any API request (§6.2): `project.organization_id == key.org_id AND (key.project_ids IS NULL OR project_id = ANY(key.project_ids))`, enforced at the edge and re-verified in the DB. An agent therefore cannot read or mutate a project outside its resolved tenancy — the same wall that stops one org's key from touching another org's data. Newly created projects fall under the key's org by construction (the stamping above), so the agent that created a project can immediately self-verify it via `list_projects` and read it back through `api_can_access_project` — the exact trail the run-readiness contract requires (§12).
+
+**No privileged path, fully attributed.** Agents add no new write surface: they create, seed, and configure through the same RPC lifecycle, the same required-data/pre-run gates, and the same `bulk_upsert_policy_overrides` the UI uses. Every agent write is audited to its resolving principal via `api_request_logs` (§11) and, for key lifecycle, `admin_audit_logs` (§7-adjacent) — reusing the existing audit fabric, no agent-specific provenance store. This is the access-control realization of the blueprint's guardrail that "every agent tool surface is a subset of the platform's existing public interfaces."
 
 ---
 
