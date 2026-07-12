@@ -26,6 +26,8 @@ import DeveloperApi from './pages/DeveloperApi';
 import Forbidden from './pages/Forbidden';
 import DocsLayout from '@/components/docs/DocsLayout';
 import HelpPage from './pages/help/HelpPage';
+import Landing from './pages/Landing';
+import { PageLayout } from '@/components/shared/PageLayout';
 import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -53,8 +55,9 @@ function App() {
               <Routes>
                 <Route path="/auth" element={<Auth />} />
               <Route path="/forbidden" element={<Forbidden />} />
+                <Route path="/" element={<Landing />} />
                 <Route
-                  path="/"
+                  path="/app"
                   element={
                     <ProtectedRoute>
                     <RoleGuard><GettingStarted 
@@ -162,7 +165,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                <Route path="/help" element={<DocsLayout />}>
+                <Route
+                  path="/help"
+                  element={
+                    <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+                      <DocsLayout />
+                    </PageLayout>
+                  }
+                >
                   <Route index element={<HelpPage slug="overview" />} />
                   <Route path=":slug" element={<HelpPage />} />
                 </Route>
