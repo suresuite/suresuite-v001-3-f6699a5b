@@ -70,11 +70,13 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
     setLoading(true);
     const [usage, orgRes] = await Promise.all([
       db.from('v_admin_user_usage').select('*').order('mtd_cost_usd', { ascending: false }),
-      db.from('organizations').select('id,name').order('name'),
+      // RPC instead of a direct read: RLS hides organizations from the
+      // context-less anon connection the browser uses.
+      db.rpc('admin_list_organizations', actorArgs()),
     ]);
     if (usage.error) toast.error(usage.error.message);
     setRows((usage.data ?? []) as Row[]);
-    setOrgs((orgRes.data ?? []) as OrgOption[]);
+    setOrgs(((orgRes.data ?? []) as any[]).map((o) => ({ id: o.id, name: o.name })));
     setLoading(false);
   };
 
