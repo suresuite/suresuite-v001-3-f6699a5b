@@ -289,9 +289,9 @@ export default function DocsLayout() {
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col bg-background text-foreground">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 h-14 border-b bg-background/95 backdrop-blur flex items-center gap-3 px-4">
+      <header className="sticky top-0 z-30 h-12 border-b bg-background/95 backdrop-blur flex items-center gap-3 px-4">
         <Button
           variant="ghost"
           size="icon"
@@ -301,9 +301,9 @@ export default function DocsLayout() {
         >
           {navOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
         </Button>
-        <Link to="/help" className="flex items-center gap-2 font-semibold shrink-0">
-          <BookText className="h-5 w-5 text-primary" />
-          <span className="hidden sm:inline">DSCT Docs</span>
+        <Link to="/help" className="flex items-center gap-2 text-sm font-semibold shrink-0">
+          <BookText className="h-4 w-4 text-primary" />
+          <span className="hidden sm:inline">Docs</span>
         </Link>
         <div className="flex-1 flex justify-center px-2">
           <DocsSearch />
@@ -311,12 +311,6 @@ export default function DocsLayout() {
         <div className="flex items-center gap-2 shrink-0">
           <FontSizeControl step={fontStep} setStep={changeFont} />
           <ThemeToggle />
-          <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 hidden sm:inline-flex">
-            <Link to="/">
-              <CornerUpLeft className="h-3.5 w-3.5" />
-              App
-            </Link>
-          </Button>
         </div>
       </header>
 
