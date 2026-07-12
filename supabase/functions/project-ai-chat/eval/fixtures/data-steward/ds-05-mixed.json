@@ -1,0 +1,50 @@
+{
+  "id": "ds-05-mixed",
+  "description": "2 reducer-resolvable gaps + 1 user value in one ask → 3 rows, mixed sources, single proposal, idempotency key stable across re-run (ai-agents.md §5.1 #5).",
+  "project_snapshot": {
+    "materials": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "MAT-1", "name": "Resin A", "cost": null, "holding_cost_pct": 0.2, "moq": 100, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "MAT-2", "name": "Resin B", "cost": null, "holding_cost_pct": 0.2, "moq": 50, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null }
+    ],
+    "products": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "product_id": "P-1", "name": "Widget", "sell_price": null, "production_capacity": 1000, "fulfillment_mode": "mts", "demand_distribution": "triangular", "demand_mean": 120, "demand_cv": 0.2 }
+    ],
+    "suppliers": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "name": "Alpha Supply", "capacity_per_week": 500, "reliability_score": 1 },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S3", "name": "Gamma Chem", "capacity_per_week": 300, "reliability_score": 1 }
+    ],
+    "inbound_logistics": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "material_id": "MAT-1", "unit_price": 4.5, "lead_time": 2, "volume": 100, "time_unit": "week" },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "material_id": "MAT-2", "unit_price": 2, "lead_time": 2, "volume": 200, "time_unit": "week" },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S3", "material_id": "MAT-1", "unit_price": 5.25, "lead_time": 4, "volume": 60, "time_unit": "week" }
+    ],
+    "outbound_logistics": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "product_id": "P-1", "customer_id": "C1", "unit_price": 25, "volume": 120, "time_unit": "week" }
+    ],
+    "bom_single_level": [],
+    "bom_multi_level": [],
+    "policy_defaults": [ { "project_id": "11111111-1111-4111-8111-111111111111" } ]
+  },
+  "utterance": "Fill the missing costs, and set P-1's sell price to 30",
+  "mocked_llm": {
+    "tool": "draft_item_master_update",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 4.5, "source": "reducer", "reducer": "cheapest_inbound_price" },
+        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 2, "source": "reducer", "reducer": "cheapest_inbound_price" },
+        { "table": "products", "entity_id": "P-1", "field": "sell_price", "value": 30, "source": "user_supplied", "why": "User stated the sell price." }
+      ],
+      "title": "Fill missing costs; set P-1 sell price"
+    }
+  },
+  "expect": {
+    "proposal": {
+      "rows": 3,
+      "provenance": "deterministic",
+      "sources": { "reducer": 2, "user_supplied": 1 },
+      "citation_kinds": ["table_rows", "user_message"]
+    },
+    "rerun_same_proposal": true
+  },
+  "retired_reason": null
+}

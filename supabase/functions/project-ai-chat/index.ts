@@ -9,10 +9,25 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { runChat, resolveModel, type ChatTurn } from "./providers.ts";
-import { makeToolContext } from "./tools.ts";
+import { runChat, resolveModel, type ChatRunResult, type ChatTurn } from "./providers.ts";
+import { makeToolContext, type ToolContext } from "./tools.ts";
 import { canonicalJson, makeTelemetry, sha256Hex, telemetryEnabled } from "./telemetry.ts";
-import { decideRoute, deploymentEnabledAgents } from "./router.ts";
+import {
+  decideRoute,
+  deploymentEnabledAgents,
+  makeClassifier,
+  OFFER_CHIP_TEXT,
+  resolveRoutedUtterance,
+} from "./router.ts";
+// Importing agentTurn.ts registers the Stage 1 draft tools (draftTools.ts)
+// into the shared executeTool registry (ai-agents.md §9.2).
+import { buildWrapupMessage, mixedHandoffNote, runDataStewardTurn } from "./agentTurn.ts";
+import {
+  loadThreadSummary,
+  refreshThreadSummary,
+  shouldRefreshSummary,
+  summariesEnabled,
+} from "./summaries.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -246,7 +261,7 @@ serve(async (req) => {
         orgId = (u as any)?.organization_id ?? null;
       } catch { /* attribution only */ }
     }
-    const telemetry = makeTelemetry(supabaseAdmin, {
+    const telemetryBase = {
       user_id: userId ?? null,
       org_id: orgId,
       project_id: projectId ?? null,
@@ -255,26 +270,29 @@ serve(async (req) => {
       persona_id: agentId ?? null,
       model_code: resolvedModel.id,
       provider_code: resolvedModel.provider,
-    });
+    };
+    const telemetry = makeTelemetry(supabaseAdmin, telemetryBase);
     telemetry.emit('chat.request', {
       prompt_chars: promptText.length,
       history_len: history.length,
       has_project: Boolean(projectId),
     });
 
-    // --- Router seam (ai-agents.md §6; AGENT_ROUTER_ENABLED=false ⇒ pure
+    // --- Router (ai-agents.md §6; AGENT_ROUTER_ENABLED=false ⇒ pure
     // passthrough, no LLM call). Effective agent set is computed server-side
-    // (§13.2): deployment kill switch ∩ capability grants. Stage 0 wires no
-    // classifier, so every decision is an advisory short-circuit.
+    // (§13.2): deployment kill switch ∩ capability grants. Stage 1 wires the
+    // live structured-output classifier; a bare "do it" follow-up re-routes
+    // the prior utterance (§6.2 step 3).
     const enabledAgents = deploymentEnabledAgents().filter(
       (slug) => capFeatures['agent_' + slug.replace(/-/g, '_')] === true,
     );
-    const routeDecision = await decideRoute(promptText, {
+    const routedUtterance = resolveRoutedUtterance(promptText, history);
+    const routeDecision = await decideRoute(routedUtterance, {
       personaId: agentId ?? null,
       hasProject: Boolean(projectId),
       enabledAgents,
       modelId: resolvedModel.id,
-    });
+    }, makeClassifier(resolvedModel));
     telemetry.emit('router.decision', {
       route: routeDecision.route,
       agent_id: routeDecision.agent_id,
@@ -282,12 +300,137 @@ serve(async (req) => {
       confidence: routeDecision.confidence,
       short_circuit: routeDecision.short_circuit,
     });
-    // Stage 0: routeDecision is always advisory — the persona turn below is
-    // the whole request. Stage 1 adds the agent-turn orchestration here (§3.3).
+
+    // --- M1 rolling summary (§14.3, CHAT_SUMMARY_ENABLED default off):
+    // persona turns receive the thread summary; agent turns never do.
+    let threadSummary: string | null = null;
+    let summaryUptoSeq = 0;
+    const summariesOn = summariesEnabled();
+    if (summariesOn && typeof threadId === 'string' && uuidRe.test(threadId)) {
+      const s = await loadThreadSummary(supabaseAdmin, threadId, userId);
+      if (s) {
+        threadSummary = s.summary;
+        summaryUptoSeq = s.summaryUptoSeq;
+      }
+    }
 
     const _t0 = Date.now();
     try {
-      const result = await runChat(model, promptText, history, ctx, agentId);
+      // §3.3 orchestration: agent turn → persona wrap-up → proposal part
+      // attached mechanically. Per-request turn budget (§8 T5): ≤ 1 router
+      // call + ≤ 1 agent turn + ≤ 1 persona turn.
+      let result: ChatRunResult;
+      let telemetryToolCalls: ChatRunResult['toolCalls'] = [];
+      let proposalId: string | null = null;
+
+      const stewardRouted =
+        (routeDecision.route === 'artifact' || routeDecision.route === 'mixed') &&
+        routeDecision.agent_id === 'data-steward' && ctx !== null;
+
+      if (stewardRouted) {
+        const agentUtterance = routeDecision.artifact_part ?? routedUtterance;
+        const agentCtx: ToolContext = {
+          ...(ctx as ToolContext),
+          draft: {
+            userEmail: userEmail ?? null,
+            threadId: typeof threadId === 'string' ? threadId : null,
+            modelCode: resolvedModel.id,
+            providerCode: resolvedModel.provider,
+            canProposals: capFeatures['agent_proposals'] === true,
+            utterance: agentUtterance,
+          },
+        };
+        const agentT0 = Date.now();
+        const agent = await runDataStewardTurn({ modelId: model, utterance: agentUtterance, ctx: agentCtx });
+        logAiUsage({
+          status: agent.ok ? 'success' : 'error',
+          modelCode: model,
+          promptChars: agentUtterance.length,
+          completionChars: agent.reply.length,
+          latencyMs: Date.now() - agentT0,
+          errorCode: agent.ok ? undefined : (agent.error ?? 'agent_turn_failed').slice(0, 200),
+        });
+
+        const agentTelemetry = makeTelemetry(supabaseAdmin, { ...telemetryBase, agent_id: 'data-steward' });
+        for (const call of agent.toolCalls) {
+          sha256Hex(canonicalJson(call.args ?? {})).then((argsSha) =>
+            agentTelemetry.emit('tool.call', {
+              tool: call.name,
+              args_sha256: argsSha,
+              ok: call.ok,
+              row_count: call.row_count,
+            })
+          ).catch(() => { /* never blocks the reply */ });
+        }
+        const part = agent.proposalPart;
+        if (part) {
+          proposalId = part.data.proposal_id;
+          if (!part.data.duplicate) {
+            agentTelemetry.emit('proposal.created', {
+              artifact_type: part.data.artifact_type,
+              provenance: part.data.provenance,
+            }, { proposal_id: proposalId });
+          }
+        }
+
+        if (routeDecision.route === 'mixed' && routeDecision.advisory_part) {
+          // §6.2 step 5: the persona answers the advisory part in a normal
+          // Layer A turn; the handoff note + card join the same reply. The
+          // advisory answer survives an agent failure.
+          const persona = await runChat(
+            model, routeDecision.advisory_part.slice(0, 4000), history, ctx, agentId,
+            { summary: threadSummary },
+          );
+          telemetryToolCalls = persona.toolCalls ?? [];
+          result = {
+            ...persona,
+            reply: `${persona.reply}\n\n${mixedHandoffNote(agent)}`.trim(),
+            parts: [...(persona.parts ?? []), ...(part ? [part] : [])],
+            toolCalls: [...(persona.toolCalls ?? []), ...agent.toolCalls],
+          };
+        } else if (agent.ok) {
+          // §6.4: persona wrap-up turn — voice only (no tools), fed the
+          // agent's report; the proposal part is attached mechanically.
+          let wrapReply = '';
+          try {
+            const wrap = await runChat(
+              model,
+              buildWrapupMessage({ utterance: agentUtterance, agentReply: agent.reply, proposal: part?.data ?? null }),
+              history, null, agentId, { summary: threadSummary },
+            );
+            wrapReply = wrap.reply ?? '';
+          } catch (e) {
+            console.warn('persona wrap-up failed, falling back to the agent report:',
+              e instanceof Error ? e.message : e);
+          }
+          result = {
+            reply: wrapReply || agent.reply ||
+              'I drafted a proposal for this — review the card below and approve it before it applies.',
+            parts: part ? [part] : [],
+            toolCalls: agent.toolCalls,
+            model: resolvedModel.label,
+          };
+        } else {
+          // Agent turn failed outright: the advisory answer still returns,
+          // with one sentence noting the draft failed and why (§6.2 step 5).
+          const persona = await runChat(model, promptText, history, ctx, agentId, { summary: threadSummary });
+          telemetryToolCalls = persona.toolCalls ?? [];
+          result = {
+            ...persona,
+            reply: `${persona.reply}\n\nI tried to draft this for you but the drafting step failed` +
+              `${agent.error ? ` (${agent.error})` : ''}. You can ask again or make the change manually.`,
+          };
+        }
+      } else {
+        result = await runChat(model, promptText, history, ctx, agentId, { summary: threadSummary });
+        telemetryToolCalls = result.toolCalls ?? [];
+        if (routeDecision.short_circuit === 'low_confidence') {
+          // §6.2 step 3: below-threshold artifact asks stay advisory with one
+          // plain-text offer chip.
+          result = { ...result, reply: `${result.reply}\n\n${OFFER_CHIP_TEXT}` };
+        }
+      }
+
       const latencyMs = Date.now() - _t0;
       logAiUsage({
         status: 'success',
@@ -296,7 +439,7 @@ serve(async (req) => {
         completionChars: (result?.reply ?? '').length,
         latencyMs,
       });
-      for (const call of result.toolCalls ?? []) {
+      for (const call of telemetryToolCalls) {
         sha256Hex(canonicalJson(call.args ?? {})).then((argsSha) =>
           telemetry.emit('tool.call', {
             tool: call.name,
@@ -319,17 +462,34 @@ serve(async (req) => {
       const storeEnabled = (Deno.env.get('CHAT_STORE_ENABLED') ?? '').trim().toLowerCase() === 'true';
       if (storeEnabled && typeof threadId === 'string' && uuidRe.test(threadId)) {
         try {
-          const { error: appendErr } = await supabaseAdmin.rpc('append_chat_message', {
+          const { data: seqData, error: appendErr } = await supabaseAdmin.rpc('append_chat_message', {
             p_user_id: userId,
             p_thread_id: threadId,
             p_role: 'assistant',
             p_content: result.reply ?? '',
             p_parts: result.parts ?? [],
             p_tool_calls: result.toolCalls ?? [],
+            p_proposal_id: proposalId,
             p_model_code: resolvedModel.id,
           });
           persisted = !appendErr;
           if (appendErr) console.warn('[chat-store] append failed:', appendErr.message);
+
+          // §14.3 trigger: after an assistant reply, if 24+ messages have
+          // accumulated past the summarized prefix, queue a refresh
+          // (fire-and-forget, same posture as logAiUsage).
+          const maxSeq = Number(seqData ?? 0) || 0;
+          if (persisted && summariesOn && shouldRefreshSummary(maxSeq, summaryUptoSeq)) {
+            const refresh = refreshThreadSummary(supabaseAdmin, {
+              threadId,
+              userId,
+              model: resolvedModel,
+            });
+            // deno-lint-ignore no-explicit-any
+            const rt = (globalThis as any).EdgeRuntime;
+            if (rt?.waitUntil) rt.waitUntil(refresh);
+            else refresh.catch(() => { /* logged inside */ });
+          }
         } catch (e) {
           console.warn('[chat-store] append failed:', e instanceof Error ? e.message : e);
         }

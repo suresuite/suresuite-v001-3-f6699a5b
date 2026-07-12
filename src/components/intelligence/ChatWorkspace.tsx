@@ -5,6 +5,7 @@ import { AssistantMascot } from "@/components/chat/AssistantMascot";
 import { useProjectChat } from "@/hooks/useProjectChat";
 import { AgentPicker } from "./AgentPicker";
 import { ChatComposer } from "./ChatComposer";
+import { ThreadInfoPanel } from "./ThreadInfoPanel";
 import { getAgent } from "@/lib/chat/agents";
 
 interface Project { id: string; name: string; plant_name?: string | null }
@@ -79,6 +80,10 @@ export function ChatWorkspace({
           </button>
         </div>
       )}
+
+      {/* M1 (§14.3): rolling-summary visibility + deletion; renders nothing
+          until the server has maintained a summary for this thread. */}
+      <ThreadInfoPanel threadId={threadId} />
 
       {empty ? (
         <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-10">

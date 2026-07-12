@@ -7,9 +7,22 @@ Two tiers gate the agent layer the way golden traces gate the engine (asset A13)
    supabase-js bundle is import-mapped to a local stub (`deno.json`), and the
    proposal/chat-store RPCs run against a throwaway scratch Postgres booted
    from the real migration files.
-2. **Model-scored tier — nightly + before any flag flip** (Stage 1 adds
-   `run_model_eval.ts`): executes enabled agents' fixtures and
-   `routing.golden.jsonl` against every enabled model.
+2. **Model-scored tier — nightly + before any flag flip**
+   (`run_model_eval.ts`): executes enabled agents' fixtures and
+   `routing.golden.jsonl` against every enabled model, scores the §6.5/§7.4
+   targets (exit 1 on a miss — the flag-flip gate), and records results into
+   `ai_chat_events` under `thread_id 'eval:<run-id>'` when service-role creds
+   are set. `--mock` exercises the runner offline (oracle classifier + fixture
+   args); a mock run is never flag-flip evidence.
+
+   ```sh
+   deno run --allow-env --allow-read --allow-write --allow-net run_model_eval.ts \
+     [--models=gemini-2.5-flash,gpt-5] [--agents=data-steward] [--mock] [--out=report.json]
+   ```
+
+There is also a runnable Stage 1 end-to-end demo transcript
+(`deno run --allow-env --allow-read demo_stage1.ts`): routed ask → agent turn →
+proposal card → wrap-up → idempotent re-run → apply with the findings delta.
 
 ## Running
 
@@ -32,8 +45,11 @@ with a warning; CI sets `EVAL_REQUIRE_DB=1` to turn that skip into a failure.
 | `router_test.ts` | §6.2 deterministic wrapper: short-circuits, strict parse, fallbacks, tie-break, kill-switch parsing. |
 | `routing.golden.jsonl` + `routing_golden_test.ts` | §6.5 routing golden set seed (class quotas: ≥25/agent class, ≥25 advisory, ≥15 mixed, ≥10 adversarial) and its well-formedness. |
 | `telemetry_test.ts` | §7.1/§7.5: flag-gated, never-throws, canonical args hashing. |
-| `db_rpc_test.ts` + `fixtures/local-threads.json` | §4.1/§4.2 proposal state machine, idempotency, service-role-only apply markers, T10 cap; §7.1 event store; §13.1 capability seeds; §14.1 chat store incl. lossless localStorage import and TS↔SQL quick-thread-id parity. |
+| `db_rpc_test.ts` + `fixtures/local-threads.json` | §4.1/§4.2 proposal state machine, idempotency, service-role-only apply markers, T10 cap; §13.2 checkpoint 4 (approve requires `agent_apply`, fail closed) + review events; §7.1 event store; §13.1 capability seeds; §14.1 chat store incl. lossless localStorage import and TS↔SQL quick-thread-id parity; `bulk_upsert_*` full-row semantics; §14.3 `set_thread_summary`. |
 | `chat_import_test.ts` | §14.7 M0 import mapping (pure functions). |
+| `router_structured_test.ts` | Stage 1 classifier wiring: per-provider structured-output request bodies (§6.2/§12.2), key-missing fallback, the low-confidence offer chip + "do it" re-route. |
+| `data_steward_test.ts` + `fixtures/data-steward/ds-01…ds-09` | §5.1 golden task suite on the real tool handlers with mocked LLM args: reducer recomputation (1e-9), enum/scope gates, idempotency, injection containment, and the §4.4 apply sequence with its findings delta. |
+| `memory_test.ts` + `fixtures/memory/mm-01, mm-02` | §14.3 rolling summaries: 24/8 thresholds, verbatim template, persona-only injection (mm-02 pins that no agent turn ever sees the summary). |
 | `fixtures/<agent>/` | Golden task suites per agent (populated per stage, §5). |
 
 Fixture growth discipline (§7.3): every production misroute, rejected-with-note

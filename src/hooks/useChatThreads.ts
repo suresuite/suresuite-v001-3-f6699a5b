@@ -45,6 +45,9 @@ export interface Thread {
   pinned?: boolean;
   archived?: boolean;
   folderId?: string | null;
+  // M1 rolling summary (§14.3) — server-maintained; user-deletable via
+  // clearThreadSummary ("What the assistant remembers about this conversation").
+  summary?: string | null;
 }
 
 export interface ChatFolder {
@@ -169,6 +172,7 @@ interface ServerThreadRow {
   title: string;
   pinned: boolean;
   archived: boolean;
+  summary: string | null;
   last_message_at: string | null;
   created_at: string;
 }
@@ -197,6 +201,7 @@ function serverRowToThread(row: ServerThreadRow, quickServerId: string, cached?:
     pinned: row.pinned,
     archived: row.archived,
     folderId: row.folder_id,
+    summary: row.summary ?? null,
     messages: cached?.messages ?? [],
   };
 }
@@ -570,6 +575,23 @@ export function useChatThreads() {
     }
   }, [persist, serverThreadIdFor, user?.id]);
 
+  /** M1 (§14.3): delete the rolling summary — the user's right over what the
+   * assistant remembers. Server clears summary and resets summary_upto_seq. */
+  const clearThreadSummary = useCallback((threadId: string) => {
+    persist((prev) => prev.map((t) => (t.id === threadId ? { ...t, summary: null } : t)), true);
+    const serverId = serverThreadIdFor(threadId);
+    if (serverId && user?.id) {
+      rpc("set_thread_summary", {
+        p_thread_id: serverId,
+        p_user_id: user.id,
+        p_summary: null,
+        p_upto_seq: 0,
+      }).then(({ error }: { error: { message: string } | null }) => {
+        if (error) console.warn("[chat-store] summary delete failed:", error.message);
+      });
+    }
+  }, [persist, serverThreadIdFor, user?.id]);
+
   /** Global FTS over the caller's own messages (§14.5); ≤ 50 hits. */
   const searchMessages = useCallback(async (query: string, projectId?: string | null): Promise<ChatSearchHit[]> => {
     if (!syncEnabled || !user?.id || !query.trim()) return [];
@@ -620,5 +642,7 @@ export function useChatThreads() {
     searchMessages,
     getServerThreadId,
     appendMessageToStore,
+    // M1 (§14.3): rolling-summary visibility + deletion.
+    clearThreadSummary,
   };
 }

@@ -66,6 +66,44 @@ INSERT INTO public.capabilities (key, kind, label) VALUES ('ai_chat', 'feature',
 INSERT INTO public.role_capabilities (role, capability_key, allowed) VALUES
   ('super_admin','ai_chat',true), ('admin','ai_chat',true),
   ('modeler','ai_chat',true), ('user','ai_chat',true);
+
+-- capability RESOLVER stub for the §13.2 checkpoint-4 checks: the real
+-- get_my_capabilities ships in 20260711000002 (out of this suite's scope);
+-- the Stage 1 migration only calls it at runtime. USER_A holds agent_apply,
+-- USER_B holds agent_proposals only — the §13.1 modeler-vs-user split.
+CREATE TABLE public.eval_user_caps (user_id uuid PRIMARY KEY, caps jsonb NOT NULL);
+CREATE FUNCTION public.get_my_capabilities(_user_id uuid) RETURNS jsonb
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    (SELECT caps FROM public.eval_user_caps WHERE user_id = _user_id),
+    '{"is_super_admin": false, "features": {}}'::jsonb);
+$$;
+INSERT INTO public.eval_user_caps VALUES
+  ('${USER_A}', '{"is_super_admin": false, "features": {"agent_apply": true, "agent_proposals": true, "data_editing": true}}'),
+  ('${USER_B}', '{"is_super_admin": false, "features": {"agent_apply": false, "agent_proposals": true}}');
+
+-- item-master tables (20260614000001 slice) so the write-RPC migration —
+-- applied VERBATIM below — runs against the real column set.
+CREATE TABLE public.materials (
+  project_id uuid NOT NULL, material_id text NOT NULL, name text,
+  cost numeric, holding_cost_pct numeric, moq numeric, initial_on_hand numeric,
+  lead_time_dist text, lead_time_cv numeric,
+  updated_at timestamptz NOT NULL DEFAULT now(), created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (project_id, material_id)
+);
+CREATE TABLE public.products (
+  project_id uuid NOT NULL, product_id text NOT NULL, name text,
+  sell_price numeric, production_capacity numeric, fulfillment_mode text,
+  demand_distribution text, demand_mean numeric, demand_cv numeric,
+  updated_at timestamptz NOT NULL DEFAULT now(), created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (project_id, product_id)
+);
+CREATE TABLE public.suppliers (
+  project_id uuid NOT NULL, supplier_id text NOT NULL, name text,
+  capacity_per_week numeric, reliability_score numeric NOT NULL DEFAULT 1.0,
+  updated_at timestamptz NOT NULL DEFAULT now(), created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (project_id, supplier_id)
+);
 `;
 
 function createProposalSql(idem: string, opts?: { grounding?: string; userId?: string; status?: string; agent?: string; artifact?: string }): string {
@@ -91,10 +129,12 @@ Deno.test("Stage 0 + M0 migrations against scratch Postgres", async (t) => {
     await t.step("setup + migrations apply cleanly (verbatim files)", async () => {
       await db.sql(SETUP_SQL);
       for (const f of [
+        "20260702000001_item_master_write_rpcs.sql",
         "20260715000001_agent_proposals.sql",
         "20260715000002_agent_telemetry.sql",
         "20260715000003_agent_capabilities.sql",
         "20260717000001_chat_store.sql",
+        "20260718000001_stage1_agent_rights_and_summary.sql",
       ]) {
         await db.applyFile(new URL(`../../../migrations/${f}`, import.meta.url));
       }
@@ -119,13 +159,36 @@ Deno.test("Stage 0 + M0 migrations against scratch Postgres", async (t) => {
       assertStringIncludes(e3, "not found");
     });
 
+    await t.step("review: checkpoint 4 — approve needs agent_apply, fail closed (§13.2)", async () => {
+      // USER_B holds agent_proposals but NOT agent_apply: sees the card,
+      // cannot approve (typed failure) — the Stage 1 acceptance case.
+      const denied = await db.sqlExpectError(
+        `SELECT public.review_agent_proposal('${idA}', 'approve', '${USER_B}');`,
+      );
+      assertStringIncludes(denied, "forbidden: approve requires the agent_apply capability");
+      // No asserted user resolves to no grants ⇒ forbidden (fail closed).
+      const anon = await db.sqlExpectError(`SELECT public.review_agent_proposal('${idA}', 'approve');`);
+      assertStringIncludes(anon, "forbidden");
+      assertEquals(await db.sql(`SELECT status FROM public.proposals WHERE id='${idA}';`), "proposed");
+      // USER_B may still reject (agent_proposals).
+      const idRej = await db.sql(createProposalSql("idem-userb-reject", { userId: USER_B }));
+      await db.sql(`SELECT public.review_agent_proposal('${idRej}', 'reject', '${USER_B}', NULL, 'not needed');`);
+      assertEquals(await db.sql(`SELECT status FROM public.proposals WHERE id='${idRej}';`), "rejected");
+    });
+
     await t.step("review: proposed → approved → rejected; wrong-state actions raise", async () => {
       await db.sql(`SELECT public.review_agent_proposal('${idA}', 'approve', '${USER_A}', 'a@example.com', NULL);`);
       assertEquals(
         await db.sql(`SELECT status || '|' || COALESCE(reviewed_by::text,'') FROM public.proposals WHERE id='${idA}';`),
         `approved|${USER_A}`,
       );
-      const e1 = await db.sqlExpectError(`SELECT public.review_agent_proposal('${idA}', 'approve');`);
+      // §4.2 side effect: the approve event lands in ai_chat_events.
+      assertEquals(
+        await db.sql(`SELECT count(*) FROM public.ai_chat_events
+                      WHERE proposal_id='${idA}' AND event_kind='proposal.approved';`),
+        "1",
+      );
+      const e1 = await db.sqlExpectError(`SELECT public.review_agent_proposal('${idA}', 'approve', '${USER_A}');`);
       assertStringIncludes(e1, "approve requires status=proposed");
       const e2 = await db.sqlExpectError(`SELECT public.review_agent_proposal('${idA}', 'propose');`);
       assertStringIncludes(e2, "propose requires status=draft");
@@ -133,6 +196,11 @@ Deno.test("Stage 0 + M0 migrations against scratch Postgres", async (t) => {
       assertEquals(
         await db.sql(`SELECT status || '|' || status_reason FROM public.proposals WHERE id='${idA}';`),
         "rejected|changed my mind",
+      );
+      assertEquals(
+        await db.sql(`SELECT count(*) FROM public.ai_chat_events
+                      WHERE proposal_id='${idA}' AND event_kind='proposal.rejected';`),
+        "1",
       );
     });
 
@@ -246,7 +314,8 @@ Deno.test("Stage 0 + M0 migrations against scratch Postgres", async (t) => {
       await db.sql(`SELECT public.record_proposal_viewed('${idB}', '${USER_A}');`);
       assertEquals(
         await db.sql(`SELECT event_kind || '|' || project_id || '|' || (payload->>'artifact_type')
-                      FROM public.ai_chat_events WHERE proposal_id='${idB}';`),
+                      FROM public.ai_chat_events
+                      WHERE proposal_id='${idB}' AND event_kind='proposal.viewed';`),
         `proposal.viewed|${PROJECT}|item_master_diff`,
       );
       const err = await db.sqlExpectError(`SELECT public.record_proposal_viewed('99999999-9999-4999-8999-999999999999');`);
@@ -260,8 +329,9 @@ Deno.test("Stage 0 + M0 migrations against scratch Postgres", async (t) => {
       assertStringIncludes(err, "ai_chat_events_event_kind_check");
       const err2 = await db.sqlExpectError(`SELECT public.prune_ai_chat_events(180);`, { role: "anon" });
       assertStringIncludes(err2, "permission denied");
+      const total = await db.sql(`SELECT count(*) FROM public.ai_chat_events;`);
       await db.sql(`UPDATE public.ai_chat_events SET created_at = now() - interval '181 days';`);
-      assertEquals(await db.sql(`SELECT public.prune_ai_chat_events(180);`, { role: "service_role" }), "1");
+      assertEquals(await db.sql(`SELECT public.prune_ai_chat_events(180);`, { role: "service_role" }), total);
     });
 
     // ── capability seeds (§13.1 + §14.7) ─────────────────────────────────────
@@ -422,6 +492,60 @@ Deno.test("Stage 0 + M0 migrations against scratch Postgres", async (t) => {
         ).then((s) => s.split("\n").pop()),
         "t",
         "owner context ⇒ own rows visible",
+      );
+    });
+
+    // ── Stage 1: write-RPC semantics the apply path leans on (§4.4) ──────────
+    await t.step("bulk_upsert_materials: full-row upsert — NULL clears; enum CHECK rejects", async () => {
+      await db.sql(`INSERT INTO public.materials (project_id, material_id, name, cost, moq)
+                    VALUES ('${PROJECT}', 'MAT-1', 'Resin A', NULL, 100);`);
+      // a full-row payload built by merging the diff onto `before` keeps moq
+      await db.sql(`SELECT public.bulk_upsert_materials('${PROJECT}', '[
+        {"material_id":"MAT-1","name":"Resin A","cost":"3.75","holding_cost_pct":null,
+         "moq":"100","initial_on_hand":null,"lead_time_dist":null,"lead_time_cv":null}]'::jsonb);`);
+      assertEquals(
+        await db.sql(`SELECT cost || '|' || moq FROM public.materials
+                      WHERE project_id='${PROJECT}' AND material_id='MAT-1';`),
+        "3.75|100",
+      );
+      // …while a PARTIAL payload would clear untouched columns — the reason
+      // agent-apply must merge before calling (§4.4 step 3):
+      await db.sql(`SELECT public.bulk_upsert_materials('${PROJECT}', '[
+        {"material_id":"MAT-1","cost":"3.75"}]'::jsonb);`);
+      assertEquals(
+        await db.sql(`SELECT cost || '|' || COALESCE(moq::text,'NULL') FROM public.materials
+                      WHERE project_id='${PROJECT}' AND material_id='MAT-1';`),
+        "3.75|NULL",
+        "partial payloads clear — full-row merge is mandatory",
+      );
+      const enumErr = await db.sqlExpectError(
+        `SELECT public.bulk_upsert_products('${PROJECT}', '[
+          {"product_id":"P-2","fulfillment_mode":"ato"}]'::jsonb);`,
+      );
+      assertStringIncludes(enumErr, "engine accepts: mto, mts (ato is not yet runnable)");
+    });
+
+    // ── M1: rolling-summary write / delete (§14.3) ──────────────────────────
+    await t.step("set_thread_summary: owner-checked write, 4000-char cap, delete resets", async () => {
+      await db.sql(`SELECT public.set_thread_summary('${threadId}', '${USER_A}', 'S3 is strategic for MAT-17.', 18);`);
+      assertEquals(
+        await db.sql(`SELECT summary || '|' || summary_upto_seq FROM public.chat_threads WHERE id='${threadId}';`),
+        "S3 is strategic for MAT-17.|18",
+      );
+      const foreign = await db.sqlExpectError(
+        `SELECT public.set_thread_summary('${threadId}', '${USER_B}', 'not yours', 1);`,
+      );
+      assertStringIncludes(foreign, "forbidden");
+      const capped = await db.sql(
+        `SELECT public.set_thread_summary('${threadId}', '${USER_A}', repeat('x', 5000), 20);
+         SELECT char_length(summary) FROM public.chat_threads WHERE id='${threadId}';`,
+      );
+      assertEquals(capped.split("\n").pop(), "4000");
+      // user deletes ⇒ summary NULL, summary_upto_seq 0 (§14.3 integrity)
+      await db.sql(`SELECT public.set_thread_summary('${threadId}', '${USER_A}', NULL, 0);`);
+      assertEquals(
+        await db.sql(`SELECT COALESCE(summary,'NULL') || '|' || summary_upto_seq FROM public.chat_threads WHERE id='${threadId}';`),
+        "NULL|0",
       );
     });
 

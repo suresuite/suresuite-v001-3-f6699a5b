@@ -34,3 +34,9 @@ verify_jwt = true
 # API keys (`Authorization: Bearer sk_…`), not Supabase JWTs, so platform JWT
 # verification must be off — the function fails closed on its own auth.
 verify_jwt = false
+
+[functions.agent-apply]
+# Same trust model as project-ai-chat (client-asserted identity, ai-agents.md
+# §8 T4 / §13.5); the function fails closed on its own §13.2 checkpoint-5
+# checks (status, project ownership, agent_apply + operation rights, quota).
+verify_jwt = false

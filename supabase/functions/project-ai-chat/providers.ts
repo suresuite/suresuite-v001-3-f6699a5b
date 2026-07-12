@@ -34,6 +34,10 @@ export interface ChatTurn { role: "user" | "assistant"; content: string }
 export interface RunChatOptions {
   system?: string;
   tools?: ReadonlyArray<ToolDeclaration>;
+  /** M1 rolling summary (ai-agents.md §14.3): injected into the built persona
+   * system prompt only. Ignored whenever `system` is supplied — agent turns
+   * pass explicit prompts and must never receive conversation memory. */
+  summary?: string | null;
 }
 
 export interface ChatRunResult {
@@ -55,8 +59,19 @@ function emptyReply(parts: ChatRunResult["parts"]): string {
     : "I didn't get a usable answer back — try rephrasing, or switch models in the header.";
 }
 
-export function buildSystemPrompt(modelLabel: string, agentId?: string | null, hasProject = true): string {
+export function buildSystemPrompt(
+  modelLabel: string,
+  agentId?: string | null,
+  hasProject = true,
+  summary?: string | null,
+): string {
   const agent = resolveAgent(agentId);
+  // M1 (§14.3): one optional block, persona turns only. Summaries are
+  // conversation recall, never a source of factual claims — the data rules
+  // above still require tool-grounded facts.
+  const summaryBlock = summary && summary.trim()
+    ? `\n\nCONVERSATION SUMMARY (older context): ${summary.trim()}`
+    : "";
   const projectBlock = hasProject
     ? "- A project is attached. Use the provided tools to retrieve any operational fact. Never invent or estimate numbers, names, or scores."
     : "- No project is attached. Answer conceptually and offer to attach a project (the + button in the composer) for data-backed answers. Do NOT claim numeric facts.";
@@ -89,7 +104,7 @@ STYLE
 - Format large numbers with thousands separators when it helps readability.
 
 AGENT PERSONA
-- ${agent.systemPreamble}`;
+- ${agent.systemPreamble}${summaryBlock}`;
 }
 
 // ---------------- Gemini ----------------
@@ -253,7 +268,7 @@ export async function runChat(
   opts?: RunChatOptions,
 ): Promise<ChatRunResult> {
   const model = resolveModel(modelId);
-  const system = opts?.system ?? buildSystemPrompt(model.label, agentId, !!ctx);
+  const system = opts?.system ?? buildSystemPrompt(model.label, agentId, !!ctx, opts?.summary);
   const tools = opts?.tools ?? toolDeclarations;
 
   if (model.provider === "gemini") {
