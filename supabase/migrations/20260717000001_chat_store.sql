@@ -79,11 +79,14 @@ CREATE POLICY "chat_messages: owner read" ON public.chat_messages FOR SELECT
 -- Deterministic per-user id for the permanent "Quick chat" scratch thread
 -- (§14.2 rule 1): the same derivation runs client-side, so every device of a
 -- user converges on one server row without a discovery round trip.
+-- pg_catalog.sha256 (not pgcrypto's digest) so the derivation resolves under
+-- any search_path — callers like import_local_threads pin search_path to
+-- 'public', where pgcrypto's schema is not visible.
 CREATE OR REPLACE FUNCTION public.chat_quick_thread_id(p_user_id uuid)
 RETURNS uuid
 LANGUAGE sql IMMUTABLE
 AS $$
-  SELECT encode(substring(extensions.digest('suresuite.quick.' || p_user_id::text, 'sha256') from 1 for 16), 'hex')::uuid;
+  SELECT encode(substring(sha256(convert_to('suresuite.quick.' || p_user_id::text, 'UTF8')) from 1 for 16), 'hex')::uuid;
 $$;
 GRANT EXECUTE ON FUNCTION public.chat_quick_thread_id(uuid) TO anon, authenticated, service_role;
 
