@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -10,7 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2 } from 'lucide-react';
+import { StatCard } from '@/components/shared/StatCard';
+import { TableEmpty } from '@/components/shared/TableEmpty';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   isCollapsed: boolean;
@@ -33,8 +36,6 @@ interface TopRow {
   cost: number;
 }
 
-// The new admin tables are on external Supabase and not in generated types.ts.
-// Cast to any to bypass typegen mismatch.
 const db = supabase as any;
 
 export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
@@ -115,7 +116,6 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
           }))
         );
 
-        // Aggregate top orgs client-side (small volumes).
         const orgAgg = new Map<string, { requests: number; cost: number }>();
         (topOrgsRes.data ?? []).forEach((r: any) => {
           const k = r.org_id || 'unknown';
@@ -147,57 +147,81 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
 
   const fmt$ = (v: number) => `$${v.toFixed(2)}`;
   const fmtN = (v: number) => v.toLocaleString();
+  const avgPerReq = kpis && kpis.requests ? kpis.costMtd / Math.max(1, kpis.requests) : 0;
 
   return (
     <AdminLayout
       isCollapsed={isCollapsed}
       setIsCollapsed={setIsCollapsed}
       title="Platform Overview"
-      description="Platform-wide organizations, users, projects, and AI spend."
     >
       {loading || !kpis ? (
-        <div className="flex h-40 items-center justify-center text-muted-foreground">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading metrics…
+        <div className="space-y-6">
+          <StatGridSkeleton />
+          <StatGridSkeleton />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Skeleton className="h-56" />
+            <Skeleton className="h-56" />
+          </div>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Kpi label="Organizations" value={fmtN(kpis.orgs)} />
-            <Kpi label="Projects" value={fmtN(kpis.projects)} />
-            <Kpi label="Users" value={fmtN(kpis.users)} />
-            <Kpi label="Active users (7d)" value={fmtN(kpis.activeUsers7d)} />
-            <Kpi label="AI requests (all-time)" value={fmtN(kpis.requests)} />
-            <Kpi label="AI cost today" value={fmt$(kpis.costToday)} />
-            <Kpi label="AI cost MTD" value={fmt$(kpis.costMtd)} />
-            <Kpi label="Avg $/request MTD" value={fmt$(kpis.requests ? kpis.costMtd / Math.max(1, kpis.requests) : 0)} />
-          </div>
+        <div className="space-y-8">
+          <section>
+            <SectionHeader label="Reach" />
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatCard label="Organizations" value={fmtN(kpis.orgs)} />
+              <StatCard label="Projects" value={fmtN(kpis.projects)} />
+              <StatCard label="Users" value={fmtN(kpis.users)} />
+              <StatCard label="Active users (7d)" value={fmtN(kpis.activeUsers7d)} />
+            </div>
+          </section>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <TopTable title="Top users by AI cost (MTD)" rows={topUsers} />
-            <TopTable title="Top organizations by AI cost (MTD)" rows={topOrgs} />
-          </div>
-        </>
+          <section>
+            <SectionHeader label="AI spend" />
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatCard label="Requests" value={fmtN(kpis.requests)} hint="all-time" />
+              <StatCard label="Cost today" value={fmt$(kpis.costToday)} />
+              <StatCard label="Cost MTD" value={fmt$(kpis.costMtd)} emphasis />
+              <StatCard label="Avg $/request" value={fmt$(avgPerReq)} hint="month-to-date" />
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <TopTable title="Top users" rows={topUsers} />
+            <TopTable title="Top organizations" rows={topOrgs} />
+          </section>
+        </div>
       )}
     </AdminLayout>
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function SectionHeader({ label }: { label: string }) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
-      </CardContent>
-    </Card>
+    <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {label}
+    </div>
+  );
+}
+
+function StatGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-[92px]" />
+      ))}
+    </div>
   );
 }
 
 function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+    <Card className="shadow-xs">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        <Badge variant="secondary" className="text-[10px] font-medium tracking-wide">
+          MTD
+        </Badge>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
@@ -209,20 +233,21 @@ function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={3} className="py-6 text-center text-sm text-muted-foreground">
-                  No usage recorded yet.
-                </TableCell>
-              </TableRow>
+            {rows.length === 0 ? (
+              <TableEmpty colSpan={3} message="No usage recorded yet." />
+            ) : (
+              rows.map((r) => (
+                <TableRow key={r.label}>
+                  <TableCell className="font-medium">{r.label}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {r.requests.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    ${r.cost.toFixed(2)}
+                  </TableCell>
+                </TableRow>
+              ))
             )}
-            {rows.map((r) => (
-              <TableRow key={r.label}>
-                <TableCell>{r.label}</TableCell>
-                <TableCell className="text-right">{r.requests.toLocaleString()}</TableCell>
-                <TableCell className="text-right">${r.cost.toFixed(2)}</TableCell>
-              </TableRow>
-            ))}
           </TableBody>
         </Table>
       </CardContent>
