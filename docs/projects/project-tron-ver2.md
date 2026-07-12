@@ -111,6 +111,21 @@ disruption** (8-week inbound delay at the paper's top-impact supplier).
 4. **`verify_sim_e2e.mjs` gains `EXPECTED_CODE_VERSION`** — pins the worker to
    the engine version at the verified ref, so a stale worker fails the check
    loudly instead of silently ignoring newly added mapping fields.
+5. **NaN-safe replication persistence (latent data-loss bug).** The first
+   fully-green server run exposed it: the engine reports unmeasured KPIs as
+   NaN (`capacity_utilization` without full-debug matrices), `json.dumps`
+   emits a literal `NaN` token — invalid JSON — and PostgREST silently
+   rejected **every** `run_replications` upsert; the run reported done with
+   `rep_count_done=30` and zero evidence rows. Fixed in the bridge (`_finite`:
+   non-finite → JSON null, covering the worker and browser paths), made the
+   worker's final replication write load-bearing (failure → run `failed`,
+   never green-with-no-evidence), and pinned with a strict-JSON regression
+   test.
+6. **Seed-workflow concurrency.** Two seed runs from back-to-back pushes
+   interleaved on the same project (the loser hit a statement timeout
+   mid-restore and left the dataset half-seeded) — the workflow now runs in a
+   serial concurrency group and the seeder retries transient RPC faults
+   (safe: each RPC is one transaction).
 
 ## 6. Validation & debugging playbook used
 
