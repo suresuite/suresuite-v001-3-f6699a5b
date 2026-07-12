@@ -43,7 +43,18 @@ export type FeatureKey =
   | 'simulation_lab'
   | 'project_intelligence'
   | 'data_editing'
-  | 'export';
+  | 'export'
+  // AI-agent capability keys (ai-agents.md §13.1; seeded in
+  // 20260715000003_agent_capabilities.sql):
+  | 'agent_proposals'
+  | 'agent_apply'
+  | 'agent_data_steward'
+  | 'agent_policy_configurator'
+  | 'agent_vv_analyst'
+  | 'agent_experiment_designer'
+  | 'agent_explainer'
+  // workstream M0 (ai-agents.md §14.7; seeded in 20260717000001_chat_store.sql):
+  | 'chat_history_sync';
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'ai_chat', kind: 'feature', label: 'AI Assistant' },
@@ -51,6 +62,14 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'project_intelligence', kind: 'feature', label: 'Project Intelligence' },
   { key: 'data_editing', kind: 'feature', label: 'Data Editing' },
   { key: 'export', kind: 'feature', label: 'Export' },
+  { key: 'agent_proposals', kind: 'feature', label: 'Agent Proposals' },
+  { key: 'agent_apply', kind: 'feature', label: 'Agent Apply' },
+  { key: 'agent_data_steward', kind: 'feature', label: 'Data Steward Agent' },
+  { key: 'agent_policy_configurator', kind: 'feature', label: 'Policy Configurator Agent' },
+  { key: 'agent_vv_analyst', kind: 'feature', label: 'V&V Analyst Agent' },
+  { key: 'agent_experiment_designer', kind: 'feature', label: 'Experiment Designer Agent' },
+  { key: 'agent_explainer', kind: 'feature', label: 'Explainer Agent' },
+  { key: 'chat_history_sync', kind: 'feature', label: 'Chat History Sync' },
 ];
 
 /** `/profile` is a system page — always reachable, never deniable. */
@@ -147,6 +166,17 @@ export function roleFallbackCapabilities(
     export: true,
     simulation_lab: powerRole,
     data_editing: powerRole,
+    // Mirrors the 20260715000003 / 20260717000001 role seeds (ai-agents.md
+    // §13.1, §14.7): proposals follow ai_chat; apply is power-role; per-agent
+    // keys and chat_history_sync are off until their stages GA.
+    agent_proposals: true,
+    agent_apply: powerRole,
+    agent_data_steward: false,
+    agent_policy_configurator: false,
+    agent_vv_analyst: false,
+    agent_experiment_designer: false,
+    agent_explainer: false,
+    chat_history_sync: false,
   };
   return {
     user_id: null,

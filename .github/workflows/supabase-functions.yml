@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/functions/project-ai-chat/**'
+      - 'supabase/functions/project-ai-health/**'
       - 'supabase/functions/sim-command/**'
       - 'supabase/functions/api/**'
       - 'supabase/functions/_shared/**'
@@ -71,6 +72,14 @@ jobs:
       # supabase/config.toml, which the deploy reads.
       - name: Deploy project-ai-chat
         run: supabase functions deploy project-ai-chat --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Deploy the provider-registry health probe (ai-agents.md §3.2 bridge 6).
+      # It imports MODEL_REGISTRY from project-ai-chat, so it redeploys on the
+      # same path triggers.
+      - name: Deploy project-ai-health
+        run: supabase functions deploy project-ai-health --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
