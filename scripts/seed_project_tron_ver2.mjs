@@ -118,6 +118,30 @@ async function rest(path, init = {}) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// On a statement timeout, dump who is blocking whom RIGHT NOW (read-only
+// Management API query) — post-mortem activity dumps keep coming back empty
+// because the blocker's own statements also time out and release.
+async function dumpBlockers(context) {
+  const token = process.env.DIAG_MANAGEMENT_TOKEN;
+  if (!token) return;
+  try {
+    const ref = SUPABASE_URL.match(/https:\/\/([^.]+)\./)?.[1];
+    const sql =
+      "select a.pid, a.state, now()-a.xact_start as xact_age, " +
+      "pg_blocking_pids(a.pid) as blocked_by, left(a.query,140) as query " +
+      "from pg_stat_activity a where a.xact_start is not null " +
+      "and a.pid <> pg_backend_pid() order by a.xact_start";
+    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: sql }),
+    });
+    console.log(`  ⤷ live sessions at ${context}: ${JSON.stringify(await res.json())}`);
+  } catch (err) {
+    console.log(`  ⤷ blocker dump failed: ${err.message ?? err}`);
+  }
+}
+
 async function rpc(fn, args) {
   // Each RPC is a single transaction, so a failed call leaves no partial
   // state — retrying transient faults (statement timeout 57014, 5xx, network)
@@ -137,6 +161,7 @@ async function rpc(fn, args) {
     const transient = status >= 500 || body?.code === "57014";
     if (!transient) throw lastErr;
     console.log(`  … transient ${fn} failure (attempt ${attempt}/4): HTTP ${status} ${body?.code ?? ""} — retrying`);
+    if (body?.code === "57014") await dumpBlockers(`${fn} attempt ${attempt}`);
     await sleep(2000 * attempt);
   }
   throw lastErr;

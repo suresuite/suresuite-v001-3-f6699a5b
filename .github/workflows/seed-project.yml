@@ -159,6 +159,8 @@ jobs:
           # ALL live triggers on the arc tables — dashboard-created webhooks
           # (pg_net) never appear in the repo's migrations, only here.
           q "live triggers on arc tables" "select c.relname as tbl, t.tgname, p.proname from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_proc p on p.oid=t.tgfoid where c.relname in ('inbound_logistics','outbound_logistics','bom_single_level','multi_tier_supply_chain') and not t.tgisinternal order by c.relname, t.tgname"
+          q "live triggers on projects" "select t.tgname, p.proname from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_proc p on p.oid=t.tgfoid where c.relname='projects' and not t.tgisinternal order by t.tgname"
+          q "pg_cron jobs" "select jobid, jobname, schedule, active, left(command,120) as command from cron.job order by jobid"
           # Per-trigger timing on a real single-row insert (Management API runs
           # untimed as postgres): EXPLAIN ANALYZE names the slow trigger.
           q "outbound insert trigger timing" "explain (analyze, buffers) insert into public.outbound_logistics (customer_id, product_id, volume, time_unit, expected_lead_time, unit_price, plant_name, project_id) select 'DIAG-CUST','DIAG-PROD',1,'week',1,1,p.plant_name,p.id from public.projects p where p.name='Project TRON - ver2' limit 1"
@@ -177,6 +179,9 @@ jobs:
         env:
           USER_ID: ${{ steps.identity.outputs.user_id }}
           USER_EMAIL: ${{ steps.params.outputs.user_email }}
+          # Optional: lets the seeder dump blocking sessions the moment a
+          # statement timeout fires (read-only Management API query).
+          DIAG_MANAGEMENT_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Post-failure lock diagnostics (read-only)
         if: failure() && steps.seed.outcome == 'failure'
