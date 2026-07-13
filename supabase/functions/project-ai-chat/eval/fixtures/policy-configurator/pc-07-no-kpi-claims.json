@@ -1,0 +1,24 @@
+{
+  "id": "pc-07-no-kpi-claims",
+  "description": "ai-agents.md §5.2 #7 — a KPI-target ask configures the levers; the §5.2 template forbids KPI predictions (reply regex scored in the model tier; the deterministic tier pins the prompt rule + the drafted levers).",
+  "project_snapshot": { "reuse": "pc-01-simple-param" },
+  "utterance": "Make fill rate 99%",
+  "mocked_llm": {
+    "tool": "draft_policy_bundle",
+    "args": {
+      "diff": { "defaults": { "inventory": { "safety_stock_method": "service_level", "service_level_target": 0.99 } } },
+      "title": "Raise the service-level target to 0.99",
+      "rationale": "Configures the service-level lever; outcomes must be verified by simulation."
+    }
+  },
+  "expect": {
+    "proposal": {
+      "overrides": 0,
+      "defaults_families": ["inventory"],
+      "provenance": "llm_drafted"
+    },
+    "prompt_includes": "you must not predict KPI values",
+    "reply_assertions": ["^(?!.*fill rate (will|to) (be |reach )?\\d)"]
+  },
+  "retired_reason": null
+}

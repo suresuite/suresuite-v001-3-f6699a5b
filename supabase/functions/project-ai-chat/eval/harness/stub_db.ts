@@ -111,11 +111,52 @@ const nextUuid = () => {
   return `00000000-0000-4000-8000-${String(idCounter).padStart(12, "0")}`;
 };
 
-/** In-memory mirror of the proposal fabric + item-master write RPCs — the SQL
- * originals are pinned separately against scratch Postgres (db_rpc_test.ts);
- * this mirror lets the tool/apply orchestration run without a database. */
+/** djb2 over a canonical JSON — an opaque, state-derived stand-in for the SQL
+ * current_policy_hash, so out-of-band mutations drift the hash (pc-08). */
+function stubHash(value: unknown): string {
+  const sort = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(sort);
+    if (v && typeof v === "object") {
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+        out[k] = sort((v as Record<string, unknown>)[k]);
+      }
+      return out;
+    }
+    return v;
+  };
+  const s = JSON.stringify(sort(value));
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return `stub-${h.toString(16)}`;
+}
+
+/** In-memory mirror of the proposal fabric + item-master write RPCs + the
+ * Stage 2/3 policy/validation RPCs + the M2 memory RPCs — the SQL originals
+ * are pinned separately against scratch Postgres (db_rpc_test.ts /
+ * db_stage23_test.ts); this mirror lets the tool/apply orchestration run
+ * without a database. */
 export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?: string }): Record<string, RpcHandler> {
   if (!tables.proposals) tables.proposals = [];
+
+  const FAMILIES = ["sourcing", "inventory", "transport", "fulfillment", "production", "recovery", "demand"];
+
+  const policyHash = (): string => {
+    const d = (tables.policy_defaults ?? [])[0] ?? {};
+    const overrides = (tables.policy_overrides ?? [])
+      .map(({ scope, target_key, family, patch }) => ({ scope, target_key, family, patch }))
+      .sort((a, b) =>
+        String(a.scope).localeCompare(String(b.scope)) ||
+        String(a.target_key).localeCompare(String(b.target_key)) ||
+        String(a.family).localeCompare(String(b.family)));
+    const defaults: Record<string, unknown> = {};
+    for (const f of FAMILIES) defaults[f] = d[f] ?? null;
+    return stubHash({
+      defaults,
+      fulfillment_strategy: d.fulfillment_strategy ?? "make_to_stock",
+      overrides,
+    });
+  };
 
   const upsert = (table: string, idCol: string, enums: Record<string, string[]>) => (args: Record<string, unknown>) => {
     const rows = (args.p_rows ?? []) as Row[];
@@ -200,5 +241,151 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       demand_distribution: ["triangular", "deterministic", "poisson", "negbin"],
     }),
     bulk_upsert_suppliers: upsert("suppliers", "supplier_id", {}),
+
+    // ── Stage 2 mirrors (SQL originals: 20260609000025 / 20260612000001 /
+    //    20260716000001, pinned in db_stage23_test.ts) ────────────────────────
+    current_policy_hash: () => policyHash(),
+    list_policy_versions: () =>
+      [...(tables.policy_versions ?? [])]
+        .sort((a, b) => Number(b.created_at ?? 0) - Number(a.created_at ?? 0))
+        .map(({ id, label, parent_version_id, policy_hash, created_at }) => ({
+          id, label, author_email: null, author_name: null,
+          parent_version_id: parent_version_id ?? null,
+          policy_hash: policy_hash ?? null, created_at,
+        })),
+    apply_policy_bundle: (args) => {
+      if (args.p_expected_policy_hash != null && String(args.p_expected_policy_hash) !== policyHash()) {
+        throw new Error(
+          `stale_values: the policy configuration changed since this proposal was drafted`,
+        );
+      }
+      const store = tables.policy_defaults ?? (tables.policy_defaults = []);
+      if (store.length === 0) store.push({ project_id: args.p_project_id });
+      const def = store[0];
+      for (const [family, patch] of Object.entries((args.p_defaults ?? {}) as Record<string, Row>)) {
+        if (!FAMILIES.includes(family)) throw new Error(`unknown policy family ${family}`);
+        def[family] = { ...((def[family] ?? {}) as Row), ...patch };
+      }
+      const oStore = tables.policy_overrides ?? (tables.policy_overrides = []);
+      for (const o of (args.p_overrides ?? []) as Row[]) {
+        if (!FAMILIES.includes(String(o.family))) throw new Error(`unknown policy family ${o.family}`);
+        const existing = oStore.find((row) =>
+          String(row.scope) === String(o.scope) &&
+          String(row.target_key) === String(o.target_key) &&
+          String(row.family) === String(o.family));
+        if (existing) existing.patch = { ...((existing.patch ?? {}) as Row), ...((o.patch ?? {}) as Row) };
+        else oStore.push({ project_id: args.p_project_id, scope: o.scope, target_key: o.target_key, family: o.family, patch: o.patch ?? {} });
+      }
+      const vStore = tables.policy_versions ?? (tables.policy_versions = []);
+      const id = nextUuid();
+      const hash = policyHash();
+      vStore.push({
+        id,
+        project_id: args.p_project_id,
+        label: args.p_label ?? "agent: policy bundle",
+        parent_version_id: args.p_parent_version_id ?? null,
+        policy_hash: hash,
+        created_at: Date.now() + vStore.length,
+      });
+      return { policy_version_id: id, policy_hash: hash, overrides_applied: ((args.p_overrides ?? []) as Row[]).length };
+    },
+    restore_policy_version: (args) => {
+      const v = (tables.policy_versions ?? []).find((r) => String(r.id) === String(args.p_version_id));
+      if (!v) throw new Error(`Version ${args.p_version_id} not found`);
+      return null; // mirror records the call; full restore is pinned in SQL tests
+    },
+
+    // ── Stage 3 mirrors (SQL original: 20260710000001) ───────────────────────
+    scenario_fingerprint_hash: (args) => `scen-${args.p_scenario_id}`,
+    list_model_validations: () =>
+      [...(tables.model_validations ?? [])]
+        .sort((a, b) => Number(b.created_at ?? 0) - Number(a.created_at ?? 0)),
+    record_model_validation: (args) => {
+      const versions = tables.policy_versions ?? [];
+      if (!versions.some((v) => String(v.id) === String(args.p_policy_version_id))) {
+        throw new Error(`policy version ${args.p_policy_version_id} not found`);
+      }
+      if (!(tables.dataset_versions ?? []).some((v) => String(v.id) === String(args.p_dataset_version_id))) {
+        throw new Error(`dataset version ${args.p_dataset_version_id} not found`);
+      }
+      if (!(tables.scenarios ?? []).some((s) => String(s.id) === String(args.p_scenario_id))) {
+        throw new Error(`scenario ${args.p_scenario_id} not found`);
+      }
+      const store = tables.model_validations ?? (tables.model_validations = []);
+      const graphHash = opts?.graphHash ?? "graph-hash-1";
+      const scenarioHash = `scen-${args.p_scenario_id}`;
+      const id = nextUuid();
+      const prev = store.find((c) =>
+        String(c.policy_version_id) === String(args.p_policy_version_id) &&
+        String(c.graph_hash) === graphHash &&
+        String(c.scenario_hash) === scenarioHash &&
+        c.status === "active");
+      if (prev) {
+        prev.status = "superseded";
+        prev.superseded_by = id;
+      }
+      store.push({
+        id,
+        project_id: args.p_project_id,
+        policy_version_id: args.p_policy_version_id,
+        policy_hash: versions.find((v) => String(v.id) === String(args.p_policy_version_id))?.policy_hash ?? "ph",
+        dataset_version_id: args.p_dataset_version_id,
+        graph_hash: graphHash,
+        scenario_hash: scenarioHash,
+        adopted_warmup_days: args.p_adopted_warmup_days,
+        warmup_method: args.p_warmup_method ?? "engine",
+        recommended_replications: args.p_recommended_replications,
+        replication_basis: args.p_replication_basis ?? {},
+        validation_tests: args.p_validation_tests ?? [],
+        findings_snapshot: args.p_findings ?? [],
+        verdict: args.p_verdict ?? "validated",
+        basis: args.p_basis ?? "statistical",
+        evidence_run_id: args.p_evidence_run_id ?? null,
+        status: "active",
+        superseded_by: null,
+        validated_at: Date.now(),
+        created_at: Date.now() + store.length,
+      });
+      return id;
+    },
+    active_model_validation: (args) =>
+      (tables.model_validations ?? []).filter((c) =>
+        String(c.policy_version_id) === String(args.p_policy_version_id) &&
+        String(c.graph_hash) === String(args.p_graph_hash) &&
+        String(c.scenario_hash) === String(args.p_scenario_hash) &&
+        c.status === "active" && c.verdict === "validated"),
+
+    // ── M2 mirrors (SQL original: 20260717000003) ────────────────────────────
+    save_project_memory: (args) => {
+      const content = String(args.p_content ?? "").trim();
+      if (!content) throw new Error("memory content must not be empty");
+      if (content.length > 500) throw new Error("too_large: memory content exceeds 500 characters");
+      if (!["fact", "preference", "decision"].includes(String(args.p_kind))) {
+        throw new Error("kind must be fact, preference or decision");
+      }
+      const store = tables.project_memory ?? (tables.project_memory = []);
+      if (store.filter((m) => String(m.project_id) === String(args.p_project_id) && m.status === "active").length >= 200) {
+        throw new Error("too_large: active-memory cap (200) reached for this project — archive older entries first");
+      }
+      const id = nextUuid();
+      store.push({
+        id,
+        project_id: args.p_project_id,
+        kind: args.p_kind,
+        content,
+        citations: args.p_citations ?? [],
+        grounding: args.p_grounding ?? {},
+        status: "active",
+        created_by: args.p_user_id ?? null,
+        source_thread_id: args.p_source_thread_id ?? null,
+        created_at: Date.now() + store.length,
+      });
+      return id;
+    },
+    archive_project_memory: (args) => {
+      const m = (tables.project_memory ?? []).find((r) => String(r.id) === String(args.p_id));
+      if (m && m.status === "active") m.status = "archived";
+      return null;
+    },
   };
 }

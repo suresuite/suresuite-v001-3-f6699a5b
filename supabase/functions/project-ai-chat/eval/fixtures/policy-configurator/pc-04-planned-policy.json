@@ -1,0 +1,19 @@
+{
+  "id": "pc-04-planned-policy",
+  "description": "ai-agents.md §5.2 #4 — configuring a planned catalog policy (P-P.2 lot sizing) is refused naming the milestone (honest catalog A3); no proposal.",
+  "project_snapshot": { "reuse": "pc-01-simple-param" },
+  "utterance": "Use lot sizing EOQ",
+  "mocked_llm": {
+    "tool": "draft_policy_bundle",
+    "args": {
+      "diff": { "defaults": { "production": { "lot_policy": "epq" } } }
+    }
+  },
+  "expect": {
+    "error_code": "dependency_missing",
+    "message_includes": "P-P.2",
+    "message_includes_milestone": "M8",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

@@ -1,0 +1,27 @@
+{
+  "id": "mm-05-stale-memory-marked",
+  "description": "ai-agents.md \u00a714.4/\u00a714.7 mm-05 \u2014 a memory carrying grounding hashes renders the stale marker when the current hashes drift (display-only; still shown to the model WITH the marker).",
+  "project_snapshot": {
+    "project_memory": [
+      {
+        "id": "99999999-9999-4999-8999-999999999902",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "kind": "fact",
+        "content": "Weekly demand for P1 is about 300 units",
+        "citations": [],
+        "grounding": {
+          "graph_hash": "graph-hash-OLD"
+        },
+        "status": "active",
+        "created_by": "22222222-2222-4222-8222-222222222222",
+        "source_thread_id": null,
+        "created_at": 11
+      }
+    ]
+  },
+  "expect": {
+    "stale_marker": "[stale \u2014 saved against older project data]",
+    "fresh_when_hash_matches": true
+  },
+  "retired_reason": null
+}

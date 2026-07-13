@@ -1,0 +1,122 @@
+{
+  "id": "vv-04-no-run",
+  "description": "ai-agents.md \u00a75.3 vv-04 \u2014 no completed evidence run \u21d2 dependency_missing; the Analyst never drafts blind.",
+  "project_snapshot": {
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-4",
+        "name": "Widget resin",
+        "cost": 4.2,
+        "moq": 100,
+        "holding_cost_pct": 0.2
+      }
+    ],
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "P1",
+        "name": "Widget",
+        "sell_price": 25,
+        "production_capacity": 500,
+        "demand_mean": 300,
+        "demand_cv": 0.2
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "name": "Acme",
+        "capacity_per_week": 1200,
+        "reliability_score": 0.95
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "material_id": "MAT-4",
+        "unit_price": 4.2,
+        "lead_time": 2,
+        "volume": 300,
+        "time_unit": "week"
+      }
+    ],
+    "outbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "customer_id": "C1",
+        "product_id": "P1",
+        "unit_price": 25,
+        "volume": 300,
+        "time_unit": "week"
+      }
+    ],
+    "bom_single_level": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "P1",
+        "material_id": "MAT-4"
+      }
+    ],
+    "bom_multi_level": [],
+    "policy_defaults": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "fulfillment_strategy": "make_to_stock",
+        "sourcing": {},
+        "inventory": {},
+        "transport": {},
+        "fulfillment": {},
+        "production": {},
+        "recovery": {},
+        "demand": {}
+      }
+    ],
+    "policy_overrides": [],
+    "simulation_runs": [],
+    "run_replications": [],
+    "policy_versions": [
+      {
+        "id": "44444444-4444-4444-8444-444444444401",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "label": "baseline",
+        "parent_version_id": null,
+        "policy_hash": "ph-run",
+        "created_at": 1
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "55555555-5555-4555-8555-555555555501",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "name": "Validation scenario"
+      }
+    ],
+    "dataset_versions": [
+      {
+        "id": "77777777-7777-4777-8777-777777777701",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "graph_hash": "graph-hash-1"
+      }
+    ],
+    "model_validations": [],
+    "proposals": []
+  },
+  "utterance": "Adopt these validation results",
+  "mocked_llm": {
+    "tool": "draft_model_card_narrative",
+    "args": {
+      "evidence_run_id": "66666666-6666-4666-8666-666666666601",
+      "verdict": "validated",
+      "basis": "face",
+      "narrative_md": "n/a"
+    }
+  },
+  "expect": {
+    "error_code": "dependency_missing",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

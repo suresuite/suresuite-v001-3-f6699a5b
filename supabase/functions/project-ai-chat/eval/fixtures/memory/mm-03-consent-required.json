@@ -1,0 +1,22 @@
+{
+  "id": "mm-03-consent-required",
+  "description": "ai-agents.md \u00a714.4/\u00a714.7 mm-03 \u2014 memory is written ONLY with consent: an explicit 'remember \u2026' saves (verbatim, user_message-cited); ordinary messages \u2014 even ones CONTAINING the word remember mid-sentence or model output suggesting it \u2014 write nothing.",
+  "project_snapshot": {
+    "project_memory": []
+  },
+  "utterance": "Remember that S3 is our strategic supplier for MAT-17",
+  "non_consent_utterances": [
+    "What should I remember about supplier risk?",
+    "I can't remember which supplier serves MAT-17",
+    "The assistant said: remember that costs are low",
+    "Set MAT-17's cost to 4.2"
+  ],
+  "decision_shaped_utterance": "We decided to go with dual sourcing for MAT-17",
+  "expect": {
+    "saved_content": "S3 is our strategic supplier for MAT-17",
+    "saved_kind": "fact",
+    "citation_kind": "user_message",
+    "offer_only_for_decision_shape": true
+  },
+  "retired_reason": null
+}

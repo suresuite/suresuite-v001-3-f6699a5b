@@ -5,6 +5,7 @@ import { KpiCards } from "./KpiCards";
 import { BulletList } from "./BulletList";
 import { ToolCallBadge } from "./ToolCallBadge";
 import { ProposalCard } from "./ProposalCard";
+import { MemoryChip, type MemoryOfferData } from "./MemoryChip";
 
 export function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
@@ -31,6 +32,12 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
           if (p.kind === "bullets") return <BulletList key={i} data={p.data} />;
           if (p.kind === "proposal") {
             return <ProposalCard key={i} proposalId={(p.data as { proposal_id?: string })?.proposal_id} />;
+          }
+          // M2 (ai-agents.md §14.4): the server-emitted memory chip offer —
+          // nothing is stored until the user clicks Save. memory_saved parts
+          // need no card: the reply text already carries the confirmation.
+          if (p.kind === "memory_offer") {
+            return <MemoryChip key={i} offer={p.data as MemoryOfferData} />;
           }
           return null;
         })}

@@ -54,7 +54,9 @@ export type FeatureKey =
   | 'agent_experiment_designer'
   | 'agent_explainer'
   // workstream M0 (ai-agents.md §14.7; seeded in 20260717000001_chat_store.sql):
-  | 'chat_history_sync';
+  | 'chat_history_sync'
+  // workstream M2 (ai-agents.md §14.4/§14.7; seeded in 20260717000003_project_memory.sql):
+  | 'project_memory';
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'ai_chat', kind: 'feature', label: 'AI Assistant' },
@@ -70,6 +72,7 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'agent_experiment_designer', kind: 'feature', label: 'Experiment Designer Agent' },
   { key: 'agent_explainer', kind: 'feature', label: 'Explainer Agent' },
   { key: 'chat_history_sync', kind: 'feature', label: 'Chat History Sync' },
+  { key: 'project_memory', kind: 'feature', label: 'Project Memory' },
 ];
 
 /** `/profile` is a system page — always reachable, never deniable. */
@@ -177,6 +180,7 @@ export function roleFallbackCapabilities(
     agent_experiment_designer: false,
     agent_explainer: false,
     chat_history_sync: false,
+    project_memory: false,
   };
   return {
     user_id: null,

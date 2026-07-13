@@ -49,7 +49,12 @@ with a warning; CI sets `EVAL_REQUIRE_DB=1` to turn that skip into a failure.
 | `chat_import_test.ts` | §14.7 M0 import mapping (pure functions). |
 | `router_structured_test.ts` | Stage 1 classifier wiring: per-provider structured-output request bodies (§6.2/§12.2), key-missing fallback, the low-confidence offer chip + "do it" re-route. |
 | `data_steward_test.ts` + `fixtures/data-steward/ds-01…ds-09` | §5.1 golden task suite on the real tool handlers with mocked LLM args: reducer recomputation (1e-9), enum/scope gates, idempotency, injection containment, and the §4.4 apply sequence with its findings delta. |
+| `policy_configurator_test.ts` + `fixtures/policy-configurator/pc-01…pc-09` | §5.2 golden task suite: registry-schema diff validation (unknown field / planned-policy milestone refusal), scope gates, the manifest recompile (`findings_preview` / `newly_required`), idempotency, and the §4.4 apply — lineage (`agent:` label + parent), zero-block post-grade, `stale_values` on out-of-band edits. |
+| `vv_analyst_test.ts` + `fixtures/vv-analyst/vv-01…vv-08` | §5.3 golden task suite: the HANDLER-READ computed block (engine/Welch warm-up, per-KPI adequacy n*, persisted-tests-only rule), the verdict/basis downgrade, badge derivation, and the §4.4 apply through `record_model_validation` (supersede-not-edit). |
 | `memory_test.ts` + `fixtures/memory/mm-01, mm-02` | §14.3 rolling summaries: 24/8 thresholds, verbatim template, persona-only injection (mm-02 pins that no agent turn ever sees the summary). |
+| `memory_m2_test.ts` + `fixtures/memory/mm-03…mm-07` | §14.4 project memory: consent-only writes (explicit "remember …" / chip offer — no silent path), retrieval + `document` citations in B2 drafts, stale markers on hash drift, archive-erases, injection-as-data. |
+| `db_stage23_test.ts` | Scratch-Postgres pins for `apply_policy_bundle` (merge semantics, agent label + parent lineage, transactional rollback, in-transaction `stale_values`), `record_model_validation` supersession, and the `project_memory` consent funnel (RPC-only writes, guards, 200-cap, capability seed). |
+| `demo_stage23.ts` | Runnable Stage 2/3 + M2 acceptance transcript: policy bundle draft→apply, stale_values on drift, model-card adopt→supersede, memory save→citation→stale chip. |
 | `fixtures/<agent>/` | Golden task suites per agent (populated per stage, §5). |
 
 Fixture growth discipline (§7.3): every production misroute, rejected-with-note

@@ -1,0 +1,249 @@
+{
+  "id": "vv-05-gate-skipped",
+  "description": "ai-agents.md \u00a75.3 vv-05 \u2014 a gate-skipped evidence run is flagged: the card's computed.findings carries the run.gate_skipped warn.",
+  "project_snapshot": {
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-4",
+        "name": "Widget resin",
+        "cost": 4.2,
+        "moq": 100,
+        "holding_cost_pct": 0.2
+      }
+    ],
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "P1",
+        "name": "Widget",
+        "sell_price": 25,
+        "production_capacity": 500,
+        "demand_mean": 300,
+        "demand_cv": 0.2
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "name": "Acme",
+        "capacity_per_week": 1200,
+        "reliability_score": 0.95
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "material_id": "MAT-4",
+        "unit_price": 4.2,
+        "lead_time": 2,
+        "volume": 300,
+        "time_unit": "week"
+      }
+    ],
+    "outbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "customer_id": "C1",
+        "product_id": "P1",
+        "unit_price": 25,
+        "volume": 300,
+        "time_unit": "week"
+      }
+    ],
+    "bom_single_level": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "P1",
+        "material_id": "MAT-4"
+      }
+    ],
+    "bom_multi_level": [],
+    "policy_defaults": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "fulfillment_strategy": "make_to_stock",
+        "sourcing": {},
+        "inventory": {},
+        "transport": {},
+        "fulfillment": {},
+        "production": {},
+        "recovery": {},
+        "demand": {}
+      }
+    ],
+    "policy_overrides": [],
+    "simulation_runs": [
+      {
+        "id": "66666666-6666-4666-8666-666666666601",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "status": "done",
+        "warmup_detected_at": 12,
+        "rep_count_done": 10,
+        "gate_skipped": true,
+        "policy_version_id": "44444444-4444-4444-8444-444444444401",
+        "policy_hash": "ph-run",
+        "scenario_id": "55555555-5555-4555-8555-555555555501",
+        "scenario_hash": "scen-55555555-5555-4555-8555-555555555501",
+        "dataset_version_id": "77777777-7777-4777-8777-777777777701",
+        "code_version": "scsim-1",
+        "aggregate_kpis": {
+          "fill_rate": 0.95,
+          "max_backlog": 100
+        },
+        "created_at": 100
+      }
+    ],
+    "run_replications": [
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 0,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.94,
+          "max_backlog": 100
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 1,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.95,
+          "max_backlog": 102
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 2,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.96,
+          "max_backlog": 98
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 3,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.94,
+          "max_backlog": 101
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 4,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.95,
+          "max_backlog": 99
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 5,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.96,
+          "max_backlog": 100
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 6,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.94,
+          "max_backlog": 102
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 7,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.95,
+          "max_backlog": 98
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 8,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.96,
+          "max_backlog": 101
+        },
+        "time_series": null
+      },
+      {
+        "run_id": "66666666-6666-4666-8666-666666666601",
+        "rep_index": 9,
+        "status": "done",
+        "kpis": {
+          "fill_rate": 0.95,
+          "max_backlog": 99
+        },
+        "time_series": null
+      }
+    ],
+    "policy_versions": [
+      {
+        "id": "44444444-4444-4444-8444-444444444401",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "label": "baseline",
+        "parent_version_id": null,
+        "policy_hash": "ph-run",
+        "created_at": 1
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "55555555-5555-4555-8555-555555555501",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "name": "Validation scenario"
+      }
+    ],
+    "dataset_versions": [
+      {
+        "id": "77777777-7777-4777-8777-777777777701",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "graph_hash": "graph-hash-1"
+      }
+    ],
+    "model_validations": [],
+    "proposals": []
+  },
+  "utterance": "Adopt these validation results",
+  "mocked_llm": {
+    "tool": "draft_model_card_narrative",
+    "args": {
+      "evidence_run_id": "66666666-6666-4666-8666-666666666601",
+      "verdict": "rejected",
+      "basis": "face",
+      "narrative_md": "The evidence run skipped the gate; treat with care."
+    }
+  },
+  "expect": {
+    "proposal": {
+      "verdict": "rejected",
+      "basis": "face",
+      "findings_include_field": "run.gate_skipped"
+    },
+    "context_includes": [
+      "\"gate_skipped\":true"
+    ]
+  },
+  "retired_reason": null
+}

@@ -1,0 +1,18 @@
+{
+  "id": "pc-03-unknown-field",
+  "description": "ai-agents.md §5.2 #3 (adversarial, mocked LLM) — a patch field outside the registry-generated schema is refused invalid_params; no proposal (Pydantic extra=forbid mirrored, asset A2).",
+  "project_snapshot": { "reuse": "pc-01-simple-param" },
+  "utterance": "Add a magic buffer of 40 to the inventory policy",
+  "mocked_llm": {
+    "tool": "draft_policy_bundle",
+    "args": {
+      "diff": { "defaults": { "inventory": { "magic_buffer": 40 } } }
+    }
+  },
+  "expect": {
+    "error_code": "invalid_params",
+    "message_includes": "magic_buffer",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

@@ -19,15 +19,22 @@ import {
   OFFER_CHIP_TEXT,
   resolveRoutedUtterance,
 } from "./router.ts";
-// Importing agentTurn.ts registers the Stage 1 draft tools (draftTools.ts)
-// into the shared executeTool registry (ai-agents.md §9.2).
-import { buildWrapupMessage, mixedHandoffNote, runDataStewardTurn } from "./agentTurn.ts";
+// Importing agentTurn.ts registers the staged draft tools (draftTools.ts,
+// configuratorTools.ts, vvTools.ts, memory.ts) into the shared executeTool
+// registry (ai-agents.md §9.2–§9.4, §14.7).
+import { AGENT_TURNS, buildWrapupMessage, mixedHandoffNote, runAgentTurn } from "./agentTurn.ts";
 import {
   loadThreadSummary,
   refreshThreadSummary,
   shouldRefreshSummary,
   summariesEnabled,
 } from "./summaries.ts";
+import {
+  detectDecisionShape,
+  detectExplicitMemoryRequest,
+  memoryEnabled,
+  saveExplicitMemory,
+} from "./memory.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -188,6 +195,7 @@ serve(async (req) => {
     // never wrongly blocks a legitimate call (fail open, log, proceed).
     const resolvedModel = resolveModel(model);
     let capFeatures: Record<string, boolean> = {};
+    let capIsSuper = false;
     try {
       const { data: caps, error: capsErr } = await supabaseAdmin.rpc('get_my_capabilities', {
         _user_id: userId,
@@ -196,6 +204,7 @@ serve(async (req) => {
         const c = caps as Record<string, any>;
         capFeatures = (c.features as Record<string, boolean>) ?? {};
         const isSuper = Boolean(c.is_super_admin);
+        capIsSuper = isSuper;
         if (!isSuper) {
           if (c.features && c.features.ai_chat !== true) {
             return jsonResponse({
@@ -314,6 +323,33 @@ serve(async (req) => {
       }
     }
 
+    // --- M2 project memory (ai-agents.md §14.4; PROJECT_MEMORY_ENABLED
+    // default off). Consent path (a): an explicit "remember …" message IS the
+    // consent — saved deterministically (the model is never in this loop) with
+    // a user_message citation. Consent path (b): a decision-shaped message
+    // yields a {kind:"memory_offer"} part; the chip's Save button writes.
+    const memoryOn = memoryEnabled() && Boolean(projectId) &&
+      (capIsSuper || capFeatures['project_memory'] === true);
+    let memorySaved: { id: string; content: string; kind: string } | null = null;
+    let memorySaveError: string | null = null;
+    let memoryOffer: { content: string; kind: string } | null = null;
+    if (memoryOn) {
+      const explicit = detectExplicitMemoryRequest(promptText);
+      if (explicit) {
+        const saved = await saveExplicitMemory(supabaseAdmin, {
+          projectId,
+          userId: userId ?? null,
+          threadId: typeof threadId === 'string' && uuidRe.test(threadId) ? threadId : null,
+          content: explicit.content,
+          kind: explicit.kind,
+        });
+        if (saved.ok) memorySaved = { id: saved.id!, content: explicit.content, kind: explicit.kind };
+        else memorySaveError = saved.error ?? 'save failed';
+      } else {
+        memoryOffer = detectDecisionShape(promptText);
+      }
+    }
+
     const _t0 = Date.now();
     try {
       // §3.3 orchestration: agent turn → persona wrap-up → proposal part
@@ -323,11 +359,16 @@ serve(async (req) => {
       let telemetryToolCalls: ChatRunResult['toolCalls'] = [];
       let proposalId: string | null = null;
 
-      const stewardRouted =
-        (routeDecision.route === 'artifact' || routeDecision.route === 'mixed') &&
-        routeDecision.agent_id === 'data-steward' && ctx !== null;
+      // Stages 1–3: any routed agent with a §5 turn runner (data-steward,
+      // policy-configurator, vv-analyst — AGENT_TURNS) executes here; agents
+      // without one fall through to the advisory path.
+      const routedAgentId =
+        (routeDecision.route === 'artifact' || routeDecision.route === 'mixed') && ctx !== null &&
+        routeDecision.agent_id !== null && AGENT_TURNS[routeDecision.agent_id]
+          ? routeDecision.agent_id
+          : null;
 
-      if (stewardRouted) {
+      if (routedAgentId) {
         const agentUtterance = routeDecision.artifact_part ?? routedUtterance;
         const agentCtx: ToolContext = {
           ...(ctx as ToolContext),
@@ -341,7 +382,7 @@ serve(async (req) => {
           },
         };
         const agentT0 = Date.now();
-        const agent = await runDataStewardTurn({ modelId: model, utterance: agentUtterance, ctx: agentCtx });
+        const agent = await runAgentTurn({ agentId: routedAgentId, modelId: model, utterance: agentUtterance, ctx: agentCtx });
         logAiUsage({
           status: agent.ok ? 'success' : 'error',
           modelCode: model,
@@ -351,7 +392,7 @@ serve(async (req) => {
           errorCode: agent.ok ? undefined : (agent.error ?? 'agent_turn_failed').slice(0, 200),
         });
 
-        const agentTelemetry = makeTelemetry(supabaseAdmin, { ...telemetryBase, agent_id: 'data-steward' });
+        const agentTelemetry = makeTelemetry(supabaseAdmin, { ...telemetryBase, agent_id: routedAgentId });
         for (const call of agent.toolCalls) {
           sha256Hex(canonicalJson(call.args ?? {})).then((argsSha) =>
             agentTelemetry.emit('tool.call', {
@@ -395,7 +436,12 @@ serve(async (req) => {
           try {
             const wrap = await runChat(
               model,
-              buildWrapupMessage({ utterance: agentUtterance, agentReply: agent.reply, proposal: part?.data ?? null }),
+              buildWrapupMessage({
+                utterance: agentUtterance,
+                agentReply: agent.reply,
+                proposal: part?.data ?? null,
+                agentName: AGENT_TURNS[routedAgentId].name,
+              }),
               history, null, agentId, { summary: threadSummary },
             );
             wrapReply = wrap.reply ?? '';
@@ -429,6 +475,28 @@ serve(async (req) => {
           // plain-text offer chip.
           result = { ...result, reply: `${result.reply}\n\n${OFFER_CHIP_TEXT}` };
         }
+      }
+
+      // M2 (§14.4): the deterministic memory confirmation/offer joins the same
+      // reply. The saved line is appended by the SERVER (never the model) so
+      // the user always sees exactly what was stored; the offer chip is a part
+      // the client renders with Save/Dismiss — no write until Save.
+      if (memorySaved) {
+        result = {
+          ...result,
+          reply: `${result.reply}\n\nSaved to project memory (${memorySaved.kind}): “${memorySaved.content}” — manage it in the Project memory panel.`,
+          parts: [...(result.parts ?? []), { kind: 'memory_saved', data: memorySaved }],
+        };
+      } else if (memorySaveError) {
+        result = {
+          ...result,
+          reply: `${result.reply}\n\nI couldn't save that to project memory: ${memorySaveError}`,
+        };
+      } else if (memoryOffer) {
+        result = {
+          ...result,
+          parts: [...(result.parts ?? []), { kind: 'memory_offer', data: { ...memoryOffer, project_id: projectId } }],
+        };
       }
 
       const latencyMs = Date.now() - _t0;

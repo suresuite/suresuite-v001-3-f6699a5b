@@ -25,6 +25,8 @@ import {
   type ApplyErrorCode,
   type ItemMasterApplyResult,
 } from "./itemMasterApply.ts";
+import { applyPolicyBundle, type PolicyBundleApplyResult } from "./policyBundleApply.ts";
+import { applyModelCard, type ModelCardApplyResult } from "./modelCardApply.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,20 +47,26 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
 const APPLY_RETRY_CAP = 3;
 
 /** §13.3 operation-rights matrix: apply never demands less than the
- * equivalent manual action. Keys are capability feature keys, ALL required
- * (on top of agent_apply). */
-const ARTIFACT_RIGHTS: Record<string, string[]> = {
-  item_master_diff: ["data_editing"],
+ * equivalent manual action — capability feature keys AND page grants, ALL
+ * required (on top of agent_apply). policy_bundle_diff carries the grants a
+ * user needs to do this by hand on /policies; model_card_draft adoption lives
+ * on Run & Validate (a /policies stage). */
+const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string[] }> = {
+  item_master_diff: { features: ["data_editing"], pages: [] },
+  policy_bundle_diff: { features: ["data_editing"], pages: ["/policies"] },
+  model_card_draft: { features: [], pages: ["/policies"] },
 };
 
-/** §13.4: compute quotas per artifact. item_master_diff dispatches no compute,
- * so no quota binds in Stage 1; experiment_spec (Stage 4) adds the
- * 3-concurrent / 10-per-day agent-applied-runs rule here. Returns the
+/** §13.4: compute quotas per artifact. None of the Stage 1–3 artifacts
+ * dispatches compute, so no quota binds yet; experiment_spec (Stage 4) adds
+ * the 3-concurrent / 10-per-day agent-applied-runs rule here. Returns the
  * human-readable violation, or null when within quota. */
 // deno-lint-ignore no-explicit-any
 function checkApplyQuota(_db: any, artifactType: string): Promise<string | null> {
   switch (artifactType) {
     case "item_master_diff":
+    case "policy_bundle_diff":
+    case "model_card_draft":
       return Promise.resolve(null);
     default:
       return Promise.resolve(null);
@@ -142,6 +150,7 @@ serve(async (req) => {
     }
     const c = caps as Record<string, unknown>;
     const features = (c.features as Record<string, boolean>) ?? {};
+    const pages = (c.pages as Record<string, boolean>) ?? {};
     const isSuper = Boolean(c.is_super_admin);
     if (!isSuper) {
       if (features.agent_apply !== true) {
@@ -150,10 +159,19 @@ serve(async (req) => {
           type: "FORBIDDEN",
         });
       }
-      for (const right of ARTIFACT_RIGHTS[String(proposal.artifact_type)] ?? []) {
+      const rights = ARTIFACT_RIGHTS[String(proposal.artifact_type)] ?? { features: [], pages: [] };
+      for (const right of rights.features) {
         if (features[right] !== true) {
           return jsonResponse({
             error: `This apply also requires the "${right}" capability — the same right the manual edit needs.`,
+            type: "FORBIDDEN",
+          });
+        }
+      }
+      for (const page of rights.pages) {
+        if (pages[page] !== true) {
+          return jsonResponse({
+            error: `This apply also requires access to the ${page} page — the same right the manual edit needs.`,
             type: "FORBIDDEN",
           });
         }
@@ -204,28 +222,45 @@ serve(async (req) => {
       return jsonResponse({ error: message, code, type: "APPLY_FAILED" });
     };
 
-    let result: ItemMasterApplyResult;
-    switch (String(proposal.artifact_type)) {
-      case "item_master_diff": {
-        try {
+    let result: ItemMasterApplyResult | PolicyBundleApplyResult | ModelCardApplyResult;
+    try {
+      switch (String(proposal.artifact_type)) {
+        case "item_master_diff":
           result = await applyItemMasterDiff(svc, {
             projectId,
             payload: (proposal.payload ?? {}) as Record<string, unknown>,
             grounding: (proposal.grounding ?? {}) as Record<string, unknown>,
           });
-        } catch (e) {
-          if (e instanceof ApplyFailure) return await fail(e.code, e.message);
-          return await fail("rpc_error", e instanceof Error ? e.message : "apply failed");
-        }
-        break;
+          break;
+        case "policy_bundle_diff":
+          result = await applyPolicyBundle(svc, {
+            projectId,
+            title: String(proposal.title ?? "policy bundle"),
+            payload: (proposal.payload ?? {}) as Record<string, unknown>,
+            grounding: (proposal.grounding ?? {}) as Record<string, unknown>,
+            userId,
+            userEmail,
+          });
+          break;
+        case "model_card_draft":
+          result = await applyModelCard(svc, {
+            projectId,
+            payload: (proposal.payload ?? {}) as Record<string, unknown>,
+            userId,
+            userEmail,
+          });
+          break;
+        default:
+          // Later stages add their §4.4 rows here; an artifact this deployment
+          // cannot apply is a typed error, not an attempt.
+          return jsonResponse({
+            error: `No apply mapping is enabled for artifact type "${proposal.artifact_type}" in this deployment.`,
+            type: "UNSUPPORTED_ARTIFACT",
+          });
       }
-      default:
-        // Later stages add their §4.4 rows here; an artifact this deployment
-        // cannot apply is a typed error, not an attempt.
-        return jsonResponse({
-          error: `No apply mapping is enabled for artifact type "${proposal.artifact_type}" in this deployment.`,
-          type: "UNSUPPORTED_ARTIFACT",
-        });
+    } catch (e) {
+      if (e instanceof ApplyFailure) return await fail(e.code, e.message);
+      return await fail("rpc_error", e instanceof Error ? e.message : "apply failed");
     }
 
     const { error: markErr } = await svc.rpc("mark_agent_proposal_applied", {

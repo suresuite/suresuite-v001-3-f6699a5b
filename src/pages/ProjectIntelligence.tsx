@@ -5,6 +5,7 @@ import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useAuth } from "@/hooks/useAuth";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/intelligence/ChatSidebar";
@@ -22,6 +23,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
   setIsCollapsed,
 }) => {
   const { user } = useAuth();
+  const { can } = useCapabilities();
   const { setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const [projects, setProjects] = useState<any[]>([]);
   const [input, setInput] = useState("");
@@ -137,6 +139,8 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
             onTogglePin={setPinned}
             onToggleArchive={setArchived}
             onSearchMessages={searchMessages}
+            memoryEnabled={can("project_memory")}
+            memoryProjectId={activeThread?.projectId ?? null}
           />
           <ChatWorkspace
             threadId={activeThreadId}
