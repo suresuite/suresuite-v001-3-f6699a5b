@@ -186,3 +186,45 @@ Full log: `seed-results` branch, `results/latest.log`.
   experimentation layer's stochastic event seeds can generalize this later.
 - The paper's Table 1 lists 15 products; the reference snapshot (and this
   project) carries 17 — the snapshot is authoritative.
+
+## 9. G17 workstream verification (deployed pipeline, 2026-07-13)
+
+The B0 follow-on trust-surface workstream (blueprint §13, gap G17: per-seed
+filter · verifiable exports · single-run inspection mode · reuse-or-rerun)
+was validated end-to-end on this project — seed-project run `29214265937`
+(`seed-results` branch, `results/latest.log`), engine `scsim-0.2.3`, project
+`0a7040e1…`, saved policy version `18dee60a…`
+(`policy_hash d250e2f0…`), `graph_hash 32c28e90…`:
+
+- **30-rep baseline** (156 weeks): queued → running → **done in 21 s**;
+  30/30 `run_replications` rows with per-seed KPIs + weekly series — the
+  evidence the per-seed filter (W1) renders; policy-hash round-trip, gate
+  graded, mapping report info-only (the standing coverage-κ note).
+- **Reuse-or-rerun (W4)**: an identical repeat dispatch answered
+  **409 `reuse_available`** naming the completed run (`0fe71525…`, 30 reps,
+  `scsim-0.2.3`) — no silent recompute, no silent skip.
+- **Single-run inspection (W3)**: a 1-replication run at seed 7 with
+  `payload.inspection=true` finished in 11 s and persisted
+  **577 `run_item_series` rows (17 products + 560 materials)** — material
+  series `on_hand/in_transit/orders`, product series
+  `demand/production/fulfillment/backlog/lost_units`, each 156 weeks — the
+  rows the product/material picker renders; the 30-rep run persisted none
+  (single-rep evidence only, by design).
+- **Verifiable-export source (W2)**: `snapshot_dataset`'s canonical rows ==
+  the committed `scripts/tron_ver2/dataset.json` table-for-table
+  (60/560/17/560/596/17) with an economics spot check
+  (material `001407706A` cost 0.0054), and `current_graph_hash` == the
+  snapshot's hash — a run stamped with that hash provably ran on this data.
+
+**Incident during validation — G16 observed live.** The first seed attempt
+(run `29214103179`) failed exactly as the blueprint's G16 predicts:
+`create_project` hit `uq_modeler_project` (the project exists for this
+modeler) while org-scoped `list_projects` no longer returned it —
+`projects.organization` had drifted from the owner's current
+`approved_users.organization`. Fixed in the same PR: the seed workflow
+gained an *Org-visibility diagnosis + repair* step (re-stamps the project to
+its owner's current org — what `set_project_defaults` would stamp today),
+and the seeder recovers the project id through an org-independent read on
+the 409 instead of dying, keeping the final `list_projects` visibility check
+as the hard run-readiness gate. The retry reused the project and reported
+`✓ visible … (org "DMRG")`.
