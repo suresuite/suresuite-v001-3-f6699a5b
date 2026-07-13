@@ -1,0 +1,17 @@
+{
+  "id": "sug-05-ask-mode",
+  "description": "ai-agents.md §17.3 sug-05 — ask-mode variant: Review-only actions offered in an Ask thread must say 'switch to Review' (the §15/§17.3 honesty rule).",
+  "project_snapshot": { "reuse": "sug-01-gap-driven" },
+  "caller": {
+    "enabledAgents": ["data-steward", "policy-configurator", "vv-analyst", "experiment-designer"],
+    "features": { "agent_proposals": true },
+    "isSuper": false,
+    "mode": "ask",
+    "memoryOn": false
+  },
+  "expect": {
+    "first_rule": "data_gaps",
+    "every_draft_suggestion_mentions": "switch to Review"
+  },
+  "retired_reason": null
+}

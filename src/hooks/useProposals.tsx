@@ -47,10 +47,17 @@ export const APPLY_RETRY_CAP = 3;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
+/** Reviewer-side apply options (ai-agents.md §5.4): acknowledge_warnings can
+ * only be set by the approving human on the card — the server honors it only
+ * when the card displayed warn findings (payload.findings_preview). */
+export interface ApplyOptions {
+  acknowledgeWarnings?: boolean;
+}
+
 interface ProposalActions {
-  approve: (id: string) => Promise<string | null>;
+  approve: (id: string, opts?: ApplyOptions) => Promise<string | null>;
   reject: (id: string, note?: string) => Promise<string | null>;
-  retryApply: (id: string) => Promise<string | null>;
+  retryApply: (id: string, opts?: ApplyOptions) => Promise<string | null>;
   recordViewed: (id: string) => void;
 }
 
@@ -59,12 +66,17 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
   const [applyingIds, setApplyingIds] = useState<Set<string>>(new Set());
   const viewedRef = useRef<Set<string>>(new Set());
 
-  const invokeApply = useCallback(async (id: string): Promise<string | null> => {
+  const invokeApply = useCallback(async (id: string, opts?: ApplyOptions): Promise<string | null> => {
     setApplyingIds((prev) => new Set(prev).add(id));
     try {
       // agent-apply ships in Stage 1; until then approved cards simply wait.
       const { data, error } = await db.functions.invoke("agent-apply", {
-        body: { proposalId: id, userId: user?.id, userEmail: user?.email },
+        body: {
+          proposalId: id,
+          userId: user?.id,
+          userEmail: user?.email,
+          ...(opts?.acknowledgeWarnings ? { acknowledgeWarnings: true } : {}),
+        },
       });
       if (error) return error.message ?? "Apply failed.";
       if (data?.error) return String(data.error);
@@ -81,7 +93,7 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
     }
   }, [user?.id, user?.email, onChanged]);
 
-  const approve = useCallback(async (id: string): Promise<string | null> => {
+  const approve = useCallback(async (id: string, opts?: ApplyOptions): Promise<string | null> => {
     const { error } = await db.rpc("review_agent_proposal", {
       p_proposal_id: id,
       p_action: "approve",
@@ -91,7 +103,7 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
     if (error) return error.message ?? "Approve failed.";
     onChanged?.();
     // §4.2: approval immediately POSTs agent-apply.
-    return invokeApply(id);
+    return invokeApply(id, opts);
   }, [user?.id, user?.email, invokeApply, onChanged]);
 
   const reject = useCallback(async (id: string, note?: string): Promise<string | null> => {
@@ -106,7 +118,7 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
     return error ? error.message ?? "Reject failed." : null;
   }, [user?.id, user?.email, onChanged]);
 
-  const retryApply = useCallback((id: string) => invokeApply(id), [invokeApply]);
+  const retryApply = useCallback((id: string, opts?: ApplyOptions) => invokeApply(id, opts), [invokeApply]);
 
   const recordViewed = useCallback((id: string) => {
     if (viewedRef.current.has(id)) return;

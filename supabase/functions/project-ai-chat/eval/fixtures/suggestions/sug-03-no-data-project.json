@@ -1,0 +1,33 @@
+{
+  "id": "sug-03-no-data-project",
+  "description": "ai-agents.md §17.3 sug-03 — an empty project: no entities to grade, no runs, no versions ⇒ no rule fires; the engine returns an empty list rather than inventing guidance (and never crashes).",
+  "project_snapshot": {
+    "materials": [],
+    "products": [],
+    "suppliers": [],
+    "inbound_logistics": [],
+    "outbound_logistics": [],
+    "bom_single_level": [],
+    "bom_multi_level": [],
+    "policy_defaults": [],
+    "policy_overrides": [],
+    "policy_versions": [],
+    "scenarios": [],
+    "dataset_versions": [],
+    "model_validations": [],
+    "simulation_runs": [],
+    "run_replications": [],
+    "proposals": []
+  },
+  "caller": {
+    "enabledAgents": ["data-steward", "policy-configurator", "vv-analyst", "experiment-designer"],
+    "features": { "agent_proposals": true },
+    "isSuper": false,
+    "mode": "review",
+    "memoryOn": false
+  },
+  "expect": {
+    "count": 0
+  },
+  "retired_reason": null
+}

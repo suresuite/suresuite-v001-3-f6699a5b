@@ -1,0 +1,24 @@
+{
+  "id": "ed-04-doe-honest",
+  "description": "ai-agents.md §5.4 ed-04 — comparison ask pre-Phase-C: the prompt instructs the honest refusal naming the unshipped types and offering the nearest single run; a model that tries to smuggle a comparison through extra parameters is stopped by the schema gate (additionalProperties: false).",
+  "project_snapshot": { "reuse": "ed-01-simple-run" },
+  "utterance": "Compare dual sourcing against +2 weeks of safety stock",
+  "mocked_llm": {
+    "tool": "draft_experiment_spec",
+    "args": {
+      "scenario_id": "55555555-5555-4555-8555-555555555501",
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "replications": 30,
+      "baseline_policy_version_id": "44444444-4444-4444-8444-444444444401"
+    }
+  },
+  "expect": {
+    "error_code": "invalid_params",
+    "proposal_count": 0,
+    "context_includes": [
+      "If the ask needs an experiment type the platform has not shipped",
+      "(comparison, DOE, battery), say exactly that and offer the nearest single"
+    ]
+  },
+  "retired_reason": null
+}

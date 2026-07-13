@@ -1,0 +1,26 @@
+{
+  "id": "ed-03-no-version",
+  "description": "ai-agents.md §5.4 ed-03 — no saved policy version → dependency_missing, no proposal; the reply must say save/snapshot first (no dispatch without a SAVED policy_version_id — dispatch.ts's own refusal, restated at draft).",
+  "project_snapshot": {
+    "reuse": "ed-01-simple-run",
+    "patch": {
+      "policy_versions": [],
+      "model_validations": []
+    }
+  },
+  "utterance": "Run the baseline scenario with 30 replications",
+  "mocked_llm": {
+    "tool": "draft_experiment_spec",
+    "args": {
+      "scenario_id": "55555555-5555-4555-8555-555555555501",
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "replications": 30
+    }
+  },
+  "expect": {
+    "error_code": "dependency_missing",
+    "error_includes": "save/snapshot",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

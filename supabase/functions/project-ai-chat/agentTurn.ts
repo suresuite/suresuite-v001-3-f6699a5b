@@ -14,7 +14,8 @@
 //
 // Importing this module registers every staged draft tool into the shared
 // executeTool registry (bridge 2): B1 via draftTools.ts, B2 via
-// configuratorTools.ts, B3 via vvTools.ts, get_project_memory via memory.ts.
+// configuratorTools.ts, B3 via vvTools.ts, B4 via experimentTools.ts,
+// get_project_memory via memory.ts.
 
 import { runChat, type ChatRunResult } from "./providers.ts";
 import type { ToolContext, ToolDeclaration } from "./tools.ts";
@@ -30,6 +31,11 @@ import {
   configuratorToolDeclarations,
 } from "./configuratorTools.ts";
 import { buildVvContext, VV_AGENT_ID, vvToolDeclarations } from "./vvTools.ts";
+import {
+  buildExperimentContext,
+  EXPERIMENT_AGENT_ID,
+  experimentToolDeclarations,
+} from "./experimentTools.ts";
 import { getProjectMemoryDeclaration, memoryEnabled } from "./memory.ts";
 
 export interface AgentTurnResult {
@@ -51,9 +57,9 @@ interface AgentSpec {
   tools: () => ReadonlyArray<ToolDeclaration>;
 }
 
-/** The turnable roster — one §5 spec per GA'd stage. B4/B5 join with their
- * stages; an agent absent here can be routed to but never run (index.ts falls
- * back to advisory). */
+/** The turnable roster — one §5 spec per GA'd stage. B5 joins with its stage
+ * (facet-11 traces, §9.6); an agent absent here can be routed to but never
+ * run (index.ts falls back to advisory). */
 export const AGENT_TURNS: Record<string, AgentSpec> = {
   [STEWARD_AGENT_ID]: {
     name: "Data Steward",
@@ -73,6 +79,11 @@ export const AGENT_TURNS: Record<string, AgentSpec> = {
     name: "V&V Analyst",
     buildContext: (ctx, args) => buildVvContext(ctx, args),
     tools: () => vvToolDeclarations(),
+  },
+  [EXPERIMENT_AGENT_ID]: {
+    name: "Experiment Designer",
+    buildContext: (ctx, args) => buildExperimentContext(ctx, args),
+    tools: () => experimentToolDeclarations(),
   },
 };
 

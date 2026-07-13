@@ -1,0 +1,42 @@
+{
+  "id": "ed-08-apply-dispatch",
+  "description": "ai-agents.md §5.4 ed-08 — approve+apply dispatches through dispatchExperimentRun: the run row is queued carrying policy_version_id, policy_hash, dataset_version_id, graph_hash, scenario_hash, model_validation_id EXACTLY as a Lab dispatch of the same command would (provenance indistinguishability); a second apply returns the same run_id (idempotent apply, §4.4).",
+  "project_snapshot": { "reuse": "ed-01-simple-run" },
+  "utterance": "Test a 6-week outage of supplier S1 with 30 replications",
+  "mocked_llm": {
+    "tool": "draft_experiment_spec",
+    "args": {
+      "new_scenario": {
+        "name": "S1 outage — 6 weeks",
+        "horizon_days": 182,
+        "disruption_schedule": [
+          { "target": "S1", "target_type": "node", "start_day": 7, "duration_days": 42, "magnitude_pct": 100 }
+        ]
+      },
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "replications": 30,
+      "title": "S1 outage — 6 weeks × baseline (30 reps)"
+    }
+  },
+  "expect": {
+    "apply": {
+      "run_status": "queued",
+      "rep_count_target": 30,
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "policy_hash": "ph-run",
+      "dataset_version_id": "77777777-7777-4777-8777-777777777701",
+      "graph_hash": "graph-hash-1",
+      "provenance_stamp_fields": [
+        "policy_version_id",
+        "policy_hash",
+        "dataset_version_id",
+        "graph_hash",
+        "scenario_hash",
+        "model_validation_id",
+        "rep_count_target",
+        "status"
+      ]
+    }
+  },
+  "retired_reason": null
+}

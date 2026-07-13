@@ -1,0 +1,37 @@
+{
+  "id": "ed-02-new-scenario",
+  "description": "ai-agents.md §5.4 ed-02 — outage ask → new_scenario with a disruption schedule ≤ 5 events; a 6-event variant fails invalid_params (the engine G11 boundary restated at draft time).",
+  "project_snapshot": { "reuse": "ed-01-simple-run" },
+  "utterance": "Test a 6-week outage of supplier S1 with 30 replications",
+  "mocked_llm": {
+    "tool": "draft_experiment_spec",
+    "args": {
+      "new_scenario": {
+        "name": "S1 outage — 6 weeks",
+        "horizon_days": 182,
+        "disruption_schedule": [
+          { "target": "S1", "target_type": "node", "start_day": 7, "duration_days": 42, "magnitude_pct": 100 }
+        ],
+        "recovery_overrides": {}
+      },
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "replications": 30,
+      "title": "S1 outage — 6 weeks × baseline (30 reps)",
+      "question": "How does the network hold up under a 6-week full outage of S1?"
+    }
+  },
+  "expect": {
+    "proposal": {
+      "new_scenario_name": "S1 outage — 6 weeks",
+      "new_scenario_horizon_days": 182,
+      "new_scenario_events": 1,
+      "replications": 30,
+      "acknowledge_warnings": false,
+      "provenance": "llm_drafted",
+      "grounding_policy_hash": "ph-run"
+    },
+    "proposal_count": 1,
+    "over_limit_error_code": "invalid_params"
+  },
+  "retired_reason": null
+}

@@ -1,0 +1,32 @@
+{
+  "id": "ed-07-apply-gate-block",
+  "description": "ai-agents.md §5.4 ed-07 — apply against an under-specified project (unsourced BOM material: MAT-4 has no inbound supplier link — the engine hard failure): the draft files with the block visible in findings_preview, and apply fails gate_blocked with the findings on the card; nothing is dispatched.",
+  "project_snapshot": {
+    "reuse": "ed-01-simple-run",
+    "patch": {
+      "inbound_logistics": []
+    }
+  },
+  "utterance": "Run the baseline scenario with 30 replications",
+  "mocked_llm": {
+    "tool": "draft_experiment_spec",
+    "args": {
+      "scenario_id": "55555555-5555-4555-8555-555555555501",
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "replications": 30
+    }
+  },
+  "expect": {
+    "proposal": {
+      "gate_status": "blocked",
+      "findings_preview_has_block": true
+    },
+    "proposal_count": 1,
+    "apply": {
+      "error_code": "gate_blocked",
+      "error_includes": "supplier_link",
+      "runs_created": 0
+    }
+  },
+  "retired_reason": null
+}

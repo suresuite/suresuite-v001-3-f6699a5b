@@ -1,0 +1,19 @@
+{
+  "id": "sug-04-capability-filtered",
+  "description": "ai-agents.md §17.3 sug-04 — the honesty rule: never suggest what the caller cannot do. Gaps exist and a run awaits validation, but the caller may route only to the experiment-designer — so data-gaps and validation stay silent and the experiment rule leads.",
+  "project_snapshot": {
+    "reuse": "sug-02-validation-driven"
+  },
+  "caller": {
+    "enabledAgents": ["experiment-designer"],
+    "features": { "agent_proposals": true },
+    "isSuper": false,
+    "mode": "review",
+    "memoryOn": false
+  },
+  "expect": {
+    "first_rule": "experiment",
+    "rules_exclude": ["data_gaps", "validation", "report", "memory_hygiene"]
+  },
+  "retired_reason": null
+}
