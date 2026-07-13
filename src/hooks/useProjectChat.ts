@@ -3,14 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { useChatThreads } from "@/hooks/useChatThreads";
+import { chatModesUiEnabled } from "@/components/chat/ModeSwitch";
 
 export type ChatRole = "user" | "assistant";
 
 export interface ChatPart {
   // "proposal" carries {proposal_id} and renders as a ProposalCard
   // (ai-agents.md §4.5/§4.6); "memory_offer"/"memory_saved" are the M2
-  // consent-chip parts (§14.4); older clients ignore unknown kinds.
-  kind: "table" | "kpi" | "bullets" | "text" | "proposal" | "memory_offer" | "memory_saved";
+  // consent-chip parts (§14.4); "mode_notice" is the §15 Ask-mode refusal
+  // chip ("Switch to Review"); older clients ignore unknown kinds.
+  kind: "table" | "kpi" | "bullets" | "text" | "proposal" | "memory_offer" | "memory_saved" | "mode_notice";
   data: unknown;
 }
 
@@ -141,6 +143,11 @@ export function useProjectChat(threadId: string | null) {
           userEmail: user.email,
           model: opts.model ?? "gemini-2.5-flash",
           ...(serverThreadId ? { threadId: serverThreadId } : {}),
+          // §15: unsynced/localStorage threads carry the mode in the request
+          // body — the server still enforces it (synced threads resolve from
+          // chat_threads.mode, which wins over this hint). Sent only when the
+          // modes UI is on so pre-§15 request bodies stay byte-identical.
+          ...(chatModesUiEnabled() ? { threadMode: thread?.mode ?? "review" } : {}),
         };
 
         const { data, error: invokeError } = await supabase.functions.invoke<ChatApiResponse>(

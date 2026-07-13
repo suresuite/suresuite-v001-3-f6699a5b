@@ -33,8 +33,9 @@ import {
   type ClassifierCall,
 } from "../router.ts";
 import { executeTool, type ToolContext } from "../tools.ts";
-// Importing agentTurn.ts registers every staged draft tool (B1/B2/B3 + memory).
+// Importing agentTurn.ts registers every staged draft tool (B1-B4 + memory).
 import { runAgentTurn, runDataStewardTurn } from "../agentTurn.ts";
+import { applyModeToRoute } from "../modes.ts";
 import { makeAgentRpcs, makeStubDb, type Row } from "./harness/stub_db.ts";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
@@ -53,7 +54,10 @@ const TARGETS = {
 interface GoldenRow {
   id: string;
   utterance: string;
-  expect: { route: string; agent_id: string | null; intent: string | null };
+  /** §15 ask-mode fixtures: classified normally, then the mode subtracts at
+   * checkpoint 2 — the expected route is post-mode (always advisory). */
+  mode?: string;
+  expect: { route: string; agent_id: string | null; intent: string | null; blocked_intent?: string | null };
   class: string;
 }
 
@@ -123,9 +127,21 @@ async function evalRouting(
   Deno.env.set("AGENT_ROUTER_ENABLED", "true");
   const oracle: ClassifierCall = (prompt) => {
     // mock mode: an oracle answering from the golden label embedded in the
-    // prompt's USER MESSAGE — validates scoring, never model quality.
+    // prompt's USER MESSAGE — validates scoring, never model quality. Ask-mode
+    // rows answer with the PRE-mode classification (blocked_intent): the mode
+    // filter below is what must turn them advisory.
     const utterance = prompt.slice(prompt.indexOf("USER MESSAGE:") + 14).trim();
     const row = rows.find((r) => r.utterance === utterance);
+    if (row?.mode === "ask" && row.expect.blocked_intent) {
+      const intent = row.expect.blocked_intent;
+      const agent = AGENT_PRECEDENCE.find((a) =>
+        intent.startsWith(a === "data-steward" ? "steward" : a === "policy-configurator" ? "policy" : a === "vv-analyst" ? "vv" : a === "experiment-designer" ? "exp" : "explain")
+      ) ?? null;
+      return Promise.resolve(JSON.stringify({
+        route: "artifact", agent_id: agent, intent, confidence: 0.95,
+        advisory_part: null, artifact_part: utterance,
+      }));
+    }
     const e = row?.expect ?? { route: "advisory", agent_id: null, intent: null };
     return Promise.resolve(JSON.stringify({
       route: e.route,
@@ -147,12 +163,17 @@ async function evalRouting(
     const enabledExpected = row.expect.agent_id !== null && enabledAgents.includes(row.expect.agent_id)
       ? row.expect
       : { route: "advisory", agent_id: null, intent: null };
-    const decision = await decideRoute(row.utterance, {
+    const rawDecision = await decideRoute(row.utterance, {
       personaId: null,
       hasProject: true,
       enabledAgents,
       modelId: model.id,
     }, classifier);
+    // §15 ask-mode fixtures: the mode subtracts after classification, exactly
+    // as index.ts applies it at checkpoint 2 — the same code path is scored.
+    const decision = row.mode === "ask"
+      ? applyModeToRoute(rawDecision, "ask").decision
+      : rawDecision;
 
     // per-enabled-class precision/recall over the routed owner
     for (const a of enabledAgents) {
@@ -317,12 +338,12 @@ async function evalSteward(model: ModelSpec, mock: boolean): Promise<StewardMetr
 // ── B2/B3 fixture evaluation (generic draft-agent runner, §9.3/§9.4) ─────────
 
 interface AgentEvalConfig {
-  agentId: "policy-configurator" | "vv-analyst";
+  agentId: "policy-configurator" | "vv-analyst" | "experiment-designer";
   fixtureDir: string;
   draftTool: string;
   artifactType: string;
-  /** Draft-time fixtures only — the apply-path fixtures (pc-08/pc-09/vv-08)
-   * exercise deterministic machinery and stay in the CI tier. */
+  /** Draft-time fixtures only — the apply-path fixtures (pc-08/pc-09/vv-08/
+   * ed-07/ed-08) exercise deterministic machinery and stay in the CI tier. */
   fixtures: string[];
 }
 
@@ -346,6 +367,16 @@ const AGENT_EVAL: Record<string, AgentEvalConfig> = {
     fixtures: [
       "vv-02-adopt-pass", "vv-03-adopt-fail-tests", "vv-04-no-run",
       "vv-05-gate-skipped", "vv-07-adequacy-quote",
+    ],
+  },
+  "experiment-designer": {
+    agentId: "experiment-designer",
+    fixtureDir: "experiment-designer",
+    draftTool: "draft_experiment_spec",
+    artifactType: "experiment_spec",
+    fixtures: [
+      "ed-01-simple-run", "ed-02-new-scenario", "ed-03-no-version",
+      "ed-04-doe-honest", "ed-05-ack-forced-false", "ed-06-brief-grounded",
     ],
   },
 };
@@ -374,6 +405,25 @@ function scoreAgentOutcome(cfg: AgentEvalConfig, proposals: Row[], exp: Record<s
         !((payload.newly_required as string[]) ?? []).includes(exp.proposal.newly_required_includes)) {
       return { pass: false, detail: `newly_required missing ${exp.proposal.newly_required_includes}` };
     }
+  } else if (cfg.agentId === "experiment-designer") {
+    if (exp.proposal.replications !== undefined && payload.replications !== exp.proposal.replications) {
+      return { pass: false, detail: `expected ${exp.proposal.replications} replications, got ${payload.replications}` };
+    }
+    if (exp.proposal.acknowledge_warnings !== undefined &&
+        payload.acknowledge_warnings !== exp.proposal.acknowledge_warnings) {
+      return { pass: false, detail: `acknowledge_warnings must be ${exp.proposal.acknowledge_warnings} (§5.4 forced-false rule)` };
+    }
+    if (exp.proposal.scenario_id && payload.scenario_id !== exp.proposal.scenario_id) {
+      return { pass: false, detail: `expected scenario ${exp.proposal.scenario_id}, got ${payload.scenario_id}` };
+    }
+    if (exp.proposal.new_scenario_name &&
+        (payload.new_scenario as { name?: string } | undefined)?.name !== exp.proposal.new_scenario_name) {
+      return { pass: false, detail: `expected new scenario "${exp.proposal.new_scenario_name}"` };
+    }
+    if (exp.proposal.grounding_policy_hash &&
+        (p.grounding as Record<string, unknown> | null)?.policy_hash !== exp.proposal.grounding_policy_hash) {
+      return { pass: false, detail: `grounding.policy_hash must bind the version's hash` };
+    }
   } else {
     if (exp.proposal.verdict && payload.verdict !== exp.proposal.verdict) {
       return { pass: false, detail: `expected verdict ${exp.proposal.verdict}, got ${payload.verdict}` };
@@ -390,6 +440,8 @@ function scoreAgentOutcome(cfg: AgentEvalConfig, proposals: Row[], exp: Record<s
 
 async function evalAgent(cfg: AgentEvalConfig, model: ModelSpec, mock: boolean): Promise<StewardMetrics> {
   Deno.env.set("AGENT_ENABLED_IDS", cfg.agentId);
+  // §9.5: the single-run subset rides its own flag beside the roster switch.
+  if (cfg.agentId === "experiment-designer") Deno.env.set("AGENT_EXPERIMENT_TYPES", "single");
   const fixtures: StewardMetrics["fixtures"] = {};
   let draftCalls = 0, validDraftCalls = 0;
 
@@ -522,6 +574,7 @@ if (import.meta.main) {
     }
   }
   Deno.env.set("AGENT_ENABLED_IDS", agents.join(","));
+  if (agents.includes("experiment-designer")) Deno.env.set("AGENT_EXPERIMENT_TYPES", "single");
 
   const goldenText = await Deno.readTextFile(new URL("./routing.golden.jsonl", import.meta.url));
   const goldenRows: GoldenRow[] = goldenText.trim().split("\n").map((l) => JSON.parse(l));

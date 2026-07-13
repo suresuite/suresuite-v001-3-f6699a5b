@@ -3,8 +3,10 @@ import { X } from "lucide-react";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { AssistantMascot } from "@/components/chat/AssistantMascot";
 import { useProjectChat } from "@/hooks/useProjectChat";
+import type { ThreadMode } from "@/components/chat/ModeSwitch";
 import { AgentPicker } from "./AgentPicker";
 import { ChatComposer } from "./ChatComposer";
+import { SuggestedActions, suggestedActionsUiEnabled } from "./SuggestedActions";
 import { ThreadInfoPanel } from "./ThreadInfoPanel";
 import { getAgent } from "@/lib/chat/agents";
 
@@ -22,6 +24,9 @@ interface ChatWorkspaceProps {
   onInputChange: (v: string) => void;
   model: string;
   onModelChange: (id: string) => void;
+  /** §15 per-thread interaction mode (Review when absent). */
+  threadMode?: ThreadMode;
+  onModeChange?: (mode: ThreadMode) => void;
 }
 
 function greeting(name?: string | null) {
@@ -42,6 +47,8 @@ export function ChatWorkspace({
   onInputChange,
   model,
   onModelChange,
+  threadMode = "review",
+  onModeChange,
 }: ChatWorkspaceProps) {
   const { messages, loading, error, send } = useProjectChat(threadId);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -56,7 +63,14 @@ export function ChatWorkspace({
     await send(text, { model, projectId, agentId });
   };
 
+  // §17.3: a picked chip sends its utterance — a plain sentence the user
+  // could have typed (the chips teach the interface by example).
+  const pickSuggestion = (utterance: string) => {
+    if (!loading) void send(utterance, { model, projectId, agentId });
+  };
+
   const empty = messages.length === 0;
+  const suggestionsOn = suggestedActionsUiEnabled() && Boolean(projectId);
   const activeAgent = agentId ? getAgent(agentId) : null;
 
   return (
@@ -104,6 +118,17 @@ export function ChatWorkspace({
               </div>
             )}
 
+            {/* §17.3: empty-thread starters — the same server-computed chips */}
+            {suggestionsOn && (
+              <SuggestedActions
+                projectId={projectId}
+                threadId={threadId}
+                threadMode={threadMode}
+                onPick={pickSuggestion}
+                disabled={loading}
+              />
+            )}
+
             <ChatComposer
               input={input}
               onInputChange={onInputChange}
@@ -114,6 +139,8 @@ export function ChatWorkspace({
               projects={projects}
               projectId={projectId}
               onProjectChange={onProjectChange}
+              mode={threadMode}
+              onModeChange={onModeChange}
               placeholder={activeAgent ? `Ask the ${activeAgent.name}…` : "How can I help you today?"}
               autoFocus
             />
@@ -151,6 +178,16 @@ export function ChatWorkspace({
 
           <div className="border-t border-border bg-surface-sunken">
             <div className="mx-auto max-w-[720px] px-4 py-3">
+              {/* §17.3: chips above the composer */}
+              {suggestionsOn && (
+                <SuggestedActions
+                  projectId={projectId}
+                  threadId={threadId}
+                  threadMode={threadMode}
+                  onPick={pickSuggestion}
+                  disabled={loading}
+                />
+              )}
               <ChatComposer
                 input={input}
                 onInputChange={onInputChange}
@@ -161,6 +198,8 @@ export function ChatWorkspace({
                 projects={projects}
                 projectId={projectId}
                 onProjectChange={onProjectChange}
+                mode={threadMode}
+                onModeChange={onModeChange}
                 placeholder="Reply…"
                 minRows={1}
               />

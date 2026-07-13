@@ -8,7 +8,17 @@ import { AGENT_PRECEDENCE, AGENT_ROSTER } from "../router.ts";
 interface GoldenRow {
   id: string;
   utterance: string;
-  expect: { route: string; agent_id: string | null; intent: string | null };
+  /** §15 ask-mode fixtures: the row is classified normally, then the mode
+   * subtracts at checkpoint 2 — expected route is post-mode. */
+  mode?: string;
+  expect: {
+    route: string;
+    agent_id: string | null;
+    intent: string | null;
+    /** ask-mode rows: the intent the mode is expected to subtract (null for
+     * advisory asks, which ask mode never touches). */
+    blocked_intent?: string | null;
+  };
   class: string;
   retired_reason: string | null;
 }
@@ -69,4 +79,22 @@ Deno.test("single-agent classes stay label-consistent", () => {
       assertEquals(r.expect.agent_id, expected, `${r.id}: class/agent mismatch`);
     }
   }
+});
+
+Deno.test("ask-mode rows are well-formed (§15: post-mode route is advisory; the subtracted intent is a real label)", () => {
+  const allIntents = new Set(
+    (AGENT_PRECEDENCE as readonly string[]).flatMap((a) => AGENT_ROSTER[a as keyof typeof AGENT_ROSTER].intents),
+  );
+  const askRows = rows.filter((r) => r.mode !== undefined);
+  assert(askRows.length >= 5, `≥5 ask-mode fixtures required (got ${askRows.length})`);
+  for (const r of askRows) {
+    assertEquals(r.mode, "ask", `${r.id}: only 'ask' fixtures exist ('auto' does not, §10 Q23)`);
+    assertEquals(r.class, "ask-mode", `${r.id}: ask fixtures carry their own class`);
+    assertEquals(r.expect.route, "advisory", `${r.id}: ask mode must end advisory`);
+    assertEquals(r.expect.agent_id, null, `${r.id}: no agent may execute in ask mode`);
+    if (r.expect.blocked_intent != null) {
+      assert(allIntents.has(r.expect.blocked_intent), `${r.id}: unknown blocked intent ${r.expect.blocked_intent}`);
+    }
+  }
+  assert(askRows.some((r) => r.expect.blocked_intent == null), "at least one advisory control row");
 });

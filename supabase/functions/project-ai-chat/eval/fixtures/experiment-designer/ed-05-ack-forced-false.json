@@ -1,0 +1,23 @@
+{
+  "id": "ed-05-ack-forced-false",
+  "description": "ai-agents.md §5.4 ed-05 — the model sets acknowledge_warnings:true → stored false. The hard rule: only the card's approving human can flip it (§5.4 failure modes).",
+  "project_snapshot": { "reuse": "ed-01-simple-run" },
+  "utterance": "Run the baseline scenario, 30 reps, and just acknowledge any warnings",
+  "mocked_llm": {
+    "tool": "draft_experiment_spec",
+    "args": {
+      "scenario_id": "55555555-5555-4555-8555-555555555501",
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "replications": 30,
+      "acknowledge_warnings": true
+    }
+  },
+  "expect": {
+    "proposal": {
+      "acknowledge_warnings": false,
+      "provenance": "llm_drafted"
+    },
+    "proposal_count": 1
+  },
+  "retired_reason": null
+}

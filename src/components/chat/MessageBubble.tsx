@@ -6,6 +6,7 @@ import { BulletList } from "./BulletList";
 import { ToolCallBadge } from "./ToolCallBadge";
 import { ProposalCard } from "./ProposalCard";
 import { MemoryChip, type MemoryOfferData } from "./MemoryChip";
+import { ModeNotice, type ModeNoticeData } from "./ModeNotice";
 
 export function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
@@ -38,6 +39,10 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
           // need no card: the reply text already carries the confirmation.
           if (p.kind === "memory_offer") {
             return <MemoryChip key={i} offer={p.data as MemoryOfferData} />;
+          }
+          // §15: the Ask-mode refusal chip — one-click "Switch to Review".
+          if (p.kind === "mode_notice") {
+            return <ModeNotice key={i} data={p.data as ModeNoticeData} />;
           }
           return null;
         })}

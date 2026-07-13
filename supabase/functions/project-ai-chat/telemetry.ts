@@ -15,7 +15,13 @@ export type ChatEventKind =
   | "proposal.rejected"
   | "proposal.applied"
   | "proposal.apply_failed"
-  | "proposal.expired";
+  | "proposal.expired"
+  // §15 modes + §17.3 suggestions (§16.3 usage-learning kinds; CHECK extended
+  // in 20260721000001_chat_modes_and_ui_events.sql):
+  | "mode.changed"
+  | "mode.blocked_intent"
+  | "suggestion.shown"
+  | "suggestion.clicked";
 
 // Structural client type so this module never imports the supabase-js bundle.
 export interface TelemetryDb {

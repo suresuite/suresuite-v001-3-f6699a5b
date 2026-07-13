@@ -1,0 +1,35 @@
+{
+  "id": "sug-02-validation-driven",
+  "description": "ai-agents.md §17.3 sug-02 — complete data, a completed run, no active validated card: the validation rule leads (data-gaps rule silent); the experiment rule follows (a saved version exists).",
+  "project_snapshot": {
+    "reuse": "ed-01-simple-run",
+    "patch": {
+      "model_validations": [],
+      "simulation_runs": [
+        {
+          "id": "66666666-6666-4666-8666-666666666601",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "status": "done",
+          "rep_count_done": 10,
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "scenario_id": "55555555-5555-4555-8555-555555555501",
+          "aggregate_kpis": { "fill_rate": 0.95 },
+          "created_at": 100
+        }
+      ]
+    }
+  },
+  "caller": {
+    "enabledAgents": ["data-steward", "policy-configurator", "vv-analyst", "experiment-designer"],
+    "features": { "agent_proposals": true },
+    "isSuper": false,
+    "mode": "review",
+    "memoryOn": false
+  },
+  "expect": {
+    "first_rule": "validation",
+    "rules_include": ["validation", "experiment"],
+    "rules_exclude": ["data_gaps", "report"]
+  },
+  "retired_reason": null
+}

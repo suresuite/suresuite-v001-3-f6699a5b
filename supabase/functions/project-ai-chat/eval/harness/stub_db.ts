@@ -24,11 +24,26 @@ class QueryBuilder implements PromiseLike<QueryResult> {
   private orderCol: string | null = null;
   private orderAsc = true;
   private limitN: number | null = null;
-  private single = false;
+  private wantSingle = false;
+  // Stage 4: write fidelity for the dispatch path — .insert({...}).select()
+  // .single() and .update({...}).eq(...) as dispatch.ts drives them.
+  private mode: "select" | "insert" | "update" = "select";
+  private insertRows: Row[] = [];
+  private updatePatch: Row | null = null;
 
   constructor(private rows: Row[]) {}
 
   select(_cols?: string) { return this; }
+  insert(payload: Row | Row[]) {
+    this.mode = "insert";
+    this.insertRows = Array.isArray(payload) ? payload : [payload];
+    return this;
+  }
+  update(patch: Row) {
+    this.mode = "update";
+    this.updatePatch = patch;
+    return this;
+  }
   eq(col: string, value: unknown) { this.filters.push({ kind: "eq", col, value }); return this; }
   in(col: string, value: unknown[]) { this.filters.push({ kind: "in", col, value }); return this; }
   gte(col: string, value: unknown) { this.filters.push({ kind: "gte", col, value }); return this; }
@@ -39,9 +54,38 @@ class QueryBuilder implements PromiseLike<QueryResult> {
     return this;
   }
   limit(n: number) { this.limitN = n; return this; }
-  maybeSingle() { this.single = true; return this; }
+  maybeSingle() { this.wantSingle = true; return this; }
+  /** supabase-js .single(): here identical to maybeSingle (callers assert). */
+  single() { this.wantSingle = true; return this; }
 
   private run(): QueryResult {
+    if (this.mode === "insert") {
+      const inserted: Row[] = [];
+      for (const r of this.insertRows) {
+        const row: Row = { id: nextUuid(), created_at: new Date().toISOString(), ...r };
+        this.rows.push(row);
+        inserted.push(row);
+      }
+      if (this.wantSingle || this.insertRows.length === 1) {
+        return { data: inserted[0] ? structuredClone(inserted[0]) : null, error: null };
+      }
+      return { data: structuredClone(inserted), error: null };
+    }
+    if (this.mode === "update") {
+      const touched = this.rows.filter((r) =>
+        this.filters.every((f) => {
+          const v = r[f.col];
+          switch (f.kind) {
+            case "eq": return String(v) === String(f.value);
+            case "in": return (f.value as unknown[]).map(String).includes(String(v));
+            case "gte": return Number(v) >= Number(f.value);
+            case "lte": return Number(v) <= Number(f.value);
+          }
+        })
+      );
+      for (const r of touched) Object.assign(r, this.updatePatch ?? {});
+      return { data: structuredClone(touched), error: null };
+    }
     let out = this.rows.filter((r) =>
       this.filters.every((f) => {
         const v = r[f.col];
@@ -63,7 +107,7 @@ class QueryBuilder implements PromiseLike<QueryResult> {
     if (this.limitN != null) out = out.slice(0, this.limitN);
     // Clone like the wire would: callers must never hold references into the
     // store (the apply path's `before` snapshot depends on this).
-    if (this.single) return { data: out[0] ? structuredClone(out[0]) : null, error: null };
+    if (this.wantSingle) return { data: out[0] ? structuredClone(out[0]) : null, error: null };
     return { data: structuredClone(out), error: null };
   }
 
@@ -91,7 +135,10 @@ export function makeStubDb(
   return {
     tables,
     from(table: string) {
-      return new QueryBuilder(tables[table] ?? []);
+      // Materialize missing tables so inserts land in the store, not in a
+      // detached array (the Stage 4 dispatch path inserts simulation_runs).
+      if (!tables[table]) tables[table] = [];
+      return new QueryBuilder(tables[table]);
     },
     rpc(fn: string, args: Record<string, unknown> = {}) {
       const handler = rpcs[fn];
@@ -293,6 +340,16 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       const v = (tables.policy_versions ?? []).find((r) => String(r.id) === String(args.p_version_id));
       if (!v) throw new Error(`Version ${args.p_version_id} not found`);
       return null; // mirror records the call; full restore is pinned in SQL tests
+    },
+
+    // ── Stage 4 mirrors ──────────────────────────────────────────────────────
+    // snapshot_dataset (20260703000001): deduped server-side — an unchanged
+    // dataset reuses its latest version. The mirror returns the newest seeded
+    // dataset_versions row (or none, matching a pre-migration database).
+    snapshot_dataset: () => {
+      const versions = [...(tables.dataset_versions ?? [])]
+        .sort((a, b) => Number(b.created_at ?? 0) - Number(a.created_at ?? 0));
+      return versions[0]?.id ?? null;
     },
 
     // ── Stage 3 mirrors (SQL original: 20260710000001) ───────────────────────

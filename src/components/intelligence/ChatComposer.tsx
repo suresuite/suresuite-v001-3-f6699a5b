@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { ModelPicker } from "@/components/chat/ModelPicker";
+import { chatModesUiEnabled, ModeSwitch, type ThreadMode } from "@/components/chat/ModeSwitch";
 import { AttachProjectButton } from "./AttachProjectButton";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,10 @@ interface Props {
   projects: Project[];
   projectId: string | null;
   onProjectChange: (id: string | null) => void;
+  /** §15 mode control, rendered beside the model picker when the modes UI
+   * flag is on and both props are provided. */
+  mode?: ThreadMode;
+  onModeChange?: (mode: ThreadMode) => void;
   placeholder?: string;
   autoFocus?: boolean;
   minRows?: number;
@@ -32,6 +37,8 @@ export function ChatComposer({
   projects,
   projectId,
   onProjectChange,
+  mode,
+  onModeChange,
   placeholder = "How can I help you today?",
   autoFocus,
   minRows = 2,
@@ -77,6 +84,9 @@ export function ChatComposer({
           disabled={loading}
         />
         <div className="flex items-center gap-1.5">
+          {chatModesUiEnabled() && mode && onModeChange && (
+            <ModeSwitch value={mode} onChange={onModeChange} disabled={loading} />
+          )}
           <ModelPicker value={model} onChange={onModelChange} />
           <button
             type="button"

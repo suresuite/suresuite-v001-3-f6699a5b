@@ -27,6 +27,8 @@ import {
 } from "./itemMasterApply.ts";
 import { applyPolicyBundle, type PolicyBundleApplyResult } from "./policyBundleApply.ts";
 import { applyModelCard, type ModelCardApplyResult } from "./modelCardApply.ts";
+import { applyExperimentSpec, type ExperimentSpecApplyResult } from "./experimentSpecApply.ts";
+import { cleanEnv } from "../_shared/env.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,25 +53,75 @@ const APPLY_RETRY_CAP = 3;
  * required (on top of agent_apply). policy_bundle_diff carries the grants a
  * user needs to do this by hand on /policies; model_card_draft adoption lives
  * on Run & Validate (a /policies stage). */
-const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string[] }> = {
+export const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string[] }> = {
   item_master_diff: { features: ["data_editing"], pages: [] },
   policy_bundle_diff: { features: ["data_editing"], pages: ["/policies"] },
   model_card_draft: { features: [], pages: ["/policies"] },
+  // §13.3 row 4 — "this is the 'agents can run simulations' right": exactly
+  // the feature + page that gate the Lab's own Run button.
+  experiment_spec: { features: ["simulation_lab"], pages: ["/simulation-lab"] },
 };
 
-/** §13.4: compute quotas per artifact. None of the Stage 1–3 artifacts
- * dispatches compute, so no quota binds yet; experiment_spec (Stage 4) adds
- * the 3-concurrent / 10-per-day agent-applied-runs rule here. Returns the
- * human-readable violation, or null when within quota. */
+/** §13.4 quota caps (DEFAULT, §10 Q15): agent-applied runs per user per
+ * project, counted on simulation_runs rows joined through
+ * proposals.applied_result→run_id. */
+export const EXPERIMENT_CONCURRENT_CAP = 3;
+export const EXPERIMENT_DAILY_CAP = 10;
+
+const isUuid = (v: unknown): v is string =>
+  typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+/** §13.4: compute quotas per artifact. Only experiment_spec dispatches
+ * compute: max 3 concurrent queued/running agent-applied runs and 10 per day,
+ * per user per project. Returns the human-readable violation naming the
+ * remaining allowance, or null when within quota. Quota failures never count
+ * as an apply attempt (§10 Q21c — attempts count real gate/RPC executions). */
 // deno-lint-ignore no-explicit-any
-function checkApplyQuota(_db: any, artifactType: string): Promise<string | null> {
-  switch (artifactType) {
-    case "item_master_diff":
-    case "policy_bundle_diff":
-    case "model_card_draft":
-      return Promise.resolve(null);
-    default:
-      return Promise.resolve(null);
+export async function checkApplyQuota(db: any, args: {
+  artifactType: string;
+  projectId: string;
+  userId: string;
+}): Promise<string | null> {
+  if (args.artifactType !== "experiment_spec") return null;
+  try {
+    const { data: applied, error } = await db
+      .from("proposals")
+      .select("applied_result,reviewed_by")
+      .eq("project_id", args.projectId)
+      .eq("artifact_type", "experiment_spec")
+      .eq("status", "applied")
+      .eq("reviewed_by", args.userId);
+    if (error) throw error;
+    const runIds = ((applied ?? []) as Array<{ applied_result: Record<string, unknown> | null }>)
+      .map((p) => p.applied_result?.run_id)
+      .filter(isUuid);
+    if (runIds.length === 0) return null;
+    const { data: runs, error: runsErr } = await db
+      .from("simulation_runs")
+      .select("id,status,created_at")
+      .in("id", runIds);
+    if (runsErr) throw runsErr;
+    const rows = (runs ?? []) as Array<{ status: string; created_at: unknown }>;
+
+    const concurrent = rows.filter((r) => r.status === "queued" || r.status === "running").length;
+    if (concurrent >= EXPERIMENT_CONCURRENT_CAP) {
+      return `Agent-run quota: ${concurrent} agent-applied runs are already queued or running for you on this project ` +
+        `(limit ${EXPERIMENT_CONCURRENT_CAP} concurrent, 0 remaining). Wait for one to finish or cancel it in the Lab.`;
+    }
+
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const ts = (v: unknown): number => (typeof v === "number" ? v : Date.parse(String(v ?? "")) || 0);
+    const today = rows.filter((r) => ts(r.created_at) >= dayStart.getTime()).length;
+    if (today >= EXPERIMENT_DAILY_CAP) {
+      return `Daily agent-run quota reached: ${today} of ${EXPERIMENT_DAILY_CAP} agent-applied runs today for you on this ` +
+        `project (${Math.max(0, EXPERIMENT_DAILY_CAP - today)} remaining). Try again tomorrow, or run it manually from the Lab.`;
+    }
+    return null;
+  } catch (e) {
+    // Fail closed: compute must not dispatch when the quota cannot be counted.
+    console.error("apply quota check failed:", e);
+    return "The agent-run quota could not be verified — try again.";
   }
 }
 
@@ -178,12 +230,15 @@ serve(async (req) => {
       }
     }
 
-    const quotaViolation = await checkApplyQuota(svc, String(proposal.artifact_type));
+    // §13.4 quota — checked before anything mutates. A quota denial is a
+    // typed error that does NOT increment apply_attempts (§10 Q21c: attempts
+    // count real gate/RPC executions; the card's Retry stays available).
+    const quotaViolation = await checkApplyQuota(svc, {
+      artifactType: String(proposal.artifact_type),
+      projectId,
+      userId,
+    });
     if (quotaViolation) {
-      await svc.rpc("mark_agent_proposal_apply_failed", {
-        p_proposal_id: proposalId,
-        p_error: `quota_exceeded: ${quotaViolation}`,
-      });
       return jsonResponse({ error: quotaViolation, code: "quota_exceeded", type: "APPLY_FAILED" });
     }
 
@@ -222,7 +277,7 @@ serve(async (req) => {
       return jsonResponse({ error: message, code, type: "APPLY_FAILED" });
     };
 
-    let result: ItemMasterApplyResult | PolicyBundleApplyResult | ModelCardApplyResult;
+    let result: ItemMasterApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult;
     try {
       switch (String(proposal.artifact_type)) {
         case "item_master_diff":
@@ -250,6 +305,35 @@ serve(async (req) => {
             userEmail,
           });
           break;
+        case "experiment_spec": {
+          // §4.4 row 4: scenario write path + dispatchExperimentRun — the
+          // ONLY dispatch path. The worker-queue env is verified before any
+          // write so a misconfigured deployment fails clean.
+          const upstashUrl = cleanEnv("UPSTASH_REDIS_REST_URL");
+          const upstashToken = cleanEnv("UPSTASH_REDIS_REST_TOKEN");
+          if (!upstashUrl || !upstashToken) {
+            return await fail("rpc_error", "the worker queue is not configured in this deployment (UPSTASH_REDIS_REST_URL/TOKEN)");
+          }
+          const upstash = async (cmd: (string | number)[]): Promise<unknown> => {
+            const res = await fetch(upstashUrl, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${upstashToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify(cmd),
+            });
+            if (!res.ok) throw new Error(`upstash ${res.status}: ${await res.text()}`);
+            return res.json();
+          };
+          result = await applyExperimentSpec(svc, { upstash }, {
+            projectId,
+            payload: (proposal.payload ?? {}) as Record<string, unknown>,
+            grounding: (proposal.grounding ?? {}) as Record<string, unknown>,
+            userId,
+            // The approving human's checkbox from the card — honored inside
+            // only when the stored findings_preview displayed warn findings.
+            acknowledgeWarnings: body.acknowledgeWarnings === true,
+          });
+          break;
+        }
         default:
           // Later stages add their §4.4 rows here; an artifact this deployment
           // cannot apply is a typed error, not an attempt.

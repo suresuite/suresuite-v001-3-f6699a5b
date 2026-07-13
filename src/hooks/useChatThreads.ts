@@ -48,6 +48,9 @@ export interface Thread {
   // M1 rolling summary (§14.3) — server-maintained; user-deletable via
   // clearThreadSummary ("What the assistant remembers about this conversation").
   summary?: string | null;
+  // §15 interaction mode — 'review' when absent (the DEFAULT; 'auto' does not
+  // exist, §10 Q23). Server-enforced; this field is the client's view of it.
+  mode?: "ask" | "review";
 }
 
 export interface ChatFolder {
@@ -175,6 +178,8 @@ interface ServerThreadRow {
   summary: string | null;
   last_message_at: string | null;
   created_at: string;
+  /** §15 — absent on databases without the 20260721000001 migration. */
+  mode?: "ask" | "review" | null;
 }
 
 interface ServerMessageRow {
@@ -202,6 +207,7 @@ function serverRowToThread(row: ServerThreadRow, quickServerId: string, cached?:
     archived: row.archived,
     folderId: row.folder_id,
     summary: row.summary ?? null,
+    mode: row.mode === "ask" ? "ask" : "review",
     messages: cached?.messages ?? [],
   };
 }
@@ -575,6 +581,33 @@ export function useChatThreads() {
     }
   }, [persist, serverThreadIdFor, user?.id]);
 
+  /** §15: flip a thread's interaction mode (Ask ↔ Review). Local state first,
+   * then the server row (which is what the server actually enforces at
+   * checkpoint 2) and the mode.changed telemetry event — both fire-and-forget
+   * so a missing migration never blocks the switch UI. */
+  const setThreadMode = useCallback((threadId: string, mode: "ask" | "review") => {
+    persist((prev) => prev.map((t) => (t.id === threadId ? { ...t, mode } : t)), true);
+    const serverId = serverThreadIdFor(threadId);
+    if (serverId && user?.id) {
+      rpc("upsert_chat_thread", { p_user_id: user.id, p_id: serverId, p_mode: mode })
+        .then(({ error }: { error: { message: string } | null }) => {
+          if (error) console.warn("[chat-store] mode update failed:", error.message);
+        });
+    }
+    if (user?.id) {
+      const thread = threads.find((t) => t.id === threadId);
+      rpc("record_chat_ui_event", {
+        p_kind: "mode.changed",
+        p_user_id: user.id,
+        p_project_id: thread?.projectId ?? null,
+        p_thread_id: serverId ?? threadId,
+        p_payload: { mode },
+      }).then(({ error }: { error: { message: string } | null }) => {
+        if (error) console.warn("[chat-store] mode event failed:", error.message);
+      });
+    }
+  }, [persist, serverThreadIdFor, user?.id, threads]);
+
   /** M1 (§14.3): delete the rolling summary — the user's right over what the
    * assistant remembers. Server clears summary and resets summary_upto_seq. */
   const clearThreadSummary = useCallback((threadId: string) => {
@@ -644,5 +677,7 @@ export function useChatThreads() {
     appendMessageToStore,
     // M1 (§14.3): rolling-summary visibility + deletion.
     clearThreadSummary,
+    // §15: per-thread interaction mode.
+    setThreadMode,
   };
 }

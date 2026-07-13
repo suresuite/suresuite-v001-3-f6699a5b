@@ -46,6 +46,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
     setPinned,
     setArchived,
     searchMessages,
+    setThreadMode,
   } = useChatThreads();
 
   useEffect(() => {
@@ -154,6 +155,8 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
             onInputChange={setInput}
             model={model}
             onModelChange={handleModelChange}
+            threadMode={activeThread?.mode ?? "review"}
+            onModeChange={(m) => activeThreadId && setThreadMode(activeThreadId, m)}
           />
         </div>
       </div>

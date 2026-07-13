@@ -247,6 +247,68 @@ function ModelCardDraft({ payload }: { payload: ModelCardPayload }) {
   );
 }
 
+interface ExperimentSpecPayload {
+  scenario_id?: string;
+  scenario_name?: string;
+  new_scenario?: {
+    name?: string;
+    horizon_days?: number;
+    disruption_schedule?: Array<Record<string, unknown>>;
+  };
+  policy_version_id?: string;
+  policy_version_label?: string | null;
+  newer_version_exists?: boolean;
+  replications?: number;
+  question?: string;
+  gate_status?: string;
+  findings_preview?: Array<{ severity: string; field: string; message: string }>;
+}
+
+/** §4.6 experiment view: spec summary + the read-only gate pre-check result
+ * (findings_preview) the acknowledgment checkbox is informed by (§5.4). */
+function ExperimentSpec({ payload, grounding }: { payload: ExperimentSpecPayload; grounding: Record<string, unknown> }) {
+  const ns = payload.new_scenario;
+  const events = ns?.disruption_schedule ?? [];
+  const findings = payload.findings_preview ?? [];
+  const policyHash = typeof grounding?.policy_hash === "string" ? String(grounding.policy_hash) : null;
+  return (
+    <div className="space-y-1.5 text-[12.5px]">
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded bg-muted px-1.5 py-px font-mono">
+          scenario: {ns ? `${ns.name ?? "—"} (new, ${ns.horizon_days ?? "—"}d, ${events.length} events)` : payload.scenario_name ?? payload.scenario_id ?? "—"}
+        </span>
+        <span className="rounded bg-muted px-1.5 py-px font-mono">
+          policy version: {payload.policy_version_label ?? payload.policy_version_id?.slice(0, 8) ?? "—"}
+          {policyHash ? ` (${policyHash.slice(0, 12)})` : ""}
+        </span>
+        <span className="rounded bg-muted px-1.5 py-px font-mono">replications: {payload.replications ?? "—"}</span>
+      </div>
+      {payload.question && <div className="text-[12px] text-muted-foreground">Question: {payload.question}</div>}
+      {payload.newer_version_exists && (
+        <div className="rounded bg-amber-500/10 px-2 py-1 text-[12px] text-amber-700 dark:text-amber-400">
+          A newer saved policy version exists — this spec binds an older one (versions are immutable, so the run stays reproducible).
+        </div>
+      )}
+      <div className="text-[12px]">
+        Gate pre-check: <span className="font-mono">{payload.gate_status ?? "—"}</span>
+        {findings.length > 0 && (
+          <ul className="mt-1 space-y-0.5">
+            {findings.slice(0, 8).map((f, i) => (
+              <li key={i} className={f.severity === "block" ? "text-destructive" : f.severity === "warn" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}>
+                [{f.severity}] {f.field}: {f.message}
+              </li>
+            ))}
+            {findings.length > 8 && <li className="text-muted-foreground">(+{findings.length - 8} more)</li>}
+          </ul>
+        )}
+      </div>
+      <div className="text-[11.5px] text-muted-foreground">
+        Approving dispatches this run through the standard gate — the engine computes the results; nothing here predicts them.
+      </div>
+    </div>
+  );
+}
+
 function ProposalBody({ proposal }: { proposal: Proposal }) {
   const payload = proposal.payload ?? {};
   const rows = (payload as { rows?: Array<Record<string, unknown>> }).rows;
@@ -258,6 +320,9 @@ function ProposalBody({ proposal }: { proposal: Proposal }) {
   }
   if (proposal.artifact_type === "model_card_draft" && (payload as ModelCardPayload).computed) {
     return <ModelCardDraft payload={payload as ModelCardPayload} />;
+  }
+  if (proposal.artifact_type === "experiment_spec" && (payload as ExperimentSpecPayload).policy_version_id) {
+    return <ExperimentSpec payload={payload as ExperimentSpecPayload} grounding={proposal.grounding ?? {}} />;
   }
   const narrative = (payload as { narrative_md?: string; explanation_md?: string });
   const text = narrative.explanation_md ?? narrative.narrative_md;
@@ -289,6 +354,11 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
   const { proposal, loading, applying, approve, reject, retryApply, recordViewed } = useProposal(proposalId ?? null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // §5.4: only the approving human can acknowledge warn findings — this
+  // checkbox is that act. It renders only when the card DISPLAYS warn (and
+  // no block) findings from the stored findings_preview; the server honors
+  // it only under the same condition.
+  const [ackWarnings, setAckWarnings] = useState(false);
 
   useEffect(() => {
     if (proposal?.id) recordViewed(proposal.id);
@@ -316,6 +386,13 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
   const dimmed = proposal.status === "rejected" || proposal.status === "expired";
   const isApplying = proposal.status === "approved" && !proposal.apply_error;
   const retryDisabled = proposal.apply_attempts >= APPLY_RETRY_CAP;
+  const findingsPreview = Array.isArray((proposal.payload as { findings_preview?: unknown })?.findings_preview)
+    ? ((proposal.payload as { findings_preview: Array<{ severity: string }> }).findings_preview)
+    : [];
+  const ackAvailable = proposal.artifact_type === "experiment_spec" &&
+    findingsPreview.some((f) => f.severity === "warn") &&
+    !findingsPreview.some((f) => f.severity === "block");
+  const applyOpts = ackAvailable ? { acknowledgeWarnings: ackWarnings } : undefined;
 
   const run = async (fn: () => Promise<string | null>) => {
     setBusy(true);
@@ -395,11 +472,26 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
         <div className="mt-2 rounded bg-destructive/10 px-2 py-1.5 text-[12.5px] text-destructive">{actionError}</div>
       )}
 
+      {ackAvailable && (proposal.status === "proposed" || (proposal.status === "approved" && proposal.apply_error)) && (
+        <label className="mt-2 flex items-start gap-2 text-[12px] text-amber-700 dark:text-amber-400">
+          <input
+            type="checkbox"
+            checked={ackWarnings}
+            onChange={(e) => setAckWarnings(e.target.checked)}
+            className="mt-0.5 h-3.5 w-3.5 accent-amber-600"
+          />
+          <span>
+            I've read the warn findings above and want the run dispatched anyway
+            (the same "Run anyway" acknowledgment the Lab asks for).
+          </span>
+        </label>
+      )}
+
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {proposal.status === "proposed" && (
           <>
             <Button size="sm" className="h-7 px-3 text-[12.5px]" disabled={busy}
-              onClick={() => run(() => approve(proposal.id))}>
+              onClick={() => run(() => approve(proposal.id, applyOpts))}>
               Approve
             </Button>
             <Button size="sm" variant="outline" className="h-7 px-3 text-[12.5px]" disabled={busy}
@@ -412,7 +504,7 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
           <>
             <Button size="sm" className="h-7 px-3 text-[12.5px]" disabled={busy || applying || retryDisabled}
               title={retryDisabled ? `Retry limit reached (${APPLY_RETRY_CAP})` : undefined}
-              onClick={() => run(() => retryApply(proposal.id))}>
+              onClick={() => run(() => retryApply(proposal.id, applyOpts))}>
               Retry
             </Button>
             <Button size="sm" variant="outline" className="h-7 px-3 text-[12.5px]" disabled={busy}

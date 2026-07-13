@@ -24,6 +24,13 @@ import {
 // registry (ai-agents.md §9.2–§9.4, §14.7).
 import { AGENT_TURNS, buildWrapupMessage, mixedHandoffNote, runAgentTurn } from "./agentTurn.ts";
 import {
+  applyModeToRoute,
+  MODE_NOTICE_TEXT,
+  modeNoticePart,
+  resolveThreadMode,
+} from "./modes.ts";
+import { buildSuggestions, suggestionsEnabled } from "./suggestions.ts";
+import {
   loadThreadSummary,
   refreshThreadSummary,
   shouldRefreshSummary,
@@ -75,7 +82,70 @@ serve(async (req) => {
   } catch (_e) {
     return jsonResponse({ error: 'Invalid JSON body.', type: 'BAD_REQUEST' });
   }
-  const { projectId, message, conversationHistory, userId, userEmail, mode, model, agentId, threadId } = body;
+  const { projectId, message, conversationHistory, userId, userEmail, mode, model, agentId, threadId, threadMode } = body;
+
+  // §17.3 suggested actions: mode:"suggest" is a deterministic, capability-
+  // filtered project read — no LLM. Flag off ⇒ the request falls through to
+  // the standard validation below (byte-identical pre-§17.3 behavior).
+  if (mode === 'suggest' && suggestionsEnabled()) {
+    if (!userId || !userEmail) {
+      return jsonResponse({ error: 'Missing required parameters: userId, userEmail', type: 'BAD_REQUEST' });
+    }
+    if (!projectId) return jsonResponse({ suggestions: [] });
+    try {
+      const sbClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      );
+      const sbAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      );
+      const { error: accessErr } = await sbClient.rpc('get_project_dataset_counts', {
+        p_project_id: projectId,
+        p_user_id: userId,
+        p_user_email: userEmail,
+      });
+      if (accessErr) {
+        return jsonResponse({ error: "You don't have access to this project.", type: 'FORBIDDEN' });
+      }
+      const { data: caps } = await sbAdmin.rpc('get_my_capabilities', { _user_id: userId });
+      const c = (caps ?? {}) as Record<string, unknown>;
+      const features = (c.features as Record<string, boolean>) ?? {};
+      const isSuper = Boolean(c.is_super_admin);
+      if (!isSuper && features.ai_chat !== true) {
+        return jsonResponse({ error: "The AI assistant isn't enabled for your account.", type: 'FORBIDDEN' });
+      }
+      // §13.2 checkpoint-2 resolution, reused verbatim: a suggestion never
+      // names an agent the caller cannot route to (§17.3 honesty rule).
+      const enabledAgents = deploymentEnabledAgents().filter(
+        (slug) => features['agent_' + slug.replace(/-/g, '_')] === true,
+      );
+      const chatMode = await resolveThreadMode(sbAdmin, typeof threadId === 'string' ? threadId : null, threadMode);
+      const memoryOn = memoryEnabled() && (isSuper || features['project_memory'] === true);
+      const suggestions = await buildSuggestions(sbAdmin, projectId, {
+        enabledAgents,
+        features,
+        isSuper,
+        mode: chatMode,
+        memoryOn,
+      });
+      makeTelemetry(sbAdmin, {
+        user_id: userId,
+        project_id: projectId,
+        thread_id: typeof threadId === 'string' ? threadId : null,
+        request_id: crypto.randomUUID(),
+      }).emit('suggestion.shown', {
+        count: suggestions.length,
+        rules: suggestions.map((s) => s.rule),
+        mode: chatMode,
+      });
+      return jsonResponse({ suggestions, mode: chatMode });
+    } catch (e) {
+      console.error('suggest mode failed:', e);
+      return jsonResponse({ suggestions: [] });
+    }
+  }
 
   if (!message || !userId || !userEmail) {
     return jsonResponse({
@@ -295,13 +365,28 @@ serve(async (req) => {
     const enabledAgents = deploymentEnabledAgents().filter(
       (slug) => capFeatures['agent_' + slug.replace(/-/g, '_')] === true,
     );
+
+    // §15 mode (CHAT_MODES_ENABLED default off ⇒ 'review', no read): synced
+    // threads resolve from chat_threads.mode; unsynced threads carry the mode
+    // in the request body and the server STILL enforces it.
+    const chatMode = await resolveThreadMode(
+      supabaseAdmin,
+      typeof threadId === 'string' ? threadId : null,
+      threadMode,
+    );
+
     const routedUtterance = resolveRoutedUtterance(promptText, history);
-    const routeDecision = await decideRoute(routedUtterance, {
+    // Classification runs with the full capability-resolved set so a blocked
+    // mutation ask is DETECTED and named (§15 voice: never silently drop an
+    // intent); the mode then SUBTRACTS at checkpoint 2 — in Ask mode only the
+    // §15 allowlist may execute. Modes never grant anything §13 doesn't.
+    const rawDecision = await decideRoute(routedUtterance, {
       personaId: agentId ?? null,
       hasProject: Boolean(projectId),
       enabledAgents,
       modelId: resolvedModel.id,
     }, makeClassifier(resolvedModel));
+    const { decision: routeDecision, blocked: modeBlocked } = applyModeToRoute(rawDecision, chatMode);
     telemetry.emit('router.decision', {
       route: routeDecision.route,
       agent_id: routeDecision.agent_id,
@@ -309,6 +394,13 @@ serve(async (req) => {
       confidence: routeDecision.confidence,
       short_circuit: routeDecision.short_circuit,
     });
+    if (modeBlocked) {
+      telemetry.emit('mode.blocked_intent', {
+        mode: chatMode,
+        agent_id: modeBlocked.agent_id,
+        intent: modeBlocked.intent,
+      });
+    }
 
     // --- M1 rolling summary (§14.3, CHAT_SUMMARY_ENABLED default off):
     // persona turns receive the thread summary; agent turns never do.
@@ -475,6 +567,17 @@ serve(async (req) => {
           // plain-text offer chip.
           result = { ...result, reply: `${result.reply}\n\n${OFFER_CHIP_TEXT}` };
         }
+      }
+
+      // §15: the persona names the mode and never silently drops an intent —
+      // the notice + one-click "Switch to Review" chip are appended by the
+      // SERVER (never the model), after the advisory answer to the same ask.
+      if (modeBlocked) {
+        result = {
+          ...result,
+          reply: `${result.reply}\n\n${MODE_NOTICE_TEXT}`,
+          parts: [...(result.parts ?? []), modeNoticePart(modeBlocked)],
+        };
       }
 
       // M2 (§14.4): the deterministic memory confirmation/offer joins the same
