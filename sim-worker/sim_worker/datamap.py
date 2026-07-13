@@ -166,6 +166,7 @@ def build_project_data(
             disruption_schedule=scenario.get("disruption_schedule") or [],
             stopping_rule=scenario.get("stopping_rule"),
             name=str(scenario.get("name", "scenario")),
+            inspection=bool(scenario.get("inspection", False)),
         ),
         project_model=project_model,
     )

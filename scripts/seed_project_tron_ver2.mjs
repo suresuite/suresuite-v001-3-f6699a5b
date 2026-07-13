@@ -223,17 +223,47 @@ async function main() {
     projectId = project.id;
     console.log(`  reusing existing project ${projectId}`);
   } else {
-    projectId = await rpc("create_project", {
-      p_name: PROJECT.name,
-      p_plant: PROJECT.plant_name,
-      p_model: PROJECT.supply_chain_model,
-      p_bom_level: PROJECT.bom_level,
-      p_user_id: USER_ID,
-      p_user_email: USER_EMAIL,
-      p_user_name: USER_NAME,
-      p_data_type: "curated",
-    });
-    console.log(`  created project ${projectId}`);
+    try {
+      projectId = await rpc("create_project", {
+        p_name: PROJECT.name,
+        p_plant: PROJECT.plant_name,
+        p_model: PROJECT.supply_chain_model,
+        p_bom_level: PROJECT.bom_level,
+        p_user_id: USER_ID,
+        p_user_email: USER_EMAIL,
+        p_user_name: USER_NAME,
+        p_data_type: "curated",
+      });
+      console.log(`  created project ${projectId}`);
+    } catch (err) {
+      // G16 "wrong-org invisibility": the unique key (modeler_id, plant_name,
+      // name) says the project EXISTS for this modeler, yet the org-scoped
+      // list_projects did not return it — projects.organization has drifted
+      // from the owner's current approved_users.organization. Recover the id
+      // through an org-independent read (the seeded scenarios are anon-
+      // readable and carry project_id); the final visibility check below
+      // remains the hard gate, so a still-misaligned org fails loudly there.
+      if (!String(err.message).includes("uq_modeler_project")) throw err;
+      console.error(
+        "  ! create_project hit uq_modeler_project — the project exists but is NOT\n" +
+        "    visible via list_projects under this identity (G16 org mismatch:\n" +
+        "    projects.organization != owner's current approved_users.organization).\n" +
+        "    The workflow's 'Org-visibility diagnosis + repair' step re-stamps it;\n" +
+        "    recovering the project id via its seeded scenarios…",
+      );
+      const scenarioName = ds.scenarios[0]?.name;
+      const found = await rest(
+        `scenarios?select=project_id,created_at&name=eq.${encodeURIComponent(scenarioName)}&order=created_at.desc&limit=1`,
+      );
+      projectId = found.status === 200 ? found.body?.[0]?.project_id : null;
+      if (!projectId) {
+        throw new Error(
+          `project exists (uq_modeler_project) but could not be recovered via scenario "${scenarioName}" — ` +
+          "repair projects.organization to the owner's org and re-run",
+        );
+      }
+      console.log(`  recovered existing project ${projectId} (org repair pending verification below)`);
+    }
   }
 
   // 2) Item masters (chunked upserts — idempotent on (project_id, id)).

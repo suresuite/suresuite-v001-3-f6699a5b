@@ -11,7 +11,8 @@ import {
   type PolicyFamily,
 } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
-import { exportStageWorkbook, downloadWorkbook } from "@/lib/policies/excel";
+import { downloadWorkbook } from "@/lib/policies/excel";
+import { buildPolicyVersionWorkbook } from "@/lib/policies/verifiableExports";
 
 export interface PolicyVersion {
   id: string;
@@ -568,10 +569,12 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     [selectedVersionId, refreshVersions],
   );
 
-  // 6.D — download a saved version's policy bundle as an .xlsx workbook,
-  // reusing the stage Excel writer (one sheet per family). Reads the stored v2
-  // snapshot { defaults, fulfillment_strategy, overrides }; v1 snapshots (a
-  // flat family map, no `defaults` key) are handled too.
+  // 6.D + W2/G17 — download a saved version's policy bundle as an .xlsx
+  // workbook with per-cell PROVENANCE: values equal to the registry schema
+  // default are marked as such (they may be placeholders, not real data),
+  // and _meta states explicitly that this is the policy snapshot ONLY.
+  // Reads the stored v2 snapshot { defaults, fulfillment_strategy, overrides };
+  // v1 snapshots (a flat family map, no `defaults` key) are handled too.
   const exportVersion = useCallback(async (version: PolicyVersion) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -589,7 +592,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     const bundle = Object.fromEntries(
       families.map((f) => [f, parseFamily(f, rawDefaults[f])]),
     ) as unknown as PolicyBundle;
-    const overrides = (Array.isArray(snap.overrides) ? snap.overrides : []).map(
+    const snapOverrides = (Array.isArray(snap.overrides) ? snap.overrides : []).map(
       (o: Record<string, unknown>) => ({
         scope: o.scope,
         target_key: o.target_key,
@@ -598,10 +601,16 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       }),
     ) as OverrideRow[];
     const name = version.label || `version-${version.id.slice(0, 8)}`;
-    const wb = exportStageWorkbook(`Policy ${name}`, [...families], bundle, overrides);
+    const wb = buildPolicyVersionWorkbook(
+      version,
+      [...families],
+      bundle,
+      snapOverrides,
+      (snap.fulfillment_strategy as string | undefined) ?? null,
+    );
     const safe = name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 48);
     downloadWorkbook(wb, `policy-${safe}.xlsx`);
-    toast.success("Version exported");
+    toast.success("Version exported (policy snapshot only — with provenance)");
   }, []);
 
   const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? null;

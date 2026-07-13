@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { KpiStatTable } from "./KpiStatTable";
 import { UtilizationHeatmap } from "./UtilizationHeatmap";
 import { ConvergencePlot } from "./ConvergencePlot";
+import { ItemSeriesExplorer } from "./ItemSeriesExplorer";
+import { ReplicationSeedExplorer } from "./ReplicationSeedExplorer";
 import { RecoveryImpactCard } from "./RecoveryImpactCard";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { RecoveryConfig, DisruptionEvent } from "@/lib/sim/recoveryScore";
@@ -94,8 +96,18 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility 
         />
       )}
       <ConvergencePlot reps={reps} primaryKpi={primaryKpi} warmupAt={run.warmup_detected_at} />
+      {/* Per-seed filter over the persisted weekly traces (W1 / G17): default
+          is the cross-rep mean ± CI band; selecting a seed overlays or
+          isolates that replication and shows its KPI row. */}
+      <ReplicationSeedExplorer
+        reps={reps.filter((r) => r.status === "done" && r.kpis)}
+        warmupWeeks={run.warmup_detected_at}
+      />
       <KpiStatTable reps={reps} />
       <UtilizationHeatmap reps={reps} />
+      {/* Per-item weekly series (W3 / G17): inspection runs only — renders
+          nothing when the run persisted no run_item_series rows. */}
+      <ItemSeriesExplorer runId={run.id} warmupWeeks={run.warmup_detected_at} />
     </div>
   );
 }

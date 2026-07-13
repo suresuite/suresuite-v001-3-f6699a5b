@@ -24,6 +24,7 @@ log = logging.getLogger(__name__)
 # Non-scalar KPI keys that must never be broadcast as a KPI delta.
 _NON_BROADCAST_KEYS = {
     "replications", "mapping_warnings", "feasibility_warnings", "scsim_notes", "run_id",
+    "item_series",
 }
 
 
@@ -207,6 +208,11 @@ class SimWorker:
                     run_id: str | None = raw.get("run_id")
                     scenario_data: dict = raw.get("scenario") or {}
                     recovery_data: dict = raw.get("recovery") or {}
+                    # Single-run inspection mode (G17/§9.5.1): the dispatcher
+                    # forwards payload.inspection; the mapper honors it only
+                    # for 1-replication runs (warns and ignores otherwise).
+                    if (cmd.payload or {}).get("inspection") is True:
+                        scenario_data = {**scenario_data, "inspection": True}
 
                     disruption_schedule: list[dict] = scenario_data.get("disruption_schedule") or []
                     n_weeks = max(1, round(float(scenario_data.get("horizon_days", 90)) / 7))
@@ -290,6 +296,21 @@ class SimWorker:
                                                  "reporting results with no evidence rows",
                             })
                             raise RuntimeError("run_replications upsert failed")
+                        # Inspection mode's whole point is the per-item series:
+                        # a requested-but-unpersisted inspection run must fail
+                        # loudly, never report green with no item evidence.
+                        item_rows = kpis.get("item_series") or []
+                        if item_rows:
+                            items_ok = await self._write_item_series(
+                                run_id, cmd.project_id, item_rows)
+                            if not items_ok:
+                                await self._update_run(run_id, {
+                                    "status": "failed",
+                                    "error_message": "per-item series failed to persist "
+                                                     "(run_item_series upsert; see worker "
+                                                     "logs) — inspection run aborted",
+                                })
+                                raise RuntimeError("run_item_series upsert failed")
                         await self._update_run(
                             run_id, build_run_update(kpis, int(kpis.get("n_reps", n_reps))))
                     else:
@@ -410,6 +431,42 @@ class SimWorker:
         except Exception:
             log.exception("failed to upsert replications for run %s", run_id)
             return False
+
+    async def _write_item_series(
+        self, run_id: str, project_id: str, rows: list[dict[str, Any]]
+    ) -> bool:
+        """Idempotently UPSERT per-item weekly series rows on
+        (run_id, kind, item_id) — the single-run inspection evidence
+        (G17/§9.5.1). Chunked: ~577 rows × 156-week series is a few MB."""
+        if not rows:
+            return True
+        payload = [{
+            "run_id": run_id, "project_id": project_id,
+            "kind": r["kind"], "item_id": r["item_id"], "series": r.get("series", {}),
+        } for r in rows]
+        for i in range(0, len(payload), 100):
+            chunk = payload[i:i + 100]
+            try:
+                resp = await self._http.post(
+                    f"{self._supabase_url}/rest/v1/run_item_series",
+                    params={"on_conflict": "run_id,kind,item_id"},
+                    headers={
+                        "apikey": self._service_role_key,
+                        "Authorization": f"Bearer {self._service_role_key}",
+                        "Content-Type": "application/json",
+                        "Prefer": "resolution=merge-duplicates,return=minimal",
+                    },
+                    json=chunk,
+                    timeout=30.0,
+                )
+                if resp.status_code >= 300:
+                    log.warning("item-series upsert failed %s %s",
+                                resp.status_code, resp.text[:200])
+                    return False
+            except Exception:
+                log.exception("failed to upsert item series for run %s", run_id)
+                return False
+        return True
 
     async def _update_run(self, run_id: str, patch: dict[str, Any]) -> None:
         """PATCH a simulation_runs row via PostgREST (service role)."""

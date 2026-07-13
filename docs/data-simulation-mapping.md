@@ -183,6 +183,25 @@ KPI keys (the `ScenarioResult → DB` contract, in `scsim_bridge.py`): `fill_rat
 engine's `extra_series` (`backlog_units`, `on_hand_value`, `revenue_value`) — consumed by the
 /policies Run & Validate stage for warm-up estimation and KS/Welch-t validation.
 
+**Single-run inspection mode (G17/§9.5.1).** `payload.inspection=true` on an `experiment.run`
+flows worker → `scenario.inspection` → `ScenarioSettings.inspection`; the mapper raises
+`trace_verbosity` to `full_debug` **only when replications == 1** (warn-level
+`MappingWarning` + ignore otherwise). The engine then exposes per-item weekly matrices on
+`ScenarioResult.item_series` (`material.on_hand` / `material.in_transit` / `material.orders`,
+`product.demand` / `production` / `fulfillment` / `backlog` / `lost_units`); the bridge emits
+them as `item_series` rows and the worker upserts them into **`run_item_series`**
+(`(run_id, kind, item_id) → series jsonb`, migration `20260720000001`) — load-bearing when
+inspection was requested (a requested-but-unpersisted inspection run fails, never reports
+green). Multi-rep runs never write this table. The browser (Pyodide) path persists the same
+rows best-effort.
+
+**Reuse-or-rerun at dispatch (§9.2 read-path slice).** Before inserting the queued run,
+`_shared/dispatch.ts` looks up the newest completed run with the same
+`(policy_hash, graph_hash, scenario_hash)` whose scenario row is unchanged since it ran
+(seed-spec/disruption guard) and — unless `payload.force_rerun=true` — answers
+**409 `reuse_available`** with the candidate instead of enqueuing. Reuse is a user choice;
+on reuse the client surfaces the stored run and the worker is never woken.
+
 ---
 
 ## 8. Frontend rendering of this contract (live)

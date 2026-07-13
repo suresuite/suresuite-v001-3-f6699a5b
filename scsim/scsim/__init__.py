@@ -18,7 +18,7 @@ __version__ = "0.2.0"
 # Engine semantic version. Bump per change-governance tiers (Part IX §9.5):
 #   Tier 2 (new variable, behavior-neutral default) -> patch
 #   Tier 3 (new phase / contract change)            -> minor or major + ADR
-ENGINE_VERSION = "0.2.2"  # Tier 2: explicit demand_min/demand_max product bounds (behavior-neutral when NULL)
+ENGINE_VERSION = "0.2.3"  # Tier 2: single-run inspection surface — per-item weekly matrices on ScenarioResult (behavior-neutral; full_debug + 1 rep only)
 
 from scsim.entities.config import SimulationSettings, StatisticsReport  # noqa: E402,F401
 from scsim.entities.network import (  # noqa: E402,F401

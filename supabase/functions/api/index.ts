@@ -31,6 +31,7 @@ import {
   dispatchExperimentCancel,
   dispatchExperimentRun,
   enqueueEnvelope,
+  ReuseAvailable,
   ValidationRejection,
 } from "../_shared/dispatch.ts";
 
@@ -401,6 +402,9 @@ const RunCreateSchema = z.object({
   scenario_id: z.string().uuid(),
   policy_version_id: z.string().uuid(),
   acknowledge_warnings: z.boolean().optional().default(false),
+  /** Recompute even when identical completed results exist (§9.2 reuse check
+   *  answers 409 reuse_available otherwise — reuse is always a caller choice). */
+  force_rerun: z.boolean().optional().default(false),
 }).strict();
 
 const AddRepsSchema = z.object({ n: z.number().int().min(1).max(100) }).strict();
@@ -741,6 +745,7 @@ const createRun: Handler = async (ctx) => {
       payload: {
         policy_version_id: body.policy_version_id,
         acknowledge_warnings: body.acknowledge_warnings,
+        force_rerun: body.force_rerun,
       },
     }, null);
   } catch (e) {
@@ -751,6 +756,13 @@ const createRun: Handler = async (ctx) => {
           ack_required: e.gate.status === "ack_required",
           findings: e.gate.findings,
         });
+    }
+    if (e instanceof ReuseAvailable) {
+      // §9.2 read-path slice: identical completed results exist. The caller
+      // reads the stored run, or retries with force_rerun=true to recompute.
+      throw new ApiError(409, "reuse_available",
+        "identical completed run exists — read it or retry with force_rerun=true",
+        { reuse_candidate: e.candidate });
     }
     throw new ApiError(500, "dispatch_failed", String((e as Error)?.message ?? e).slice(0, 300));
   }

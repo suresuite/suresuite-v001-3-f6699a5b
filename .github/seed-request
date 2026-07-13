@@ -13,3 +13,5 @@ request: 2026-07-12T05:40:00Z reason=reseed-after-arc-write-performance-migratio
 request: 2026-07-12T08:30:00Z reason=reseed-with-orphan-repair-trigger-diagnostics-small-outbound-batches
 request: 2026-07-12T08:45:00Z reason=reseed-orphan-repair-cron-diag-live-blocker-dump
 request: 2026-07-12T09:00:00Z reason=reseed-after-metrics-check-performance-fix
+request: 2026-07-12T12:20:00Z reason=verify-g17-workstream-seed-filter-inspection-reuse-exports
+request: 2026-07-12T12:55:00Z reason=retry-after-g16-org-visibility-repair
