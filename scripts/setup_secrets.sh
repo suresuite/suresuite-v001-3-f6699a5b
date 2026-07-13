@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Push every deploy secret from ONE source (scripts/deploy.env) to its three homes:
 #   • Fly app       — worker runtime secrets (native Redis URL + Supabase)
-#   • Supabase       — sim-command edge-function secrets (Upstash REST + Supabase)
+#   • Supabase       — sim-command edge-function secrets (Upstash REST + Supabase,
+#                      plus FLY_API_TOKEN + FLY_APP_NAME so it can wake a
+#                      scaled-to-zero worker via the Fly Machines API)
 #   • GitHub Actions — only what CI needs to deploy (FLY_API_TOKEN + FLY_APP_NAME)
 #
 # Single source of truth → the three copies can never drift. Idempotent: re-run any
@@ -42,8 +44,10 @@ if command -v supabase >/dev/null 2>&1; then
   supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
     UPSTASH_REDIS_REST_URL="$UPSTASH_REDIS_REST_URL" \
     UPSTASH_REDIS_REST_TOKEN="$UPSTASH_REDIS_REST_TOKEN" \
-    SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
-  echo "  ✓ Supabase function secrets set"
+    SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
+    FLY_API_TOKEN="$FLY_API_TOKEN" \
+    FLY_APP_NAME="$FLY_APP_NAME"
+  echo "  ✓ Supabase function secrets set (incl. Fly wake creds for scale-to-zero)"
 else
   echo "  · supabase CLI not found — set these on Supabase → Edge Functions → Secrets."
 fi

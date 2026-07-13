@@ -113,17 +113,34 @@ def _log_engine_mode() -> None:
 async def main() -> None:
     _log_engine_mode()
     validate_env()
+
+    stop = asyncio.Event()
+    idle_shutdown = int(os.getenv("IDLE_SHUTDOWN_SECONDS", "0") or "0")
     worker = SimWorker(
         redis_url=os.environ["UPSTASH_REDIS_URL"],
         supabase_url=os.environ["SUPABASE_URL"],
         service_role_key=os.environ["SUPABASE_SERVICE_ROLE_KEY"],
         idle_ttl=int(os.getenv("IDLE_TTL_SECONDS", "600")),
+        idle_shutdown=idle_shutdown,
+        # Idle scale-to-zero and OS signals share the same clean-shutdown path:
+        # main() exits normally (code 0) so Fly can stop the machine.
+        on_idle=stop.set,
     )
 
-    stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
+
+    if idle_shutdown > 0:
+        log.info(
+            "scale-to-zero armed: will exit after %ss idle. Needs fly.toml "
+            "'[[restart]] policy = \"on-failure\"' to stop the machine, and the "
+            "sim-command edge function's Fly wake secrets (FLY_API_TOKEN + "
+            "FLY_APP_NAME) to restart it on the next run.",
+            idle_shutdown,
+        )
+    else:
+        log.info("scale-to-zero disabled (IDLE_SHUTDOWN_SECONDS unset/0) — worker stays always-on")
 
     log.info("sim-worker starting")
     runner = asyncio.create_task(worker.run())

@@ -11,7 +11,15 @@ primary_region = "iad"   # set this close to your Supabase region
 
 [env]
   LOG_LEVEL = "INFO"
-  IDLE_TTL_SECONDS = "600"
+  IDLE_TTL_SECONDS = "600"   # LRU eviction of warm project graphs (in-memory)
+  # Scale-to-zero cost control. "0" = disabled → the worker runs 24/7. That is
+  # the SAFE default: an always-on machine can never strand a queued run.
+  # Set to a positive number of seconds (e.g. "900" = 15 min) to make the
+  # worker exit cleanly after that long with no command in flight, so the Fly
+  # machine STOPS and stops billing (~$0/day while unused). To actually save
+  # money AND stay correct, TWO more things are required — see the [[restart]]
+  # block below and README "Scale to zero (idle cost → ~$0)".
+  IDLE_SHUTDOWN_SECONDS = "0"
   # Run experiment.run on the scsim phase-pipeline engine (the canonical path:
   # worker is the sole authoritative writer of runs + per-replication rows).
   # Remove to fall back to the legacy analytical engine (aggregates only).
@@ -25,6 +33,16 @@ primary_region = "iad"   # set this close to your Supabase region
 # A queue consumer must outlive its own crashes: without this, a boot-time
 # exception exhausts the default on-failure retries and the machine parks in
 # "stopped" — runs then sit "queued" forever with no visible error.
+#
+# SCALE-TO-ZERO: to let an idle worker actually stop (see IDLE_SHUTDOWN_SECONDS
+# above), change this to `policy = "on-failure"`, so a clean exit(0) on idle
+# STOPS the machine while genuine crashes still restart. Keep "always" whenever
+# IDLE_SHUTDOWN_SECONDS is "0": with "always", a worker that exits(0) on idle is
+# restarted immediately — no savings, but never a stranded run (the safe pairing
+# to deploy before the edge-function wake is configured). Once stopped, the next
+# run wakes the machine via the sim-command edge function's Fly Machines API
+# call (supabase/functions/_shared/wakeWorker.ts), which also closes the
+# original "queued forever" hole this "always" policy was guarding against.
 [[restart]]
   policy = "always"
 
