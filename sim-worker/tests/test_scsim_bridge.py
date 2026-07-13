@@ -152,3 +152,63 @@ def test_run_from_project_observer_errors_do_not_break_the_run():
     out = compute_run_from_project(_project_data(replications=2), on_replication=boom)
     assert out["source"] == "scsim"
     assert len(out["replications"]) == 2
+
+
+def _inspection_project_data(replications: int = 1):
+    from sim_worker.datamap import build_project_data
+
+    return build_project_data(
+        suppliers=[{"supplier_id": "S1", "name": "S1"}],
+        materials=[{"material_id": "M1", "cost": 4.0, "initial_on_hand": 200}],
+        products=[{"product_id": "P1", "sell_price": 25.0, "production_capacity": 900,
+                   "demand_mean": 300, "demand_cv": 0.2}],
+        inbound=[{"supplier_id": "S1", "material_id": "M1", "unit_price": 4.0, "lead_time": 2}],
+        bom=[{"product_id": "P1", "material_id": "M1", "consumption_rate": 1.0}],
+        outbound=[{"product_id": "P1", "customer_id": "C1", "unit_price": 25.0,
+                   "volume": 300, "time_unit": "week"}],
+        policies={"default": {"inventory": {"type": "min_max"}}},
+        scenario={"horizon_days": 365, "seed": 7, "replications": replications,
+                  "crn": True, "inspection": True},
+        project_model="make_to_stock",
+    )
+
+
+def test_inspection_run_emits_item_series_rows():
+    """G17/§9.5.1: a 1-rep inspection run returns per-item weekly series rows
+    in the run_item_series persistence shape, strict-JSON safe."""
+    import json
+
+    from sim_worker.scsim_bridge import compute_run_from_project
+
+    out = compute_run_from_project(_inspection_project_data(replications=1))
+    rows = out.get("item_series")
+    assert rows, "inspection run must emit item_series rows"
+    by_kind = {}
+    for r in rows:
+        assert set(r) == {"kind", "item_id", "series"}
+        by_kind.setdefault(r["kind"], []).append(r)
+        json.loads(json.dumps(r["series"], allow_nan=False))
+    assert [r["item_id"] for r in by_kind["material"]] == ["M1"]
+    assert [r["item_id"] for r in by_kind["product"]] == ["P1"]
+    mat = by_kind["material"][0]["series"]
+    assert set(mat) == {"on_hand", "in_transit", "orders"}
+    prod = by_kind["product"][0]["series"]
+    assert set(prod) == {"demand", "production", "fulfillment", "backlog", "lost_units"}
+    horizon_weeks = 52  # 365 days → engine floor
+    for series in list(mat.values()) + list(prod.values()):
+        assert len(series) == horizon_weeks
+
+
+def test_multi_rep_run_never_emits_item_series():
+    """Per-item series are single-replication evidence only — a multi-rep run
+    (inspection requested or not) must not carry them."""
+    from sim_worker.scsim_bridge import compute_run_from_project
+
+    out = compute_run_from_project(_inspection_project_data(replications=3))
+    assert not out.get("item_series")
+    assert any(
+        w["field"] == "inspection" and w["level"] == "warn"
+        for w in out["mapping_warnings"]
+    )
+    out2 = compute_run_from_project(_project_data(replications=2))
+    assert not out2.get("item_series")

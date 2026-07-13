@@ -15,6 +15,7 @@ import {
   dispatchExperimentCancel,
   dispatchExperimentRun,
   enqueueEnvelope,
+  ReuseAvailable,
   ValidationRejection,
 } from "../_shared/dispatch.ts";
 import { cleanEnv } from "../_shared/env.ts";
@@ -185,6 +186,19 @@ Deno.serve(async (req) => {
               findings: e.gate.findings,
             }),
             { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        // Reuse-or-rerun (G17 / §9.2 read-path slice): identical completed
+        // results exist. Reuse is a USER choice — the client either surfaces
+        // the candidate run or re-dispatches with payload.force_rerun=true.
+        if (e instanceof ReuseAvailable) {
+          return new Response(
+            JSON.stringify({
+              error: "identical completed run exists — reuse or re-run",
+              reuse_available: true,
+              reuse_candidate: e.candidate,
+            }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
         throw e;

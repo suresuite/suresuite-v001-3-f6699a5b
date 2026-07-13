@@ -84,6 +84,8 @@ import {
 } from "@/lib/sim/pyodideEngine";
 import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
+import { ItemSeriesExplorer } from "@/components/sim/ItemSeriesExplorer";
+import { ReplicationSeedExplorer } from "@/components/sim/ReplicationSeedExplorer";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { PolicyBundle, FulfillmentStrategy } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
@@ -188,6 +190,9 @@ interface MultiRunCfg {
 interface SingleRunCfg {
   seed: number;
   horizon_days: number;
+  /** Inspection mode (G17/§9.5.1): raise the engine trace and persist the
+   *  per-product / per-material weekly series of this ONE replication. */
+  inspection: boolean;
 }
 
 interface WarmupCfg {
@@ -202,7 +207,7 @@ interface IndicatorUpload {
   points?: number;
 }
 
-const DEFAULT_SINGLE: SingleRunCfg = { seed: 1, horizon_days: 365 };
+const DEFAULT_SINGLE: SingleRunCfg = { seed: 1, horizon_days: 365, inspection: false };
 const DEFAULT_MULTI: MultiRunCfg = {
   seeds_mode: "auto",
   replications: 10,
@@ -263,6 +268,7 @@ export function RunValidateStage({
     cancelRun,
     addReps,
     loadReps,
+    refresh: refreshRuns,
   } = useSimulationRun(validationScenarioId);
 
   // In-memory result of a run computed by the BROWSER engine (offline
@@ -688,11 +694,24 @@ export function RunValidateStage({
     let scen = scenarios.find((s) => s.name === VALIDATION_SCENARIO_NAME);
     if (!scen) scen = await createScenario(VALIDATION_SCENARIO_NAME);
     if (!scen) return null;
-    await updateScenario(scen.id, {
-      ...patch,
-      disruption_schedule: [],
-      recovery_overrides: {},
-    });
+    // Skip the write when nothing changes: a no-op UPDATE still bumps
+    // updated_at, which would defeat the §9.2 reuse-or-rerun check (run
+    // identity treats "scenario row unchanged since the candidate ran" as
+    // the seed-spec/disruption guard).
+    const unchanged =
+      scen.replications === patch.replications &&
+      scen.seed === patch.seed &&
+      scen.horizon_days === patch.horizon_days &&
+      scen.primary_kpi === patch.primary_kpi &&
+      (scen.disruption_schedule ?? []).length === 0 &&
+      Object.keys(scen.recovery_overrides ?? {}).length === 0;
+    if (!unchanged) {
+      await updateScenario(scen.id, {
+        ...patch,
+        disruption_schedule: [],
+        recovery_overrides: {},
+      });
+    }
     return scen.id;
   };
 
@@ -706,7 +725,9 @@ export function RunValidateStage({
     scenarioId: string,
     policyVersionId: string,
     computeClient = false,
-  ): Promise<string> => {
+    inspection = false,
+    forceRerun = false,
+  ): Promise<{ runId: string; reused: boolean }> => {
     const { data, error } = await supabase.functions.invoke("sim-command", {
       body: {
         project_id: projectId,
@@ -719,6 +740,8 @@ export function RunValidateStage({
           policy_version_id: policyVersionId,
           acknowledge_warnings: true,
           ...(computeClient ? { compute: "client" } : {}),
+          ...(inspection ? { inspection: true } : {}),
+          ...(forceRerun ? { force_rerun: true } : {}),
         },
         client_ts: Date.now(),
       },
@@ -726,7 +749,42 @@ export function RunValidateStage({
     if (!error) {
       const runId = (data as { run_id?: string } | null)?.run_id;
       if (!runId) throw new Error("sim-command did not return a run_id");
-      return runId;
+      return { runId, reused: false };
+    }
+    // Reuse-or-rerun (G17 / §9.2 read-path slice): the dispatcher found a
+    // completed run with the identical (policy_hash, graph_hash, scenario
+    // fingerprint, seed spec) and answers 409 instead of recomputing. Reuse
+    // is ALWAYS the user's choice — never silent.
+    const reuseCtx = (error as { context?: Response }).context;
+    if (reuseCtx?.status === 409 && typeof reuseCtx.json === "function") {
+      let reuseBody: {
+        reuse_candidate?: {
+          run_id: string;
+          ended_at?: string | null;
+          code_version?: string | null;
+          rep_count_done?: number;
+        };
+      } | null = null;
+      try {
+        reuseBody = await reuseCtx.clone().json();
+      } catch {
+        /* fall through to normal error handling */
+      }
+      const cand = reuseBody?.reuse_candidate;
+      if (cand?.run_id) {
+        const when = cand.ended_at ? new Date(cand.ended_at).toLocaleString() : "earlier";
+        const reuse = window.confirm(
+          `Identical results already exist from ${when} ` +
+            `(${cand.rep_count_done ?? "?"} replication(s), engine ${cand.code_version || "unknown"}).\n\n` +
+            `OK — reuse the stored results (no recompute).\n` +
+            `Cancel — re-run the simulation from scratch.`,
+        );
+        if (reuse) {
+          toast.success("Reusing the stored run — no recompute needed.");
+          return { runId: cand.run_id, reused: true };
+        }
+        return dispatchRun(scenarioId, policyVersionId, computeClient, inspection, true);
+      }
     }
     // Surface the server's actual response instead of supabase-js's generic
     // "non-2xx" message — a §8.1 gate rejection carries typed findings, and
@@ -803,9 +861,10 @@ export function RunValidateStage({
   const runValidationScenario = async (
     scenarioId: string,
     versionId: string | null,
-    scenario: { seed: number; horizon_days: number; replications: number },
+    scenario: { seed: number; horizon_days: number; replications: number; inspection?: boolean },
   ) => {
     setValidationScenarioId(scenarioId);
+    const inspection = scenario.inspection === true && scenario.replications === 1;
 
     // ── Server path ─────────────────────────────────────────────────────
     // Server mode NEVER silently computes in the browser: the whole point of
@@ -831,13 +890,20 @@ export function RunValidateStage({
       }
       try {
         setRunPhase({ kind: "loading", detail: "Dispatching to the simulation server…" });
-        const runId = await dispatchRun(scenarioId, versionId);
+        const { runId, reused } = await dispatchRun(scenarioId, versionId, false, inspection);
         // Clear any previous browser run so stale local rows can't shadow
         // the incoming realtime rows while rep_count_done is still 0.
         setLocalRun(null);
         setLocalReps([]);
         setActiveRunPath("server");
         setServerRunId(runId);
+        if (reused) {
+          // §9.2 read-path slice: the user chose to reuse the stored run —
+          // surface it (it is this scenario's newest completed run) instead
+          // of waiting on realtime events that will never come.
+          await refreshRuns();
+          return;
+        }
         setRunPhase({ kind: "loading", detail: "Queued on the simulation server…" });
         return; // realtime drives the UI from here (see the status effect)
       } catch (err) {
@@ -859,7 +925,15 @@ export function RunValidateStage({
     let snapshot: Record<string, unknown> | null = null;
     if (versionId) {
       try {
-        runId = await dispatchRun(scenarioId, versionId, true);
+        const dispatched = await dispatchRun(scenarioId, versionId, true, inspection);
+        if (dispatched.reused) {
+          // The user chose to reuse the stored run — surface it, skip compute.
+          setActiveRunPath("server");
+          setServerRunId(dispatched.runId);
+          await refreshRuns();
+          return;
+        }
+        runId = dispatched.runId;
         snapshot = await fetchPolicySnapshot(versionId);
       } catch (err) {
         // A hard gate rejection (missing required data) must still stop the run.
@@ -972,6 +1046,7 @@ export function RunValidateStage({
         seed: singleCfg.seed,
         horizon_days: singleCfg.horizon_days,
         replications: 1,
+        inspection: singleCfg.inspection,
       });
     } catch (err) {
       setSingleQueuedAt(null);
@@ -1440,6 +1515,25 @@ export function RunValidateStage({
                     </Button>
                   </div>
                 </div>
+                {/* Inspection mode (G17/§9.5.1 — W3): opt-in per-item evidence
+                    for this ONE replication at the chosen seed. */}
+                <label className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={singleCfg.inspection}
+                    onChange={(e) =>
+                      setSingleCfg((c) => ({ ...c, inspection: e.target.checked }))
+                    }
+                  />
+                  <span className="text-[11px]">
+                    <b>Inspection mode</b> — raise the engine trace and persist the
+                    per-product / per-material weekly series (on-hand, in-transit, orders,
+                    demand, production, fulfillment) of this single replication. A
+                    product/material picker appears in the run output below. Single-run
+                    only; multi-replication runs never persist per-item series.
+                  </span>
+                </label>
               </TabsContent>
 
               <TabsContent value="multi" className="mt-3 flex flex-col gap-3">
@@ -2501,77 +2595,22 @@ function MultiRunResultsPanel({
         <Stat label="n reps" value={String(values.length)} />
       </div>
       <div className="p-2 flex flex-col gap-2">
-        {weekly.length > 0 && (
-          <RealWeeklyTraces frSeries={weekly} confidence={confidence} warmupWeeks={warmupWeeks} />
-        )}
+        {/* Per-seed filter (W1): mean ± CI band by default; selecting a seed
+            overlays or isolates that replication's trace + its KPI row. */}
+        <ReplicationSeedExplorer
+          reps={reps}
+          warmupWeeks={warmupWeeks}
+          confidence={confidence}
+          title="Weekly traces by seed"
+        />
         <ConvergencePlot reps={reps} primaryKpi={activeKpi} warmupAt={null} />
       </div>
       <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">
         {weekly.length > 0
-          ? "Weekly per-replication series (engine output) with cross-rep mean ± CI and the adopted warm-up cut, plus the running mean ± 95% CI vs. replication count."
+          ? "Weekly per-replication series (engine output) with cross-rep mean ± CI and the adopted warm-up cut — filterable to a single seed — plus the running mean ± 95% CI vs. replication count."
           : "No weekly series persisted for this KPI — running mean ± 95% CI of the per-replication values as replications accumulate."}
       </div>
     </div>
-  );
-}
-
-/** Real per-replication weekly fill-rate traces + cross-rep mean ± CI band. */
-function RealWeeklyTraces({
-  frSeries,
-  confidence,
-  warmupWeeks,
-}: {
-  frSeries: number[][];
-  confidence: number;
-  warmupWeeks: number | null;
-}) {
-  const shown = frSeries.slice(0, 10);
-  const data = useMemo(() => {
-    const n = Math.min(...shown.map((s) => s.length));
-    if (!Number.isFinite(n) || n <= 0) return [];
-    return Array.from({ length: n }, (_, week) => {
-      const vals = shown.map((s) => s[week]);
-      const stats = meanCI(vals, confidence);
-      const row: Record<string, number> = {
-        week,
-        mean: stats.mean,
-        lower: stats.mean - stats.half,
-        upper: stats.mean + stats.half,
-      };
-      shown.forEach((s, i) => {
-        row[`r${i}`] = s[week];
-      });
-      return row;
-    });
-  }, [shown, confidence]);
-  if (data.length === 0) return null;
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-        <CartesianGrid strokeOpacity={0.15} />
-        <XAxis dataKey="week" tick={{ fontSize: 10 }} label={{ value: "week", fontSize: 10, position: "insideBottom", offset: -2 }} />
-        <YAxis tick={{ fontSize: 10 }} width={40} domain={["auto", "auto"]} />
-        <RTooltip contentStyle={{ fontSize: 11 }} />
-        {warmupWeeks != null && warmupWeeks > 0 && (
-          <ReferenceLine x={warmupWeeks} stroke="hsl(var(--destructive))" strokeDasharray="4 3" label={{ value: "warm-up", fontSize: 9, fill: "hsl(var(--destructive))" }} />
-        )}
-        <Line type="monotone" dataKey="upper" stroke="hsl(var(--primary) / 0.2)" strokeWidth={1} dot={false} isAnimationActive={false} />
-        <Line type="monotone" dataKey="lower" stroke="hsl(var(--primary) / 0.2)" strokeWidth={1} dot={false} isAnimationActive={false} />
-        {shown.map((_, i) => (
-          <Line
-            key={i}
-            type="monotone"
-            dataKey={`r${i}`}
-            stroke={`hsl(${(i * 47) % 360} 65% 55%)`}
-            strokeOpacity={0.4}
-            strokeWidth={0.8}
-            dot={false}
-            isAnimationActive={false}
-          />
-        ))}
-        <Line type="monotone" dataKey="mean" stroke="hsl(var(--primary))" strokeWidth={2.2} dot={false} isAnimationActive={false} />
-      </LineChart>
-    </ResponsiveContainer>
   );
 }
 
@@ -2841,6 +2880,14 @@ function EngineOutputSummary({
         </div>
         {/* 4 — sanity-check scalars. */}
         <SanityScalars reps={reps} />
+        {/* 5 — per-seed filter over the persisted weekly traces (W1): only
+            meaningful when the run has more than one replication. */}
+        {reps.length > 1 && (
+          <ReplicationSeedExplorer reps={reps} warmupWeeks={warmupWeeks} />
+        )}
+        {/* 6 — per-item weekly series (W3, inspection runs only): renders
+            nothing when the run persisted no run_item_series rows. */}
+        <ItemSeriesExplorer runId={run.id} warmupWeeks={warmupWeeks} />
       </div>
     </div>
   );

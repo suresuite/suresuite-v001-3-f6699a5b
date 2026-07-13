@@ -47,16 +47,31 @@ interface GateErrorBody {
   validation?: "blocked" | "ack_required";
   ack_required?: boolean;
   findings?: GateResponseFinding[];
+  /** Set on a 409 — the §9.2 reuse-or-rerun candidate. */
+  reuse_available?: boolean;
+  reuse_candidate?: ReuseCandidate;
+}
+
+/** A completed run identical to the requested one (reuse-or-rerun, §9.2). */
+export interface ReuseCandidate {
+  run_id: string;
+  ended_at: string | null;
+  created_at: string;
+  code_version: string | null;
+  rep_count_done: number | null;
 }
 
 /** Typed dispatch outcome: queued, or rejected with the gate's findings so
  *  the Lab renders them structurally instead of concatenating a toast. */
 export interface RunDispatchResult {
   queued: boolean;
-  /** Set when queued=false — the gate's rejection class. */
-  status?: "blocked" | "ack_required";
+  /** Set when queued=false — the rejection class. */
+  status?: "blocked" | "ack_required" | "reuse_available";
   /** Set when queued=false — the gate's typed findings. */
   findings?: GateResponseFinding[];
+  /** Set when status="reuse_available" — the identical completed run
+   *  (reuse is a USER choice: surface it, or re-dispatch with forceRerun). */
+  reuseCandidate?: ReuseCandidate;
 }
 
 async function parseFunctionError(error: unknown): Promise<GateErrorBody | null> {
@@ -157,6 +172,7 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
       projectId: string,
       policyVersionId: string,
       acknowledgeWarnings = false,
+      forceRerun = false,
     ): Promise<RunDispatchResult> => {
       if (!scenarioId) throw new Error("no scenario selected");
       const { error } = await supabase.functions.invoke("sim-command", {
@@ -167,6 +183,7 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
           payload: {
             policy_version_id: policyVersionId,
             acknowledge_warnings: acknowledgeWarnings,
+            ...(forceRerun ? { force_rerun: true } : {}),
           },
           client_ts: Date.now(),
         },
@@ -183,6 +200,15 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
           queued: false,
           status: body.validation,
           findings: body.findings ?? [],
+        };
+      }
+      // §9.2 reuse-or-rerun (409): identical completed results exist — the
+      // caller asks the user whether to surface the stored run or recompute.
+      if (body?.reuse_available && body.reuse_candidate) {
+        return {
+          queued: false,
+          status: "reuse_available",
+          reuseCandidate: body.reuse_candidate,
         };
       }
       throw error;

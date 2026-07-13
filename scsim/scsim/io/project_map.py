@@ -26,6 +26,7 @@ from scsim.entities.enums import (
     LeadTimeDist,
     ReplicationStopping,
     TargetType,
+    TraceVerbosity,
     WarmupMethod,
 )
 from scsim.entities.network import (
@@ -162,6 +163,10 @@ class ScenarioSettings:
     disruption_schedule: list[dict] = field(default_factory=list)
     stopping_rule: Optional[dict] = None     # {"kind": "fixed_horizon"|"sequential_ci", "epsilon": ...}
     name: str = "scenario"
+    # Single-run inspection mode (G17/§9.5.1): raises trace_verbosity to
+    # full_debug so per-item weekly matrices are exposed on the result.
+    # Honored only when replications == 1 — ignored (with a warning) otherwise.
+    inspection: bool = False
 
 
 @dataclass
@@ -609,6 +614,18 @@ def _build_settings(sc: ScenarioSettings, w: list[MappingWarning]) -> Simulation
         eps = (sc.stopping_rule or {}).get("epsilon") or (sc.stopping_rule or {}).get("ci_halfwidth_target")
         if eps is not None:
             kwargs["ci_halfwidth_target"] = float(_clamp(float(eps), 0.01, 0.10))
+    # Single-run inspection mode (G17): full-debug trace so the engine exposes
+    # per-item weekly matrices. Strictly single-replication — per-item series
+    # at multi-rep scale are deliberately never produced.
+    if sc.inspection:
+        if kwargs["model_seeds"] == 1:
+            kwargs["trace_verbosity"] = TraceVerbosity.FULL_DEBUG
+        else:
+            w.append(MappingWarning(
+                "warn", "scenario", "inspection",
+                f"inspection mode requires exactly 1 replication "
+                f"(got {kwargs['model_seeds']}) → ignored",
+            ))
     return SimulationSettings(**kwargs)
 
 

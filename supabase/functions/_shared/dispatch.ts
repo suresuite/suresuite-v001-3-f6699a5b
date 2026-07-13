@@ -99,6 +99,25 @@ export class ValidationRejection extends Error {
   }
 }
 
+/** A completed run identical to the requested one (reuse-or-rerun, §9.2). */
+export interface ReuseCandidate {
+  run_id: string;
+  ended_at: string | null;
+  created_at: string;
+  code_version: string | null;
+  rep_count_done: number | null;
+}
+
+/** Carries the reuse candidate out of dispatchExperimentRun as a 409 response.
+ *  Reuse is ALWAYS a user choice: the dispatcher never silently skips a run —
+ *  it answers "identical results exist" and the caller either surfaces the
+ *  stored run (reuse) or re-dispatches with payload.force_rerun=true. */
+export class ReuseAvailable extends Error {
+  constructor(public candidate: ReuseCandidate) {
+    super(`identical completed run exists (${candidate.run_id})`);
+  }
+}
+
 export async function dispatchExperimentRun(
   deps: DispatchDeps,
   cmd: DispatchCommand,
@@ -237,6 +256,54 @@ export async function dispatchExperimentRun(
     }
   } catch (e) {
     console.error("model-validation stamp failed (run continues unstamped)", e);
+  }
+
+  // Reuse-or-rerun check (G17 — the read-path slice of the §9.2 run cache).
+  // Run identity here = (policy_hash, graph_hash, scenario fingerprint hash,
+  // seed spec, disruption schedule): the first three compare stamped hashes;
+  // the seed spec + disruption schedule are covered by requiring the scenario
+  // row to be UNCHANGED since the candidate was dispatched (the stamped
+  // scenario_hash is the baseline fingerprint, which excludes events and
+  // estimation settings — the row-unchanged guard closes exactly that gap).
+  // The candidate's engine code_version is returned for the user to judge;
+  // the full RunKey with the engine fingerprint lands with Phase C.
+  // Never silent: a hit raises ReuseAvailable (→ 409) unless the caller
+  // explicitly asked to recompute via payload.force_rerun.
+  const forceRerun = (cmd.payload as Record<string, unknown>).force_rerun === true;
+  if (!forceRerun && graphHash && scenarioHash) {
+    try {
+      // deno-lint-ignore no-explicit-any
+      const { data: cand, error: candErr } = await (svc as any)
+        .from("simulation_runs")
+        .select("id,ended_at,created_at,code_version,rep_count_done")
+        .eq("scenario_id", scenario.id)
+        .eq("status", "done")
+        .eq("policy_hash", policyHash)
+        .eq("graph_hash", graphHash)
+        .eq("scenario_hash", scenarioHash)
+        .gte("rep_count_done", replications)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (candErr) throw candErr;
+      const scenarioUnchanged =
+        !scenario.updated_at ||
+        (cand?.created_at &&
+          new Date(cand.created_at).getTime() >= new Date(scenario.updated_at).getTime());
+      if (cand && scenarioUnchanged) {
+        throw new ReuseAvailable({
+          run_id: cand.id as string,
+          ended_at: (cand.ended_at as string | null) ?? null,
+          created_at: cand.created_at as string,
+          code_version: (cand.code_version as string | null) ?? null,
+          rep_count_done: (cand.rep_count_done as number | null) ?? null,
+        });
+      }
+    } catch (e) {
+      if (e instanceof ReuseAvailable) throw e;
+      // The reuse check is an optimization — never let it take dispatch down.
+      console.error("reuse check skipped (lookup failed)", e);
+    }
   }
 
   // Insert run row (queued) with the SERVICE ROLE: the dispatcher is the

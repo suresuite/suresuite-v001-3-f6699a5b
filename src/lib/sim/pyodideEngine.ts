@@ -19,6 +19,9 @@ export interface EngineResult {
   engineVersion: string;
   runUpdate: Record<string, unknown>;
   replications: Record<string, unknown>[];
+  /** Per-item weekly series rows (run_item_series shape) — present only for
+   *  inspection runs (1 replication, full-debug trace; G17/§9.5.1). */
+  itemSeries?: Record<string, unknown>[];
 }
 
 export interface EngineDataset {
@@ -34,7 +37,14 @@ export interface RunArgs {
   runId: string;
   projectId: string;
   snapshot: Record<string, unknown>;
-  scenario: { seed: number; horizon_days: number; replications: number; crn?: boolean };
+  scenario: {
+    seed: number;
+    horizon_days: number;
+    replications: number;
+    crn?: boolean;
+    /** Inspection mode (G17): honored by the mapper only when replications === 1. */
+    inspection?: boolean;
+  };
   projectModel: string | null;
   dataset: EngineDataset;
 }
@@ -158,6 +168,7 @@ export function runInBrowser(
             engineVersion: m.result?.engine_version ?? "scsim",
             runUpdate: m.result!.run_update,
             replications: m.result!.replications,
+            itemSeries: (m.result as { item_series?: Record<string, unknown>[] })?.item_series,
           });
           break;
         case "error":
@@ -250,6 +261,17 @@ export async function persistEngineResult(
         .from("run_replications")
         .upsert(rows, { onConflict: "run_id,rep_index" });
       if (repErr) throw repErr;
+    }
+    // Inspection runs (G17): the per-item weekly series rows, chunked — the
+    // whole payload is a few MB for the reference project's ~577 items.
+    if (result.itemSeries && result.itemSeries.length > 0) {
+      const rows = result.itemSeries.map((r) => ({ ...r, run_id: runId, project_id: projectId }));
+      for (let i = 0; i < rows.length; i += 100) {
+        const { error: itemErr } = await sb
+          .from("run_item_series")
+          .upsert(rows.slice(i, i + 100), { onConflict: "run_id,kind,item_id" });
+        if (itemErr) throw itemErr;
+      }
     }
     const { error: runErr } = await sb
       .from("simulation_runs")

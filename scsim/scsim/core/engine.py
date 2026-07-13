@@ -354,6 +354,13 @@ def _mech_accounting(model: CompiledModel, ctx: SimContext, policies: list[Polic
         tr.B[:, t] = ctx.backlog
         tr.L[:, t] = L
         tr.I_mat[:, t] = ctx.on_hand
+        # Inspection-mode per-material flows: pipeline content (in transit,
+        # all future arrival slots) and this week's purchase orders, both
+        # aggregated over supplier links onto materials.
+        tr.I_transit[:, t] = np.asarray(
+            model.link_to_mat @ ctx.pipeline.sum(axis=1)
+        ).ravel()
+        tr.O_mat[:, t] = np.asarray(model.link_to_mat @ ctx.purchase_orders).ravel()
 
 
 _MECHANIC_HOOKS: list[tuple[str, Hook, Callable]] = [
@@ -623,6 +630,17 @@ class ScenarioResult:
     # Additional weekly per-replication series lifted from the trace
     # (same shape as fr_series): "backlog_units", "on_hand_value", "revenue_value".
     extra_series: dict[str, np.ndarray] = field(default_factory=dict)
+    # Single-run inspection surface (blueprint G17/§9.5.1): per-item weekly
+    # matrices lifted from the full-debug trace — populated ONLY when
+    # trace_verbosity=full_debug and the run has exactly one replication
+    # (per-item evidence at multi-rep scale is deliberately not exposed).
+    # Keys: "material.on_hand" / "material.in_transit" / "material.orders"
+    # ([n_mats, horizon]) and "product.demand" / "product.production" /
+    # "product.fulfillment" / "product.backlog" / "product.lost_units"
+    # ([n_prods, horizon]).
+    item_series: Optional[dict[str, np.ndarray]] = None
+    # Row labels for item_series: {"material": [...ids], "product": [...ids]}.
+    item_ids: Optional[dict[str, list[str]]] = None
 
     def kpi_array(self, key: str) -> np.ndarray:
         return np.array([row.get(key, np.nan) for row in self.kpis])
@@ -709,6 +727,32 @@ def run_scenario(
             grid, t_w, window_end, debug, progress,
         )
 
+    # Single-run inspection surface (G17/§9.5.1): expose the full-debug
+    # per-item matrices when — and only when — the run is exactly one
+    # replication. `ctx` is the sole replication's context here.
+    item_series: Optional[dict[str, np.ndarray]] = None
+    item_ids: Optional[dict[str, list[str]]] = None
+    if (
+        settings.trace_verbosity == TraceVerbosity.FULL_DEBUG
+        and len(grid) == 1
+        and ctx.trace.keep_matrices
+    ):
+        tr = ctx.trace
+        item_series = {
+            "material.on_hand": tr.I_mat,
+            "material.in_transit": tr.I_transit,
+            "material.orders": tr.O_mat,
+            "product.demand": tr.D,
+            "product.production": tr.Q,
+            "product.fulfillment": tr.F,
+            "product.backlog": tr.B,
+            "product.lost_units": tr.L,
+        }
+        item_ids = {
+            "material": list(compiled.model.mat_ids),
+            "product": list(compiled.model.prod_ids),
+        }
+
     keys = sorted({k for row in kpis for k in row} - {"model_rep", "event_rep"})
     aggregates = {
         k: aggregate_mean_ci(np.array([r[k] for r in kpis if k in r]), settings.ci_level)
@@ -741,6 +785,8 @@ def run_scenario(
             "on_hand_value": onhand_rows,
             "revenue_value": revenue_rows,
         },
+        item_series=item_series,
+        item_ids=item_ids,
     )
 
 

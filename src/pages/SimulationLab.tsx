@@ -164,17 +164,38 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     });
   }, [selected, policyVersionId, policyDirty, cred]);
 
-  const dispatchRun = async (versionId: string) => {
+  const dispatchRun = async (versionId: string, forceRerun = false) => {
     if (!projectId || !selected) return;
     if (!canRunSimulations) {
       toast.error("Running simulations isn't enabled for your account.");
       return;
     }
     try {
-      const result = await runExperiment(projectId, versionId, ackWarnings);
+      const result = await runExperiment(projectId, versionId, ackWarnings, forceRerun);
       if (result.queued) {
         toast.success(`Queued: ${selected.name}`);
         setPane("run");
+        return;
+      }
+      // Reuse-or-rerun (G17 / §9.2 read-path slice): identical completed
+      // results exist. Reuse is ALWAYS the user's explicit choice — on reuse
+      // the stored run is surfaced (it is this scenario's newest completed
+      // run), on re-run we dispatch again with force_rerun.
+      if (result.status === "reuse_available" && result.reuseCandidate) {
+        const c = result.reuseCandidate;
+        const when = c.ended_at ? new Date(c.ended_at).toLocaleString() : "earlier";
+        const reuse = window.confirm(
+          `Identical results already exist from ${when} ` +
+            `(${c.rep_count_done ?? "?"} replication(s), engine ${c.code_version || "unknown"}).\n\n` +
+            `OK — reuse the stored results (no recompute).\n` +
+            `Cancel — re-run the simulation from scratch.`,
+        );
+        if (reuse) {
+          toast.success("Reusing the stored run — no recompute needed.");
+          setPane("results");
+          return;
+        }
+        await dispatchRun(versionId, true);
         return;
       }
       // Typed 422: render the gate's findings structurally in the run pane.
