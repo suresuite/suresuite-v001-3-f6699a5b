@@ -1794,6 +1794,7 @@ The user-facing promise: **you choose, per conversation, whether the assistant m
 Contract:
 
 - **Storage.** `chat_threads.mode text NOT NULL DEFAULT 'review' CHECK (mode IN ('ask','review'))` (migration in the Phase 1 slice; unsynced/localStorage threads carry the mode in the request body and the server still enforces it). `'auto'` is deliberately absent from the CHECK (§10 Q23).
+- **Flag.** Server flag `CHAT_MODES_ENABLED` (§9 conventions): off ⇒ the switch does not render, every thread behaves as `review`, byte-identical to pre-§15 behavior.
 - **Enforcement point.** Mode is applied at §13.2 checkpoint 2: in Ask mode, `enabledAgents(request)` intersects with `{report-builder}`. Mode can only **subtract** from what §13's capability resolution grants — a mode never confers a right, so the §13.3 matrix is unchanged.
 - **Voice.** The persona names the mode when it matters and never silently drops an intent: "You're in Decision Support mode, so I won't change anything — here's what I *would* propose… [Switch to Review]". The refused-intent event is recorded (`mode.blocked_intent` in `ai_chat_events`) — it is the single best signal for when a user wants more autonomy.
 - **Why not three live modes now.** "Plan" (Claude-style) is what Review already *is* — every agent output is a reviewable plan (proposal) before it is an action. Renaming Review to Plan would misdescribe the apply step; adding a live Auto would violate the platform law without the Q6 evidence. Two live positions + one visibly-conditioned position tells the user the truth about the system.
@@ -1831,6 +1832,7 @@ Roster and fabric mechanics are the standard ones: the `proposals` CHECK constra
 - **Rights (§13.3 row added):** `decision_report` apply requires `agent_proposals` + the new `reports` feature key — **not** `agent_apply`, because rendering a file mutates no project state; same-as-UI proof: a future manual "Export report" button would demand exactly `reports`. Quota: 20 renders/day/user (DEFAULT, §10 Q25).
 - **Chained flow (the disruption-brief mission):** "supplier X disrupted 10 weeks — what should we do?" in Review mode is a *two-proposal* conversation by design: B4 drafts the experiment (user approves → simulation runs through the §13.3 gate), then B6 drafts the brief citing the finished runs. In Ask mode, B6 may only cite runs that already exist; if the evidence run is missing, the refusal names it ("no scenario run exists for this disruption — switch to Review and I'll set one up").
 - **Golden suite:** `eval/fixtures/report-builder/` rb-01…rb-08 (template selection, citation coverage on narrative, refusal-when-no-evidence-run, render determinism: same spec + same data ⇒ byte-identical XLSX cell values).
+- **Flags:** `AGENT_ENABLED_IDS+=report-builder` (the standard per-agent kill switch) and server `FILE_WORKSPACE_ENABLED` gating the §16.2 surfaces; either off ⇒ clean regression per §9.
 
 ### 16.2 The file workspace — storage, retention, admin visibility
 
@@ -1877,6 +1879,7 @@ Deterministic, server-computed, capability-filtered. A new endpoint (`get_sugges
 - **Rule-ordered v0 (DEFAULT):** data gaps ("Fill 12 missing lead times — I'll draft the values") > validation ("Your model isn't validated — run the checks") > decision experiments ("Compare baseline vs. a 4-week outage at your top-risk supplier") > reports ("Generate a risk-posture report for this project") > memory hygiene ("Save this decision to project memory"). Telemetry re-ranking (§16.3) replaces rule order only when click data exists.
 - **Honesty rules:** a suggestion never names an action the caller's capabilities can't perform, never suggests Review-mode actions in an Ask thread without saying "switch to Review", and every chip's `utterance` is a plain sentence the user could have typed — the chips teach the interface by example.
 - **Fixtures:** sug-01…sug-05 (gap-driven, validation-driven, no-data project, capability-filtered, ask-mode variants).
+- **Flag:** server `SUGGESTED_ACTIONS_ENABLED`; off ⇒ no chips, no `suggest` mode, byte-identical pre-§17.3 behavior.
 
 ### 17.4 Memory guidance
 
