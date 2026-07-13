@@ -1,0 +1,23 @@
+{
+  "id": "pc-06-run-ready",
+  "description": "ai-agents.md §5.2 #6 — run-readiness selections (primary supplier per material, primary sourcing firm per customer×product) ride override rows; the applied bundle passes the post-apply grade with zero blocks.",
+  "project_snapshot": { "reuse": "pc-01-simple-param" },
+  "utterance": "Make the pre-run gate pass: set the primary supplier and the primary sourcing firm",
+  "mocked_llm": {
+    "tool": "draft_policy_bundle",
+    "args": {
+      "diff": {
+        "overrides": [
+          { "scope": "node", "target_key": "S1::MAT-4", "family": "sourcing", "patch": { "primary_source": true } },
+          { "scope": "node", "target_key": "C1::P1", "family": "fulfillment", "patch": { "sourcing_firm": "PLANT-1", "primary_source": true } }
+        ]
+      },
+      "title": "Run-readiness selections"
+    }
+  },
+  "expect": {
+    "proposal": { "overrides": 2, "defaults_families": [], "provenance": "llm_drafted" },
+    "apply": { "post_grade_blocks": 0, "overrides_rows": 2 }
+  },
+  "retired_reason": null
+}

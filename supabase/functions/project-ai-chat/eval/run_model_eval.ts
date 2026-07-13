@@ -33,8 +33,8 @@ import {
   type ClassifierCall,
 } from "../router.ts";
 import { executeTool, type ToolContext } from "../tools.ts";
-import "../draftTools.ts";
-import { runDataStewardTurn } from "../agentTurn.ts";
+// Importing agentTurn.ts registers every staged draft tool (B1/B2/B3 + memory).
+import { runAgentTurn, runDataStewardTurn } from "../agentTurn.ts";
 import { makeAgentRpcs, makeStubDb, type Row } from "./harness/stub_db.ts";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
@@ -59,7 +59,7 @@ interface GoldenRow {
 
 interface Fixture {
   id: string;
-  project_snapshot: Record<string, Row[]> | { reuse: string };
+  project_snapshot: Record<string, Row[]> | { reuse: string; patch?: Record<string, Row[]> };
   utterance: string;
   mocked_llm?: { args?: Record<string, unknown>; reuse?: string };
   // deno-lint-ignore no-explicit-any
@@ -84,17 +84,23 @@ function keyFor(provider: ModelSpec["provider"]): string {
   return provider === "gemini" ? "GEMINI_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY";
 }
 
-async function loadFixture(id: string): Promise<Fixture> {
+async function loadFixtureFrom(dir: string, id: string): Promise<Fixture> {
   const f: Fixture = JSON.parse(
-    await Deno.readTextFile(new URL(`./fixtures/data-steward/${id}.json`, import.meta.url)),
+    await Deno.readTextFile(new URL(`./fixtures/${dir}/${id}.json`, import.meta.url)),
   );
   if ("reuse" in f.project_snapshot) {
-    const base = await loadFixture((f.project_snapshot as { reuse: string }).reuse);
-    f.project_snapshot = base.project_snapshot;
+    const spec = f.project_snapshot as { reuse: string; patch?: Record<string, Row[]> };
+    const base = await loadFixtureFrom(dir, spec.reuse);
+    f.project_snapshot = {
+      ...(base.project_snapshot as Record<string, Row[]>),
+      ...(spec.patch ?? {}),
+    };
     if (f.mocked_llm && "reuse" in f.mocked_llm) f.mocked_llm = base.mocked_llm;
   }
   return f;
 }
+
+const loadFixture = (id: string) => loadFixtureFrom("data-steward", id);
 
 // ── routing evaluation ────────────────────────────────────────────────────────
 
@@ -308,6 +314,165 @@ async function evalSteward(model: ModelSpec, mock: boolean): Promise<StewardMetr
   };
 }
 
+// ── B2/B3 fixture evaluation (generic draft-agent runner, §9.3/§9.4) ─────────
+
+interface AgentEvalConfig {
+  agentId: "policy-configurator" | "vv-analyst";
+  fixtureDir: string;
+  draftTool: string;
+  artifactType: string;
+  /** Draft-time fixtures only — the apply-path fixtures (pc-08/pc-09/vv-08)
+   * exercise deterministic machinery and stay in the CI tier. */
+  fixtures: string[];
+}
+
+const AGENT_EVAL: Record<string, AgentEvalConfig> = {
+  "policy-configurator": {
+    agentId: "policy-configurator",
+    fixtureDir: "policy-configurator",
+    draftTool: "draft_policy_bundle",
+    artifactType: "policy_bundle_diff",
+    fixtures: [
+      "pc-01-simple-param", "pc-02-family-default", "pc-03-unknown-field",
+      "pc-04-planned-policy", "pc-05-data-demand", "pc-06-run-ready",
+      "pc-07-no-kpi-claims",
+    ],
+  },
+  "vv-analyst": {
+    agentId: "vv-analyst",
+    fixtureDir: "vv-analyst",
+    draftTool: "draft_model_card_narrative",
+    artifactType: "model_card_draft",
+    fixtures: [
+      "vv-02-adopt-pass", "vv-03-adopt-fail-tests", "vv-04-no-run",
+      "vv-05-gate-skipped", "vv-07-adequacy-quote",
+    ],
+  },
+};
+
+// deno-lint-ignore no-explicit-any
+function scoreAgentOutcome(cfg: AgentEvalConfig, proposals: Row[], exp: Record<string, any>): { pass: boolean; detail: string } {
+  if (exp.error_code || exp.proposal_count === 0) {
+    return proposals.length === 0
+      ? { pass: true, detail: "ok" }
+      : { pass: false, detail: `expected a refusal (${exp.error_code ?? "no proposal"}), got ${proposals.length} proposal(s)` };
+  }
+  if (!exp.proposal) return { pass: true, detail: "ok" };
+  const p = proposals[0];
+  if (!p) return { pass: false, detail: "expected a proposal, none created" };
+  const payload = p.payload as Record<string, unknown>;
+  if (cfg.agentId === "policy-configurator") {
+    const diff = (payload.diff ?? {}) as { defaults?: Record<string, unknown>; overrides?: unknown[] };
+    if (exp.proposal.overrides !== undefined && (diff.overrides ?? []).length !== exp.proposal.overrides) {
+      return { pass: false, detail: `expected ${exp.proposal.overrides} overrides, got ${(diff.overrides ?? []).length}` };
+    }
+    if (exp.proposal.defaults_families &&
+        JSON.stringify(Object.keys(diff.defaults ?? {}).sort()) !== JSON.stringify([...exp.proposal.defaults_families].sort())) {
+      return { pass: false, detail: `defaults families mismatch: ${Object.keys(diff.defaults ?? {})}` };
+    }
+    if (exp.proposal.newly_required_includes &&
+        !((payload.newly_required as string[]) ?? []).includes(exp.proposal.newly_required_includes)) {
+      return { pass: false, detail: `newly_required missing ${exp.proposal.newly_required_includes}` };
+    }
+  } else {
+    if (exp.proposal.verdict && payload.verdict !== exp.proposal.verdict) {
+      return { pass: false, detail: `expected verdict ${exp.proposal.verdict}, got ${payload.verdict}` };
+    }
+    if (exp.proposal.basis && payload.basis !== exp.proposal.basis) {
+      return { pass: false, detail: `expected basis ${exp.proposal.basis}, got ${payload.basis}` };
+    }
+  }
+  if (exp.proposal.provenance && p.provenance !== exp.proposal.provenance) {
+    return { pass: false, detail: `expected provenance ${exp.proposal.provenance}, got ${p.provenance}` };
+  }
+  return { pass: true, detail: "ok" };
+}
+
+async function evalAgent(cfg: AgentEvalConfig, model: ModelSpec, mock: boolean): Promise<StewardMetrics> {
+  Deno.env.set("AGENT_ENABLED_IDS", cfg.agentId);
+  const fixtures: StewardMetrics["fixtures"] = {};
+  let draftCalls = 0, validDraftCalls = 0;
+
+  for (const id of cfg.fixtures) {
+    const fixture = await loadFixtureFrom(cfg.fixtureDir, id);
+    const tables = structuredClone(fixture.project_snapshot) as Record<string, Row[]>;
+    const db = makeStubDb(tables, makeAgentRpcs(tables));
+    const ctx: ToolContext = {
+      projectId: PROJECT,
+      userId: USER,
+      supabase: db as unknown as ToolContext["supabase"],
+      draft: {
+        userEmail: "eval@example.com",
+        threadId: null,
+        modelCode: model.id,
+        providerCode: model.provider,
+        canProposals: true,
+        utterance: fixture.utterance,
+      },
+    };
+
+    let reply = "";
+    if (mock) {
+      // offline: exercise the pipeline with the fixture's mocked args (the
+      // adversarial fixtures inject deliberately bad args to prove the gate
+      // catches them; they score the outcome, not model schema validity).
+      if (fixture.mocked_llm?.args) {
+        const env = await executeTool(cfg.draftTool, fixture.mocked_llm.args, ctx);
+        if (fixture.expect.proposal) {
+          draftCalls++;
+          if (env.kind === "proposal") validDraftCalls++;
+        }
+      }
+    } else {
+      const turn = await runAgentTurn({ agentId: cfg.agentId, modelId: model.id, utterance: fixture.utterance, ctx });
+      reply = turn.reply;
+      for (const call of turn.toolCalls) {
+        if (call.name !== cfg.draftTool) continue;
+        draftCalls++;
+        if (call.row_count > 0) validDraftCalls++;
+      }
+    }
+
+    const outcome = scoreAgentOutcome(cfg, tables.proposals ?? [], fixture.expect);
+    let { pass, detail } = outcome;
+    // Reply-level assertions (e.g. pc-07's no-KPI-prediction regex) apply only
+    // to real model output.
+    if (!mock && pass && Array.isArray(fixture.expect.reply_assertions)) {
+      for (const re of fixture.expect.reply_assertions as string[]) {
+        if (!new RegExp(re, "is").test(reply)) {
+          pass = false;
+          detail = `reply failed assertion ${re}`;
+          break;
+        }
+      }
+    }
+    fixtures[id] = { pass, detail };
+  }
+
+  const schemaValidity = draftCalls === 0 ? 1 : validDraftCalls / draftCalls;
+  const gateViolationRate = draftCalls === 0 ? 0 : (draftCalls - validDraftCalls) / draftCalls;
+  const failures: string[] = [];
+  if (schemaValidity < TARGETS.schemaValidity) {
+    failures.push(`schema validity ${schemaValidity.toFixed(3)} < ${TARGETS.schemaValidity}`);
+  }
+  if (gateViolationRate > TARGETS.gateViolationAlarm) {
+    failures.push(`gate-violation attempts ${gateViolationRate.toFixed(3)} > ${TARGETS.gateViolationAlarm}`);
+  }
+  for (const [id, r] of Object.entries(fixtures)) {
+    if (!r.pass) failures.push(`${id}: ${r.detail}`);
+  }
+  return {
+    model: model.id,
+    fixtures,
+    draftCalls,
+    validDraftCalls,
+    schemaValidity,
+    gateViolationRate,
+    pass: failures.length === 0,
+    failures,
+  };
+}
+
 // ── result recording (§7.4: rows land in ai_chat_events, thread 'eval:<id>') ──
 
 async function recordToEvents(runId: string, payload: Record<string, unknown>): Promise<void> {
@@ -373,6 +538,7 @@ if (import.meta.main) {
     models: models.map((m) => m.id),
     routing: [] as unknown[],
     steward: [] as unknown[],
+    agents: [] as unknown[],
   };
 
   let allPass = true;
@@ -398,7 +564,23 @@ if (import.meta.main) {
       for (const f of steward.failures) console.log(`  ✗ ${f}`);
     }
 
-    const modelPass = routing.pass && (steward?.pass ?? true);
+    // Stage 2/3 agents (§9.3/§9.4): score every enabled agent's suite.
+    const agentResults: Record<string, boolean> = {};
+    for (const agentId of agents) {
+      const cfg = AGENT_EVAL[agentId];
+      if (!cfg) continue;
+      const metrics = await evalAgent(cfg, model, mock);
+      (report.agents as unknown[]).push({ agent: agentId, ...metrics });
+      agentResults[agentId] = metrics.pass;
+      console.log(`${agentId}: ${metrics.pass ? "PASS" : "FAIL"} — ` +
+        `schema-validity=${metrics.schemaValidity.toFixed(3)} ` +
+        `gate-violation-attempts=${metrics.gateViolationRate.toFixed(3)} ` +
+        `fixtures=${Object.values(metrics.fixtures).filter((f) => f.pass).length}/${Object.keys(metrics.fixtures).length}`);
+      for (const f of metrics.failures) console.log(`  ✗ ${f}`);
+    }
+
+    const modelPass = routing.pass && (steward?.pass ?? true) &&
+      Object.values(agentResults).every(Boolean);
     allPass = allPass && modelPass;
     await recordToEvents(runId, {
       eval: "model-scored",
@@ -406,6 +588,7 @@ if (import.meta.main) {
       model: model.id,
       routing_pass: routing.pass,
       steward_pass: steward?.pass ?? null,
+      agent_pass: agentResults,
       advisory_false_artifact: routing.advisoryFalseArtifactRate,
       mixed_recall: routing.mixedRecall,
       schema_validity: steward?.schemaValidity ?? null,

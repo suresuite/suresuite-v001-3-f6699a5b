@@ -1,0 +1,25 @@
+{
+  "id": "pc-05-data-demand",
+  "description": "ai-agents.md §5.2 #5 — activating P-P.5 short-term capacity (recovery response capacity_flex) on a project without products.production_capacity keeps the change AND surfaces the newly-required field via the recompiled manifest (findings_preview).",
+  "project_snapshot": {
+    "reuse": "pc-01-simple-param",
+    "patch": { "products": [{ "project_id": "11111111-1111-4111-8111-111111111111", "product_id": "P1", "name": "Widget", "sell_price": 25, "production_capacity": null, "demand_mean": 300, "demand_cv": 0.2 }] }
+  },
+  "utterance": "Enable capacity flex so the plant can surge during disruptions",
+  "mocked_llm": {
+    "tool": "draft_policy_bundle",
+    "args": {
+      "diff": { "defaults": { "recovery": { "response": ["capacity_flex"] } } },
+      "title": "Enable short-term capacity flex"
+    }
+  },
+  "expect": {
+    "proposal": {
+      "overrides": 0,
+      "defaults_families": ["recovery"],
+      "provenance": "llm_drafted",
+      "newly_required_includes": "products.production_capacity"
+    }
+  },
+  "retired_reason": null
+}

@@ -66,9 +66,13 @@ export type DraftErrorCode =
   | "project_scope_violation"
   | "agent_disabled";
 
-function failure(tool: string, code: DraftErrorCode, reason: string): ToolEnvelope {
+/** §4.5 failure envelope — shared by every draft_* tool family (B1 here,
+ * B2 in configuratorTools.ts, B3 in vvTools.ts). */
+export function failureEnvelope(tool: string, code: DraftErrorCode, reason: string): ToolEnvelope {
   return { kind: "text", data: reason, meta: { tool, row_count: 0, note: code } };
 }
+
+const failure = failureEnvelope;
 
 export interface ProposalPartData {
   proposal_id: string;
@@ -84,7 +88,8 @@ export interface ProposalPartData {
   duplicate?: boolean;
 }
 
-function proposalEnvelope(tool: string, data: ProposalPartData): ToolEnvelope {
+/** §4.5 success envelope — shared by every draft_* tool family. */
+export function proposalEnvelope(tool: string, data: ProposalPartData): ToolEnvelope {
   return {
     kind: "proposal",
     data,

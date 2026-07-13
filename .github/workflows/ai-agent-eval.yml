@@ -12,6 +12,8 @@ on:
     paths:
       - 'supabase/functions/project-ai-chat/**'
       - 'supabase/functions/project-ai-health/**'
+      - 'supabase/functions/agent-apply/**'
+      - 'supabase/functions/_shared/**'
       - 'supabase/migrations/**'
       - 'src/lib/chat/**'
       - '.github/workflows/ai-agent-eval.yml'
@@ -19,6 +21,8 @@ on:
     paths:
       - 'supabase/functions/project-ai-chat/**'
       - 'supabase/functions/project-ai-health/**'
+      - 'supabase/functions/agent-apply/**'
+      - 'supabase/functions/_shared/**'
       - 'supabase/migrations/**'
       - 'src/lib/chat/**'
       - '.github/workflows/ai-agent-eval.yml'

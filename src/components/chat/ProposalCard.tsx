@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { FIELD_LABELS } from "@/lib/policies/schemas";
 import { APPLY_RETRY_CAP, useProposal, type Proposal } from "@/hooks/useProposals";
 
 /**
@@ -91,19 +92,172 @@ function ItemMasterDiff({ rows }: { rows: Array<Record<string, unknown>> }) {
   );
 }
 
+const fieldLabel = (f: string) => FIELD_LABELS[f] ?? f;
+
+const fmtValue = (v: unknown): string => {
+  if (v == null) return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+};
+
+interface PolicyDiffPayload {
+  diff?: {
+    defaults?: Record<string, Record<string, unknown>>;
+    overrides?: Array<{ scope: string; target_key: string; family: string; patch: Record<string, unknown> }>;
+  };
+  rationale?: string;
+  newly_required?: string[];
+  findings_preview?: Array<{ severity: string; field: string; message: string }>;
+}
+
+/** §4.6 policy diff view: per-field family/override rows with the registry
+ * labels the /policies grid uses — the reviewer reads the storage vocabulary. */
+function PolicyBundleDiff({ payload }: { payload: PolicyDiffPayload }) {
+  const [showAll, setShowAll] = useState(false);
+  const rows: Array<{ target: string; family: string; field: string; value: unknown }> = [];
+  for (const [family, patch] of Object.entries(payload.diff?.defaults ?? {})) {
+    for (const [field, value] of Object.entries(patch ?? {})) {
+      rows.push({ target: "project default", family, field, value });
+    }
+  }
+  for (const o of payload.diff?.overrides ?? []) {
+    for (const [field, value] of Object.entries(o.patch ?? {})) {
+      rows.push({ target: o.target_key, family: o.family, field, value });
+    }
+  }
+  const visible = showAll ? rows : rows.slice(0, DIFF_COLLAPSE_LIMIT);
+  const newlyRequired = payload.newly_required ?? [];
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12.5px]">
+          <thead>
+            <tr className="border-b border-border text-left text-muted-foreground">
+              <th className="py-1 pr-3 font-medium">Target</th>
+              <th className="py-1 pr-3 font-medium">Family</th>
+              <th className="py-1 pr-3 font-medium">Parameter</th>
+              <th className="py-1 font-medium">New value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r, i) => (
+              <tr key={i} className="border-b border-border/50">
+                <td className="py-1 pr-3 font-mono">{r.target}</td>
+                <td className="py-1 pr-3">{r.family}</td>
+                <td className="py-1 pr-3">{fieldLabel(r.field)}</td>
+                <td className="py-1 font-mono">{fmtValue(r.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length > DIFF_COLLAPSE_LIMIT && !showAll && (
+          <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
+            show all {rows.length}
+          </button>
+        )}
+      </div>
+      {payload.rationale && (
+        <div className="mt-1.5 text-[12px] text-muted-foreground">{payload.rationale}</div>
+      )}
+      {newlyRequired.length > 0 && (
+        <div className="mt-1.5 rounded bg-amber-500/10 px-2 py-1 text-[12px] text-amber-700 dark:text-amber-400">
+          Newly required data (from the recompiled manifest): {newlyRequired.join(", ")} — the Data
+          Steward can fill these.
+        </div>
+      )}
+      <div className="mt-1 text-[11.5px] text-muted-foreground">
+        Outcomes are not predicted — verify with a simulation run (unvalidated configuration).
+      </div>
+    </div>
+  );
+}
+
+interface ModelCardPayload {
+  verdict?: string;
+  basis?: string;
+  downgrade_note?: string | null;
+  narrative_md?: string;
+  computed?: {
+    adopted_warmup_days?: number;
+    warmup_method?: string;
+    recommended_replications?: number;
+    replication_basis?: { confidence?: number; target_precision?: number; per_kpi?: Record<string, { mean: number; half: number; n: number; n_star: number }> };
+    validation_tests?: Array<{ kpi: string; pass: boolean }>;
+  };
+}
+
+/** §4.6 model-card view: the machine-computed adopted numbers printed next to
+ * the AI-drafted narrative, so prose can never contradict silently (§5.3). */
+function ModelCardDraft({ payload }: { payload: ModelCardPayload }) {
+  const c = payload.computed ?? {};
+  const perKpi = c.replication_basis?.per_kpi ?? {};
+  return (
+    <div className="space-y-1.5 text-[12.5px]">
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded bg-muted px-1.5 py-px font-mono">
+          verdict: {payload.verdict ?? "—"} ({payload.basis ?? "—"})
+        </span>
+        <span className="rounded bg-muted px-1.5 py-px font-mono">
+          warm-up: {c.adopted_warmup_days ?? "—"}d ({c.warmup_method ?? "—"})
+        </span>
+        <span className="rounded bg-muted px-1.5 py-px font-mono">
+          recommended replications: {c.recommended_replications ?? "—"}
+        </span>
+      </div>
+      {payload.downgrade_note && (
+        <div className="rounded bg-amber-500/10 px-2 py-1 text-[12px] text-amber-700 dark:text-amber-400">
+          Downgraded by the platform: {payload.downgrade_note}
+        </div>
+      )}
+      {Object.keys(perKpi).length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="py-0.5 pr-3 font-medium">KPI</th>
+                <th className="py-0.5 pr-3 font-medium">Mean</th>
+                <th className="py-0.5 pr-3 font-medium">± CI</th>
+                <th className="py-0.5 pr-3 font-medium">n</th>
+                <th className="py-0.5 font-medium">n*</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(perKpi).map(([kpi, s]) => (
+                <tr key={kpi} className="border-b border-border/50">
+                  <td className="py-0.5 pr-3 font-mono">{kpi}</td>
+                  <td className="py-0.5 pr-3 font-mono">{Number(s.mean).toFixed(4)}</td>
+                  <td className="py-0.5 pr-3 font-mono">{Number(s.half).toFixed(4)}</td>
+                  <td className="py-0.5 pr-3 font-mono">{s.n}</td>
+                  <td className="py-0.5 font-mono">{s.n_star}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {payload.narrative_md && (
+        <div>
+          <div className="mb-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+            Narrative — AI-drafted, verify
+          </div>
+          <div className="whitespace-pre-wrap text-[13px]">{payload.narrative_md}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProposalBody({ proposal }: { proposal: Proposal }) {
   const payload = proposal.payload ?? {};
   const rows = (payload as { rows?: Array<Record<string, unknown>> }).rows;
   if (proposal.artifact_type === "item_master_diff" && Array.isArray(rows)) {
     return <ItemMasterDiff rows={rows} />;
   }
-  const diff = (payload as { diff?: Record<string, unknown> }).diff;
-  if (proposal.artifact_type === "policy_bundle_diff" && diff) {
-    return (
-      <pre className="max-h-64 overflow-auto rounded bg-muted px-2 py-1.5 text-[12px]">
-        {JSON.stringify(diff, null, 2)}
-      </pre>
-    );
+  if (proposal.artifact_type === "policy_bundle_diff" && (payload as PolicyDiffPayload).diff) {
+    return <PolicyBundleDiff payload={payload as PolicyDiffPayload} />;
+  }
+  if (proposal.artifact_type === "model_card_draft" && (payload as ModelCardPayload).computed) {
+    return <ModelCardDraft payload={payload as ModelCardPayload} />;
   }
   const narrative = (payload as { narrative_md?: string; explanation_md?: string });
   const text = narrative.explanation_md ?? narrative.narrative_md;

@@ -1,0 +1,22 @@
+{
+  "id": "pc-02-family-default",
+  "description": "ai-agents.md §5.2 #2 — 'use base stock control everywhere' is a defaults.inventory patch with a registry-valid type; zero overrides.",
+  "project_snapshot": { "reuse": "pc-01-simple-param" },
+  "utterance": "Use base stock control everywhere",
+  "mocked_llm": {
+    "tool": "draft_policy_bundle",
+    "args": {
+      "diff": { "defaults": { "inventory": { "type": "base_stock" } } },
+      "title": "Base-stock replenishment project-wide"
+    }
+  },
+  "expect": {
+    "proposal": {
+      "overrides": 0,
+      "defaults_families": ["inventory"],
+      "defaults_patch": { "inventory": { "type": "base_stock" } },
+      "provenance": "llm_drafted"
+    }
+  },
+  "retired_reason": null
+}

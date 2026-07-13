@@ -1,0 +1,15 @@
+{
+  "id": "pc-09-snapshot-lineage",
+  "description": "ai-agents.md §5.2 #9 — applying pc-01 creates a policy_versions row with parent_version_id = the base version and an 'agent:' label prefix (§4.4 lineage).",
+  "project_snapshot": { "reuse": "pc-01-simple-param" },
+  "utterance": "Make MAT-4's review period 2 weeks",
+  "mocked_llm": { "reuse": "pc-01-simple-param" },
+  "expect": {
+    "apply": {
+      "parent_version_id": "44444444-4444-4444-8444-444444444401",
+      "label_prefix": "agent:",
+      "post_grade_blocks": 0
+    }
+  },
+  "retired_reason": null
+}

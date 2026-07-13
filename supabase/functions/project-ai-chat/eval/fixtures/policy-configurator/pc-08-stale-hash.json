@@ -1,0 +1,11 @@
+{
+  "id": "pc-08-stale-hash",
+  "description": "ai-agents.md §5.2 #8 — an out-of-band policy edit between approve and apply fails cleanly with stale_values (grounding policy-hash drift, §8 T8).",
+  "project_snapshot": { "reuse": "pc-01-simple-param" },
+  "utterance": "Make MAT-4's review period 2 weeks",
+  "mocked_llm": { "reuse": "pc-01-simple-param" },
+  "expect": {
+    "apply_error_code": "stale_values"
+  },
+  "retired_reason": null
+}

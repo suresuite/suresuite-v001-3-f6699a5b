@@ -8,8 +8,9 @@ export type ChatRole = "user" | "assistant";
 
 export interface ChatPart {
   // "proposal" carries {proposal_id} and renders as a ProposalCard
-  // (ai-agents.md §4.5/§4.6); older clients ignore unknown kinds.
-  kind: "table" | "kpi" | "bullets" | "text" | "proposal";
+  // (ai-agents.md §4.5/§4.6); "memory_offer"/"memory_saved" are the M2
+  // consent-chip parts (§14.4); older clients ignore unknown kinds.
+  kind: "table" | "kpi" | "bullets" | "text" | "proposal" | "memory_offer" | "memory_saved";
   data: unknown;
 }
 

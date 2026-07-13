@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { ProjectMemoryPanel } from "@/components/intelligence/ProjectMemoryPanel";
 import {
   QUICK_THREAD_ID,
   type ChatFolder,
@@ -59,6 +60,11 @@ interface ChatSidebarProps {
   onTogglePin?: (threadId: string, pinned: boolean) => void;
   onToggleArchive?: (threadId: string, archived: boolean) => void;
   onSearchMessages?: (query: string) => Promise<ChatSearchHit[]>;
+  /** Workstream M2 (ai-agents.md §14.4): the "Project memory" panel — shown
+   * only when the project_memory capability is on and a project is attached
+   * to the active thread. Omitted ⇒ pre-M2 sidebar exactly. */
+  memoryEnabled?: boolean;
+  memoryProjectId?: string | null;
 }
 
 function groupThreadsLegacy(threads: Thread[]) {
@@ -146,6 +152,8 @@ export function ChatSidebar({
   onTogglePin,
   onToggleArchive,
   onSearchMessages,
+  memoryEnabled = false,
+  memoryProjectId = null,
 }: ChatSidebarProps) {
   const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -538,6 +546,10 @@ export function ChatSidebar({
             ? renderOrganized()
             : renderLegacy()}
       </ScrollArea>
+
+      {memoryEnabled && memoryProjectId && (
+        <ProjectMemoryPanel projectId={memoryProjectId} />
+      )}
     </aside>
   );
 }
