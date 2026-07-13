@@ -14,6 +14,7 @@ import {
   runValidationGate,
   type GateResult,
 } from "./validationGate.ts";
+import { fireWakeWorker } from "./wakeWorker.ts";
 
 // Matches sim-command's Zod CommandSchema output; the API gateway constructs
 // these directly from its own validated request bodies.
@@ -389,6 +390,11 @@ export async function dispatchExperimentRun(
         .eq("id", run.id);
       throw new Error(`enqueue to worker queue failed: ${String(e).slice(0, 300)}`);
     }
+
+    // Scale-to-zero: the command is on the stream — wake a stopped Fly worker
+    // so it gets consumed. No-op when the worker is always-on or the wake creds
+    // are unset; runs on both front doors (browser + /v1 API) via this path.
+    fireWakeWorker();
   }
 
   // The worker is the SOLE authoritative writer of results: it sets the run to
@@ -420,6 +426,7 @@ export async function dispatchExperimentCancel(
     "data",
     JSON.stringify({ ...cmd, server_ts: Date.now() }),
   ]).catch((e) => console.error("xadd cancel failed", e));
+  fireWakeWorker();  // wake a slept worker so it can act on the cancel
 }
 
 /** Enqueue a raw command envelope (add-reps and echo-style commands). */

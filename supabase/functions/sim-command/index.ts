@@ -19,6 +19,7 @@ import {
   ValidationRejection,
 } from "../_shared/dispatch.ts";
 import { cleanEnv } from "../_shared/env.ts";
+import { fireWakeWorker } from "../_shared/wakeWorker.ts";
 
 // Inline like every other function in this repo — supabase-js has no "/cors"
 // subpath export; importing one fails at boot, which breaks even the OPTIONS
@@ -203,6 +204,8 @@ Deno.serve(async (req) => {
         }
         throw e;
       }
+      // (dispatchExperimentRun wakes a scaled-to-zero worker after it enqueues,
+      // so both the browser and the /v1 API front doors get it for free.)
       await broadcast(channel, "run.queued", { ...envelope, ...result });
       return new Response(JSON.stringify({ ok: true, ...result }), {
         status: 202,
@@ -211,7 +214,7 @@ Deno.serve(async (req) => {
     }
 
     if (cmd.kind === "experiment.cancel") {
-      await dispatchExperimentCancel(deps, cmd);
+      await dispatchExperimentCancel(deps, cmd);  // wakes the worker internally
       return new Response(JSON.stringify({ ok: true }), {
         status: 202,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -222,6 +225,7 @@ Deno.serve(async (req) => {
       await enqueueEnvelope(deps, cmd.project_id, envelope).catch((e) =>
         console.error("xadd add_reps failed", e)
       );
+      fireWakeWorker();
       return new Response(JSON.stringify({ ok: true }), {
         status: 202,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -244,6 +248,7 @@ Deno.serve(async (req) => {
           })
         : Promise.resolve(),
     ]);
+    fireWakeWorker();  // scenario/policy commands also feed the Fly worker
 
     return new Response(JSON.stringify({ ok: true, server_ts: envelope.server_ts }), {
       status: 202,

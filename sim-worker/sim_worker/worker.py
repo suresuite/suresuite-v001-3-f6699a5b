@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 import redis.asyncio as redis
@@ -73,6 +73,8 @@ class SimWorker:
         supabase_url: str,
         service_role_key: str,
         idle_ttl: int = 600,
+        idle_shutdown: int = 0,
+        on_idle: Callable[[], None] | None = None,
     ):
         # socket_timeout MUST exceed the XREADGROUP block window: redis-py 8
         # changed its default from None to 5 s — equal to the block — so every
@@ -95,6 +97,16 @@ class SimWorker:
         self._consumer_name = f"worker-{int(time.time())}"
         self._active_streams: set[str] = set()
         self._tasks: list[asyncio.Task] = []
+        # Scale-to-zero bookkeeping. `idle_shutdown` (seconds, 0 = disabled)
+        # is the quiet period after which the worker exits cleanly so Fly can
+        # stop the machine; `on_idle` is the callback that triggers the clean
+        # shutdown. `_active` counts in-flight command handlers so a long run
+        # is never mistaken for idle; `_last_activity` is stamped whenever a
+        # command is picked up or finishes.
+        self._idle_shutdown = idle_shutdown
+        self._on_idle = on_idle
+        self._active = 0
+        self._last_activity = time.monotonic()
 
     async def aclose(self) -> None:
         for t in self._tasks:
@@ -106,9 +118,41 @@ class SimWorker:
     async def run(self) -> None:
         self._tasks.append(asyncio.create_task(self._discover_loop()))
         self._tasks.append(asyncio.create_task(self._evict_loop()))
+        if self._idle_shutdown > 0 and self._on_idle is not None:
+            self._tasks.append(asyncio.create_task(self._idle_monitor()))
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
     # ------------------------------------------------------------------ loops
+
+    def _should_idle_stop(self) -> bool:
+        """True when scale-to-zero is armed, nothing is in flight, and no
+        command has been handled for `idle_shutdown` seconds. Pure/synchronous
+        so the decision is unit-testable without driving the sleep loop."""
+        return (
+            self._idle_shutdown > 0
+            and self._active == 0
+            and (time.monotonic() - self._last_activity) >= self._idle_shutdown
+        )
+
+    async def _idle_monitor(self) -> None:
+        """Scale-to-zero: exit cleanly after a quiet period so the Fly machine
+        stops billing. A clean exit(0) only STOPS the machine when fly.toml sets
+        `[[restart]] policy = "on-failure"` (with the default "always" Fly just
+        restarts it — no savings, but also no stranded run). The next enqueued
+        command wakes the machine again via the sim-command edge function's Fly
+        Machines API call (supabase/functions/_shared/wakeWorker.ts), which also
+        closes the original 'queued forever with no worker' hole."""
+        interval = max(1.0, min(30.0, self._idle_shutdown / 2))
+        while True:
+            await asyncio.sleep(interval)
+            if self._should_idle_stop():
+                log.info(
+                    "idle %.0fs (no work, nothing in flight) — exiting to scale "
+                    "the Fly machine to zero", time.monotonic() - self._last_activity,
+                )
+                assert self._on_idle is not None  # guarded by run()
+                self._on_idle()
+                return
 
     async def _evict_loop(self) -> None:
         while True:
@@ -164,6 +208,20 @@ class SimWorker:
     # --------------------------------------------------------------- handlers
 
     async def _handle(self, stream: str, msg_id: str, fields: dict[str, str]) -> None:
+        # Scale-to-zero in-flight guard: count active handlers and stamp
+        # activity on BOTH entry and exit. Stamping on exit keeps a long
+        # experiment.run from ever looking idle; the always-run finally keeps a
+        # malformed command from leaking the counter and pinning the worker
+        # awake forever.
+        self._active += 1
+        self._last_activity = time.monotonic()
+        try:
+            await self._handle_inner(stream, msg_id, fields)
+        finally:
+            self._active -= 1
+            self._last_activity = time.monotonic()
+
+    async def _handle_inner(self, stream: str, msg_id: str, fields: dict[str, str]) -> None:
         t0 = time.perf_counter()
         # Keep raw dict so experiment.run can access top-level fields (scenario, recovery)
         # that sim-command embeds outside the Command schema's `payload` key.

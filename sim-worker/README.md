@@ -111,6 +111,60 @@ Once it's live, a scenario **Run** in the app flips from the yellow
 "preliminary (stub)" badge to a green "worker engine" badge with real KPIs —
 that flip confirms the engine is actually running.
 
+## Scale to zero (idle cost → ~$0)
+
+By default the worker blocks on the Redis stream 24/7, so the Fly machine bills
+even when you never run a simulation. Scale-to-zero lets an idle worker **stop
+itself** and be **woken on the next run**, so idle cost drops to roughly nothing
+(you pay only while a run is actually executing, plus Fly's tiny stopped-machine
+rootfs charge).
+
+Two halves, both required — enable them together:
+
+1. **Stop when idle** (the worker) — `sim-worker/fly.toml`:
+   - Set `IDLE_SHUTDOWN_SECONDS` to a quiet period, e.g. `"900"` (15 min). The
+     worker exits cleanly after that long with no command in flight (a running
+     `experiment.run` never counts as idle).
+   - Change `[[restart]] policy` from `"always"` to `"on-failure"`, so a clean
+     `exit(0)` **stops** the machine while genuine crashes still restart. (With
+     `"always"`, an idle exit is restarted immediately — you get no savings but
+     also never a stranded run, which is why `"always"` is the safe default to
+     ship before the wake half is configured.)
+   - Redeploy: `flyctl deploy . --config sim-worker/fly.toml --dockerfile
+     sim-worker/Dockerfile` (from the repo root). Confirm in `fly logs`:
+     `scale-to-zero armed: will exit after 900s idle`.
+
+2. **Wake on demand** (the edge function) — the `sim-command` function starts a
+   stopped worker via the Fly Machines API the moment a command is enqueued
+   (`supabase/functions/_shared/wakeWorker.ts`). It needs two secrets:
+
+   ```bash
+   supabase secrets set --project-ref <ref> \
+     FLY_API_TOKEN="$(flyctl auth token)" \
+     FLY_APP_NAME="suresuite-sim-worker"
+   ```
+
+   `scripts/setup_secrets.sh` and the `Deploy Supabase Functions` workflow now
+   set these automatically from the same `FLY_API_TOKEN` / `FLY_APP_NAME` you
+   already use to deploy the worker, so in most setups this step is done for you
+   on the next functions deploy. Without these secrets the wake is a logged
+   no-op — safe, but a stopped worker won't come back, so **don't enable half 1
+   without half 2**.
+
+**Tradeoff:** the first run after the worker has slept pays a cold start
+(machine boot + scsim import + graph load, typically ~10–30 s) before it begins;
+subsequent runs within the idle window are immediate. Interactive
+scenario/policy deltas still feel instant because `sim-command` returns stub
+KPIs synchronously — the real worker delta just follows a little later on a cold
+machine. Tune `IDLE_SHUTDOWN_SECONDS` to trade idle savings against how often
+you eat a cold start.
+
+**Other Fly cost levers** (independent of scale-to-zero):
+- `fly scale count 1` — make sure you're not paying for an HA pair of machines
+  you don't need for a single-project workload.
+- `memory_mb` in `fly.toml` — 1024 MB is sized for heavier runs; drop it only if
+  your runs fit (an OOM kill fails runs), e.g. `512`.
+
 ## Latency budget (target)
 
 | Stage | Budget |

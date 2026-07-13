@@ -219,7 +219,12 @@ In `src/components/policies/RunValidateStage.tsx` (`runValidationScenario`, `onR
 - **Dead-letter + observability**: bad commands are `XACK`'d and dropped — add a DLQ stream.
   Add Fly metrics/log alerts and a worker heartbeat surfaced in the UI (so the user can tell
   "queued because worker down" from "running").
-- **Cost**: Upstash free-tier request limits; Fly autostop. Document expected cost.
+- **Cost**: Upstash free-tier request limits; Fly autostop. **Implemented** (opt-in):
+  scale-to-zero via `IDLE_SHUTDOWN_SECONDS` — the worker exits(0) when idle (needs
+  `[[restart]] policy = "on-failure"`) and the `sim-command` edge function restarts a
+  stopped machine via the Fly Machines API (`_shared/wakeWorker.ts`) on the next enqueue.
+  Default is disabled (always-on) so nothing strands a run until both halves are set. See
+  `sim-worker/README.md` → "Scale to zero (idle cost → ~$0)".
 
 ## Lessons learned this project — do not repeat
 
