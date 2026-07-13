@@ -581,6 +581,73 @@ export function useChatThreads() {
     }
   }, [persist, serverThreadIdFor, user?.id]);
 
+  // ── §17.1 sidebar v2: multi-select bulk actions ─────────────────────────────
+  // One local-state pass for every selected thread, then ONE set-based RPC in
+  // synced mode (bulk_* — owner checks server-side, non-owned ids skipped).
+  // In legacy (unsynced) mode the local pass IS the whole action — the same
+  // client path each single-row control takes, applied per selected thread.
+
+  /** Resolve selected ids to their server ids (sync on; Quick excluded). */
+  const bulkServerIds = useCallback((threadIds: string[]): string[] => {
+    return threadIds
+      .filter((id) => id !== QUICK_THREAD_ID)
+      .map(serverThreadIdFor)
+      .filter((id): id is string => Boolean(id));
+  }, [serverThreadIdFor]);
+
+  /** Bulk pin/archive; null keeps a flag (set_thread_flags semantics). */
+  const bulkSetThreadFlags = useCallback((threadIds: string[], flags: { pinned?: boolean | null; archived?: boolean | null }) => {
+    const pinned = flags.pinned ?? null;
+    const archived = flags.archived ?? null;
+    const ids = new Set(threadIds.filter((id) => id !== QUICK_THREAD_ID));
+    if (ids.size === 0 || (pinned === null && archived === null)) return;
+    persist((prev) => prev.map((t) => (ids.has(t.id) ? {
+      ...t,
+      ...(pinned !== null ? { pinned } : {}),
+      ...(archived !== null ? { archived } : {}),
+    } : t)), true);
+    const serverIds = bulkServerIds([...ids]);
+    if (serverIds.length > 0 && user?.id) {
+      rpc("bulk_set_thread_flags", { p_thread_ids: serverIds, p_pinned: pinned, p_archived: archived, p_user_id: user.id })
+        .then(({ error }: { error: { message: string } | null }) => {
+          if (error) console.warn("[chat-store] bulk flags failed:", error.message);
+        });
+    }
+  }, [persist, bulkServerIds, user?.id]);
+
+  /** Bulk move to a folder (null detaches). */
+  const bulkMoveToFolder = useCallback((threadIds: string[], folderId: string | null) => {
+    const ids = new Set(threadIds.filter((id) => id !== QUICK_THREAD_ID));
+    if (ids.size === 0) return;
+    persist((prev) => prev.map((t) => (ids.has(t.id) ? { ...t, folderId } : t)), true);
+    const serverIds = bulkServerIds([...ids]);
+    if (serverIds.length > 0 && user?.id) {
+      rpc("bulk_move_chat_threads", { p_thread_ids: serverIds, p_folder_id: folderId, p_user_id: user.id })
+        .then(({ error }: { error: { message: string } | null }) => {
+          if (error) console.warn("[chat-store] bulk move failed:", error.message);
+        });
+    }
+  }, [persist, bulkServerIds, user?.id]);
+
+  /** Bulk hard delete (the sidebar confirms with count before calling). */
+  const bulkDeleteThreads = useCallback((threadIds: string[]) => {
+    const ids = new Set(threadIds.filter((id) => id !== QUICK_THREAD_ID));
+    if (ids.size === 0) return;
+    const serverIds = bulkServerIds([...ids]);
+    persist((prev) => prev.filter((t) => !ids.has(t.id)), syncEnabled);
+    setActiveThreadIdState((cur) => {
+      if (!cur || !ids.has(cur)) return cur;
+      writeActive(null);
+      return null;
+    });
+    if (serverIds.length > 0 && user?.id) {
+      rpc("bulk_delete_chat_threads", { p_thread_ids: serverIds, p_user_id: user.id })
+        .then(({ error }: { error: { message: string } | null }) => {
+          if (error) console.warn("[chat-store] bulk delete failed:", error.message);
+        });
+    }
+  }, [persist, bulkServerIds, syncEnabled, user?.id]);
+
   /** §15: flip a thread's interaction mode (Ask ↔ Review). Local state first,
    * then the server row (which is what the server actually enforces at
    * checkpoint 2) and the mode.changed telemetry event — both fire-and-forget
@@ -675,6 +742,11 @@ export function useChatThreads() {
     searchMessages,
     getServerThreadId,
     appendMessageToStore,
+    // §17.1 sidebar v2: multi-select bulk actions (legacy = local loop,
+    // synced = the set-based bulk_* RPCs).
+    bulkSetThreadFlags,
+    bulkMoveToFolder,
+    bulkDeleteThreads,
     // M1 (§14.3): rolling-summary visibility + deletion.
     clearThreadSummary,
     // §15: per-thread interaction mode.

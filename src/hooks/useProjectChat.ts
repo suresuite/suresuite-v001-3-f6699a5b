@@ -21,6 +21,9 @@ export interface ChatToolCall {
   args: Record<string, unknown>;
   ok: boolean;
   row_count: number;
+  /** Additive (§17.2 ActivityGroup): step timing, rendered only when a
+   * stored call record carries it — the server does not emit it today. */
+  duration_ms?: number;
 }
 
 export interface ChatMessage {

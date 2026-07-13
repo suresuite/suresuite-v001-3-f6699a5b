@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   BadgeCheck,
@@ -6,6 +6,7 @@ import {
   Database,
   ExternalLink,
   FlaskConical,
+  Lightbulb,
   Loader2,
   MessageSquareQuote,
   SlidersHorizontal,
@@ -13,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FIELD_LABELS } from "@/lib/policies/schemas";
+import { errorRemedy, PART_TREATMENTS, typedErrorCode } from "@/lib/chat/partStyles";
 import { APPLY_RETRY_CAP, useProposal, type Proposal } from "@/hooks/useProposals";
 
 /**
@@ -20,6 +22,11 @@ import { APPLY_RETRY_CAP, useProposal, type Proposal } from "@/hooks/useProposal
  * anchored in-thread at the message that produced it. Card states map 1:1 to
  * proposals.status + apply bookkeeping; the card never renders numbers that
  * are not in payload/applied_result (no client-side recomputation).
+ *
+ * §17.2 (v1.2 Phase 2): the card sits in the readability grammar — amber left
+ * rail (the proposal content class, never the agent) + agent chip + status
+ * pill; apply errors render in the errors-and-refusals treatment with the
+ * typed code and its one-line remedy. All treatments from partStyles.ts.
  */
 
 const AGENT_META: Record<string, { name: string; Icon: typeof Database }> = {
@@ -160,7 +167,7 @@ function PolicyBundleDiff({ payload }: { payload: PolicyDiffPayload }) {
         <div className="mt-1.5 text-[12px] text-muted-foreground">{payload.rationale}</div>
       )}
       {newlyRequired.length > 0 && (
-        <div className="mt-1.5 rounded bg-amber-500/10 px-2 py-1 text-[12px] text-amber-700 dark:text-amber-400">
+        <div className={cn("mt-1.5 rounded px-2 py-1 text-[12px]", PART_TREATMENTS.proposal.chip)}>
           Newly required data (from the recompiled manifest): {newlyRequired.join(", ")} — the Data
           Steward can fill these.
         </div>
@@ -205,7 +212,7 @@ function ModelCardDraft({ payload }: { payload: ModelCardPayload }) {
         </span>
       </div>
       {payload.downgrade_note && (
-        <div className="rounded bg-amber-500/10 px-2 py-1 text-[12px] text-amber-700 dark:text-amber-400">
+        <div className={cn("rounded px-2 py-1 text-[12px]", PART_TREATMENTS.proposal.chip)}>
           Downgraded by the platform: {payload.downgrade_note}
         </div>
       )}
@@ -237,7 +244,7 @@ function ModelCardDraft({ payload }: { payload: ModelCardPayload }) {
       )}
       {payload.narrative_md && (
         <div>
-          <div className="mb-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+          <div className={cn("mb-0.5 text-[11px] font-medium uppercase tracking-wide", PART_TREATMENTS.proposal.accent)}>
             Narrative — AI-drafted, verify
           </div>
           <div className="whitespace-pre-wrap text-[13px]">{payload.narrative_md}</div>
@@ -285,7 +292,7 @@ function ExperimentSpec({ payload, grounding }: { payload: ExperimentSpecPayload
       </div>
       {payload.question && <div className="text-[12px] text-muted-foreground">Question: {payload.question}</div>}
       {payload.newer_version_exists && (
-        <div className="rounded bg-amber-500/10 px-2 py-1 text-[12px] text-amber-700 dark:text-amber-400">
+        <div className={cn("rounded px-2 py-1 text-[12px]", PART_TREATMENTS.proposal.chip)}>
           A newer saved policy version exists — this spec binds an older one (versions are immutable, so the run stays reproducible).
         </div>
       )}
@@ -294,7 +301,7 @@ function ExperimentSpec({ payload, grounding }: { payload: ExperimentSpecPayload
         {findings.length > 0 && (
           <ul className="mt-1 space-y-0.5">
             {findings.slice(0, 8).map((f, i) => (
-              <li key={i} className={f.severity === "block" ? "text-destructive" : f.severity === "warn" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}>
+              <li key={i} className={f.severity === "block" ? PART_TREATMENTS.error.accent : f.severity === "warn" ? PART_TREATMENTS.proposal.accent : "text-muted-foreground"}>
                 [{f.severity}] {f.field}: {f.message}
               </li>
             ))}
@@ -350,7 +357,14 @@ function Citations({ citations }: { citations: Proposal["citations"] }) {
   );
 }
 
-export function ProposalCard({ proposalId }: { proposalId: string | null | undefined }) {
+interface ProposalCardProps {
+  proposalId: string | null | undefined;
+  /** §17.4: offer a follow-up utterance (prefilled into the composer) — used
+   * for the post-apply "save this decision to project memory" suggestion. */
+  onSuggestUtterance?: (utterance: string) => void;
+}
+
+export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardProps) {
   const { proposal, loading, applying, approve, reject, retryApply, recordViewed } = useProposal(proposalId ?? null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -359,10 +373,22 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
   // no block) findings from the stored findings_preview; the server honors
   // it only under the same condition.
   const [ackWarnings, setAckWarnings] = useState(false);
+  // §17.4: the save-the-rationale suggestion appears only when THIS session
+  // watched the card transition to applied — the moment memory is most
+  // valuable — never retroactively on old applied cards in history.
+  const [justApplied, setJustApplied] = useState(false);
+  const prevStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (proposal?.id) recordViewed(proposal.id);
   }, [proposal?.id, recordViewed]);
+
+  useEffect(() => {
+    if (!proposal) return;
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = proposal.status;
+    if (prev && prev !== "applied" && proposal.status === "applied") setJustApplied(true);
+  }, [proposal, proposal?.status]);
 
   if (!proposalId) return null;
   if (loading) {
@@ -407,7 +433,8 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
       role="region"
       aria-label={`Proposal: ${proposal.title}`}
       className={cn(
-        "my-2 rounded-lg border border-border bg-surface-elevated/50 px-3 py-2.5",
+        "my-2 px-3 py-2.5",
+        PART_TREATMENTS.proposal.card,
         dimmed && "opacity-60",
       )}
     >
@@ -425,7 +452,7 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
       <div className="mt-1 text-[13.5px] font-medium">{proposal.title}</div>
 
       {proposal.status === "draft" && (
-        <div className="mt-2 rounded bg-amber-500/10 px-2 py-1.5 text-[12.5px] text-amber-700 dark:text-amber-400">
+        <div className={cn("mt-2 rounded px-2 py-1.5 text-[12.5px]", PART_TREATMENTS.proposal.chip)}>
           Needs input — answer the agent's question in the chat to continue.
         </div>
       )}
@@ -448,8 +475,18 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
       )}
 
       {proposal.status === "approved" && proposal.apply_error && (
-        <div className="mt-2 rounded bg-destructive/10 px-2 py-1.5 text-[12.5px] text-destructive">
-          {proposal.apply_error}
+        <div className={cn("mt-2 px-2 py-1.5 text-[12.5px]", PART_TREATMENTS.error.card)}>
+          {typedErrorCode(proposal.apply_error) && (
+            <span className={cn("mr-1.5 rounded px-1 py-px font-mono text-[11px]", PART_TREATMENTS.error.chip)}>
+              {typedErrorCode(proposal.apply_error)}
+            </span>
+          )}
+          <span className={PART_TREATMENTS.error.accent}>{proposal.apply_error}</span>
+          {errorRemedy(typedErrorCode(proposal.apply_error)) && (
+            <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+              {errorRemedy(typedErrorCode(proposal.apply_error))}
+            </div>
+          )}
         </div>
       )}
 
@@ -464,16 +501,34 @@ export function ProposalCard({ proposalId }: { proposalId: string | null | undef
         </div>
       )}
 
+      {/* §17.4: post-apply guidance — offer to save the decision rationale at
+          the moment it's most valuable. The chip only PREFILLS the composer
+          with a "Remember that …" sentence; the save itself rides the §14.4
+          consent path (a) when the user sends it — no new write path. */}
+      {justApplied && proposal.status === "applied" && onSuggestUtterance && (
+        <button
+          type="button"
+          onClick={() =>
+            onSuggestUtterance(`Remember that we applied "${proposal.title}" because `)
+          }
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-elevated px-2.5 py-1 text-[12px] text-muted-foreground transition hover:text-foreground"
+          title="Prefills a 'Remember that…' message — you add the rationale and send"
+        >
+          <Lightbulb className="h-3 w-3 shrink-0" />
+          Save this decision to project memory
+        </button>
+      )}
+
       {dimmed && proposal.status_reason && (
         <div className="mt-1.5 text-[12px] text-muted-foreground">{proposal.status_reason}</div>
       )}
 
       {actionError && (
-        <div className="mt-2 rounded bg-destructive/10 px-2 py-1.5 text-[12.5px] text-destructive">{actionError}</div>
+        <div className={cn("mt-2 px-2 py-1.5 text-[12.5px]", PART_TREATMENTS.error.card, PART_TREATMENTS.error.accent)}>{actionError}</div>
       )}
 
       {ackAvailable && (proposal.status === "proposed" || (proposal.status === "approved" && proposal.apply_error)) && (
-        <label className="mt-2 flex items-start gap-2 text-[12px] text-amber-700 dark:text-amber-400">
+        <label className={cn("mt-2 flex items-start gap-2 text-[12px]", PART_TREATMENTS.proposal.accent)}>
           <input
             type="checkbox"
             checked={ackWarnings}

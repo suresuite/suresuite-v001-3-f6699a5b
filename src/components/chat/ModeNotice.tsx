@@ -1,4 +1,6 @@
 import { ShieldQuestion } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { PART_TREATMENTS } from "@/lib/chat/partStyles";
 import { useChatThreads } from "@/hooks/useChatThreads";
 
 /**
@@ -7,7 +9,13 @@ import { useChatThreads } from "@/hooks/useChatThreads";
  * "Switch to Review" chip — clicking flips THIS thread's mode (client state +
  * server row via upsert_chat_thread) so the user can re-ask and get a card.
  * The server emitted the refusal; this component only offers the switch.
+ *
+ * §17.2: refusals share the errors-and-refusals treatment (partStyles.ts) —
+ * a red-tinted card carrying the typed code (the blocked intent) and the
+ * one-line remedy (the switch chip).
  */
+
+const err = PART_TREATMENTS.error;
 
 export interface ModeNoticeData {
   mode: "ask";
@@ -33,10 +41,15 @@ export function ModeNotice({ data }: { data: ModeNoticeData }) {
   }
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[12px]">
-      <ShieldQuestion className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="text-muted-foreground">
-        Decision Support mode — nothing was changed{data.blocked_intent ? ` (blocked: ${data.blocked_intent})` : ""}.
+    <div className={cn("mt-2 flex flex-wrap items-center gap-2 px-2.5 py-1.5 text-[12px]", err.card)}>
+      <ShieldQuestion className={cn("h-3.5 w-3.5 shrink-0", err.icon)} />
+      {data.blocked_intent && (
+        <span className={cn("rounded px-1 py-px font-mono text-[11px]", err.chip)}>
+          {data.blocked_intent}
+        </span>
+      )}
+      <span className={err.accent}>
+        Decision Support mode — nothing was changed.
       </span>
       <button
         type="button"
