@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | v1.1 — authoritative for all AI-agent work (Layer A hardening, the proposal fabric, and the Layer B artifact-agent roster). v1.1 adds §12 (state-of-the-art alignment against the four industrial-trust pillars), §13 (rights-checked authorization incl. agent-driven simulation/analytics), §14 (memory architecture + chat organization, workstream M); decides §10 Q3; adds Q14–Q18 |
-| **Date** | 2026-07-12 (v1.0 and v1.1 same day) |
+| **Status** | v1.2 — authoritative for all AI-agent work (Layer A hardening, the proposal fabric, and the Layer B artifact-agent roster). v1.1 added §12 (state-of-the-art alignment against the four industrial-trust pillars), §13 (rights-checked authorization incl. agent-driven simulation/analytics), §14 (memory architecture + chat organization, workstream M); decided §10 Q3; added Q14–Q18. **v1.2** adds §15 (interaction modes: Ask / Review / Auto), §16 (decision reports, file workspace, retention — agent B6 Report Builder), §17 (chat experience v2: sidebar organization, readability grammar, suggested actions, memory guidance), §18 (extended roster B7–B9 + the background-execution addendum), §9.8 (v1.2 delivery sequencing — Stage 4 reprioritized first); decides Q23–Q25; adds Q26–Q28 |
+| **Date** | 2026-07-12 (v1.0/v1.1); 2026-07-13 (v1.2) |
 | **Authority** | Governed by `docs/design/next-gen-platform-design.md` (the blueprint). **This document supersedes the roster sketch that blueprint §12 carried**; §12 is rewritten in the same change to frame the two layers and point here (per the `CLAUDE.md` doc-and-code law). The blueprint's §12 platform law and the agent run-readiness contract (G16) remain stated in the blueprint and are restated here verbatim where they bind. `docs/design/public-api-and-access-control.md` remains authoritative for identity/tenancy/quota; `docs/design/policy-specification.md` for policy semantics; `docs/design/phase-b0-core-loop.md` for the model-validation card. |
 | **Altitude** | Implementation-deterministic: executable DDL, JSON Schemas, verbatim prompt templates, literal file/table/tool/flag/event names, numeric thresholds. Two independent implementers reading this document must produce interchangeable systems. |
 | **Non-goals** | Adding LLM providers or models (explicitly out of scope — §3.4); autonomous/background agents; LLM-generated simulation results; replacing the persona chat UX |
@@ -26,6 +26,11 @@
 | How this compares to the state of the art (adopt/adapt/reject) | §12 |
 | Who may make an agent act — rights, gated simulation/analytics, quotas | §13 |
 | Long memory, chat folders, project memory | §14 |
+| The Ask / Review / Auto interaction modes | §15 |
+| Reports (Excel/PDF), the file workspace, retention | §16 |
+| Chat UX v2 — sidebar, readability, suggested actions | §17 |
+| Planned agents: cost estimation, deep-tier mapping, disruption alerts | §18 |
+| What ships in which delivery phase (v1.2) | §9.8 |
 
 **Conventions used throughout.**
 
@@ -236,11 +241,11 @@ When `route:"advisory"` (or confidence below threshold, or the target agent's fl
 ### 3.4 Explicit non-goals
 
 1. **No new providers or models.** The registry is hardened, not extended. (Decision already made; re-litigating it is out of scope. Specifically: no Claude/Anthropic addition at this time.)
-2. **No autonomous or scheduled agents.** Every agent turn is caused by a user message in a thread; every apply is caused by a user approval. (Background/batch agents are a future decision — §10 Q9.)
+2. **No autonomous or scheduled agents.** Every agent turn is caused by a user message in a thread; every apply is caused by a user approval. (Background/batch agents are a future decision — §10 Q9; **v1.2 makes the Q9 entry checklist binding in §18.4** for the planned B8/B9 agents, but the non-goal stands until that addendum is implemented as its own staged design.)
 3. **No LLM-generated simulation results, KPIs, rankings, or validation statistics.** Numbers shown as facts are read from persisted artifacts or computed by named deterministic reducers; the LLM packages and explains (platform law).
 4. **No agent-only write path.** The `agent-apply` function (§4.4) calls exactly the RPCs and dispatch module the UI calls. If a needed mutation has no existing gated path, the agent cannot do it until the platform grows that path for humans first.
 5. **No server-side chat memory.** Threads remain client-owned; agents are stateless per task.
-6. **No replacement of human review.** There is no auto-approve mode in any stage of this document (§10 Q6 records the deliberate rejection and its revisit condition).
+6. **No replacement of human review.** There is no auto-approve mode in any stage of this document (§10 Q6 records the deliberate rejection and its revisit condition; §15's mode control renders the "Auto" position **disabled** with the Q6 unlock conditions stated in its tooltip — the position exists in the UI vocabulary, the behavior does not exist anywhere).
 
 ---
 
@@ -1405,6 +1410,19 @@ Scope: `get_decision_traces`, `draft_trace_explanation`; B5 suite. Flag: `AGENT_
 
 Existing chats need no migration at any stage: threads are client-side, message shape only gains an optional part kind, and every flag-off state is a superset-compatible regression to the previous stage.
 
+### 9.8 v1.2 delivery sequencing *(added v1.2)*
+
+As-built at v1.2 writing: Stages 0–3 and workstream M0–M2 are landed (B1 Data Steward, B2 Policy Configurator, B3 V&V Analyst, server chat store, summaries, project memory). **Stage 4 — the one agent authorized to dispatch simulation runs — is not implemented**, which is why "run a simulation for me" currently routes nowhere. v1.2 work is delivered in three phases, dependency-ordered; each phase is independently shippable and flag-killable per the §9 conventions.
+
+| Phase | Name | Scope (sections) | Why this order |
+|---|---|---|---|
+| **1** | *Act* — close the decision loop | Stage 4 Experiment Designer, `AGENT_EXPERIMENT_TYPES=single` (§5.4, §9.5); the §15 mode control (Ask/Review, Auto disabled); suggested-actions v0 (§17.3, rule-ordered) | The product promise is simulation-backed decisions; until an agent can compile a question into a dispatched run, every other improvement decorates an incomplete loop |
+| **2** | *Read* — make the loop legible | Sidebar v2: collapsible sections + multi-select bulk actions (§17.1); the readability grammar: ActivityGroup, part-kind visual tokens, agent-turn dividers (§17.2); memory guidance (§17.4) | Phase 1 increases in-thread density (specs, run cards, results); the reading system must land right behind it |
+| **3** | *Deliver* — decisions leave the chat | B6 Report Builder + `decision_report` artifact + `report-render` (§16.1); file workspace bucket + `user_files` + retention + admin rollup (§16.2); usage-learning telemetry kinds (§16.3) | Reports consume Phase 1's run results and Phase 2's presentation vocabulary; retention/admin ships with the first stored file, not after |
+| **4** *(later)* | *Extend* — new intelligence | B7 Cost Estimator, B8 Network Cartographer, B9 Disruption Sentinel (§18), background-execution addendum (§18.4) | Blocked on owner inputs (§10 Q26–Q28: methodology papers, source strategy) and on Q2 resolved principals for anything scheduled |
+
+Stage 5 (Explainer) keeps its own entry gate (facet-11 traces, §9.6) and is orthogonal to this sequencing.
+
 ---
 
 ## 10. Risks and open questions
@@ -1439,6 +1457,12 @@ Numbered; each marked **[owner decision needed]** (blocks a stage entry until de
     (e) **Review events are RPC-emitted:** `review_agent_proposal` records `proposal.approved`/`proposal.rejected` into `ai_chat_events` itself (the §4.2 side-effect column), keeping the acceptance metric client-independent; `reject` requires `agent_proposals` and `approve` requires `agent_apply`, both fail-closed (§13.2 checkpoint 4).
     (f) **Usage logging:** the agent turn writes its own `ai_usage_logs` row; the router classification call (≤ 300 tokens) is not separately usage-logged until `ai_usage_logs` carries a `request_id` (§8 T5's "distinct request_id" applies to `ai_chat_events` today). Revisit with the telemetry-ledger follow-up.
     (g) **Memory-suite numbering** shifted at M1 landing (§14.7): mm-02 is the M1 summary-agent-isolation fixture; the consent-and-memory fixtures renumber to mm-03…mm-07 and land with M2.
+23. **[DECIDED — v1.2, §15] Interaction modes ship as a two-live-position control: Ask and Review**, per-thread, server-enforced, with the third position "Auto" rendered disabled and its unlock conditions equal to Q6's revisit trigger verbatim. `chat_threads.mode` CHECK deliberately excludes `'auto'` — unlocking it is a migration + a Q6 decision, never a UI change. Modes only *subtract* capability (Ask disables artifact routing except `report-builder`); they never grant anything §13 doesn't.
+24. **[default taken] Report rendering is first-party and deterministic:** XLSX via SheetJS (`xlsx`, already a frontend dependency; Deno-compatible) and PDF via `pdf-lib` inside the `report-render` edge function (§16.1). LLMs never touch the render path — they draft the report *spec* and narrative only. Revisit: if template layout needs exceed pdf-lib's imperative API, evaluate an HTML→PDF service as a rendering backend swap (spec contract unchanged).
+25. **[default taken] File-workspace retention numbers (§16.2):** 14-day TTL on unretained files; "Keep" exempts a file under a 500 MB per-user retained cap; render quota 20/day/user; expiry warning surfaces at T-3 days; signed download URLs 60 min. All DEFAULT; org-level overrides are a settings row when enterprise retention (Q18) is decided.
+26. **[owner decision needed — blocks B7]** Cost-estimation methodology for the Cost Estimator (§18.1): the owner will supply a reference paper; the `_shared/estimators.ts` method registry (versioned, citable estimator functions) is designed to receive it. Until then B7 has a reserved slug and artifact type only.
+27. **[owner decision needed — blocks B8]** Deep-tier network data sources for the Network Cartographer (§18.2): which external registries/document classes feed `external_evidence`, and the tier-confidence vocabulary. Weekly refresh additionally requires the §18.4 addendum.
+28. **[owner decision needed — blocks B9]** News/event feeds and validation thresholds for the Disruption Sentinel (§18.3): feed providers, the corroboration rule (DEFAULT sketch: ≥ 2 independent sources), and the alert severity scale. Impact numbers come from dispatched simulations (B4 path) — that part is already designed and is not the blocker.
 22. **[default taken — Stage 2/3 + M2 as-built]** Landing notes for the Policy Configurator, the V&V Analyst, and project memory (migrations `20260716000001_apply_policy_bundle.sql`, `20260717000003_project_memory.sql`):
     (a) **Module layout** (the Q21a seam discipline, no contract change): B2 lives in `project-ai-chat/configuratorTools.ts`, B3 in `vvTools.ts`, M2 in `memory.ts` — all registered through the `agentTurn.ts` import, which now hosts the generic `runAgentTurn`/`AGENT_TURNS` roster the §3.3 orchestration dispatches on; apply mappings live in `agent-apply/policyBundleApply.ts` / `modelCardApply.ts`; the deterministic surfaces both draft and apply consume are `_shared/policyFields.ts` (diff vocabulary + validation) and `_shared/vvEvidence.ts` (computed block + downgrade rule).
     (b) **Migration filename**: the doc's `20260717000002_project_memory.sql` slot was consumed at M0 by the quick-thread-id sha256 fix; project memory ships as `20260717000003_project_memory.sql`, content per §14.4. `save_project_memory` gains a trailing `p_grounding jsonb DEFAULT '{}'` so saves stamp the staleness hashes §14.4 displays.
@@ -1474,12 +1498,16 @@ Numbered; each marked **[owner decision needed]** (blocks a stage entry until de
 | §12 SOTA alignment | §12 platform law (gates over model trust); A13 eval-gate pattern | — (evidence structure) |
 | §13 authorization | public-api-and-access-control.md §6 (tenancy/scopes idiom); unified capability layer (`20260711000002`) | G15 adjacency; G16 identity precondition |
 | §14 memory & chat | §12 statelessness law (memory as explicit artifacts); A5 supersede-not-edit (memory edits) | pillar 04; workstream M |
+| §15 interaction modes | §12 platform law (human gate); §13 rights (modes subtract, never grant) | Phase B/C UX |
+| §16 reports & files | §12 "results never LLM-generated" (deterministic render); A5 provenance discipline | G13/G8 adjacency (decision delivery) |
+| §17 chat UX v2 | §12 personas-as-voice; §14.2 folder contract | workstream M continuation |
+| §18 B7–B9 + background addendum | §12 platform law projected onto scheduled execution; public-api Q2 identity precondition | future phases; Q26–Q28 |
 
 Commit/PR trailer for work under this document: `Phase B / §12 / AI agents: <slice> (ai-agents.md §<n>)`.
 
 ### 11.2 Glossary
 
-**Layer A / Layer B** — §0 conventions. **Persona** — a voice + advisory competence in the chat (`agents.ts`); never mutates. **Artifact agent (B1–B5)** — a stateless task executor owning one artifact class, emitting proposals only. **Proposal** — a row in `proposals`; the unit of agent output (§4). **Proposal fabric** — table + lifecycle + `agent-apply` + card UX. **`draft_*` tool** — the single tool through which an agent files its artifact class (§4.5). **Provenance (proposal)** — `deterministic` / `llm_drafted` / `user_supplied` (§4.1). **Grounding drift** — mismatch between a proposal's recorded hashes and the project's current `current_policy_hash`/`current_graph_hash`; expires the proposal (§4.2). **Intent router** — §6 classifier + deterministic wrapper. **Reducer** — a named deterministic derivation from project data (the `grading.ts` fallback-reducer library). **Run-readiness contract** — blueprint §12 (G16): agent-created/populated projects must pass the same pre-run gate as human projects, in the correct org, self-verified. **Two-tier eval** — deterministic CI tier + model-scored nightly tier (§7.4). **Platform law** — the five-clause §12 guardrail restated in §0. **Agent capability keys** — the §13.1 feature rows (`agent_proposals`, `agent_apply`, per-agent keys) in the unified capability registry. **Rolling summary** — the per-thread ≤300-word running summary maintained at the 24/8 thresholds (§14.3). **Project memory** — consent-only, provenance-cited `project_memory` rows retrieved via `get_project_memory` (§14.4). **Memory chip** — the persona's save-this offer; the only non-verbal path into project memory. **Workstream M** — the memory/chat-organization stages M0–M2 (§14.7), parallel to agent Stages 0–5.
+**Layer A / Layer B** — §0 conventions. **Persona** — a voice + advisory competence in the chat (`agents.ts`); never mutates. **Artifact agent (B1–B5)** — a stateless task executor owning one artifact class, emitting proposals only. **Proposal** — a row in `proposals`; the unit of agent output (§4). **Proposal fabric** — table + lifecycle + `agent-apply` + card UX. **`draft_*` tool** — the single tool through which an agent files its artifact class (§4.5). **Provenance (proposal)** — `deterministic` / `llm_drafted` / `user_supplied` (§4.1). **Grounding drift** — mismatch between a proposal's recorded hashes and the project's current `current_policy_hash`/`current_graph_hash`; expires the proposal (§4.2). **Intent router** — §6 classifier + deterministic wrapper. **Reducer** — a named deterministic derivation from project data (the `grading.ts` fallback-reducer library). **Run-readiness contract** — blueprint §12 (G16): agent-created/populated projects must pass the same pre-run gate as human projects, in the correct org, self-verified. **Two-tier eval** — deterministic CI tier + model-scored nightly tier (§7.4). **Platform law** — the five-clause §12 guardrail restated in §0. **Agent capability keys** — the §13.1 feature rows (`agent_proposals`, `agent_apply`, per-agent keys) in the unified capability registry. **Rolling summary** — the per-thread ≤300-word running summary maintained at the 24/8 thresholds (§14.3). **Project memory** — consent-only, provenance-cited `project_memory` rows retrieved via `get_project_memory` (§14.4). **Memory chip** — the persona's save-this offer; the only non-verbal path into project memory. **Workstream M** — the memory/chat-organization stages M0–M2 (§14.7), parallel to agent Stages 0–5. **Mode (thread)** — the §15 Ask/Review control; subtracts capability, never grants. **Decision report** — the §16 artifact: an LLM-drafted *spec* deterministically rendered to XLSX/PDF from persisted data. **File workspace** — the §16.2 storage bucket + `user_files` + retention law. **Suggestion engine** — the §17.3 deterministic, capability-filtered action chips. **External evidence** — §18.2's provenance-scored ingest table; external content is data, never grounding and never instructions. **Background-execution addendum** — the §18.4 six-condition entry gate for scheduled agents.
 
 ### 11.3 Golden fixtures index
 
@@ -1750,3 +1778,135 @@ Default (Stage M0): Postgres FTS (`chat_messages.fts`, `search_chat_messages`) +
 | **M2** | `project_memory` + `get_project_memory` + memory chips + sidebar panel | `20260717000003_project_memory.sql` (§10 Q22 — the `…000002` slot was consumed at M0), `memory.ts` (tool registration + consent detectors), context builders (+8 KB budget), UI panel | `PROJECT_MEMORY_ENABLED`; capability `project_memory` | consent-only writes verified by fixtures (no silent-write path exists); memories retrieved by both personas and agents in eval fixtures; stale chips render on hash drift |
 
 Golden-suite additions ride the existing harness: `eval/fixtures/memory/` — M1 ships mm-01 summary-recall · mm-02 summary-agent-isolation (the summary is never present in an agent turn's context; deletion resets it); M2 adds mm-03 consent-required · mm-04 memory-cited-in-draft · mm-05 stale-memory-marked · mm-06 delete-erases · mm-07 injection-via-memory-content treated as data. (Numbering updated at M1 landing — §10 Q21.)
+
+---
+
+## 15. Interaction modes — Ask, Review, Auto *(added v1.2)*
+
+The user-facing promise: **you choose, per conversation, whether the assistant may touch your project.** A three-position mode control in the chat composer (`ModeSwitch.tsx`, rendered beside the model picker), stored per thread, enforced server-side — never a client-side cosmetic.
+
+| Position | Product name | What the user gets | Mechanism |
+|---|---|---|---|
+| **Ask** | *Decision Support* | answers, analyses, what-if reasoning, reports (§16) — **nothing about the project changes** | router artifact routes are disabled for the turn except `report-builder`; draft tools are not registered; when the user asks for a mutation the persona explains the mode and offers a one-click "Switch to Review" chip |
+| **Review** | *Accept edits* (DEFAULT — the shipped v1.1 behavior) | agents draft; every change is a proposal card the user approves | the §4 fabric, byte-identical to today |
+| **Auto** | — | rendered **disabled** with a tooltip stating the unlock conditions | does not exist behaviorally; unlock = §10 Q6's revisit trigger verbatim (resolved principals + explicit org opt-in + per-agent accepted-rate ≥ 0.9 sustained 3 months), and even then scoped first to `provenance:'deterministic'` diffs as a new design decision |
+
+Contract:
+
+- **Storage.** `chat_threads.mode text NOT NULL DEFAULT 'review' CHECK (mode IN ('ask','review'))` (migration in the Phase 1 slice; unsynced/localStorage threads carry the mode in the request body and the server still enforces it). `'auto'` is deliberately absent from the CHECK (§10 Q23).
+- **Enforcement point.** Mode is applied at §13.2 checkpoint 2: in Ask mode, `enabledAgents(request)` intersects with `{report-builder}`. Mode can only **subtract** from what §13's capability resolution grants — a mode never confers a right, so the §13.3 matrix is unchanged.
+- **Voice.** The persona names the mode when it matters and never silently drops an intent: "You're in Decision Support mode, so I won't change anything — here's what I *would* propose… [Switch to Review]". The refused-intent event is recorded (`mode.blocked_intent` in `ai_chat_events`) — it is the single best signal for when a user wants more autonomy.
+- **Why not three live modes now.** "Plan" (Claude-style) is what Review already *is* — every agent output is a reviewable plan (proposal) before it is an action. Renaming Review to Plan would misdescribe the apply step; adding a live Auto would violate the platform law without the Q6 evidence. Two live positions + one visibly-conditioned position tells the user the truth about the system.
+- **Telemetry.** `mode.changed`, `mode.blocked_intent` event kinds (§16.3); the golden router suite gains ask-mode fixtures (routing must return advisory + mode notice, never a proposal).
+
+---
+
+## 16. Decision reports and the file workspace *(added v1.2)*
+
+Users who will never edit a model still need to leave the chat with something they can circulate: *what if this supplier is down 10 weeks — what do we do?* answered as a saved, downloadable document built from **their** data and **real** simulation results. This section adds the sixth artifact agent, the deterministic render path, and the storage/retention substrate.
+
+### 16.1 B6 · Report Builder (`report-builder`, artifact `decision_report`)
+
+Roster and fabric mechanics are the standard ones: the `proposals` CHECK constraints gain the `('report-builder','decision_report')` pairing (one migration), the agent registers in `AGENT_TURNS`, capability key `agent_report_builder` seeds with the stage. What is *not* standard is the payload: **the proposal is a report spec, never the file.**
+
+```jsonc
+// payload (schema_version 1) — decision_report
+{
+  "template_id": "disruption-brief",        // one of the registry below
+  "title": "Supplier S3 10-week outage — impact & response options",
+  "format": "pdf",                           // 'xlsx' | 'pdf' | 'both'
+  "sections": [
+    { "kind": "kpi_grid",       "source": { "tool": "get_run_results", "args": { "run_id": "…" } } },
+    { "kind": "run_comparison", "source": { "baseline_run_id": "…", "scenario_run_id": "…" } },
+    { "kind": "table",          "source": { "tool": "get_supplier_risk", "args": { "top_n": 10 } } },
+    { "kind": "narrative",      "narrative_md": "…", "citations": [ /* §4.3 shape */ ] }
+  ]
+}
+```
+
+- **Deterministic sections** (`kpi_grid`, `table`, `run_comparison`, `chart`) name a registered read tool or persisted run ids; their data is resolved **at render time** by the renderer, not copied into the payload — the report can never disagree with the database it cites. Provenance `deterministic`.
+- **Narrative sections** are `llm_drafted`, citation-mandatory (§4.3), and render under an explicit "AI-drafted commentary" heading with the provenance chip — the §12.2 transparency artifact carried into the document itself.
+- **Template registry** — `_shared/reportTemplates.ts`, deterministic section builders keyed by `template_id`. v1 set (DEFAULT): `risk-posture` (supplier/material exposure), `run-results` (one run's KPI pack), `run-comparison` (baseline vs scenario), `disruption-brief` (what-if narrative + experiment evidence), `data-readiness` (manifest status). The LLM *selects* a template and *fills* narrative; it never computes a number (platform law).
+- **Apply mapping (§4.4 row added):** on approval, `agent-apply` invokes the new `report-render` edge function: resolve sections → render XLSX (SheetJS — already a repo dependency) and/or PDF (`pdf-lib`, Deno-native — §10 Q24) → upload to the workspace bucket → insert the `user_files` row → `applied_result = {file_ids, paths}`. Card flips to a file card with Download.
+- **Rights (§13.3 row added):** `decision_report` apply requires `agent_proposals` + the new `reports` feature key — **not** `agent_apply`, because rendering a file mutates no project state; same-as-UI proof: a future manual "Export report" button would demand exactly `reports`. Quota: 20 renders/day/user (DEFAULT, §10 Q25).
+- **Chained flow (the disruption-brief mission):** "supplier X disrupted 10 weeks — what should we do?" in Review mode is a *two-proposal* conversation by design: B4 drafts the experiment (user approves → simulation runs through the §13.3 gate), then B6 drafts the brief citing the finished runs. In Ask mode, B6 may only cite runs that already exist; if the evidence run is missing, the refusal names it ("no scenario run exists for this disruption — switch to Review and I'll set one up").
+- **Golden suite:** `eval/fixtures/report-builder/` rb-01…rb-08 (template selection, citation coverage on narrative, refusal-when-no-evidence-run, render determinism: same spec + same data ⇒ byte-identical XLSX cell values).
+
+### 16.2 The file workspace — storage, retention, admin visibility
+
+- **Bucket.** One private Storage bucket `workspace`. Path law: `org/<org_id>/user/<user_id>/<project_id|shared>/<file_id>__<safe_filename>` — the org/user hierarchy the admin view rolls up on.
+- **Metadata table** `user_files` (migration with Phase 3): `id, org_id, user_id, project_id, proposal_id, kind ('report_xlsx'|'report_pdf'|'export_csv'|'upload'), name, path, size_bytes, retained boolean DEFAULT false, expires_at timestamptz DEFAULT now() + interval '14 days', created_at`. RLS owner-read; writes via SECURITY DEFINER RPCs + service role (the §4.1 posture); downloads via 60-minute signed URLs.
+- **Retention law (DEFAULT 14 days, §10 Q25).** Unretained files expire at `expires_at`; a lazy sweep on list plus a scheduled cleanup delete both row and object. Every file card shows its countdown; a **Keep** action sets `retained = true` under a 500 MB/user retained cap; at T-3 days the workspace panel shows a warning banner ("3 files expire this week — download or Keep"). Nothing the user marked Keep is ever auto-deleted.
+- **Surfaces.** "My files" panel in the Project Intelligence sidebar (per-project filter) + file cards in-thread (§17.2). Admin: the existing admin page gains an org rollup (`admin_org_file_usage` view: org → file count, bytes, expiring-in-7d) — the same place model allowlists and budgets already live.
+
+### 16.3 Usage learning (behavior telemetry, §7.5-safe)
+
+New `ai_chat_events` kinds — `suggestion.shown` / `suggestion.clicked`, `report.rendered` / `report.downloaded`, `file.kept` / `file.expired`, `mode.changed` / `mode.blocked_intent` — all structured ids and codes, **never message text** (the §7.5 boundary is unchanged). Purpose, in priority order: (1) rank §17.3 suggestions by realized usefulness; (2) grow golden-suite task distributions from real traffic (§7.3); (3) give the owner the adoption picture per org (which templates, which modes, which suggestions convert).
+
+---
+
+## 17. Chat experience v2 — organization, readability, guidance *(added v1.2)*
+
+### 17.1 Sidebar v2: collapsible sections and multi-select
+
+Extends the §14.2 contract; the group *order* is unchanged and remains normative.
+
+- **Collapsible sections.** Every §14.2 group (Quick chat, Pinned, per-project groups, My folders, Recent, Archive) renders a header with a count badge and a chevron; collapsed state persists per user in localStorage `chat.sidebar.collapsed.v1` (a UI preference, not data — deliberately not server-synced).
+- **Multi-select.** A "Select" affordance (header button; long-press on touch) enters selection mode: checkboxes on thread rows, a bottom action bar with **Move to folder · Archive · Pin/Unpin · Delete** (delete confirms with count). Bulk writes go through set-based RPCs `bulk_move_chat_threads(p_thread_ids, p_folder_id)`, `bulk_set_thread_flags(p_thread_ids, p_pinned, p_archived)`, `bulk_delete_chat_threads(p_thread_ids)` — each enforcing the same owner checks as its single-row §14.1 sibling, skipping (not failing) non-owned ids and returning the affected count.
+
+### 17.2 The readability grammar — one visual system for message content
+
+The problem observed in testing: a dense agent turn (prose + tool calls + tables + a proposal) reads as an undifferentiated wall. The fix is a **fixed visual grammar per content class**, defined once in `src/lib/chat/partStyles.ts` (design-system tokens only) and consumed by `MessageBubble`:
+
+| Content class | Treatment |
+|---|---|
+| Assistant prose | plain, as today — prose is the voice, it gets no chrome |
+| **Tool activity** | collapsed by default into one `ActivityGroup.tsx` line — "🛠 Analyzed project data · 4 steps · 2.1s" — expanding to a step timeline (tool label, row count, duration, error state). Replaces the always-expanded `ToolCallBadge` row |
+| Data parts (`table`/`kpi`/`bullets`) | on `surface` cards with a slate left rail; tables longer than 10 rows collapse to 10 + "Show all N"; every card carries its source note (`meta.tool`) |
+| Proposals | amber left rail + agent chip + status pill (the existing card, placed in the grammar) |
+| Memory offers/saves | violet chip (existing `MemoryChip`) |
+| Report/file cards | emerald left rail: filename, format icon, size, expiry countdown, **Download** / **Keep** |
+| Errors & refusals | red-tinted card carrying the typed code and the one-line remedy |
+
+Turn-level structure: an agent turn renders under a labeled divider ("**Data Steward** drafted a proposal"), so persona voice and agent output are visually distinct; replies longer than ~3 screens gain sticky section anchors from their markdown headings. Colors come from semantic tokens (state colors), not per-agent branding — the *class* of content is what the eye must learn, and the system must survive dark mode and future agents without redesign.
+
+### 17.3 Suggested actions — the guidance engine
+
+Deterministic, server-computed, capability-filtered. A new endpoint (`get_suggested_actions` in `project-ai-chat`, mode `suggest`) inspects the project's actual state — grading-manifest gaps, validation status, run recency, pending proposals, live memories — and returns ≤ 4 suggestions `{label, utterance, agent_hint, reason}` rendered as chips above the composer and as starter prompts on empty threads.
+
+- **Rule-ordered v0 (DEFAULT):** data gaps ("Fill 12 missing lead times — I'll draft the values") > validation ("Your model isn't validated — run the checks") > decision experiments ("Compare baseline vs. a 4-week outage at your top-risk supplier") > reports ("Generate a risk-posture report for this project") > memory hygiene ("Save this decision to project memory"). Telemetry re-ranking (§16.3) replaces rule order only when click data exists.
+- **Honesty rules:** a suggestion never names an action the caller's capabilities can't perform, never suggests Review-mode actions in an Ask thread without saying "switch to Review", and every chip's `utterance` is a plain sentence the user could have typed — the chips teach the interface by example.
+- **Fixtures:** sug-01…sug-05 (gap-driven, validation-driven, no-data project, capability-filtered, ask-mode variants).
+
+### 17.4 Memory guidance
+
+Project memory (§14.4) shipped mechanically sound but under-explained. Three additions, all UI-only: a first-run popover on the memory chip ("What happens when you Save?" — the three-bullet contract: consent-only, always visible in the panel, cited when used); a "How memory works" explainer in `ThreadInfoPanel`; and a post-apply suggestion (§17.3) offering to save the decision rationale after a proposal applies — the moment memory is most valuable and least likely to be volunteered.
+
+---
+
+## 18. Extended roster — planned agents B7–B9 and the background-execution addendum *(added v1.2; not staged)*
+
+Direction-setting, not yet implementable: each agent below becomes buildable only when its §10 input arrives (Q26–Q28). Slugs and artifact types are **reserved now** so each later landing stays one migration + one `AGENT_TURNS` registration, exactly like B1–B6. All three obey the platform law unchanged: proposals only, existing gates, no LLM-generated numbers.
+
+### 18.1 B7 · Cost Estimator (`cost-estimator`, artifact `parameter_estimate`)
+
+Estimates missing simulation parameters — unit costs, holding/backorder costs, lead-time distributions, capacities — that today block run-readiness or silently default. Architecture mirrors B1 with one addition: a **method registry** (`_shared/estimators.ts`) of versioned deterministic estimator functions, each declaring its inputs, assumptions, and citation form (`method:<id>@<version>` + the data rows consumed). The LLM selects a method and explains its fit; the *value* comes from the estimator; apply flows through the same `bulk_upsert_*` / policy gates as B1/B2 (the §13.3 rows already exist). **Blocked on §10 Q26:** the owner-supplied methodology paper seeds the method registry; until then this section reserves the contract.
+
+### 18.2 B8 · Network Cartographer (`network-cartographer`, artifact `network_map_diff`)
+
+Maps the network beyond tier 1 — tier-2/3/4 suppliers — from user-provided documents and external registries, proposing graph extensions the user reviews. New substrate: an `external_evidence` table (source, url/document ref, confidence, retrieved_at, content hash) — **external data never enters grounding directly**; the agent cites evidence rows, and the §8 threat model gains an external-content-injection row (evidence text is data, never instructions — the mm-07 discipline generalized). Tier-2+ rows carry a `confidence` the UI renders; low-confidence nodes are visually provisional. The user's "runs weekly" intent requires §18.4. **Blocked on §10 Q27** (source strategy).
+
+### 18.3 B9 · Disruption Sentinel (`disruption-sentinel`, artifact `risk_alert`)
+
+Watches validated news/event feeds and alerts when a credible disruption touches the user's network. Pipeline (each step deterministic except the stated LLM roles): **ingest** feeds → **dedupe** → **corroborate** (credibility score; DEFAULT sketch: ≥ 2 independent sources before an alert can exist) → **match** events to project entities, including B8's deep-tier map (LLM assists entity resolution; matches are citable) → **size impact by dispatching a simulation** through the B4/§13.3 path — the impact range in an alert is a simulation result, never an LLM guess → **file** a `risk_alert` proposal + notification: event, sources, matched entities, simulated impact range, linked playbooks (P-X.1), recommended next actions phrased as §17.3-style suggestion chips. Alerts recommend; humans act. **Blocked on §10 Q28** (feeds, thresholds) and on §18.4 for scheduled watching.
+
+### 18.4 The background-execution addendum (the §10 Q9 checklist, made binding)
+
+Scheduled or event-driven agent turns (B8 weekly refresh, B9 monitoring) may exist only when **all** of the following hold — this list is the entry gate for lifting non-goal §3.4-2, and it must be implemented as its own staged design chapter, not a flag:
+
+1. **Resolved principals** (public-api Q2): every background turn attributable to a real, grant-holding principal (an org service principal, not an asserted user id).
+2. **Trigger infrastructure** with per-org schedules and kill switches (an `agent_schedules` table + deployment flag above it — flags gate existence, capabilities gate access, the §13.1 pattern).
+3. **Quotas extended to background load**: LLM spend under `ai_budgets`, compute under §13.4-style caps, both per org.
+4. **A notification surface** (alerts inbox) so background output is seen without an open thread — background proposals otherwise die unreviewed at TTL.
+5. **Schedule-shaped eval**: scheduled agents run their golden suites on fixtures that simulate the schedule (stale evidence, repeated firings, no-change runs must produce *no* proposal — idempotent silence is a tested behavior).
+6. **Everything still lands as a proposal.** Background execution changes *when* an agent runs, never *what it may do* — the fabric, gates, and rights matrix apply identically.
