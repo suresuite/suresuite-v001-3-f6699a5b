@@ -13,11 +13,24 @@ import {
   ArchiveRestore,
   Trash2,
   Check,
+  ChevronRight,
   Loader2,
+  ListChecks,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +78,31 @@ interface ChatSidebarProps {
    * to the active thread. Omitted ⇒ pre-M2 sidebar exactly. */
   memoryEnabled?: boolean;
   memoryProjectId?: string | null;
+  /** §17.1 sidebar v2: multi-select bulk actions. In legacy (unsynced) mode
+   * these run the client paths per thread; in synced mode they call the
+   * set-based bulk_* RPCs. Omitted ⇒ no Select affordance. */
+  onBulkSetFlags?: (threadIds: string[], flags: { pinned?: boolean | null; archived?: boolean | null }) => void;
+  onBulkMoveToFolder?: (threadIds: string[], folderId: string | null) => void;
+  onBulkDelete?: (threadIds: string[]) => void;
+}
+
+/** §17.1: collapsed-section state — a per-user UI preference, deliberately
+ * localStorage-only (never server-synced). Keys: quick · pinned ·
+ * project:<id> · folders · recent · archive · legacy:<label>. */
+const COLLAPSE_KEY = "chat.sidebar.collapsed.v1";
+
+function readCollapsedMap(): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCollapsedMap(map: Record<string, boolean>) {
+  try { window.localStorage.setItem(COLLAPSE_KEY, JSON.stringify(map)); } catch { /* ignore */ }
 }
 
 function groupThreadsLegacy(threads: Thread[]) {
@@ -79,20 +117,28 @@ function groupThreadsLegacy(threads: Thread[]) {
     { label: "Previous 7 days", items: [] },
     { label: "Older", items: [] },
   ];
+  // Archived/pinned exist locally once a bulk action sets them (§17.1 legacy
+  // mode); pre-v1.2 threads carry neither, so their grouping is unchanged.
+  const archived: Thread[] = [];
   for (const t of threads) {
     if (t.id === QUICK_THREAD_ID) groups[0].items.push(t);
+    else if (t.archived) archived.push(t);
+    else if (t.pinned) groups[0].items.push(t);
     else if (t.updatedAt >= startOfToday) groups[1].items.push(t);
     else if (t.updatedAt >= startOfYesterday) groups[2].items.push(t);
     else if (t.updatedAt >= sevenDaysAgo) groups[3].items.push(t);
     else groups[4].items.push(t);
   }
-  return groups.filter((g) => g.items.length > 0);
+  return {
+    groups: groups.filter((g) => g.items.length > 0),
+    archived: archived.sort((a, b) => b.updatedAt - a.updatedAt),
+  };
 }
 
 /** §14.2 organizing rules — the exact section order the sidebar renders when
  * the server store is on: Quick chat · Pinned · by-project (automatic) ·
- * user folders · Archive. A thread shows under its folder AND its project
- * group (views over the same row). */
+ * user folders · Recent · Archive. A thread shows under its folder AND its
+ * project group (views over the same row). */
 function groupThreadsOrganized(threads: Thread[], folders: ChatFolder[], projects: Project[]) {
   const byRecency = (a: Thread, b: Thread) => b.updatedAt - a.updatedAt;
   const quick = threads.find((t) => t.id === QUICK_THREAD_ID) ?? null;
@@ -154,16 +200,23 @@ export function ChatSidebar({
   onSearchMessages,
   memoryEnabled = false,
   memoryProjectId = null,
+  onBulkSetFlags,
+  onBulkMoveToFolder,
+  onBulkDelete,
 }: ChatSidebarProps) {
   const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [folderName, setFolderName] = useState("");
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [searchHits, setSearchHits] = useState<ChatSearchHit[] | null>(null);
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
+  // §17.1: collapsible sections + multi-select.
+  const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>(() => readCollapsedMap());
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Global FTS search (sync on): debounce the query against the server store.
   useEffect(() => {
@@ -186,16 +239,57 @@ export function ChatSidebar({
     return () => clearTimeout(timer);
   }, [query, syncEnabled, onSearchMessages]);
 
+  // Drop selections for threads that no longer exist (deleted elsewhere).
+  useEffect(() => {
+    setSelected((prev) => {
+      const alive = new Set(threads.map((t) => t.id));
+      const next = new Set([...prev].filter((id) => alive.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [threads]);
+
   const filtered = useMemo(() => {
     if (!query.trim()) return threads;
     const q = query.toLowerCase();
     return threads.filter((t) => t.title.toLowerCase().includes(q));
   }, [threads, query]);
-  const legacyGroups = useMemo(() => groupThreadsLegacy(filtered), [filtered]);
+  const legacyGrouped = useMemo(() => groupThreadsLegacy(filtered), [filtered]);
   const organized = useMemo(
     () => groupThreadsOrganized(threads, folders, projects),
     [threads, folders, projects],
   );
+
+  // Archive ships collapsed by default (§14.2 rule 5); everything else open.
+  const isCollapsed = (key: string) => collapsedMap[key] ?? key === "archive";
+  const toggleSection = (key: string) => {
+    setCollapsedMap((prev) => {
+      const next = { ...prev, [key]: !isCollapsed(key) };
+      writeCollapsedMap(next);
+      return next;
+    });
+  };
+
+  const bulkAvailable = Boolean(onBulkSetFlags || onBulkDelete);
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+  const toggleSelected = (id: string) => {
+    if (id === QUICK_THREAD_ID) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedThreads = useMemo(
+    () => threads.filter((t) => selected.has(t.id)),
+    [threads, selected],
+  );
+  const allSelectedArchived = selectedThreads.length > 0 && selectedThreads.every((t) => t.archived);
+  const allSelectedPinned = selectedThreads.length > 0 && selectedThreads.every((t) => t.pinned);
 
   const startRename = (t: Thread) => {
     setRenamingId(t.id);
@@ -216,6 +310,37 @@ export function ChatSidebar({
   const renderThreadRow = (t: Thread) => {
     const active = t.id === activeThreadId;
     const isQuick = t.id === QUICK_THREAD_ID;
+    if (selectMode) {
+      const checked = selected.has(t.id);
+      return (
+        <li key={t.id} className="group relative flex items-center rounded-md pr-0.5">
+          <button
+            type="button"
+            disabled={isQuick}
+            onClick={() => toggleSelected(t.id)}
+            aria-pressed={checked}
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-tight",
+              checked ? "bg-background text-foreground shadow-xs" : "text-foreground/75 hover:bg-background/60",
+              isQuick && "opacity-40",
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border",
+                checked ? "border-foreground bg-foreground text-background" : "border-border bg-background",
+              )}
+            >
+              {checked && <Check className="h-2.5 w-2.5" />}
+            </span>
+            {isQuick && <MessagesSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            {t.pinned && !isQuick && <Pin className="h-3 w-3 shrink-0 text-muted-foreground" />}
+            <span className="truncate">{t.title}</span>
+          </button>
+        </li>
+      );
+    }
     return (
       <li
         key={t.id}
@@ -248,7 +373,7 @@ export function ChatSidebar({
             {isQuick && (
               <MessagesSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}
-            {syncEnabled && t.pinned && !isQuick && (
+            {t.pinned && !isQuick && (
               <Pin className="h-3 w-3 shrink-0 text-muted-foreground" />
             )}
             <span className="truncate">{t.title}</span>
@@ -355,20 +480,55 @@ export function ChatSidebar({
     );
   };
 
-  const sectionHeader = (label: string, action?: React.ReactNode) => (
-    <div className="flex items-center justify-between px-2 pb-1 pt-1">
-      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-        {label}
-      </span>
+  /** §17.1 group header: count badge + chevron; collapsed state persists in
+   * chat.sidebar.collapsed.v1. */
+  const sectionHeader = (key: string, label: React.ReactNode, count: number, action?: React.ReactNode) => (
+    <div className="flex items-center justify-between px-1 pb-1 pt-1">
+      <button
+        type="button"
+        onClick={() => toggleSection(key)}
+        aria-expanded={!isCollapsed(key)}
+        className="flex min-w-0 flex-1 items-center gap-1 text-left text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70 transition hover:text-muted-foreground"
+      >
+        <ChevronRight
+          className={cn("h-3 w-3 shrink-0 transition-transform", !isCollapsed(key) && "rotate-90")}
+        />
+        <span className="truncate">{label}</span>
+        <span className="ml-1 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium normal-case tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      </button>
       {action}
     </div>
   );
+
+  const section = (
+    key: string,
+    label: React.ReactNode,
+    items: Thread[],
+    opts?: { action?: React.ReactNode; children?: React.ReactNode; alwaysShow?: boolean; count?: number },
+  ) => {
+    if (items.length === 0 && !opts?.children && !opts?.alwaysShow) return null;
+    return (
+      <div className="mb-3" key={key}>
+        {sectionHeader(key, label, opts?.count ?? items.length, opts?.action)}
+        {!isCollapsed(key) && (
+          <>
+            {opts?.children}
+            {items.length > 0 && <ul className="space-y-px">{items.map(renderThreadRow)}</ul>}
+          </>
+        )}
+      </div>
+    );
+  };
 
   const stripTags = (s: string) => s.replace(/<[^>]+>/g, "");
 
   const renderSearchResults = () => (
     <div className="px-1.5 pb-3">
-      {sectionHeader(searching ? "Searching…" : `Results (${searchHits?.length ?? 0})`)}
+      <div className="px-2 pb-1 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        {searching ? "Searching…" : `Results (${searchHits?.length ?? 0})`}
+      </div>
       {searching && (
         <div className="flex items-center gap-2 px-2 py-2 text-[12px] text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching your chats
@@ -398,26 +558,20 @@ export function ChatSidebar({
     const { quick, pinned, projectGroups, folderGroups, recent, archived } = organized;
     return (
       <div className="px-1.5 pb-3">
-        {quick && <ul className="mb-2 space-y-px">{renderThreadRow(quick)}</ul>}
+        {quick && section("quick", "Quick chat", [quick])}
 
-        {pinned.length > 0 && (
-          <div className="mb-3">
-            {sectionHeader("Pinned")}
-            <ul className="space-y-px">{pinned.map(renderThreadRow)}</ul>
-          </div>
-        )}
+        {section("pinned", "Pinned", pinned)}
 
-        {projectGroups.map((g) => (
-          <div key={g.projectId} className="mb-3">
-            {sectionHeader(g.label)}
-            <ul className="space-y-px">{g.items.map(renderThreadRow)}</ul>
-          </div>
-        ))}
+        {projectGroups.map((g) => section(`project:${g.projectId}`, g.label, g.items))}
 
-        <div className="mb-3">
-          {sectionHeader(
-            "My folders",
-            onCreateFolder && (
+        {section(
+          "folders",
+          "My folders",
+          [],
+          {
+            alwaysShow: true,
+            count: folderGroups.reduce((sum, g) => sum + g.items.length, 0),
+            action: onCreateFolder && (
               <button
                 type="button"
                 aria-label="New folder"
@@ -427,70 +581,62 @@ export function ChatSidebar({
                 <FolderPlus className="h-3.5 w-3.5" />
               </button>
             ),
-          )}
-          {creatingFolder && (
-            <Input
-              autoFocus
-              value={folderName}
-              placeholder="Folder name"
-              onChange={(e) => setFolderName(e.target.value)}
-              onBlur={commitFolder}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commitFolder();
-                if (e.key === "Escape") { setCreatingFolder(false); setFolderName(""); }
-              }}
-              className="mb-1 h-7 text-[12.5px]"
-            />
-          )}
-          {folderGroups.length === 0 && !creatingFolder && (
-            <p className="px-2 py-1 text-[11.5px] text-muted-foreground/70">
-              Group chats across projects.
-            </p>
-          )}
-          {folderGroups.map(({ folder, items }) => (
-            <div key={folder.id} className="mb-1.5">
-              <div className="group/f flex items-center justify-between px-2 py-0.5">
-                <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-muted-foreground">
-                  <Folder className="h-3 w-3" /> {folder.name}
-                </span>
-                {onDeleteFolder && (
-                  <button
-                    type="button"
-                    aria-label={`Delete folder ${folder.name}`}
-                    onClick={() => onDeleteFolder(folder.id)}
-                    className="hidden rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground group-hover/f:block"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+            children: (
+              <>
+                {creatingFolder && (
+                  <Input
+                    autoFocus
+                    value={folderName}
+                    placeholder="Folder name"
+                    onChange={(e) => setFolderName(e.target.value)}
+                    onBlur={commitFolder}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitFolder();
+                      if (e.key === "Escape") { setCreatingFolder(false); setFolderName(""); }
+                    }}
+                    className="mb-1 h-7 text-[12.5px]"
+                  />
                 )}
-              </div>
-              {items.length === 0 ? (
-                <p className="px-2 py-0.5 text-[11px] text-muted-foreground/60">Empty</p>
-              ) : (
-                <ul className="space-y-px">{items.map(renderThreadRow)}</ul>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {recent.length > 0 && (
-          <div className="mb-3">
-            {sectionHeader("Recent")}
-            <ul className="space-y-px">{recent.map(renderThreadRow)}</ul>
-          </div>
+                {folderGroups.length === 0 && !creatingFolder && (
+                  <p className="px-2 py-1 text-[11.5px] text-muted-foreground/70">
+                    Group chats across projects.
+                  </p>
+                )}
+                {folderGroups.map(({ folder, items }) => (
+                  <div key={folder.id} className="mb-1.5">
+                    <div className="group/f flex items-center justify-between px-2 py-0.5">
+                      <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-muted-foreground">
+                        <Folder className="h-3 w-3" /> {folder.name}
+                      </span>
+                      {onDeleteFolder && (
+                        <button
+                          type="button"
+                          aria-label={`Delete folder ${folder.name}`}
+                          onClick={() => onDeleteFolder(folder.id)}
+                          className="hidden rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground group-hover/f:block"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                    {items.length === 0 ? (
+                      <p className="px-2 py-0.5 text-[11px] text-muted-foreground/60">Empty</p>
+                    ) : (
+                      <ul className="space-y-px">{items.map(renderThreadRow)}</ul>
+                    )}
+                  </div>
+                ))}
+              </>
+            ),
+          },
         )}
 
-        {archived.length > 0 && (
-          <div className="mb-3">
-            <button
-              type="button"
-              onClick={() => setArchiveOpen((v) => !v)}
-              className="flex w-full items-center gap-1.5 px-2 pb-1 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-muted-foreground"
-            >
-              <Archive className="h-3 w-3" /> Archive ({archived.length}) {archiveOpen ? "▾" : "▸"}
-            </button>
-            {archiveOpen && <ul className="space-y-px">{archived.map(renderThreadRow)}</ul>}
-          </div>
+        {section("recent", "Recent", recent)}
+
+        {section(
+          "archive",
+          <span className="inline-flex items-center gap-1.5"><Archive className="h-3 w-3" /> Archive</span>,
+          archived,
         )}
       </div>
     );
@@ -498,19 +644,19 @@ export function ChatSidebar({
 
   const renderLegacy = () => (
     <div className="px-1.5 pb-3">
-      {legacyGroups.length === 0 ? (
+      {legacyGrouped.groups.length === 0 && legacyGrouped.archived.length === 0 ? (
         <p className="px-2 py-6 text-center text-[12px] text-muted-foreground">
           No chats yet.
         </p>
       ) : (
-        legacyGroups.map((g) => (
-          <div key={g.label} className="mb-3">
-            <div className="px-2 pb-1 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-              {g.label}
-            </div>
-            <ul className="space-y-px">{g.items.map(renderThreadRow)}</ul>
-          </div>
-        ))
+        <>
+          {legacyGrouped.groups.map((g) => section(`legacy:${g.label}`, g.label, g.items))}
+          {section(
+            "archive",
+            <span className="inline-flex items-center gap-1.5"><Archive className="h-3 w-3" /> Archive</span>,
+            legacyGrouped.archived,
+          )}
+        </>
       )}
     </div>
   );
@@ -537,6 +683,22 @@ export function ChatSidebar({
             className="h-8 border-transparent bg-transparent pl-8 text-[12.5px] focus-visible:border-border focus-visible:bg-background"
           />
         </div>
+        {bulkAvailable && !showSearchResults && (
+          <div className="flex items-center justify-between px-0.5">
+            <span className="text-[11px] text-muted-foreground" aria-live="polite">
+              {selectMode ? `${selected.size} selected` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11.5px] text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              {selectMode
+                ? (<><X className="h-3 w-3" /> Cancel</>)
+                : (<><ListChecks className="h-3 w-3" /> Select</>)}
+            </button>
+          </div>
+        )}
       </div>
 
       <ScrollArea className="flex-1 min-h-0">
@@ -546,6 +708,107 @@ export function ChatSidebar({
             ? renderOrganized()
             : renderLegacy()}
       </ScrollArea>
+
+      {/* §17.1 multi-select action bar: Move to folder · Archive · Pin/Unpin ·
+          Delete (confirms with count). Move needs the synced folder surface. */}
+      {selectMode && selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-1 border-t border-border bg-surface-elevated p-1.5">
+          {syncEnabled && onBulkMoveToFolder && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11.5px]">
+                  <FolderPlus className="h-3 w-3" /> Move
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="z-[130] max-h-64 overflow-y-auto">
+                {folders.length === 0 && <DropdownMenuItem disabled>No folders yet</DropdownMenuItem>}
+                {folders.map((f) => (
+                  <DropdownMenuItem
+                    key={f.id}
+                    onClick={() => { onBulkMoveToFolder([...selected], f.id); exitSelectMode(); }}
+                  >
+                    <Folder className="mr-2 h-3.5 w-3.5" /> {f.name}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem
+                  onClick={() => { onBulkMoveToFolder([...selected], null); exitSelectMode(); }}
+                >
+                  <FolderX className="mr-2 h-3.5 w-3.5" /> Remove from folder
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {onBulkSetFlags && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[11.5px]"
+              onClick={() => {
+                onBulkSetFlags([...selected], { archived: !allSelectedArchived });
+                exitSelectMode();
+              }}
+            >
+              {allSelectedArchived
+                ? (<><ArchiveRestore className="h-3 w-3" /> Unarchive</>)
+                : (<><Archive className="h-3 w-3" /> Archive</>)}
+            </Button>
+          )}
+          {onBulkSetFlags && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[11.5px]"
+              onClick={() => {
+                onBulkSetFlags([...selected], { pinned: !allSelectedPinned });
+                exitSelectMode();
+              }}
+            >
+              {allSelectedPinned
+                ? (<><PinOff className="h-3 w-3" /> Unpin</>)
+                : (<><Pin className="h-3 w-3" /> Pin</>)}
+            </Button>
+          )}
+          {onBulkDelete && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto h-7 gap-1 px-2 text-[11.5px] text-destructive hover:text-destructive"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="h-3 w-3" /> Delete
+            </Button>
+          )}
+        </div>
+      )}
+
+      {onBulkDelete && (
+        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Delete {selected.size} {selected.size === 1 ? "chat" : "chats"}?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This permanently deletes {selected.size === 1 ? "this chat" : "these chats"} and{" "}
+                {selected.size === 1 ? "its" : "their"} messages. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  onBulkDelete([...selected]);
+                  setConfirmDelete(false);
+                  exitSelectMode();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete {selected.size}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       {memoryEnabled && memoryProjectId && (
         <ProjectMemoryPanel projectId={memoryProjectId} />

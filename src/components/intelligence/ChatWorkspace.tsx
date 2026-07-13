@@ -157,7 +157,11 @@ export function ChatWorkspace({
           <div ref={scrollRef} className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-[720px] space-y-5 px-6 py-8">
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} />
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  onSuggestUtterance={onInputChange}
+                />
               ))}
               {loading && (
                 <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">

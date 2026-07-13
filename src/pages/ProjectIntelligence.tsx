@@ -47,6 +47,9 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
     setArchived,
     searchMessages,
     setThreadMode,
+    bulkSetThreadFlags,
+    bulkMoveToFolder,
+    bulkDeleteThreads,
   } = useChatThreads();
 
   useEffect(() => {
@@ -142,6 +145,9 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
             onSearchMessages={searchMessages}
             memoryEnabled={can("project_memory")}
             memoryProjectId={activeThread?.projectId ?? null}
+            onBulkSetFlags={bulkSetThreadFlags}
+            onBulkMoveToFolder={bulkMoveToFolder}
+            onBulkDelete={bulkDeleteThreads}
           />
           <ChatWorkspace
             threadId={activeThreadId}
