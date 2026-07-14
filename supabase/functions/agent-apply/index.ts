@@ -28,6 +28,8 @@ import {
 import { applyPolicyBundle, type PolicyBundleApplyResult } from "./policyBundleApply.ts";
 import { applyModelCard, type ModelCardApplyResult } from "./modelCardApply.ts";
 import { applyExperimentSpec, type ExperimentSpecApplyResult } from "./experimentSpecApply.ts";
+import { applyDecisionReport, type DecisionReportApplyResult } from "./decisionReportApply.ts";
+import { makeWriters } from "../report-render/writers.ts";
 import { cleanEnv } from "../_shared/env.ts";
 
 const corsHeaders = {
@@ -60,6 +62,18 @@ export const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string
   // §13.3 row 4 — "this is the 'agents can run simulations' right": exactly
   // the feature + page that gate the Lab's own Run button.
   experiment_spec: { features: ["simulation_lab"], pages: ["/simulation-lab"] },
+  // §13.3 decision_report row — same-as-UI proof: a future manual "Export
+  // report" button would demand exactly `reports`. NOT data_editing —
+  // rendering mutates no project state.
+  decision_report: { features: ["reports"], pages: [] },
+};
+
+/** §13.3: the base capability an artifact's apply demands. Everything rides
+ * agent_apply except decision_report, which deliberately demands only
+ * agent_proposals (+ its `reports` operation right above) — rendering a
+ * file mutates no project state, so the mutation right is never required. */
+export const ARTIFACT_BASE_FEATURE: Record<string, string> = {
+  decision_report: "agent_proposals",
 };
 
 /** §13.4 quota caps (DEFAULT, §10 Q15): agent-applied runs per user per
@@ -67,6 +81,10 @@ export const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string
  * proposals.applied_result→run_id. */
 export const EXPERIMENT_CONCURRENT_CAP = 3;
 export const EXPERIMENT_DAILY_CAP = 10;
+
+/** §10 Q25 (DEFAULT): render quota — 20 decision-report renders per day per
+ * user, counted on applied decision_report proposals across projects. */
+export const REPORT_DAILY_CAP = 20;
 
 const isUuid = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -82,6 +100,34 @@ export async function checkApplyQuota(db: any, args: {
   projectId: string;
   userId: string;
 }): Promise<string | null> {
+  // §10 Q25: 20 renders/day PER USER (across projects), counted on applied
+  // decision_report proposals — one render per apply; the idempotent re-POST
+  // of an already-applied proposal never reaches this check.
+  if (args.artifactType === "decision_report") {
+    try {
+      const { data, error } = await db
+        .from("proposals")
+        .select("applied_at")
+        .eq("artifact_type", "decision_report")
+        .eq("status", "applied")
+        .eq("reviewed_by", args.userId);
+      if (error) throw error;
+      const dayStart = new Date();
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const ts = (v: unknown): number => (typeof v === "number" ? v : Date.parse(String(v ?? "")) || 0);
+      const today = ((data ?? []) as Array<{ applied_at: unknown }>)
+        .filter((r) => ts(r.applied_at) >= dayStart.getTime()).length;
+      if (today >= REPORT_DAILY_CAP) {
+        return `Daily report-render quota reached: ${today} of ${REPORT_DAILY_CAP} renders today for your account ` +
+          `(${Math.max(0, REPORT_DAILY_CAP - today)} remaining). Try again tomorrow.`;
+      }
+      return null;
+    } catch (e) {
+      // Fail closed: nothing renders when the quota cannot be counted.
+      console.error("report quota check failed:", e);
+      return "The report-render quota could not be verified — try again.";
+    }
+  }
   if (args.artifactType !== "experiment_spec") return null;
   try {
     const { data: applied, error } = await db
@@ -205,9 +251,12 @@ serve(async (req) => {
     const pages = (c.pages as Record<string, boolean>) ?? {};
     const isSuper = Boolean(c.is_super_admin);
     if (!isSuper) {
-      if (features.agent_apply !== true) {
+      // §13.3: decision_report rides agent_proposals (rendering mutates no
+      // project state); every other artifact demands agent_apply.
+      const baseFeature = ARTIFACT_BASE_FEATURE[String(proposal.artifact_type)] ?? "agent_apply";
+      if (features[baseFeature] !== true) {
         return jsonResponse({
-          error: "Applying agent proposals isn't enabled for your account (agent_apply). Contact an administrator.",
+          error: `Applying this proposal isn't enabled for your account (${baseFeature}). Contact an administrator.`,
           type: "FORBIDDEN",
         });
       }
@@ -277,7 +326,7 @@ serve(async (req) => {
       return jsonResponse({ error: message, code, type: "APPLY_FAILED" });
     };
 
-    let result: ItemMasterApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult;
+    let result: ItemMasterApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult | DecisionReportApplyResult;
     try {
       switch (String(proposal.artifact_type)) {
         case "item_master_diff":
@@ -334,6 +383,30 @@ serve(async (req) => {
           });
           break;
         }
+        case "decision_report": {
+          // §16.1 apply row: resolve → render (XLSX/PDF) → workspace upload →
+          // user_files rows → {file_ids, paths}. Same module the
+          // report-render function serves, executed in-process (the
+          // dispatch.ts precedent — one render path, never a parallel one).
+          // deno-lint-ignore no-explicit-any
+          const storage = (svc as any).storage;
+          result = await applyDecisionReport(svc, {
+            writers: makeWriters(),
+            upload: async (path, bytes, contentType) => {
+              const { error } = await storage.from("workspace").upload(path, bytes, { contentType, upsert: false });
+              return { error: error ? { message: String(error.message) } : null };
+            },
+            remove: async (paths) => {
+              await storage.from("workspace").remove(paths);
+            },
+          }, {
+            projectId,
+            proposalId,
+            payload: (proposal.payload ?? {}) as Record<string, unknown>,
+            userId,
+          });
+          break;
+        }
         default:
           // Later stages add their §4.4 rows here; an artifact this deployment
           // cannot apply is a typed error, not an attempt.
@@ -361,6 +434,16 @@ serve(async (req) => {
       artifact_type: proposal.artifact_type,
       provenance: proposal.provenance,
     }, { proposal_id: proposalId, latency_ms: Date.now() - t0 });
+    if (String(proposal.artifact_type) === "decision_report") {
+      // §16.3 report.rendered — structured ids/counts only, never text (§7.5).
+      const r = result as DecisionReportApplyResult;
+      telemetry.emit("report.rendered", {
+        template_id: r.template_id,
+        format: r.format,
+        files: r.file_ids.length,
+        total_bytes: r.total_bytes,
+      }, { proposal_id: proposalId, latency_ms: Date.now() - t0 });
+    }
 
     return jsonResponse({ ok: true, applied_result: result });
   } catch (err) {

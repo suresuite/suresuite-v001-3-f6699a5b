@@ -4,6 +4,7 @@
 
 import { assert, assertEquals } from "./harness/asserts.ts";
 import { AGENT_PRECEDENCE, AGENT_ROSTER } from "../router.ts";
+import { ASK_MODE_AGENT_ALLOWLIST } from "../modes.ts";
 
 interface GoldenRow {
   id: string;
@@ -32,6 +33,7 @@ const AGENT_CLASS: Record<string, string> = {
   vv: "vv-analyst",
   exp: "experiment-designer",
   explain: "explainer",
+  report: "report-builder",
 };
 
 Deno.test("class quotas meet the §6.5 seed requirements", () => {
@@ -81,7 +83,7 @@ Deno.test("single-agent classes stay label-consistent", () => {
   }
 });
 
-Deno.test("ask-mode rows are well-formed (§15: post-mode route is advisory; the subtracted intent is a real label)", () => {
+Deno.test("ask-mode rows are well-formed (§15: post-mode route is advisory — except the §16.1 allowlist agent; the subtracted intent is a real label)", () => {
   const allIntents = new Set(
     (AGENT_PRECEDENCE as readonly string[]).flatMap((a) => AGENT_ROSTER[a as keyof typeof AGENT_ROSTER].intents),
   );
@@ -90,11 +92,22 @@ Deno.test("ask-mode rows are well-formed (§15: post-mode route is advisory; the
   for (const r of askRows) {
     assertEquals(r.mode, "ask", `${r.id}: only 'ask' fixtures exist ('auto' does not, §10 Q23)`);
     assertEquals(r.class, "ask-mode", `${r.id}: ask fixtures carry their own class`);
-    assertEquals(r.expect.route, "advisory", `${r.id}: ask mode must end advisory`);
-    assertEquals(r.expect.agent_id, null, `${r.id}: no agent may execute in ask mode`);
+    if (r.expect.route === "advisory") {
+      assertEquals(r.expect.agent_id, null, `${r.id}: advisory ask rows carry no agent`);
+    } else {
+      // §15/§16.1: report-builder is the ONE agent routable in Ask mode —
+      // its rows survive the mode subtraction as artifact routes.
+      assertEquals(r.expect.route, "artifact", `${r.id}: non-advisory ask rows must be artifact routes`);
+      assert(
+        ASK_MODE_AGENT_ALLOWLIST.includes(String(r.expect.agent_id)),
+        `${r.id}: only the §15 allowlist (${ASK_MODE_AGENT_ALLOWLIST.join(", ")}) may execute in ask mode`,
+      );
+      assertEquals(r.expect.blocked_intent ?? null, null, `${r.id}: an executed intent is never a blocked intent`);
+    }
     if (r.expect.blocked_intent != null) {
       assert(allIntents.has(r.expect.blocked_intent), `${r.id}: unknown blocked intent ${r.expect.blocked_intent}`);
     }
   }
-  assert(askRows.some((r) => r.expect.blocked_intent == null), "at least one advisory control row");
+  assert(askRows.some((r) => r.expect.blocked_intent == null && r.expect.route === "advisory"),
+    "at least one advisory control row");
 });

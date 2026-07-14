@@ -107,12 +107,20 @@ Deno.test("ask-mode golden fixtures: classification detects the intent, the mode
   assert(askRows.length >= 5, `ask-mode golden rows required (got ${askRows.length})`);
   Deno.env.set("AGENT_ROUTER_ENABLED", "true");
   try {
-    const enabledAgents = ["data-steward", "policy-configurator", "vv-analyst", "experiment-designer"];
+    const enabledAgents = ["data-steward", "policy-configurator", "vv-analyst", "experiment-designer", "report-builder"];
     // Oracle classifier (§7.4 tier 1): answers with the underlying intent the
     // utterance would classify to in review mode.
     const oracle: ClassifierCall = (prompt) => {
       const utterance = prompt.slice(prompt.indexOf("USER MESSAGE:") + 14).trim();
       const row = askRows.find((r) => r.utterance === utterance)!;
+      if (row.expect.route === "artifact") {
+        // §15/§16.1: the allowlist agent (report-builder) — classified
+        // normally, and the mode subtraction must let it through.
+        return Promise.resolve(JSON.stringify({
+          route: "artifact", agent_id: row.expect.agent_id, intent: row.expect.intent,
+          confidence: 0.95, advisory_part: null, artifact_part: utterance,
+        }));
+      }
       const blocked = row.expect.blocked_intent ?? null;
       const agent = blocked
         ? enabledAgents.find((a) => blocked.startsWith(a === "data-steward" ? "steward" : a === "policy-configurator" ? "policy" : a === "vv-analyst" ? "vv" : "exp")) ?? null

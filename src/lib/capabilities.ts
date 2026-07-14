@@ -56,7 +56,11 @@ export type FeatureKey =
   // workstream M0 (ai-agents.md §14.7; seeded in 20260717000001_chat_store.sql):
   | 'chat_history_sync'
   // workstream M2 (ai-agents.md §14.4/§14.7; seeded in 20260717000003_project_memory.sql):
-  | 'project_memory';
+  | 'project_memory'
+  // v1.2 Phase 3 (ai-agents.md §16.1/§13.3; seeded in
+  // 20260723000001_reports_and_file_workspace.sql):
+  | 'reports'
+  | 'agent_report_builder';
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'ai_chat', kind: 'feature', label: 'AI Assistant' },
@@ -73,6 +77,8 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'agent_explainer', kind: 'feature', label: 'Explainer Agent' },
   { key: 'chat_history_sync', kind: 'feature', label: 'Chat History Sync' },
   { key: 'project_memory', kind: 'feature', label: 'Project Memory' },
+  { key: 'reports', kind: 'feature', label: 'Decision Reports' },
+  { key: 'agent_report_builder', kind: 'feature', label: 'Report Builder Agent' },
 ];
 
 /** `/profile` is a system page — always reachable, never deniable. */

@@ -1,0 +1,19 @@
+{
+  "id": "rb-06-render-determinism",
+  "description": "ai-agents.md §16.1 rb-06 — render determinism: the same approved spec resolved twice against the same data yields IDENTICAL XLSX cell values (the workbook model is the cells; documents carry no wall-clock values); the PDF model renders the narrative under the explicit 'AI-drafted commentary' heading; the stored spec sections carry no copied data.",
+  "project_snapshot": {
+    "reuse": "rb-02-disruption-brief"
+  },
+  "utterance": "Write up the outage experiment for my team as a PDF",
+  "mocked_llm": {
+    "reuse": "rb-02-disruption-brief"
+  },
+  "expect": {
+    "workbook_sheets": 5,
+    "overview_sheet": "Overview",
+    "narrative_sheet": "AI-drafted commentary",
+    "pdf_has_ai_heading": true,
+    "comparison_columns": ["KPI", "Baseline", "Scenario", "Delta", "Delta %"]
+  },
+  "retired_reason": null
+}

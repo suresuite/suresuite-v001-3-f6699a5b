@@ -1,0 +1,24 @@
+{
+  "id": "rb-07-apply-path",
+  "description": "ai-agents.md §16.1/§16.2 rb-07 — the apply row: approve → render → PDF + XLSX uploaded under the org/<org>/user/<user>/<project>/<file_id>__<name> path law → user_files rows (row id = path file_id) → applied_result {file_ids, paths}; format 'pdf' still ships the XLSX data pack; a vanished cited run fails stale_values; flags off ⇒ typed refusal, nothing stored.",
+  "project_snapshot": {
+    "reuse": "rb-02-disruption-brief"
+  },
+  "utterance": "Write up the outage experiment for my team as a PDF",
+  "mocked_llm": {
+    "reuse": "rb-02-disruption-brief"
+  },
+  "expect": {
+    "apply": {
+      "files": 2,
+      "kinds": ["report_pdf", "report_xlsx"],
+      "path_prefix": "org/99999999-9999-4999-8999-999999999901/user/22222222-2222-4222-8222-222222222222/11111111-1111-4111-8111-111111111111/",
+      "template_id": "disruption-brief",
+      "format": "pdf"
+    },
+    "xlsx_only_format_files": 1,
+    "stale_error_code": "stale_values",
+    "flag_off_error_includes": "FILE_WORKSPACE_ENABLED"
+  },
+  "retired_reason": null
+}

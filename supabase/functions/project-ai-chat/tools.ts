@@ -26,6 +26,10 @@ export interface DraftAttribution {
   canProposals: boolean;
   /** The routed utterance — cited on user_supplied rows (kind user_message). */
   utterance: string;
+  /** The thread's §15 interaction mode — lets the one ask-mode-routable
+   * agent (report-builder, §16.1) phrase its refusals per mode. Absent ⇒
+   * 'review' (the pre-§15 behavior). */
+  mode?: "ask" | "review";
 }
 
 export interface ToolContext {

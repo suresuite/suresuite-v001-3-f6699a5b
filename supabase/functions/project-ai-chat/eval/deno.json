@@ -10,7 +10,9 @@
   "imports": {
     "https://esm.sh/@supabase/supabase-js@2.45.0": "./stubs/supabase-js.ts",
     "https://deno.land/std@0.168.0/http/server.ts": "./stubs/deno_std_http_server.ts",
-    "https://deno.land/x/xhr@0.1.0/mod.ts": "./stubs/xhr.ts"
+    "https://deno.land/x/xhr@0.1.0/mod.ts": "./stubs/xhr.ts",
+    "https://esm.sh/xlsx@0.18.5": "./stubs/xlsx.ts",
+    "https://esm.sh/pdf-lib@1.17.1": "./stubs/pdf-lib.ts"
   },
   "tasks": {
     "eval": "deno test --allow-env --allow-read --allow-write --allow-run ."
