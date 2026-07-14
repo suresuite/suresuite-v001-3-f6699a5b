@@ -106,49 +106,52 @@ jobs:
         if: steps.params.outputs.mode != 'state-only'
         run: |
           REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
-          node -e '
-            const [ref, token] = process.argv.slice(1);
-            fetch(`https://api.supabase.com/v1/projects/${ref}/secrets`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }).then(async (r) => {
-              if (!r.ok) { console.error(`secrets fetch failed: HTTP ${r.status}`); process.exit(1); }
-              const rows = await r.json();
-              const fs = require("fs");
-              // The same one-pair quote strip _shared/env.ts applies at runtime —
-              // this deployment has a history of quote-wrapped pasted secrets
-              // (commit "Fix sim dispatch 500: tolerate quote-wrapped secrets").
-              const strip = (raw) => {
-                const t = String(raw).trim();
-                const m = t.match(/^(["'])([\s\S]*)\1$/);
-                return (m ? m[2] : t).trim();
-              };
-              // Shape diagnostics (never the value): a 64-hex value is the CLI
-              // digest — i.e. the API is write-only and the eval cannot obtain
-              // plaintext keys this way.
-              const shape = (v) =>
-                /^[0-9a-f]{64}$/.test(v) ? "hex64(digest?)" :
-                /^AIza/.test(v) ? "gemini-plaintext" :
-                /^sk-/.test(v) ? "sk-plaintext" : "other";
-              for (const name of ["GEMINI_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"]) {
-                const row = Array.isArray(rows) ? rows.find((s) => s.name === name) : null;
-                if (row && row.value) {
-                  const raw = String(row.value);
-                  const v = strip(raw);
-                  console.log(`::add-mask::${raw}`);
-                  console.log(`::add-mask::${v}`);
-                  console.error(`${name}: raw len=${raw.length} stripped len=${v.length} quoted=${raw !== v} shape=${shape(v)}`);
-                  if (/^[0-9a-f]{64}$/.test(v)) {
-                    console.error(`${name}: looks like the CLI digest, not a key — NOT exporting`);
-                    continue;
-                  }
-                  fs.appendFileSync(process.env.GITHUB_ENV, `${name}=${v}\n`);
-                  console.error(`resolved ${name} from the deployment`);
-                } else {
-                  console.error(`no deployed value for ${name} — its models will be skipped`);
+          # Quoted heredoc: the script contains quote characters that a
+          # node -e '...' single-quoted argument cannot carry.
+          cat > /tmp/resolve-keys.cjs <<'JS'
+          const [ref, token] = process.argv.slice(2);
+          fetch(`https://api.supabase.com/v1/projects/${ref}/secrets`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(async (r) => {
+            if (!r.ok) { console.error(`secrets fetch failed: HTTP ${r.status}`); process.exit(1); }
+            const rows = await r.json();
+            const fs = require("fs");
+            // The same one-pair quote strip _shared/env.ts applies at runtime —
+            // this deployment has a history of quote-wrapped pasted secrets
+            // (commit "Fix sim dispatch 500: tolerate quote-wrapped secrets").
+            const strip = (raw) => {
+              const t = String(raw).trim();
+              const m = t.match(/^(["'])([\s\S]*)\1$/);
+              return (m ? m[2] : t).trim();
+            };
+            // Shape diagnostics (never the value): a 64-hex value is the CLI
+            // digest — i.e. the API is write-only and the eval cannot obtain
+            // plaintext keys this way.
+            const shape = (v) =>
+              /^[0-9a-f]{64}$/.test(v) ? "hex64(digest?)" :
+              /^AIza/.test(v) ? "gemini-plaintext" :
+              /^sk-/.test(v) ? "sk-plaintext" : "other";
+            for (const name of ["GEMINI_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"]) {
+              const row = Array.isArray(rows) ? rows.find((s) => s.name === name) : null;
+              if (row && row.value) {
+                const raw = String(row.value);
+                const v = strip(raw);
+                console.log(`::add-mask::${raw}`);
+                console.log(`::add-mask::${v}`);
+                console.error(`${name}: raw len=${raw.length} stripped len=${v.length} quoted=${raw !== v} shape=${shape(v)}`);
+                if (/^[0-9a-f]{64}$/.test(v)) {
+                  console.error(`${name}: looks like the CLI digest, not a key — NOT exporting`);
+                  continue;
                 }
+                fs.appendFileSync(process.env.GITHUB_ENV, `${name}=${v}\n`);
+                console.error(`resolved ${name} from the deployment`);
+              } else {
+                console.error(`no deployed value for ${name} — its models will be skipped`);
               }
-            });
-          ' "$REF" "$SUPABASE_ACCESS_TOKEN"
+            }
+          });
+          JS
+          node /tmp/resolve-keys.cjs "$REF" "$SUPABASE_ACCESS_TOKEN"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 

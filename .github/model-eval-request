@@ -6,6 +6,6 @@
 #
 #   agents=<comma list>       which agents to score (§7.4: every enabled agent)
 #   mode=full|state-only      state-only skips the two eval tiers
-run=3 v1.2 GA flip — pre-flip evidence, take 3 (quote-strip resolved keys per _shared/env.ts; digest-shape diagnostics)
+run=4 v1.2 GA flip — pre-flip evidence, take 4 (heredoc fixes the shell-quoting bug in the key-resolve step)
 agents=data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder
 mode=full
