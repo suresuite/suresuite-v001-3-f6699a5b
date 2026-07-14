@@ -1,0 +1,11 @@
+# Git-native trigger for .github/workflows/ai-agent-model-eval.yml — the §7.4
+# model-scored eval tier + live deployment-state capture. Exists for
+# environments that can push but cannot call the Actions API (the
+# ops-request/seed-request idiom). Change any line and push to fire a run;
+# results land on the eval-results branch (results/latest.log).
+#
+#   agents=<comma list>       which agents to score (§7.4: every enabled agent)
+#   mode=full|state-only      state-only skips the two eval tiers
+run=1 v1.2 GA flip — pre-flip evidence (ai-agents.md §7.4: live model-scored eval BEFORE the flag flip)
+agents=data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder
+mode=full

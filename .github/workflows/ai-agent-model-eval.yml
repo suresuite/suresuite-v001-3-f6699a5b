@@ -1,0 +1,239 @@
+name: AI Agent Eval (model-scored tier) + live deployment state
+
+# The §7.4 tier-2 gate (docs/design/ai-agents.md): the LIVE model-scored eval
+# on every model enabled in this deployment — nightly + BEFORE any flag flip.
+# A --mock run is never flag-flip evidence (§7.4; §10 entries 28(h)/29(j)/31(j)),
+# so this workflow runs run_model_eval.ts against the real providers using the
+# same API-key secrets the deployed functions use: a model is "enabled in this
+# deployment" exactly when its provider key is configured, and the runner
+# skips (with a warning) models whose key is absent.
+#
+# The run also captures the live deployment state (applied migrations,
+# role-capability grants for the GA keys, function flag secrets, health and
+# smoke probes) so a GA flip is verifiable from one log. mode=state-only
+# captures the state without spending an eval run.
+#
+# Triggers, matching the repo's git-native ops idiom (ops-request/seed-request):
+#   * workflow_dispatch with inputs, or
+#   * pushing a change to .github/model-eval-request (for environments that can
+#     push but cannot call the Actions API), or
+#   * nightly schedule (§7.4: "nightly + before any flag flip") — active once
+#     this file is on the default branch.
+#
+# The full log + report land on the eval-results branch (results/latest.log,
+# results/latest-report.json, plus per-run copies) so the outcome is readable
+# over plain git, like migration-results and seed-results.
+
+on:
+  workflow_dispatch:
+    inputs:
+      agents:
+        description: "Comma list of agents to score (§7.4: every enabled agent)"
+        default: "data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder"
+      mode:
+        description: "full = eval + state; state-only = skip the eval tiers"
+        type: choice
+        options: [full, state-only]
+        default: full
+  push:
+    paths:
+      - ".github/model-eval-request"
+  schedule:
+    - cron: "17 3 * * *"
+
+# Model-scored runs are expensive (every golden row × every enabled model);
+# never overlap two.
+concurrency:
+  group: ai-agent-model-eval
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: write   # publish the report to the eval-results branch
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve parameters
+        id: params
+        run: |
+          DEFAULT_AGENTS="data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            AGENTS=$(grep -oP '^agents=\K.+' .github/model-eval-request | tail -1 || true)
+            MODE=$(grep -oP '^mode=\K.+' .github/model-eval-request | tail -1 || true)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            AGENTS="${{ inputs.agents }}"
+            MODE="${{ inputs.mode }}"
+          else
+            # nightly (§7.4): always the full suite on the full enabled roster
+            AGENTS=""; MODE=""
+          fi
+          echo "agents=${AGENTS:-$DEFAULT_AGENTS}" >> "$GITHUB_OUTPUT"
+          echo "mode=${MODE:-full}" >> "$GITHUB_OUTPUT"
+          echo "resolved: agents=${AGENTS:-$DEFAULT_AGENTS} mode=${MODE:-full}"
+
+      - uses: denoland/setup-deno@v2
+        if: steps.params.outputs.mode != 'state-only'
+        with:
+          deno-version: v2.x
+
+      # ── Tier 1 (§7.4): deterministic, no LLM — must be green in the SAME
+      # run that produces flag-flip evidence. ubuntu-latest ships Postgres
+      # server binaries; the harness boots its own throwaway cluster.
+      - name: "Tier 1: deterministic eval"
+        id: tier1
+        if: steps.params.outputs.mode != 'state-only'
+        working-directory: supabase/functions/project-ai-chat/eval
+        env:
+          EVAL_REQUIRE_DB: '1'
+        run: |
+          set -o pipefail
+          deno test --allow-env --allow-read --allow-write --allow-run . 2>&1 | tee /tmp/tier1.log
+
+      # ── Tier 2 (§7.4): live model-scored eval. Exit 1 on any missed target,
+      # failing this job — the flag-flip gate. The provider keys are the SAME
+      # GitHub secrets supabase-functions.yml pushes into the deployed
+      # functions, so "every model enabled in this deployment" is scored.
+      - name: "Tier 2: model-scored eval (live)"
+        id: tier2
+        if: steps.params.outputs.mode != 'state-only'
+        working-directory: supabase/functions/project-ai-chat/eval
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -o pipefail
+          deno run --allow-env --allow-read --allow-write --allow-net run_model_eval.ts \
+            --agents="${{ steps.params.outputs.agents }}" \
+            --out=/tmp/model-eval-report.json 2>&1 | tee /tmp/tier2.log
+
+      # ── Live deployment state (always captured, even when the eval fails,
+      # so the log shows exactly what the deployment looked like). Read-only:
+      # Management API SQL (the seed-project.yml idiom), CLI secrets digests,
+      # and anon-key probes of the deployed functions.
+      - uses: supabase/setup-cli@v1
+        if: always()
+        with:
+          version: latest
+
+      - name: "State: applied migrations + GA capability grants"
+        if: always()
+        continue-on-error: true
+        run: |
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+          q() {
+            printf '── %s\n' "$1" | tee -a /tmp/state.log
+            node -e '
+              const [ref, token, sql] = process.argv.slice(1);
+              fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ query: sql }),
+              }).then(async (r) => console.log(JSON.stringify(await r.json(), null, 1)))
+                .catch((e) => console.log("query failed:", e.message));
+            ' "$REF" "$SUPABASE_ACCESS_TOKEN" "$2" | tee -a /tmp/state.log
+          }
+          q "last 12 applied migrations" "select version, name from supabase_migrations.schema_migrations order by version desc limit 12"
+          q "role grants for the GA capability keys (§13.1)" "select capability_key, role, allowed from public.role_capabilities where capability_key in ('ai_chat','agent_proposals','agent_apply','agent_data_steward','agent_policy_configurator','agent_vv_analyst','agent_experiment_designer','agent_report_builder','agent_explainer','chat_history_sync','project_memory','reports') order by capability_key, role"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: "State: edge-function flag secrets (names + digests only)"
+        if: always()
+        continue-on-error: true
+        run: |
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+          echo "── supabase secrets list" | tee -a /tmp/state.log
+          supabase secrets list --project-ref "$REF" 2>&1 | tee -a /tmp/state.log
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Anon-key smoke probes of the deployed functions. §7.5 discipline: ids
+      # only in logs, never emails (the smoke identity's email is masked).
+      - name: "Smoke: health, suggested actions, file workspace"
+        if: always()
+        continue-on-error: true
+        run: |
+          URL=$(grep -oP 'SUPABASE_URL = "\K[^"]+' src/integrations/supabase/client.ts)
+          KEY=$(grep -oP 'SUPABASE_PUBLISHABLE_KEY = "\K[^"]+' src/integrations/supabase/client.ts)
+          REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
+
+          echo "── project-ai-health (provider registry probes)" | tee -a /tmp/state.log
+          curl -s -X POST "$URL/functions/v1/project-ai-health" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            -H "Content-Type: application/json" -d '{}' | tee -a /tmp/state.log
+          echo | tee -a /tmp/state.log
+
+          # Most recently active modeler + one of their projects, ids only.
+          IDS=$(node -e '
+            const [ref, token] = process.argv.slice(1);
+            const sql = "select p.id as project_id, p.modeler_id as user_id, au.email from public.projects p join public.approved_users au on au.id = p.modeler_id order by p.updated_at desc nulls last limit 1";
+            fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ query: sql }),
+            }).then(async (r) => {
+              const rows = await r.json();
+              const row = Array.isArray(rows) ? rows[0] : null;
+              if (row) console.log(`${row.project_id} ${row.user_id} ${row.email}`);
+            }).catch(() => {});
+          ' "$REF" "$SUPABASE_ACCESS_TOKEN")
+          PROJECT_ID=$(echo "$IDS" | cut -d' ' -f1)
+          USER_ID=$(echo "$IDS" | cut -d' ' -f2)
+          USER_EMAIL=$(echo "$IDS" | cut -d' ' -f3)
+          echo "::add-mask::$USER_EMAIL"
+
+          if [ -n "$PROJECT_ID" ] && [ -n "$USER_ID" ]; then
+            echo "── suggested actions (mode:suggest, §17.3) project=$PROJECT_ID user=$USER_ID" | tee -a /tmp/state.log
+            curl -s -X POST "$URL/functions/v1/project-ai-chat" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"mode\":\"suggest\",\"projectId\":\"$PROJECT_ID\",\"userId\":\"$USER_ID\",\"userEmail\":\"$USER_EMAIL\"}" | tee -a /tmp/state.log
+            echo | tee -a /tmp/state.log
+
+            echo "── report-render download probe (expect NOT_FOUND when FILE_WORKSPACE_ENABLED; SERVICE_UNAVAILABLE when off; HTTP 404 when undeployed)" | tee -a /tmp/state.log
+            curl -s -w "\nHTTP %{http_code}\n" -X POST "$URL/functions/v1/report-render" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"action\":\"download\",\"fileId\":\"00000000-0000-4000-8000-000000000000\",\"userId\":\"$USER_ID\"}" | tee -a /tmp/state.log
+          else
+            echo "smoke skipped: could not resolve a modeler/project id" | tee -a /tmp/state.log
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Outcome readable over plain git (environments here may lack Actions
+      # API access): everything lands on the eval-results branch.
+      - name: Publish results to eval-results branch
+        if: always()
+        run: |
+          {
+            echo "run_id: ${{ github.run_id }}  attempt: ${{ github.run_attempt }}"
+            echo "trigger: ${{ github.event_name }}  ref: ${{ github.ref_name }}  sha: ${{ github.sha }}"
+            echo "mode: ${{ steps.params.outputs.mode }}  agents: ${{ steps.params.outputs.agents }}"
+            echo "tier1 (deterministic): ${{ steps.tier1.outcome }}   tier2 (model-scored, live): ${{ steps.tier2.outcome }}"
+            echo "──────────────────────────────────────"
+            cat /tmp/tier1.log 2>/dev/null || echo "(tier 1 skipped or never produced a log)"
+            echo "──────────────────────────────────────"
+            cat /tmp/tier2.log 2>/dev/null || echo "(tier 2 skipped or never produced a log)"
+            echo "──────────────────────────────────────"
+            cat /tmp/state.log 2>/dev/null || echo "(state capture produced no log)"
+          } > /tmp/eval-full.log
+          cp /tmp/model-eval-report.json /tmp/report.json 2>/dev/null || echo '{"note":"no model-eval report produced"}' > /tmp/report.json
+          git config user.name "ai-agent-model-eval"
+          git config user.email "actions@github.com"
+          git checkout --orphan eval-results-tmp
+          git rm -rfq . || true
+          # keep prior per-run files if the branch exists
+          git fetch origin eval-results 2>/dev/null && git checkout origin/eval-results -- results 2>/dev/null || true
+          mkdir -p results
+          cp /tmp/eval-full.log results/latest.log
+          cp /tmp/report.json results/latest-report.json
+          cp /tmp/eval-full.log "results/run-${{ github.run_id }}.log"
+          cp /tmp/report.json "results/run-${{ github.run_id }}-report.json"
+          git add results
+          git commit -qm "model-eval run ${{ github.run_id }}: tier1=${{ steps.tier1.outcome }} tier2=${{ steps.tier2.outcome }} mode=${{ steps.params.outputs.mode }}"
+          git push -f origin HEAD:eval-results

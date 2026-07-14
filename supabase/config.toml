@@ -40,3 +40,11 @@ verify_jwt = false
 # §8 T4 / §13.5); the function fails closed on its own §13.2 checkpoint-5
 # checks (status, project ownership, agent_apply + operation rights, quota).
 verify_jwt = false
+
+[functions.report-render]
+# Same trust model as project-ai-chat / agent-apply (client-asserted identity,
+# ai-agents.md §8 T4 / §13.5): download fails closed on file ownership for the
+# asserted user and only ever returns a 60-minute signed URL; render requires
+# the service-role bearer. Platform JWT verification must be off for the
+# anon-key client (`useUserFiles`) to reach it.
+verify_jwt = false
