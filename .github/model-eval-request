@@ -6,6 +6,6 @@
 #
 #   agents=<comma list>       which agents to score (§7.4: every enabled agent)
 #   mode=full|state-only      state-only skips the two eval tiers
-run=1 v1.2 GA flip — pre-flip evidence (ai-agents.md §7.4: live model-scored eval BEFORE the flag flip)
+run=2 v1.2 GA flip — pre-flip evidence, take 2 (provider keys now resolved from the deployment's own function secrets)
 agents=data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder
 mode=full
