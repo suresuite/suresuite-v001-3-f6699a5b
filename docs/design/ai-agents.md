@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | v1.2 — authoritative for all AI-agent work (Layer A hardening, the proposal fabric, and the Layer B artifact-agent roster). v1.1 added §12 (state-of-the-art alignment against the four industrial-trust pillars), §13 (rights-checked authorization incl. agent-driven simulation/analytics), §14 (memory architecture + chat organization, workstream M); decided §10 Q3; added Q14–Q18. **v1.2** adds §15 (interaction modes: Ask / Review / Auto), §16 (decision reports, file workspace, retention — agent B6 Report Builder), §17 (chat experience v2: sidebar organization, readability grammar, suggested actions, memory guidance), §18 (extended roster B7–B9 + the background-execution addendum), §9.8 (v1.2 delivery sequencing — Stage 4 reprioritized first); decides Q23–Q25; adds Q26–Q28 |
-| **Date** | 2026-07-12 (v1.0/v1.1); 2026-07-13 (v1.2) |
+| **Status** | v1.2 — authoritative for all AI-agent work (Layer A hardening, the proposal fabric, and the Layer B artifact-agent roster). v1.1 added §12 (state-of-the-art alignment against the four industrial-trust pillars), §13 (rights-checked authorization incl. agent-driven simulation/analytics), §14 (memory architecture + chat organization, workstream M); decided §10 Q3; added Q14–Q18. **v1.2** adds §15 (interaction modes: Ask / Review / Auto), §16 (decision reports, file workspace, retention — agent B6 Report Builder), §17 (chat experience v2: sidebar organization, readability grammar, suggested actions, memory guidance), §18 (extended roster B7–B9 + the background-execution addendum), §9.8 (v1.2 delivery sequencing — Stage 4 reprioritized first); decides Q23–Q25; adds Q26–Q28. **v1.3** adds §19 (conversation coverage & grounding — the accuracy-validation workstream: the coverage law, the intent taxonomy I1–I15, read-tool gap specs that close supplier→material / BOM / policy / readiness / run-result questions, the verbatim faithfulness & refusal grammar, and the entity-fabrication metric) |
+| **Date** | 2026-07-12 (v1.0/v1.1); 2026-07-13 (v1.2); 2026-07-14 (v1.3) |
 | **Authority** | Governed by `docs/design/next-gen-platform-design.md` (the blueprint). **This document supersedes the roster sketch that blueprint §12 carried**; §12 is rewritten in the same change to frame the two layers and point here (per the `CLAUDE.md` doc-and-code law). The blueprint's §12 platform law and the agent run-readiness contract (G16) remain stated in the blueprint and are restated here verbatim where they bind. `docs/design/public-api-and-access-control.md` remains authoritative for identity/tenancy/quota; `docs/design/policy-specification.md` for policy semantics; `docs/design/phase-b0-core-loop.md` for the model-validation card. |
 | **Altitude** | Implementation-deterministic: executable DDL, JSON Schemas, verbatim prompt templates, literal file/table/tool/flag/event names, numeric thresholds. Two independent implementers reading this document must produce interchangeable systems. |
 | **Non-goals** | Adding LLM providers or models (explicitly out of scope — §3.4); autonomous/background agents; LLM-generated simulation results; replacing the persona chat UX |
@@ -31,6 +31,7 @@
 | Chat UX v2 — sidebar, readability, suggested actions | §17 |
 | Planned agents: cost estimation, deep-tier mapping, disruption alerts | §18 |
 | What ships in which delivery phase (v1.2) | §9.8 |
+| Conversation coverage, grounding, and anti-fabrication (v1.3) | §19 |
 
 **Conventions used throughout.**
 
@@ -1946,3 +1947,113 @@ Scheduled or event-driven agent turns (B8 weekly refresh, B9 monitoring) may exi
 4. **A notification surface** (alerts inbox) so background output is seen without an open thread — background proposals otherwise die unreviewed at TTL.
 5. **Schedule-shaped eval**: scheduled agents run their golden suites on fixtures that simulate the schedule (stale evidence, repeated firings, no-change runs must produce *no* proposal — idempotent silence is a tested behavior).
 6. **Everything still lands as a proposal.** Background execution changes *when* an agent runs, never *what it may do* — the fabric, gates, and rights matrix apply identically.
+
+---
+
+## 19. Appendix — Conversation coverage and grounding *(added v1.3)*
+
+**Purpose.** This appendix makes the advisory surface (Layer A, §2) *provably* grounded across the full space of things a modeler asks — not just the handful of intents the room launched with. It is the design output of the accuracy-validation workstream. It defines: the coverage law (§19.1), the intent taxonomy the assistant must handle (§19.2), the read-tool gaps to close and their specs (§19.3), the verbatim faithfulness/refusal grammar (§19.4), the conversation skills that raise handled-rate (§19.5–§19.6), and the eval that gates all of it (§19.7). It governs the persona read path; it changes no gate and no Layer B write path.
+
+### 19.0 Motivating incident (real, reproduced)
+
+On `Project TRON - ver2` (modeler-owned, 60 suppliers · 560 materials · 560 inbound arcs) a user asked what **supplier 10** supplies. The policies page correctly shows supplier 10 (TTI INC) sourcing material `001409784A`. The assistant instead returned five IDs — `007507784A`, `…785A`, `…786A`, `…787A`, `…788A` — as supplier 10's materials. Recomputed truth from `inbound_logistics`:
+
+- Supplier 10 actually supplies **187 materials** (all 187 sole-sourced; supplier 10 is also the project's **#1 by procurement spend** — its single most critical supplier).
+- The five claimed IDs are **all supplied by supplier 41679 (MICROTEC)**, not supplier 10, and none appears in the first page `list_project_entities` would return.
+
+The claim was **ungrounded by construction**: no advisory tool maps a supplier to the list of its materials. `get_supplier_risk` *counts* a supplier's materials (it returned the correct 187) but never enumerates them; `list_project_entities` lists materials *unscoped* by supplier. With no grounded path to the answer, the model filled the gap by over-claiming. The tools that *did* apply were correct — this is a **capability-coverage gap plus a faithfulness gap**, not a tool bug and not a data-sync drift (policies page and tools read the same `inbound_logistics`). The deterministic audit that produced these numbers is §19.7's `coverage.audit`.
+
+### 19.1 The coverage law (what "handle 99.99%" means)
+
+> For **every** in-scope user message, the assistant must **answer correctly from a grounded artifact**, **or** state plainly that it cannot and offer the nearest supported action. It must **never** present an ungrounded entity, number, or relationship as fact.
+
+"Handled" is answer-or-honest-refuse; it is **not** "answers everything." The measurable target is **entity-fabrication rate = 0** (§19.7) — every entity id, name, count, or relationship in a reply must be traceable to a tool result on *this* project. Coverage is raised by closing gaps (§19.3) so more intents fall in the "answer" branch, and by the refusal grammar (§19.4) so the residue falls in the "honest refuse" branch instead of the "fabricate" branch.
+
+### 19.2 Intent taxonomy (the surface to cover)
+
+Every advisory message classifies into one family below. **Status** is the as-audited grounding state on the shipped five tools (§2.3); **Target** is the state after §19.3 lands. Status codes: ✅ grounded · ⚠️ partial (tool returns an aggregate but not the asked identity/detail) · ❌ gap (no grounded path — fabrication risk).
+
+| # | Family | Representative intents | Status (shipped) | Closes via |
+|---|---|---|---|---|
+| I1 | **Entity enumeration** | list suppliers / materials / customers / plants / products; counts | ✅ | `list_project_entities` |
+| I2 | **Entity detail** | lead time / price / MOQ / holding cost / reliability / criticality of a named entity | ⚠️ (avg-lead only, via risk tools) | `get_entity_detail` (§19.3) |
+| I3 | **Relation: supplier→materials** | "what does supplier X supply?" | ❌ **(the incident)** | `get_supplier_materials` (§19.3) |
+| I4 | **Relation: material→suppliers** | "who supplies material Y?" (identities, not just count) | ⚠️ (count only) | `get_material_suppliers` (§19.3) |
+| I5 | **Relation: BOM** | "what products use material Y?"; "what's in product P's BOM?" | ❌ | `get_bom_relations` (§19.3) |
+| I6 | **Relation: customer↔product** | "who buys product P?"; "what does customer C order?" | ❌ | `get_bom_relations` (outbound mode) |
+| I7 | **Risk / concentration** | riskiest supplier; single-source exposure; spend concentration | ✅ | `get_supplier_risk`, `get_material_risk`, `get_procurement_spend` |
+| I8 | **Policy configuration (read)** | "what safety stock / reorder / MOQ is set for X?"; "what's my fulfillment strategy?" | ❌ | `get_policy_config` (read-only; wraps §5 grounding tool) |
+| I9 | **Readiness (read)** | "is my model run-ready?"; "what data am I missing?"; "is it validated?" | ❌ | `get_data_completeness`, `get_validation_status` (§5 tools, exposed to persona read) |
+| I10 | **Run results (read)** | "what did my last run show?"; KPI/scenario comparison | ❌ | `get_run_results` (§5 tool, exposed to persona read) |
+| I11 | **Disruption advice** | recovery playbooks for an outage/shortage/shock | ✅ (with the flagged generic fallback, §2.6) | `recommend_disruption_strategy` |
+| I12 | **How-to / conceptual** | "what is TTR?"; "how do I set up a scenario?" | ✅ (no data claim) | persona prose |
+| I13 | **Navigation** | "where do I edit policies?"; "take me to the Lab" | ✅ (static app map) | persona prose + app-route hints |
+| I14 | **Action (route to Layer B)** | "fill missing costs"; "configure policy"; "run a stress test"; "make a report" | n/a (router §6) | existing agents B1–B6 |
+| I15 | **Out of scope / off-data** | non-supply-chain; asks about data the project doesn't have | ✅ must refuse | refusal grammar (§19.4) |
+
+The taxonomy is the **coverage contract**: every family has either a grounded tool or a defined honest-refusal. The audit (§19.7) asserts no family sits in ❌ once §19.3 lands.
+
+### 19.3 Read-tool gaps to close (specs)
+
+These are **read-only, project-scoped** tools registered exactly like the shipped five (§2.3): service-role client, `.eq("project_id", ctx.projectId)`, the `{kind,data,meta}` envelope, `clamp()`ed numerics, `empty()` on no data. Each wraps an **existing** interface (the relation tools read the same `inbound_logistics` / `bom_multi_level` / `get_supply_chain_data` the policies page reads via `useStageRows`; the state tools wrap the §5 grounding tools). No new privileged path; identity/tenancy unchanged.
+
+| Tool | Params | Returns (`table` unless noted) | Reads | Ranking / notes |
+|---|---|---|---|---|
+| `get_supplier_materials` | `supplier` (required, id/name fragment); `top_n?` (1–200, default 50) | `[Material, Unit Price, Lead Time, Single-source?]` + `meta.note` with the **total count** when truncated | `inbound_logistics` | Resolve `supplier` via `list_project_entities` first; sort single-source → lead time → spend. Answers I3. On >`top_n`, the note reads "supplier X supplies N materials; showing top `top_n`." |
+| `get_material_suppliers` | `material` (required); `top_n?` (1–50, default 25) | `[Supplier, Unit Price, Lead Time, Volume]` | `inbound_logistics`, `suppliers` (name) | Names the actual suppliers (fixes I4's ⚠️). Sole-source case returns the one row. |
+| `get_bom_relations` | `direction: "material_to_products"\|"product_to_materials"\|"product_customers"\|"customer_products"` (required); `target` (required) | relation rows | `bom_multi_level`, `outbound_logistics` | Answers I5/I6; parent/leaf logic mirrors `useStageRows` (`higher_level_component_id`). |
+| `get_entity_detail` | `entity_type` (required); `id` (required) | `kpi` block of the master-record fields | `suppliers`/`materials`/`products`/`node_list` | Answers I2 (price, MOQ, holding cost, lead-time dist, reliability, criticality). Verbatim master values — never imputed. |
+| `get_policy_config` | `family?`; `target?` | policy rows (default + overrides) | `policy_defaults`, `policy_overrides` (read RPC) | Answers I8. Read-only mirror of the §5 Configurator grounding read; states the effective value and whether it's a default or an override. |
+| `get_data_completeness` | — | `bullets`/`table` of the grader findings | §5 `loadGateDataset`+`gradeDataset` | Answers I9 (missing/derivable fields). Already exists for Layer B (`draftTools.ts`); expose read-only to the persona set. |
+| `get_validation_status` | — | `kpi` (verdict, adequacy, active card) | `model_validations` (list RPC) | Answers I9. |
+| `get_run_results` | `scenario?`; `top_n?` | run/replication KPI table | `simulation_runs`, `run_replications` | Answers I10. Numbers are read from persisted rows — never LLM-computed (platform law). |
+
+Least-privilege stays intact: these are **persona read tools**, appended to `toolDeclarations`; they are *not* `draft_*` tools and cannot mutate. Layer B agents keep their curated subsets (§3.2 bridge 2).
+
+### 19.4 Faithfulness and refusal grammar (verbatim additions to `buildSystemPrompt` DATA RULES)
+
+Insert these lines into the `DATA RULES` block (`providers.ts::buildSystemPrompt`, after the existing "Resolve ambiguous entity references…" line). They are contracts, not tone:
+
+```
+- Relationships are FACTS, not guesses. Never state that a supplier supplies a
+  material, that a material is used by a product, or that a customer buys a
+  product, unless a tool result on THIS project shows that exact pair. If no
+  relation tool covers the question, say so and offer the closest grounded fact.
+- A COUNT is not a LIST. If a tool gives you only a count (e.g. "supplier 10:
+  187 materials"), report the count. Do NOT enumerate individual ids you did
+  not receive from a tool. Never continue a partial list by pattern.
+- Every entity id, name, or number you state must appear in a tool result you
+  received this turn. If it does not, you may not say it.
+- When you cannot answer from data, use ONE sentence: what you can't do, and the
+  nearest thing you can ("I can't list supplier 10's materials individually yet,
+  but I can tell you it supplies 187 — 187 of them sole-sourced, and it's your
+  top supplier by spend. Want the risk breakdown?").
+```
+
+**The incident, after this change.** Asked "what does supplier 10 supply?", the assistant either calls `get_supplier_materials("10")` and returns the grounded list (with the truncation note), or — if that tool is not yet enabled — answers the bounded honest form above. It can no longer emit five wrong ids. This is enforced by eval, not trust (§19.7).
+
+### 19.5 Disambiguation and multi-turn skills
+
+- **Entity resolution before relation** (already the rule for §2.3; restated as binding for all relation tools): a fragment that matches >1 entity returns a short "did you mean…" list, not a guess. `list_project_entities` is the resolver.
+- **Name vs id**: ids like `10` or `001409784A` are matched exactly first, then as fragments; a numeric that matches both an id and a name substring surfaces both.
+- **Follow-up carry**: the last resolved entity is the implicit subject of a follow-up ("and its lead times?") — carried via the normal history window (§2.2), never via server memory.
+- **Scope honesty**: if the project has the *table* but not the *row* (e.g. no run yet for I10), that is an honest "no data yet," distinct from "no such tool."
+
+### 19.6 Large result sets (the 187-material case)
+
+Grounded ≠ dump. Tools cap rows (`top_n`) and carry the true total in `meta.note`; the persona summarizes ("187 materials, all sole-sourced; here are the 10 longest-lead") and offers to narrow or page. This keeps the typed `parts` channel authoritative (§2.6) while the prose stays readable per the §17.2 grammar.
+
+### 19.7 Evaluation — what gates this
+
+Extends §7.4's two tiers; suites only grow (§7.3).
+
+1. **`coverage.audit` (deterministic, per real project).** For a fixed question battery spanning I1–I13, recompute truth from project tables and diff against each tool's output; compute the **capability-coverage map** (which families are ✅/⚠️/❌). Runs offline against a seeded project (e.g. `scripts/tron_ver2/dataset.json`) in CI, and against a live project via a read-only diagnostic for the modeler's own projects (TRON ver1/ver2, AA ver3). Asserts: every tool that applies matches truth; **no I1–I10 family is ❌** once §19.3 lands.
+2. **Entity-fabrication metric (model-scored, nightly + pre-flag).** Deterministic post-check over real-model replies to the battery: **every** entity id/name in the reply must appear in that turn's tool results. **Target = 0 fabrications.** A single fabrication fails the run. This is the metric that would have caught the incident.
+3. **Golden conversation transcripts.** Multi-turn fixtures under `eval/fixtures/coverage/`, including the **pinned regression** `cov-supplier-materials` (the supplier-10 case: expected = grounded list or the §19.4 bounded refusal; forbidden = any id not in a tool result). Added the moment the fix lands, per §7.3.
+
+These join the §7.2 metric table as **Advisory coverage** (families grounded ÷ families asked, from telemetry) and **Entity-fabrication rate** (target 0).
+
+### 19.8 How this rides the shipped phases
+
+No new surface. The new reads are persona tools behind the existing dispatcher (bridge 1); the honest-refusal residue becomes **suggested actions** (§17.3) that point at the owning Layer B agent ("I can't set that, but I can draft it — switch to Review"); the taxonomy's I14 actions route exactly as §6 already routes. The Ask/Review modes (§15) are unchanged: coverage is a read-path property and applies in both.
+
