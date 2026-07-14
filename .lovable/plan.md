@@ -1,63 +1,51 @@
 ## Goal
 
-Expand the new public Landing page (`/`) with the substance from the old `/app` home, using the new tightened design language (mono-accent, sharp borders, minimal decoration, Inter, subtle grid). Keep the funding block **verbatim** — same copy, same logos, same layout — as the last section.
+Replace the current mid-page sections of `src/pages/Landing.tsx` with the 5 sections migrated from `/app` (GettingStarted), preserving the exact "Quick Start" block and the 3D Network Graph figure. Keep the existing top bar, hero, value tiles, funding block, and footer. Normalize section rhythm so vertical spacing is uniform.
 
-## Design language (applied consistently)
+## Section order (top → bottom)
 
-- One canvas: `bg-background`, one accent color for interactive elements, no rainbow gradients or colored card tints from the old page.
-- Typography: existing Inter stack, tight tracking on H1/H2, muted-foreground body.
-- Surfaces: `border border-border`, `rounded-lg`, `shadow-xs` on hover. No `hover:-translate-y-1`, no `shadow-xl`, no gradient card backgrounds.
-- Icons: neutral 4x4 in a `bg-secondary` tile, matching the current value tiles.
-- Spacing: 6xl max width, `py-24` section rhythm, `border-t border-border/60` between sections.
+1. Top bar *(unchanged)*
+2. Hero *(unchanged, keeps credibility chips)*
+3. Value tiles *(unchanged)*
+4. **Core Capabilities** *(migrated, tuned)*
+5. **Quick Start with SuReSuite** *(migrated verbatim — dark section, red heading, yellow numbered steps, "Launch SuReSuite" CTA row)*
+6. **SuReSuite Technical Architecture** *(migrated, tuned; keeps 3D figure)*
+7. **Ready to boost the resilience of your supply chain?** *(migrated, tuned)*
+8. **Roadmap** *(migrated, tuned)*
+9. Funding & attribution *(unchanged, verbatim)*
+10. Footer *(unchanged)*
 
-## New Landing structure (top → bottom)
+Removes the previously-added "How it works", static "Platform architecture" grid, and generic CTA strip — they are superseded by Quick Start, Technical Architecture, and the "Ready to boost" strip.
 
-1. **Top bar** *(unchanged)* — wordmark, Docs, Log in, Get started.
+## Per-section tuning
 
-2. **Hero** *(kept, lightly enriched)*
-   - Same eyebrow, headline, subhead, primary + secondary CTA.
-   - Add a compact row of 4 credibility chips under CTAs (from old StatChips): "3 network levels · 5k+ simulations · 5 resilience tactics · Scenario library". Rendered as small pill outlines, not colored.
+**Core Capabilities** — keep 3-card grid + centered heading. Drop the pastel gradient card backgrounds, colored badge chips, hover lift, and "Learn more" buttons. Use the Landing card style: `border border-border bg-card`, neutral `bg-secondary` icon tile, small uppercase tag, title, body. Icons and copy unchanged.
 
-3. **Value tiles** *(existing 3 tiles kept, copy sharpened)*
-   - Titles/bodies stay concise. No change to visual treatment.
+**Quick Start with SuReSuite** — KEEP AS-IS. Same black background, red `#BF2330` heading, `border-b border-white/10` divider row with "Launch SuReSuite" pill button, 3 columns with yellow gradient numbered circles, uppercase eyebrows, bold titles, white bodies. No visual changes.
 
-4. **Core capabilities** *(new, from old "Core Capabilities")*
-   - 3-column grid, same card style as value tiles (border, no gradient, no lift).
-   - Cards: Interactive Network Graph / Hidden Critical Detection / Strategy Simulation. Icon + eyebrow tag + title + one-line body. No "Learn more" button (CTA lives in hero/footer).
+**SuReSuite Technical Architecture** — keep the tab pattern (Network / Nexus Detection / Simulation), keep `NetworkVisualization3D` for the Network tab, keep auto-rotate effect. Tuning: swap the outer `bg-gradient-to-br from-muted to-background` panel for a flat `border border-border bg-card rounded-lg`; swap the 3D figure's `from-slate-900 to-gray-800` for a subtle single tone (`bg-neutral-950`) with a soft radial grid overlay so it sits better on the light Landing canvas; recolor accents to neutral (drop `#BF2330` in tab active + info tile icons, use `text-foreground` on tab active + `bg-secondary` icon tiles), keeping the Network Graph 3-level illustration itself untouched.
 
-5. **How it works** *(new, replaces old dark "Quick Start")*
-   - Light section, 3 numbered steps in a row: Import data → Detect nexus → Simulate strategies.
-   - Numbers as small `border` circles, no yellow gradient. Short 1-line description each.
+**Ready to boost…** — replace the compact dark strip with a bordered light panel matching the Landing card language: `rounded-lg border border-border bg-card p-8`, headline left, primary `Get started` button right. Same copy.
 
-6. **Platform architecture** *(new, distilled from old "Technical Architecture" tabs)*
-   - Static 3-column grid instead of tabbed panel: Network Graph, Nexus Detection, Monte Carlo Simulation.
-   - No 3D visualization, no auto-rotating tabs — keeps page fast and on-brand.
-   - Each column: small icon tile, title, 2 short bullets (e.g. "3 network levels", "Centrality metrics").
+**Roadmap** — reuse the migrated list. Tuning: unify status pill color (single muted `border` chip instead of primary/blue tints), unify roadmap icons to `text-foreground` inside `bg-secondary` tiles (drop green/blue/primary tints), keep the left vertical rule + circular icon markers. Same 3 items and dates.
 
-7. **Roadmap** *(new, from old Roadmap)*
-   - Same 3 items (Enhanced Training / GIS Mapping / Deep-Tier). Rendered as a clean vertical list with a left rule, muted status pill + quarter. No colored icon backgrounds — single accent for status.
+## Spacing normalization
 
-8. **CTA strip** *(new, from old "Ready to boost")*
-   - Single line: "Ready to strengthen your supply chain?" + primary "Get started" button on a subtle bordered panel (not the black dark section).
+Every content section between hero and funding uses the same rhythm:
 
-9. **Funding & attribution** *(KEPT EXACTLY AS-IS)*
-   - Reuse the old `DarkSection` block verbatim: black background, `logo3.png` + Digital SC Lab copy on the left, `logo2.png` + full ACCURATE EU disclaimer + Start/Finish dates on the right. Same 30% / 17% / 53% grid, same text, same spacing.
-   - This is the only dark surface on the page and it's intentionally preserved for the funding requirement.
+- Outer wrapper: `border-t border-border/60`
+- Inner container: `mx-auto max-w-6xl px-6 py-24`
+- Section header (when present): `max-w-2xl` with `text-3xl font-semibold tracking-tight` + `mt-3 text-muted-foreground`, followed by `mt-12` grid.
 
-10. **Slim footer** *(existing)* — © year, Docs, Sign in.
+Exception: the Quick Start dark section keeps its own internal spacing verbatim, but its outer wrapper still uses `border-t border-border/60` and `py-24` so the vertical rhythm across the page stays consistent.
 
 ## Files
 
-- **Edit** `src/pages/Landing.tsx` — add sections 3–9 above between the existing hero/value tiles and the current slim footer. Import `lucide-react` icons already used elsewhere (Network, Crosshair, Shuffle, Sparkles, MapPin, Layers3, CalendarDays, ArrowRight). Reuse `/logo2.png` and `/logo3.png` from `public/`.
-- No changes to `GettingStarted.tsx`, routing, or auth flow. Authenticated users still redirect to `/app`.
-
-## What is intentionally NOT ported
-
-- 3D `NetworkVisualization3D` (heavy, off-brand for a marketing page).
-- YouTube intro video (placeholder `VIDEO_ID`, not production-ready).
-- Auto-rotating tab animation and hash updates.
-- Colored gradient cards, yellow numbered badges, hover lift animations.
+- **Edit** `src/pages/Landing.tsx` only. Replace the "How it works", "Platform architecture", "Roadmap", and "CTA strip" blocks with the 5 migrated sections above; keep hero, value tiles, funding, footer.
+- Import `NetworkVisualization3D` from `@/components/NetworkVisualization3D`.
+- Add state + effect for `activeTech` tab (copied from GettingStarted, no logic changes).
+- No changes to `GettingStarted.tsx`, routing, auth, or any other file.
 
 ## Out of scope
 
-No business logic, no data fetching, no route changes, no new dependencies.
+No business logic, no route changes, no new deps, no changes to the funding block.
