@@ -92,17 +92,20 @@ jobs:
           set -o pipefail
           deno test --allow-env --allow-read --allow-write --allow-run . 2>&1 | tee /tmp/tier1.log
 
-      # The provider API keys are NOT GitHub secrets in this repo (only
-      # SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD / FLY_API_TOKEN are —
-      # verified 2026-07-14: the supabase-functions.yml "Set function
-      # secrets" step resolves them empty on main too). The deployed
-      # functions read them from Supabase function secrets, set once via
-      # scripts/setup_secrets.sh. So resolve the keys from the deployment
-      # itself (Management API GET /v1/projects/{ref}/secrets — the same
-      # token the migrations workflow uses), masked before use. This is
-      # also the honest §7.4 scope: the eval scores exactly the models THIS
-      # deployment has keys for.
-      - name: Resolve provider keys from the deployment (Management API)
+      # Provider keys: the eval expects GEMINI_API_KEY / OPENAI_API_KEY /
+      # DEEPSEEK_API_KEY as GitHub Actions secrets — the same names the
+      # supabase-functions.yml "Set function secrets" step was always
+      # designed to read. Verified 2026-07-14 (runs 1-4): these are NOT
+      # currently set in this repo (they resolve empty on main too); the
+      # deployed functions read them from Supabase function secrets, and
+      # the Management API secrets endpoint returns sha256 DIGESTS, not
+      # plaintext (write-only store) — so CI cannot recover them from the
+      # deployment. Until the owner adds the GitHub secrets (values from
+      # scripts/deploy.env or the provider consoles), tier 2 exits 2 with
+      # "no provider keys configured". The step below stays as a
+      # diagnostic: it reports each deployed secret's shape (never its
+      # value) and would export only a non-digest value.
+      - name: Resolve provider keys from the deployment (diagnostic)
         if: steps.params.outputs.mode != 'state-only'
         run: |
           REF=$(grep -oP 'SUPABASE_URL = "https://\K[^.]+' src/integrations/supabase/client.ts)
@@ -156,14 +159,23 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # ── Tier 2 (§7.4): live model-scored eval. Exit 1 on any missed target,
-      # failing this job — the flag-flip gate. Provider keys come from the
-      # resolve step above (job env), never from step-level secrets.
+      # failing this job — the flag-flip gate. GitHub secrets win when set;
+      # otherwise any value the diagnostic step exported is kept. The
+      # runner itself skips (with a warning) models whose provider key is
+      # absent — "every model enabled in this deployment" is what remains.
       - name: "Tier 2: model-scored eval (live)"
         id: tier2
         if: steps.params.outputs.mode != 'state-only'
         working-directory: supabase/functions/project-ai-chat/eval
+        env:
+          GH_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           set -o pipefail
+          if [ -n "$GH_GEMINI_API_KEY" ];   then export GEMINI_API_KEY="$GH_GEMINI_API_KEY"; fi
+          if [ -n "$GH_OPENAI_API_KEY" ];   then export OPENAI_API_KEY="$GH_OPENAI_API_KEY"; fi
+          if [ -n "$GH_DEEPSEEK_API_KEY" ]; then export DEEPSEEK_API_KEY="$GH_DEEPSEEK_API_KEY"; fi
           deno run --allow-env --allow-read --allow-write --allow-net run_model_eval.ts \
             --agents="${{ steps.params.outputs.agents }}" \
             --out=/tmp/model-eval-report.json 2>&1 | tee /tmp/tier2.log
