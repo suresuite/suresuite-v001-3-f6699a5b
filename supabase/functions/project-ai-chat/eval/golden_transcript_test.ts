@@ -14,7 +14,8 @@ const recorded: GoldenCapture[] = JSON.parse(await Deno.readTextFile(fixturePath
 const recordedById = new Map(recorded.map((c) => [c.id, c]));
 
 // Flags off — the §9 global kill-switch state (incl. the v1.2 Phase 1 flags:
-// Stage 4 single-run, §15 modes, §17.3 suggestions).
+// Stage 4 single-run, §15 modes, §17.3 suggestions; and the Phase 3 file
+// workspace).
 Deno.env.delete("AGENT_TELEMETRY_ENABLED");
 Deno.env.delete("AGENT_ROUTER_ENABLED");
 Deno.env.delete("AGENT_ENABLED_IDS");
@@ -22,6 +23,7 @@ Deno.env.delete("CHAT_STORE_ENABLED");
 Deno.env.delete("AGENT_EXPERIMENT_TYPES");
 Deno.env.delete("CHAT_MODES_ENABLED");
 Deno.env.delete("SUGGESTED_ACTIONS_ENABLED");
+Deno.env.delete("FILE_WORKSPACE_ENABLED");
 setTestProviderKeys();
 
 for (const scenario of GOLDEN_SCENARIOS) {

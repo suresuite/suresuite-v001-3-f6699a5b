@@ -21,7 +21,15 @@ export type ChatEventKind =
   | "mode.changed"
   | "mode.blocked_intent"
   | "suggestion.shown"
-  | "suggestion.clicked";
+  | "suggestion.clicked"
+  // §16.3 report/file kinds — landed with their Phase-3 surfaces (CHECK
+  // extended in 20260723000001_reports_and_file_workspace.sql). file.kept /
+  // file.expired are RPC-emitted (set_file_retained / sweep_expired_files);
+  // report.rendered / report.downloaded are server-emitted:
+  | "report.rendered"
+  | "report.downloaded"
+  | "file.kept"
+  | "file.expired";
 
 // Structural client type so this module never imports the supabase-js bundle.
 export interface TelemetryDb {

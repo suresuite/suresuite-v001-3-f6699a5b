@@ -1,0 +1,29 @@
+{
+  "id": "rb-08-ask-mode",
+  "description": "ai-agents.md §15/§16.1/§13.3 rb-08 — report-builder is the ONE agent routable in Ask mode: an ask-mode thread can draft (and apply) a decision_report while every other artifact route is subtracted; the rights row is agent_proposals + reports (NOT agent_apply, no data_editing); the render quota is 20/day/user.",
+  "project_snapshot": {
+    "reuse": "rb-01-run-results"
+  },
+  "utterance": "Please generate the run results report for this thread",
+  "mocked_llm": {
+    "tool": "draft_decision_report",
+    "args": {
+      "template_id": "run-results",
+      "run_id": "66666666-6666-4666-8666-666666666601",
+      "format": "both",
+      "title": "Run results for the team"
+    }
+  },
+  "expect": {
+    "proposal": {
+      "template_id": "run-results",
+      "format": "both",
+      "sections": 1,
+      "provenance": "llm_drafted"
+    },
+    "proposal_count": 1,
+    "rights": { "features": ["reports"], "pages": [], "base_feature": "agent_proposals" },
+    "daily_cap": 20
+  },
+  "retired_reason": null
+}

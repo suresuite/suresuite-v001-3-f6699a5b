@@ -12,6 +12,7 @@ import { ChatSidebar } from "@/components/intelligence/ChatSidebar";
 import { ChatWorkspace } from "@/components/intelligence/ChatWorkspace";
 import { useChatThreads, QUICK_THREAD_ID } from "@/hooks/useChatThreads";
 import { getStoredModel, setStoredModel } from "@/components/chat/ModelPicker";
+import { fileWorkspaceUiEnabled } from "@/hooks/useUserFiles";
 
 interface ProjectIntelligenceProps {
   isCollapsed: boolean;
@@ -145,6 +146,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({
             onSearchMessages={searchMessages}
             memoryEnabled={can("project_memory")}
             memoryProjectId={activeThread?.projectId ?? null}
+            filesEnabled={fileWorkspaceUiEnabled() && can("reports")}
             onBulkSetFlags={bulkSetThreadFlags}
             onBulkMoveToFolder={bulkMoveToFolder}
             onBulkDelete={bulkDeleteThreads}

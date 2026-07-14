@@ -1,0 +1,43 @@
+{
+  "id": "rb-04-no-evidence-run",
+  "description": "ai-agents.md §16.1 rb-04 — refusal-when-no-evidence-run: the only run is still running, so the disruption-brief refuses dependency_missing NAMING the missing run. In Review mode the refusal offers the experiment path (the chained flow's first proposal); in Ask mode it offers the mode switch.",
+  "project_snapshot": {
+    "reuse": "rb-01-run-results",
+    "patch": {
+      "simulation_runs": [
+        {
+          "id": "66666666-6666-4666-8666-666666666603",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "status": "running",
+          "rep_count_done": 4,
+          "rep_count_target": 30,
+          "scenario_id": "55555555-5555-4555-8555-555555555502",
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "aggregate_kpis": {},
+          "created_at": 300
+        }
+      ]
+    }
+  },
+  "utterance": "Write up the outage experiment for my team as a PDF",
+  "mocked_llm": {
+    "tool": "draft_decision_report",
+    "args": {
+      "template_id": "disruption-brief",
+      "scenario_run_id": "66666666-6666-4666-8666-666666666603",
+      "format": "pdf",
+      "narrative_md": "The outage analysis will follow the run.",
+      "citations": [{ "kind": "run", "ref": "66666666-6666-4666-8666-666666666603" }]
+    }
+  },
+  "expect": {
+    "error_code": "dependency_missing",
+    "error_includes": "No completed scenario run for this disruption",
+    "error_names_run": "66666666-6666-4666-8666-666666666603",
+    "review_remedy_includes": "Experiment Designer",
+    "ask_remedy_includes": "Switch this thread to Review",
+    "no_runs_message_includes": "no completed run",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

@@ -1,0 +1,64 @@
+{
+  "id": "rb-02-disruption-brief",
+  "description": "ai-agents.md §16.1 rb-02 — the chained disruption-brief mission's second proposal: baseline + scenario runs completed → disruption-brief spec (kpi_grid + run_comparison + supplier-risk table + narrative). Narrative is citation-mandatory (§4.3) and carries run citations.",
+  "project_snapshot": {
+    "reuse": "rb-01-run-results",
+    "patch": {
+      "simulation_runs": [
+        {
+          "id": "66666666-6666-4666-8666-666666666601",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "status": "done",
+          "rep_count_done": 30,
+          "rep_count_target": 30,
+          "scenario_id": null,
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "aggregate_kpis": { "fill_rate": 0.94, "on_time_delivery": 0.91, "total_cost": 125000.5 },
+          "created_at": 100
+        },
+        {
+          "id": "66666666-6666-4666-8666-666666666602",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "status": "done",
+          "rep_count_done": 30,
+          "rep_count_target": 30,
+          "scenario_id": "55555555-5555-4555-8555-555555555502",
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "aggregate_kpis": { "fill_rate": 0.71, "on_time_delivery": 0.62, "total_cost": 168400.25 },
+          "created_at": 200
+        }
+      ]
+    }
+  },
+  "utterance": "Write up the outage experiment for my team as a PDF",
+  "mocked_llm": {
+    "tool": "draft_decision_report",
+    "args": {
+      "template_id": "disruption-brief",
+      "scenario_run_id": "66666666-6666-4666-8666-666666666602",
+      "baseline_run_id": "66666666-6666-4666-8666-666666666601",
+      "format": "pdf",
+      "title": "Supplier S1 outage — impact & response options",
+      "narrative_md": "During the simulated outage the fill rate and on-time delivery drop materially against baseline while total cost rises; the network recovers within the horizon. Recommend qualifying a second source for the sole-sourced material before the risk window.",
+      "citations": [
+        { "kind": "run", "ref": "66666666-6666-4666-8666-666666666602" },
+        { "kind": "run", "ref": "66666666-6666-4666-8666-666666666601" }
+      ]
+    }
+  },
+  "expect": {
+    "proposal": {
+      "template_id": "disruption-brief",
+      "format": "pdf",
+      "sections": 4,
+      "narrative_cited": true,
+      "provenance": "llm_drafted",
+      "evidence_runs": [
+        "66666666-6666-4666-8666-666666666602",
+        "66666666-6666-4666-8666-666666666601"
+      ]
+    },
+    "proposal_count": 1
+  },
+  "retired_reason": null
+}

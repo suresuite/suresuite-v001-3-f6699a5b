@@ -33,10 +33,30 @@ interface LogRow {
   user_name?: string;
 }
 
+/** §16.2 admin rollup: one row per org from the admin_org_file_usage view —
+ * file count, bytes, retained bytes, expiring-in-7d. Aggregates only. */
+interface OrgFileUsageRow {
+  org_id: string | null;
+  org_name: string | null;
+  file_count: number;
+  total_bytes: number;
+  retained_bytes: number;
+  expiring_7d: number;
+}
+
+const humanBytes = (n: number): string => {
+  if (!Number.isFinite(n) || n < 0) return '—';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+
 const db = supabase as any;
 
 export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
   const [rows, setRows] = useState<LogRow[]>([]);
+  const [fileRows, setFileRows] = useState<OrgFileUsageRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -57,6 +77,14 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
       names = Object.fromEntries((users ?? []).map((u: any) => [u.id, u.name || u.email]));
     }
     setRows(logs.map((l) => ({ ...l, user_name: l.user_id ? names[l.user_id] : undefined })));
+    try {
+      // File-workspace rollup (ai-agents.md §16.2) — absent pre-Phase-3
+      // deployments simply render no section.
+      const { data: usage, error } = await db.from('admin_org_file_usage').select('*');
+      setFileRows(!error && Array.isArray(usage) ? (usage as OrgFileUsageRow[]) : []);
+    } catch {
+      setFileRows([]);
+    }
     setLoading(false);
   };
 
@@ -181,6 +209,46 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
           </TableBody>
         </Table>
       </div>
+
+      {fileRows.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-1 text-sm font-semibold">File workspace by organization</h2>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Rendered reports and exports per org (14-day retention unless Kept; 500 MB retained
+            cap per user). Counts and bytes only — file contents stay private to their owners.
+          </p>
+          <div className="rounded-md border border-border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Organization</TableHead>
+                  <TableHead className="text-right">Files</TableHead>
+                  <TableHead className="text-right">Total size</TableHead>
+                  <TableHead className="text-right">Kept size</TableHead>
+                  <TableHead className="text-right">Expiring ≤ 7d</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {fileRows.map((r) => (
+                  <TableRow key={r.org_id ?? 'none'}>
+                    <TableCell>{r.org_name || (r.org_id ? r.org_id.slice(0, 8) : 'No organization')}</TableCell>
+                    <TableCell className="text-right">{r.file_count}</TableCell>
+                    <TableCell className="text-right">{humanBytes(Number(r.total_bytes))}</TableCell>
+                    <TableCell className="text-right">{humanBytes(Number(r.retained_bytes))}</TableCell>
+                    <TableCell className="text-right">
+                      {Number(r.expiring_7d) > 0 ? (
+                        <Badge variant="outline">{r.expiring_7d}</Badge>
+                      ) : (
+                        '0'
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

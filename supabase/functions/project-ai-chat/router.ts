@@ -16,6 +16,7 @@ export interface RouteDecision {
     | "vv-analyst"
     | "experiment-designer"
     | "explainer"
+    | "report-builder"
     | null; // null for advisory
   intent: string | null; // the §5 intent label, e.g. "steward.fill_missing"
   confidence: number; // [0,1]
@@ -44,12 +45,15 @@ export type ClassifierCall = (prompt: string) => Promise<string>;
 export const ROUTER_CONFIDENCE_MIN = 0.70; // DEFAULT (§6.2 step 3)
 
 // §6.2 step 4 tie-break: dependency order — upstream artifacts first.
+// report-builder sits last: reports CONSUME what every other agent produces
+// (runs, validations, data), so any tie resolves to the producing agent.
 export const AGENT_PRECEDENCE = [
   "data-steward",
   "policy-configurator",
   "vv-analyst",
   "experiment-designer",
   "explainer",
+  "report-builder",
 ] as const;
 
 export type AgentSlug = (typeof AGENT_PRECEDENCE)[number];
@@ -81,6 +85,11 @@ export const AGENT_ROSTER: Record<AgentSlug, { mission: string; intents: string[
     mission:
       "answers \"why did the model do that?\" from recorded decision traces with mandatory citations",
     intents: ["explain.decision", "explain.policy_effect"],
+  },
+  "report-builder": {
+    mission:
+      "turns persisted data and completed simulation runs into downloadable decision reports (XLSX/PDF) via a reviewable spec",
+    intents: ["report.build", "report.export"],
   },
 };
 

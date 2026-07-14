@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { ProjectMemoryPanel } from "@/components/intelligence/ProjectMemoryPanel";
+import { MyFilesPanel } from "@/components/intelligence/MyFilesPanel";
 import {
   QUICK_THREAD_ID,
   type ChatFolder,
@@ -78,6 +79,10 @@ interface ChatSidebarProps {
    * to the active thread. Omitted ⇒ pre-M2 sidebar exactly. */
   memoryEnabled?: boolean;
   memoryProjectId?: string | null;
+  /** v1.2 Phase 3 (ai-agents.md §16.2): the "My files" workspace panel —
+   * shown only when the reports capability + the file-workspace flag are on.
+   * Omitted ⇒ pre-Phase-3 sidebar exactly. */
+  filesEnabled?: boolean;
   /** §17.1 sidebar v2: multi-select bulk actions. In legacy (unsynced) mode
    * these run the client paths per thread; in synced mode they call the
    * set-based bulk_* RPCs. Omitted ⇒ no Select affordance. */
@@ -200,6 +205,7 @@ export function ChatSidebar({
   onSearchMessages,
   memoryEnabled = false,
   memoryProjectId = null,
+  filesEnabled = false,
   onBulkSetFlags,
   onBulkMoveToFolder,
   onBulkDelete,
@@ -808,6 +814,10 @@ export function ChatSidebar({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      )}
+
+      {filesEnabled && (
+        <MyFilesPanel projectId={memoryProjectId} />
       )}
 
       {memoryEnabled && memoryProjectId && (

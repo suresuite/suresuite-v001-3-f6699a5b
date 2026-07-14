@@ -1,0 +1,150 @@
+{
+  "id": "rb-01-run-results",
+  "description": "ai-agents.md §16.1 rb-01 — template selection: a completed run + a spreadsheet ask → run-results spec proposal. The payload stores ONLY source references (never data); provenance llm_drafted; grounding {} (render-time resolution); idempotency converges re-phrasings.",
+  "project_snapshot": {
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-4",
+        "name": "Widget resin",
+        "cost": 4.2,
+        "moq": 100,
+        "holding_cost_pct": 0.2
+      }
+    ],
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "P1",
+        "name": "Widget",
+        "sell_price": 25,
+        "production_capacity": 500,
+        "demand_mean": 300,
+        "demand_cv": 0.2
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "name": "Acme",
+        "capacity_per_week": 1200,
+        "reliability_score": 0.95
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S2",
+        "name": "Bolt",
+        "capacity_per_week": 800,
+        "reliability_score": 0.9
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "material_id": "MAT-4",
+        "unit_price": 4.2,
+        "lead_time": 2,
+        "volume": 300,
+        "time_unit": "week"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S2",
+        "material_id": "MAT-5",
+        "unit_price": 1.1,
+        "lead_time": 4,
+        "volume": 120,
+        "time_unit": "week"
+      }
+    ],
+    "outbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "customer_id": "C1",
+        "product_id": "P1",
+        "unit_price": 25,
+        "volume": 300,
+        "time_unit": "week"
+      }
+    ],
+    "bom_single_level": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "P1",
+        "material_id": "MAT-4"
+      }
+    ],
+    "bom_multi_level": [],
+    "policy_defaults": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "fulfillment_strategy": "make_to_stock",
+        "sourcing": {},
+        "inventory": {},
+        "transport": {},
+        "fulfillment": {},
+        "production": {},
+        "recovery": {},
+        "demand": {}
+      }
+    ],
+    "policy_overrides": [],
+    "policy_versions": [
+      {
+        "id": "44444444-4444-4444-8444-444444444401",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "label": "baseline",
+        "parent_version_id": null,
+        "policy_hash": "ph-run",
+        "snapshot": { "defaults": {}, "fulfillment_strategy": "make_to_stock" },
+        "created_at": 1
+      }
+    ],
+    "scenarios": [],
+    "approved_users": [
+      {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "organization_id": "99999999-9999-4999-8999-999999999901",
+        "email": "a@example.com"
+      }
+    ],
+    "simulation_runs": [
+      {
+        "id": "66666666-6666-4666-8666-666666666601",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "status": "done",
+        "rep_count_done": 30,
+        "rep_count_target": 30,
+        "scenario_id": null,
+        "policy_version_id": "44444444-4444-4444-8444-444444444401",
+        "aggregate_kpis": { "fill_rate": 0.94, "on_time_delivery": 0.91, "total_cost": 125000.5 },
+        "created_at": 100
+      }
+    ],
+    "run_replications": [],
+    "proposals": []
+  },
+  "utterance": "Turn the latest run results into a spreadsheet I can share",
+  "mocked_llm": {
+    "tool": "draft_decision_report",
+    "args": {
+      "template_id": "run-results",
+      "run_id": "66666666-6666-4666-8666-666666666601",
+      "format": "xlsx",
+      "title": "Baseline run results"
+    }
+  },
+  "expect": {
+    "proposal": {
+      "template_id": "run-results",
+      "format": "xlsx",
+      "sections": 1,
+      "provenance": "llm_drafted",
+      "evidence_runs": ["66666666-6666-4666-8666-666666666601"]
+    },
+    "proposal_count": 1
+  },
+  "retired_reason": null
+}

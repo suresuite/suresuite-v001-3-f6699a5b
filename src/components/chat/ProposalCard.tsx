@@ -5,12 +5,15 @@ import {
   CircleDashed,
   Database,
   ExternalLink,
+  FileText,
   FlaskConical,
   Lightbulb,
   Loader2,
   MessageSquareQuote,
   SlidersHorizontal,
 } from "lucide-react";
+import { AppliedReportFiles } from "@/components/chat/FileCard";
+import { fileWorkspaceUiEnabled } from "@/hooks/useUserFiles";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FIELD_LABELS } from "@/lib/policies/schemas";
@@ -35,6 +38,7 @@ const AGENT_META: Record<string, { name: string; Icon: typeof Database }> = {
   "vv-analyst": { name: "V&V Analyst", Icon: BadgeCheck },
   "experiment-designer": { name: "Experiment Designer", Icon: FlaskConical },
   explainer: { name: "Explainer", Icon: MessageSquareQuote },
+  "report-builder": { name: "Report Builder", Icon: FileText },
 };
 
 const PROVENANCE_CHIP: Record<Proposal["provenance"], { label: string; className: string }> = {
@@ -50,6 +54,7 @@ const ARTIFACT_META: Record<string, { room: string | null; roomLabel: string; ga
   model_card_draft: { room: "/policies", roomLabel: "Run & Validate", gate: "record_model_validation" },
   experiment_spec: { room: "/simulation-lab", roomLabel: "Simulation Lab", gate: "the experiment dispatch gate" },
   trace_explanation: { room: null, roomLabel: "", gate: "" },
+  decision_report: { room: null, roomLabel: "", gate: "the report renderer (workspace)" },
 };
 
 const DIFF_COLLAPSE_LIMIT = 20;
@@ -316,6 +321,74 @@ function ExperimentSpec({ payload, grounding }: { payload: ExperimentSpecPayload
   );
 }
 
+interface DecisionReportPayload {
+  template_id?: string;
+  template_label?: string;
+  format?: string;
+  sections?: Array<{
+    kind: string;
+    title?: string;
+    source?: { tool?: string; args?: Record<string, unknown>; baseline_run_id?: string; scenario_run_id?: string };
+    narrative_md?: string;
+    citations?: Array<{ kind: string; ref: string }>;
+  }>;
+  evidence_runs?: string[];
+}
+
+type ReportSpecSection = NonNullable<DecisionReportPayload["sections"]>[number];
+
+/** §16.1 spec view: the proposal is a report SPEC, never the file —
+ * deterministic sections show ONLY their source references (data resolves
+ * at render time); the narrative shows under the AI-drafted label. */
+function DecisionReportSpec({ payload }: { payload: DecisionReportPayload }) {
+  const sections = payload.sections ?? [];
+  const narrative = sections.find((s) => s.kind === "narrative");
+  const deterministic = sections.filter((s) => s.kind !== "narrative");
+  const sourceRef = (s: ReportSpecSection): string => {
+    if (s.source?.tool) return `tool: ${s.source.tool}`;
+    if (s.source?.baseline_run_id) {
+      return `runs: ${String(s.source.baseline_run_id).slice(0, 8)} vs ${String(s.source.scenario_run_id ?? "").slice(0, 8)}`;
+    }
+    return "—";
+  };
+  return (
+    <div className="space-y-1.5 text-[12.5px]">
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded bg-muted px-1.5 py-px font-mono">
+          template: {payload.template_id ?? "—"}
+        </span>
+        <span className="rounded bg-muted px-1.5 py-px font-mono">format: {payload.format ?? "—"}</span>
+        {(payload.evidence_runs ?? []).length > 0 && (
+          <span className="rounded bg-muted px-1.5 py-px font-mono">
+            cites: {(payload.evidence_runs ?? []).map((r) => r.slice(0, 8)).join(", ")}
+          </span>
+        )}
+      </div>
+      <ul className="space-y-0.5">
+        {deterministic.map((s, i) => (
+          <li key={i} className="flex flex-wrap items-center gap-1.5">
+            <span className={cn("rounded px-1 py-px text-[11px]", PART_TREATMENTS.data.chip)}>{s.kind}</span>
+            <span>{s.title ?? "—"}</span>
+            <span className="font-mono text-[11px] text-muted-foreground">{sourceRef(s)}</span>
+          </li>
+        ))}
+      </ul>
+      {narrative && (
+        <div>
+          <div className={cn("mb-0.5 text-[11px] font-medium uppercase tracking-wide", PART_TREATMENTS.proposal.accent)}>
+            AI-drafted commentary — verify
+          </div>
+          <div className="whitespace-pre-wrap text-[13px]">{narrative.narrative_md}</div>
+        </div>
+      )}
+      <div className="mt-1 text-[11.5px] text-muted-foreground">
+        Every number in the rendered document is resolved from the project database at render
+        time — the sections above store source references, never data.
+      </div>
+    </div>
+  );
+}
+
 function ProposalBody({ proposal }: { proposal: Proposal }) {
   const payload = proposal.payload ?? {};
   const rows = (payload as { rows?: Array<Record<string, unknown>> }).rows;
@@ -330,6 +403,9 @@ function ProposalBody({ proposal }: { proposal: Proposal }) {
   }
   if (proposal.artifact_type === "experiment_spec" && (payload as ExperimentSpecPayload).policy_version_id) {
     return <ExperimentSpec payload={payload as ExperimentSpecPayload} grounding={proposal.grounding ?? {}} />;
+  }
+  if (proposal.artifact_type === "decision_report" && (payload as DecisionReportPayload).template_id) {
+    return <DecisionReportSpec payload={payload as DecisionReportPayload} />;
   }
   const narrative = (payload as { narrative_md?: string; explanation_md?: string });
   const text = narrative.explanation_md ?? narrative.narrative_md;
@@ -493,7 +569,14 @@ export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardPro
       {proposal.status === "applied" && (
         <div className="mt-2 rounded bg-emerald-500/10 px-2 py-1.5 text-[12.5px] text-emerald-700 dark:text-emerald-400">
           Applied{proposal.applied_at ? ` · ${new Date(proposal.applied_at).toLocaleString()}` : ""}
-          {proposal.applied_result && (
+          {/* §16.1: a rendered decision_report flips to file cards (emerald
+              treatment) — Download via 60-min signed URL, Keep toggle. */}
+          {proposal.artifact_type === "decision_report" && fileWorkspaceUiEnabled() &&
+            Array.isArray((proposal.applied_result as { file_ids?: string[] } | null)?.file_ids) ? (
+            <AppliedReportFiles
+              fileIds={((proposal.applied_result as { file_ids: string[] }).file_ids).map(String)}
+            />
+          ) : proposal.applied_result && (
             <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted/60 px-2 py-1 text-[11.5px] text-foreground">
               {JSON.stringify(proposal.applied_result, null, 2)}
             </pre>
@@ -568,7 +651,7 @@ export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardPro
             </Button>
           </>
         )}
-        {proposal.status === "applied" && (
+        {proposal.status === "applied" && proposal.artifact_type !== "decision_report" && (
           <Button size="sm" variant="outline" className="h-7 px-3 text-[12.5px]" disabled
             title="Revert drafting ships with the owning agent">
             Draft revert

@@ -1,0 +1,21 @@
+{
+  "id": "rb-05-template-vocabulary",
+  "description": "ai-agents.md §16.1 rb-05 — the template registry is a closed vocabulary: an unknown template_id, an unknown format, an unknown parameter, and a disruption-brief without its mandatory narrative all refuse invalid_params. Nothing is filed.",
+  "project_snapshot": {
+    "reuse": "rb-02-disruption-brief"
+  },
+  "utterance": "Generate the quarterly magic report",
+  "mocked_llm": {
+    "tool": "draft_decision_report",
+    "args": {
+      "template_id": "quarterly-magic",
+      "format": "pdf"
+    }
+  },
+  "expect": {
+    "error_code": "invalid_params",
+    "error_includes": "unknown template_id",
+    "proposal_count": 0
+  },
+  "retired_reason": null
+}

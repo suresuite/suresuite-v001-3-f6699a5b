@@ -338,7 +338,7 @@ async function evalSteward(model: ModelSpec, mock: boolean): Promise<StewardMetr
 // ── B2/B3 fixture evaluation (generic draft-agent runner, §9.3/§9.4) ─────────
 
 interface AgentEvalConfig {
-  agentId: "policy-configurator" | "vv-analyst" | "experiment-designer";
+  agentId: "policy-configurator" | "vv-analyst" | "experiment-designer" | "report-builder";
   fixtureDir: string;
   draftTool: string;
   artifactType: string;
@@ -379,6 +379,16 @@ const AGENT_EVAL: Record<string, AgentEvalConfig> = {
       "ed-04-doe-honest", "ed-05-ack-forced-false", "ed-06-brief-grounded",
     ],
   },
+  "report-builder": {
+    agentId: "report-builder",
+    fixtureDir: "report-builder",
+    draftTool: "draft_decision_report",
+    artifactType: "decision_report",
+    fixtures: [
+      "rb-01-run-results", "rb-02-disruption-brief", "rb-03-citation-required",
+      "rb-04-no-evidence-run", "rb-05-template-vocabulary",
+    ],
+  },
 };
 
 // deno-lint-ignore no-explicit-any
@@ -404,6 +414,24 @@ function scoreAgentOutcome(cfg: AgentEvalConfig, proposals: Row[], exp: Record<s
     if (exp.proposal.newly_required_includes &&
         !((payload.newly_required as string[]) ?? []).includes(exp.proposal.newly_required_includes)) {
       return { pass: false, detail: `newly_required missing ${exp.proposal.newly_required_includes}` };
+    }
+  } else if (cfg.agentId === "report-builder") {
+    if (exp.proposal.template_id && payload.template_id !== exp.proposal.template_id) {
+      return { pass: false, detail: `expected template ${exp.proposal.template_id}, got ${payload.template_id}` };
+    }
+    if (exp.proposal.format && payload.format !== exp.proposal.format) {
+      return { pass: false, detail: `expected format ${exp.proposal.format}, got ${payload.format}` };
+    }
+    if (exp.proposal.sections !== undefined &&
+        ((payload.sections as unknown[]) ?? []).length !== exp.proposal.sections) {
+      return { pass: false, detail: `expected ${exp.proposal.sections} sections, got ${((payload.sections as unknown[]) ?? []).length}` };
+    }
+    if (exp.proposal.narrative_cited) {
+      const narrative = ((payload.sections as Array<{ kind: string; citations?: unknown[] }>) ?? [])
+        .find((s) => s.kind === "narrative");
+      if (!narrative || !Array.isArray(narrative.citations) || narrative.citations.length === 0) {
+        return { pass: false, detail: "narrative section missing or uncited (§4.3 citation-mandatory)" };
+      }
     }
   } else if (cfg.agentId === "experiment-designer") {
     if (exp.proposal.replications !== undefined && payload.replications !== exp.proposal.replications) {
@@ -442,6 +470,8 @@ async function evalAgent(cfg: AgentEvalConfig, model: ModelSpec, mock: boolean):
   Deno.env.set("AGENT_ENABLED_IDS", cfg.agentId);
   // §9.5: the single-run subset rides its own flag beside the roster switch.
   if (cfg.agentId === "experiment-designer") Deno.env.set("AGENT_EXPERIMENT_TYPES", "single");
+  // §16.2: B6 requires the workspace flag beside the roster switch.
+  if (cfg.agentId === "report-builder") Deno.env.set("FILE_WORKSPACE_ENABLED", "true");
   const fixtures: StewardMetrics["fixtures"] = {};
   let draftCalls = 0, validDraftCalls = 0;
 
@@ -575,6 +605,7 @@ if (import.meta.main) {
   }
   Deno.env.set("AGENT_ENABLED_IDS", agents.join(","));
   if (agents.includes("experiment-designer")) Deno.env.set("AGENT_EXPERIMENT_TYPES", "single");
+  if (agents.includes("report-builder")) Deno.env.set("FILE_WORKSPACE_ENABLED", "true");
 
   const goldenText = await Deno.readTextFile(new URL("./routing.golden.jsonl", import.meta.url));
   const goldenRows: GoldenRow[] = goldenText.trim().split("\n").map((l) => JSON.parse(l));

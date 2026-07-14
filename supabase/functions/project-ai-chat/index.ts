@@ -471,6 +471,9 @@ serve(async (req) => {
             providerCode: resolvedModel.provider,
             canProposals: capFeatures['agent_proposals'] === true,
             utterance: agentUtterance,
+            // §15/§16.1: the one ask-mode-routable agent (report-builder)
+            // phrases its evidence refusals per the thread's mode.
+            mode: chatMode,
           },
         };
         const agentT0 = Date.now();

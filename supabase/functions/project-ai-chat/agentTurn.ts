@@ -15,7 +15,7 @@
 // Importing this module registers every staged draft tool into the shared
 // executeTool registry (bridge 2): B1 via draftTools.ts, B2 via
 // configuratorTools.ts, B3 via vvTools.ts, B4 via experimentTools.ts,
-// get_project_memory via memory.ts.
+// B6 via reportTools.ts, get_project_memory via memory.ts.
 
 import { runChat, type ChatRunResult } from "./providers.ts";
 import type { ToolContext, ToolDeclaration } from "./tools.ts";
@@ -36,6 +36,11 @@ import {
   EXPERIMENT_AGENT_ID,
   experimentToolDeclarations,
 } from "./experimentTools.ts";
+import {
+  buildReportContext,
+  REPORT_AGENT_ID,
+  reportToolDeclarations,
+} from "./reportTools.ts";
 import { getProjectMemoryDeclaration, memoryEnabled } from "./memory.ts";
 
 export interface AgentTurnResult {
@@ -84,6 +89,11 @@ export const AGENT_TURNS: Record<string, AgentSpec> = {
     name: "Experiment Designer",
     buildContext: (ctx, args) => buildExperimentContext(ctx, args),
     tools: () => experimentToolDeclarations(),
+  },
+  [REPORT_AGENT_ID]: {
+    name: "Report Builder",
+    buildContext: (ctx, args) => buildReportContext(ctx, args),
+    tools: () => reportToolDeclarations(),
   },
 };
 
