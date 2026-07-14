@@ -6,6 +6,6 @@
 #
 #   agents=<comma list>       which agents to score (§7.4: every enabled agent)
 #   mode=full|state-only      state-only skips the two eval tiers
-run=2 v1.2 GA flip — pre-flip evidence, take 2 (provider keys now resolved from the deployment's own function secrets)
+run=3 v1.2 GA flip — pre-flip evidence, take 3 (quote-strip resolved keys per _shared/env.ts; digest-shape diagnostics)
 agents=data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder
 mode=full
