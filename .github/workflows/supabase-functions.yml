@@ -7,6 +7,7 @@ on:
       - 'supabase/functions/project-ai-chat/**'
       - 'supabase/functions/project-ai-health/**'
       - 'supabase/functions/agent-apply/**'
+      - 'supabase/functions/report-render/**'
       - 'supabase/functions/sim-command/**'
       - 'supabase/functions/api/**'
       - 'supabase/functions/_shared/**'
@@ -79,6 +80,42 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'suresuite-sim-worker' }}
 
+      # AI-agent v1.2 GA server flags (ai-agents.md §9 flag conventions; GA
+      # flip per §9.8, §14.7 M0-M2 and §16 — flipped only after the §7.4 live
+      # model-scored eval passed; see .github/workflows/ai-agent-model-eval.yml
+      # and the eval-results branch). Values are deliberately literal: these
+      # are deployment flags, not secrets, and this step is their single
+      # source of truth. To kill a stage, edit the value here and re-run this
+      # workflow (workflow_dispatch or ops-request.yml); every flag off ⇒
+      # clean regression to the previous stage per §9.
+      #
+      #   AGENT_TELEMETRY_ENABLED   §7.1 event writer (Stage 0)
+      #   AGENT_ROUTER_ENABLED      §6 intent router (Stage 1+)
+      #   AGENT_ENABLED_IDS         deployment-wide per-agent kill switch
+      #                             (§9.2; explainer stays out — Stage 5 gate)
+      #   AGENT_EXPERIMENT_TYPES    §9.5 spec vocabulary (single until Phase C)
+      #   CHAT_STORE_ENABLED        §14.7 M0 server chat store
+      #   CHAT_SUMMARY_ENABLED      §14.7 M1 rolling summaries
+      #   PROJECT_MEMORY_ENABLED    §14.7 M2 project memory
+      #   CHAT_MODES_ENABLED        §15 Ask/Review mode control
+      #   SUGGESTED_ACTIONS_ENABLED §17.3 suggestion engine
+      #   FILE_WORKSPACE_ENABLED    §16.2 file workspace + report-render
+      - name: Set AI-agent GA flags (ai-agents.md §9 GA flip)
+        run: |
+          supabase secrets set --project-ref wckdrutwkytwcomrlpib \
+            AGENT_TELEMETRY_ENABLED=true \
+            AGENT_ROUTER_ENABLED=true \
+            AGENT_ENABLED_IDS=data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder \
+            AGENT_EXPERIMENT_TYPES=single \
+            CHAT_STORE_ENABLED=true \
+            CHAT_SUMMARY_ENABLED=true \
+            PROJECT_MEMORY_ENABLED=true \
+            CHAT_MODES_ENABLED=true \
+            SUGGESTED_ACTIONS_ENABLED=true \
+            FILE_WORKSPACE_ENABLED=true
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       # Deploy the AI chat edge function. verify_jwt is configured in
       # supabase/config.toml, which the deploy reads.
       - name: Deploy project-ai-chat
@@ -99,6 +136,18 @@ jobs:
       # it redeploys on the same path triggers.
       - name: Deploy agent-apply
         run: supabase functions deploy agent-apply --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Deploy the file-workspace function (ai-agents.md §16.1/§16.2 — the
+      # ONLY client download path, plus the retention sweep and an internal
+      # service-bearer render; v1.2 Phase 3). It imports from
+      # project-ai-chat/ and _shared/, so it redeploys on the same path
+      # triggers. NOTE: this step was missing from the Phase-3 landing
+      # (PR #81) — the function existed in-repo but was never deployed;
+      # added at the v1.2 GA flip.
+      - name: Deploy report-render
+        run: supabase functions deploy report-render --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
