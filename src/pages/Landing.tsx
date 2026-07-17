@@ -490,7 +490,7 @@ export default function Landing() {
 
         {/* Funding & attribution — KEPT VERBATIM */}
         <section className="border-t border-border/60 bg-black text-white">
-          <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 py-16">
+          <div className="mx-auto max-w-6xl px-6 py-16">
             <div className="grid grid-cols-1 md:[grid-template-columns:30%_17%_53%] items-start gap-0">
               {/* Left: Developer / Digital SC Lab */}
               <div className="md:justify-self-start w-full">
