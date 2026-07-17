@@ -143,38 +143,73 @@ export default function Landing() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative mx-auto max-w-6xl px-6 pt-24 pb-24">
+        <section className="relative mx-auto max-w-6xl px-6 pt-16 pb-24">
           <div className="absolute inset-0 -z-10 bg-grid opacity-[0.35] [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
-          <div className="max-w-3xl">
-            <span className="inline-flex items-center rounded-full border border-border bg-surface-elevated px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+
+          {/* Top meta line */}
+          <div className="mb-12 flex items-center gap-4">
+            <div className="h-px flex-1 bg-border" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              System: SuReSuite-v2.0 // Active
+            </span>
+          </div>
+
+          {/* Eyebrow */}
+          <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 shadow-xs">
+            <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Resilience-grade supply chain simulator
             </span>
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
-              Design supply chains that survive the next shock.
-            </h1>
-            <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
-              Build a digital twin of your network, run rigorous experiments, and pick the strategy that holds up.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg">
-                <Link to="/auth">
-                  Get started <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link to="/auth">Sign in</Link>
-              </Button>
+          </span>
+
+          {/* Headline block */}
+          <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-12">
+            <div className="md:col-span-8">
+              <h1 className="text-4xl font-semibold tracking-tight leading-[1.1] sm:text-5xl md:text-6xl">
+                Design supply chains that survive{' '}
+                <span className="font-serif italic text-muted-foreground">the next shock.</span>
+              </h1>
+
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Button asChild size="lg" className="group rounded-sm">
+                  <Link to="/auth">
+                    Get started
+                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="rounded-sm">
+                  <Link to="/auth">Sign in</Link>
+                </Button>
+              </div>
             </div>
-            <ul className="mt-10 flex flex-wrap gap-2">
-              {CREDIBILITY.map((c) => (
-                <li
-                  key={c}
-                  className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground"
-                >
-                  {c}
-                </li>
+
+            {/* Marginalia subhead */}
+            <div className="flex flex-col justify-end md:col-span-4">
+              <div className="border-l border-border pl-6 py-2">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Build a digital twin of your network, run rigorous experiments, and pick the strategy that holds up under pressure.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Credibility data grid */}
+          <div className="mt-16 border-t border-border pt-8">
+            <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+              {[
+                { label: 'Network architecture', value: '3 network levels' },
+                { label: 'Compute capacity', value: '5k+ simulations' },
+                { label: 'Stress modules', value: '5 resilience tactics' },
+                { label: 'Access level', value: 'Scenario library' },
+              ].map((item) => (
+                <div key={item.label} className="space-y-1">
+                  <span className="block font-mono text-[10px] uppercase tracking-tighter text-muted-foreground">
+                    {item.label}
+                  </span>
+                  <span className="text-sm font-medium text-foreground">{item.value}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         </section>
 
