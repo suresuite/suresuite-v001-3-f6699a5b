@@ -61,9 +61,17 @@ def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
 STREAM_PREFIX = "sim.cmd."
 CONSUMER_GROUP = "sim-workers"
 PROJECT_DISCOVERY_KEY = "sim.active_projects"  # set populated by edge function (future)
-DEFAULT_PROJECTS_REFRESH = 5.0  # seconds
+# Idle-poll cadences. The discover and consume loops below poll on these timers
+# even when nothing is running, and every poll is a billed Upstash command — at
+# the old 5 s cadence the two loops alone issued ~1M idle reads/month, blowing
+# the 500k free tier. 30 s cuts that ~6x. Widening XREAD_BLOCK_MS costs no
+# job-pickup latency: a blocking XREADGROUP returns the instant a command is
+# XADD'd; the longer block only removes empty idle polls. A longer
+# DEFAULT_PROJECTS_REFRESH only delays discovery of a brand-new project's
+# first-ever stream — streams persist, so repeat runs are unaffected.
+DEFAULT_PROJECTS_REFRESH = 30.0  # seconds
 EVICT_INTERVAL = 60.0
-XREAD_BLOCK_MS = 5000
+XREAD_BLOCK_MS = 30000
 
 
 class SimWorker:
@@ -77,10 +85,11 @@ class SimWorker:
         on_idle: Callable[[], None] | None = None,
     ):
         # socket_timeout MUST exceed the XREADGROUP block window: redis-py 8
-        # changed its default from None to 5 s — equal to the block — so every
-        # idle poll's read died with a TimeoutError before the server's empty
-        # reply arrived (requirements.txt doesn't pin the redis major). The
-        # keepalive + health check hold the connection across Upstash's
+        # changed its default from None to 5 s — at or below the block window —
+        # so every idle poll's read died with a TimeoutError before the server's
+        # empty reply arrived (requirements.txt doesn't pin the redis major). The
+        # +10 keeps this derived timeout above the block whatever it is set to.
+        # The keepalive + health check hold the connection across Upstash's
         # idle-connection reaping between commands.
         self._redis = redis.from_url(
             redis_url,

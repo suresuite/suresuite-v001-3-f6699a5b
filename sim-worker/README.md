@@ -111,6 +111,31 @@ Once it's live, a scenario **Run** in the app flips from the yellow
 "preliminary (stub)" badge to a green "worker engine" badge with real KPIs —
 that flip confirms the engine is actually running.
 
+## Idle command budget (Upstash free tier)
+
+Two loops poll Redis on a fixed timer while the worker is running, independent of
+load:
+
+- `_discover_loop` — a `SCAN` for new `sim.cmd.*` streams every
+  `DEFAULT_PROJECTS_REFRESH` seconds.
+- `_consume` — an `XREADGROUP … BLOCK XREAD_BLOCK_MS` per stream; an idle poll
+  returns empty and re-issues.
+
+Every poll is a billed Upstash command. At the original 5 s cadence an always-on
+worker issued on the order of **1M idle reads/month** from these two loops alone —
+enough to blow the 500k-commands/month free tier with essentially no real work
+(one `XADD` per run is the only write). The cadence is now **30 s**
+(`sim_worker/worker.py`), a ~6× cut that drops the always-on idle floor to roughly
+**95k reads/month**.
+
+Widening the `XREADGROUP` block adds **no** job-pickup latency — a blocking read
+returns the instant a command is `XADD`'d, so the longer block only removes empty
+polls. A longer discovery interval only delays picking up a *brand-new* project's
+first-ever stream (≤ 30 s); streams persist, so repeat runs are unaffected.
+
+To drive idle reads to ~0 (and idle Fly cost with them), also enable scale-to-zero
+below — the worker then stops entirely when unused instead of polling.
+
 ## Scale to zero (idle cost → ~$0)
 
 By default the worker blocks on the Redis stream 24/7, so the Fly machine bills
