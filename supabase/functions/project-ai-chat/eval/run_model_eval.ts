@@ -47,7 +47,9 @@ import { makeAgentRpcs, makeStubDb, type Row } from "./harness/stub_db.ts";
 const PROJECT = "11111111-1111-4111-8111-111111111111";
 const USER = "22222222-2222-4222-8222-222222222222";
 
-// §6.5 targets
+// §6.5 targets + the §6.6 v2-signal targets (H2: a missed needs_run degrades
+// to an honest refusal; a false cache_checkable costs one wasted read — both
+// safe failures, hence the slightly looser targets)
 const TARGETS = {
   precision: 0.90,
   recall: 0.85,
@@ -55,6 +57,8 @@ const TARGETS = {
   mixedRecall: 0.70,
   schemaValidity: 0.95,
   gateViolationAlarm: 0.10,
+  needsRunRecall: 0.80,
+  cacheCheckablePrecision: 0.85,
 };
 
 interface GoldenRow {
@@ -63,7 +67,15 @@ interface GoldenRow {
   /** §15 ask-mode fixtures: classified normally, then the mode subtracts at
    * checkpoint 2 — the expected route is post-mode (always advisory). */
   mode?: string;
-  expect: { route: string; agent_id: string | null; intent: string | null; blocked_intent?: string | null };
+  expect: {
+    route: string;
+    agent_id: string | null;
+    intent: string | null;
+    blocked_intent?: string | null;
+    /** §6.6 (H2): optional labels — absent means expected false. */
+    needs_run?: boolean;
+    cache_checkable?: boolean;
+  };
   class: string;
 }
 
@@ -120,6 +132,10 @@ interface RouteMetrics {
   perClass: Record<string, { tp: number; fp: number; fn: number; precision: number; recall: number }>;
   advisoryFalseArtifactRate: number;
   mixedRecall: number;
+  /** §6.6 (H2): needs-run recall ≥ 0.80, cache-checkable precision ≥ 0.85
+   * per enabled model — scored with ROUTER_V2_SIGNALS on. */
+  needsRunRecall: number;
+  cacheCheckablePrecision: number;
   pass: boolean;
   failures: string[];
 }
@@ -131,6 +147,9 @@ async function evalRouting(
   mock: boolean,
 ): Promise<RouteMetrics> {
   Deno.env.set("AGENT_ROUTER_ENABLED", "true");
+  // §6.6: the v2 signals are part of what this tier scores — the classifier
+  // runs with the v2 prompt block + schemas, exactly as a v2 deployment would.
+  Deno.env.set("ROUTER_V2_SIGNALS", "true");
   const oracle: ClassifierCall = (prompt) => {
     // mock mode: an oracle answering from the golden label embedded in the
     // prompt's USER MESSAGE — validates scoring, never model quality. Ask-mode
@@ -138,6 +157,10 @@ async function evalRouting(
     // filter below is what must turn them advisory.
     const utterance = prompt.slice(prompt.indexOf("USER MESSAGE:") + 14).trim();
     const row = rows.find((r) => r.utterance === utterance);
+    const v2 = {
+      needs_run: row?.expect.needs_run === true,
+      cache_checkable: row?.expect.cache_checkable === true,
+    };
     if (row?.mode === "ask" && row.expect.blocked_intent) {
       const intent = row.expect.blocked_intent;
       const agent = AGENT_PRECEDENCE.find((a) =>
@@ -145,7 +168,7 @@ async function evalRouting(
       ) ?? null;
       return Promise.resolve(JSON.stringify({
         route: "artifact", agent_id: agent, intent, confidence: 0.95,
-        advisory_part: null, artifact_part: utterance,
+        advisory_part: null, artifact_part: utterance, ...v2,
       }));
     }
     const e = row?.expect ?? { route: "advisory", agent_id: null, intent: null };
@@ -156,6 +179,7 @@ async function evalRouting(
       confidence: 0.95,
       advisory_part: e.route === "mixed" ? "question part" : null,
       artifact_part: e.route === "mixed" || e.route === "artifact" ? utterance : null,
+      ...v2,
     }));
   };
   const classifier = mock ? oracle : makeClassifier(model);
@@ -164,39 +188,55 @@ async function evalRouting(
   const perClass: RouteMetrics["perClass"] = {};
   for (const a of enabledAgents) perClass[a] = { tp: 0, fp: 0, fn: 0, precision: 1, recall: 1 };
   let advisoryN = 0, advisoryFalse = 0, mixedN = 0, mixedHit = 0;
+  // §6.6 metric counters: recall over labeled-true needs_run rows; precision
+  // over cache_checkable=true predictions (absent labels mean expected false).
+  let needsRunTrue = 0, needsRunHit = 0, cachePredicted = 0, cachePredictedRight = 0;
 
-  for (const row of rows) {
-    const enabledExpected = row.expect.agent_id !== null && enabledAgents.includes(row.expect.agent_id)
-      ? row.expect
-      : { route: "advisory", agent_id: null, intent: null };
-    const rawDecision = await decideRoute(row.utterance, {
-      personaId: null,
-      hasProject: true,
-      enabledAgents,
-      modelId: model.id,
-    }, classifier);
-    // §15 ask-mode fixtures: the mode subtracts after classification, exactly
-    // as index.ts applies it at checkpoint 2 — the same code path is scored.
-    const decision = row.mode === "ask"
-      ? applyModeToRoute(rawDecision, "ask").decision
-      : rawDecision;
+  try {
+    for (const row of rows) {
+      const enabledExpected = row.expect.agent_id !== null && enabledAgents.includes(row.expect.agent_id)
+        ? row.expect
+        : { route: "advisory", agent_id: null, intent: null };
+      const rawDecision = await decideRoute(row.utterance, {
+        personaId: null,
+        hasProject: true,
+        enabledAgents,
+        modelId: model.id,
+      }, classifier);
+      // §15 ask-mode fixtures: the mode subtracts after classification, exactly
+      // as index.ts applies it at checkpoint 2 — the same code path is scored.
+      const decision = row.mode === "ask"
+        ? applyModeToRoute(rawDecision, "ask").decision
+        : rawDecision;
 
-    // per-enabled-class precision/recall over the routed owner
-    for (const a of enabledAgents) {
-      const expected = enabledExpected.agent_id === a;
-      const got = decision.agent_id === a && (decision.route === "artifact" || decision.route === "mixed");
-      if (expected && got) perClass[a].tp++;
-      else if (!expected && got) perClass[a].fp++;
-      else if (expected && !got) perClass[a].fn++;
+      // per-enabled-class precision/recall over the routed owner
+      for (const a of enabledAgents) {
+        const expected = enabledExpected.agent_id === a;
+        const got = decision.agent_id === a && (decision.route === "artifact" || decision.route === "mixed");
+        if (expected && got) perClass[a].tp++;
+        else if (!expected && got) perClass[a].fp++;
+        else if (expected && !got) perClass[a].fn++;
+      }
+      if (enabledExpected.route === "advisory") {
+        advisoryN++;
+        if (decision.route !== "advisory") advisoryFalse++;
+      }
+      if (enabledExpected.route === "mixed") {
+        mixedN++;
+        if (decision.route === "mixed") mixedHit++;
+      }
+      // §6.6 signals (route-independent; the fallbacks carry them through).
+      if (row.expect.needs_run === true) {
+        needsRunTrue++;
+        if (decision.needs_run) needsRunHit++;
+      }
+      if (decision.cache_checkable) {
+        cachePredicted++;
+        if (row.expect.cache_checkable === true) cachePredictedRight++;
+      }
     }
-    if (enabledExpected.route === "advisory") {
-      advisoryN++;
-      if (decision.route !== "advisory") advisoryFalse++;
-    }
-    if (enabledExpected.route === "mixed") {
-      mixedN++;
-      if (decision.route === "mixed") mixedHit++;
-    }
+  } finally {
+    Deno.env.delete("ROUTER_V2_SIGNALS");
   }
 
   const failures: string[] = [];
@@ -212,6 +252,14 @@ async function evalRouting(
   }
   const mixedRecall = mixedN === 0 ? 1 : mixedHit / mixedN;
   if (mixedRecall < TARGETS.mixedRecall) failures.push(`mixed recall ${mixedRecall.toFixed(3)} < ${TARGETS.mixedRecall}`);
+  const needsRunRecall = needsRunTrue === 0 ? 1 : needsRunHit / needsRunTrue;
+  if (needsRunRecall < TARGETS.needsRunRecall) {
+    failures.push(`needs-run recall ${needsRunRecall.toFixed(3)} < ${TARGETS.needsRunRecall}`);
+  }
+  const cacheCheckablePrecision = cachePredicted === 0 ? 1 : cachePredictedRight / cachePredicted;
+  if (cacheCheckablePrecision < TARGETS.cacheCheckablePrecision) {
+    failures.push(`cache-checkable precision ${cacheCheckablePrecision.toFixed(3)} < ${TARGETS.cacheCheckablePrecision}`);
+  }
 
   return {
     model: model.id,
@@ -219,6 +267,8 @@ async function evalRouting(
     perClass,
     advisoryFalseArtifactRate,
     mixedRecall,
+    needsRunRecall,
+    cacheCheckablePrecision,
     pass: failures.length === 0,
     failures,
   };
@@ -882,7 +932,9 @@ if (import.meta.main) {
       Object.entries(routing.perClass).map(([a, m]) =>
         `${a} P=${m.precision.toFixed(3)} R=${m.recall.toFixed(3)}`).join("; ") +
       `; advisory-false-artifact=${routing.advisoryFalseArtifactRate.toFixed(3)}` +
-      `; mixed-recall=${routing.mixedRecall.toFixed(3)}`);
+      `; mixed-recall=${routing.mixedRecall.toFixed(3)}` +
+      `; needs-run-recall=${routing.needsRunRecall.toFixed(3)}` +
+      `; cache-checkable-precision=${routing.cacheCheckablePrecision.toFixed(3)}`);
     for (const f of routing.failures) console.log(`  ✗ ${f}`);
 
     let steward: StewardMetrics | null = null;
@@ -936,6 +988,8 @@ if (import.meta.main) {
       agent_pass: agentResults,
       advisory_false_artifact: routing.advisoryFalseArtifactRate,
       mixed_recall: routing.mixedRecall,
+      needs_run_recall: routing.needsRunRecall,
+      cache_checkable_precision: routing.cacheCheckablePrecision,
       schema_validity: steward?.schemaValidity ?? null,
       coverage_pass: coverage.pass,
       fabrications: coverage.fabrications,

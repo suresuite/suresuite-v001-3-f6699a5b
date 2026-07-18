@@ -1,0 +1,32 @@
+{
+  "id": "cl-07-forgotten-order",
+  "description": "ai-agents.md §20.6 cl-07 — a mocked LLM calls draft_experiment_spec FIRST on a cache-hit state: the deterministic handler-side guard (not the prompt) answers error_code cache_hit pointing at the stored run and files NO proposal.",
+  "stub": { "graph_hash": "graph-hash-1", "current_policy_hash": "ph-run" },
+  "project_snapshot": {
+    "reuse": "cl-01-cache-hit"
+  },
+  "utterance": "what did the 6-week outage do?",
+  "mocked_llm": {
+    "tool_calls": [
+      {
+        "tool": "draft_experiment_spec",
+        "args": {
+          "scenario_id": "55555555-5555-4555-8555-555555555502",
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "replications": 30,
+          "title": "6-week outage of S1 × baseline (30 reps)",
+          "question": "What does a 6-week outage of S1 do?"
+        }
+      }
+    ],
+    "reply": "That run already exists — run 99999999-9999-4999-8999-999999999901 answers the 6-week outage question; no new run is needed."
+  },
+  "expect": {
+    "guard_note": "cache_hit",
+    "guard_run_id": "99999999-9999-4999-8999-999999999901",
+    "guard_hashes": ["ph-run", "graph-hash-1", "scen-5555555"],
+    "proposal_count": 0,
+    "run_count": 1
+  },
+  "retired_reason": null
+}

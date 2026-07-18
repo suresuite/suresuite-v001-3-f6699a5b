@@ -1,0 +1,37 @@
+{
+  "id": "cl-02-cache-miss-proposes",
+  "description": "ai-agents.md §20.6 cl-02 — no matching run; the same ask files exactly one experiment_spec proposal and ZERO simulation_runs rows (the §20.6 plan/awaiting_approval assertions land with Phase H3's plan tool).",
+  "stub": { "graph_hash": "graph-hash-1", "current_policy_hash": "ph-run" },
+  "project_snapshot": {
+    "reuse": "cl-01-cache-hit",
+    "patch": {
+      "simulation_runs": [],
+      "run_replications": [],
+      "model_validations": []
+    }
+  },
+  "utterance": "what did the 6-week outage do?",
+  "mocked_llm": {
+    "tool_calls": [
+      { "tool": "find_completed_run", "args": { "scenario": "outage", "replications": 30 } },
+      {
+        "tool": "draft_experiment_spec",
+        "args": {
+          "scenario_id": "55555555-5555-4555-8555-555555555502",
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "replications": 30,
+          "title": "6-week outage of S1 × baseline (30 reps)",
+          "question": "What does a 6-week outage of S1 do?"
+        }
+      }
+    ],
+    "reply": "No completed run answers this yet — I filed an experiment card for the 6-week outage of S1 against the saved baseline version (30 replications). Review and approve it before anything runs."
+  },
+  "expect": {
+    "cache_note": "cache_miss",
+    "proposal_count": 1,
+    "proposal_artifact_type": "experiment_spec",
+    "run_count": 0
+  },
+  "retired_reason": null
+}

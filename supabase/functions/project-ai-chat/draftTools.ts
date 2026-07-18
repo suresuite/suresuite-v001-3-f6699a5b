@@ -63,6 +63,10 @@ export type DraftErrorCode =
   | "dependency_missing"
   | "too_large"
   | "duplicate"
+  // v1.4 §20.2: an identical completed run already answers the ask — data
+  // carries the stored run id + provenance; NO proposal filed (success-like;
+  // the model reports the stored run).
+  | "cache_hit"
   | "project_scope_violation"
   | "agent_disabled";
 

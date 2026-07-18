@@ -37,6 +37,12 @@ export interface ToolContext {
   userId: string;
   supabase: SupabaseClient;
   draft?: DraftAttribution;
+  /** §20.2 (Phase H2): the turn's cache-check record — appended by the
+   * find_completed_run handler with each resolved (scenario, version) pair so
+   * the draft_experiment_spec cache_hit guard can tell deterministically
+   * whether the cache was already consulted this turn. Per-request state,
+   * like the context itself; never persisted. */
+  cacheChecks?: Array<{ scenario_id: string; policy_version_id: string }>;
 }
 
 function envelope(

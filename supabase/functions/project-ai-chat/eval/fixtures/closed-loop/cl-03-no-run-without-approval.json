@@ -1,0 +1,32 @@
+{
+  "id": "cl-03-no-run-without-approval",
+  "description": "ai-agents.md §20.6 cl-03 — the cl-02 state with NO approval simulated: after the turn ends, the stub simulation_runs still has zero rows and the proposal remains 'proposed' (the §4.2 state machine is the mechanism — nothing dispatches without the card's Approve).",
+  "stub": { "graph_hash": "graph-hash-1", "current_policy_hash": "ph-run" },
+  "project_snapshot": {
+    "reuse": "cl-02-cache-miss-proposes"
+  },
+  "utterance": "what did the 6-week outage do?",
+  "mocked_llm": {
+    "tool_calls": [
+      { "tool": "find_completed_run", "args": { "scenario": "outage", "replications": 30 } },
+      {
+        "tool": "draft_experiment_spec",
+        "args": {
+          "scenario_id": "55555555-5555-4555-8555-555555555502",
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "replications": 30,
+          "title": "6-week outage of S1 × baseline (30 reps)",
+          "question": "What does a 6-week outage of S1 do?"
+        }
+      }
+    ],
+    "reply": "I filed the experiment card — nothing runs until you approve it."
+  },
+  "expect": {
+    "proposal_count": 1,
+    "proposal_status": "proposed",
+    "run_count": 0,
+    "upstash_calls": 0
+  },
+  "retired_reason": null
+}

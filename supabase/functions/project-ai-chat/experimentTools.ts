@@ -31,6 +31,7 @@ import {
   type ToolEnvelope,
 } from "./tools.ts";
 import { loadGateDataset, runValidationGate, type GateFinding } from "../_shared/validationGate.ts";
+import { findReuseCandidates, type ReuseCandidate } from "../_shared/dispatch.ts";
 import { canonicalJson, sha256Hex } from "./telemetry.ts";
 import { deploymentEnabledAgents } from "./router.ts";
 import {
@@ -40,7 +41,12 @@ import {
   MAX_PAYLOAD_BYTES,
   proposalEnvelope,
 } from "./draftTools.ts";
-import { getRunResultsDeclaration, getValidationStatusDeclaration } from "./vvTools.ts";
+import {
+  currentHashes,
+  deriveValidationBadge,
+  getRunResultsDeclaration,
+  getValidationStatusDeclaration,
+} from "./vvTools.ts";
 import { getPolicyConfigDeclaration } from "./configuratorTools.ts";
 import {
   getProjectMemoryDeclaration,
@@ -80,6 +86,13 @@ export function experimentTypesEnabled(): string[] {
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+}
+
+/** §20 closed decision loop flag (Phase H2). Off ⇒ §5.4 v1 behavior
+ * byte-identically: the v1 prompt, the v1 tool surface, no draft-time
+ * cache-hit guard (the §9 kill-switch convention). */
+export function closedLoopEnabled(): boolean {
+  return (Deno.env.get("CLOSED_LOOP_ENABLED") ?? "").trim().toLowerCase() === "true";
 }
 
 // ---------- §5.4 output contract (verbatim JSON Schema) ----------
@@ -159,10 +172,43 @@ export const draftExperimentSpecDeclaration: ToolDeclaration = {
   },
 };
 
+/** §20.2 (Phase H2): the cache-first read — the read-path twin of the G17
+ * reuse check. Same identity, same tables, zero mutation: no parameter can
+ * cause a dispatch. Joins the B4 closed-loop set always (below) and the
+ * persona set when the router says cache_checkable (§6.6 rule 1, index.ts). */
+export const findCompletedRunDeclaration: ToolDeclaration = {
+  name: "find_completed_run",
+  description:
+    "Check whether a COMPLETED simulation run already answers the asked result, BEFORE proposing anything: matches the stored runs' provenance hashes (policy/graph/scenario) against the project's current state — the same identity the dispatcher's reuse check uses. Returns the matching runs (newest first, with their validation badge) on a hit; note cache_miss when nothing matches; note cache_stale naming the drifted hash when the data changed since a stored run. Read-only — it never dispatches anything.",
+  parameters: {
+    type: "object",
+    properties: {
+      scenario: {
+        type: "string",
+        description:
+          "Scenario id or name fragment (resolved against this project's scenarios). May be omitted when the project has a single scenario.",
+      },
+      policy_version_id: {
+        type: "string",
+        description:
+          "A SAVED policy version id (from CONTEXT). Defaults to the project's newest saved version.",
+      },
+      replications: {
+        type: "number",
+        description:
+          "Minimum completed replications required (1-200). Default 1 — any completed run of at least n reps.",
+      },
+    },
+  },
+};
+
 /** The Designer's complete least-privilege tool surface (§5.4): nothing else
- * is declared to the model. get_project_memory joins when M2 is on (§14.4). */
+ * is declared to the model. get_project_memory joins when M2 is on (§14.4);
+ * find_completed_run joins the closed-loop set always (§20.2 — flag off ⇒
+ * the v1 surface byte-identically). */
 export function experimentToolDeclarations(): ReadonlyArray<ToolDeclaration> {
   return [
+    ...(closedLoopEnabled() ? [findCompletedRunDeclaration] : []),
     getRunResultsDeclaration,
     getValidationStatusDeclaration,
     getPolicyConfigDeclaration,
@@ -205,6 +251,63 @@ TASK
   tools, each with its run id and credibility badge. Differences between
   runs are DESCRIPTIVE unless a paired statistic is persisted — say which.
 - Reply in 2-6 sentences. Never present a projection as a result.
+
+${AGENT_COMMON}`;
+}
+
+// ---------- §20.4 closed-loop system prompt (verbatim; Phase H2) ----------
+
+/** The §20.4 template, verbatim, superseding §5.4's when CLOSED_LOOP_ENABLED.
+ * Written for the weakest enabled model (law 7): one decision per numbered
+ * rule, every branch named, all facts arriving in CONTEXT or tool results.
+ * `planBlock` is the §21.3 PLAN block — empty until Phase H3 lands the plan
+ * tool (the step-2/update_task_plan references are inert until H3 registers
+ * it). */
+export function buildClosedLoopPrompt(args: {
+  projectId: string;
+  scenariosJson: string;
+  policyVersionsJson: string;
+  validationJson: string;
+  runsJson: string;
+  planBlock?: string;
+}): string {
+  const plan = args.planBlock ? `\n${args.planBlock}` : "";
+  return `You are the Experiment Designer, the SureSuite agent that answers decision
+questions from simulation evidence for one project. You follow a fixed loop.
+
+CONTEXT
+- Project: ${args.projectId}
+- Scenarios: ${args.scenariosJson}
+- Saved policy versions: ${args.policyVersionsJson}
+- Validation cards and current hashes: ${args.validationJson}
+- Recent runs: ${args.runsJson}${plan}
+
+THE LOOP — follow these steps IN ORDER, one at a time:
+1. UNDERSTAND. Identify the scenario and policy version the question needs.
+   If an entity name matches more than one candidate, ask ONE short
+   "did you mean" question and stop.
+2. PLAN. If answering needs more than one step (an approval, a new run),
+   call update_task_plan ONCE with every step you foresee, before any other
+   tool. If the answer may already exist, step 1 of the plan is the cache
+   check. Single-step answers need no plan.
+3. CHECK THE CACHE. Call find_completed_run for the scenario + policy
+   version BEFORE drafting anything.
+   - HIT: do NOT draft a proposal. Call get_run_results (and
+     get_validation_status) for that run and go to step 5.
+   - STALE (note cache_stale): say the data changed since that run, name
+     which hash drifted, and ask whether to re-run. Do not draft unless the
+     user already asked to proceed.
+   - MISS: go to step 4.
+4. PROPOSE THE RUN. Call draft_experiment_spec ONCE (rules of your §5.4
+   contract: bind a SAVED policy version, replications 1-200, never set
+   acknowledge_warnings). Mark the plan step awaiting_approval. Tell the
+   user the card must be approved before anything runs, then STOP — the
+   conversation resumes after approval and run completion.
+5. ANSWER FROM EVIDENCE. Report ONLY numbers present in tool results from
+   THIS turn. Cite every factual sentence with [n] markers bound to the
+   evidence list (run id + hashes). Name the run's credibility badge and,
+   if the run's engine code_version is not the current one, say so.
+   Close every plan step (done / failed / refused) via update_task_plan.
 
 ${AGENT_COMMON}`;
 }
@@ -339,16 +442,313 @@ export async function buildExperimentContext(
     } catch { /* memory is context, not a gate */ }
   }
 
-  const prompt = buildExperimentPrompt({
-    projectId: ctx.projectId,
-    utterance: args.utterance.slice(0, 4000),
-    scenariosJson,
-    policyVersionsJson: versionsJson,
-    validationJson,
-    runsJson,
-    memoryBlock,
-  });
+  // §20.4 (Phase H2): behind CLOSED_LOOP_ENABLED the closed-loop template
+  // supersedes §5.4's — same grounding context, the ordered-loop discipline
+  // in place of the TASK block. Flag off ⇒ the v1 prompt byte-identically.
+  const prompt = closedLoopEnabled()
+    ? buildClosedLoopPrompt({
+      projectId: ctx.projectId,
+      scenariosJson,
+      policyVersionsJson: versionsJson,
+      validationJson,
+      runsJson,
+      // The §21.3 PLAN block joins with Phase H3 (plan tool + chat_plans).
+    })
+    : buildExperimentPrompt({
+      projectId: ctx.projectId,
+      utterance: args.utterance.slice(0, 4000),
+      scenariosJson,
+      policyVersionsJson: versionsJson,
+      validationJson,
+      runsJson,
+      memoryBlock,
+    });
   return prompt.length <= EXPERIMENT_CONTEXT_BUDGET ? prompt : prompt.slice(0, EXPERIMENT_CONTEXT_BUDGET);
+}
+
+// ---------- §20.2 find_completed_run handler (Phase H2) ----------
+
+/** The read-path identity inputs (§20.2): the bound version's policy_hash,
+ * `current_graph_hash(project)` (20260703000001) and
+ * `scenario_fingerprint_hash(scenario)` (20260710000001). Unlike the
+ * dispatcher this NEVER snapshots — a pure read of current state. Returns
+ * null when a hash RPC is unavailable (a pre-migration database). */
+async function resolveRunIdentity(
+  db: Db,
+  projectId: string,
+  scenario: ScenarioRow,
+  version: { policy_hash?: unknown; snapshot?: unknown },
+): Promise<{ policyHash: string; graphHash: string; scenarioHash: string } | null> {
+  const snapshot = (version.snapshot ?? {}) as Record<string, unknown>;
+  const policyHash: string = (version.policy_hash as string | null) ??
+    (await sha256Hex(canonicalJson(snapshot)));
+  let graphHash = "";
+  let scenarioHash = "";
+  try {
+    const { data } = await db.rpc("current_graph_hash", { p_project_id: projectId });
+    if (typeof data === "string" && data) graphHash = data;
+  } catch { /* reported as unavailable below */ }
+  try {
+    const { data } = await db.rpc("scenario_fingerprint_hash", { p_scenario_id: scenario.id });
+    if (typeof data === "string" && data) scenarioHash = data;
+  } catch { /* reported as unavailable below */ }
+  if (!graphHash || !scenarioHash) return null;
+  return { policyHash, graphHash, scenarioHash };
+}
+
+/** §19.5/§22.5 disambiguation shape (as tools.ts::ambiguousEnvelope): the ≤5
+ * candidates as rows, never a guess — the reply instantiates the template. */
+function scenarioDisambiguation(
+  tool: string,
+  fragment: string,
+  hits: ScenarioRow[],
+): ToolEnvelope {
+  const candidates = hits.slice(0, 5).map((s) => ({ id: String(s.id), label: String(s.name ?? s.id) }));
+  return {
+    kind: "table",
+    data: { columns: ["id", "label"], rows: candidates.map((c) => [c.id, c.label]) },
+    meta: {
+      tool,
+      row_count: candidates.length,
+      note: `ambiguous: "${fragment || "(no scenario named)"}" matches ${hits.length} scenarios — ask which one`,
+    },
+  };
+}
+
+const shortHex = (h: string): string => h.slice(0, 12);
+
+async function findCompletedRun(
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<ToolEnvelope> {
+  const tool = "find_completed_run";
+  const db = ctx.supabase as unknown as Db;
+  // §20.2: replications 1-200 (clamp), default 1 — "any completed run of at
+  // least n reps".
+  const rawReps = typeof args.replications === "number" ? args.replications : Number(args.replications);
+  const replications = Number.isFinite(rawReps)
+    ? Math.max(REPLICATIONS_MIN, Math.min(REPLICATIONS_MAX, Math.floor(rawReps)))
+    : 1;
+
+  try {
+    // Scenario resolution against `scenarios` (id or name fragment; §19.5:
+    // ambiguity yields the disambiguation candidates, never a guess).
+    const { data: scenarioRows } = await db
+      .from("scenarios")
+      .select("*")
+      .eq("project_id", ctx.projectId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const scenarios = (scenarioRows ?? []) as ScenarioRow[];
+    if (scenarios.length === 0) {
+      return {
+        kind: "text",
+        data: "This project has no scenarios yet — there is no completed run to find.",
+        meta: { tool, row_count: 0, note: "empty" },
+      };
+    }
+    const fragment = String(args.scenario ?? "").trim();
+    let scenario: ScenarioRow | null = null;
+    if (fragment) {
+      const frag = fragment.toLowerCase();
+      const exact = scenarios.find((s) => String(s.id).toLowerCase() === frag);
+      if (exact) scenario = exact;
+      else {
+        const hits = scenarios.filter((s) =>
+          String(s.id).toLowerCase().includes(frag) ||
+          String(s.name ?? "").toLowerCase().includes(frag)
+        );
+        if (hits.length === 1) scenario = hits[0];
+        else if (hits.length === 0) {
+          return {
+            kind: "text",
+            data: `No scenario matching "${fragment}" in this project.`,
+            meta: { tool, row_count: 0, note: "empty" },
+          };
+        } else {
+          return scenarioDisambiguation(tool, fragment, hits);
+        }
+      }
+    } else if (scenarios.length === 1) {
+      scenario = scenarios[0];
+    } else {
+      return scenarioDisambiguation(tool, fragment, scenarios);
+    }
+
+    // Policy version: an explicit id, else the project's newest saved
+    // version (`list_policy_versions`, §20.2 default).
+    let versionId = String(args.policy_version_id ?? "").trim();
+    if (versionId && !uuidRe.test(versionId)) {
+      return {
+        kind: "text",
+        data: "policy_version_id must be a uuid of a SAVED policy version.",
+        meta: { tool, row_count: 0, note: "error" },
+      };
+    }
+    if (!versionId) {
+      const { data: versions } = await db.rpc("list_policy_versions", { p_project_id: ctx.projectId });
+      versionId = String((Array.isArray(versions) ? versions : [])[0]?.id ?? "");
+    }
+    if (!versionId) {
+      return {
+        kind: "text",
+        data:
+          "This project has no saved policy version yet — save/snapshot the policy configuration on /policies first; runs never bind live tables.",
+        meta: { tool, row_count: 0, note: "dependency_missing" },
+      };
+    }
+    const { data: version } = await db
+      .from("policy_versions")
+      .select("id,project_id,label,snapshot,policy_hash")
+      .eq("id", versionId)
+      .maybeSingle();
+    if (!version || String(version.project_id) !== ctx.projectId) {
+      return {
+        kind: "text",
+        data: `policy version ${versionId} is not in this project.`,
+        meta: { tool, row_count: 0, note: "error" },
+      };
+    }
+
+    const identity = await resolveRunIdentity(db, ctx.projectId, scenario, version);
+    if (!identity) {
+      return {
+        kind: "text",
+        data: "The provenance hashes are unavailable on this project — the run cache cannot be checked.",
+        meta: { tool, row_count: 0, note: "error" },
+      };
+    }
+    // §20.2 ordering, made deterministic: record the consultation so the
+    // draft_experiment_spec cache-hit guard knows this turn already checked.
+    (ctx.cacheChecks ??= []).push({
+      scenario_id: String(scenario.id),
+      policy_version_id: versionId,
+    });
+
+    // THE predicate — the single extracted G17 implementation the dispatcher
+    // also calls, so read-hit and apply-hit can never disagree (§20.1 law 2).
+    const candidates = await findReuseCandidates(ctx.supabase, {
+      scenario: { id: String(scenario.id), updated_at: scenario.updated_at },
+      policyHash: identity.policyHash,
+      graphHash: identity.graphHash,
+      scenarioHash: identity.scenarioHash,
+      replications,
+    }, { limit: 5 });
+
+    const triple =
+      `policy_hash=${shortHex(identity.policyHash)} graph_hash=${shortHex(identity.graphHash)} ` +
+      `scenario_hash=${shortHex(identity.scenarioHash)}`;
+
+    if (candidates.length > 0) {
+      // Hit: one row per matching run (newest first, ≤ 5); Validated is the
+      // §9.5-derived badge (deriveValidationBadge — get_validation_status's
+      // own logic); meta.note carries the resolved triple so §22 citations
+      // can bind to it.
+      const badges = new Map<string, string>();
+      try {
+        const hashes = await currentHashes(db, ctx.projectId);
+        const { data: cards } = await db.rpc("list_model_validations", { p_project_id: ctx.projectId });
+        const { data: runRows } = await db
+          .from("simulation_runs")
+          .select("id,model_validation_id")
+          .in("id", candidates.map((c) => c.run_id));
+        for (const r of (runRows ?? []) as Array<Record<string, unknown>>) {
+          const card = (Array.isArray(cards) ? cards : []).find(
+            (c: Record<string, unknown>) => String(c.id) === String(r.model_validation_id ?? ""),
+          );
+          badges.set(String(r.id), card ? deriveValidationBadge(card, hashes) : "unvalidated");
+        }
+      } catch { /* badge is enrichment — hits still answer */ }
+      const rows = candidates.map((c: ReuseCandidate) => [
+        c.run_id,
+        c.ended_at ?? "-",
+        c.rep_count_done ?? 0,
+        (version.label as string | null) ?? versionId.slice(0, 8),
+        c.code_version || "-",
+        badges.get(c.run_id) ?? "unvalidated",
+      ]);
+      return {
+        kind: "table",
+        data: {
+          columns: ["Run", "Finished", "Replications", "Policy version", "Engine", "Validated"],
+          rows,
+        },
+        meta: { tool, row_count: rows.length, note: `cache_hit: ${triple}` },
+      };
+    }
+
+    // No candidate: distinguish cache_stale (a done run exists but the
+    // project state drifted — §9.5 staleness law, spoken) from cache_miss.
+    const { data: doneRows } = await db
+      .from("simulation_runs")
+      .select("id,policy_hash,graph_hash,scenario_hash,rep_count_done,created_at")
+      .eq("scenario_id", String(scenario.id))
+      .eq("status", "done")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    const done = (doneRows ?? []) as Array<Record<string, unknown>>;
+    if (done.length === 0) {
+      return {
+        kind: "text",
+        data:
+          `no completed run matches this scenario + policy version + current data ` +
+          `(scenario "${scenario.name}" has no completed runs).`,
+        meta: { tool, row_count: 0, note: "cache_miss" },
+      };
+    }
+    const newest = done[0];
+    const drifted: string[] = [];
+    if (String(newest.policy_hash ?? "") !== identity.policyHash) {
+      drifted.push(
+        `policy_hash (run: ${shortHex(String(newest.policy_hash ?? "?"))} vs current: ${shortHex(identity.policyHash)})`,
+      );
+    }
+    if (String(newest.graph_hash ?? "") !== identity.graphHash) {
+      drifted.push(
+        `graph_hash (run: ${shortHex(String(newest.graph_hash ?? "?"))} vs current: ${shortHex(identity.graphHash)})`,
+      );
+    }
+    if (String(newest.scenario_hash ?? "") !== identity.scenarioHash) {
+      drifted.push(
+        `scenario_hash (run: ${shortHex(String(newest.scenario_hash ?? "?"))} vs current: ${shortHex(identity.scenarioHash)})`,
+      );
+    } else if (
+      scenario.updated_at && newest.created_at &&
+      new Date(String(newest.created_at)).getTime() < new Date(String(scenario.updated_at)).getTime()
+    ) {
+      // The row-unchanged guard's gap: the stamped scenario_hash excludes
+      // events/estimation settings, so a scenario edit is drift even when
+      // the baseline fingerprint still matches.
+      drifted.push("scenario (the scenario row was edited after that run was dispatched)");
+    }
+    if (drifted.length > 0) {
+      return {
+        kind: "text",
+        data:
+          `the data changed since run ${newest.id} completed — drifted: ${drifted.join("; ")}. ` +
+          `The stored result no longer reflects current project state; a re-run is needed for a current answer.`,
+        meta: { tool, row_count: 0, note: "cache_stale" },
+      };
+    }
+    if (Number(newest.rep_count_done ?? 0) < replications) {
+      return {
+        kind: "text",
+        data:
+          `no completed run matches this scenario + policy version + current data at the requested ` +
+          `replication count: run ${newest.id} matches but has only ${Number(newest.rep_count_done ?? 0)} ` +
+          `completed replications (< ${replications} requested) — a new run is needed.`,
+        meta: { tool, row_count: 0, note: "cache_miss" },
+      };
+    }
+    return {
+      kind: "text",
+      data: "no completed run matches this scenario + policy version + current data.",
+      meta: { tool, row_count: 0, note: "cache_miss" },
+    };
+  } catch (e) {
+    console.warn("find_completed_run failed:", (e as Error).message);
+    return { kind: "text", data: "Run-cache lookup failed.", meta: { tool, row_count: 0, note: "error" } };
+  }
 }
 
 // ---------- draft_experiment_spec handler ----------
@@ -508,6 +908,51 @@ async function draftExperimentSpec(
       return failureEnvelope(tool, "project_scope_violation", `scenario ${scenarioId} is not in this project`);
     }
     scenario = data as ScenarioRow;
+  }
+
+  // §20.2 deterministic cache-hit guard (Phase H2, CLOSED_LOOP_ENABLED): the
+  // §20.4 prompt ORDERS find_completed_run before drafting, and the ordering
+  // is also enforced here — when the turn's cache-check record shows no prior
+  // find_completed_run for this scenario+version, the handler runs the SAME
+  // extracted G17 lookup itself; a hit returns `cache_hit` (success-like,
+  // §4.5) pointing at the stored run and files NO proposal. A weak model
+  // that forgets the order cannot waste an approval on an already-answered
+  // question. New scenarios have no runs by construction — the guard only
+  // applies to existing-scenario specs.
+  if (closedLoopEnabled() && scenario) {
+    const consulted = (ctx.cacheChecks ?? []).some(
+      (c) => c.scenario_id === String(scenario!.id) && c.policy_version_id === policyVersionId,
+    );
+    if (!consulted) {
+      try {
+        const identity = await resolveRunIdentity(db, ctx.projectId, scenario, version);
+        if (identity) {
+          const [cand] = await findReuseCandidates(ctx.supabase, {
+            scenario: { id: String(scenario.id), updated_at: scenario.updated_at },
+            policyHash: identity.policyHash,
+            graphHash: identity.graphHash,
+            scenarioHash: identity.scenarioHash,
+            replications,
+          }, { limit: 1 });
+          if (cand) {
+            return failureEnvelope(
+              tool,
+              "cache_hit",
+              `An identical completed run already answers this — run ${cand.run_id} ` +
+                `(${cand.rep_count_done ?? "?"} replications done` +
+                `${cand.ended_at ? `, finished ${cand.ended_at}` : ""}; ` +
+                `policy_hash ${identity.policyHash.slice(0, 12)}, ` +
+                `graph_hash ${identity.graphHash.slice(0, 12)}, ` +
+                `scenario_hash ${identity.scenarioHash.slice(0, 12)}). ` +
+                `No proposal was filed — report the stored run (get_run_results ${cand.run_id}).`,
+            );
+          }
+        }
+      } catch (e) {
+        // The guard is an optimization — never let it take drafting down.
+        console.warn("cache-hit guard skipped (lookup failed):", e instanceof Error ? e.message : e);
+      }
+    }
   }
 
   // §5.4 hard gate 4: read-only gate preview — the SAME runValidationGate the
@@ -679,4 +1124,8 @@ async function draftExperimentSpec(
 
 // Register into the shared executeTool registry (bridge 2). The read tools of
 // the §5.4 surface are registered by vvTools.ts / configuratorTools.ts.
+// find_completed_run is registered always (like every §2.3 read); it is only
+// DECLARED to models per §20.2's exposure rules (closed-loop B4 set; persona
+// set when the router says cache_checkable — §6.6 rule 1 in index.ts).
 registerToolHandler("draft_experiment_spec", draftExperimentSpec);
+registerToolHandler("find_completed_run", findCompletedRun);

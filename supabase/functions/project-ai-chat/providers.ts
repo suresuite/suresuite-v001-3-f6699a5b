@@ -28,6 +28,63 @@ export function resolveModel(id: string | undefined | null): ModelSpec {
 
 export interface ChatTurn { role: "user" | "assistant"; content: string }
 
+// ── §20.5 free-tier operations (Phase H2): one retry on 429/5xx ─────────────
+//
+// Each provider call gets ONE retry with exponential backoff (1 s, then 2 s;
+// jittered ±25%); a second failure surfaces the typed error below honestly —
+// no queueing, no silent model substitution (§23.4's no-silent-degradation
+// rule). The retry is logged and its wait counts against the request's wall
+// time; the §21.5 budget COUNTERS land with Phase H3.
+export const PROVIDER_RETRY_MAX = 1;
+export const PROVIDER_RETRY_BASE_MS = 1000;
+export const PROVIDER_RETRY_JITTER = 0.25;
+
+/** §20.5's §2.2-style typed error: surfaced verbatim to the user; the model
+ * is never substituted on a rate limit. */
+export class ProviderRateLimitError extends Error {
+  constructor(public provider: string, public status: number) {
+    super("the model provider is rate-limiting — try again shortly or switch models");
+    this.name = "ProviderRateLimitError";
+  }
+}
+
+/** Backoff schedule: 1 s, then 2 s, jittered ±25% (§20.5). `rand` is
+ * injectable for the deterministic tier. */
+export function providerRetryDelayMs(attempt: number, rand: () => number = Math.random): number {
+  const base = PROVIDER_RETRY_BASE_MS * 2 ** attempt;
+  const jitter = (rand() * 2 - 1) * PROVIDER_RETRY_JITTER * base;
+  return Math.max(0, Math.round(base + jitter));
+}
+
+/** One provider HTTP call under the §20.5 retry contract. Non-retryable
+ * statuses return to the caller's existing error handling unchanged; the
+ * success path is byte-identical to a plain fetch. */
+async function providerFetch(
+  providerLabel: string,
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, init);
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable) return res;
+    if (attempt >= PROVIDER_RETRY_MAX) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        `[provider-retry] ${providerLabel} still failing (${res.status}) after ${attempt} retry — surfacing the §20.5 typed error`,
+        body.slice(0, 200),
+      );
+      throw new ProviderRateLimitError(providerLabel, res.status);
+    }
+    const delay = providerRetryDelayMs(attempt);
+    console.warn(
+      `[provider-retry] ${providerLabel} returned ${res.status} — retrying once in ${delay} ms (§20.5; the wait counts against the wall budget)`,
+    );
+    await res.text().catch(() => { /* drain before retrying */ });
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}
+
 // Bridge 1 (ai-agents.md §3.2): Layer B agent turns reuse this exact loop with
 // an agent system prompt in place of buildSystemPrompt and a least-privilege
 // tool subset in place of the full toolDeclarations. Omitting both yields
@@ -48,6 +105,12 @@ export interface RunChatOptions {
    * verifier needs every envelope). Absent ⇒ zero behavior change — the
    * golden-transcript suite pins the flag-off path. */
   onToolResult?: (name: string, args: Record<string, unknown>, envelope: ToolEnvelope) => void;
+  /** §6.6 rule 1 (Phase H2): set by the orchestrator when the router marked
+   * the ask cache_checkable — the built persona prompt then carries the
+   * cache-first instruction (§20.4's discipline, spoken to the persona).
+   * Only reachable with ROUTER_V2_SIGNALS on; absent ⇒ byte-identical
+   * prompts. Ignored when `system` is supplied (agent turns own theirs). */
+  cacheFirst?: boolean;
 }
 
 export interface ChatRunResult {
@@ -69,13 +132,29 @@ function emptyReply(parts: ChatRunResult["parts"]): string {
     : "I didn't get a usable answer back — try rephrasing, or switch models in the header.";
 }
 
+/** §6.6 rule 1: the cache-first instruction the persona prompt carries when
+ * the router says cache_checkable (the §20.4 discipline for read-only turns —
+ * the persona has no draft tools, so only the read half applies). */
+export const CACHE_FIRST_INSTRUCTION =
+  `- CACHE FIRST: the asked result may already exist as a completed simulation
+  run. Call find_completed_run for the scenario + policy version BEFORE
+  saying no result exists or suggesting a new run. On a hit, answer from
+  get_run_results for that run, naming the run id. If the note says
+  cache_stale, say the project data changed since that run and name the
+  drifted hash.`;
+
 export function buildSystemPrompt(
   modelLabel: string,
   agentId?: string | null,
   hasProject = true,
   summary?: string | null,
+  cacheFirst = false,
 ): string {
   const agent = resolveAgent(agentId);
+  // §6.6 rule 1 (H2): one appended DATA RULES line, only when the router
+  // marked the ask cache_checkable (requires ROUTER_V2_SIGNALS) — flag off
+  // ⇒ the prompt below byte-identically.
+  const cacheBlock = cacheFirst ? `\n${CACHE_FIRST_INSTRUCTION}` : "";
   // M1 (§14.3): one optional block, persona turns only. Summaries are
   // conversation recall, never a source of factual claims — the data rules
   // above still require tool-grounded facts.
@@ -145,7 +224,7 @@ ${projectBlock}
 - When a tool returns kind "table"/"kpi"/"bullets", don't restate the
   payload — give 1-3 sentences of interpretation and call out the most
   important insight.
-- Never generate SQL. You are read-only.
+- Never generate SQL. You are read-only.${cacheBlock}
 
 STYLE
 - Format large numbers with thousands separators when it helps readability.
@@ -176,7 +255,7 @@ ${projectBlock}
 - If a tool returns kind "text" with note "empty" or row_count 0, say plainly: "I don't have enough data on that yet." Then suggest ONE thing to try.
 - Resolve ambiguous entity references by calling list_project_entities first.
 - When a tool returns kind "table"/"kpi"/"bullets", don't restate the payload — give 1-3 sentences of interpretation and call out the most important insight.
-- Never generate SQL. You are read-only.
+- Never generate SQL. You are read-only.${cacheBlock}
 
 STYLE
 - Format large numbers with thousands separators when it helps readability.
@@ -211,7 +290,7 @@ async function runGemini(
   const toolCalls: ChatRunResult["toolCalls"] = [];
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
-    const res = await fetch(`${endpoint}?key=${encodeURIComponent(apiKey)}`, {
+    const res = await providerFetch("gemini", `${endpoint}?key=${encodeURIComponent(apiKey)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -296,7 +375,7 @@ async function runOpenAICompatible(
       body.max_tokens = 2048;
     }
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await providerFetch(model.provider, `${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -350,7 +429,8 @@ export async function runChat(
   opts?: RunChatOptions,
 ): Promise<ChatRunResult> {
   const model = resolveModel(modelId);
-  const builtSystem = opts?.system ?? buildSystemPrompt(model.label, agentId, !!ctx, opts?.summary);
+  const builtSystem = opts?.system ??
+    buildSystemPrompt(model.label, agentId, !!ctx, opts?.summary, opts?.cacheFirst === true);
   // §22.3: the corrective-retry addendum joins the system prompt; absent ⇒
   // byte-identical to the pre-H1 path.
   const system = opts?.systemAddendum ? `${builtSystem}\n\n${opts.systemAddendum}` : builtSystem;

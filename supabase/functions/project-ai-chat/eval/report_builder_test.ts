@@ -481,12 +481,14 @@ Deno.test("rb-08: ask mode — report-builder is the ONE routable agent; the §1
     }
     const routed = applyModeToRoute({
       route: "artifact", agent_id: "report-builder", intent: "report.build",
-      confidence: 0.95, advisory_part: null, artifact_part: "x", short_circuit: null,
+      confidence: 0.95, advisory_part: null, artifact_part: "x",
+      needs_run: false, cache_checkable: false, short_circuit: null,
     }, "ask");
     assertEquals(routed.blocked, null, "report-builder survives the ask-mode subtraction");
     const blocked = applyModeToRoute({
       route: "artifact", agent_id: "data-steward", intent: "steward.fill_missing",
-      confidence: 0.95, advisory_part: null, artifact_part: "x", short_circuit: null,
+      confidence: 0.95, advisory_part: null, artifact_part: "x",
+      needs_run: false, cache_checkable: false, short_circuit: null,
     }, "ask");
     assertEquals(blocked.decision.route, "advisory");
     assertEquals(blocked.blocked?.agent_id, "data-steward");

@@ -109,6 +109,69 @@ export interface ReuseCandidate {
   rep_count_done: number | null;
 }
 
+/** The G17 run identity, resolved to its comparable parts. Callers compute
+ * the three hashes their own way (the dispatcher from the snapshot it just
+ * took; the ai-agents.md §20.2 read tool from the current-state RPCs) — the
+ * PREDICATE below is the single shared implementation, so read-hit and
+ * apply-hit can never disagree (§20.1 law 2). */
+export interface ReuseIdentity {
+  /** The scenario row's id + updated_at (the seed-spec/disruption-schedule
+   * row-unchanged guard input). */
+  scenario: { id: string; updated_at?: unknown };
+  policyHash: string;
+  graphHash: string;
+  scenarioHash: string;
+  replications: number;
+}
+
+/**
+ * The G17 reuse predicate (ai-agents.md §20.2), extracted verbatim from
+ * dispatchExperimentRun so the §20.2 `find_completed_run` read tool and the
+ * apply-time reuse check share ONE implementation. A candidate matches when
+ * ALL hold: status='done' ∧ the three stamped hashes equal the identity's ∧
+ * rep_count_done ≥ replications ∧ the scenario row unchanged since the
+ * candidate was dispatched (scenarios.updated_at ≤ candidate.created_at).
+ * Newest first; errors propagate — the callers own their failure posture.
+ */
+export async function findReuseCandidates(
+  // deno-lint-ignore no-explicit-any
+  svc: any,
+  identity: ReuseIdentity,
+  opts?: { limit?: number },
+): Promise<ReuseCandidate[]> {
+  const limit = Math.max(1, Math.min(5, opts?.limit ?? 1));
+  const { data: rows, error } = await svc
+    .from("simulation_runs")
+    .select("id,ended_at,created_at,code_version,rep_count_done")
+    .eq("scenario_id", identity.scenario.id)
+    .eq("status", "done")
+    .eq("policy_hash", identity.policyHash)
+    .eq("graph_hash", identity.graphHash)
+    .eq("scenario_hash", identity.scenarioHash)
+    .gte("rep_count_done", identity.replications)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const updatedAt = identity.scenario.updated_at;
+  return ((rows ?? []) as Array<Record<string, unknown>>)
+    .filter((cand) =>
+      // Row-unchanged guard: the stamped scenario_hash is the events-excluded
+      // baseline fingerprint, so any scenario edit after the candidate's
+      // dispatch invalidates it. Candidates come newest-first, so filtering
+      // is equivalent to the original take-newest-then-guard check.
+      !updatedAt ||
+      (cand.created_at &&
+        new Date(String(cand.created_at)).getTime() >= new Date(String(updatedAt)).getTime())
+    )
+    .map((cand) => ({
+      run_id: String(cand.id),
+      ended_at: (cand.ended_at as string | null) ?? null,
+      created_at: String(cand.created_at),
+      code_version: (cand.code_version as string | null) ?? null,
+      rep_count_done: (cand.rep_count_done as number | null) ?? null,
+    }));
+}
+
 /** Carries the reuse candidate out of dispatchExperimentRun as a 409 response.
  *  Reuse is ALWAYS a user choice: the dispatcher never silently skips a run —
  *  it answers "identical results exist" and the caller either surfaces the
@@ -273,33 +336,15 @@ export async function dispatchExperimentRun(
   const forceRerun = (cmd.payload as Record<string, unknown>).force_rerun === true;
   if (!forceRerun && graphHash && scenarioHash) {
     try {
-      // deno-lint-ignore no-explicit-any
-      const { data: cand, error: candErr } = await (svc as any)
-        .from("simulation_runs")
-        .select("id,ended_at,created_at,code_version,rep_count_done")
-        .eq("scenario_id", scenario.id)
-        .eq("status", "done")
-        .eq("policy_hash", policyHash)
-        .eq("graph_hash", graphHash)
-        .eq("scenario_hash", scenarioHash)
-        .gte("rep_count_done", replications)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (candErr) throw candErr;
-      const scenarioUnchanged =
-        !scenario.updated_at ||
-        (cand?.created_at &&
-          new Date(cand.created_at).getTime() >= new Date(scenario.updated_at).getTime());
-      if (cand && scenarioUnchanged) {
-        throw new ReuseAvailable({
-          run_id: cand.id as string,
-          ended_at: (cand.ended_at as string | null) ?? null,
-          created_at: cand.created_at as string,
-          code_version: (cand.code_version as string | null) ?? null,
-          rep_count_done: (cand.rep_count_done as number | null) ?? null,
-        });
-      }
+      // The single extracted G17 predicate (shared with the §20.2 read tool).
+      const [cand] = await findReuseCandidates(svc, {
+        scenario: { id: scenario.id as string, updated_at: scenario.updated_at },
+        policyHash,
+        graphHash,
+        scenarioHash,
+        replications,
+      });
+      if (cand) throw new ReuseAvailable(cand);
     } catch (e) {
       if (e instanceof ReuseAvailable) throw e;
       // The reuse check is an optimization — never let it take dispatch down.

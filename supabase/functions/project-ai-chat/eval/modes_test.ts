@@ -40,6 +40,8 @@ function artifactDecision(agentId: string, intent: string): RoutedDecision {
     confidence: 0.95,
     advisory_part: null,
     artifact_part: "do it",
+    needs_run: false,
+    cache_checkable: false,
     short_circuit: null,
   };
 }
@@ -86,7 +88,8 @@ Deno.test("checkpoint 2: ask subtracts every artifact route except the §15 allo
   // advisory routes pass through untouched in every mode (modes only subtract)
   const advisory: RoutedDecision = {
     route: "advisory", agent_id: null, intent: null, confidence: 0,
-    advisory_part: null, artifact_part: null, short_circuit: null,
+    advisory_part: null, artifact_part: null,
+    needs_run: false, cache_checkable: false, short_circuit: null,
   };
   assertEquals(applyModeToRoute(advisory, "ask").decision, advisory);
   assertEquals(applyModeToRoute(advisory, "ask").blocked, null);

@@ -1,0 +1,23 @@
+{
+  "id": "cl-05-stale-data",
+  "description": "ai-agents.md §20.6 cl-05 — a done run exists but the stub current_graph_hash differs (a CSV re-upload): find_completed_run reports cache_stale NAMING the drifted hash; no proposal is filed (the utterance did not ask to proceed).",
+  "stub": { "graph_hash": "graph-hash-2", "current_policy_hash": "ph-run" },
+  "project_snapshot": {
+    "reuse": "cl-01-cache-hit"
+  },
+  "utterance": "what did the 6-week outage do?",
+  "mocked_llm": {
+    "tool_calls": [
+      { "tool": "find_completed_run", "args": { "scenario": "outage", "replications": 30 } }
+    ],
+    "reply": "Your data changed since that run: run 99999999-9999-4999-8999-999999999901 was computed against graph_hash graph-hash-1, but the current data hashes to graph-hash-2 — the stored result no longer reflects current state. Want me to set up a re-run?"
+  },
+  "expect": {
+    "cache_note": "cache_stale",
+    "stale_names_hash": "graph_hash",
+    "stale_run_id": "99999999-9999-4999-8999-999999999901",
+    "proposal_count": 0,
+    "run_count": 1
+  },
+  "retired_reason": null
+}

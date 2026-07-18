@@ -19,6 +19,9 @@ interface GoldenRow {
     /** ask-mode rows: the intent the mode is expected to subtract (null for
      * advisory asks, which ask mode never touches). */
     blocked_intent?: string | null;
+    /** §6.6 (H2): optional v2-signal labels — absent means expected false. */
+    needs_run?: boolean;
+    cache_checkable?: boolean;
   };
   class: string;
   retired_reason: string | null;
@@ -70,6 +73,32 @@ Deno.test("every row is well-formed against the router vocabularies", () => {
       );
     }
     assertEquals(r.retired_reason, null, `${r.id}: seed rows are never retired`);
+  }
+});
+
+Deno.test("§6.6 v2-signal labels are well-formed and sufficiently seeded (H2)", () => {
+  let needsTrue = 0;
+  let cacheTrue = 0;
+  for (const r of rows) {
+    for (const key of ["needs_run", "cache_checkable"] as const) {
+      const v = r.expect[key];
+      assert(v === undefined || typeof v === "boolean", `${r.id}: ${key} must be boolean when present`);
+    }
+    if (r.expect.needs_run === true) needsTrue++;
+    if (r.expect.cache_checkable === true) cacheTrue++;
+    // A cache-checkable ask is by definition result-shaped; on artifact rows
+    // that means the Experiment Designer owns it (results live in runs).
+    if (r.expect.cache_checkable === true && r.expect.route === "artifact") {
+      assertEquals(r.expect.agent_id, "experiment-designer", `${r.id}: cache-checkable artifact asks are B4's`);
+    }
+  }
+  // Enough positives that the §6.6 recall/precision targets are measurable.
+  assert(needsTrue >= 20, `≥20 needs_run=true labels required (got ${needsTrue})`);
+  assert(cacheTrue >= 10, `≥10 cache_checkable=true labels required (got ${cacheTrue})`);
+  // Every exp-class row carries a needs_run label (a run-shaped ask is the
+  // signal's home class — unlabeled exp rows would silently score as false).
+  for (const r of rows.filter((x) => x.class === "exp")) {
+    assertEquals(typeof r.expect.needs_run, "boolean", `${r.id}: exp rows must be needs_run-labeled`);
   }
 });
 

@@ -22,6 +22,12 @@ export interface RouteDecision {
   confidence: number; // [0,1]
   advisory_part: string | null; // for mixed: the question portion, verbatim
   artifact_part: string | null; // for mixed: the actionable portion, verbatim
+  // §6.6 router v2 (Phase H2, ROUTER_V2_SIGNALS) — additive, so every v1
+  // consumer keeps working. Malformed or missing ⇒ both false (the v1
+  // behavior: a wrong false costs one avoidable refusal or one human-shaped
+  // detour, never a fabrication or an unapproved dispatch).
+  needs_run: boolean; // a correct answer requires simulation results
+  cache_checkable: boolean; // the asked result may already exist as a completed run
 }
 
 export interface RouterContext {
@@ -97,6 +103,13 @@ export function routerEnabled(): boolean {
   return (Deno.env.get("AGENT_ROUTER_ENABLED") ?? "").trim().toLowerCase() === "true";
 }
 
+/** §6.6 router v2 flag (Phase H2). Off ⇒ the v1 classifier prompt and both
+ * provider structured-output schemas byte-identically; the two booleans then
+ * simply default false everywhere. */
+export function routerV2Enabled(): boolean {
+  return (Deno.env.get("ROUTER_V2_SIGNALS") ?? "").trim().toLowerCase() === "true";
+}
+
 /** Deployment-wide kill switch: AGENT_ENABLED_IDS comma list (§9.2). */
 export function deploymentEnabledAgents(): string[] {
   const raw = Deno.env.get("AGENT_ENABLED_IDS") ?? "";
@@ -113,17 +126,32 @@ const ADVISORY: RouteDecision = {
   confidence: 0,
   advisory_part: null,
   artifact_part: null,
+  needs_run: false,
+  cache_checkable: false,
 };
 
 function advisory(short_circuit: string | null): RoutedDecision {
   return { ...ADVISORY, short_circuit };
 }
 
-/** §6.3 classification prompt, verbatim template. */
+/** §6.6 classifier block (verbatim), inserted between the intent-label line
+ * and the "Reply with ONLY" line when ROUTER_V2_SIGNALS is on. */
+export const ROUTER_V2_PROMPT_BLOCK = `Also decide two booleans:
+- "needs_run": true only if a correct answer requires SIMULATION RESULTS
+  (KPIs, disruption impact, comparisons) — not for data lookups, policy
+  reads, or configuration changes.
+- "cache_checkable": true only if the user is asking for a RESULT that a
+  previously completed simulation run could already contain (e.g. "what
+  would a 6-week outage of S1 do?", "what did the last run show?").`;
+
+/** §6.3 classification prompt, verbatim template. v2 (§6.6, behind
+ * ROUTER_V2_SIGNALS) gains exactly one block; flag off ⇒ the v1 prompt
+ * byte-identically. */
 export function buildClassifierPrompt(message: string, enabledAgents: string[]): string {
   const ordered = AGENT_PRECEDENCE.filter((a) => enabledAgents.includes(a));
   const agentLines = ordered.map((a) => `- "${a}": ${AGENT_ROSTER[a].mission}`).join("\n");
   const intentLabels = ordered.flatMap((a) => AGENT_ROSTER[a].intents).join(", ");
+  const v2Block = routerV2Enabled() ? `${ROUTER_V2_PROMPT_BLOCK}\n\n` : "";
   return `You are an intent classifier for a supply-chain platform assistant.
 Classify the USER MESSAGE into exactly one route.
 
@@ -139,7 +167,7 @@ When more than one could own it, prefer the earliest in the list order given.
 
 Also pick the closest intent label from: ${intentLabels}
 
-Reply with ONLY a JSON object, no prose:
+${v2Block}Reply with ONLY a JSON object, no prose:
 {"route": "...", "agent_id": "... or null", "intent": "... or null",
  "confidence": 0.0-1.0,
  "advisory_part": "... or null", "artifact_part": "... or null"}
@@ -190,6 +218,11 @@ function validateDecision(c: unknown): RouteDecision | null {
     confidence,
     advisory_part: typeof o.advisory_part === "string" ? o.advisory_part : null,
     artifact_part: typeof o.artifact_part === "string" ? o.artifact_part : null,
+    // §6.6: malformed or missing ⇒ false (the v1 behavior). Tolerant by
+    // construction, so DeepSeek's best-effort json_object mode never breaks
+    // the parse when the booleans are absent.
+    needs_run: o.needs_run === true,
+    cache_checkable: o.cache_checkable === true,
   };
 }
 
@@ -218,10 +251,24 @@ export async function decideRoute(
   const decision = parseClassifierResponse(raw);
   if (!decision) return advisory("parse_failure");
   if (decision.route === "advisory") return { ...decision, agent_id: null, short_circuit: null };
+  // §6.6: the two v2 signals are route-independent facts about the ask, so
+  // the deterministic advisory fallbacks below carry them through — rule 1
+  // (cache_checkable ⇒ cache reads on the executing turn) applies on ANY
+  // route, including a demoted one.
   if (!decision.agent_id || !ctx.enabledAgents.includes(decision.agent_id)) {
-    return advisory("agent_not_enabled");
+    return {
+      ...advisory("agent_not_enabled"),
+      needs_run: decision.needs_run,
+      cache_checkable: decision.cache_checkable,
+    };
   }
-  if (decision.confidence < ROUTER_CONFIDENCE_MIN) return advisory("low_confidence");
+  if (decision.confidence < ROUTER_CONFIDENCE_MIN) {
+    return {
+      ...advisory("low_confidence"),
+      needs_run: decision.needs_run,
+      cache_checkable: decision.cache_checkable,
+    };
+  }
   return { ...decision, short_circuit: null };
 }
 
@@ -276,32 +323,48 @@ export interface ClassifierModel {
 // json_object best-effort). The deterministic parser stays the actual gate.
 const ROUTE_ENUM = ["advisory", "artifact", "mixed"];
 
-const GEMINI_ROUTE_SCHEMA = {
-  type: "object",
-  properties: {
-    route: { type: "string", enum: ROUTE_ENUM },
-    agent_id: { type: "string", nullable: true },
-    intent: { type: "string", nullable: true },
-    confidence: { type: "number" },
-    advisory_part: { type: "string", nullable: true },
-    artifact_part: { type: "string", nullable: true },
-  },
-  required: ["route", "confidence"],
-};
+/** §6.6: both provider schemas gain the two boolean properties when
+ * ROUTER_V2_SIGNALS is on; flag off ⇒ the v1 schema objects byte-identically
+ * (pinned by router_structured_test.ts). */
+export function geminiRouteSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: {
+      route: { type: "string", enum: ROUTE_ENUM },
+      agent_id: { type: "string", nullable: true },
+      intent: { type: "string", nullable: true },
+      confidence: { type: "number" },
+      advisory_part: { type: "string", nullable: true },
+      artifact_part: { type: "string", nullable: true },
+      ...(routerV2Enabled()
+        ? { needs_run: { type: "boolean" }, cache_checkable: { type: "boolean" } }
+        : {}),
+    },
+    required: ["route", "confidence"],
+  };
+}
 
-const OPENAI_ROUTE_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    route: { type: "string", enum: ROUTE_ENUM },
-    agent_id: { type: ["string", "null"] },
-    intent: { type: ["string", "null"] },
-    confidence: { type: "number" },
-    advisory_part: { type: ["string", "null"] },
-    artifact_part: { type: ["string", "null"] },
-  },
-  required: ["route", "agent_id", "intent", "confidence", "advisory_part", "artifact_part"],
-};
+export function openaiRouteSchema(): Record<string, unknown> {
+  const v2 = routerV2Enabled();
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      route: { type: "string", enum: ROUTE_ENUM },
+      agent_id: { type: ["string", "null"] },
+      intent: { type: ["string", "null"] },
+      confidence: { type: "number" },
+      advisory_part: { type: ["string", "null"] },
+      artifact_part: { type: ["string", "null"] },
+      ...(v2 ? { needs_run: { type: "boolean" }, cache_checkable: { type: "boolean" } } : {}),
+    },
+    required: [
+      "route", "agent_id", "intent", "confidence", "advisory_part", "artifact_part",
+      // OpenAI strict mode requires every property listed in `required`.
+      ...(v2 ? ["needs_run", "cache_checkable"] : []),
+    ],
+  };
+}
 
 /** One classification call: temperature 0, ≤ 300 output tokens, no tools
  * (§6.2 step 2). Returns null when the provider key is not configured —
@@ -323,7 +386,7 @@ export function makeClassifier(model: ClassifierModel): ClassifierCall | null {
             maxOutputTokens: 300,
             thinkingConfig: { thinkingBudget: 0 },
             responseMimeType: "application/json",
-            responseSchema: GEMINI_ROUTE_SCHEMA,
+            responseSchema: geminiRouteSchema(),
           },
         }),
       });
@@ -344,7 +407,7 @@ export function makeClassifier(model: ClassifierModel): ClassifierCall | null {
       model: model.apiModel,
       messages: [{ role: "user", content: prompt }],
       response_format: isOpenAI
-        ? { type: "json_schema", json_schema: { name: "route_decision", strict: true, schema: OPENAI_ROUTE_SCHEMA } }
+        ? { type: "json_schema", json_schema: { name: "route_decision", strict: true, schema: openaiRouteSchema() } }
         : { type: "json_object" }, // DeepSeek: best-effort JSON mode
     };
     if (isOpenAI && model.apiModel.startsWith("gpt-5")) {
