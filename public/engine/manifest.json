@@ -1,5 +1,5 @@
 {
-  "engine_version": "unknown",
+  "engine_version": "0.2.3",
   "pyodide_version": "0.26.4",
   "wheels": ["scsim-0.2.0-py3-none-any.whl", "sim_worker-0.1.0-py3-none-any.whl"],
   "pyodide_packages": ["numpy", "scipy", "pydantic", "micropip"],
