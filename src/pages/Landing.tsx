@@ -2,48 +2,28 @@
 // Authenticated users are redirected to `/app` (their app home).
 
 import { Link, Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import NetworkVisualization3D from '@/components/NetworkVisualization3D';
 import {
   ArrowRight,
-  Database,
-  FlaskConical,
-  LineChart,
   Network,
   Crosshair,
   Shuffle,
-  Sparkles,
   MapPin,
   Layers3,
   Share2,
-  CalendarDays,
 } from 'lucide-react';
 
-const VALUE_TILES = [
-  {
-    icon: Database,
-    title: 'Model your network',
-    body: 'Import suppliers, plants, and flows. One canonical graph across every scenario.',
-  },
-  {
-    icon: FlaskConical,
-    title: 'Simulate disruptions',
-    body: 'Stress-test policies with the resilience-grade engine. Replications, warm-up, KPIs.',
-  },
-  {
-    icon: LineChart,
-    title: 'Decide with evidence',
-    body: 'Compare strategies on cost, service, and resilience. Ship the plan with confidence.',
-  },
-];
+// Canonical micro-label style — the only uppercase label treatment on this page.
+const KICKER = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
 
-const CREDIBILITY = [
-  '3 network levels',
-  '5k+ simulations',
-  '5 resilience tactics',
-  'Scenario library',
+const SIGNAL_STRIP = [
+  { label: 'Network layers', value: 'Firm · Product · Process' },
+  { label: 'Training corpus', value: '5,000+ simulation runs' },
+  { label: 'Resilience tactics', value: '5 comparable strategies' },
+  { label: 'Scenario library', value: 'Known & unknown disruptions' },
 ];
 
 const CAPABILITIES = [
@@ -52,12 +32,6 @@ const CAPABILITIES = [
     tag: 'Interactive network graph',
     title: 'See disruption impact fast',
     body: 'Explore your network at three levels—firm, product, and process—to spot propagation paths and critical dependencies.',
-  },
-  {
-    icon: Crosshair,
-    tag: 'Hidden critical detection',
-    title: 'Surface nexus nodes automatically',
-    body: 'ML trained on 5,000 simulations highlights critical suppliers/materials and cascading risks before they occur.',
   },
   {
     icon: Shuffle,
@@ -69,45 +43,66 @@ const CAPABILITIES = [
 
 const ROADMAP = [
   {
-    icon: Sparkles,
+    phase: 'Now',
     title: 'Enhanced Training',
     body: 'Broaden simulation scenarios and industry datasets to improve model robustness.',
     status: 'In progress',
-    when: 'Q4 2025',
   },
   {
-    icon: MapPin,
+    phase: 'Next',
     title: 'GIS Mapping',
     body: 'Geospatial visualization of suppliers/customers for location-based risk analysis.',
     status: 'Planned',
-    when: 'Q1 2026',
   },
   {
-    icon: Layers3,
+    phase: 'Later',
     title: 'Deep-Tier Analysis',
     body: 'Extend to tier-2/3 suppliers to capture cascading dependencies across the network.',
     status: 'Planned',
-    when: 'Q2 2026',
   },
 ];
 
 type TechKey = 'network' | 'nexus' | 'simulation';
 
+const NEXUS_STATS = [
+  { label: 'Training runs', value: '5,000+' },
+  { label: 'Detection target', value: 'Nexus nodes' },
+  { label: 'Signal', value: 'Cascade risk' },
+  { label: 'Output', value: 'Ranked criticality' },
+];
+
+const SIMULATION_STATS = [
+  { label: 'Method', value: 'Monte Carlo' },
+  { label: 'Tactics compared', value: '5' },
+  { label: 'KPIs tracked', value: 'Cost · Service · Resilience' },
+  { label: 'Disruptions', value: 'Known & unknown' },
+];
+
+function StatViewport({ stats }: { stats: { label: string; value: string }[] }) {
+  // Always-dark viewport, matching the 3D visualization panel.
+  return (
+    <div className="relative min-h-[320px] lg:h-[500px] bg-black">
+      <div className="grid h-full place-content-center p-8">
+        <div className="grid grid-cols-1 gap-px border border-white/10 bg-white/10 sm:grid-cols-2">
+          {stats.map((s) => (
+            <div key={s.label} className="bg-black p-6 sm:min-w-[180px]">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
+                {s.label}
+              </span>
+              <span className="mt-1.5 block text-lg font-medium text-white tabular-nums">
+                {s.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Landing() {
   const { user, loading } = useAuth();
   const [activeTech, setActiveTech] = useState<TechKey>('network');
-
-  // Auto-rotate through architecture tabs once
-  useEffect(() => {
-    const t1 = setTimeout(() => setActiveTech('nexus'), 3000);
-    const t2 = setTimeout(() => setActiveTech('simulation'), 6000);
-    const t3 = setTimeout(() => setActiveTech('network'), 9000);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
-  }, []);
 
   if (loading) {
     return (
@@ -143,23 +138,18 @@ export default function Landing() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative mx-auto max-w-6xl px-6 pt-16 pb-24">
-          <div className="absolute inset-0 -z-10 bg-grid opacity-[0.35] [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
-
+        <section className="mx-auto max-w-6xl px-6 pt-20 pb-24">
           {/* Top meta line */}
           <div className="mb-12 flex items-center gap-4">
             <div className="h-px flex-1 bg-border" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              System: SuReSuite-v2.0 // Active
-            </span>
+            <span className={KICKER}>System: SuReSuite-v2.0 // Active</span>
+            <div className="h-px flex-1 bg-border" />
           </div>
 
           {/* Eyebrow */}
-          <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 shadow-xs">
+          <span className="inline-flex items-center rounded-sm border border-border bg-card px-3 py-1.5">
             <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Resilience-grade supply chain simulator
-            </span>
+            <span className={KICKER}>Resilience-grade supply chain simulator</span>
           </span>
 
           {/* Headline block */}
@@ -167,7 +157,7 @@ export default function Landing() {
             <div className="md:col-span-8">
               <h1 className="text-4xl font-semibold tracking-tight leading-[1.1] sm:text-5xl md:text-6xl">
                 Design supply chains that survive{' '}
-                <span className="font-serif italic text-muted-foreground">the next shock.</span>
+                <span className="font-serif italic">the next shock.</span>
               </h1>
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -176,9 +166,6 @@ export default function Landing() {
                     Get started
                     <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="rounded-sm">
-                  <Link to="/auth">Sign in</Link>
                 </Button>
               </div>
             </div>
@@ -193,47 +180,17 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Credibility data grid */}
-          <div className="mt-16 border-t border-border pt-8">
+          {/* Signal strip */}
+          <div className="mt-16 border-t border-border pt-6">
             <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-              {[
-                { label: 'Network architecture', value: '3 network levels' },
-                { label: 'Compute capacity', value: '5k+ simulations' },
-                { label: 'Stress modules', value: '5 resilience tactics' },
-                { label: 'Access level', value: 'Scenario library' },
-              ].map((item) => (
-                <div key={item.label} className="space-y-1">
-                  <span className="block font-mono text-[10px] uppercase tracking-tighter text-muted-foreground">
-                    {item.label}
+              {SIGNAL_STRIP.map((item) => (
+                <div key={item.label} className="space-y-1.5">
+                  <span className={`block ${KICKER}`}>{item.label}</span>
+                  <span className="block text-sm font-medium text-foreground tabular-nums">
+                    {item.value}
                   </span>
-                  <span className="text-sm font-medium text-foreground">{item.value}</span>
                 </div>
               ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Value tiles */}
-        <section className="border-t border-border/60">
-          <div className="mx-auto max-w-6xl px-6 py-24">
-            <div className="grid gap-4 md:grid-cols-3">
-              {VALUE_TILES.map((tile) => {
-                const Icon = tile.icon;
-                return (
-                  <div
-                    key={tile.title}
-                    className="rounded-lg border border-border bg-card p-6 shadow-xs transition-shadow hover:shadow-sharp-sm"
-                  >
-                    <div className="grid h-9 w-9 place-items-center rounded-md bg-secondary text-foreground">
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <h3 className="mt-4 text-base font-semibold">{tile.title}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
-                      {tile.body}
-                    </p>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </section>
@@ -241,33 +198,50 @@ export default function Landing() {
         {/* Core Capabilities */}
         <section className="border-t border-border/60">
           <div className="mx-auto max-w-6xl px-6 py-24">
-            <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight">Core Capabilities</h2>
-              <p className="mt-3 text-muted-foreground">
-                Discover hidden vulnerabilities and test resilience strategies with SuReSuite's comprehensive supply chain analysis platform.
+            <div className="max-w-2xl">
+              <span className={KICKER}>01 / 03 — Capabilities</span>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Core capabilities</h2>
+              <p className="mt-4 text-base text-muted-foreground">
+                Model your network, simulate disruptions, and decide with evidence — one workspace from data import to strategy comparison.
               </p>
             </div>
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
-              {CAPABILITIES.map((cap) => {
-                const Icon = cap.icon;
-                return (
-                  <div
-                    key={cap.title}
-                    className="rounded-lg border border-border bg-card p-6 shadow-xs transition-shadow hover:shadow-sharp-sm"
-                  >
-                    <div className="grid h-9 w-9 place-items-center rounded-md bg-secondary text-foreground">
-                      <Icon className="h-4 w-4" />
+
+            <div className="mt-12 grid gap-8 md:grid-cols-3">
+              {/* Featured capability */}
+              <div className="flex flex-col rounded-sm border border-border bg-card p-8 md:col-span-2">
+                <div className="flex items-center gap-2">
+                  <Crosshair className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className={KICKER}>Hidden critical detection</span>
+                </div>
+                <h3 className="mt-5 text-xl font-semibold tracking-tight">
+                  Surface nexus nodes automatically
+                </h3>
+                <p className="mt-2 mb-6 max-w-xl text-sm text-muted-foreground leading-relaxed">
+                  ML trained on 5,000 simulations highlights critical suppliers/materials and cascading risks before they occur.
+                </p>
+                <p className="mt-auto border-t border-border/60 pt-4 font-serif italic text-sm text-muted-foreground">
+                  The nodes that break your network are rarely the ones you watch.
+                </p>
+              </div>
+
+              {/* Compact capabilities */}
+              <div className="flex flex-col gap-8">
+                {CAPABILITIES.map((cap) => {
+                  const Icon = cap.icon;
+                  return (
+                    <div key={cap.title} className="flex-1 rounded-sm border border-border bg-card p-6">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className={KICKER}>{cap.tag}</span>
+                      </div>
+                      <h3 className="mt-4 text-base font-semibold">{cap.title}</h3>
+                      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                        {cap.body}
+                      </p>
                     </div>
-                    <div className="mt-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {cap.tag}
-                    </div>
-                    <h3 className="mt-1 text-base font-semibold">{cap.title}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
-                      {cap.body}
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>
@@ -354,16 +328,23 @@ export default function Landing() {
         {/* Technical Architecture */}
         <section className="border-t border-border/60">
           <div className="mx-auto max-w-6xl px-6 py-24">
-            <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight">SuReSuite Technical Architecture</h2>
-              <p className="mt-3 text-muted-foreground">
+            <div className="max-w-2xl">
+              <span className={KICKER}>02 / 03 — Architecture</span>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                SuReSuite Technical Architecture
+              </h2>
+              <p className="mt-4 text-base text-muted-foreground">
                 Explore the advanced analytics engine and simulation capabilities that power comprehensive supply chain resilience analysis.
               </p>
             </div>
 
             {/* Tab Navigation */}
-            <div className="mt-12 flex justify-center">
-              <div className="inline-flex rounded-lg border border-border bg-card p-1">
+            <div className="mt-12">
+              <div
+                role="tablist"
+                aria-label="Technical architecture views"
+                className="inline-flex rounded-sm border border-border bg-card p-1"
+              >
                 {([
                   ['network', 'Network'],
                   ['nexus', 'Nexus Detection'],
@@ -371,8 +352,10 @@ export default function Landing() {
                 ] as [TechKey, string][]).map(([key, label]) => (
                   <button
                     key={key}
+                    role="tab"
+                    aria-selected={activeTech === key}
                     onClick={() => setActiveTech(key)}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`px-4 py-2 rounded-sm text-sm font-medium transition-colors ${
                       activeTech === key
                         ? 'bg-secondary text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
@@ -385,96 +368,158 @@ export default function Landing() {
             </div>
 
             {/* Content Panel */}
-            <div className="mt-10 rounded-lg border border-border bg-card overflow-hidden">
-              {activeTech === 'network' && (
-                <div className="grid lg:grid-cols-3 gap-0">
-                  {/* Left: Info Panel */}
-                  <div className="lg:col-span-1 p-8 border-b lg:border-b-0 lg:border-r border-border">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="grid h-10 w-10 place-items-center rounded-md bg-secondary text-foreground">
-                        <Share2 className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-foreground">Network Graph</h3>
-                        <p className="text-sm text-muted-foreground">Multi-layer topology</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="p-4 rounded-md border border-border bg-background">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Layers3 className="h-4 w-4 text-foreground" />
-                          <span className="text-sm font-semibold text-foreground">3 Network Levels</span>
+            <div className="relative isolate mt-10">
+              <div
+                aria-hidden
+                className="absolute -inset-x-6 -inset-y-8 -z-10 bg-grid opacity-[0.35] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+              />
+              <div role="tabpanel" className="rounded-sm border border-border bg-card overflow-hidden">
+                {activeTech === 'network' && (
+                  <div className="grid lg:grid-cols-3 gap-0">
+                    {/* Left: Info Panel */}
+                    <div className="lg:col-span-1 p-8 border-b lg:border-b-0 lg:border-r border-border">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="grid h-10 w-10 place-items-center rounded-sm bg-secondary text-foreground">
+                          <Share2 className="h-5 w-5" />
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Process, Product, and Firm layers with interconnected dependencies.
-                        </p>
-                      </div>
-
-                      <div className="p-4 rounded-md border border-border bg-background">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <MapPin className="h-4 w-4 text-foreground" />
-                          <span className="text-sm font-semibold text-foreground">Centrality Analysis</span>
+                        <div>
+                          <h3 className="text-lg font-semibold text-foreground">Network Graph</h3>
+                          <p className="text-sm text-muted-foreground">Multi-layer topology</p>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Betweenness and closeness metrics identify critical nodes.
-                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="p-4 rounded-sm border border-border bg-background">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Layers3 className="h-4 w-4 text-foreground" />
+                            <span className="text-sm font-semibold text-foreground">3 Network Levels</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Process, Product, and Firm layers with interconnected dependencies.
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-sm border border-border bg-background">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <MapPin className="h-4 w-4 text-foreground" />
+                            <span className="text-sm font-semibold text-foreground">Centrality Analysis</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Betweenness and closeness metrics identify critical nodes.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: 3D Visualization — kept. Always-dark viewport: the canvas is
+                        transparent and its legend is white, so this surface must not follow
+                        the theme. */}
+                    <div className="lg:col-span-2 h-[500px] relative bg-black">
+                      <div className="absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+                      <div className="relative h-full">
+                        <NetworkVisualization3D />
                       </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Right: 3D Visualization — kept */}
-                  <div className="lg:col-span-2 h-[500px] relative bg-neutral-950">
-                    <div className="absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-                    <div className="relative h-full">
-                      <NetworkVisualization3D />
+                {activeTech === 'nexus' && (
+                  <div className="grid lg:grid-cols-3 gap-0">
+                    <div className="lg:col-span-1 p-8 border-b lg:border-b-0 lg:border-r border-border">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="grid h-10 w-10 place-items-center rounded-sm bg-secondary text-foreground">
+                          <Crosshair className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-foreground">Nexus Detection</h3>
+                          <p className="text-sm text-muted-foreground">ML-ranked criticality</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="p-4 rounded-sm border border-border bg-background">
+                          <span className="block text-sm font-semibold text-foreground mb-1.5">
+                            Trained on 5,000+ runs
+                          </span>
+                          <p className="text-sm text-muted-foreground">
+                            ML algorithms learn which suppliers and materials drive cascading failures across your network.
+                          </p>
+                        </div>
+                        <div className="p-4 rounded-sm border border-border bg-background">
+                          <span className="block text-sm font-semibold text-foreground mb-1.5">
+                            Early warning
+                          </span>
+                          <p className="text-sm text-muted-foreground">
+                            Hidden single points of failure are flagged before disruptions occur.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="lg:col-span-2">
+                      <StatViewport stats={NEXUS_STATS} />
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {activeTech === 'nexus' && (
-                <div className="p-12 text-center min-h-[500px] flex flex-col items-center justify-center">
-                  <div className="grid h-14 w-14 place-items-center rounded-md bg-secondary text-foreground mb-6">
-                    <Crosshair className="h-7 w-7" />
-                  </div>
-                  <h3 className="text-2xl font-semibold text-foreground mb-3">Nexus Node Detection</h3>
-                  <p className="text-muted-foreground max-w-lg mx-auto">
-                    ML algorithms trained on 5,000+ simulations identify critical suppliers and materials that could cause cascading failures across your network.
-                  </p>
-                </div>
-              )}
+                {activeTech === 'simulation' && (
+                  <div className="grid lg:grid-cols-3 gap-0">
+                    <div className="lg:col-span-1 p-8 border-b lg:border-b-0 lg:border-r border-border">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="grid h-10 w-10 place-items-center rounded-sm bg-secondary text-foreground">
+                          <Shuffle className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-foreground">Monte Carlo Simulation</h3>
+                          <p className="text-sm text-muted-foreground">Strategy comparison</p>
+                        </div>
+                      </div>
 
-              {activeTech === 'simulation' && (
-                <div className="p-12 text-center min-h-[500px] flex flex-col items-center justify-center">
-                  <div className="grid h-14 w-14 place-items-center rounded-md bg-secondary text-foreground mb-6">
-                    <Shuffle className="h-7 w-7" />
+                      <div className="space-y-3">
+                        <div className="p-4 rounded-sm border border-border bg-background">
+                          <span className="block text-sm font-semibold text-foreground mb-1.5">
+                            Replications & warm-up
+                          </span>
+                          <p className="text-sm text-muted-foreground">
+                            Statistically rigorous experiments with replications and warm-up periods.
+                          </p>
+                        </div>
+                        <div className="p-4 rounded-sm border border-border bg-background">
+                          <span className="block text-sm font-semibold text-foreground mb-1.5">
+                            Side-by-side tactics
+                          </span>
+                          <p className="text-sm text-muted-foreground">
+                            Dual sourcing, buffers, and capacity shifts compared under one experiment design.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="lg:col-span-2">
+                      <StatViewport stats={SIMULATION_STATS} />
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-semibold text-foreground mb-3">Monte Carlo Simulation</h3>
-                  <p className="text-muted-foreground max-w-lg mx-auto">
-                    Test multiple resilience strategies side-by-side using advanced simulation scenarios to compare performance under various disruption conditions.
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Ready to boost */}
+        {/* CTA band */}
         <section className="border-t border-border/60">
           <div className="mx-auto max-w-6xl px-6 py-24">
-            <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-8 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h3 className="text-xl font-semibold tracking-tight">
-                  Ready to boost the resilience of your supply chain?
+                <span className={KICKER}>Next step</span>
+                <h3 className="mt-3 text-2xl font-semibold tracking-tight">
+                  Put your supply chain under pressure — on purpose.
                 </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Upload data, analyze vulnerabilities, and simulate strategies in one workspace.
                 </p>
               </div>
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="group shrink-0 rounded-sm">
                 <Link to="/auth">
-                  Start now <ArrowRight className="ml-1 h-4 w-4" />
+                  Start now
+                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
             </div>
@@ -485,50 +530,37 @@ export default function Landing() {
         <section className="border-t border-border/60">
           <div className="mx-auto max-w-6xl px-6 py-24">
             <div className="max-w-2xl">
-              <h2 className="text-3xl font-semibold tracking-tight">Roadmap</h2>
-              <p className="mt-3 text-muted-foreground">What we're building next.</p>
+              <span className={KICKER}>03 / 03 — Roadmap</span>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Roadmap</h2>
+              <p className="mt-4 text-base text-muted-foreground">What we're building next.</p>
             </div>
 
-            <div className="relative mt-12 max-w-5xl">
-              <div className="absolute left-5 top-0 bottom-0 w-px bg-border" />
-              <ol className="space-y-3">
-                {ROADMAP.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <li key={item.title} className="relative pl-16">
-                      <div className="absolute left-0 top-0 h-10 w-10 rounded-full border border-border bg-background grid place-items-center">
-                        <Icon className="h-4 w-4 text-foreground" />
-                      </div>
-                      <div className="rounded-lg border border-border bg-card p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="text-sm">
-                            <span className="font-semibold text-foreground">{item.title}.</span>{' '}
-                            <span className="text-muted-foreground">{item.body}</span>
-                          </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                              {item.status}
-                            </span>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                              <CalendarDays className="h-3 w-3" /> {item.when}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
+            <div className="mt-12 border-t border-border/60">
+              {ROADMAP.map((item) => (
+                <div
+                  key={item.title}
+                  className="grid gap-2 border-b border-border/60 py-6 md:grid-cols-12 md:gap-6"
+                >
+                  <span className={`${KICKER} pt-1 md:col-span-2`}>{item.phase}</span>
+                  <div className="md:col-span-8">
+                    <h3 className="text-base font-semibold">{item.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{item.body}</p>
+                  </div>
+                  <span className="pt-1 text-xs text-muted-foreground md:col-span-2 md:justify-self-end">
+                    {item.status}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Funding & attribution — KEPT VERBATIM */}
+        {/* Funding & attribution — content KEPT VERBATIM; layout on the shared 12-col rail */}
         <section className="border-t border-border/60 bg-black text-white">
           <div className="mx-auto max-w-6xl px-6 py-16">
-            <div className="grid grid-cols-1 md:[grid-template-columns:30%_17%_53%] items-start gap-0">
+            <div className="grid grid-cols-1 gap-y-10 md:grid-cols-12 md:gap-x-6 items-start">
               {/* Left: Developer / Digital SC Lab */}
-              <div className="md:justify-self-start w-full">
+              <div className="md:col-span-4">
                 <img src="/logo3.png" alt="Digital SC Lab" className="h-12 w-auto mb-4" />
                 <p className="text-sm text-white/80">
                   Developer: <span className="text-white">Phu Nguyen</span><br />
@@ -536,10 +568,8 @@ export default function Landing() {
                   Digital SC Lab @ HWR Berlin
                 </p>
               </div>
-              {/* Middle spacer */}
-              <div aria-hidden className="hidden md:block" />
               {/* Right: ACCURATE / EU */}
-              <div className="md:justify-self-start">
+              <div className="md:col-span-7 md:col-start-6">
                 <img src="/logo2.png" alt="EU / ACCURATE logo" className="h-12 w-auto mb-4" />
                 <p className="text-sm text-white/80">
                   The ACCURATE project is funded by the European Union, under Grant Agreement number 101138269. Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Health and Digital Executive Agency. Neither the European Union nor the granting authority can be held responsible for them.
