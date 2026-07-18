@@ -2139,6 +2139,8 @@ These are **read-only, project-scoped** tools registered exactly like the shippe
 
 Least-privilege stays intact: these are **persona read tools**, appended to `toolDeclarations`; they are *not* `draft_*` tools and cannot mutate. Layer B agents keep their curated subsets (§3.2 bridge 2).
 
+*As built (H1):* the four relation/detail handlers + declarations live in `tools.ts`; the **append itself** lives in the sibling module `personaTools.ts::personaToolDeclarations()` (consumed by `index.ts` persona turns, gated on `COVERAGE_TOOLS_ENABLED`; flag off returns the unchanged `toolDeclarations` array). The exposed §5 reads are imported from their owning modules — `tools.ts` cannot import them without an ESM init cycle (they import `registerToolHandler` *from* `tools.ts`). Same contract, different home — the `vvTools.ts` module-layout precedent (§10 Q21a/Q22).
+
 ### 19.4 Faithfulness and refusal grammar (verbatim additions to `buildSystemPrompt` DATA RULES)
 
 Insert these lines into the `DATA RULES` block (`providers.ts::buildSystemPrompt`, after the existing "Resolve ambiguous entity references…" line). They are contracts, not tone:
@@ -2469,6 +2471,8 @@ The §4.3 JSONB shape is unchanged (kinds `tool_call · table_rows · registry �
 **On failure:** ONE corrective retry — the same turn re-invoked with a system-side addendum naming the violations verbatim (`"Your reply stated these ungrounded items: … Remove or ground each, or refuse honestly."`); the retry spends one `MAX_LLM_CALLS_PER_REQUEST` unit. If the retry still fails: the reply is **replaced** by the deterministic fallback — the §22.5 honest-refusal template instantiated with the turn's actual grounded facts (the typed parts still render; data the tools returned is never withheld) — and the event `verifier.blocked_reply` (payload: violation counts by class, model_code; no text, §7.5) records the save. The user never sees the fabrication; the nightly §7.7 metric counts how often the gate fired per model. False-positive posture: layer 1's extraction is deliberately narrow (id-shaped + high-precision numerics); a hedged prose sentence with no ids and no precise numbers always passes — the verifier polices *facts*, not style.
 
 **UI.** A verified reply renders a subtle "grounded — N sources" chip (click = the evidence list); a fallback reply renders the refusal with its typed code per §17.2's errors-and-refusals class. No unverified state is rendered as verified.
+
+*As built (H1):* verification runs on every persona and agent reply **when a project is attached** — a no-project chat has no tools, no grounded vocabulary and no project claims, and its prompt already forbids numeric facts (§2.1 project block), so running layer 1 there would only manufacture false positives on conceptual prose. Model prose is verified *before* the deterministic server notes (mode notice, memory confirmation, drafting-failure line) are appended. The `verifier.blocked_reply` event kind joins the §7.1 CHECK via migration `20260724000001_verifier_event.sql` (the per-phase CHECK-extension pattern of `20260721000001`/`20260723000001`; no new store).
 
 ### 22.4 The hardened persona prompt — `buildSystemPrompt` v2 (verbatim; supersedes §2.1's text when `VERIFIER_ENABLED`)
 

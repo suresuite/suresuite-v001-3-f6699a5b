@@ -1,0 +1,104 @@
+{
+  "id": "cov-07-readiness",
+  "description": "§7.7-1 cov-07 — I9 on a mid-data-entry project: get_data_completeness names the missing fields (the same grader the pre-run gate uses).",
+  "project_snapshot": {
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-4",
+        "name": "Widget resin",
+        "cost": null,
+        "moq": 100,
+        "holding_cost_pct": 0.2
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-5",
+        "name": "Widget shell",
+        "cost": 2,
+        "moq": null,
+        "holding_cost_pct": 0.2
+      }
+    ],
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "P1",
+        "name": "Widget",
+        "sell_price": 25,
+        "demand_mean": 300
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "name": "Acme",
+        "reliability_score": 0.95
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "material_id": "MAT-4",
+        "volume": 100,
+        "time_unit": "week",
+        "lead_time": 3,
+        "unit_price": 4.2
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S1",
+        "material_id": "MAT-5",
+        "volume": 60,
+        "time_unit": "week",
+        "lead_time": 2,
+        "unit_price": 2
+      }
+    ],
+    "outbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "customer_id": "C1",
+        "product_id": "P1",
+        "volume": 40,
+        "time_unit": "week",
+        "expected_lead_time": 1,
+        "unit_price": 25
+      }
+    ],
+    "bom_multi_level": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-4",
+        "level": 1,
+        "higher_level_component_id": "P1",
+        "consumption_rate": 1
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-5",
+        "level": 1,
+        "higher_level_component_id": "P1",
+        "consumption_rate": 1
+      }
+    ],
+    "policy_defaults": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "fulfillment_strategy": "make_to_stock"
+      }
+    ]
+  },
+  "utterance": "what data am I missing before I can run?",
+  "mocked_llm": {
+    "args": {}
+  },
+  "expect": {
+    "tool": "get_data_completeness",
+    "names_field": "cost",
+    "names_entity": "MAT-4"
+  },
+  "retired_reason": null
+}

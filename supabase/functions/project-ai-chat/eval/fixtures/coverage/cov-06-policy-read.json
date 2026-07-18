@@ -1,0 +1,53 @@
+{
+  "id": "cov-06-policy-read",
+  "description": "§7.7-1 cov-06 — I8 via get_policy_config: the effective configuration names family defaults AND per-entity overrides distinctly (default-vs-override sections).",
+  "project_snapshot": {
+    "policy_defaults": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "fulfillment_strategy": "make_to_stock",
+        "inventory": {
+          "policy": "basestock",
+          "basestock_level": 120
+        },
+        "sourcing": {
+          "supplier_selection": "cheapest"
+        }
+      }
+    ],
+    "policy_overrides": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "scope": "node",
+        "target_key": "S1::MAT-4",
+        "family": "inventory",
+        "patch": {
+          "basestock_level": 200
+        }
+      }
+    ],
+    "policy_versions": [
+      {
+        "id": "44444444-4444-4444-8444-444444444444",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "label": "baseline",
+        "policy_hash": "ph-1",
+        "created_at": 1
+      }
+    ]
+  },
+  "utterance": "what safety stock policy is set for S1?",
+  "mocked_llm": {
+    "args": {}
+  },
+  "expect": {
+    "tool": "get_policy_config",
+    "sections_present": [
+      "defaults",
+      "override"
+    ],
+    "override_key": "node:S1::MAT-4 (inventory)",
+    "defaults_row_contains": "basestock"
+  },
+  "retired_reason": null
+}

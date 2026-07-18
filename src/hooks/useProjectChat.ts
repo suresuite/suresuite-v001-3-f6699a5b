@@ -11,8 +11,9 @@ export interface ChatPart {
   // "proposal" carries {proposal_id} and renders as a ProposalCard
   // (ai-agents.md §4.5/§4.6); "memory_offer"/"memory_saved" are the M2
   // consent-chip parts (§14.4); "mode_notice" is the §15 Ask-mode refusal
-  // chip ("Switch to Review"); older clients ignore unknown kinds.
-  kind: "table" | "kpi" | "bullets" | "text" | "proposal" | "memory_offer" | "memory_saved" | "mode_notice";
+  // chip ("Switch to Review"); "evidence" is the H1 §22.2 citation list
+  // ("grounded — N sources"); older clients ignore unknown kinds.
+  kind: "table" | "kpi" | "bullets" | "text" | "proposal" | "memory_offer" | "memory_saved" | "mode_notice" | "evidence";
   data: unknown;
 }
 

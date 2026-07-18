@@ -1,0 +1,672 @@
+{
+  "id": "cov-01-supplier-materials",
+  "description": "ai-agents.md §7.7-1 cov-01 — THE pinned supplier-10 regression (§19.0): expected = the grounded list via get_supplier_materials (truncation note carries the TRUE total) or the §19.4 bounded refusal; forbidden = any entity id absent from that turn's tool results (the five incident ids belong to supplier 41679).",
+  "project_snapshot": {
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "name": "TTI INC (EUR) (FR)",
+        "reliability_score": 1
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "41679",
+        "name": "MICROTEC (FR)",
+        "reliability_score": 1
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "965",
+        "name": "AVNET EMG (EUR) (FR)",
+        "reliability_score": 1
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "001410084A",
+        "name": "001410084A — Résistifs"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "001410184A",
+        "name": "001410184A — Résistifs"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "001410284A",
+        "name": "001410284A — Résistifs"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410084A",
+        "volume": 100,
+        "time_unit": "week",
+        "lead_time": 4,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410184A",
+        "volume": 101,
+        "time_unit": "week",
+        "lead_time": 5,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410284A",
+        "volume": 102,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410384A",
+        "volume": 103,
+        "time_unit": "week",
+        "lead_time": 7,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410484A",
+        "volume": 104,
+        "time_unit": "week",
+        "lead_time": 8,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410584A",
+        "volume": 105,
+        "time_unit": "week",
+        "lead_time": 9,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410684A",
+        "volume": 106,
+        "time_unit": "week",
+        "lead_time": 10,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410784A",
+        "volume": 107,
+        "time_unit": "week",
+        "lead_time": 11,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410884A",
+        "volume": 108,
+        "time_unit": "week",
+        "lead_time": 12,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001410984A",
+        "volume": 109,
+        "time_unit": "week",
+        "lead_time": 13,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411084A",
+        "volume": 110,
+        "time_unit": "week",
+        "lead_time": 14,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411184A",
+        "volume": 111,
+        "time_unit": "week",
+        "lead_time": 15,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411284A",
+        "volume": 112,
+        "time_unit": "week",
+        "lead_time": 4,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411384A",
+        "volume": 113,
+        "time_unit": "week",
+        "lead_time": 5,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411484A",
+        "volume": 114,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411584A",
+        "volume": 115,
+        "time_unit": "week",
+        "lead_time": 7,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411684A",
+        "volume": 116,
+        "time_unit": "week",
+        "lead_time": 8,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411784A",
+        "volume": 117,
+        "time_unit": "week",
+        "lead_time": 9,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411884A",
+        "volume": 118,
+        "time_unit": "week",
+        "lead_time": 10,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001411984A",
+        "volume": 119,
+        "time_unit": "week",
+        "lead_time": 11,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412084A",
+        "volume": 120,
+        "time_unit": "week",
+        "lead_time": 12,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412184A",
+        "volume": 121,
+        "time_unit": "week",
+        "lead_time": 13,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412284A",
+        "volume": 122,
+        "time_unit": "week",
+        "lead_time": 14,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412384A",
+        "volume": 123,
+        "time_unit": "week",
+        "lead_time": 15,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412484A",
+        "volume": 124,
+        "time_unit": "week",
+        "lead_time": 4,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412584A",
+        "volume": 125,
+        "time_unit": "week",
+        "lead_time": 5,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412684A",
+        "volume": 126,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412784A",
+        "volume": 127,
+        "time_unit": "week",
+        "lead_time": 7,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412884A",
+        "volume": 128,
+        "time_unit": "week",
+        "lead_time": 8,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001412984A",
+        "volume": 129,
+        "time_unit": "week",
+        "lead_time": 9,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413084A",
+        "volume": 130,
+        "time_unit": "week",
+        "lead_time": 10,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413184A",
+        "volume": 131,
+        "time_unit": "week",
+        "lead_time": 11,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413284A",
+        "volume": 132,
+        "time_unit": "week",
+        "lead_time": 12,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413384A",
+        "volume": 133,
+        "time_unit": "week",
+        "lead_time": 13,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413484A",
+        "volume": 134,
+        "time_unit": "week",
+        "lead_time": 14,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413584A",
+        "volume": 135,
+        "time_unit": "week",
+        "lead_time": 15,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413684A",
+        "volume": 136,
+        "time_unit": "week",
+        "lead_time": 4,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413784A",
+        "volume": 137,
+        "time_unit": "week",
+        "lead_time": 5,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413884A",
+        "volume": 138,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001413984A",
+        "volume": 139,
+        "time_unit": "week",
+        "lead_time": 7,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414084A",
+        "volume": 140,
+        "time_unit": "week",
+        "lead_time": 8,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414184A",
+        "volume": 141,
+        "time_unit": "week",
+        "lead_time": 9,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414284A",
+        "volume": 142,
+        "time_unit": "week",
+        "lead_time": 10,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414384A",
+        "volume": 143,
+        "time_unit": "week",
+        "lead_time": 11,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414484A",
+        "volume": 144,
+        "time_unit": "week",
+        "lead_time": 12,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414584A",
+        "volume": 145,
+        "time_unit": "week",
+        "lead_time": 13,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414684A",
+        "volume": 146,
+        "time_unit": "week",
+        "lead_time": 14,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414784A",
+        "volume": 147,
+        "time_unit": "week",
+        "lead_time": 15,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414884A",
+        "volume": 148,
+        "time_unit": "week",
+        "lead_time": 4,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001414984A",
+        "volume": 149,
+        "time_unit": "week",
+        "lead_time": 5,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415084A",
+        "volume": 150,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415184A",
+        "volume": 151,
+        "time_unit": "week",
+        "lead_time": 7,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415284A",
+        "volume": 152,
+        "time_unit": "week",
+        "lead_time": 8,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415384A",
+        "volume": 153,
+        "time_unit": "week",
+        "lead_time": 9,
+        "unit_price": 0.009000000000000001
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415484A",
+        "volume": 154,
+        "time_unit": "week",
+        "lead_time": 10,
+        "unit_price": 0.01
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415584A",
+        "volume": 155,
+        "time_unit": "week",
+        "lead_time": 11,
+        "unit_price": 0.011
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415684A",
+        "volume": 156,
+        "time_unit": "week",
+        "lead_time": 12,
+        "unit_price": 0.005
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415784A",
+        "volume": 157,
+        "time_unit": "week",
+        "lead_time": 13,
+        "unit_price": 0.006
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415884A",
+        "volume": 158,
+        "time_unit": "week",
+        "lead_time": 14,
+        "unit_price": 0.007
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "10",
+        "material_id": "001415984A",
+        "volume": 159,
+        "time_unit": "week",
+        "lead_time": 15,
+        "unit_price": 0.008
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "41679",
+        "material_id": "007507784A",
+        "volume": 40,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.02
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "41679",
+        "material_id": "007507785A",
+        "volume": 41,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.02
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "41679",
+        "material_id": "007507786A",
+        "volume": 42,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.02
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "41679",
+        "material_id": "007507787A",
+        "volume": 43,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.02
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "41679",
+        "material_id": "007507788A",
+        "volume": 44,
+        "time_unit": "week",
+        "lead_time": 6,
+        "unit_price": 0.02
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "965",
+        "material_id": "001999901A",
+        "volume": 30,
+        "time_unit": "week",
+        "lead_time": 10,
+        "unit_price": 0.4
+      }
+    ]
+  },
+  "utterance": "what does supplier 10 supply?",
+  "mocked_llm": {
+    "args": {
+      "supplier": "10",
+      "top_n": 50
+    }
+  },
+  "expect": {
+    "tool": "get_supplier_materials",
+    "row_count": 50,
+    "note": "supplier 10 supplies 60 materials; showing top 50.",
+    "total_truth": 60,
+    "forbidden_ids": [
+      "007507784A",
+      "007507785A",
+      "007507786A",
+      "007507787A",
+      "007507788A"
+    ],
+    "planted_reply": "Supplier 10 supplies these materials: 007507784A, 007507785A, 007507786A, 007507787A, 007507788A.",
+    "bounded_refusal_reply": "I can't list supplier 10's materials individually yet, but I can tell you it supplies 60 — all of them sole-sourced. Want the risk breakdown?",
+    "reply_assertions": [
+      "(?:supplier\\s*10|60 materials|top 50)"
+    ],
+    "forbidden_reply_patterns": [
+      "007507784A",
+      "007507785A",
+      "007507786A",
+      "007507787A",
+      "007507788A"
+    ]
+  },
+  "retired_reason": null
+}

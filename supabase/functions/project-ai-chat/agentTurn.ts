@@ -17,7 +17,7 @@
 // configuratorTools.ts, B3 via vvTools.ts, B4 via experimentTools.ts,
 // B6 via reportTools.ts, get_project_memory via memory.ts.
 
-import { runChat, type ChatRunResult } from "./providers.ts";
+import { runChat, type ChatRunResult, type RunChatOptions } from "./providers.ts";
 import type { ToolContext, ToolDeclaration } from "./tools.ts";
 import {
   buildStewardContext,
@@ -107,6 +107,12 @@ export async function runAgentTurn(args: {
   modelId: string | undefined | null;
   utterance: string;
   ctx: ToolContext; // must carry ctx.draft (attribution + agent_proposals)
+  /** H1 (§22.3): envelope collector for the pre-send verifier's grounded
+   * vocabulary. Absent ⇒ zero behavior change. */
+  onToolResult?: RunChatOptions["onToolResult"];
+  /** H1 (§22.3): hands the built CONTEXT/system text to the verifier (the
+   * CONTEXT block's serialized artifacts ground the agent's claims). */
+  onContext?: (contextText: string) => void;
 }): Promise<AgentTurnResult> {
   const spec = AGENT_TURNS[args.agentId];
   if (!spec) {
@@ -117,9 +123,11 @@ export async function runAgentTurn(args: {
       utterance: args.utterance,
       userEmail: args.ctx.draft?.userEmail ?? null,
     });
+    args.onContext?.(system);
     const result = await runChat(args.modelId, args.utterance.slice(0, 4000), [], args.ctx, null, {
       system,
       tools: spec.tools(),
+      ...(args.onToolResult ? { onToolResult: args.onToolResult } : {}),
     });
     const proposalPart = (result.parts ?? []).find((p) => p.kind === "proposal") as
       | { kind: "proposal"; data: ProposalPartData }

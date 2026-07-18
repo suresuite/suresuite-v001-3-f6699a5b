@@ -1,0 +1,113 @@
+{
+  "id": "cov-03-bom-both-directions",
+  "description": "§7.7-1 cov-03 — I5/I6: get_bom_relations traverses bom_multi_level up (material→products) and down (product→materials) mirroring useStageRows' higher_level_component_id logic, and reads outbound relations both ways.",
+  "project_snapshot": {
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "XP1",
+        "name": "Widget"
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "M1",
+        "name": "Frame"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "M2",
+        "name": "Assembly"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "M3",
+        "name": "Screw"
+      }
+    ],
+    "bom_multi_level": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "M1",
+        "level": 1,
+        "higher_level_component_id": "XP1",
+        "consumption_rate": 2
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "M2",
+        "level": 1,
+        "higher_level_component_id": "XP1",
+        "consumption_rate": 1
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "M3",
+        "level": 2,
+        "higher_level_component_id": "M2",
+        "consumption_rate": 8
+      }
+    ],
+    "outbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "customer_id": "C1",
+        "product_id": "XP1",
+        "volume": 50,
+        "time_unit": "week",
+        "expected_lead_time": 2,
+        "unit_price": 25
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "customer_id": "C2",
+        "product_id": "XP1",
+        "volume": 20,
+        "time_unit": "week",
+        "expected_lead_time": 3,
+        "unit_price": 26
+      }
+    ]
+  },
+  "utterance": "what products use material M3, and what's in XP1's BOM?",
+  "expect": {
+    "material_to_products": {
+      "target": "M3",
+      "ancestors": {
+        "M2": 1,
+        "XP1": 2
+      },
+      "outbound_flagged": [
+        "XP1"
+      ]
+    },
+    "product_to_materials": {
+      "target": "XP1",
+      "edge_count": 3,
+      "direct": [
+        "M1",
+        "M2"
+      ],
+      "deep": {
+        "material": "M3",
+        "depth": 2
+      }
+    },
+    "product_customers": {
+      "target": "XP1",
+      "customers": [
+        "C1",
+        "C2"
+      ],
+      "first": "C1"
+    },
+    "customer_products": {
+      "target": "C1",
+      "products": [
+        "XP1"
+      ]
+    }
+  },
+  "retired_reason": null
+}

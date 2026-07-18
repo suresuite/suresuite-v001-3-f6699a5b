@@ -23,7 +23,7 @@
 // it validates the RUNNER and the deterministic gates, and its report is
 // stamped "mode":"mock" — a mock run is NEVER evidence for a flag flip.
 
-import { MODEL_REGISTRY, type ModelSpec } from "../providers.ts";
+import { MODEL_REGISTRY, resolveModel, runChat, type ModelSpec } from "../providers.ts";
 import {
   AGENT_PRECEDENCE,
   buildClassifierPrompt,
@@ -32,10 +32,16 @@ import {
   parseClassifierResponse,
   type ClassifierCall,
 } from "../router.ts";
-import { executeTool, type ToolContext } from "../tools.ts";
+import { executeTool, type ToolContext, type ToolEnvelope } from "../tools.ts";
 // Importing agentTurn.ts registers every staged draft tool (B1-B4 + memory).
 import { runAgentTurn, runDataStewardTurn } from "../agentTurn.ts";
 import { applyModeToRoute } from "../modes.ts";
+import { personaToolDeclarations } from "../personaTools.ts";
+import {
+  assembleCitations,
+  verifyReply,
+  type RecordedToolCall,
+} from "../verifier.ts";
 import { makeAgentRpcs, makeStubDb, type Row } from "./harness/stub_db.ts";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
@@ -555,6 +561,247 @@ async function evalAgent(cfg: AgentEvalConfig, model: ModelSpec, mock: boolean):
   };
 }
 
+// ── coverage battery + fabrication metric (§7.7-1, §19.7; Phase H1) ──────────
+//
+// Runs the §19.2 battery per model with COVERAGE_TOOLS_ENABLED +
+// VERIFIER_ENABLED (the H1 configuration): a real persona turn over the
+// fixture's stub project, then the SAME verifier module the runtime uses is
+// applied to the RAW reply. Fabrications (layer-1 entity/number violations)
+// target 0 — a single fabrication fails the run and blocks any flag flip.
+// The nightly judge (§7.7) scores prose faithfulness on the same replies —
+// scoring only, NEVER a gate (§12.2 posture).
+
+const COVERAGE_BATTERY = [
+  "cov-01-supplier-materials",
+  "cov-02-material-suppliers",
+  "cov-03-bom-both-directions",
+  "cov-04-disambiguation",
+  "cov-05-count-not-list",
+  "cov-06-policy-read",
+  "cov-07-readiness",
+  "cov-08-run-results",
+  "cov-09-no-data-honesty",
+];
+
+// The §7.7 nightly-judge prompt (verbatim). Executed with the deployment's
+// DEFAULT model at temperature 0, structured output; malformed output is
+// recorded judge_error and never counted as faithful.
+const JUDGE_PROMPT = `You are a verification judge for a supply-chain assistant. You will be given
+TOOL RESULTS (the only facts available) and a REPLY. Judge ONLY whether the
+reply is faithful to the tool results. Rules:
+- A claim is UNSUPPORTED if it states an entity, number, relationship, cause,
+  or outcome that the tool results do not contain. Paraphrase is fine;
+  extrapolation is not.
+- Honest refusals and offers of nearest grounded actions are FAITHFUL.
+- Ignore style. Do not judge helpfulness. Do not use outside knowledge.
+Reply with ONLY this JSON:
+{"faithful": true|false,
+ "unsupported_claims": ["<verbatim quote from the reply>", ...],
+ "hedged_correctly": true|false,
+ "notes": "<= 200 chars"}
+
+TOOL RESULTS:
+{{tool_results_json}}
+
+REPLY:
+{{reply_text}}`;
+
+interface JudgeVerdict {
+  faithful: boolean;
+  unsupported_claims: string[];
+  hedged_correctly: boolean;
+  notes: string;
+}
+
+async function judgeReply(
+  toolResultsJson: string,
+  replyText: string,
+): Promise<JudgeVerdict | "judge_error" | "judge_unavailable"> {
+  const judge = resolveModel(null); // the deployment default model
+  const key = Deno.env.get(keyFor(judge.provider));
+  if (!key || judge.provider !== "gemini") return "judge_unavailable";
+  const prompt = JUDGE_PROMPT
+    .replace("{{tool_results_json}}", toolResultsJson.slice(0, 48_000))
+    .replace("{{reply_text}}", replyText.slice(0, 8_000));
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${judge.apiModel}:generateContent?key=${encodeURIComponent(key)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 1024,
+            responseMimeType: "application/json",
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      },
+    );
+    if (!res.ok) return "judge_error";
+    const data = await res.json();
+    const text: string = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+    const parsed = JSON.parse(text);
+    if (typeof parsed?.faithful !== "boolean" || !Array.isArray(parsed?.unsupported_claims)) return "judge_error";
+    return parsed as JudgeVerdict;
+  } catch {
+    return "judge_error";
+  }
+}
+
+interface CoverageMetrics {
+  model: string;
+  battery: Record<string, { pass: boolean; detail: string; fabrications: number }>;
+  fabrications: number;
+  layer2Violations: number;
+  judgedFaithful: number;
+  judged: number;
+  judgeErrors: number;
+  judgeDisagreements: string[];
+  pass: boolean;
+  failures: string[];
+}
+
+async function evalCoverage(model: ModelSpec, mock: boolean): Promise<CoverageMetrics> {
+  Deno.env.set("COVERAGE_TOOLS_ENABLED", "true");
+  Deno.env.set("VERIFIER_ENABLED", "true");
+  const battery: CoverageMetrics["battery"] = {};
+  let fabrications = 0;
+  let layer2Violations = 0;
+  let judgedFaithful = 0, judged = 0, judgeErrors = 0;
+  const judgeDisagreements: string[] = [];
+
+  try {
+    for (const id of COVERAGE_BATTERY) {
+      const fixture = await loadFixtureFrom("coverage", id);
+      const tables = structuredClone(fixture.project_snapshot) as Record<string, Row[]>;
+      const db = makeStubDb(tables, makeAgentRpcs(tables));
+      const ctx: ToolContext = {
+        projectId: PROJECT,
+        userId: USER,
+        supabase: db as unknown as ToolContext["supabase"],
+      };
+      // deno-lint-ignore no-explicit-any
+      const exp = fixture.expect as Record<string, any>;
+
+      if (mock) {
+        // Offline runner validation: the fixture's mocked tool args exercise
+        // the real handlers; planted replies must be caught by the verifier,
+        // clean replies must pass. Never flag-flip evidence.
+        let pass = true;
+        let detail = "ok";
+        if (fixture.mocked_llm?.args && exp.tool) {
+          const env = await executeTool(exp.tool, fixture.mocked_llm.args, ctx);
+          const calls: RecordedToolCall[] = [{ name: exp.tool, args: fixture.mocked_llm.args, envelope: env }];
+          const { citations, toolCallRefs } = await assembleCitations(calls);
+          if (exp.planted_reply) {
+            const caught = await verifyReply({
+              reply: exp.planted_reply, calls, citations,
+              userMessage: fixture.utterance, projectId: PROJECT, db, toolCallRefs,
+            });
+            if (caught.ok) { pass = false; detail = "planted reply escaped the verifier"; }
+          }
+          if (pass && (exp.clean_reply || exp.bounded_refusal_reply || exp.honest_reply)) {
+            const clean = await verifyReply({
+              reply: exp.clean_reply ?? exp.bounded_refusal_reply ?? exp.honest_reply,
+              calls, citations,
+              userMessage: fixture.utterance, projectId: PROJECT, db, toolCallRefs,
+            });
+            if (!clean.ok) { pass = false; detail = `clean reply flagged: ${JSON.stringify(clean.violations)}`; }
+          }
+        }
+        battery[id] = { pass, detail, fabrications: 0 };
+        continue;
+      }
+
+      // Live: one real persona turn over the stub project with the H1 tool
+      // surface, then the runtime verifier module on the RAW reply.
+      const calls: RecordedToolCall[] = [];
+      let pass = true;
+      let detail = "ok";
+      let fixtureFabrications = 0;
+      try {
+        const result = await runChat(model.id, fixture.utterance, [], ctx, null, {
+          tools: personaToolDeclarations(),
+          onToolResult: (name: string, args: Record<string, unknown>, envelope: ToolEnvelope) => {
+            calls.push({ name, args, envelope });
+          },
+        });
+        const { citations, toolCallRefs } = await assembleCitations(calls);
+        const verdict = await verifyReply({
+          reply: result.reply ?? "", calls, citations,
+          userMessage: fixture.utterance, projectId: PROJECT, db, toolCallRefs,
+        });
+        fixtureFabrications = verdict.violations.filter((v) => v.class === "entity" || v.class === "number").length;
+        fabrications += fixtureFabrications;
+        layer2Violations += verdict.violations.length - fixtureFabrications;
+        if (fixtureFabrications > 0) {
+          pass = false;
+          detail = `fabricated: ${verdict.violations.filter((v) => v.class === "entity" || v.class === "number").map((v) => v.token).join(", ")}`;
+        }
+        // Fixture-level reply assertions (§7.7-1: forbidden = any id absent
+        // from that turn's tool results — the pinned patterns say it twice).
+        if (pass && Array.isArray(exp.forbidden_reply_patterns)) {
+          const returned = JSON.stringify(calls.map((c) => c.envelope.data));
+          for (const bad of exp.forbidden_reply_patterns as string[]) {
+            if ((result.reply ?? "").includes(bad) && !returned.includes(bad)) {
+              pass = false;
+              detail = `forbidden id in reply: ${bad}`;
+              break;
+            }
+          }
+        }
+        if (pass && Array.isArray(exp.reply_assertions)) {
+          for (const re of exp.reply_assertions as string[]) {
+            if (!new RegExp(re, "is").test(result.reply ?? "")) {
+              pass = false;
+              detail = `reply failed assertion ${re}`;
+              break;
+            }
+          }
+        }
+        // Nightly judge (scoring only — never a gate).
+        const j = await judgeReply(JSON.stringify(calls.map((c) => c.envelope)), result.reply ?? "");
+        if (j === "judge_error") judgeErrors++;
+        else if (j !== "judge_unavailable") {
+          judged++;
+          if (j.faithful) judgedFaithful++;
+          if (j.faithful && fixtureFabrications > 0) {
+            judgeDisagreements.push(`${id}: judge faithful=true but verifier found ${fixtureFabrications} fabrication(s)`);
+          }
+        }
+      } catch (e) {
+        pass = false;
+        detail = `turn failed: ${e instanceof Error ? e.message : e}`;
+      }
+      battery[id] = { pass, detail, fabrications: fixtureFabrications };
+    }
+  } finally {
+    Deno.env.delete("COVERAGE_TOOLS_ENABLED");
+    Deno.env.delete("VERIFIER_ENABLED");
+  }
+
+  const failures: string[] = [];
+  if (fabrications > 0) failures.push(`entity-fabrication count ${fabrications} > 0 (target 0 — a single fabrication fails the run)`);
+  for (const [id, r] of Object.entries(battery)) {
+    if (!r.pass) failures.push(`${id}: ${r.detail}`);
+  }
+  return {
+    model: model.id,
+    battery,
+    fabrications,
+    layer2Violations,
+    judgedFaithful,
+    judged,
+    judgeErrors,
+    judgeDisagreements,
+    pass: failures.length === 0,
+    failures,
+  };
+}
+
 // ── result recording (§7.4: rows land in ai_chat_events, thread 'eval:<id>') ──
 
 async function recordToEvents(runId: string, payload: Record<string, unknown>): Promise<void> {
@@ -623,6 +870,7 @@ if (import.meta.main) {
     routing: [] as unknown[],
     steward: [] as unknown[],
     agents: [] as unknown[],
+    coverage: [] as unknown[],
   };
 
   let allPass = true;
@@ -663,8 +911,21 @@ if (import.meta.main) {
       for (const f of metrics.failures) console.log(`  ✗ ${f}`);
     }
 
+    // H1 (§7.7-1): the coverage battery + entity-fabrication metric (target
+    // 0; one fabrication fails the run) + the nightly judge (scoring only).
+    const coverage = await evalCoverage(model, mock);
+    (report.coverage as unknown[]).push(coverage);
+    console.log(`coverage: ${coverage.pass ? "PASS" : "FAIL"} — ` +
+      `fabrications=${coverage.fabrications} (target 0) ` +
+      `battery=${Object.values(coverage.battery).filter((f) => f.pass).length}/${Object.keys(coverage.battery).length}` +
+      (coverage.judged > 0
+        ? ` judged-faithful=${(coverage.judgedFaithful / coverage.judged).toFixed(3)} (informational)`
+        : mock ? "" : " judge=unavailable"));
+    for (const f of coverage.failures) console.log(`  ✗ ${f}`);
+    for (const d of coverage.judgeDisagreements) console.log(`  ⚠ triage (§7.3): ${d}`);
+
     const modelPass = routing.pass && (steward?.pass ?? true) &&
-      Object.values(agentResults).every(Boolean);
+      Object.values(agentResults).every(Boolean) && coverage.pass;
     allPass = allPass && modelPass;
     await recordToEvents(runId, {
       eval: "model-scored",
@@ -676,6 +937,9 @@ if (import.meta.main) {
       advisory_false_artifact: routing.advisoryFalseArtifactRate,
       mixed_recall: routing.mixedRecall,
       schema_validity: steward?.schemaValidity ?? null,
+      coverage_pass: coverage.pass,
+      fabrications: coverage.fabrications,
+      judged_faithful_rate: coverage.judged > 0 ? coverage.judgedFaithful / coverage.judged : null,
     });
   }
 
