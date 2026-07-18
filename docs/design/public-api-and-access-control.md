@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.2 — **adopted**; the Phase 0–2 foundation is implemented: gateway `supabase/functions/api` (/v1), migration `20260711000001_api_access_control.sql` (keys/logs/quotas/RPCs), shared dispatch `supabase/functions/_shared/dispatch.ts`, key-management UI at `/developer`, reference docs `docs/api/README.md`. The §16 blueprint edits are applied (G15). Outstanding: webhooks/realtime tokens, OpenAPI generation + SDKs, sandbox seeding, OAuth tokens, pre-launch pen-test (Phases 3–4). |
+| **Status** | v0.2 — **adopted**; the Phase 0–2 foundation is implemented: gateway `supabase/functions/api` (/v1), migration `20260711000001_api_access_control.sql` (keys/logs/quotas/RPCs), shared dispatch `supabase/functions/_shared/dispatch.ts`, key-management UI at `/developer`, reference docs `docs/api/README.md`, and the §12 notebook quickstart (`public/notebooks/suresuite_api_quickstart.ipynb` + the `/developer` Notebook tab: per-project config panel, pre-filled download, Colab link). The §16 blueprint edits are applied (G15). Outstanding: webhooks/realtime tokens, OpenAPI generation + SDKs, sandbox seeding, OAuth tokens, pre-launch pen-test (Phases 3–4). |
 | **Date** | 2026-07-11 (v0.1 and adoption same day) |
 | **Altitude** | Platform capability design: a public, versioned HTTP API over the existing control plane, plus the authentication, authorization, quota, and audit machinery that makes it safe to expose |
 | **Authority** | Governed by `docs/design/next-gen-platform-design.md`. This document proposes a **new capability and a new gap (G15)** the blueprint does not yet cover; §16 lists the exact blueprint edits to apply when this plan is adopted, per the "document and code move together" rule in `CLAUDE.md`. |

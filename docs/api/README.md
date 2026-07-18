@@ -136,6 +136,21 @@ curl -s "$BASE/runs/$RUN_ID" -H "Authorization: Bearer $SURESUITE_API_KEY"
 A Python end-to-end example (snapshot → dispatch → poll → replications) is on
 the Developer API page's Quickstart tab.
 
+### Jupyter notebook
+
+`public/notebooks/suresuite_api_quickstart.ipynb` is a runnable walkthrough of
+**every v1 use case** — auth, projects, dataset freezing, the policy catalog,
+policy editing & snapshots, scenarios, run dispatch/polling, per-replication
+analysis with pandas/matplotlib, credibility status, and A/B + disruption
+experiments. Get it from the `/developer` page's **Notebook** tab, which also:
+
+- lists the projects your account can access and, per project, every id the
+  notebook needs (scenario / policy-version / dataset-version ids, base URL)
+  with a copy-paste CONFIG cell;
+- downloads the notebook with that CONFIG cell pre-filled; and
+- links **Open in Google Colab** (store the key in Colab's Secrets panel as
+  `SURESUITE_API_KEY` — never in a cell).
+
 ## Security model (summary)
 
 See the design doc §10 for the full STRIDE analysis. In brief: hashed
