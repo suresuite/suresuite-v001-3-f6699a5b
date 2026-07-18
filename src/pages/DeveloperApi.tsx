@@ -7,6 +7,12 @@
 // list, rotate, revoke, per-key usage, and copy-paste quickstarts. Backed
 // entirely by the SECURITY DEFINER RPCs (create/list/rotate/revoke_api_key);
 // the plaintext secret exists only in this browser tab, once.
+//
+// The Notebook tab serves the §12 analyst/notebook audience: pick an
+// accessible project, see every id the API needs (scenarios, policy versions,
+// dataset versions), and download the canonical quickstart notebook
+// (public/notebooks/suresuite_api_quickstart.ipynb) with its CONFIG cell
+// pre-filled — or open the same notebook straight in Google Colab.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -28,7 +34,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  AlertTriangle, Check, Copy, KeyRound, Loader2, Plus, RefreshCcw, ShieldOff,
+  AlertTriangle, Check, Copy, Download, ExternalLink, KeyRound, Loader2,
+  NotebookText, Plus, RefreshCcw, ShieldOff,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -64,10 +71,43 @@ interface UsageRow {
   last_request_at: string | null;
 }
 
+interface NbScenario {
+  id: string;
+  name: string;
+  horizon_days: number;
+  warmup_days: number;
+  replications: number;
+  seed: number;
+  primary_kpi: string;
+  created_at: string;
+}
+
+interface NbPolicyVersion {
+  id: string;
+  label: string | null;
+  policy_hash: string | null;
+  created_at: string;
+  run_count: number;
+}
+
+interface NbDatasetVersion {
+  id: string;
+  label: string | null;
+  graph_hash: string | null;
+  created_at: string;
+}
+
 const db = supabase as any;
 const SUPABASE_URL: string =
   (supabase as any).supabaseUrl ?? 'https://wckdrutwkytwcomrlpib.supabase.co';
 const API_BASE = `${SUPABASE_URL}/functions/v1/api/v1`;
+
+// Canonical quickstart notebook: committed in the repo (Colab opens it from
+// GitHub) and shipped as a static asset (the download button patches its
+// CONFIG cell with the selected project's ids).
+const NOTEBOOK_ASSET_PATH = '/notebooks/suresuite_api_quickstart.ipynb';
+const NOTEBOOK_COLAB_URL =
+  'https://colab.research.google.com/github/suresuite/suresuite-v001-3-f6699a5b/blob/main/public/notebooks/suresuite_api_quickstart.ipynb';
 
 const SCOPES: { id: string; label: string; hint: string }[] = [
   { id: 'read:data', label: 'read:data', hint: 'List/read projects, item masters, dataset versions' },
@@ -102,6 +142,27 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       {label && <span className="ml-1.5">{label}</span>}
     </Button>
+  );
+}
+
+function IdCell({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      title="Copy id"
+      className="group inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+      onClick={async () => {
+        await navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {value}
+      {copied
+        ? <Check className="h-3 w-3 shrink-0" />
+        : <Copy className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100" />}
+    </button>
   );
 }
 
@@ -146,6 +207,14 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   const [revokeTarget, setRevokeTarget] = useState<ApiKeyRow | null>(null);
   const [mutating, setMutating] = useState(false);
 
+  // notebook tab: selected project + the ids the notebook's CONFIG cell needs
+  const [nbProjectId, setNbProjectId] = useState('');
+  const [nbLoading, setNbLoading] = useState(false);
+  const [nbDownloading, setNbDownloading] = useState(false);
+  const [nbScenarios, setNbScenarios] = useState<NbScenario[]>([]);
+  const [nbPolicyVersions, setNbPolicyVersions] = useState<NbPolicyVersion[]>([]);
+  const [nbDatasetVersions, setNbDatasetVersions] = useState<NbDatasetVersion[]>([]);
+
   const rpcAuth = useMemo(
     () => ({ p_user_id: user?.id, p_user_email: user?.email }),
     [user?.id, user?.email],
@@ -185,6 +254,93 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   }, [user?.id, rpcAuth, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load the selected project's ids for the notebook config panel — the same
+  // reads the app's own pages use (scenarios table + list_* RPCs), so what the
+  // panel shows is exactly what the API will accept.
+  useEffect(() => {
+    if (!nbProjectId) {
+      setNbScenarios([]);
+      setNbPolicyVersions([]);
+      setNbDatasetVersions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setNbLoading(true);
+      const [sc, pv, dv] = await Promise.all([
+        db.from('scenarios')
+          .select('id,name,horizon_days,warmup_days,replications,seed,primary_kpi,created_at')
+          .eq('project_id', nbProjectId)
+          .order('created_at', { ascending: false }),
+        db.rpc('list_policy_versions', { p_project_id: nbProjectId }),
+        db.rpc('list_dataset_versions', { p_project_id: nbProjectId }),
+      ]);
+      if (cancelled) return;
+      setNbScenarios((sc.data ?? []) as NbScenario[]);
+      setNbPolicyVersions((pv.data ?? []) as NbPolicyVersion[]);
+      setNbDatasetVersions((dv.data ?? []) as NbDatasetVersion[]);
+      setNbLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [nbProjectId]);
+
+  const nbProject = projects.find((p) => p.id === nbProjectId) ?? null;
+  const nbScenario = nbScenarios[0] ?? null;
+  const nbPolicyVersion = nbPolicyVersions[0] ?? null;
+
+  // Mirrors the notebook's CONFIG cell exactly (same "# ── CONFIG" marker the
+  // download patcher and the .ipynb template share).
+  const nbConfigCell = useMemo(() => {
+    if (!nbProject) return '';
+    return [
+      '# ── CONFIG ──────────────────────────────────────────────────────────────────',
+      `# Filled from /developer → Notebook for project “${nbProject.name}”.`,
+      `BASE_URL = "${API_BASE}"`,
+      `PROJECT_ID = "${nbProject.id}"`,
+      nbScenario
+        ? `SCENARIO_ID = "${nbScenario.id}"  # ${nbScenario.name}`
+        : 'SCENARIO_ID = ""         # no scenarios yet — §6 of the notebook creates one',
+      nbPolicyVersion
+        ? `POLICY_VERSION_ID = "${nbPolicyVersion.id}"  # ${nbPolicyVersion.label ?? 'unlabelled'}`
+        : 'POLICY_VERSION_ID = ""   # no snapshots yet — §5 of the notebook makes one',
+    ].join('\n');
+  }, [nbProject, nbScenario, nbPolicyVersion]);
+
+  const downloadNotebook = async () => {
+    setNbDownloading(true);
+    try {
+      const res = await fetch(NOTEBOOK_ASSET_PATH);
+      if (!res.ok) throw new Error(`could not load notebook template (${res.status})`);
+      const nb = await res.json();
+      if (nbConfigCell) {
+        const idx = (nb.cells ?? []).findIndex((c: { cell_type: string; source: string | string[] }) =>
+          c.cell_type === 'code' &&
+          (Array.isArray(c.source) ? c.source.join('') : String(c.source)).startsWith('# ── CONFIG'));
+        if (idx >= 0) {
+          const lines = nbConfigCell.split('\n');
+          nb.cells[idx].source = lines.map((l, i) => (i < lines.length - 1 ? `${l}\n` : l));
+        }
+      }
+      const slug = nbProject
+        ? `_${nbProject.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+        : '';
+      const blob = new Blob([JSON.stringify(nb, null, 1)], { type: 'application/x-ipynb+json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `suresuite_api_quickstart${slug}.ipynb`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      toast({
+        title: 'Notebook download failed',
+        description: String((e as Error)?.message ?? e),
+        variant: 'destructive',
+      });
+    } finally {
+      setNbDownloading(false);
+    }
+  };
 
   const resetCreateForm = () => {
     setName('');
@@ -326,6 +482,7 @@ print(r["aggregate_kpis"], len(reps))`;
           <TabsList>
             <TabsTrigger value="keys">API keys</TabsTrigger>
             <TabsTrigger value="quickstart">Quickstart</TabsTrigger>
+            <TabsTrigger value="notebook">Notebook</TabsTrigger>
           </TabsList>
 
           {/* ── Keys ─────────────────────────────────────────────────────── */}
@@ -516,6 +673,207 @@ print(r["aggregate_kpis"], len(reps))`;
                     ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── Notebook ─────────────────────────────────────────────────── */}
+          <TabsContent value="notebook" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <NotebookText className="h-4 w-4" /> Jupyter notebook quickstart
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  One runnable notebook covering every v1 use case: connect, read input data,
+                  freeze dataset versions, explore the policy catalog, edit &amp; snapshot policies,
+                  create scenarios, dispatch runs, analyze replications with pandas/matplotlib,
+                  check credibility, and run A/B and disruption experiments. Pick a project below
+                  and the downloaded copy comes with its CONFIG cell pre-filled.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={NOTEBOOK_COLAB_URL} target="_blank" rel="noreferrer">
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Google Colab
+                    </a>
+                  </Button>
+                  <Button size="sm" onClick={downloadNotebook} disabled={nbDownloading}>
+                    {nbDownloading
+                      ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      : <Download className="mr-1.5 h-3.5 w-3.5" />}
+                    Download .ipynb{nbProject ? ` for “${nbProject.name}”` : ''}
+                  </Button>
+                </div>
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Never paste your API key into a notebook cell. In Colab, store it once in the
+                    🔑 <span className="font-medium">Secrets</span> panel as{' '}
+                    <span className="font-mono">SURESUITE_API_KEY</span> — the notebook reads it from
+                    there (or from the environment / a hidden prompt when run locally). If Colab
+                    can’t open the repository directly, download the pre-filled notebook and use
+                    Colab’s <span className="font-medium">File → Upload notebook</span>.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Project configuration</CardTitle>
+                <CardDescription className="text-xs">
+                  These are the projects your account can access. Select one to see every id the
+                  notebook (and any API call) needs — copy the CONFIG cell, or just download the
+                  notebook above with it already filled in.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-w-md space-y-1.5">
+                  <Label>Project</Label>
+                  <Select value={nbProjectId} onValueChange={setNbProjectId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={projects.length ? 'Select a project…' : 'No projects available'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {!nbProject ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Select a project to see its API configuration.
+                  </p>
+                ) : nbLoading ? (
+                  <div className="py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></div>
+                ) : (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Base URL</p>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 truncate rounded-md border border-border bg-muted/50 px-3 py-1.5 text-[11px]">{API_BASE}</code>
+                          <CopyButton text={API_BASE} />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Project ID</p>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 truncate rounded-md border border-border bg-muted/50 px-3 py-1.5 text-[11px]">{nbProject.id}</code>
+                          <CopyButton text={nbProject.id} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Snippet title="Notebook CONFIG cell (pre-filled — paste over the notebook's first code cell)" code={nbConfigCell} />
+
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Scenarios ({nbScenarios.length}) — <span className="font-mono">SCENARIO_ID</span>
+                      </p>
+                      {nbScenarios.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          None yet — §6 of the notebook creates one via <span className="font-mono">POST …/scenarios</span>.
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>ID</TableHead>
+                              <TableHead>Horizon</TableHead>
+                              <TableHead>Reps</TableHead>
+                              <TableHead>Seed</TableHead>
+                              <TableHead>Primary KPI</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {nbScenarios.map((s) => (
+                              <TableRow key={s.id}>
+                                <TableCell className="text-xs font-medium">{s.name}</TableCell>
+                                <TableCell><IdCell value={s.id} /></TableCell>
+                                <TableCell className="text-xs">{s.horizon_days} d (+{s.warmup_days} warm-up)</TableCell>
+                                <TableCell className="text-xs">{s.replications}</TableCell>
+                                <TableCell className="text-xs">{s.seed}</TableCell>
+                                <TableCell className="font-mono text-[11px]">{s.primary_kpi}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Policy versions ({nbPolicyVersions.length}) — <span className="font-mono">POLICY_VERSION_ID</span>
+                      </p>
+                      {nbPolicyVersions.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          None yet — §5 of the notebook snapshots one via <span className="font-mono">POST …/policy-versions</span>.
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Label</TableHead>
+                              <TableHead>ID</TableHead>
+                              <TableHead>policy_hash</TableHead>
+                              <TableHead>Runs</TableHead>
+                              <TableHead>Created</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {nbPolicyVersions.slice(0, 8).map((v) => (
+                              <TableRow key={v.id}>
+                                <TableCell className="text-xs font-medium">{v.label ?? 'unlabelled'}</TableCell>
+                                <TableCell><IdCell value={v.id} /></TableCell>
+                                <TableCell className="font-mono text-[11px] text-muted-foreground">{(v.policy_hash ?? '').slice(0, 12)}…</TableCell>
+                                <TableCell className="text-xs">{v.run_count}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(v.created_at).toLocaleDateString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Dataset versions ({nbDatasetVersions.length}) — input-data provenance
+                      </p>
+                      {nbDatasetVersions.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          None yet — §2 of the notebook freezes one via <span className="font-mono">POST …/datasets:freeze</span>.
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Label</TableHead>
+                              <TableHead>ID</TableHead>
+                              <TableHead>graph_hash</TableHead>
+                              <TableHead>Created</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {nbDatasetVersions.slice(0, 8).map((v) => (
+                              <TableRow key={v.id}>
+                                <TableCell className="text-xs font-medium">{v.label ?? 'unlabelled'}</TableCell>
+                                <TableCell><IdCell value={v.id} /></TableCell>
+                                <TableCell className="font-mono text-[11px] text-muted-foreground">{(v.graph_hash ?? '').slice(0, 12)}…</TableCell>
+                                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(v.created_at).toLocaleDateString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
