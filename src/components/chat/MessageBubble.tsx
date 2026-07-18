@@ -14,6 +14,7 @@ import { ActivityGroup } from "./ActivityGroup";
 import { ProposalCard } from "./ProposalCard";
 import { MemoryChip, type MemoryOfferData } from "./MemoryChip";
 import { ModeNotice, type ModeNoticeData } from "./ModeNotice";
+import { EvidenceList } from "./EvidenceList";
 
 /**
  * MessageBubble renders the §17.2 readability grammar (ai-agents.md v1.2
@@ -167,6 +168,11 @@ export function MessageBubble({ message, onSuggestUtterance }: MessageBubbleProp
           // refusals treatment with the one-click "Switch to Review" remedy.
           if (p.kind === "mode_notice") {
             return <ModeNotice key={i} data={p.data as ModeNoticeData} />;
+          }
+          // H1 (§22.2): the verified reply's source list — the "grounded —
+          // N sources" chip; verifier fallbacks take the error treatment.
+          if (p.kind === "evidence") {
+            return <EvidenceList key={i} data={p.data} />;
           }
           return null;
         })}

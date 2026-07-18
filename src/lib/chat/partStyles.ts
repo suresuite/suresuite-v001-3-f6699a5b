@@ -18,7 +18,8 @@ export type PartClass =
   | "proposal"  // reviewable cards — amber rail
   | "memory"    // memory offers/saves — violet chip
   | "file"      // report/file cards (Phase 3 consumes this) — emerald rail
-  | "error";    // errors & refusals — red-tinted card
+  | "error"     // errors & refusals — red-tinted card
+  | "evidence"; // §22.2 citation list — slate rail, one line per citation
 
 export interface PartTreatment {
   /** Card container: surface card with the class-colored left rail. */
@@ -67,6 +68,14 @@ export const PART_TREATMENTS: Record<PartClass, PartTreatment> = {
     accent: "text-destructive",
     chip: "bg-destructive/10 text-destructive",
     icon: "text-destructive",
+  },
+  // §22.2 (Phase H1): evidence — the reply's numbered source list. Slate like
+  // data (it IS the data's provenance), one line per citation, click resolves.
+  evidence: {
+    card: "rounded-md border border-border border-l-2 border-l-slate-400 bg-surface-elevated dark:border-l-slate-500",
+    accent: "text-slate-600 dark:text-slate-400",
+    chip: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    icon: "text-slate-500 dark:text-slate-400",
   },
 };
 

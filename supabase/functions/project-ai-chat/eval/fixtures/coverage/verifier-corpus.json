@@ -1,0 +1,60 @@
+{
+  "id": "verifier-corpus",
+  "description": "ai-agents.md §7.7-1(b) — the verifier unit corpus: replies with planted fabricated ids, planted ungrounded numbers, planted unresolvable citations, and clean replies. The verifier module must catch EVERY planted violation and pass EVERY clean reply. Envelopes simulate one turn's tool results (a supplier-materials table + a run-results table).",
+  "envelopes": [
+    {
+      "name": "get_supplier_materials",
+      "args": { "supplier": "10", "top_n": 50 },
+      "envelope": {
+        "kind": "table",
+        "data": {
+          "columns": ["Material", "Unit Price", "Lead Time", "Single-source?"],
+          "rows": [
+            ["001409784A", 0.005, 14, "Yes"],
+            ["001410084A", 0.006, 9, "Yes"],
+            ["001410184A", 0.012, 8, "Yes"]
+          ]
+        },
+        "meta": { "tool": "get_supplier_materials", "row_count": 3, "note": "supplier 10 supplies 187 materials; showing top 3." }
+      }
+    },
+    {
+      "name": "get_run_results",
+      "args": { "run_id": "33333333-3333-4333-8333-333333333333" },
+      "envelope": {
+        "kind": "table",
+        "data": {
+          "columns": ["item", "value"],
+          "rows": [
+            ["run", "{\"id\":\"33333333-3333-4333-8333-333333333333\",\"status\":\"done\",\"reps_done\":3,\"policy_hash\":\"9f2c41d8ab3e55aa\",\"scenario_hash\":\"5e5e5e5e5e5e5e5e\",\"aggregate_kpis\":{\"fill_rate\":0.824,\"otif\":0.781}}"],
+            ["rep 1", "{\"fill_rate\":0.826,\"otif\":0.79}"],
+            ["rep 2", "{\"fill_rate\":0.821,\"otif\":0.77}"]
+          ]
+        },
+        "meta": { "tool": "get_run_results", "row_count": 3 }
+      }
+    }
+  ],
+  "user_message": "what does supplier 10 supply, and what did the run show?",
+  "cases": [
+    { "kind": "planted", "class": "entity", "reply": "Supplier 10 supplies 007507784A, 007507785A and 007507786A." },
+    { "kind": "planted", "class": "entity", "reply": "Its key material is 001409999A, sole-sourced." },
+    { "kind": "planted", "class": "number", "reply": "The riskiest arc is MAT-991 from supplier 10." },
+    { "kind": "planted", "class": "number", "reply": "Supplier 10 accounts for 49,639 in spend." },
+    { "kind": "planted", "class": "number", "reply": "Fill rate landed at 91.7% in the last run." },
+    { "kind": "planted", "class": "number", "reply": "The average lead time is 12.4 weeks." },
+    { "kind": "planted", "class": "entity", "reply": "001409784A pairs with 007507788A in the same BOM." },
+    { "kind": "planted", "class": "number", "reply": "That's a $4,120 exposure per week." },
+    { "kind": "planted-citation", "class": "citation", "reply": "Fill rate held at 82.4% [1].", "citations": [{ "kind": "run", "ref": "99999999-9999-4999-8999-999999999999" }] },
+    { "kind": "planted-citation", "class": "marker", "reply": "Fill rate held at 82.4% [3].", "citations": [{ "kind": "run", "ref": "33333333-3333-4333-8333-333333333333" }] },
+    { "kind": "planted-citation", "class": "uncited_result", "reply": "Fill rate held at 82.4% across the replications. OTIF was 78.1% [1].", "citations": [{ "kind": "run", "ref": "33333333-3333-4333-8333-333333333333" }] },
+    { "kind": "clean", "reply": "Supplier 10 supplies 187 materials — the top 3 by exposure are 001409784A, 001410084A and 001410184A, all sole-sourced." },
+    { "kind": "clean", "reply": "I can't list every material yet, but supplier 10 supplies 187 of them. Want the risk breakdown?" },
+    { "kind": "clean", "reply": "Fill rate held at 82.4% and OTIF at 78.1% in the last run [1] [2].", "citations": [{ "kind": "run", "ref": "33333333-3333-4333-8333-333333333333" }, { "kind": "run", "ref": "33333333-3333-4333-8333-333333333333" }] },
+    { "kind": "clean", "reply": "The longest lead among the top rows is 14 weeks, on 001409784A." },
+    { "kind": "clean", "reply": "I don't have enough data on that yet. Try importing your outbound lanes first." },
+    { "kind": "clean", "reply": "Your top material 001409784A costs 0.005 per unit and is sole-sourced." },
+    { "kind": "clean", "reply": "Rep 1 came in at 82.6% fill rate [2]; the aggregate is 82.4% [2].", "citations": [{ "kind": "run", "ref": "33333333-3333-4333-8333-333333333333" }, { "kind": "run", "ref": "33333333-3333-4333-8333-333333333333" }] },
+    { "kind": "clean", "reply": "There are 3 rows shown; the true total is 187." }
+  ]
+}

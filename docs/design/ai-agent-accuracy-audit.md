@@ -9,6 +9,16 @@ ver3) needs read-only access to the modeler's own database.
 Status: **TRON ver2 complete** (deterministic tier). TRON ver1 and AA ver3
 pending read-only live access.
 
+**Post-H1 update (ai-agents.md §24.3 H1, this repo):** the §19.3 coverage
+tools landed and the audit was re-run on the same dataset —
+`scripts/audit/report_Project_TRON_ver2.md` now shows **OK: 12 · PARTIAL: 0 ·
+GAP: 0** with every new relation/detail tool matching recomputed truth
+(`get_supplier_materials("10")` enumerates exactly the 187 true materials;
+none of the five incident ids appears). The audit script exits non-zero if
+any I1–I10 family regresses to GAP/PARTIAL or a tool-vs-truth diff appears,
+so the closure is CI-checkable. The findings below are preserved as the
+pre-H1 record of the incident.
+
 ## Method — a three-way oracle
 
 For a fixed question battery (intents I1–I13, ai-agents.md §19.2), compare:

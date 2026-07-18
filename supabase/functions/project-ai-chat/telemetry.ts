@@ -29,7 +29,11 @@ export type ChatEventKind =
   | "report.rendered"
   | "report.downloaded"
   | "file.kept"
-  | "file.expired";
+  | "file.expired"
+  // §22.3 pre-send verifier (Phase H1; CHECK extended in
+  // 20260724000001_verifier_event.sql). Payload: violation counts by class +
+  // retried flag — ids and counts only, never reply text (§7.5).
+  | "verifier.blocked_reply";
 
 // Structural client type so this module never imports the supabase-js bundle.
 export interface TelemetryDb {

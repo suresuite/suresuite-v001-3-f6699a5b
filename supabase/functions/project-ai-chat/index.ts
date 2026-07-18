@@ -10,7 +10,18 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { runChat, resolveModel, type ChatRunResult, type ChatTurn } from "./providers.ts";
-import { makeToolContext, type ToolContext } from "./tools.ts";
+import { makeToolContext, type ToolContext, type ToolEnvelope } from "./tools.ts";
+// H1 (ai-agents.md §19.3/§22.3): the coverage-expanded persona read surface
+// and the pre-send verifier. Both flags default off ⇒ byte-identical pre-H1
+// behavior (personaToolDeclarations() returns the unchanged toolDeclarations;
+// the verifier never runs).
+import { personaToolDeclarations } from "./personaTools.ts";
+import {
+  verifierEnabled,
+  verifyWithRetry,
+  type RecordedToolCall,
+  type VerifyWithRetryResult,
+} from "./verifier.ts";
 import { canonicalJson, makeTelemetry, sha256Hex, telemetryEnabled } from "./telemetry.ts";
 import {
   decideRoute,
@@ -446,10 +457,45 @@ serve(async (req) => {
     try {
       // §3.3 orchestration: agent turn → persona wrap-up → proposal part
       // attached mechanically. Per-request turn budget (§8 T5): ≤ 1 router
-      // call + ≤ 1 agent turn + ≤ 1 persona turn.
+      // call + ≤ 1 agent turn + ≤ 1 persona turn (+ the §22.3 verifier's
+      // single corrective retry when VERIFIER_ENABLED).
       let result: ChatRunResult;
       let telemetryToolCalls: ChatRunResult['toolCalls'] = [];
       let proposalId: string | null = null;
+
+      // --- H1 pre-send verifier (§22.3; VERIFIER_ENABLED default off). Runs
+      // on every persona AND agent reply when a project is attached (without
+      // one there are no tools, no grounded vocabulary and no project claims;
+      // the no-project prompt already forbids numeric facts). Model prose is
+      // verified BEFORE the deterministic server notes (mode notice, memory
+      // line, failure note) are appended, and before the chat-store append.
+      const verifierOn = verifierEnabled() && ctx !== null;
+      // §19.3: the persona read surface (coverage tools + exposed Layer B
+      // reads when COVERAGE_TOOLS_ENABLED; the unchanged declarations else).
+      const personaTools = personaToolDeclarations();
+      const recordInto = (arr: RecordedToolCall[]) =>
+        (name: string, args: Record<string, unknown>, envelope: ToolEnvelope) => {
+          arr.push({ name, args, envelope });
+        };
+      type VerifiedTurn = { reply: string; calls: RecordedToolCall[]; result: ChatRunResult };
+      let verdict: VerifyWithRetryResult<VerifiedTurn> | null = null;
+      // §22.5: the fallback's nearest grounded action, from the §17.3
+      // suggestion rules — computed only if the fallback fires.
+      const nearestAction = async (): Promise<string | null> => {
+        if (!projectId) return null;
+        try {
+          const suggestions = await buildSuggestions(supabaseAdmin, projectId, {
+            enabledAgents,
+            features: capFeatures,
+            isSuper: capIsSuper,
+            mode: chatMode,
+            memoryOn,
+          });
+          return suggestions[0]?.label ?? null;
+        } catch {
+          return null;
+        }
+      };
 
       // Stages 1–3: any routed agent with a §5 turn runner (data-steward,
       // policy-configurator, vv-analyst — AGENT_TURNS) executes here; agents
@@ -477,7 +523,22 @@ serve(async (req) => {
           },
         };
         const agentT0 = Date.now();
-        const agent = await runAgentTurn({ agentId: routedAgentId, modelId: model, utterance: agentUtterance, ctx: agentCtx });
+        const agentCalls: RecordedToolCall[] = [];
+        let agentContext: string | undefined;
+        const agent = await runAgentTurn({
+          agentId: routedAgentId,
+          modelId: model,
+          utterance: agentUtterance,
+          ctx: agentCtx,
+          ...(verifierOn
+            ? {
+              onToolResult: recordInto(agentCalls),
+              onContext: (text: string) => {
+                agentContext = text;
+              },
+            }
+            : {}),
+        });
         logAiUsage({
           status: agent.ok ? 'success' : 'error',
           modelCode: model,
@@ -513,30 +574,85 @@ serve(async (req) => {
           // §6.2 step 5: the persona answers the advisory part in a normal
           // Layer A turn; the handoff note + card join the same reply. The
           // advisory answer survives an agent failure.
+          const advisoryPart = routeDecision.advisory_part.slice(0, 4000);
+          const personaCalls: RecordedToolCall[] = [];
           const persona = await runChat(
-            model, routeDecision.advisory_part.slice(0, 4000), history, ctx, agentId,
-            { summary: threadSummary },
+            model, advisoryPart, history, ctx, agentId,
+            {
+              summary: threadSummary,
+              tools: personaTools,
+              ...(verifierOn ? { onToolResult: recordInto(personaCalls) } : {}),
+            },
           );
           telemetryToolCalls = persona.toolCalls ?? [];
-          result = {
-            ...persona,
-            reply: `${persona.reply}\n\n${mixedHandoffNote(agent)}`.trim(),
-            parts: [...(persona.parts ?? []), ...(part ? [part] : [])],
-            toolCalls: [...(persona.toolCalls ?? []), ...agent.toolCalls],
-          };
+          if (verifierOn) {
+            // §22.3: verify the MODEL prose — the persona answer plus, when
+            // the handoff note would relay it, the agent's own report. The
+            // deterministic note variants (card pointer / failure line) are
+            // server text, appended after verification.
+            const agentProse = !part && agent.ok ? (agent.reply || '') : '';
+            const serverNote = agentProse ? '' : mixedHandoffNote(agent);
+            const compose = (p: ChatRunResult, prose: string): ChatRunResult => ({
+              ...p,
+              reply: (serverNote ? `${prose}\n\n${serverNote}` : prose).trim(),
+              parts: [...(p.parts ?? []), ...(part ? [part] : [])],
+              toolCalls: [...(p.toolCalls ?? []), ...agent.toolCalls],
+            });
+            verdict = await verifyWithRetry<VerifiedTurn>({
+              projectId: projectId as string,
+              db: (ctx as ToolContext).supabase,
+              userMessage: promptText,
+              contextText: [agentContext, threadSummary ?? ''].filter(Boolean).join('\n\n') || undefined,
+              attempt: {
+                reply: agentProse ? `${persona.reply}\n\n${agentProse}` : persona.reply,
+                calls: [...personaCalls, ...agentCalls],
+                result: persona,
+              },
+              retry: async (addendum) => {
+                const retryCalls: RecordedToolCall[] = [];
+                try {
+                  const persona2 = await runChat(model, advisoryPart, history, ctx, agentId, {
+                    summary: threadSummary,
+                    tools: personaTools,
+                    systemAddendum: addendum,
+                    onToolResult: recordInto(retryCalls),
+                  });
+                  return {
+                    reply: agentProse ? `${persona2.reply}\n\n${agentProse}` : persona2.reply,
+                    calls: [...retryCalls, ...agentCalls],
+                    result: persona2,
+                  };
+                } catch {
+                  return null;
+                }
+              },
+              nearestAction,
+            });
+            result = compose(verdict.attempt.result, verdict.reply);
+            telemetryToolCalls = verdict.attempt.result.toolCalls ?? [];
+          } else {
+            result = {
+              ...persona,
+              reply: `${persona.reply}\n\n${mixedHandoffNote(agent)}`.trim(),
+              parts: [...(persona.parts ?? []), ...(part ? [part] : [])],
+              toolCalls: [...(persona.toolCalls ?? []), ...agent.toolCalls],
+            };
+          }
         } else if (agent.ok) {
           // §6.4: persona wrap-up turn — voice only (no tools), fed the
           // agent's report; the proposal part is attached mechanically.
+          const wrapMessage = buildWrapupMessage({
+            utterance: agentUtterance,
+            agentReply: agent.reply,
+            proposal: part?.data ?? null,
+            agentName: AGENT_TURNS[routedAgentId].name,
+          });
+          const wrapDefault =
+            'I drafted a proposal for this — review the card below and approve it before it applies.';
           let wrapReply = '';
           try {
             const wrap = await runChat(
-              model,
-              buildWrapupMessage({
-                utterance: agentUtterance,
-                agentReply: agent.reply,
-                proposal: part?.data ?? null,
-                agentName: AGENT_TURNS[routedAgentId].name,
-              }),
+              model, wrapMessage,
               history, null, agentId, { summary: threadSummary },
             );
             wrapReply = wrap.reply ?? '';
@@ -545,30 +661,157 @@ serve(async (req) => {
               e instanceof Error ? e.message : e);
           }
           result = {
-            reply: wrapReply || agent.reply ||
-              'I drafted a proposal for this — review the card below and approve it before it applies.',
+            reply: wrapReply || agent.reply || wrapDefault,
             parts: part ? [part] : [],
             toolCalls: agent.toolCalls,
             model: resolvedModel.label,
           };
+          if (verifierOn) {
+            // §22.3 on the agent path: the shipped prose (wrap-up or agent
+            // report) is verified against the agent turn's envelopes + its
+            // CONTEXT block; the retry re-invokes the wrap-up turn.
+            verdict = await verifyWithRetry<VerifiedTurn>({
+              projectId: projectId as string,
+              db: (ctx as ToolContext).supabase,
+              userMessage: promptText,
+              contextText: [agentContext, threadSummary ?? ''].filter(Boolean).join('\n\n') || undefined,
+              attempt: { reply: result.reply, calls: agentCalls, result },
+              retry: async (addendum) => {
+                try {
+                  const wrap2 = await runChat(model, wrapMessage, history, null, agentId, {
+                    summary: threadSummary,
+                    systemAddendum: addendum,
+                  });
+                  const reply2 = (wrap2.reply ?? '') || agent.reply || wrapDefault;
+                  return { reply: reply2, calls: agentCalls, result: { ...result, reply: reply2 } };
+                } catch {
+                  return null;
+                }
+              },
+              nearestAction,
+            });
+            result = { ...verdict.attempt.result, reply: verdict.reply };
+          }
         } else {
           // Agent turn failed outright: the advisory answer still returns,
           // with one sentence noting the draft failed and why (§6.2 step 5).
-          const persona = await runChat(model, promptText, history, ctx, agentId, { summary: threadSummary });
+          const personaCalls: RecordedToolCall[] = [];
+          const persona = await runChat(model, promptText, history, ctx, agentId, {
+            summary: threadSummary,
+            tools: personaTools,
+            ...(verifierOn ? { onToolResult: recordInto(personaCalls) } : {}),
+          });
           telemetryToolCalls = persona.toolCalls ?? [];
-          result = {
-            ...persona,
-            reply: `${persona.reply}\n\nI tried to draft this for you but the drafting step failed` +
-              `${agent.error ? ` (${agent.error})` : ''}. You can ask again or make the change manually.`,
-          };
+          const failureNote =
+            `I tried to draft this for you but the drafting step failed` +
+            `${agent.error ? ` (${agent.error})` : ''}. You can ask again or make the change manually.`;
+          if (verifierOn) {
+            // The failure note is deterministic server text (it can carry
+            // provider error codes) — appended after verification.
+            verdict = await verifyWithRetry<VerifiedTurn>({
+              projectId: projectId as string,
+              db: (ctx as ToolContext).supabase,
+              userMessage: promptText,
+              contextText: threadSummary ?? undefined,
+              attempt: { reply: persona.reply ?? '', calls: [...personaCalls, ...agentCalls], result: persona },
+              retry: async (addendum) => {
+                const retryCalls: RecordedToolCall[] = [];
+                try {
+                  const persona2 = await runChat(model, promptText, history, ctx, agentId, {
+                    summary: threadSummary,
+                    tools: personaTools,
+                    systemAddendum: addendum,
+                    onToolResult: recordInto(retryCalls),
+                  });
+                  return {
+                    reply: persona2.reply ?? '',
+                    calls: [...retryCalls, ...agentCalls],
+                    result: persona2,
+                  };
+                } catch {
+                  return null;
+                }
+              },
+              nearestAction,
+            });
+            result = {
+              ...verdict.attempt.result,
+              reply: `${verdict.reply}\n\n${failureNote}`,
+            };
+            telemetryToolCalls = verdict.attempt.result.toolCalls ?? [];
+          } else {
+            result = {
+              ...persona,
+              reply: `${persona.reply}\n\n${failureNote}`,
+            };
+          }
         }
       } else {
-        result = await runChat(model, promptText, history, ctx, agentId, { summary: threadSummary });
+        const personaCalls: RecordedToolCall[] = [];
+        result = await runChat(model, promptText, history, ctx, agentId, {
+          summary: threadSummary,
+          tools: personaTools,
+          ...(verifierOn ? { onToolResult: recordInto(personaCalls) } : {}),
+        });
         telemetryToolCalls = result.toolCalls ?? [];
+        if (verifierOn) {
+          verdict = await verifyWithRetry<VerifiedTurn>({
+            projectId: projectId as string,
+            db: (ctx as ToolContext).supabase,
+            userMessage: promptText,
+            contextText: threadSummary ?? undefined,
+            attempt: { reply: result.reply ?? '', calls: personaCalls, result },
+            retry: async (addendum) => {
+              const retryCalls: RecordedToolCall[] = [];
+              try {
+                const second = await runChat(model, promptText, history, ctx, agentId, {
+                  summary: threadSummary,
+                  tools: personaTools,
+                  systemAddendum: addendum,
+                  onToolResult: recordInto(retryCalls),
+                });
+                return { reply: second.reply ?? '', calls: retryCalls, result: second };
+              } catch {
+                return null;
+              }
+            },
+            nearestAction,
+          });
+          result = { ...verdict.attempt.result, reply: verdict.reply };
+          telemetryToolCalls = result.toolCalls ?? [];
+        }
         if (routeDecision.short_circuit === 'low_confidence') {
           // §6.2 step 3: below-threshold artifact asks stay advisory with one
           // plain-text offer chip.
           result = { ...result, reply: `${result.reply}\n\n${OFFER_CHIP_TEXT}` };
+        }
+      }
+
+      // --- H1 (§22.2): the evidence part, assembled by the ORCHESTRATOR from
+      // the recorded tool calls — the model never mints a citation entry. A
+      // verified reply renders the "grounded — N sources" chip; a fallback
+      // reply renders under the §17.2 errors-and-refusals treatment. The
+      // §7.5-safe verifier.blocked_reply event records every save.
+      if (verifierOn && verdict) {
+        if (verdict.citations.length > 0 || verdict.fallback) {
+          result = {
+            ...result,
+            parts: [...(result.parts ?? []), {
+              kind: 'evidence',
+              data: {
+                citations: verdict.citations,
+                verified: verdict.verified,
+                fallback: verdict.fallback,
+              },
+            }],
+          };
+        }
+        if (verdict.fallback) {
+          telemetry.emit('verifier.blocked_reply', {
+            violations: verdict.violationCounts,
+            retried: verdict.retried,
+            model_code: resolvedModel.id,
+          });
         }
       }
 

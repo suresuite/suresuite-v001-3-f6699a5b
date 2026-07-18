@@ -519,12 +519,607 @@ function genericPlaybooks(disruption: string, magnitude: number, target: string 
   }
 }
 
+// ---------- §19.3 coverage read tools (ai-agents.md v1.4 Phase H1) ----------
+// Four relation/detail reads closing the I2–I6 fabrication gaps (§19.2): each
+// wraps the same inbound_logistics / bom_multi_level / outbound_logistics /
+// masters reads the policies page performs via useStageRows /
+// get_supply_chain_data — no new privileged path, service-role project-scoped,
+// standard envelope, clamp()ed numerics, empty() on no data. Behind
+// COVERAGE_TOOLS_ENABLED (§9 conventions, default off): the handlers are
+// always registered (registration is inert — only declared tools are callable
+// by a model), and personaTools.ts appends the declarations to the persona
+// surface only when the flag is on.
+
+export function coverageToolsEnabled(): boolean {
+  return (Deno.env.get("COVERAGE_TOOLS_ENABLED") ?? "").trim().toLowerCase() === "true";
+}
+
+/** Best-effort master-name map for one entity kind (id → display name). */
+async function masterNames(ctx: ToolContext, table: string, idCol: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const { data } = await ctx.supabase
+      .from(table)
+      .select(`${idCol}, name`)
+      .eq("project_id", ctx.projectId)
+      .limit(10000);
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const id = r[idCol];
+      if (id != null && r.name != null && String(r.name).trim() !== "") map.set(String(id), String(r.name));
+    }
+  } catch { /* names are enrichment; ids alone are still grounded */ }
+  return map;
+}
+
+interface ResolvedEntity {
+  id: string | null;
+  /** ≤ 5 candidates when the fragment is ambiguous (§19.5: never guess). */
+  candidates: Array<{ id: string; label: string }>;
+}
+
+/** §19.5 resolution: exact id match wins outright; otherwise the fragment is
+ * matched against ids AND master names; >1 hit returns the candidate list. */
+function resolveEntity(fragment: string, ids: Iterable<string>, names: Map<string, string>): ResolvedEntity {
+  const frag = fragment.trim().toLowerCase();
+  const all = [...new Set(ids)];
+  const exact = all.find((id) => id.toLowerCase() === frag);
+  if (exact) return { id: exact, candidates: [] };
+  const hits = all.filter((id) =>
+    id.toLowerCase().includes(frag) || (names.get(id) ?? "").toLowerCase().includes(frag)
+  );
+  if (hits.length === 1) return { id: hits[0], candidates: [] };
+  return {
+    id: null,
+    candidates: hits.slice(0, 5).map((id) => ({ id, label: names.get(id) ?? id })),
+  };
+}
+
+/** The "did you mean…" envelope (§19.5/§22.5): candidates as rows, never a
+ * guess — the persona instantiates the disambiguation template from these. */
+function ambiguousEnvelope(
+  tool: string,
+  fragment: string,
+  candidates: Array<{ id: string; label: string }>,
+  total: number,
+): ToolEnvelope {
+  return envelope(tool, "table", {
+    columns: ["id", "label"],
+    rows: candidates.map((c) => [c.id, c.label]),
+  }, candidates.length, `ambiguous: "${fragment}" matches ${total} entities — ask which one`);
+}
+
+/** Last arc wins per (from,to) pair — the exact dedupe useStageRows applies
+ * via its inboundByKey/outboundByKey maps, so tool answers and the policies
+ * page can never disagree on which arc's values are shown. */
+function lastArcByPair<T>(rows: T[], keyOf: (r: T) => string): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const r of rows) map.set(keyOf(r), r);
+  return map;
+}
+
+async function getSupplierMaterials(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolEnvelope> {
+  const tool = "get_supplier_materials";
+  const fragment = String(args.supplier ?? "").trim();
+  if (!fragment) return envelope(tool, "text", "supplier is required (id or name fragment).", 0, "error");
+  const topN = clamp(args.top_n, 50, 1, 200);
+
+  try {
+    const inbound = await loadInbound(ctx);
+    if (inbound.length === 0) return empty(tool);
+    const names = await masterNames(ctx, "suppliers", "supplier_id");
+    const resolved = resolveEntity(fragment, inbound.map((r) => r.supplier_id), names);
+    if (!resolved.id) {
+      if (resolved.candidates.length > 1) {
+        return ambiguousEnvelope(tool, fragment, resolved.candidates, resolved.candidates.length);
+      }
+      return empty(tool, `No supplier matching "${fragment}" in this project's inbound logistics.`);
+    }
+    const sid = resolved.id;
+
+    // Suppliers per material (single-source flag), over the whole project.
+    const suppliersByMaterial = new Map<string, Set<string>>();
+    for (const r of inbound) {
+      if (!suppliersByMaterial.has(r.material_id)) suppliersByMaterial.set(r.material_id, new Set());
+      suppliersByMaterial.get(r.material_id)!.add(r.supplier_id);
+    }
+
+    const pairs = lastArcByPair(
+      inbound.filter((r) => r.supplier_id === sid),
+      (r) => r.material_id,
+    );
+    const total = pairs.size;
+    if (total === 0) return empty(tool, `Supplier ${sid} has no inbound rows in this project.`);
+
+    let rows = [...pairs.values()].map((r) => ({
+      material: r.material_id,
+      price: r.unit_price,
+      lead: r.lead_time,
+      single: (suppliersByMaterial.get(r.material_id)?.size ?? 0) <= 1,
+      spend: r.volume * r.unit_price,
+    }));
+    // §19.3 ranking: single-source → lead time → spend.
+    rows.sort((x, y) =>
+      Number(y.single) - Number(x.single) ||
+      (y.lead ?? 0) - (x.lead ?? 0) ||
+      y.spend - x.spend
+    );
+    rows = rows.slice(0, topN);
+
+    const supplierLabel = names.has(sid) ? `${sid} (${names.get(sid)})` : sid;
+    // §19.3/§19.6: the note carries the TRUE total on truncation.
+    const note = total > topN
+      ? `supplier ${sid} supplies ${total} materials; showing top ${topN}.`
+      : `supplier ${supplierLabel} supplies ${total} materials.`;
+    return envelope(tool, "table", {
+      columns: ["Material", "Unit Price", "Lead Time", "Single-source?"],
+      rows: rows.map((r) => [
+        r.material,
+        r.price,
+        r.lead == null ? "-" : r.lead,
+        r.single ? "Yes" : "-",
+      ]),
+    }, rows.length, note);
+  } catch (e) {
+    console.warn("get_supplier_materials failed:", (e as Error).message);
+    return empty(tool);
+  }
+}
+
+async function getMaterialSuppliers(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolEnvelope> {
+  const tool = "get_material_suppliers";
+  const fragment = String(args.material ?? "").trim();
+  if (!fragment) return envelope(tool, "text", "material is required (id or name fragment).", 0, "error");
+  const topN = clamp(args.top_n, 25, 1, 50);
+
+  try {
+    const inbound = await loadInbound(ctx);
+    if (inbound.length === 0) return empty(tool);
+    const matNames = await masterNames(ctx, "materials", "material_id");
+    const supNames = await masterNames(ctx, "suppliers", "supplier_id");
+    const resolved = resolveEntity(fragment, inbound.map((r) => r.material_id), matNames);
+    if (!resolved.id) {
+      if (resolved.candidates.length > 1) {
+        return ambiguousEnvelope(tool, fragment, resolved.candidates, resolved.candidates.length);
+      }
+      return empty(tool, `No material matching "${fragment}" in this project's inbound logistics.`);
+    }
+    const mid = resolved.id;
+
+    const pairs = lastArcByPair(
+      inbound.filter((r) => r.material_id === mid),
+      (r) => r.supplier_id,
+    );
+    const total = pairs.size;
+    if (total === 0) return empty(tool, `Material ${mid} has no inbound rows in this project.`);
+
+    let rows = [...pairs.values()].map((r) => ({
+      supplier: supNames.has(r.supplier_id) ? `${r.supplier_id} (${supNames.get(r.supplier_id)})` : r.supplier_id,
+      price: r.unit_price,
+      lead: r.lead_time,
+      volume: r.volume,
+    }));
+    // useStageRows suggested-primary order: highest volume → lowest price →
+    // lowest lead time (the sole-source case returns its one row unchanged).
+    rows.sort((x, y) =>
+      y.volume - x.volume ||
+      (x.price ?? Number.POSITIVE_INFINITY) - (y.price ?? Number.POSITIVE_INFINITY) ||
+      (x.lead ?? Number.POSITIVE_INFINITY) - (y.lead ?? Number.POSITIVE_INFINITY)
+    );
+    rows = rows.slice(0, topN);
+
+    const note = total > topN
+      ? `material ${mid} has ${total} suppliers; showing top ${topN}.`
+      : `material ${mid} has ${total} supplier${total === 1 ? "" : "s"}.`;
+    return envelope(tool, "table", {
+      columns: ["Supplier", "Unit Price", "Lead Time", "Volume"],
+      rows: rows.map((r) => [
+        r.supplier,
+        r.price,
+        r.lead == null ? "-" : r.lead,
+        r.volume,
+      ]),
+    }, rows.length, note);
+  } catch (e) {
+    console.warn("get_material_suppliers failed:", (e as Error).message);
+    return empty(tool);
+  }
+}
+
+// §19.6: get_bom_relations declares no top_n — relation rows are capped at a
+// fixed 200 with the TRUE total in meta.note.
+const BOM_RELATION_ROW_CAP = 200;
+
+interface BomRow { material_id: string; parent: string | null; level: number | null; rate: number | null }
+
+async function loadBom(ctx: ToolContext): Promise<BomRow[]> {
+  const { data, error } = await ctx.supabase
+    .from("bom_multi_level")
+    .select("material_id, higher_level_component_id, level, consumption_rate")
+    .eq("project_id", ctx.projectId)
+    .limit(10000);
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    material_id: String(r.material_id ?? ""),
+    parent: r.higher_level_component_id == null || String(r.higher_level_component_id).trim() === ""
+      ? null
+      : String(r.higher_level_component_id),
+    level: r.level == null ? null : Number(r.level),
+    rate: r.consumption_rate == null ? null : Number(r.consumption_rate),
+  })).filter((r: BomRow) => r.material_id !== "");
+}
+
+interface OutboundRow { customer_id: string; product_id: string; volume: number; unit_price: number | null; lead: number | null }
+
+async function loadOutbound(ctx: ToolContext): Promise<OutboundRow[]> {
+  const { data, error } = await ctx.supabase
+    .from("outbound_logistics")
+    .select("customer_id, product_id, volume, unit_price, expected_lead_time")
+    .eq("project_id", ctx.projectId)
+    .limit(10000);
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    customer_id: String(r.customer_id ?? "unknown"),
+    product_id: String(r.product_id ?? "unknown"),
+    volume: Number(r.volume ?? 0) || 0,
+    unit_price: r.unit_price == null ? null : Number(r.unit_price),
+    lead: r.expected_lead_time == null ? null : Number(r.expected_lead_time),
+  }));
+}
+
+const BOM_DIRECTIONS = [
+  "material_to_products", "product_to_materials", "product_customers", "customer_products",
+] as const;
+
+async function getBomRelations(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolEnvelope> {
+  const tool = "get_bom_relations";
+  const direction = String(args.direction ?? "");
+  if (!(BOM_DIRECTIONS as readonly string[]).includes(direction)) {
+    return envelope(tool, "text",
+      `direction must be one of: ${BOM_DIRECTIONS.join(", ")}.`, 0, "error");
+  }
+  const fragment = String(args.target ?? "").trim();
+  if (!fragment) return envelope(tool, "text", "target is required (entity id or name fragment).", 0, "error");
+
+  try {
+    if (direction === "product_customers" || direction === "customer_products") {
+      const outbound = await loadOutbound(ctx);
+      if (outbound.length === 0) return empty(tool, "No outbound logistics rows in this project yet.");
+      const byProduct = direction === "product_customers";
+      const idSpace = outbound.map((r) => (byProduct ? r.product_id : r.customer_id));
+      const names = byProduct ? await masterNames(ctx, "products", "product_id") : new Map<string, string>();
+      const resolved = resolveEntity(fragment, idSpace, names);
+      if (!resolved.id) {
+        if (resolved.candidates.length > 1) {
+          return ambiguousEnvelope(tool, fragment, resolved.candidates, resolved.candidates.length);
+        }
+        return empty(tool, `No ${byProduct ? "product" : "customer"} matching "${fragment}" in this project's outbound logistics.`);
+      }
+      const target = resolved.id;
+      const pairs = lastArcByPair(
+        outbound.filter((r) => (byProduct ? r.product_id : r.customer_id) === target),
+        (r) => (byProduct ? r.customer_id : r.product_id),
+      );
+      const total = pairs.size;
+      let rows = [...pairs.values()].sort((x, y) => y.volume - x.volume);
+      rows = rows.slice(0, BOM_RELATION_ROW_CAP);
+      const kindLabel = byProduct ? "Customer" : "Product";
+      const note = total > rows.length
+        ? `${byProduct ? "product" : "customer"} ${target} has ${total} ${kindLabel.toLowerCase()} relations; showing top ${rows.length}.`
+        : `${byProduct ? "product" : "customer"} ${target}: ${total} relation${total === 1 ? "" : "s"} from outbound_logistics.`;
+      return envelope(tool, "table", {
+        columns: [kindLabel, "Volume", "Unit Price", "Expected Lead Time"],
+        rows: rows.map((r) => [
+          byProduct ? r.customer_id : r.product_id,
+          r.volume,
+          r.unit_price == null ? "-" : r.unit_price,
+          r.lead == null ? "-" : r.lead,
+        ]),
+      }, rows.length, note);
+    }
+
+    // BOM traversal — parent/leaf logic mirrors useStageRows: an id is a
+    // parent iff it appears as higher_level_component_id; finished products
+    // are the outbound sources (bomTargets ∩ outboundSources, else outbound).
+    const bom = await loadBom(ctx);
+    if (bom.length === 0) return empty(tool, "No multi-level BOM rows in this project yet.");
+    const outbound = await loadOutbound(ctx);
+    const outboundProducts = new Set(outbound.map((r) => r.product_id));
+    const matNames = await masterNames(ctx, "materials", "material_id");
+    const prodNames = await masterNames(ctx, "products", "product_id");
+
+    const parentsOf = new Map<string, BomRow[]>();   // child → edge rows up
+    const childrenOf = new Map<string, BomRow[]>();  // parent → edge rows down
+    for (const r of bom) {
+      if (!r.parent) continue;
+      if (!parentsOf.has(r.material_id)) parentsOf.set(r.material_id, []);
+      parentsOf.get(r.material_id)!.push(r);
+      if (!childrenOf.has(r.parent)) childrenOf.set(r.parent, []);
+      childrenOf.get(r.parent)!.push(r);
+    }
+
+    if (direction === "material_to_products") {
+      const idSpace = bom.map((r) => r.material_id);
+      const resolved = resolveEntity(fragment, idSpace, matNames);
+      if (!resolved.id) {
+        if (resolved.candidates.length > 1) {
+          return ambiguousEnvelope(tool, fragment, resolved.candidates, resolved.candidates.length);
+        }
+        return empty(tool, `No material matching "${fragment}" in this project's BOM.`);
+      }
+      const target = resolved.id;
+      // Walk UP via higher_level_component_id, cycle-safe, tracking depth.
+      const seen = new Map<string, number>(); // ancestor → min levels up
+      const queue: Array<{ id: string; depth: number }> = [{ id: target, depth: 0 }];
+      while (queue.length > 0) {
+        const { id, depth } = queue.shift()!;
+        for (const edge of parentsOf.get(id) ?? []) {
+          const p = edge.parent!;
+          if (seen.has(p)) continue;
+          seen.set(p, depth + 1);
+          queue.push({ id: p, depth: depth + 1 });
+        }
+      }
+      if (seen.size === 0) {
+        return empty(tool, `Material ${target} has no parent components in this project's BOM.`);
+      }
+      const total = seen.size;
+      const rows = [...seen.entries()]
+        .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+        .slice(0, BOM_RELATION_ROW_CAP);
+      const note = total > rows.length
+        ? `material ${target} feeds ${total} parent items; showing ${rows.length}.`
+        : `material ${target} feeds ${total} parent item${total === 1 ? "" : "s"} (finished products flagged from outbound_logistics).`;
+      return envelope(tool, "table", {
+        columns: ["Product", "Levels up", "Outbound product?"],
+        rows: rows.map(([id, depth]) => [
+          prodNames.has(id) ? `${id} (${prodNames.get(id)})` : id,
+          depth,
+          outboundProducts.has(id) ? "Yes" : "-",
+        ]),
+      }, rows.length, note);
+    }
+
+    // product_to_materials — walk DOWN, one row per BOM edge visited.
+    const idSpace = [...new Set([...childrenOf.keys(), ...outboundProducts])];
+    const resolved = resolveEntity(fragment, idSpace, prodNames);
+    if (!resolved.id) {
+      if (resolved.candidates.length > 1) {
+        return ambiguousEnvelope(tool, fragment, resolved.candidates, resolved.candidates.length);
+      }
+      return empty(tool, `No product matching "${fragment}" in this project's BOM or outbound logistics.`);
+    }
+    const target = resolved.id;
+    const visited = new Set<string>();
+    const edges: Array<{ material: string; parent: string; depth: number; rate: number | null }> = [];
+    const queue: Array<{ id: string; depth: number }> = [{ id: target, depth: 0 }];
+    visited.add(target);
+    while (queue.length > 0) {
+      const { id, depth } = queue.shift()!;
+      for (const edge of childrenOf.get(id) ?? []) {
+        edges.push({ material: edge.material_id, parent: id, depth: depth + 1, rate: edge.rate });
+        if (!visited.has(edge.material_id)) {
+          visited.add(edge.material_id);
+          queue.push({ id: edge.material_id, depth: depth + 1 });
+        }
+      }
+    }
+    if (edges.length === 0) {
+      return empty(tool, `Product ${target} has no BOM components in this project.`);
+    }
+    const total = edges.length;
+    const rows = edges
+      .sort((a, b) => a.depth - b.depth || a.material.localeCompare(b.material))
+      .slice(0, BOM_RELATION_ROW_CAP);
+    const note = total > rows.length
+      ? `product ${target} uses ${total} BOM component rows; showing ${rows.length}.`
+      : `product ${target}: ${total} BOM component row${total === 1 ? "" : "s"}.`;
+    return envelope(tool, "table", {
+      columns: ["Material", "Parent", "Levels down", "Consumption rate"],
+      rows: rows.map((e) => [
+        matNames.has(e.material) ? `${e.material} (${matNames.get(e.material)})` : e.material,
+        e.parent,
+        e.depth,
+        e.rate == null ? "-" : e.rate,
+      ]),
+    }, rows.length, note);
+  } catch (e) {
+    console.warn("get_bom_relations failed:", (e as Error).message);
+    return empty(tool);
+  }
+}
+
+const ENTITY_DETAIL_TYPES = ["supplier", "material", "product", "customer", "plant"] as const;
+
+async function getEntityDetail(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolEnvelope> {
+  const tool = "get_entity_detail";
+  const entityType = String(args.entity_type ?? "");
+  if (!(ENTITY_DETAIL_TYPES as readonly string[]).includes(entityType)) {
+    return envelope(tool, "text",
+      `entity_type must be one of: ${ENTITY_DETAIL_TYPES.join(", ")}.`, 0, "error");
+  }
+  const fragment = String(args.id ?? "").trim();
+  if (!fragment) return envelope(tool, "text", "id is required.", 0, "error");
+
+  try {
+    const masterTable = entityType === "supplier" ? "suppliers"
+      : entityType === "material" ? "materials"
+      : entityType === "product" ? "products"
+      : null;
+    const idCol = entityType === "supplier" ? "supplier_id"
+      : entityType === "material" ? "material_id"
+      : entityType === "product" ? "product_id"
+      : "node_id";
+
+    // Master rows first; node_list is both the criticality enrichment and the
+    // only home of customer/plant records.
+    let masterRows: Record<string, unknown>[] = [];
+    if (masterTable) {
+      const { data } = await ctx.supabase
+        .from(masterTable)
+        .select("*")
+        .eq("project_id", ctx.projectId)
+        .limit(10000);
+      masterRows = (data ?? []) as Record<string, unknown>[];
+    }
+    const { data: nodeData } = await ctx.supabase
+      .from("node_list")
+      .select("node_id, node_type, node_group, location_text, is_critical_node, critical_node_score")
+      .eq("project_id", ctx.projectId)
+      .limit(10000);
+    const nodeRows = ((nodeData ?? []) as Record<string, unknown>[]).filter(
+      (n) => masterTable === null
+        ? String(n.node_type ?? "").toLowerCase() === entityType
+        : true,
+    );
+
+    const names = new Map<string, string>();
+    for (const r of masterRows) {
+      if (r.name != null && String(r.name).trim() !== "") names.set(String(r[idCol]), String(r.name));
+    }
+    const idSpace = masterTable
+      ? masterRows.map((r) => String(r[idCol]))
+      : nodeRows.map((n) => String(n.node_id));
+    if (idSpace.length === 0) {
+      return empty(tool, `No ${entityType} records in this project yet.`);
+    }
+    const resolved = resolveEntity(fragment, idSpace, names);
+    if (!resolved.id) {
+      if (resolved.candidates.length > 1) {
+        return ambiguousEnvelope(tool, fragment, resolved.candidates, resolved.candidates.length);
+      }
+      return empty(tool, `No ${entityType} matching "${fragment}" in this project.`);
+    }
+    const id = resolved.id;
+
+    // §19.3: verbatim master values — never imputed. Missing fields render "-".
+    const cards: Array<{ label: string; value: string | number; hint?: string }> = [
+      { label: `${entityType} id`, value: id },
+    ];
+    const push = (label: string, v: unknown, hint?: string) => {
+      cards.push({ label, value: v == null || String(v).trim() === "" ? "-" : (v as string | number), ...(hint ? { hint } : {}) });
+    };
+    const master = masterRows.find((r) => String(r[idCol]) === id);
+    if (master) {
+      if (entityType === "supplier") {
+        push("Name", master.name);
+        push("Capacity / week", master.capacity_per_week, "NULL = unlimited");
+        push("Reliability score", master.reliability_score);
+      } else if (entityType === "material") {
+        push("Name", master.name);
+        push("Cost / unit", master.cost);
+        push("Holding cost %", master.holding_cost_pct);
+        push("MOQ", master.moq);
+        push("Initial on hand", master.initial_on_hand);
+        push("Lead-time distribution", master.lead_time_dist);
+        push("Lead-time CV", master.lead_time_cv);
+      } else if (entityType === "product") {
+        push("Name", master.name);
+        push("Sell price", master.sell_price);
+        push("Production capacity / week", master.production_capacity);
+        push("Fulfillment mode", master.fulfillment_mode);
+        push("Demand distribution", master.demand_distribution);
+        push("Demand mean / week", master.demand_mean);
+        push("Demand CV", master.demand_cv);
+      }
+    }
+    const node = ((nodeData ?? []) as Record<string, unknown>[]).find((n) => String(n.node_id) === id);
+    if (node) {
+      push("Node type", node.node_type);
+      push("Node group", node.node_group);
+      push("Location", node.location_text);
+      push("Critical node", node.is_critical_node ? "Yes" : "-");
+      push("Criticality score", node.critical_node_score);
+    }
+    if (!master && !node) {
+      return empty(tool, `No master record for ${entityType} ${id} in this project.`);
+    }
+    const note = master
+      ? undefined
+      : `no ${masterTable ?? "master"} row for ${id}; showing node_list fields only.`;
+    return envelope(tool, "kpi", { cards }, cards.length, note);
+  } catch (e) {
+    console.warn("get_entity_detail failed:", (e as Error).message);
+    return empty(tool);
+  }
+}
+
+/** §19.3 declarations for the four relation/detail tools — appended to the
+ * persona surface by personaTools.ts when COVERAGE_TOOLS_ENABLED. */
+export const coverageToolDeclarations: ReadonlyArray<ToolDeclaration> = [
+  {
+    name: "get_supplier_materials",
+    description:
+      "List the materials a specific supplier supplies for this project, from inbound logistics: material id, unit price, lead time and whether the supplier is the sole source. Resolve the supplier via list_project_entities first if the user gave a name. Ranked single-source first, then lead time, then spend; meta.note carries the TRUE total when the list is truncated.",
+    parameters: {
+      type: "object",
+      properties: {
+        supplier: { type: "string", description: "Supplier id or name fragment (required)." },
+        top_n: { type: "number", description: "Max materials to return (1-200). Default 50." },
+      },
+      required: ["supplier"],
+    },
+  },
+  {
+    name: "get_material_suppliers",
+    description:
+      "Name the actual suppliers of a specific material for this project, from inbound logistics: supplier id + name, unit price, lead time and volume. A sole-sourced material returns its one supplier row.",
+    parameters: {
+      type: "object",
+      properties: {
+        material: { type: "string", description: "Material id or name fragment (required)." },
+        top_n: { type: "number", description: "Max suppliers to return (1-50). Default 25." },
+      },
+      required: ["material"],
+    },
+  },
+  {
+    name: "get_bom_relations",
+    description:
+      "Traverse this project's bill-of-materials and customer relations: which products use a material (material_to_products), what a product's BOM contains (product_to_materials), who buys a product (product_customers), or what a customer orders (customer_products). Rows come verbatim from bom_multi_level / outbound_logistics.",
+    parameters: {
+      type: "object",
+      properties: {
+        direction: {
+          type: "string",
+          enum: ["material_to_products", "product_to_materials", "product_customers", "customer_products"],
+          description: "Which relation to traverse.",
+        },
+        target: { type: "string", description: "The entity id (or name fragment) to start from (required)." },
+      },
+      required: ["direction", "target"],
+    },
+  },
+  {
+    name: "get_entity_detail",
+    description:
+      "Read one entity's master-record fields verbatim (never imputed): supplier capacity/reliability, material cost/MOQ/holding cost/lead-time distribution, product price/capacity/demand, plus node criticality where known. Use for lead time / price / MOQ / criticality questions about a NAMED entity.",
+    parameters: {
+      type: "object",
+      properties: {
+        entity_type: {
+          type: "string",
+          enum: ["supplier", "material", "product", "customer", "plant"],
+          description: "Which entity kind the id names.",
+        },
+        id: { type: "string", description: "The entity id (or unambiguous fragment) to read (required)." },
+      },
+      required: ["entity_type", "id"],
+    },
+  },
+];
+
 const handlers: Record<string, Handler> = {
   list_project_entities: listProjectEntities,
   get_supplier_risk: getSupplierRisk,
   get_procurement_spend: getProcurementSpend,
   get_material_risk: getMaterialRisk,
   recommend_disruption_strategy: recommendDisruptionStrategy,
+  // §19.3 coverage reads (Phase H1) — registered always, declared to persona
+  // turns only when COVERAGE_TOOLS_ENABLED (personaTools.ts).
+  get_supplier_materials: getSupplierMaterials,
+  get_material_suppliers: getMaterialSuppliers,
+  get_bom_relations: getBomRelations,
+  get_entity_detail: getEntityDetail,
 };
 
 export type ToolHandler = Handler;

@@ -1,0 +1,17 @@
+{
+  "id": "cov-09-no-data-honesty",
+  "description": "§7.7-1 cov-09 — an empty project answers 'no data yet' (empty envelope), distinct from 'no such tool' (unknown_tool note); the honest refusal reply passes the verifier (§19.5 scope honesty).",
+  "project_snapshot": {},
+  "utterance": "what does supplier 10 supply?",
+  "mocked_llm": {
+    "args": {
+      "supplier": "10"
+    }
+  },
+  "expect": {
+    "empty_note": "empty",
+    "unknown_note": "unknown_tool",
+    "honest_reply": "I don't have enough data on that yet — this project has no inbound logistics rows. Try importing procurement data first."
+  },
+  "retired_reason": null
+}
