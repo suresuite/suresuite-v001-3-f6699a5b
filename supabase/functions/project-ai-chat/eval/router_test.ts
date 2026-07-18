@@ -124,7 +124,10 @@ Deno.test("classifyIntent honors the §6.1 contract shape", async () => {
   Deno.env.set("AGENT_ROUTER_ENABLED", "true");
   const d = await classifyIntent("fill costs", ctx(), () => Promise.resolve(artifactJson()));
   assertEquals(Object.keys(d).sort(), [
-    "advisory_part", "agent_id", "artifact_part", "confidence", "intent", "route",
+    // §6.6 (v1.4): needs_run + cache_checkable are additive contract fields —
+    // always present, defaulting false with ROUTER_V2_SIGNALS off.
+    "advisory_part", "agent_id", "artifact_part", "cache_checkable",
+    "confidence", "intent", "needs_run", "route",
   ]);
   Deno.env.delete("AGENT_ROUTER_ENABLED");
 });

@@ -88,6 +88,10 @@ export function applyModeToRoute(decision: RoutedDecision, mode: ChatMode): Mode
       confidence: decision.confidence,
       advisory_part: null,
       artifact_part: null,
+      // §6.6: the v2 signals are facts about the ask, not the route — a mode
+      // subtraction keeps them (rule 1 reads apply on any route).
+      needs_run: decision.needs_run,
+      cache_checkable: decision.cache_checkable,
       short_circuit: "mode_ask",
     },
     blocked: { agent_id: decision.agent_id, intent: decision.intent },

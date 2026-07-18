@@ -10,7 +10,11 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { runChat, resolveModel, type ChatRunResult, type ChatTurn } from "./providers.ts";
-import { makeToolContext, type ToolContext, type ToolEnvelope } from "./tools.ts";
+import { makeToolContext, type ToolContext, type ToolDeclaration, type ToolEnvelope } from "./tools.ts";
+// H2 (§6.6 rule 1): the cache reads that join the persona surface when the
+// router marks an ask cache_checkable. Pure reads — no approval involved.
+import { findCompletedRunDeclaration } from "./experimentTools.ts";
+import { getRunResultsDeclaration, getValidationStatusDeclaration } from "./vvTools.ts";
 // H1 (ai-agents.md §19.3/§22.3): the coverage-expanded persona read surface
 // and the pre-send verifier. Both flags default off ⇒ byte-identical pre-H1
 // behavior (personaToolDeclarations() returns the unchanged toolDeclarations;
@@ -404,6 +408,10 @@ serve(async (req) => {
       intent: routeDecision.intent,
       confidence: routeDecision.confidence,
       short_circuit: routeDecision.short_circuit,
+      // §6.6 (H2): the v2 signals ride the same event — both false with
+      // ROUTER_V2_SIGNALS off (the v1 payload gains two constant fields).
+      needs_run: routeDecision.needs_run,
+      cache_checkable: routeDecision.cache_checkable,
     });
     if (modeBlocked) {
       telemetry.emit('mode.blocked_intent', {
@@ -472,7 +480,28 @@ serve(async (req) => {
       const verifierOn = verifierEnabled() && ctx !== null;
       // §19.3: the persona read surface (coverage tools + exposed Layer B
       // reads when COVERAGE_TOOLS_ENABLED; the unchanged declarations else).
-      const personaTools = personaToolDeclarations();
+      // §6.6 rule 1 (H2, deterministic — code, never model behavior):
+      // cache_checkable === true on ANY route ⇒ the executing persona turn's
+      // surface includes find_completed_run + get_run_results +
+      // get_validation_status and its prompt carries the cache-first
+      // instruction (§20.4). Only reachable with ROUTER_V2_SIGNALS on, so
+      // flag-off requests keep the byte-identical v1 surface and prompt.
+      const cacheCheckable = routeDecision.cache_checkable === true && ctx !== null;
+      const dedupeByName = (tools: ReadonlyArray<ToolDeclaration>): ReadonlyArray<ToolDeclaration> => {
+        const seen = new Set<string>();
+        return tools.filter((t) => !seen.has(t.name) && (seen.add(t.name), true));
+      };
+      const personaTools = cacheCheckable
+        ? dedupeByName([
+          ...personaToolDeclarations(),
+          findCompletedRunDeclaration,
+          getRunResultsDeclaration,
+          getValidationStatusDeclaration,
+        ])
+        : personaToolDeclarations();
+      // Spread into every persona runChat call so the built prompt carries
+      // the §20.4 cache-first instruction when rule 1 applies.
+      const personaCacheOpts = cacheCheckable ? { cacheFirst: true } : {};
       const recordInto = (arr: RecordedToolCall[]) =>
         (name: string, args: Record<string, unknown>, envelope: ToolEnvelope) => {
           arr.push({ name, args, envelope });
@@ -500,6 +529,12 @@ serve(async (req) => {
       // Stages 1–3: any routed agent with a §5 turn runner (data-steward,
       // policy-configurator, vv-analyst — AGENT_TURNS) executes here; agents
       // without one fall through to the advisory path.
+      // §6.6 rule 2 (H2): needs_run ∧ route artifact ∧ experiment-designer ⇒
+      // the B4 closed-loop turn (§20.3) — which IS this path: behind
+      // CLOSED_LOOP_ENABLED, buildExperimentContext swaps in the §20.4 loop
+      // prompt and the §20.2 tool surface for every routed B4 turn. needs_run
+      // on an *advisory* route changes nothing deterministic (the persona may
+      // honestly say a run would be needed — §19.4's nearest-grounded-action).
       const routedAgentId =
         (routeDecision.route === 'artifact' || routeDecision.route === 'mixed') && ctx !== null &&
         routeDecision.agent_id !== null && AGENT_TURNS[routeDecision.agent_id]
@@ -581,6 +616,7 @@ serve(async (req) => {
             {
               summary: threadSummary,
               tools: personaTools,
+              ...personaCacheOpts,
               ...(verifierOn ? { onToolResult: recordInto(personaCalls) } : {}),
             },
           );
@@ -614,6 +650,7 @@ serve(async (req) => {
                   const persona2 = await runChat(model, advisoryPart, history, ctx, agentId, {
                     summary: threadSummary,
                     tools: personaTools,
+                    ...personaCacheOpts,
                     systemAddendum: addendum,
                     onToolResult: recordInto(retryCalls),
                   });
@@ -699,6 +736,7 @@ serve(async (req) => {
           const persona = await runChat(model, promptText, history, ctx, agentId, {
             summary: threadSummary,
             tools: personaTools,
+            ...personaCacheOpts,
             ...(verifierOn ? { onToolResult: recordInto(personaCalls) } : {}),
           });
           telemetryToolCalls = persona.toolCalls ?? [];
@@ -720,6 +758,7 @@ serve(async (req) => {
                   const persona2 = await runChat(model, promptText, history, ctx, agentId, {
                     summary: threadSummary,
                     tools: personaTools,
+                    ...personaCacheOpts,
                     systemAddendum: addendum,
                     onToolResult: recordInto(retryCalls),
                   });
@@ -751,6 +790,7 @@ serve(async (req) => {
         result = await runChat(model, promptText, history, ctx, agentId, {
           summary: threadSummary,
           tools: personaTools,
+          ...personaCacheOpts,
           ...(verifierOn ? { onToolResult: recordInto(personaCalls) } : {}),
         });
         telemetryToolCalls = result.toolCalls ?? [];
@@ -767,6 +807,7 @@ serve(async (req) => {
                 const second = await runChat(model, promptText, history, ctx, agentId, {
                   summary: threadSummary,
                   tools: personaTools,
+                  ...personaCacheOpts,
                   systemAddendum: addendum,
                   onToolResult: recordInto(retryCalls),
                 });

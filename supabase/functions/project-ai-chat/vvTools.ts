@@ -239,7 +239,9 @@ export async function loadPersistedTests(
   }
 }
 
-async function currentHashes(db: Db, projectId: string): Promise<{ policy: string; graph: string }> {
+/** Exported for the §20.2 find_completed_run badge column (Phase H2) — one
+ * derivation, one reader of the hash RPCs. */
+export async function currentHashes(db: Db, projectId: string): Promise<{ policy: string; graph: string }> {
   const out = { policy: "unknown", graph: "unknown" };
   try {
     const { data } = await db.rpc("current_policy_hash", { p_project_id: projectId });
@@ -346,6 +348,24 @@ export async function buildVvContext(
 
 // ---------- read handlers ----------
 
+/** Badge derivation exactly as useModelValidation.tsx::deriveCredibility:
+ * active+validated card, drift computed against the CURRENT hashes. The ONE
+ * implementation behind get_validation_status and the §20.2
+ * find_completed_run "Validated" column (Phase H2). */
+export function deriveValidationBadge(
+  c: Record<string, unknown>,
+  hashes: { policy: string; graph: string },
+): string {
+  let badge = "unvalidated";
+  if (c.status === "active" && c.verdict === "validated") {
+    const drift: string[] = [];
+    if (hashes.policy !== "unknown" && String(c.policy_hash) !== hashes.policy) drift.push("policy");
+    if (hashes.graph !== "unknown" && String(c.graph_hash) !== hashes.graph) drift.push("data");
+    badge = drift.length === 0 ? "validated" : `stale (${drift.join("+")} drift)`;
+  }
+  return badge;
+}
+
 async function getValidationStatus(
   args: Record<string, unknown>,
   ctx: ToolContext,
@@ -370,16 +390,8 @@ async function getValidationStatus(
         meta: { tool, row_count: 0, note: "empty" },
       };
     }
-    // Badge derivation exactly as useModelValidation.tsx::deriveCredibility:
-    // active+validated card, drift computed against the CURRENT hashes.
     const derived = rows.map((c: Record<string, unknown>) => {
-      let badge = "unvalidated";
-      if (c.status === "active" && c.verdict === "validated") {
-        const drift: string[] = [];
-        if (hashes.policy !== "unknown" && String(c.policy_hash) !== hashes.policy) drift.push("policy");
-        if (hashes.graph !== "unknown" && String(c.graph_hash) !== hashes.graph) drift.push("data");
-        badge = drift.length === 0 ? "validated" : `stale (${drift.join("+")} drift)`;
-      }
+      const badge = deriveValidationBadge(c, hashes);
       return [
         String(c.id),
         badge,
