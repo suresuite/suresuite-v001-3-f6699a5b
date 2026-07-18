@@ -111,26 +111,54 @@ Once it's live, a scenario **Run** in the app flips from the yellow
 "preliminary (stub)" badge to a green "worker engine" badge with real KPIs —
 that flip confirms the engine is actually running.
 
+## Idle command budget (Upstash free tier)
+
+Two loops poll Redis on a fixed timer while the worker is running, independent of
+load:
+
+- `_discover_loop` — a `SCAN` for new `sim.cmd.*` streams every
+  `DEFAULT_PROJECTS_REFRESH` seconds.
+- `_consume` — an `XREADGROUP … BLOCK XREAD_BLOCK_MS` per stream; an idle poll
+  returns empty and re-issues.
+
+Every poll is a billed Upstash command. At the original 5 s cadence an always-on
+worker issued on the order of **1M idle reads/month** from these two loops alone —
+enough to blow the 500k-commands/month free tier with essentially no real work
+(one `XADD` per run is the only write). The cadence is now **30 s**
+(`sim_worker/worker.py`), a ~6× cut that drops the always-on idle floor to roughly
+**95k reads/month**.
+
+Widening the `XREADGROUP` block adds **no** job-pickup latency — a blocking read
+returns the instant a command is `XADD`'d, so the longer block only removes empty
+polls. A longer discovery interval only delays picking up a *brand-new* project's
+first-ever stream (≤ 30 s); streams persist, so repeat runs are unaffected.
+
+To drive idle reads to ~0 (and idle Fly cost with them), also enable scale-to-zero
+below — the worker then stops entirely when unused instead of polling.
+
 ## Scale to zero (idle cost → ~$0)
 
-By default the worker blocks on the Redis stream 24/7, so the Fly machine bills
-even when you never run a simulation. Scale-to-zero lets an idle worker **stop
-itself** and be **woken on the next run**, so idle cost drops to roughly nothing
-(you pay only while a run is actually executing, plus Fly's tiny stopped-machine
-rootfs charge).
+Scale-to-zero lets an idle worker **stop itself** and be **woken on the next
+run**. It is **enabled by default** in `fly.toml` (`IDLE_SHUTDOWN_SECONDS="900"`,
+`[[restart]] policy = "on-failure"`) because an always-on worker polls the Redis
+stream 24/7 — which bills the Fly machine *and* burns ~95k Upstash reads/month
+even at the tuned 30 s cadence (see "Idle command budget" above). Stopping the
+worker drops both to ~0: you pay only while a run is actually executing, plus
+Fly's tiny stopped-machine rootfs charge.
 
-Two halves, both required — enable them together:
+Two halves, both required. Half 1 ships enabled in `fly.toml`; the one thing to
+verify before deploying is half 2 (the wake secrets) — without it a stopped
+worker never restarts and runs sit "queued" forever.
 
-1. **Stop when idle** (the worker) — `sim-worker/fly.toml`:
-   - Set `IDLE_SHUTDOWN_SECONDS` to a quiet period, e.g. `"900"` (15 min). The
-     worker exits cleanly after that long with no command in flight (a running
-     `experiment.run` never counts as idle).
-   - Change `[[restart]] policy` from `"always"` to `"on-failure"`, so a clean
-     `exit(0)` **stops** the machine while genuine crashes still restart. (With
-     `"always"`, an idle exit is restarted immediately — you get no savings but
-     also never a stranded run, which is why `"always"` is the safe default to
-     ship before the wake half is configured.)
-   - Redeploy: `flyctl deploy . --config sim-worker/fly.toml --dockerfile
+1. **Stop when idle** (the worker) — `sim-worker/fly.toml`, already set:
+   - `IDLE_SHUTDOWN_SECONDS="900"` (15 min) — the worker exits cleanly after
+     that long with no command in flight (a running `experiment.run` never
+     counts as idle).
+   - `[[restart]] policy = "on-failure"` — a clean `exit(0)` **stops** the
+     machine while genuine crashes still restart. (To turn scale-to-zero OFF,
+     set `IDLE_SHUTDOWN_SECONDS="0"` and restore `policy = "always"`: an idle
+     exit is then restarted immediately — no savings, but never a stranded run.)
+   - Deploy: `flyctl deploy . --config sim-worker/fly.toml --dockerfile
      sim-worker/Dockerfile` (from the repo root). Confirm in `fly logs`:
      `scale-to-zero armed: will exit after 900s idle`.
 
@@ -148,8 +176,8 @@ Two halves, both required — enable them together:
    set these automatically from the same `FLY_API_TOKEN` / `FLY_APP_NAME` you
    already use to deploy the worker, so in most setups this step is done for you
    on the next functions deploy. Without these secrets the wake is a logged
-   no-op — safe, but a stopped worker won't come back, so **don't enable half 1
-   without half 2**.
+   no-op — safe, but a stopped worker won't come back, so **verify half 2 is
+   configured before deploying** the scale-to-zero worker config.
 
 **Tradeoff:** the first run after the worker has slept pays a cold start
 (machine boot + scsim import + graph load, typically ~10–30 s) before it begins;
