@@ -1,0 +1,30 @@
+{
+  "id": "mx-03-stale-proceeds",
+  "description": "ai-agents.md §23.4 fail-open trio (2/3) + §7.6 — a FAILING row measured 8 days ago is STALE: it stops gating (the turn proceeds) and renders as stale wherever displayed (the client summarizer marks it under the same mocked clock). The template must never fire off month-old evidence.",
+  "now": "2026-07-19T12:00:00Z",
+  "matrix_rows": [
+    {
+      "model_code": "gemini-2.5-flash",
+      "capability_id": "agent:experiment-designer",
+      "score": 0.5,
+      "target": 1.0,
+      "pass": false,
+      "eval_run_id": "eval:seed0001",
+      "measured_at": "2026-07-11T12:00:00Z"
+    }
+  ],
+  "model_code": "gemini-2.5-flash",
+  "utterance": "run a 6-week outage of S1 against the baseline",
+  "route": {
+    "route": "artifact",
+    "agent_id": "experiment-designer",
+    "needs_run": false,
+    "cache_checkable": false
+  },
+  "expect": {
+    "blocked": false,
+    "provider_calls_min": 1,
+    "client_renders_stale": true
+  },
+  "retired_reason": null
+}

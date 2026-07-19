@@ -1,0 +1,29 @@
+{
+  "id": "mx-02-passing-proceeds",
+  "description": "ai-agents.md §23.4 fail-open trio (1/3) — a fresh PASSING row never fires the template: the routed agent turn executes normally (the scripted provider is reached). The below-target template fires only on fresh failing evidence, never on fresh-passing rows (§24.3 H4 exit criterion).",
+  "now": "2026-07-19T12:00:00Z",
+  "matrix_rows": [
+    {
+      "model_code": "gemini-2.5-flash",
+      "capability_id": "agent:experiment-designer",
+      "score": 1.0,
+      "target": 1.0,
+      "pass": true,
+      "eval_run_id": "eval:seed0001",
+      "measured_at": "2026-07-18T12:00:00Z"
+    }
+  ],
+  "model_code": "gemini-2.5-flash",
+  "utterance": "run a 6-week outage of S1 against the baseline",
+  "route": {
+    "route": "artifact",
+    "agent_id": "experiment-designer",
+    "needs_run": false,
+    "cache_checkable": false
+  },
+  "expect": {
+    "blocked": false,
+    "provider_calls_min": 1
+  },
+  "retired_reason": null
+}

@@ -16,9 +16,10 @@ const recordedById = new Map(recorded.map((c) => [c.id, c]));
 // Flags off — the §9 global kill-switch state (incl. the v1.2 Phase 1 flags:
 // Stage 4 single-run, §15 modes, §17.3 suggestions; the Phase 3 file
 // workspace; the v1.4 H1 flags: coverage tools + verifier; the v1.4 H2
-// flags: router v2 signals + closed loop; and the v1.4 H3 plan tool — the
+// flags: router v2 signals + closed loop; the v1.4 H3 plan tool — the
 // §21.5 budgets ship unflagged but their DEFAULTs never bind a single-turn
-// request, which this suite proves byte-identically).
+// request, which this suite proves byte-identically; and the v1.4 H4
+// capability matrix, whose store is inert data with the flag off).
 Deno.env.delete("AGENT_TELEMETRY_ENABLED");
 Deno.env.delete("AGENT_ROUTER_ENABLED");
 Deno.env.delete("AGENT_ENABLED_IDS");
@@ -32,6 +33,7 @@ Deno.env.delete("VERIFIER_ENABLED");
 Deno.env.delete("ROUTER_V2_SIGNALS");
 Deno.env.delete("CLOSED_LOOP_ENABLED");
 Deno.env.delete("PLAN_TOOL_ENABLED");
+Deno.env.delete("MODEL_MATRIX_ENABLED");
 setTestProviderKeys();
 
 for (const scenario of GOLDEN_SCENARIOS) {

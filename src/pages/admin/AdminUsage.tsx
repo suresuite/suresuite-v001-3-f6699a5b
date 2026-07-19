@@ -12,6 +12,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Loader2 } from 'lucide-react';
+import {
+  aggregateMatrixByModel,
+  type ModelCapabilityRow,
+  type ModelMatrixAggregate,
+} from '@/lib/modelMatrix';
 
 interface Props {
   isCollapsed: boolean;
@@ -57,6 +62,7 @@ const db = supabase as any;
 export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [fileRows, setFileRows] = useState<OrgFileUsageRow[]>([]);
+  const [matrixRows, setMatrixRows] = useState<ModelMatrixAggregate[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -84,6 +90,19 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
       setFileRows(!error && Array.isArray(usage) ? (usage as OrgFileUsageRow[]) : []);
     } catch {
       setFileRows([]);
+    }
+    try {
+      // Per-model capability matrix (ai-agents.md §23.3, the §16.2 rollup
+      // precedent) — aggregates only. Empty until the first --matrix eval
+      // run publishes rows; absent pre-H4 deployments render no section.
+      const { data: matrix, error } = await db.rpc('get_model_capability_matrix');
+      setMatrixRows(
+        !error && Array.isArray(matrix)
+          ? aggregateMatrixByModel(matrix as ModelCapabilityRow[])
+          : [],
+      );
+    } catch {
+      setMatrixRows([]);
     }
     setLoading(false);
   };
@@ -209,6 +228,51 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
           </TableBody>
         </Table>
       </div>
+
+      {matrixRows.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-1 text-sm font-semibold">Model capability matrix</h2>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Per-model quality from the nightly model-scored eval (ai-agents.md §23). The matrix
+            informs the picker and the below-target refusal — it never hides a model and never
+            switches one. Rows older than 7 days are stale and stop gating.
+          </p>
+          <div className="rounded-md border border-border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="text-right">Capabilities passing</TableHead>
+                  <TableHead>Below target</TableHead>
+                  <TableHead>Measured</TableHead>
+                  <TableHead>Freshness</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {matrixRows.map((r) => (
+                  <TableRow key={r.model_code}>
+                    <TableCell className="text-xs">{r.model_code}</TableCell>
+                    <TableCell className="text-right">
+                      {r.passing}/{r.total}
+                    </TableCell>
+                    <TableCell className="max-w-[360px] text-xs text-muted-foreground">
+                      {r.belowTarget.length > 0 ? r.belowTarget.join(', ') : '—'}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {r.measuredAt ? new Date(r.measuredAt).toLocaleString() : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={r.stale ? 'outline' : 'secondary'}>
+                        {r.stale ? 'stale' : 'fresh'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       {fileRows.length > 0 && (
         <div className="mt-6">

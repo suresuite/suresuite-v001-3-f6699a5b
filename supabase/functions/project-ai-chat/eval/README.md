@@ -10,14 +10,19 @@ Two tiers gate the agent layer the way golden traces gate the engine (asset A13)
 2. **Model-scored tier — nightly + before any flag flip**
    (`run_model_eval.ts`): executes enabled agents' fixtures and
    `routing.golden.jsonl` against every enabled model, scores the §6.5/§7.4
-   targets (exit 1 on a miss — the flag-flip gate), and records results into
-   `ai_chat_events` under `thread_id 'eval:<run-id>'` when service-role creds
-   are set. `--mock` exercises the runner offline (oracle classifier + fixture
-   args); a mock run is never flag-flip evidence.
+   targets plus the §7.6 loop/plan slices (exit 1 on a miss — the flag-flip
+   gate), and records results into `ai_chat_events` under
+   `thread_id 'eval:<run-id>'` when service-role creds are set. `--mock`
+   exercises the runner offline (oracle classifier + fixture args); a mock
+   run is never flag-flip evidence. `--matrix` (H4, §23.1/§7.6) additionally
+   upserts one `ai_model_capabilities` row per (model, §23.2 capability) —
+   the score, the target it was measured against, `pass`, and the
+   `eval:<run-id>` correlator; it requires the full agent roster (the closed
+   vocabulary admits no subset) and is REFUSED on `--mock`.
 
    ```sh
    deno run --allow-env --allow-read --allow-write --allow-net run_model_eval.ts \
-     [--models=gemini-2.5-flash,gpt-5] [--agents=data-steward] [--mock] [--out=report.json]
+     [--models=gemini-2.5-flash,gpt-5] [--agents=data-steward] [--mock] [--out=report.json] [--matrix]
    ```
 
 There is also a runnable Stage 1 end-to-end demo transcript
@@ -70,6 +75,9 @@ with a warning; CI sets `EVAL_REQUIRE_DB=1` to turn that skip into a failure.
 | `provider_retry_test.ts` | §20.5 free-tier operations (H2): one retry on 429/5xx with 1 s→2 s ±25% jittered backoff, the typed rate-limit error on a second failure (no silent model substitution), non-retryable statuses untouched. |
 | `demo_closed_loop.ts` | Runnable H2 acceptance transcript: (a) cache hit answers instantly citing the stored run id + hashes, no card; (b) miss files the spec card and NOTHING dispatches until Approve (then the queued run carries full provenance stamps); (c) after a data re-upload the `cache_stale` reply names the drifted hash. |
 | `demo_reports.ts` | Runnable Phase 3 acceptance transcript: the chained disruption-brief flow (no evidence run → the refusal NAMES it and offers the experiment path → B4 spec → approve → dispatch → run completes → the re-ask drafts the brief citing the NEW run_id) → approve → PDF + XLSX rendered under the §16.2 path law with `user_files` rows and the "AI-drafted commentary" heading; the §13.3 rights row + the 21st-render quota denial; the report ask surviving Ask mode while a steward ask is subtracted. |
+| `matrix_test.ts` + `fixtures/matrix/mx-01…mx-04` | §23 capability-matrix suite (H4, `MODEL_MATRIX_ENABLED`): the closed §23.2 vocabulary byte-equal across the doc, `matrix.ts` and the client mirror; the §22.5 needs-a-stronger-model template VERBATIM (server-instantiated, with and without a best passing model); the §23.4 route→capability mapping; mx-01 (a fresh failing row fires the template with the agent turn UNEXECUTED — zero provider calls, zero proposals — and `model.below_target` recorded); the fail-open trio mx-02/03/04 (fresh-passing / stale / no-row all proceed, with the stale row rendering stale client-side under the SAME mocked clock — §7.6); the 7-day freshness boundary; `matrixRowsFor` (one row per capability, target snapshotting — threshold changes never rewrite history; unmeasured capabilities yield NO row); and `writeMatrix` (the on_conflict upsert shape, the `--mock` REFUSAL with zero fetches, the honest no-creds skip). |
+| `db_matrix_test.ts` | Scratch-Postgres pins for `20260726000002_model_capability_matrix.sql` (verbatim): the §23.1 DDL, "newest run upserts" via the (model_code, capability_id) ON CONFLICT (one row per pair forever, `measured_at` advancing), service-path-only writes (anon denied), the anon-readable `get_model_capability_matrix()` ordering, and `model.below_target` in the `ai_chat_events` CHECK. |
+| `demo_matrix.ts` | Runnable H4 acceptance transcript: a full LIVE-MODE `--matrix` run (mode:"model", the real runChat/classifier/judge HTTP layer over a deterministic scripted provider; an in-memory REST stand-in honoring the upsert key) proving matrix rows for EVERY enabled model × EVERY §23.2 capability with the report and the table agreeing row for row. |
 | `fixtures/<agent>/` | Golden task suites per agent (populated per stage, §5). |
 
 Fixture growth discipline (§7.3): every production misroute, rejected-with-note
