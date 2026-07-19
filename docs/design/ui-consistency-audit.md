@@ -415,3 +415,23 @@ Where the mechanical plan met reality, the following adjustments were made:
   CardHeader/CardContent(p-0) layout for no visual gain.
 - **B0 re-exports**: `TableEmpty` (pre-existing) was added to `shared/index.ts` alongside the
   new primitives so table pages import from one barrel.
+
+### 5.1 Follow-up consistency pass (same branch)
+
+A second sweep tightened the table contract without changing the design language:
+
+- **`TableLoading` upgraded** from a single spinner row to **`Skeleton` rows** (default 3,
+  `h-4` bar per row at real row height) so tables don't jump when data lands. Same API
+  (`colSpan`, optional `rows`); every consumer picked it up unchanged.
+- **Primary name columns** truncate at `max-w-[280px]` (Users, Organizations, Projects,
+  Models, Dashboard top tables, DeveloperApi key name).
+- **Actions columns** normalized to `w-[1%]` heads + `whitespace-nowrap` cells instead of
+  magic pixel widths (`w-[120px]`/`w-[60px]`/`w-[80px]`).
+- **Numeric formatting**: token counts in AI Usage now `toLocaleString()`; `tabular-nums`
+  extended to the remaining numeric cells (org members/projects, user budget, capability
+  matrix passing, DeveloperApi requests-30d — now right-aligned).
+- **Kept as-is, deliberately**: `TH_DENSE` uppercase micro-headers (C8 — the language of the
+  mature pages; a sentence-case/default-`TableHead` scheme was considered and rejected as a
+  revert of C8), `h-9` header-row search inputs (C3), `TableShell` for single-table pages
+  (a `CardHeader` title would duplicate the sticky `PageHeader` title), and the compact
+  `UsageStat` minis on the user-access page (C4 density).

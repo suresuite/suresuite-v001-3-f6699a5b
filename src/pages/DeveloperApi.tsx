@@ -495,9 +495,9 @@ print(r["aggregate_kpis"], len(reps))`;
                       <TableHead className={TH_DENSE}>Scopes</TableHead>
                       <TableHead className={TH_DENSE}>Projects</TableHead>
                       <TableHead className={TH_DENSE}>Status</TableHead>
-                      <TableHead className={TH_DENSE}>Requests (30d)</TableHead>
+                      <TableHead className={`${TH_DENSE} text-right`}>Requests (30d)</TableHead>
                       <TableHead className={TH_DENSE}>Last used</TableHead>
-                      <TableHead className={`${TH_DENSE} text-right`}>Actions</TableHead>
+                      <TableHead className={`${TH_DENSE} w-[1%] text-right`}>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -514,7 +514,7 @@ print(r["aggregate_kpis"], len(reps))`;
                         const u = usage[k.id];
                         return (
                           <TableRow key={k.id}>
-                            <TableCell className="font-medium text-sm">{k.name}</TableCell>
+                            <TableCell className="max-w-[280px] truncate font-medium text-sm">{k.name}</TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">
                               sk_{k.env}_{k.key_prefix}_••••
                             </TableCell>
@@ -541,10 +541,10 @@ print(r["aggregate_kpis"], len(reps))`;
                             <TableCell>
                               <Badge variant={st.variant}>{st.label}</Badge>
                             </TableCell>
-                            <TableCell className="text-xs">
+                            <TableCell className="text-right text-xs tabular-nums">
                               {u ? (
                                 <>
-                                  {u.requests_30d}
+                                  {Number(u.requests_30d).toLocaleString()}
                                   {u.errors_30d > 0 && (
                                     <span className="text-destructive"> · {u.errors_30d} err</span>
                                   )}

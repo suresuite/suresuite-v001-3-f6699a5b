@@ -124,7 +124,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
               <TableHead className={`${TH_DENSE} text-right`}>Cost (MTD)</TableHead>
               <TableHead className={TH_DENSE}>Status</TableHead>
               <TableHead className={TH_DENSE}>Created</TableHead>
-              <TableHead className={`${TH_DENSE} w-[120px] text-right`}>Actions</TableHead>
+              <TableHead className={`${TH_DENSE} w-[1%] text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -135,10 +135,10 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
             ) : (
               rows.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell className="font-medium">{o.name}</TableCell>
+                  <TableCell className="max-w-[280px] truncate font-medium">{o.name}</TableCell>
                   <TableCell className="text-muted-foreground">{o.slug}</TableCell>
-                  <TableCell className="text-right">{o.members}</TableCell>
-                  <TableCell className="text-right">{o.projects}</TableCell>
+                  <TableCell className="text-right tabular-nums">{o.members}</TableCell>
+                  <TableCell className="text-right tabular-nums">{o.projects}</TableCell>
                   <TableCell className="text-right tabular-nums">${o.cost_mtd.toFixed(2)}</TableCell>
                   <TableCell>
                     <Badge variant={o.status === 'active' ? 'secondary' : 'destructive'}>
@@ -148,7 +148,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                   <TableCell className="text-xs text-muted-foreground">
                     {new Date(o.created_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="whitespace-nowrap text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">

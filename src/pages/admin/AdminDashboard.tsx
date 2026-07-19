@@ -238,7 +238,7 @@ function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
             ) : (
               rows.map((r) => (
                 <TableRow key={r.label}>
-                  <TableCell className="font-medium">{r.label}</TableCell>
+                  <TableCell className="max-w-[280px] truncate font-medium">{r.label}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {r.requests.toLocaleString()}
                   </TableCell>

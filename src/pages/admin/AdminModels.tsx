@@ -219,7 +219,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
               <TableHead className={`${TH_DENSE} text-right`}>Output $/1k</TableHead>
               <TableHead className={`${TH_DENSE} text-right`}>Context</TableHead>
               <TableHead className={TH_DENSE}>Enabled</TableHead>
-              <TableHead className={`${TH_DENSE} w-[80px]`}></TableHead>
+              <TableHead className={`${TH_DENSE} w-[1%]`}></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -230,7 +230,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
             ) : (
               models.map((m) => (
                 <TableRow key={m.id}>
-                  <TableCell className="font-medium">{m.display_name}</TableCell>
+                  <TableCell className="max-w-[280px] truncate font-medium">{m.display_name}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{m.code}</TableCell>
                   <TableCell className="text-right tabular-nums">${Number(m.input_cost_per_1k).toFixed(4)}</TableCell>
                   <TableCell className="text-right tabular-nums">${Number(m.output_cost_per_1k).toFixed(4)}</TableCell>
@@ -238,7 +238,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                   <TableCell>
                     <Switch checked={m.enabled} onCheckedChange={() => toggle(m)} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <Button variant="ghost" size="icon" onClick={() => remove(m)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>

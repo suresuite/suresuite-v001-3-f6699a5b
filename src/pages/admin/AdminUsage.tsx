@@ -199,9 +199,9 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
                   </TableCell>
                   <TableCell>{r.user_name || '—'}</TableCell>
                   <TableCell className="font-mono text-xs">{r.model_code || '—'}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.prompt_tokens}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.completion_tokens}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.total_tokens}</TableCell>
+                  <TableCell className="text-right tabular-nums">{Number(r.prompt_tokens).toLocaleString()}</TableCell>
+                  <TableCell className="text-right tabular-nums">{Number(r.completion_tokens).toLocaleString()}</TableCell>
+                  <TableCell className="text-right tabular-nums">{Number(r.total_tokens).toLocaleString()}</TableCell>
                   <TableCell className="text-right tabular-nums">${Number(r.cost_usd).toFixed(4)}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.latency_ms ?? '—'}</TableCell>
                   <TableCell>
@@ -247,7 +247,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
                 {matrixRows.map((r) => (
                   <TableRow key={r.model_code}>
                     <TableCell className="font-mono text-xs">{r.model_code}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       {r.passing}/{r.total}
                     </TableCell>
                     <TableCell className="max-w-[360px] text-xs text-muted-foreground">

@@ -158,7 +158,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
               <TableHead className={`${TH_DENSE} text-right`}>Req (MTD)</TableHead>
               <TableHead className={`${TH_DENSE} text-right`}>Cost (MTD)</TableHead>
               <TableHead className={`${TH_DENSE} text-right`}>Budget</TableHead>
-              <TableHead className={`${TH_DENSE} w-[120px] text-right`}>Actions</TableHead>
+              <TableHead className={`${TH_DENSE} w-[1%] text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -186,7 +186,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                       <button
                         type="button"
                         onClick={() => navigate(`/admin/users/${r.user_id}`)}
-                        className="text-left font-medium text-primary underline-offset-2 hover:underline"
+                        className="block max-w-[280px] truncate text-left font-medium text-primary underline-offset-2 hover:underline"
                         title={`Manage ${r.name || r.email}'s individual access`}
                       >
                         {r.name || '—'}
@@ -221,7 +221,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     <TableCell className="text-right tabular-nums">
                       ${Number(r.mtd_cost_usd).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       {budget != null ? (
                         <span
                           className={
@@ -241,7 +241,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="whitespace-nowrap text-right">
                       <Button
                         variant="ghost"
                         size="sm"

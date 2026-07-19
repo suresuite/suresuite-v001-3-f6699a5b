@@ -188,7 +188,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
               <TableHead className={TH_DENSE}>Status</TableHead>
               <TableHead className={TH_DENSE}>Created</TableHead>
               <TableHead className={TH_DENSE}>Last activity</TableHead>
-              <TableHead className={`${TH_DENSE} w-[60px] text-right`}>Actions</TableHead>
+              <TableHead className={`${TH_DENSE} w-[1%] text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -209,7 +209,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
             ) : (
               filtered.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell className="max-w-[280px] truncate font-medium">{p.name}</TableCell>
                   <TableCell>{p.organization || '—'}</TableCell>
                   <TableCell>
                     <div>{p.owner_name || '—'}</div>
@@ -240,7 +240,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                   <TableCell className="text-xs text-muted-foreground">
                     {new Date(p.updated_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="whitespace-nowrap text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
