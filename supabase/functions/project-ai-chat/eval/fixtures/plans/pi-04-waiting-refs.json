@@ -1,0 +1,20 @@
+{
+  "id": "pi-04-waiting-refs",
+  "description": "ai-agents.md §21.6 pi-04 — §21.1 rule 4: waiting states carry their ref. awaiting_approval without ref.proposal_id (and awaiting_run without ref.run_id) return invalid_params — the binding is what lets the UI render live card/run state and the resume pre-step advance deterministically.",
+  "create_missing_proposal_ref": {
+    "steps": [
+      { "id": "card", "label": "File the spec card", "status": "awaiting_approval" }
+    ]
+  },
+  "create_missing_run_ref": {
+    "steps": [
+      { "id": "run", "label": "Wait for the run", "status": "awaiting_run" }
+    ]
+  },
+  "expect": {
+    "approval_error_includes": "requires ref.proposal_id",
+    "run_error_includes": "requires ref.run_id",
+    "plan_rows": 0
+  },
+  "retired_reason": null
+}

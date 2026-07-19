@@ -1,0 +1,28 @@
+{
+  "id": "pi-05-reload-resume",
+  "description": "ai-agents.md §21.6 pi-05 — reload survival (D3/Q34): a FRESH stub client over the same store + resume_plan_id resumes the same chat_plans row; while the bound run is still 'running' the reply is the §21.2 templated progress line with ZERO LLM calls (a poll costs nothing; no fetch leaves the process).",
+  "seed_plan": {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01",
+    "title": "Outage question",
+    "steps": [
+      { "id": "check", "label": "Check for an existing run", "status": "done" },
+      { "id": "card", "label": "File the spec card", "status": "done" },
+      { "id": "run", "label": "Wait for the run", "status": "awaiting_run", "ref": { "run_id": "99999999-9999-4999-8999-999999999911" } },
+      { "id": "answer", "label": "Answer from evidence", "status": "pending" }
+    ],
+    "resume_count": 1
+  },
+  "seed_run": {
+    "id": "99999999-9999-4999-8999-999999999911",
+    "status": "running",
+    "rep_count_done": 12,
+    "rep_count_target": 30
+  },
+  "expect": {
+    "kind": "progress",
+    "reply_includes": "run dispatched — 12/30 replications",
+    "fetch_calls": 0,
+    "resume_count_after": 1
+  },
+  "retired_reason": null
+}

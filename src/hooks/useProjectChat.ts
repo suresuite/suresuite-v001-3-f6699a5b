@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { useChatThreads } from "@/hooks/useChatThreads";
 import { chatModesUiEnabled } from "@/components/chat/ModeSwitch";
+import { registerPlanResumePoster } from "@/lib/chat/planResume";
 
 export type ChatRole = "user" | "assistant";
 
@@ -12,8 +13,10 @@ export interface ChatPart {
   // (ai-agents.md §4.5/§4.6); "memory_offer"/"memory_saved" are the M2
   // consent-chip parts (§14.4); "mode_notice" is the §15 Ask-mode refusal
   // chip ("Switch to Review"); "evidence" is the H1 §22.2 citation list
-  // ("grounded — N sources"); older clients ignore unknown kinds.
-  kind: "table" | "kpi" | "bullets" | "text" | "proposal" | "memory_offer" | "memory_saved" | "mode_notice" | "evidence";
+  // ("grounded — N sources"); "plan" carries {plan_id} + a render snapshot
+  // and renders as the H3 §21.2 PlanCard checklist; older clients ignore
+  // unknown kinds.
+  kind: "table" | "kpi" | "bullets" | "text" | "proposal" | "memory_offer" | "memory_saved" | "mode_notice" | "evidence" | "plan";
   data: unknown;
 }
 
@@ -71,6 +74,14 @@ export function useProjectChat(threadId: string | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastKey = useRef<string | null>(null);
+  // H3 (§21.4): the resume poster reads live state from refs — it fires from
+  // realtime/apply callbacks outside the render cycle.
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  const loadingRef = useRef(false);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+  const lastModelRef = useRef<string>("gemini-2.5-flash");
+  const resumesInFlight = useRef<Set<string>>(new Set());
 
   // Hydrate when thread changes.
   useEffect(() => {
@@ -115,6 +126,7 @@ export function useProjectChat(threadId: string | null) {
       // Access control: block disallowed features/models and over-budget calls
       // before we ever reach the LLM, with a clear, actionable reason.
       const modelId = opts.model ?? "gemini-2.5-flash";
+      lastModelRef.current = modelId;
       if (!caps.can("ai_chat")) {
         setError("The AI assistant isn't enabled for your account. Contact an administrator.");
         return;
@@ -213,6 +225,76 @@ export function useProjectChat(threadId: string | null) {
     },
     [loading, messages, user, thread, persist, caps, threadId, threads],
   );
+
+  // --- H3 (§21.4): the resume turn — a normal mode:"tools" request with
+  // resume_plan_id in the body, posted by the approve flow / the run
+  // subscription (never a background job: it renders into this thread like
+  // any reply). No user bubble: the turn is client-caused, not user-typed;
+  // the server's zero-LLM progress branch answers while the run is
+  // queued/running, so posting is always cheap.
+  const sendResume = useCallback(
+    async (planId: string) => {
+      if (!user || !threadId) return;
+      if (resumesInFlight.current.has(planId)) return;
+      if (loadingRef.current) {
+        // A turn is in flight — try once more when it clears.
+        setTimeout(() => { void sendResume(planId); }, 2000);
+        return;
+      }
+      const serverThreadId = threads.getServerThreadId(threadId);
+      if (!serverThreadId) return;
+      resumesInFlight.current.add(planId);
+      setLoading(true);
+      try {
+        const payload = {
+          mode: "tools",
+          projectId: thread?.projectId ?? null,
+          agentId: thread?.agentId ?? null,
+          message: "Continue the task plan.",
+          resume_plan_id: planId,
+          conversationHistory: messagesRef.current.map((m) => ({ role: m.role, content: m.content })),
+          userId: user.id,
+          userEmail: user.email,
+          model: lastModelRef.current,
+          threadId: serverThreadId,
+        };
+        const { data, error: invokeError } = await supabase.functions.invoke<ChatApiResponse>(
+          "project-ai-chat",
+          { body: payload },
+        );
+        if (invokeError || !data) throw invokeError ?? new Error("Empty response from AI service.");
+        if (data.error) throw new Error(data.error);
+        const assistant: ChatMessage = {
+          id: newId(),
+          role: "assistant",
+          content: data.reply ?? "",
+          parts: data.parts,
+          toolCalls: data.toolCalls,
+          createdAt: Date.now(),
+        };
+        const next = [...messagesRef.current, assistant];
+        setMessages(next);
+        persist(next);
+        if (!data.persisted) void threads.appendMessageToStore(threadId, assistant);
+      } catch (e) {
+        console.warn("[plan-resume] resume turn failed:", e instanceof Error ? e.message : e);
+      } finally {
+        resumesInFlight.current.delete(planId);
+        setLoading(false);
+      }
+    },
+    [user, threadId, thread?.projectId, thread?.agentId, threads, persist],
+  );
+
+  // Register this surface as the thread's resume poster (§21.4 triggers:
+  // approve flow + run-completion subscription). Unregisters on unmount — a
+  // closed surface simply delays resume until the user returns.
+  useEffect(() => {
+    if (!threadId) return;
+    const serverThreadId = threads.getServerThreadId(threadId);
+    if (!serverThreadId) return;
+    return registerPlanResumePoster(serverThreadId, sendResume);
+  }, [threadId, threads, sendResume]);
 
   return { messages, loading, error, send, clear };
 }

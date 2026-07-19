@@ -2388,6 +2388,8 @@ CREATE INDEX IF NOT EXISTS chat_plans_thread ON public.chat_plans (thread_id, st
 --   get_chat_plan(p_plan_id uuid, p_user_id uuid)           -- owner read
 --   list_chat_plans(p_thread_id uuid, p_user_id uuid)       -- owner read
 --   expire_chat_plans(p_thread_id uuid)                     -- lazy TTL sweep, the §4.1 pattern
+--   advance_chat_plan_step(p_plan_id, p_step_id, p_status,  -- owner write: the ONE §21.4
+--     p_user_id, p_note, p_run_id)                          --   client-legal advance (see below)
 -- Realtime: ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_plans.
 ```
 
@@ -2408,7 +2410,7 @@ active ──TTL (14 days, the proposals default)──▶ expired
 
 Where long turns run: **nowhere long**. Each request completes within the edge function; waits are persisted statuses; resumes are client-caused turns:
 
-- **Approval resume.** The card's approve flow already POSTs `agent-apply`; when the apply response carries `applied_result.run_id` and the thread has a plan step `awaiting_approval` bound to that proposal, the client (`useProposals.tsx`) advances the step to `awaiting_run` (one RPC) and posts the resume turn. Rejection ⇒ the step goes `failed` with note `rejected`, the plan recomputes, the persona acknowledges on the next turn.
+- **Approval resume.** The card's approve flow already POSTs `agent-apply`; when the apply response carries `applied_result.run_id` and the thread has a plan step `awaiting_approval` bound to that proposal, the client (`useProposals.tsx`) advances the step to `awaiting_run` (one RPC — `advance_chat_plan_step`, added to the §21.2 list at H3 landing: owner-checked, and deliberately narrow to exactly the two client-legal transitions from `awaiting_approval` — `→ awaiting_run` requiring `p_run_id`, and `→ failed` with a note for rejection/typed apply failures; every other write stays on the service path) and posts the resume turn. The server pre-step carries a converging twin: a resume that arrives before the client advance reads the applied proposal and performs the same `awaiting_approval → awaiting_run` advance itself, so the two paths can never disagree. Rejection ⇒ the step goes `failed` with note `rejected`, the plan recomputes, the persona acknowledges on the next turn.
 - **Run resume.** The client already holds a realtime subscription on the run row; on `status → done|failed` for a run bound to an `awaiting_run` step, it posts **one** resume turn (debounced per run id — at most one auto-resume per transition; further transitions are no-ops).
 - **The resume turn** is a normal `mode:"tools"` request with `resume_plan_id` in the body. Server pre-step (deterministic, before any LLM call): load the plan (owner-checked); re-run checkpoints 1–2 (§13.6 rule 5); read the bound artifact's status. Run still `queued`/`running` ⇒ reply with the templated progress line + plan part, **zero LLM calls** (a poll costs nothing). Run `done` ⇒ advance the step and execute the read-and-cite step (§20.4 step 5) as the request's agent turn. Run `failed` ⇒ step `failed` with the run's `error_message`; honest reply; no retry without a fresh user ask. `resume_count` increments only on turns that reach the LLM; cap 10 (§21.5).
 - **A closed browser** delays resume until the user returns (the plan and run are server-side; nothing is lost, the checklist is current on reload). True unattended continuation is exactly §18.4 background execution and stays behind its gate (Q33's revisit).

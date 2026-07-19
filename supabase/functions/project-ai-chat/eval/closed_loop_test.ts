@@ -5,12 +5,23 @@
 // (hit table / cache_miss / cache_stale / disambiguation), the handler-side
 // cache_hit draft guard, the §20.3 single-turn branches, and the §13.6 laws
 // on the STUB DB (zero run rows without approval; zero proposals on hits).
-// cl-04 / cl-09 / cl-10 land with Phase H3 (plan tool + resume).
-// No LLM, no network, no real DB.
+// Phase H3 adds cl-04 (approve → resume → cited answer, citations resolved
+// against the stub via the §22.2 resolver), cl-09 (the cl-01 battery on a
+// multi-sourced project — §20.7 topology independence) and cl-10 (quota
+// pause: step failed with the remaining-allowance note, no apply_attempts
+// increment, honest resume). No LLM, no network, no real DB.
 
 import { assert, assertEquals, assertStringIncludes } from "./harness/asserts.ts";
 import { makeAgentRpcs, makeStubDb, type Row, type StubDb } from "./harness/stub_db.ts";
 import { executeTool, type ToolContext, type ToolEnvelope } from "../tools.ts";
+import {
+  loadActivePlan,
+  runResumePreStep,
+  sweepPlanIntegrity,
+  type PlanStep,
+} from "../planTools.ts";
+import { verifyWithRetry, type RecordedToolCall } from "../verifier.ts";
+import { checkApplyQuota } from "../../agent-apply/index.ts";
 import {
   buildClosedLoopPrompt,
   buildExperimentContext,
@@ -99,6 +110,17 @@ function withClosedLoop<T>(fn: () => Promise<T>): Promise<T> {
     Deno.env.delete("AGENT_ENABLED_IDS");
     Deno.env.delete("AGENT_EXPERIMENT_TYPES");
     Deno.env.delete("CLOSED_LOOP_ENABLED");
+  });
+}
+
+/** H3: the closed loop with the §21 plan harness on (PLAN_TOOL_ENABLED
+ * requires CHAT_STORE_ENABLED, D3/Q34). */
+function withPlanLoop<T>(fn: () => Promise<T>): Promise<T> {
+  Deno.env.set("CHAT_STORE_ENABLED", "true");
+  Deno.env.set("PLAN_TOOL_ENABLED", "true");
+  return withClosedLoop(fn).finally(() => {
+    Deno.env.delete("CHAT_STORE_ENABLED");
+    Deno.env.delete("PLAN_TOOL_ENABLED");
   });
 }
 
@@ -471,4 +493,254 @@ Deno.test("CLOSED_LOOP_ENABLED on ⇒ the §20.4 verbatim prompt supersedes §5.
     // §20.2: the read tool is declared exactly like the §2.3 tools.
     assertEquals(findCompletedRunDeclaration.name, "find_completed_run");
     assertStringIncludes(findCompletedRunDeclaration.description, "Read-only");
+  }));
+
+// ═══ Phase H3 — the loop spans approvals and runs (§21, §13.6) ═══════════════
+
+/** Deep-substitute the runtime ids ({PROPOSAL_ID}/{PLAN_ID}/{RUN_ID}) the
+ * fixture cannot know statically into scripted args/replies. */
+function substitute<T>(value: T, map: Record<string, string>): T {
+  const s = JSON.stringify(value).replace(/\{(PROPOSAL_ID|PLAN_ID|RUN_ID)\}/g, (_, k) => map[k] ?? `{${k}}`);
+  return JSON.parse(s) as T;
+}
+
+/** Script an arbitrary tool-call sequence + final reply (the scriptTurn shape,
+ * for the H3 resume turn). */
+function scriptCalls(toolCalls: Array<{ tool: string; args: Record<string, unknown> }>, reply: string) {
+  Deno.env.set("GEMINI_API_KEY", "test-gemini-key");
+  const script = toolCalls.map((tc) => ({
+    json: {
+      candidates: [{
+        content: { parts: [{ functionCall: { name: tc.tool, args: tc.args } }] },
+      }],
+    },
+  }));
+  script.push({
+    json: { candidates: [{ content: { parts: [{ text: reply }] } }] },
+    // deno-lint-ignore no-explicit-any
+  } as any);
+  return installFetchMock(script);
+}
+
+const stepStatuses = (row: Row): Record<string, string> =>
+  Object.fromEntries(((row.steps as PlanStep[]) ?? []).map((s) => [s.id, s.status]));
+
+Deno.test("cl-04-approve-resume-cite: plan → card → approve → apply → advance → run done → resume reads persisted KPIs; citations resolve; every step terminal", () =>
+  withPlanLoop(async () => {
+    const fixture = await loadFixture("cl-04-approve-resume-cite");
+    // deno-lint-ignore no-explicit-any
+    const fx = fixture as unknown as Record<string, any>;
+    const h = makeCtx(fixture);
+    const THREAD = h.ctx.draft!.threadId!;
+
+    // ── Turn 1: the plan-shaped miss branch (§20.3) ──────────────────────────
+    const turn = await runScriptedTurn(fixture, h);
+    assert(turn.ok, `turn failed: ${turn.error}`);
+    assert(turn.proposalPart, "the miss branch files the spec card");
+    const proposalId = turn.proposalPart!.data.proposal_id;
+    const plan0 = await loadActivePlan(h.db, THREAD, USER);
+    assert(plan0, "the plan was filed BEFORE any other tool (§20.4 step 2)");
+
+    // The correct model's own binding updates (each a single legal §21.1
+    // edge): check done + card active, then card awaiting_approval with
+    // ref.proposal_id (rule 4).
+    for (const upd of fx.plan_binding_updates as Array<Record<string, unknown>>) {
+      const bindEnv = await executeTool("update_task_plan", {
+        plan_id: plan0!.id,
+        ...substitute(upd, { PROPOSAL_ID: proposalId }),
+      }, h.ctx);
+      assertEquals(bindEnv.kind, "plan", `binding update failed: ${JSON.stringify(bindEnv.data)}`);
+    }
+    assertEquals(stepStatuses(h.db.tables.chat_plans[0]).card, "awaiting_approval");
+    assertEquals((h.db.tables.simulation_runs ?? []).length, 0, "NOTHING dispatched before approval (§13.6 rule 2)");
+
+    // ── Approve → apply through the REAL shared dispatch module ─────────────
+    const proposal = h.db.tables.proposals[0];
+    proposal.status = "approved";
+    proposal.reviewed_by = USER;
+    const applied = await applyExperimentSpec(h.db, { upstash: () => Promise.resolve("ok") }, {
+      projectId: PROJECT,
+      payload: proposal.payload as Record<string, unknown>,
+      grounding: proposal.grounding as Record<string, unknown>,
+      userId: USER,
+    });
+    const runId = String(applied.run_id);
+    await h.db.rpc("mark_agent_proposal_applied", { p_proposal_id: proposalId, p_result: applied });
+    assertEquals(h.db.tables.simulation_runs.length, 1, "the approved dispatch queued exactly one run");
+
+    // §21.4 approval resume, client side: ONE RPC advances the bound step.
+    const { error: advErr } = await h.db.rpc("advance_chat_plan_step", {
+      p_plan_id: plan0!.id,
+      p_step_id: "card",
+      p_status: "awaiting_run",
+      p_user_id: USER,
+      p_run_id: runId,
+    });
+    assert(!advErr, `advance failed: ${advErr?.message}`);
+    assertEquals(stepStatuses(h.db.tables.chat_plans[0]).card, "awaiting_run");
+
+    // While the run is queued, a resume is a ZERO-LLM templated poll (§21.4).
+    const early = await runResumePreStep(h.db, { planId: plan0!.id, userId: USER });
+    assertEquals(early.kind, "progress");
+    assertStringIncludes((early as { reply: string }).reply, "run dispatched — 0/30 replications");
+
+    // ── The 'worker' completes the run (sole writer of results, A11) ────────
+    const runRow = h.db.tables.simulation_runs.find((r) => String(r.id) === runId)!;
+    Object.assign(runRow, {
+      status: "done",
+      rep_count_done: 30,
+      ended_at: "2026-07-18T12:00:00Z",
+      aggregate_kpis: fx.worker_result.aggregate_kpis,
+    });
+    h.db.tables.run_replications = (fx.worker_result.replication_kpis as Row[]).map((r) => ({
+      run_id: runId,
+      status: "done",
+      ...r,
+    }));
+
+    // ── The resume turn (run → done transition posts it, debounced) ─────────
+    const outcome = await runResumePreStep(h.db, { planId: plan0!.id, userId: USER, modelCode: "gemini-2.5-flash" });
+    assertEquals(outcome.kind, "run_done");
+    const sub = { PLAN_ID: plan0!.id, RUN_ID: runId };
+    const resumeCalls: RecordedToolCall[] = [];
+    const mock = scriptCalls(
+      substitute(fx.resume_llm.tool_calls, sub),
+      substitute(fx.resume_llm.reply, sub),
+    );
+    let resumed;
+    try {
+      resumed = await runAgentTurn({
+        agentId: "experiment-designer",
+        modelId: "gemini-2.5-flash",
+        utterance: (outcome as { utterance: string }).utterance,
+        ctx: h.ctx,
+        onToolResult: (name, args, envelope) => resumeCalls.push({ name, args, envelope }),
+      });
+    } finally {
+      mock.restore();
+    }
+    assert(resumed.ok, `resume turn failed: ${resumed.error}`);
+
+    // The resumed reply reads persisted KPIs — every number ∈ the stub rows.
+    const stubNumbers = JSON.stringify([h.db.tables.simulation_runs, h.db.tables.run_replications]);
+    for (const n of fixture.expect.reply_numbers_in_stub as string[]) {
+      assertStringIncludes(resumed.reply, n);
+      assertStringIncludes(stubNumbers, n, `reply number ${n} must exist in the stub run rows`);
+    }
+    assertStringIncludes(resumed.reply, runId, "the answer cites the run id");
+
+    // Every citation resolves via the §22.2 resolver against the stub.
+    const verdict = await verifyWithRetry({
+      projectId: PROJECT,
+      db: h.db,
+      userMessage: fixture.utterance,
+      attempt: { reply: resumed.reply, calls: resumeCalls },
+      retry: null,
+    });
+    assert(verdict.verified && !verdict.fallback, "the resumed reply verifies clean");
+    assert(verdict.citations.some((c) => c.kind === "run" && c.ref === runId), "a run citation resolves");
+
+    // §21.3: after the sweep (index.ts runs it every plan-touching turn),
+    // every plan step is terminal and the plan is done.
+    const sweep = await sweepPlanIntegrity(h.db, { planId: plan0!.id, userId: USER });
+    const finalPlan = sweep.plan ?? (await loadActivePlan(h.db, THREAD, USER));
+    assertEquals(stepStatuses(h.db.tables.chat_plans[0]), fixture.expect.terminal_step_statuses);
+    assertEquals(String(h.db.tables.chat_plans[0].status), fixture.expect.plan_status, "the plan closed");
+    assert(finalPlan === null || finalPlan.status === "done");
+    assertEquals((h.db.tables.proposals ?? []).length, fixture.expect.proposal_count);
+    assertEquals(h.db.tables.simulation_runs.length, fixture.expect.run_count, "exactly the one approved run");
+  }));
+
+Deno.test("cl-09-multi-sourced-project: the cl-01 battery holds on a ≥2-suppliers-per-material project — the loop is topology-independent (§20.7)", () =>
+  withPlanLoop(async () => {
+    const fixture = await loadFixture("cl-09-multi-sourced-project");
+    const h = makeCtx(fixture);
+    const env = await executeTool("find_completed_run", { scenario: "outage", replications: 30 }, h.ctx);
+    assertEquals(env.kind, "table", `expected a hit table, got: ${JSON.stringify(env.data)}`);
+    const data = env.data as { rows: unknown[][] };
+    assertEquals(data.rows[0][0], fixture.expect.hit_run_id);
+    assertEquals(data.rows[0][4], fixture.expect.hit_engine);
+    assertEquals(data.rows[0][5], fixture.expect.hit_badge);
+    assert(String(env.meta.note).startsWith(fixture.expect.cache_note_prefix));
+
+    const turn = await runScriptedTurn(fixture, h);
+    assert(turn.ok, `turn failed: ${turn.error}`);
+    assertEquals(turn.proposalPart, null, "no proposal part on a hit");
+    assertStringIncludes(turn.reply, fixture.expect.hit_run_id);
+    const stubNumbers = JSON.stringify([h.db.tables.simulation_runs, h.db.tables.run_replications]);
+    for (const n of fixture.expect.reply_numbers_in_stub as string[]) {
+      assertStringIncludes(turn.reply, n);
+      assertStringIncludes(stubNumbers, n);
+    }
+    assertEquals((h.db.tables.proposals ?? []).length, fixture.expect.proposal_count, "zero proposals on hits");
+    assertEquals(h.db.tables.simulation_runs.length, fixture.expect.run_count, "zero NEW run rows");
+    // No plan on a single-turn hit (§21.1: a plan exists iff the work spans a
+    // step boundary — cache hits are single-turn).
+    assertEquals((h.db.tables.chat_plans ?? []).length, 0, "no plan filed on the hit branch");
+  }));
+
+Deno.test("cl-10-quota-pause: quota_exceeded at apply ⇒ step failed with the remaining-allowance note, NO apply_attempts increment (Q21c), honest resume", () =>
+  withPlanLoop(async () => {
+    const fixture = await loadFixture("cl-10-quota-pause");
+    // deno-lint-ignore no-explicit-any
+    const fx = fixture as unknown as Record<string, any>;
+    const h = makeCtx(fixture);
+    const THREAD = h.ctx.draft!.threadId!;
+
+    // Turn 1: plan + card (the cl-04 opening).
+    const turn = await runScriptedTurn(fixture, h);
+    assert(turn.ok, `turn failed: ${turn.error}`);
+    assert(turn.proposalPart, "the miss branch files the spec card");
+    const proposalId = turn.proposalPart!.data.proposal_id;
+    const plan0 = await loadActivePlan(h.db, THREAD, USER);
+    assert(plan0);
+    for (const upd of fx.plan_binding_updates as Array<Record<string, unknown>>) {
+      const bindEnv = await executeTool("update_task_plan", {
+        plan_id: plan0!.id,
+        ...substitute(upd, { PROPOSAL_ID: proposalId }),
+      }, h.ctx);
+      assertEquals(bindEnv.kind, "plan", `binding update failed: ${JSON.stringify(bindEnv.data)}`);
+    }
+
+    // Checkpoint 5's quota (the REAL agent-apply function, fail-closed): the
+    // 3 seeded queued/running agent-applied runs exhaust the concurrent cap.
+    const violation = await checkApplyQuota(h.db, {
+      artifactType: "experiment_spec",
+      projectId: PROJECT,
+      userId: USER,
+    });
+    assert(violation, "the quota denies");
+    for (const s of fixture.expect.quota_violation_includes as string[]) {
+      assertStringIncludes(violation!, s, "the remaining allowance is NAMED");
+    }
+
+    // Q21c: a quota denial returns typed WITHOUT touching apply bookkeeping —
+    // agent-apply returns before mark_agent_proposal_apply_failed. The card's
+    // client marks the bound step failed with the note (§13.6 rule 3).
+    const newCard = h.db.tables.proposals.find((p) => String(p.id) === proposalId)!;
+    assertEquals(Number(newCard.apply_attempts ?? 0), fixture.expect.apply_attempts, "no attempt burned");
+    const { error: advErr } = await h.db.rpc("advance_chat_plan_step", {
+      p_plan_id: plan0!.id,
+      p_step_id: "card",
+      p_status: "failed",
+      p_user_id: USER,
+      p_note: violation,
+    });
+    assert(!advErr, `advance failed: ${advErr?.message}`);
+    assertEquals(stepStatuses(h.db.tables.chat_plans[0]).card, fixture.expect.card_step_status);
+    assertStringIncludes(
+      String(((h.db.tables.chat_plans[0].steps as PlanStep[]).find((s) => s.id === "card"))!.note ?? ""),
+      "quota",
+      "the remaining-allowance note lands on the plan step",
+    );
+
+    // The resume answers honestly and recomputes the plan — no silent retry,
+    // nothing ever dispatched.
+    const outcome = await runResumePreStep(h.db, { planId: plan0!.id, userId: USER });
+    assertEquals(outcome.kind, "closed");
+    assertStringIncludes((outcome as { reply: string }).reply, fixture.expect.resume_reply_includes);
+    assertEquals(String(h.db.tables.chat_plans[0].status), fixture.expect.plan_status);
+    assertEquals(h.db.tables.simulation_runs.length, fixture.expect.run_count,
+      "only the 3 pre-existing runs — the quota-paused spec dispatched nothing");
+    assertEquals(Number(newCard.apply_attempts ?? 0), 0, "still no attempt burned");
   }));

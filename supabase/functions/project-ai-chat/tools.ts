@@ -3,10 +3,13 @@
 // { kind, data, meta } envelope so the UI can pick a renderer.
 
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { tryConsumeToolCall, type RequestBudget } from "./budgets.ts";
 
 // "proposal" is the Layer B draft-tool envelope kind (ai-agents.md §4.5):
-// rendered by ProposalCard; no Stage 0 tool emits it yet.
-export type ToolKind = "table" | "kpi" | "bullets" | "text" | "proposal";
+// rendered by ProposalCard; no Stage 0 tool emits it yet. "plan" is the §21.1
+// rule-5 envelope kind (Phase H3): rendered by PlanCard, exactly the
+// "proposal" precedent — only update_task_plan (planTools.ts) emits it.
+export type ToolKind = "table" | "kpi" | "bullets" | "text" | "proposal" | "plan";
 
 export interface ToolEnvelope {
   kind: ToolKind;
@@ -30,6 +33,9 @@ export interface DraftAttribution {
    * agent (report-builder, §16.1) phrase its refusals per mode. Absent ⇒
    * 'review' (the pre-§15 behavior). */
   mode?: "ask" | "review";
+  /** The routed agent slug (Phase H3) — recorded on the chat_plans row the
+   * update_task_plan handler writes (§21.2 agent_id). Attribution only. */
+  agentId?: string;
 }
 
 export interface ToolContext {
@@ -43,6 +49,16 @@ export interface ToolContext {
    * whether the cache was already consulted this turn. Per-request state,
    * like the context itself; never persisted. */
   cacheChecks?: Array<{ scenario_id: string; policy_version_id: string }>;
+  /** §21.5 (Phase H3): the request's spend meters. Set once per request by
+   * the orchestrator; executeTool consumes the tool-call counter. Absent ⇒
+   * unmetered (direct handler calls in the eval tier are unchanged). */
+  budget?: RequestBudget;
+  /** §21.3 telemetry recorded by the update_task_plan handler (plan.created /
+   * plan.step_changed); the orchestrator emits after the turn (§7.5: ids and
+   * counts only). Per-request state, never persisted. */
+  planEvents?: Array<{ kind: "plan.created" | "plan.step_changed" | "plan.closed"; payload: Record<string, unknown> }>;
+  /** The plan this request touched (drives the §21.3 integrity sweep). */
+  planTouchedId?: string;
 }
 
 function envelope(
@@ -1147,6 +1163,19 @@ export async function executeTool(
   const handler = handlers[name];
   if (!handler) {
     return envelope(name, "text", `Unknown tool: ${name}`, 0, "unknown_tool");
+  }
+  // §21.5: the per-request tool-call budget (DEFAULT 15), consumed here so
+  // every executed call — persona or agent — spends the same meter. On
+  // exhaustion the model gets a `too_large`-style envelope (note "budget")
+  // and must wrap up; never a silent drop.
+  if (ctx.budget && !tryConsumeToolCall(ctx.budget)) {
+    return envelope(
+      name,
+      "text",
+      `The per-request tool budget (${ctx.budget.maxToolCalls} calls) is spent — stop calling tools and wrap up with what you have.`,
+      0,
+      "budget",
+    );
   }
   try {
     return await handler(rawArgs ?? {}, ctx);

@@ -1,0 +1,29 @@
+{
+  "id": "pi-02-append-only",
+  "description": "ai-agents.md §21.6 pi-02 — §21.1 rule 2: steps are append-only. An update dropping a step id returns invalid_params naming the rule; the stored row never loses a step (a wrong step goes to 'refused' with a note — visible history, not silent revision).",
+  "create": {
+    "title": "Two-step plan",
+    "steps": [
+      { "id": "a", "label": "First step", "status": "active" },
+      { "id": "b", "label": "Second step", "status": "pending" }
+    ]
+  },
+  "update_dropping_b": {
+    "steps": [
+      { "id": "a", "label": "First step", "status": "done" }
+    ]
+  },
+  "update_refusing_b": {
+    "steps": [
+      { "id": "a", "label": "First step", "status": "done" },
+      { "id": "b", "label": "Second step", "status": "pending" },
+      { "id": "c", "label": "Appended step", "status": "active" }
+    ]
+  },
+  "expect": {
+    "drop_error_includes": "append-only",
+    "stored_step_ids": ["a", "b"],
+    "appended_step_ids": ["a", "b", "c"]
+  },
+  "retired_reason": null
+}

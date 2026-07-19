@@ -113,6 +113,10 @@ export async function runAgentTurn(args: {
   /** H1 (§22.3): hands the built CONTEXT/system text to the verifier (the
    * CONTEXT block's serialized artifacts ground the agent's claims). */
   onContext?: (contextText: string) => void;
+  /** §22.3 corrective retry on the H3 resume path (where the agent's reply IS
+   * the user-facing answer): the verifier's violation addendum, appended
+   * after the agent system prompt. Never set outside that single retry. */
+  systemAddendum?: string;
 }): Promise<AgentTurnResult> {
   const spec = AGENT_TURNS[args.agentId];
   if (!spec) {
@@ -128,6 +132,10 @@ export async function runAgentTurn(args: {
       system,
       tools: spec.tools(),
       ...(args.onToolResult ? { onToolResult: args.onToolResult } : {}),
+      ...(args.systemAddendum ? { systemAddendum: args.systemAddendum } : {}),
+      // §21.5 (H3): the agent turn spends the same request meters the
+      // orchestrator created — absent ⇒ unmetered (eval direct drives).
+      ...(args.ctx.budget ? { budget: args.ctx.budget } : {}),
     });
     const proposalPart = (result.parts ?? []).find((p) => p.kind === "proposal") as
       | { kind: "proposal"; data: ProposalPartData }

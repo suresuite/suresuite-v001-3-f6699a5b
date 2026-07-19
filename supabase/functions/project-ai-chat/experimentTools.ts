@@ -55,6 +55,12 @@ import {
   memoryContextBlock,
   memoryEnabled,
 } from "./memory.ts";
+// H3 (§21): the plan tool joins the closed-loop set behind PLAN_TOOL_ENABLED
+// (which itself requires CHAT_STORE_ENABLED — planTools.ts refuses
+// otherwise), and the §20.4 PLAN block is serialized from the thread's
+// active chat_plans row. Importing planTools registers update_task_plan
+// into the shared executeTool registry (bridge 2).
+import { buildPlanBlock, planToolEnabled, updateTaskPlanDeclaration } from "./planTools.ts";
 
 export const EXPERIMENT_AGENT_ID = "experiment-designer";
 export const EXPERIMENT_ARTIFACT_TYPE = "experiment_spec";
@@ -208,6 +214,11 @@ export const findCompletedRunDeclaration: ToolDeclaration = {
  * the v1 surface byte-identically). */
 export function experimentToolDeclarations(): ReadonlyArray<ToolDeclaration> {
   return [
+    // H3 (§21.1): the plan tool leads the set — the §20.4 loop calls it
+    // before any other tool when the work spans a step boundary. Only the
+    // closed-loop turn ever sees it (PLAN_TOOL_ENABLED ∧ CLOSED_LOOP_ENABLED;
+    // both off ⇒ the pre-H3 surface byte-identically).
+    ...(closedLoopEnabled() && planToolEnabled() ? [updateTaskPlanDeclaration] : []),
     ...(closedLoopEnabled() ? [findCompletedRunDeclaration] : []),
     getRunResultsDeclaration,
     getValidationStatusDeclaration,
@@ -260,9 +271,9 @@ ${AGENT_COMMON}`;
 /** The §20.4 template, verbatim, superseding §5.4's when CLOSED_LOOP_ENABLED.
  * Written for the weakest enabled model (law 7): one decision per numbered
  * rule, every branch named, all facts arriving in CONTEXT or tool results.
- * `planBlock` is the §21.3 PLAN block — empty until Phase H3 lands the plan
- * tool (the step-2/update_task_plan references are inert until H3 registers
- * it). */
+ * `planBlock` is the §21.3 PLAN block, serialized from the thread's active
+ * chat_plans row when PLAN_TOOL_ENABLED (H3) — empty otherwise, keeping the
+ * H2 prompt byte-identical. */
 export function buildClosedLoopPrompt(args: {
   projectId: string;
   scenariosJson: string;
@@ -442,6 +453,14 @@ export async function buildExperimentContext(
     } catch { /* memory is context, not a gate */ }
   }
 
+  // H3 (§21.2/§21.4): the PLAN block — serialized fresh from the thread's
+  // active chat_plans row on EVERY turn (thread state, not model memory; a
+  // mid-plan model switch re-reads the same row). Empty until a plan exists.
+  let planBlock = "";
+  if (closedLoopEnabled() && planToolEnabled()) {
+    planBlock = await buildPlanBlock(db, ctx.draft?.threadId ?? null, ctx.userId);
+  }
+
   // §20.4 (Phase H2): behind CLOSED_LOOP_ENABLED the closed-loop template
   // supersedes §5.4's — same grounding context, the ordered-loop discipline
   // in place of the TASK block. Flag off ⇒ the v1 prompt byte-identically.
@@ -452,7 +471,7 @@ export async function buildExperimentContext(
       policyVersionsJson: versionsJson,
       validationJson,
       runsJson,
-      // The §21.3 PLAN block joins with Phase H3 (plan tool + chat_plans).
+      planBlock,
     })
     : buildExperimentPrompt({
       projectId: ctx.projectId,
