@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { ErrorBanner, SectionCard } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -307,25 +308,23 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <ErrorBanner>{error}</ErrorBanner>
       ) : !data ? null : (
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <div className="space-y-6">
 
             {/* ── Pages ─────────────────────────────────────────────── */}
-            <Section title="Pages">
+            <SectionCard title="Pages">
               <CapMatrix rows={pages} isSuper={isSuper} onSet={setOverride} />
-            </Section>
+            </SectionCard>
 
             {/* ── Features ──────────────────────────────────────────── */}
-            <Section title="Features">
+            <SectionCard title="Features">
               <CapMatrix rows={features} isSuper={isSuper} onSet={setOverride} />
-            </Section>
+            </SectionCard>
 
             {/* ── AI models ─────────────────────────────────────────── */}
-            <Section
+            <SectionCard
               title="AI models"
               badge={
                 isSuper
@@ -401,10 +400,10 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
                   </Select>
                 </div>
               </div>
-            </Section>
+            </SectionCard>
 
             {/* ── Budgets & limits ──────────────────────────────────── */}
-            <Section title="Budgets & limits">
+            <SectionCard title="Budgets & limits">
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <UsageStat label="Cost (MTD)" value={`$${data.budgets.mtd_cost_usd.toFixed(2)}`}
                   cap={data.budgets.monthly_usd != null ? `of $${data.budgets.monthly_usd.toFixed(2)}` : undefined}
@@ -445,7 +444,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
                   Save budgets &amp; limits
                 </Button>
               </div>
-            </Section>
+            </SectionCard>
           </div>
 
           {/* ── Preview as user ─────────────────────────────────────── */}
@@ -453,22 +452,6 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
         </div>
       )}
     </AdminLayout>
-  );
-}
-
-function Section({ title, badge, children }: { title: string; badge?: string; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-border bg-card p-4 shadow-xs">
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {badge && (
-          <Badge variant="secondary" className="text-[10px] font-medium">
-            {badge}
-          </Badge>
-        )}
-      </div>
-      {children}
-    </section>
   );
 }
 
@@ -519,14 +502,17 @@ function CapMatrix({
                 onValueChange={(v) => v && onSet(row, v as Tri)}
                 className="shrink-0"
               >
-                <ToggleGroupItem value="inherit" className="h-7 px-2 text-xs">Inherit</ToggleGroupItem>
-                <ToggleGroupItem value="allow" className="h-7 px-2 text-xs">Allow</ToggleGroupItem>
-                <ToggleGroupItem value="deny" className="h-7 px-2 text-xs">Deny</ToggleGroupItem>
+                <ToggleGroupItem value="inherit" className="h-8 px-2 text-xs">Inherit</ToggleGroupItem>
+                <ToggleGroupItem value="allow" className="h-8 px-2 text-xs">Allow</ToggleGroupItem>
+                <ToggleGroupItem value="deny" className="h-8 px-2 text-xs">Deny</ToggleGroupItem>
               </ToggleGroup>
             )}
             <span className="w-16 shrink-0 text-right">
               {row.effective ? (
-                <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400">
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                >
                   <Check className="mr-0.5 h-3 w-3" /> On
                 </Badge>
               ) : (
@@ -544,8 +530,8 @@ function CapMatrix({
 
 function UsageStat({ label, value, cap, over }: { label: string; value: string; cap?: string; over?: boolean }) {
   return (
-    <div className="rounded-md border border-border bg-background px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className="rounded-md border border-border bg-card px-3 py-2">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-sm font-semibold ${over ? 'text-destructive' : 'text-foreground'}`}>{value}</div>
       {cap && <div className="text-[11px] text-muted-foreground">{cap}</div>}
     </div>
@@ -571,7 +557,7 @@ function PreviewPanel({ data }: { data: AccessData }) {
         ) : (
           allowedPages.map((p) => (
             <div key={p.key} className="flex items-center gap-2 rounded-md bg-accent/40 px-2 py-1 text-xs">
-              <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+              <Check className="h-3 w-3 text-emerald-700 dark:text-emerald-300" />
               {p.label}
             </div>
           ))

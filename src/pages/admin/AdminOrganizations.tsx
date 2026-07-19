@@ -22,7 +22,15 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Loader2, Pencil, Plus, ShieldCheck } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Undo2 } from 'lucide-react';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import { toast } from 'sonner';
 import { OrgAccessDrawer } from '@/components/admin/OrgAccessDrawer';
 
@@ -105,35 +113,33 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
         </div>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead className="text-right">Members</TableHead>
-              <TableHead className="text-right">Projects</TableHead>
-              <TableHead className="text-right">Cost (MTD)</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[120px] text-right">Actions</TableHead>
+              <TableHead className={TH_DENSE}>Name</TableHead>
+              <TableHead className={TH_DENSE}>Slug</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Members</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Projects</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Cost (MTD)</TableHead>
+              <TableHead className={TH_DENSE}>Status</TableHead>
+              <TableHead className={TH_DENSE}>Created</TableHead>
+              <TableHead className={`${TH_DENSE} w-[1%] text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={8} />
+            ) : rows.length === 0 ? (
+              <TableEmpty colSpan={8} message="No organizations yet." />
             ) : (
               rows.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell className="font-medium">{o.name}</TableCell>
+                  <TableCell className="max-w-[280px] truncate font-medium">{o.name}</TableCell>
                   <TableCell className="text-muted-foreground">{o.slug}</TableCell>
-                  <TableCell className="text-right">{o.members}</TableCell>
-                  <TableCell className="text-right">{o.projects}</TableCell>
-                  <TableCell className="text-right">${o.cost_mtd.toFixed(2)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{o.members}</TableCell>
+                  <TableCell className="text-right tabular-nums">{o.projects}</TableCell>
+                  <TableCell className="text-right tabular-nums">${o.cost_mtd.toFixed(2)}</TableCell>
                   <TableCell>
                     <Badge variant={o.status === 'active' ? 'secondary' : 'destructive'}>
                       {o.status}
@@ -142,23 +148,41 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                   <TableCell className="text-xs text-muted-foreground">
                     {new Date(o.created_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setRenameOrg(o)} title="Rename">
-                      <Pencil className="mr-1 h-3 w-3" /> Rename
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setAccessOrg(o)} title="Access defaults">
-                      <ShieldCheck className="mr-1 h-3 w-3" /> Access
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => toggleStatus(o)}>
-                      {o.status === 'active' ? 'Suspend' : 'Reactivate'}
-                    </Button>
+                  <TableCell className="whitespace-nowrap text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setRenameOrg(o)}>
+                          <Pencil className="mr-2 h-4 w-4" /> Rename…
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAccessOrg(o)}>
+                          <ShieldCheck className="mr-2 h-4 w-4" /> Access defaults…
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => toggleStatus(o)}>
+                          {o.status === 'active' ? (
+                            <>
+                              <Ban className="mr-2 h-4 w-4" /> Suspend
+                            </>
+                          ) : (
+                            <>
+                              <Undo2 className="mr-2 h-4 w-4" /> Reactivate
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
 
       {accessOrg && (
         <OrgAccessDrawer

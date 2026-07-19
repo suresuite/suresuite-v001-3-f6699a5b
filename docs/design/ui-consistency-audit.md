@@ -4,8 +4,8 @@
 `src/pages/DeveloperApi.tsx` in line with the design language set by the mature pages
 (Landing `/`, Policies, Simulation Lab, Project Manager, Project Intelligence).
 
-**Status**: audit + remediation plan only — no code changes. A follow-up build turn executes
-the batches in §3 mechanically.
+**Status**: batches **B0–B4 executed** (one commit per batch) and verified by the §3-B6
+Playwright pass. B5 (lint guardrail) remains open. Execution deviations are recorded in §5.
 
 > Path note: the task brief lists `src/pages/admin/AdminLayout.tsx`; the file actually lives at
 > **`src/components/admin/AdminLayout.tsx`**. All admin pages import it from there.
@@ -390,3 +390,48 @@ Playwright at **1280×800**, screenshot each route: `/admin`, `/admin/users`,
 The three P0s all live in `AdminLayout.tsx` and are fixed by batch **B1** alone, which
 re-skins all nine admin pages in one edit. Everything else is the B0 primitives plus
 mechanical class swaps.
+
+---
+
+## 5. Execution notes (build turn)
+
+Where the mechanical plan met reality, the following adjustments were made:
+
+- **UA1 emerald recipe**: applied as `<Badge variant="outline" className="bg-emerald-500/10
+  text-emerald-700 dark:text-emerald-300 border-emerald-500/30">` rather than leaving the
+  badge on the `default` variant with the recipe classes — the `default` variant's
+  `hover:bg-primary/80` survives twMerge and would flash primary on hover. This matches how
+  the recipe's source (`ProvenanceBadge.tsx:26`) applies it.
+- **R4 (AdminRoles loading)** skipped: the loading state is a page-level block rendered
+  *before* both tables exist, not a table row — `TableLoading` (a `TableRow`) does not apply.
+  The existing block is byte-identical to the AdminUserAccess spinner pattern, which §2.4
+  treats as on-language. Same reasoning for the DeveloperApi notebook-panel spinner
+  (the non-table half of V5); the keys-table loading/empty rows were swapped as planned.
+- **AdminRoles role-column headers**: the `capitalize` on role names was dropped when
+  `TH_DENSE` landed — `uppercase` and `capitalize` are conflicting `text-transform` values
+  and the dense-header language is uppercase (C8).
+- **D3 (dashboard card hover lift)**: applied as `shadow-xs hover:shadow-xs` on the
+  `TopTable` card; converting it to `SectionCard` would have discarded its
+  CardHeader/CardContent(p-0) layout for no visual gain.
+- **B0 re-exports**: `TableEmpty` (pre-existing) was added to `shared/index.ts` alongside the
+  new primitives so table pages import from one barrel.
+
+### 5.1 Follow-up consistency pass (same branch)
+
+A second sweep tightened the table contract without changing the design language:
+
+- **`TableLoading` upgraded** from a single spinner row to **`Skeleton` rows** (default 3,
+  `h-4` bar per row at real row height) so tables don't jump when data lands. Same API
+  (`colSpan`, optional `rows`); every consumer picked it up unchanged.
+- **Primary name columns** truncate at `max-w-[280px]` (Users, Organizations, Projects,
+  Models, Dashboard top tables, DeveloperApi key name).
+- **Actions columns** normalized to `w-[1%]` heads + `whitespace-nowrap` cells instead of
+  magic pixel widths (`w-[120px]`/`w-[60px]`/`w-[80px]`).
+- **Numeric formatting**: token counts in AI Usage now `toLocaleString()`; `tabular-nums`
+  extended to the remaining numeric cells (org members/projects, user budget, capability
+  matrix passing, DeveloperApi requests-30d — now right-aligned).
+- **Kept as-is, deliberately**: `TH_DENSE` uppercase micro-headers (C8 — the language of the
+  mature pages; a sentence-case/default-`TableHead` scheme was considered and rejected as a
+  revert of C8), `h-9` header-row search inputs (C3), `TableShell` for single-table pages
+  (a `CardHeader` title would duplicate the sticky `PageHeader` title), and the compact
+  `UsageStat` minis on the user-access page (C4 density).

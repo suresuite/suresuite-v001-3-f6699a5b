@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Loader2, Lock } from 'lucide-react';
+import { ErrorBanner, TableShell, TH_DENSE } from '@/components/shared';
 import { toast } from 'sonner';
 
 interface Props {
@@ -88,15 +89,15 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
   };
 
   const renderSection = (title: string, rows: Cap[]) => (
-    <div className="mb-8">
+    <div>
       <h2 className="mb-2 text-sm font-semibold text-foreground">{title}</h2>
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[46%]">Capability</TableHead>
+              <TableHead className={`${TH_DENSE} w-[46%]`}>Capability</TableHead>
               {ROLE_ORDER.map((r) => (
-                <TableHead key={r} className="text-center capitalize">
+                <TableHead key={r} className={`${TH_DENSE} text-center`}>
                   {r.replace('_', ' ')}
                 </TableHead>
               ))}
@@ -136,7 +137,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
             })}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
     </div>
   );
 
@@ -152,19 +153,17 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <ErrorBanner>{error}</ErrorBanner>
       ) : (
-        <>
-          <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline" className="font-normal">
               <Lock className="mr-1 h-3 w-3" /> Super admins &amp; My Profile are always on
             </Badge>
           </div>
           {renderSection('Pages', pages)}
           {renderSection('Features', features)}
-        </>
+        </div>
       )}
     </AdminLayout>
   );

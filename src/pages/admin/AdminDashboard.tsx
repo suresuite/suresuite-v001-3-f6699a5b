@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatCard } from '@/components/shared/StatCard';
-import { TableEmpty } from '@/components/shared/TableEmpty';
+import { TableEmpty, TH_DENSE } from '@/components/shared';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
@@ -165,7 +165,7 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
           </div>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           <section>
             <SectionHeader label="Reach" />
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -216,7 +216,7 @@ function StatGridSkeleton() {
 
 function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
   return (
-    <Card className="shadow-xs">
+    <Card className="shadow-xs hover:shadow-xs">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         <Badge variant="secondary" className="text-[10px] font-medium tracking-wide">
@@ -227,9 +227,9 @@ function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="text-right">Requests</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
+              <TableHead className={TH_DENSE}>Name</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Requests</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Cost</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -238,7 +238,7 @@ function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
             ) : (
               rows.map((r) => (
                 <TableRow key={r.label}>
-                  <TableCell className="font-medium">{r.label}</TableCell>
+                  <TableCell className="max-w-[280px] truncate font-medium">{r.label}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {r.requests.toLocaleString()}
                   </TableCell>

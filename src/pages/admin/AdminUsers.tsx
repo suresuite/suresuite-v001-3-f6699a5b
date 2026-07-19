@@ -31,7 +31,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Loader2, Plus, SlidersHorizontal } from 'lucide-react';
-import { TableEmpty } from '@/components/shared/TableEmpty';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import { toast } from 'sonner';
 
 interface Props {
@@ -137,7 +137,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
             placeholder="Search name, email, org…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-64"
+            className="h-9 w-64"
           />
           <Button variant="outline" size="sm" onClick={load}>
             Refresh
@@ -146,28 +146,24 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
         </div>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Organization</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Req (MTD)</TableHead>
-              <TableHead className="text-right">Cost (MTD)</TableHead>
-              <TableHead className="text-right">Budget</TableHead>
-              <TableHead className="w-[120px] text-right">Actions</TableHead>
+              <TableHead className={TH_DENSE}>Name</TableHead>
+              <TableHead className={TH_DENSE}>Email</TableHead>
+              <TableHead className={TH_DENSE}>Organization</TableHead>
+              <TableHead className={TH_DENSE}>Role</TableHead>
+              <TableHead className={TH_DENSE}>Status</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Req (MTD)</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Cost (MTD)</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Budget</TableHead>
+              <TableHead className={`${TH_DENSE} w-[1%] text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={9} />
             ) : filtered.length === 0 ? (
               <TableEmpty
                 colSpan={9}
@@ -190,7 +186,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                       <button
                         type="button"
                         onClick={() => navigate(`/admin/users/${r.user_id}`)}
-                        className="text-left font-medium text-primary underline-offset-2 hover:underline"
+                        className="block max-w-[280px] truncate text-left font-medium text-primary underline-offset-2 hover:underline"
                         title={`Manage ${r.name || r.email}'s individual access`}
                       >
                         {r.name || '—'}
@@ -219,13 +215,13 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         <Badge variant="secondary">Active</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       {Number(r.mtd_requests).toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       ${Number(r.mtd_cost_usd).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       {budget != null ? (
                         <span
                           className={
@@ -245,14 +241,14 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="whitespace-nowrap text-right">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => navigate(`/admin/users/${r.user_id}`)}
                         title="Manage this individual user's pages, features, AI models & budget"
                       >
-                        <SlidersHorizontal className="mr-1 h-3 w-3" /> Access
+                        <SlidersHorizontal className="mr-1 h-3.5 w-3.5" /> Access
                       </Button>
                       <Button
                         variant="ghost"
@@ -268,7 +264,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
     </AdminLayout>
   );
 }

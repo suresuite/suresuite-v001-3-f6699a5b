@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import { toast } from 'sonner';
 
 interface Props {
@@ -129,7 +130,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
             </DialogHeader>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <Label>Provider</Label>
+                <Label className="text-xs">Provider</Label>
                 <Select
                   value={draft.provider_id ?? ''}
                   onValueChange={(v) => setDraft({ ...draft, provider_id: v || null })}
@@ -147,7 +148,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 </Select>
               </div>
               <div className="col-span-2">
-                <Label>Code (e.g. openai/gpt-5.5)</Label>
+                <Label className="text-xs">Code (e.g. openai/gpt-5.5)</Label>
                 <Input
                   value={draft.code}
                   onChange={(e) => setDraft({ ...draft, code: e.target.value })}
@@ -155,7 +156,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div className="col-span-2">
-                <Label>Display name</Label>
+                <Label className="text-xs">Display name</Label>
                 <Input
                   value={draft.display_name}
                   onChange={(e) => setDraft({ ...draft, display_name: e.target.value })}
@@ -163,7 +164,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div>
-                <Label>Input $/1k</Label>
+                <Label className="text-xs">Input $/1k</Label>
                 <Input
                   type="number"
                   step="0.0001"
@@ -175,7 +176,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div>
-                <Label>Output $/1k</Label>
+                <Label className="text-xs">Output $/1k</Label>
                 <Input
                   type="number"
                   step="0.0001"
@@ -187,7 +188,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div className="col-span-2">
-                <Label>Max context</Label>
+                <Label className="text-xs">Max context</Label>
                 <Input
                   type="number"
                   value={draft.max_context}
@@ -208,38 +209,36 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
         </Dialog>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Model</TableHead>
-              <TableHead>Code</TableHead>
-              <TableHead className="text-right">Input $/1k</TableHead>
-              <TableHead className="text-right">Output $/1k</TableHead>
-              <TableHead className="text-right">Context</TableHead>
-              <TableHead>Enabled</TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className={TH_DENSE}>Model</TableHead>
+              <TableHead className={TH_DENSE}>Code</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Input $/1k</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Output $/1k</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Context</TableHead>
+              <TableHead className={TH_DENSE}>Enabled</TableHead>
+              <TableHead className={`${TH_DENSE} w-[1%]`}></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={7} />
+            ) : models.length === 0 ? (
+              <TableEmpty colSpan={7} message="No models in the catalog yet." />
             ) : (
               models.map((m) => (
                 <TableRow key={m.id}>
-                  <TableCell className="font-medium">{m.display_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{m.code}</TableCell>
-                  <TableCell className="text-right">${Number(m.input_cost_per_1k).toFixed(4)}</TableCell>
-                  <TableCell className="text-right">${Number(m.output_cost_per_1k).toFixed(4)}</TableCell>
-                  <TableCell className="text-right">{m.max_context.toLocaleString()}</TableCell>
+                  <TableCell className="max-w-[280px] truncate font-medium">{m.display_name}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{m.code}</TableCell>
+                  <TableCell className="text-right tabular-nums">${Number(m.input_cost_per_1k).toFixed(4)}</TableCell>
+                  <TableCell className="text-right tabular-nums">${Number(m.output_cost_per_1k).toFixed(4)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{m.max_context.toLocaleString()}</TableCell>
                   <TableCell>
                     <Switch checked={m.enabled} onCheckedChange={() => toggle(m)} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <Button variant="ghost" size="icon" onClick={() => remove(m)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -249,7 +248,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
     </AdminLayout>
   );
 }
