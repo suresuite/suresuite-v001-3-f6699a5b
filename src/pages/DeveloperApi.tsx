@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ApiCodeBlock, InlineCode, TableEmpty, TableLoading, TH_DENSE } from '@/components/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -163,20 +164,6 @@ function IdCell({ value }: { value: string }) {
         ? <Check className="h-3 w-3 shrink-0" />
         : <Copy className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100" />}
     </button>
-  );
-}
-
-function Snippet({ title, code }: { title: string; code: string }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">{title}</p>
-        <CopyButton text={code} label="Copy" />
-      </div>
-      <pre className="rounded-md border border-border bg-muted/50 p-3 text-[11px] leading-relaxed overflow-x-auto">
-        <code>{code}</code>
-      </pre>
-    </div>
   );
 }
 
@@ -418,7 +405,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
     if (k.expires_at && new Date(k.expires_at).getTime() < Date.now()) {
       return { label: 'expired', variant: 'outline' };
     }
-    return { label: 'active', variant: 'default' };
+    return { label: 'active', variant: 'secondary' };
   };
 
   const exampleKey = 'sk_live_1a2b3c4d_…your-key…';
@@ -465,7 +452,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 pt-6">
+      <div className="px-12 py-6">
         <PageHeader
           title="Developer API"
           subtitle="Drive SureSuite programmatically — API keys, scopes, and quickstarts for the /v1 gateway"
@@ -487,7 +474,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
           {/* ── Keys ─────────────────────────────────────────────────────── */}
           <TabsContent value="keys" className="space-y-4">
-            <Card>
+            <Card className="shadow-xs">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <KeyRound className="h-4 w-4" /> Organization API keys
@@ -502,30 +489,25 @@ print(r["aggregate_kpis"], len(reps))`;
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Key</TableHead>
-                      <TableHead>Env</TableHead>
-                      <TableHead>Scopes</TableHead>
-                      <TableHead>Projects</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Requests (30d)</TableHead>
-                      <TableHead>Last used</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className={TH_DENSE}>Name</TableHead>
+                      <TableHead className={TH_DENSE}>Key</TableHead>
+                      <TableHead className={TH_DENSE}>Env</TableHead>
+                      <TableHead className={TH_DENSE}>Scopes</TableHead>
+                      <TableHead className={TH_DENSE}>Projects</TableHead>
+                      <TableHead className={TH_DENSE}>Status</TableHead>
+                      <TableHead className={TH_DENSE}>Requests (30d)</TableHead>
+                      <TableHead className={TH_DENSE}>Last used</TableHead>
+                      <TableHead className={`${TH_DENSE} text-right`}>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="py-10 text-center">
-                          <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                        </TableCell>
-                      </TableRow>
+                      <TableLoading colSpan={9} />
                     ) : keys.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
-                          No API keys yet. Create one to call the API from scripts, notebooks, or CI.
-                        </TableCell>
-                      </TableRow>
+                      <TableEmpty
+                        colSpan={9}
+                        message="No API keys yet. Create one to call the API from scripts, notebooks, or CI."
+                      />
                     ) : (
                       keys.map((k) => {
                         const st = keyStatus(k);
@@ -537,7 +519,12 @@ print(r["aggregate_kpis"], len(reps))`;
                               sk_{k.env}_{k.key_prefix}_••••
                             </TableCell>
                             <TableCell>
-                              <Badge variant={k.env === 'live' ? 'default' : 'secondary'}>{k.env}</Badge>
+                              <Badge
+                                variant={k.env === 'live' ? 'outline' : 'secondary'}
+                                className={k.env === 'live' ? 'font-mono text-[10px]' : undefined}
+                              >
+                                {k.env}
+                              </Badge>
                             </TableCell>
                             <TableCell className="max-w-[220px]">
                               <div className="flex flex-wrap gap-1">
@@ -612,7 +599,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
           {/* ── Quickstart ───────────────────────────────────────────────── */}
           <TabsContent value="quickstart" className="space-y-4">
-            <Card>
+            <Card className="shadow-xs">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Base URL</CardTitle>
                 <CardDescription className="text-xs">
@@ -625,17 +612,17 @@ print(r["aggregate_kpis"], len(reps))`;
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <code className="rounded-md border border-border bg-muted/50 px-3 py-1.5 text-xs">{API_BASE}</code>
+                  <InlineCode className="text-xs">{API_BASE}</InlineCode>
                   <CopyButton text={API_BASE} />
                 </div>
-                <Snippet title="List your projects" code={curlList} />
-                <Snippet title="Dispatch a simulation run (202 → run_id; retried submits with the same Idempotency-Key return the same run)" code={curlRun} />
-                <Snippet title="Poll a run until it finishes" code={curlPoll} />
-                <Snippet title="Python: end-to-end (snapshot policy → dispatch → poll → replications)" code={pythonSnippet} />
+                <ApiCodeBlock title="List your projects" code={curlList} />
+                <ApiCodeBlock title="Dispatch a simulation run (202 → run_id; retried submits with the same Idempotency-Key return the same run)" code={curlRun} />
+                <ApiCodeBlock title="Poll a run until it finishes" code={curlPoll} />
+                <ApiCodeBlock title="Python: end-to-end (snapshot policy → dispatch → poll → replications)" code={pythonSnippet} />
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-xs">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Endpoints (v1)</CardTitle>
                 <CardDescription className="text-xs">
@@ -646,9 +633,9 @@ print(r["aggregate_kpis"], len(reps))`;
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Endpoint</TableHead>
-                      <TableHead>Scope</TableHead>
-                      <TableHead>Purpose</TableHead>
+                      <TableHead className={TH_DENSE}>Endpoint</TableHead>
+                      <TableHead className={TH_DENSE}>Scope</TableHead>
+                      <TableHead className={TH_DENSE}>Purpose</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -679,7 +666,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
           {/* ── Notebook ─────────────────────────────────────────────────── */}
           <TabsContent value="notebook" className="space-y-4">
-            <Card>
+            <Card className="shadow-xs">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <NotebookText className="h-4 w-4" /> Jupyter notebook quickstart
@@ -709,8 +696,8 @@ print(r["aggregate_kpis"], len(reps))`;
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    Never paste your API key into a notebook cell. In Colab, store it once in the
-                    🔑 <span className="font-medium">Secrets</span> panel as{' '}
+                    Never paste your API key into a notebook cell. In Colab, store it once in the{' '}
+                    <span className="font-medium">Secrets</span> panel as{' '}
                     <span className="font-mono">SURESUITE_API_KEY</span> — the notebook reads it from
                     there (or from the environment / a hidden prompt when run locally). If Colab
                     can’t open the repository directly, download the pre-filled notebook and use
@@ -720,7 +707,7 @@ print(r["aggregate_kpis"], len(reps))`;
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-xs">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Project configuration</CardTitle>
                 <CardDescription className="text-xs">
@@ -756,20 +743,20 @@ print(r["aggregate_kpis"], len(reps))`;
                       <div className="space-y-1.5">
                         <p className="text-xs font-medium text-muted-foreground">Base URL</p>
                         <div className="flex items-center gap-2">
-                          <code className="flex-1 truncate rounded-md border border-border bg-muted/50 px-3 py-1.5 text-[11px]">{API_BASE}</code>
+                          <InlineCode className="flex-1 truncate">{API_BASE}</InlineCode>
                           <CopyButton text={API_BASE} />
                         </div>
                       </div>
                       <div className="space-y-1.5">
                         <p className="text-xs font-medium text-muted-foreground">Project ID</p>
                         <div className="flex items-center gap-2">
-                          <code className="flex-1 truncate rounded-md border border-border bg-muted/50 px-3 py-1.5 text-[11px]">{nbProject.id}</code>
+                          <InlineCode className="flex-1 truncate">{nbProject.id}</InlineCode>
                           <CopyButton text={nbProject.id} />
                         </div>
                       </div>
                     </div>
 
-                    <Snippet title="Notebook CONFIG cell (pre-filled — paste over the notebook's first code cell)" code={nbConfigCell} />
+                    <ApiCodeBlock title="Notebook CONFIG cell (pre-filled — paste over the notebook's first code cell)" code={nbConfigCell} />
 
                     <div className="space-y-1.5">
                       <p className="text-xs font-medium text-muted-foreground">
@@ -783,12 +770,12 @@ print(r["aggregate_kpis"], len(reps))`;
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>ID</TableHead>
-                              <TableHead>Horizon</TableHead>
-                              <TableHead>Reps</TableHead>
-                              <TableHead>Seed</TableHead>
-                              <TableHead>Primary KPI</TableHead>
+                              <TableHead className={TH_DENSE}>Name</TableHead>
+                              <TableHead className={TH_DENSE}>ID</TableHead>
+                              <TableHead className={TH_DENSE}>Horizon</TableHead>
+                              <TableHead className={TH_DENSE}>Reps</TableHead>
+                              <TableHead className={TH_DENSE}>Seed</TableHead>
+                              <TableHead className={TH_DENSE}>Primary KPI</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -819,11 +806,11 @@ print(r["aggregate_kpis"], len(reps))`;
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Label</TableHead>
-                              <TableHead>ID</TableHead>
-                              <TableHead>policy_hash</TableHead>
-                              <TableHead>Runs</TableHead>
-                              <TableHead>Created</TableHead>
+                              <TableHead className={TH_DENSE}>Label</TableHead>
+                              <TableHead className={TH_DENSE}>ID</TableHead>
+                              <TableHead className={TH_DENSE}>policy_hash</TableHead>
+                              <TableHead className={TH_DENSE}>Runs</TableHead>
+                              <TableHead className={TH_DENSE}>Created</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -853,10 +840,10 @@ print(r["aggregate_kpis"], len(reps))`;
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Label</TableHead>
-                              <TableHead>ID</TableHead>
-                              <TableHead>graph_hash</TableHead>
-                              <TableHead>Created</TableHead>
+                              <TableHead className={TH_DENSE}>Label</TableHead>
+                              <TableHead className={TH_DENSE}>ID</TableHead>
+                              <TableHead className={TH_DENSE}>graph_hash</TableHead>
+                              <TableHead className={TH_DENSE}>Created</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -985,9 +972,9 @@ print(r["aggregate_kpis"], len(reps))`;
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2">
-            <code className="flex-1 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs break-all">
+            <InlineCode className="flex-1 px-3 py-2 text-xs break-all">
               {mintedKey?.plaintext}
-            </code>
+            </InlineCode>
             <CopyButton text={mintedKey?.plaintext ?? ''} />
           </div>
           <Alert>
