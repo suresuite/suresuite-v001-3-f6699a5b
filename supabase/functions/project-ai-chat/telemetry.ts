@@ -39,7 +39,12 @@ export type ChatEventKind =
   // resume_count — ids and counts only, never step labels (§7.5).
   | "plan.created"
   | "plan.step_changed"
-  | "plan.closed";
+  | "plan.closed"
+  // §23.4 capability-matrix gate (Phase H4; CHECK extended in
+  // 20260726000002_model_capability_matrix.sql). Payload: model_code +
+  // capability_id — the single best signal for where the weakest tier
+  // actually stands (§7.5: ids only).
+  | "model.below_target";
 
 // Structural client type so this module never imports the supabase-js bundle.
 export interface TelemetryDb {

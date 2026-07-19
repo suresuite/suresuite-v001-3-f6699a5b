@@ -76,6 +76,10 @@ import {
   makeRequestBudget,
   tryConsumeLlmCall,
 } from "./budgets.ts";
+// H4 (ai-agents.md §23.4): the capability-matrix gate at the routing
+// boundary. MODEL_MATRIX_ENABLED default off ⇒ the matrix is never read and
+// behavior is byte-identical H3 (golden-transcript pinned).
+import { checkMatrixGate, matrixEnabled, routedCapabilityIds } from "./matrix.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -834,6 +838,75 @@ serve(async (req) => {
         routeDecision.agent_id !== null && AGENT_TURNS[routeDecision.agent_id]
           ? routeDecision.agent_id
           : null;
+
+      // --- H4 (§23.4): the capability-matrix gate — AFTER decideRoute,
+      // BEFORE any agent turn. A fresh (≤ 7 days) failing row for the routed
+      // (model, capability) ⇒ the agent turn is NOT executed; the SERVER
+      // instantiates the §22.5 needs-a-stronger-model template (naming the
+      // best passing model, if any), attaches no card, and emits
+      // model.below_target. Fail-open rules, per §23.4: no row, a stale row,
+      // or an advisory route ⇒ proceed normally (the matrix subtracts
+      // nothing until fresh evidence exists). NEVER auto-switch models —
+      // the user chose the model; the platform's job is honesty about what
+      // that choice can do.
+      if (routedAgentId && matrixEnabled()) {
+        const gate = await checkMatrixGate(supabaseAdmin, {
+          modelCode: resolvedModel.id,
+          modelLabel: resolvedModel.label,
+          capabilityIds: routedCapabilityIds(routeDecision, routedAgentId),
+        });
+        if (gate.blocked) {
+          telemetry.emit('model.below_target', {
+            model_code: resolvedModel.id,
+            capability_id: gate.capabilityId,
+          });
+          logAiUsage({
+            status: 'blocked',
+            modelCode: model,
+            promptChars: promptText.length,
+            latencyMs: Date.now() - _t0,
+            errorCode: 'model_below_target',
+          });
+          const refusal: ChatRunResult = {
+            reply: gate.reply,
+            parts: [],
+            toolCalls: [],
+            blocked: true,
+            model: resolvedModel.label,
+          };
+          telemetry.emit('chat.reply', {
+            reply_chars: refusal.reply.length,
+            parts_kinds: [],
+            blocked: true,
+            ...budgetTelemetryPayload(budget),
+          }, { latency_ms: Date.now() - _t0 });
+          let refusalPersisted = false;
+          const matrixStoreOn = (Deno.env.get('CHAT_STORE_ENABLED') ?? '').trim().toLowerCase() === 'true';
+          if (matrixStoreOn && typeof threadId === 'string' && uuidRe.test(threadId)) {
+            try {
+              const { error: appendErr } = await supabaseAdmin.rpc('append_chat_message', {
+                p_user_id: userId,
+                p_thread_id: threadId,
+                p_role: 'assistant',
+                p_content: refusal.reply,
+                p_parts: [],
+                p_tool_calls: [],
+                p_proposal_id: null,
+                p_model_code: resolvedModel.id,
+              });
+              refusalPersisted = !appendErr;
+              if (appendErr) console.warn('[chat-store] append failed:', appendErr.message);
+            } catch (e) {
+              console.warn('[chat-store] append failed:', e instanceof Error ? e.message : e);
+            }
+          }
+          return jsonResponse(
+            refusalPersisted
+              ? { ...refusal, persisted: true }
+              : refusal as unknown as Record<string, unknown>,
+          );
+        }
+      }
 
       if (routedAgentId) {
         const agentUtterance = routeDecision.artifact_part ?? routedUtterance;

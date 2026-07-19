@@ -1,0 +1,19 @@
+{
+  "id": "mx-04-no-row-proceeds",
+  "description": "ai-agents.md §23.4 fail-open trio (3/3) — no row for the routed (model, capability) ⇒ proceed normally: the matrix subtracts nothing until fresh evidence exists (blocking on absent data would freeze the product on day one).",
+  "now": "2026-07-19T12:00:00Z",
+  "matrix_rows": [],
+  "model_code": "gemini-2.5-flash",
+  "utterance": "run a 6-week outage of S1 against the baseline",
+  "route": {
+    "route": "artifact",
+    "agent_id": "experiment-designer",
+    "needs_run": false,
+    "cache_checkable": false
+  },
+  "expect": {
+    "blocked": false,
+    "provider_calls_min": 1
+  },
+  "retired_reason": null
+}

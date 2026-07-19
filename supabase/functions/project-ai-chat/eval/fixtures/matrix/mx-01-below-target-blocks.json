@@ -1,0 +1,52 @@
+{
+  "id": "mx-01-below-target-blocks",
+  "description": "ai-agents.md §23.4 — a FRESH (≤ 7 days) failing row for the routed (model, capability) blocks the agent turn: the SERVER instantiates the §22.5 needs-a-stronger-model template naming the best fresh passing model (highest score — GPT-5 at 1.0 beats DeepSeek at 0.9), attaches no card, emits model.below_target {model_code, capability_id}, and the agent turn NEVER runs (zero provider calls, zero proposals). Never auto-switch: the reply asks the USER to switch.",
+  "now": "2026-07-19T12:00:00Z",
+  "matrix_rows": [
+    {
+      "model_code": "gemini-2.5-flash",
+      "capability_id": "agent:experiment-designer",
+      "score": 0.5,
+      "target": 1.0,
+      "pass": false,
+      "eval_run_id": "eval:seed0001",
+      "measured_at": "2026-07-18T12:00:00Z"
+    },
+    {
+      "model_code": "gpt-5",
+      "capability_id": "agent:experiment-designer",
+      "score": 1.0,
+      "target": 1.0,
+      "pass": true,
+      "eval_run_id": "eval:seed0001",
+      "measured_at": "2026-07-18T12:00:00Z"
+    },
+    {
+      "model_code": "deepseek-chat",
+      "capability_id": "agent:experiment-designer",
+      "score": 0.9,
+      "target": 1.0,
+      "pass": true,
+      "eval_run_id": "eval:seed0001",
+      "measured_at": "2026-07-18T12:00:00Z"
+    }
+  ],
+  "model_code": "gemini-2.5-flash",
+  "utterance": "run a 6-week outage of S1 against the baseline",
+  "route": {
+    "route": "artifact",
+    "agent_id": "experiment-designer",
+    "needs_run": false,
+    "cache_checkable": false
+  },
+  "expect": {
+    "blocked": true,
+    "capability_id": "agent:experiment-designer",
+    "best_model": "GPT-5",
+    "reply": "This request needs the Experiment Designer agent, which Gemini 2.5 Flash doesn't\ncurrently pass our quality checks for. Switch models in the composer\n(GPT-5 passes) and ask again —\nI won't guess with a below-target setup.",
+    "provider_calls": 0,
+    "proposal_count": 0,
+    "telemetry_event": "model.below_target"
+  },
+  "retired_reason": null
+}

@@ -17,11 +17,21 @@
 //
 // Usage (from this directory, so eval/deno.json applies):
 //   deno run --allow-env --allow-read --allow-write --allow-net run_model_eval.ts \
-//     [--models=gemini-2.5-flash,gpt-5] [--agents=data-steward] [--mock] [--out=report.json]
+//     [--models=gemini-2.5-flash,gpt-5] [--agents=data-steward] [--mock] [--out=report.json] \
+//     [--matrix]
 //
 // --mock runs fully offline (oracle classifier + the fixtures' mocked args):
 // it validates the RUNNER and the deterministic gates, and its report is
 // stamped "mode":"mock" — a mock run is NEVER evidence for a flag flip.
+//
+// --matrix (Phase H4, ai-agents.md §7.6/§23.1): after scoring, upsert one
+// row per (model_code, capability_id) into ai_model_capabilities — the
+// measured score, the target it was measured against (threshold changes
+// never rewrite history), pass, and the 'eval:<run-id>' correlator.
+// Capability ids are the CLOSED §23.2 vocabulary (matrix.ts). A --mock run
+// REFUSES to write the matrix (§7.4: mock is harness validation, not
+// evidence), and a --matrix run requires the full agent roster — a subset
+// would publish an incomplete vocabulary.
 
 import { MODEL_REGISTRY, resolveModel, runChat, type ModelSpec } from "../providers.ts";
 import {
@@ -42,10 +52,16 @@ import {
   verifyReply,
   type RecordedToolCall,
 } from "../verifier.ts";
+// H4 (§23.2): the closed capability vocabulary — the writer keys its rows
+// off this exact list; growing it is a doc change to ai-agents.md §23.2
+// first, then matrix.ts, then here.
+import { MATRIX_CAPABILITY_IDS, type MatrixCapabilityId } from "../matrix.ts";
+import { type PlanStep } from "../planTools.ts";
 import { makeAgentRpcs, makeStubDb, type Row } from "./harness/stub_db.ts";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
 const USER = "22222222-2222-4222-8222-222222222222";
+const THREAD = "33333333-3333-4333-8333-333333333333";
 
 // §6.5 targets + the §6.6 v2-signal targets (H2: a missed needs_run degrades
 // to an honest refusal; a false cache_checkable costs one wasted read — both
@@ -88,18 +104,43 @@ interface Fixture {
   expect: Record<string, any>;
 }
 
-function parseArgs(): { models: string[] | null; agents: string[]; mock: boolean; out: string | null } {
+/** The five suite-bearing agents the §23.2 agent:<slug> rows cover — a
+ * --matrix run scores all of them (the closed vocabulary admits no subset). */
+const MATRIX_AGENTS = [
+  "data-steward",
+  "policy-configurator",
+  "vv-analyst",
+  "experiment-designer",
+  "report-builder",
+];
+
+function parseArgs(): {
+  models: string[] | null;
+  agents: string[];
+  mock: boolean;
+  out: string | null;
+  matrix: boolean;
+} {
   let models: string[] | null = null;
-  let agents = ["data-steward"];
+  let agents: string[] | null = null;
   let mock = false;
   let out: string | null = null;
+  let matrix = false;
   for (const a of Deno.args) {
     if (a.startsWith("--models=")) models = a.slice(9).split(",").map((s) => s.trim()).filter(Boolean);
     else if (a.startsWith("--agents=")) agents = a.slice(9).split(",").map((s) => s.trim()).filter(Boolean);
     else if (a === "--mock") mock = true;
+    else if (a === "--matrix") matrix = true;
     else if (a.startsWith("--out=")) out = a.slice(6);
   }
-  return { models, agents, mock, out };
+  if (matrix && agents !== null && MATRIX_AGENTS.some((a) => !agents!.includes(a))) {
+    console.error(
+      "--matrix scores the closed §23.2 vocabulary and requires the full agent roster " +
+        `(${MATRIX_AGENTS.join(",")}) — drop --agents or list all five.`,
+    );
+    Deno.exit(2);
+  }
+  return { models, agents: agents ?? (matrix ? [...MATRIX_AGENTS] : ["data-steward"]), mock, out, matrix };
 }
 
 function keyFor(provider: ModelSpec["provider"]): string {
@@ -852,6 +893,490 @@ async function evalCoverage(model: ModelSpec, mock: boolean): Promise<CoverageMe
   };
 }
 
+// ── closed-loop + plan-integrity model-scored slices (§7.6; Phase H4) ────────
+//
+// The §7.4 tier-2 battery grows the two v1.4 suites, scored per model like
+// every other suite: the cl-* split feeds loop:cache_hit / loop:run_needed
+// and the plan-shaped miss turn feeds plan:integrity (the pi-* laws the
+// MODEL owns: file the plan before acting, only legal plan writes, no step
+// left 'active' at turn end). Live mode drives the REAL B4 turn
+// (CLOSED_LOOP_ENABLED, §20.4 prompt + §20.2 surface) over the fixture's
+// stub project; mock mode replays the fixture's scripted calls through the
+// real handlers — runner validation, never flag-flip evidence. The
+// multi-turn approve/resume fixtures (cl-03/04-full/07/10) stay in the
+// deterministic tier (closed_loop_test.ts) — a model score needs a
+// single-turn, model-owned behavior to grade.
+
+const LOOP_FIXTURES: Record<"cacheHit" | "runNeeded", string[]> = {
+  cacheHit: ["cl-01-cache-hit", "cl-08-engine-version-caveat", "cl-09-multi-sourced-project"],
+  runNeeded: ["cl-02-cache-miss-proposes", "cl-05-stale-data", "cl-06-reps-upgrade"],
+};
+/** plan:integrity runs turn 1 of the plan-shaped fixture (its mocked_llm +
+ * plan_binding_updates are the compliant script the mock tier replays). */
+const PLAN_LOOP_FIXTURES = ["cl-04-approve-resume-cite"];
+
+interface LoopFixture {
+  id: string;
+  stub?: { graph_hash?: string; current_policy_hash?: string };
+  project_snapshot: Record<string, Row[]> | { reuse: string; patch?: Record<string, Row[]> };
+  utterance: string;
+  mocked_llm: { tool_calls: Array<{ tool: string; args: Record<string, unknown> }>; reply: string };
+  plan_binding_updates?: Array<Record<string, unknown>>;
+  // deno-lint-ignore no-explicit-any
+  expect: Record<string, any>;
+}
+
+async function loadLoopFixture(id: string): Promise<LoopFixture> {
+  const f: LoopFixture = JSON.parse(
+    await Deno.readTextFile(new URL(`./fixtures/closed-loop/${id}.json`, import.meta.url)),
+  );
+  if ("reuse" in f.project_snapshot) {
+    const spec = f.project_snapshot as { reuse: string; patch?: Record<string, Row[]> };
+    const base = await loadLoopFixture(spec.reuse);
+    f.project_snapshot = {
+      ...(base.project_snapshot as Record<string, Row[]>),
+      ...(spec.patch ?? {}),
+    };
+    f.stub = { ...base.stub, ...(f.stub ?? {}) };
+  }
+  return f;
+}
+
+function makeLoopHarness(fixture: LoopFixture, model: ModelSpec) {
+  const tables = structuredClone(fixture.project_snapshot) as Record<string, Row[]>;
+  const rpcs = makeAgentRpcs(tables, { graphHash: fixture.stub?.graph_hash });
+  if (fixture.stub?.current_policy_hash) {
+    const hash = fixture.stub.current_policy_hash;
+    rpcs.current_policy_hash = () => hash;
+  }
+  const db = makeStubDb(tables, rpcs);
+  const ctx: ToolContext = {
+    projectId: PROJECT,
+    userId: USER,
+    supabase: db as unknown as ToolContext["supabase"],
+    draft: {
+      userEmail: "eval@example.com",
+      threadId: THREAD,
+      modelCode: model.id,
+      providerCode: model.provider,
+      canProposals: true,
+      utterance: fixture.utterance,
+      agentId: "experiment-designer",
+    },
+  };
+  return { tables, db, ctx };
+}
+
+/** The cl fixtures' DB-level laws plus the reply assertions §20.6 pins —
+ * asserted on the STUB, exactly like the deterministic tier. */
+function scoreLoopOutcome(
+  fixture: LoopFixture,
+  tables: Record<string, Row[]>,
+  reply: string,
+): { pass: boolean; detail: string } {
+  const exp = fixture.expect;
+  const proposals = tables.proposals ?? [];
+  if (exp.proposal_count !== undefined && proposals.length !== exp.proposal_count) {
+    return { pass: false, detail: `expected ${exp.proposal_count} proposal(s), got ${proposals.length}` };
+  }
+  if (exp.run_count !== undefined && (tables.simulation_runs ?? []).length !== exp.run_count) {
+    return {
+      pass: false,
+      detail: `expected ${exp.run_count} run row(s), got ${(tables.simulation_runs ?? []).length} — ` +
+        `no run without approval (§13.6)`,
+    };
+  }
+  if (exp.proposal_artifact_type && proposals[0] &&
+      proposals[0].artifact_type !== exp.proposal_artifact_type) {
+    return { pass: false, detail: `expected artifact_type ${exp.proposal_artifact_type}, got ${proposals[0].artifact_type}` };
+  }
+  if (exp.hit_run_id && !reply.includes(exp.hit_run_id)) {
+    return { pass: false, detail: `reply must cite the stored run ${exp.hit_run_id}` };
+  }
+  for (const caveat of (exp.reply_caveat_includes as string[] | undefined) ?? []) {
+    if (!reply.includes(caveat)) {
+      return { pass: false, detail: `reply must carry the engine-version caveat "${caveat}"` };
+    }
+  }
+  if (exp.stale_names_hash && !reply.includes(exp.stale_names_hash)) {
+    return { pass: false, detail: `reply must name the drifted hash (${exp.stale_names_hash})` };
+  }
+  return { pass: true, detail: "ok" };
+}
+
+/** Substitute {PLACEHOLDER} tokens through a JSON-shaped value (the
+ * closed_loop_test idiom for binding the drafted proposal id). */
+function substituteTokens<T>(value: T, subs: Record<string, string>): T {
+  const s = JSON.stringify(value).replace(
+    /\{(PROPOSAL_ID|PLAN_ID|RUN_ID)\}/g,
+    (_, k) => subs[k] ?? `{${k}}`,
+  );
+  return JSON.parse(s);
+}
+
+interface SuiteScore {
+  fixtures: Record<string, { pass: boolean; detail: string }>;
+  score: number;
+}
+
+interface LoopMetrics {
+  model: string;
+  cacheHit: SuiteScore;
+  runNeeded: SuiteScore;
+  planIntegrity: SuiteScore;
+  pass: boolean;
+  failures: string[];
+}
+
+const suiteScore = (fixtures: SuiteScore["fixtures"]): SuiteScore => ({
+  fixtures,
+  score: Object.keys(fixtures).length === 0
+    ? 1
+    : Object.values(fixtures).filter((f) => f.pass).length / Object.keys(fixtures).length,
+});
+
+async function evalLoop(model: ModelSpec, mock: boolean): Promise<LoopMetrics> {
+  Deno.env.set("AGENT_ENABLED_IDS", "experiment-designer");
+  Deno.env.set("AGENT_EXPERIMENT_TYPES", "single");
+  Deno.env.set("CLOSED_LOOP_ENABLED", "true");
+  const cacheHit: SuiteScore["fixtures"] = {};
+  const runNeeded: SuiteScore["fixtures"] = {};
+  const planIntegrity: SuiteScore["fixtures"] = {};
+
+  const runSingleTurn = async (fixture: LoopFixture): Promise<{ pass: boolean; detail: string }> => {
+    const h = makeLoopHarness(fixture, model);
+    let reply = "";
+    try {
+      if (mock) {
+        // Replay the fixture's scripted calls through the REAL handlers —
+        // the deterministic machinery (cache-first read, cache_hit draft
+        // guard) is what the replay exercises.
+        for (const tc of fixture.mocked_llm.tool_calls) {
+          await executeTool(tc.tool, tc.args, h.ctx);
+        }
+        reply = fixture.mocked_llm.reply;
+      } else {
+        const turn = await runAgentTurn({
+          agentId: "experiment-designer",
+          modelId: model.id,
+          utterance: fixture.utterance,
+          ctx: h.ctx,
+        });
+        if (!turn.ok) return { pass: false, detail: `turn failed: ${turn.error}` };
+        reply = turn.reply;
+      }
+    } catch (e) {
+      return { pass: false, detail: `turn failed: ${e instanceof Error ? e.message : e}` };
+    }
+    return scoreLoopOutcome(fixture, h.tables, reply);
+  };
+
+  // The pi-* laws the MODEL owns, scored on the plan-shaped miss turn:
+  // plan filed before the answer ships (§20.4 step 2); every update_task_plan
+  // write legal (pi-02/03/04 — a rejection is an attempted violation); no
+  // step left 'active' at turn end (pi-01, the model's side of the §21.3
+  // law); the card step waiting on the filed proposal; nothing dispatched.
+  const runPlanTurn = async (fixture: LoopFixture): Promise<{ pass: boolean; detail: string }> => {
+    const h = makeLoopHarness(fixture, model);
+    const planEnvelopes: ToolEnvelope[] = [];
+    try {
+      if (mock) {
+        let proposalId = "";
+        for (const tc of fixture.mocked_llm.tool_calls) {
+          const env = await executeTool(tc.tool, tc.args, h.ctx);
+          if (tc.tool === "update_task_plan") planEnvelopes.push(env);
+          if (env.kind === "proposal") {
+            proposalId = String((env.data as { proposal_id?: unknown }).proposal_id ?? "");
+          }
+        }
+        const planId = String(h.tables.chat_plans?.[0]?.id ?? "");
+        for (const upd of fixture.plan_binding_updates ?? []) {
+          const env = await executeTool("update_task_plan", {
+            plan_id: planId,
+            ...substituteTokens(upd, { PROPOSAL_ID: proposalId }),
+          }, h.ctx);
+          planEnvelopes.push(env);
+        }
+      } else {
+        const turn = await runAgentTurn({
+          agentId: "experiment-designer",
+          modelId: model.id,
+          utterance: fixture.utterance,
+          ctx: h.ctx,
+          onToolResult: (name: string, _args: Record<string, unknown>, envelope: ToolEnvelope) => {
+            if (name === "update_task_plan") planEnvelopes.push(envelope);
+          },
+        });
+        if (!turn.ok) return { pass: false, detail: `turn failed: ${turn.error}` };
+      }
+    } catch (e) {
+      return { pass: false, detail: `turn failed: ${e instanceof Error ? e.message : e}` };
+    }
+
+    const plan = (h.tables.chat_plans ?? [])[0];
+    if (!plan) return { pass: false, detail: "no plan filed (§20.4 step 2: the plan comes before any other tool)" };
+    const rejected = planEnvelopes.filter((e) => e.kind !== "plan").length;
+    if (rejected > 0) {
+      return { pass: false, detail: `${rejected} update_task_plan write(s) rejected — an attempted §21.1 rule violation` };
+    }
+    const steps = (plan.steps as PlanStep[]) ?? [];
+    if (steps.length === 0) return { pass: false, detail: "the filed plan declares no steps" };
+    const dangling = steps.filter((s) => s.status === "active").map((s) => s.id);
+    if (dangling.length > 0) {
+      return { pass: false, detail: `step(s) left 'active' at turn end (${dangling.join(", ")}) — pi-01` };
+    }
+    if ((h.tables.proposals ?? []).length !== 1) {
+      return { pass: false, detail: `the miss branch files exactly one card, got ${(h.tables.proposals ?? []).length}` };
+    }
+    if (!steps.some((s) => s.status === "awaiting_approval")) {
+      return { pass: false, detail: "no step awaits the filed card (§21.1 rule 4 binding)" };
+    }
+    if ((h.tables.simulation_runs ?? []).length !== 0) {
+      return { pass: false, detail: "a run row exists without approval (§13.6 rule 2)" };
+    }
+    return { pass: true, detail: "ok" };
+  };
+
+  try {
+    for (const id of LOOP_FIXTURES.cacheHit) cacheHit[id] = await runSingleTurn(await loadLoopFixture(id));
+    for (const id of LOOP_FIXTURES.runNeeded) runNeeded[id] = await runSingleTurn(await loadLoopFixture(id));
+    Deno.env.set("CHAT_STORE_ENABLED", "true");
+    Deno.env.set("PLAN_TOOL_ENABLED", "true");
+    try {
+      for (const id of PLAN_LOOP_FIXTURES) planIntegrity[id] = await runPlanTurn(await loadLoopFixture(id));
+    } finally {
+      Deno.env.delete("CHAT_STORE_ENABLED");
+      Deno.env.delete("PLAN_TOOL_ENABLED");
+    }
+  } finally {
+    Deno.env.delete("CLOSED_LOOP_ENABLED");
+  }
+
+  const failures: string[] = [];
+  for (const [suite, fixtures] of [["loop:cache_hit", cacheHit], ["loop:run_needed", runNeeded], ["plan:integrity", planIntegrity]] as const) {
+    for (const [id, r] of Object.entries(fixtures)) {
+      if (!r.pass) failures.push(`${suite} ${id}: ${r.detail}`);
+    }
+  }
+  return {
+    model: model.id,
+    cacheHit: suiteScore(cacheHit),
+    runNeeded: suiteScore(runNeeded),
+    planIntegrity: suiteScore(planIntegrity),
+    pass: failures.length === 0,
+    failures,
+  };
+}
+
+// ── the §23 capability-matrix rows (Phase H4: §23.1 writer, §23.2 closed set) ─
+
+/** Targets the matrix rows are measured against — each row STORES the target
+ * it was scored with, so later threshold changes never rewrite history
+ * (§23.2). Defaults are the §6.5/§7.4/§7.7 numbers; suite-shaped
+ * capabilities target 1.0 (§7.4: fixture suites "must pass"). */
+export const MATRIX_TARGETS = {
+  router: 1.0, // fraction of §6.5 composite checks met
+  needsRunRecall: TARGETS.needsRunRecall,
+  cacheCheckablePrecision: TARGETS.cacheCheckablePrecision,
+  agentSuite: 1.0,
+  loopSuite: 1.0,
+  planIntegrity: 1.0,
+  coverageGroup: 1.0,
+  fabrication: 1.0, // §23.2: score = 1 − fabrication rate; target 1.0
+  faithfulness: 0.95, // §7.7: judged-faithful rate ≥ 0.95
+};
+export type MatrixTargets = typeof MATRIX_TARGETS;
+
+/** The §19.2 battery grouped I2–I6 / I8 / I9–I10 (§23.2). cov-09 (the §19.5
+ * no-data honesty case) sits outside the three groups — it scores through
+ * the fabrication metric and the battery pass, not a coverage group. */
+const COVERAGE_GROUP_FIXTURES: Record<
+  "coverage:relations" | "coverage:policy_reads" | "coverage:run_reads",
+  string[]
+> = {
+  "coverage:relations": [
+    "cov-01-supplier-materials",
+    "cov-02-material-suppliers",
+    "cov-03-bom-both-directions",
+    "cov-04-disambiguation",
+    "cov-05-count-not-list",
+  ],
+  "coverage:policy_reads": ["cov-06-policy-read"],
+  "coverage:run_reads": ["cov-07-readiness", "cov-08-run-results"],
+};
+
+export interface CapabilityRow {
+  model_code: string;
+  capability_id: MatrixCapabilityId;
+  score: number;
+  target: number;
+  pass: boolean;
+}
+
+export interface MatrixRowInput {
+  routing: RouteMetrics;
+  steward: StewardMetrics | null;
+  agents: Record<string, StewardMetrics>;
+  coverage: CoverageMetrics;
+  loop: LoopMetrics;
+}
+
+const round3 = (n: number): number => Math.round(n * 1000) / 1000;
+
+/** One row per §23.2 capability from this run's measured metrics. A
+ * capability with NO measurable data this run (an agent suite that didn't
+ * execute; the judge unavailable) yields no row and lands in `missing` —
+ * absent beats invented, and the §23.4 gate fails open on absent rows. */
+export function matrixRowsFor(
+  modelCode: string,
+  m: MatrixRowInput,
+  targets: MatrixTargets = MATRIX_TARGETS,
+): { rows: CapabilityRow[]; missing: MatrixCapabilityId[] } {
+  const rows: CapabilityRow[] = [];
+  const missing: MatrixCapabilityId[] = [];
+  const push = (capability_id: MatrixCapabilityId, score: number, target: number, pass: boolean) =>
+    rows.push({ model_code: modelCode, capability_id, score: round3(score), target, pass });
+
+  // router — the §6.5 composite: fraction of the per-class precision/recall
+  // checks + the advisory-false-artifact and mixed-recall checks met. The
+  // §6.6 v2 signals are their OWN capabilities, not part of the composite.
+  const checks: boolean[] = [];
+  for (const cls of Object.values(m.routing.perClass)) {
+    checks.push(cls.precision >= TARGETS.precision);
+    checks.push(cls.recall >= TARGETS.recall);
+  }
+  checks.push(m.routing.advisoryFalseArtifactRate <= TARGETS.advisoryFalseArtifact);
+  checks.push(m.routing.mixedRecall >= TARGETS.mixedRecall);
+  const routerScore = checks.length === 0 ? 1 : checks.filter(Boolean).length / checks.length;
+  push("router", routerScore, targets.router, routerScore >= targets.router);
+  push(
+    "router.needs_run",
+    m.routing.needsRunRecall,
+    targets.needsRunRecall,
+    m.routing.needsRunRecall >= targets.needsRunRecall,
+  );
+  push(
+    "router.cache_checkable",
+    m.routing.cacheCheckablePrecision,
+    targets.cacheCheckablePrecision,
+    m.routing.cacheCheckablePrecision >= targets.cacheCheckablePrecision,
+  );
+
+  // agent:<slug> — the suite's fixture pass rate; pass is the FULL §7.4 gate
+  // (fixtures + schema validity + gate-violation alarm), so a row can score
+  // 1.0 and still fail on a metrics miss — honest, and stored as measured.
+  const agentMetrics: Record<string, StewardMetrics | null> = {
+    "data-steward": m.steward,
+    "policy-configurator": m.agents["policy-configurator"] ?? null,
+    "vv-analyst": m.agents["vv-analyst"] ?? null,
+    "experiment-designer": m.agents["experiment-designer"] ?? null,
+    "report-builder": m.agents["report-builder"] ?? null,
+  };
+  for (const [slug, metrics] of Object.entries(agentMetrics)) {
+    const id = `agent:${slug}` as MatrixCapabilityId;
+    if (!metrics || Object.keys(metrics.fixtures).length === 0) {
+      missing.push(id);
+      continue;
+    }
+    const rate = Object.values(metrics.fixtures).filter((f) => f.pass).length /
+      Object.keys(metrics.fixtures).length;
+    push(id, rate, targets.agentSuite, metrics.pass);
+  }
+
+  // loop + plan — the §7.6 v1.4 suites.
+  push("loop:cache_hit", m.loop.cacheHit.score, targets.loopSuite, m.loop.cacheHit.score >= targets.loopSuite);
+  push("loop:run_needed", m.loop.runNeeded.score, targets.loopSuite, m.loop.runNeeded.score >= targets.loopSuite);
+  push(
+    "plan:integrity",
+    m.loop.planIntegrity.score,
+    targets.planIntegrity,
+    m.loop.planIntegrity.score >= targets.planIntegrity,
+  );
+
+  // coverage groups — I2–I6 / I8 / I9–I10 pass rates over the battery.
+  for (const [id, fixtures] of Object.entries(COVERAGE_GROUP_FIXTURES)) {
+    const scored = fixtures.filter((f) => m.coverage.battery[f]);
+    if (scored.length === 0) {
+      missing.push(id as MatrixCapabilityId);
+      continue;
+    }
+    const rate = scored.filter((f) => m.coverage.battery[f].pass).length / scored.length;
+    push(id as MatrixCapabilityId, rate, targets.coverageGroup, rate >= targets.coverageGroup);
+  }
+
+  // fabrication — score = 1 − fabrication rate (fraction of battery replies
+  // carrying ≥ 1 fabricated entity/number); target 1.0 (§19.7: a single
+  // fabrication fails the run).
+  const batterySize = Object.keys(m.coverage.battery).length;
+  const fabricatingReplies = Object.values(m.coverage.battery).filter((b) => b.fabrications > 0).length;
+  const fabricationScore = batterySize === 0 ? 1 : 1 - fabricatingReplies / batterySize;
+  push(
+    "fabrication",
+    fabricationScore,
+    targets.fabrication,
+    m.coverage.fabrications === 0 && fabricationScore >= targets.fabrication,
+  );
+
+  // faithfulness — the §7.7 judged rate. Zero judged samples (judge
+  // unavailable / all judge_error) ⇒ no row: the score would be invented.
+  if (m.coverage.judged > 0) {
+    const rate = m.coverage.judgedFaithful / m.coverage.judged;
+    push("faithfulness", rate, targets.faithfulness, rate >= targets.faithfulness);
+  } else {
+    missing.push("faithfulness");
+  }
+
+  return { rows, missing };
+}
+
+/** §23.1 writer: upsert this run's rows into ai_model_capabilities (service
+ * role; on_conflict the (model_code, capability_id) unique key — newest run
+ * wins, and measured_at is sent explicitly so freshness advances on every
+ * upsert). A --mock run is REFUSED — §7.4: mock validates the harness, it is
+ * never evidence, and the matrix is product-consumed evidence (§23.4). */
+export async function writeMatrix(
+  runId: string,
+  rows: CapabilityRow[],
+  opts: { mock: boolean; measuredAt?: string; fetchImpl?: typeof fetch },
+): Promise<{ written: number } | { refused: string } | { skipped: string } | { failed: string }> {
+  if (opts.mock) {
+    return {
+      refused: "--mock runs never write the matrix (§7.4: mock is harness validation, not evidence)",
+    };
+  }
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) {
+    return { skipped: "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — matrix rows not written" };
+  }
+  const measuredAt = opts.measuredAt ?? new Date().toISOString();
+  const payload = rows.map((r) => ({
+    ...r,
+    eval_run_id: `eval:${runId}`,
+    measured_at: measuredAt,
+  }));
+  try {
+    const doFetch = opts.fetchImpl ?? fetch;
+    const res = await doFetch(
+      `${url}/rest/v1/ai_model_capabilities?on_conflict=model_code,capability_id`,
+      {
+        method: "POST",
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) return { failed: `matrix upsert failed (${res.status}): ${await res.text().catch(() => "")}` };
+    return { written: payload.length };
+  } catch (e) {
+    return { failed: `matrix upsert failed: ${e instanceof Error ? e.message : e}` };
+  }
+}
+
 // ── result recording (§7.4: rows land in ai_chat_events, thread 'eval:<id>') ──
 
 async function recordToEvents(runId: string, payload: Record<string, unknown>): Promise<void> {
@@ -872,18 +1397,24 @@ async function recordToEvents(runId: string, payload: Record<string, unknown>): 
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
-if (import.meta.main) {
-  const { models: modelArg, agents, mock, out } = parseArgs();
+/** The whole scored run as a callable (demo_matrix.ts drives the LIVE path
+ * in-process against a scripted provider). Behavior identical to the CLI;
+ * invalid inputs throw and the CLI wrapper maps that to exit 2. */
+export async function runModelEval(opts: {
+  models: string[] | null;
+  agents: string[];
+  mock: boolean;
+  out: string | null;
+  matrix: boolean;
+}): Promise<{ report: Record<string, unknown>; pass: boolean }> {
+  const { models: modelArg, agents, mock, out, matrix } = opts;
   const runId = crypto.randomUUID().slice(0, 8);
 
   const candidates = modelArg ?? Object.keys(MODEL_REGISTRY);
   const models: ModelSpec[] = [];
   for (const id of candidates) {
     const spec = MODEL_REGISTRY[id];
-    if (!spec) {
-      console.error(`unknown model id: ${id}`);
-      Deno.exit(2);
-    }
+    if (!spec) throw new Error(`unknown model id: ${id}`);
     if (!mock && !Deno.env.get(keyFor(spec.provider))) {
       console.warn(`skipping ${id}: ${keyFor(spec.provider)} not configured`);
       continue;
@@ -891,13 +1422,13 @@ if (import.meta.main) {
     models.push(spec);
   }
   if (models.length === 0) {
-    console.error(mock ? "no models selected" : "no provider keys configured — nothing to score (use --mock to exercise the runner offline)");
-    Deno.exit(2);
+    throw new Error(
+      mock ? "no models selected" : "no provider keys configured — nothing to score (use --mock to exercise the runner offline)",
+    );
   }
   for (const a of agents) {
     if (!(AGENT_PRECEDENCE as readonly string[]).includes(a)) {
-      console.error(`unknown agent: ${a}`);
-      Deno.exit(2);
+      throw new Error(`unknown agent: ${a}`);
     }
   }
   Deno.env.set("AGENT_ENABLED_IDS", agents.join(","));
@@ -921,7 +1452,10 @@ if (import.meta.main) {
     steward: [] as unknown[],
     agents: [] as unknown[],
     coverage: [] as unknown[],
+    loop: [] as unknown[],
   };
+  const matrixRows: CapabilityRow[] = [];
+  const matrixMissing: string[] = [];
 
   let allPass = true;
   for (const model of models) {
@@ -950,12 +1484,14 @@ if (import.meta.main) {
 
     // Stage 2/3 agents (§9.3/§9.4): score every enabled agent's suite.
     const agentResults: Record<string, boolean> = {};
+    const agentMetricsById: Record<string, StewardMetrics> = {};
     for (const agentId of agents) {
       const cfg = AGENT_EVAL[agentId];
       if (!cfg) continue;
       const metrics = await evalAgent(cfg, model, mock);
       (report.agents as unknown[]).push({ agent: agentId, ...metrics });
       agentResults[agentId] = metrics.pass;
+      agentMetricsById[agentId] = metrics;
       console.log(`${agentId}: ${metrics.pass ? "PASS" : "FAIL"} — ` +
         `schema-validity=${metrics.schemaValidity.toFixed(3)} ` +
         `gate-violation-attempts=${metrics.gateViolationRate.toFixed(3)} ` +
@@ -976,8 +1512,18 @@ if (import.meta.main) {
     for (const f of coverage.failures) console.log(`  ✗ ${f}`);
     for (const d of coverage.judgeDisagreements) console.log(`  ⚠ triage (§7.3): ${d}`);
 
+    // H4 (§7.6): the closed-loop + plan-integrity slices, scored per model
+    // like every other suite.
+    const loop = await evalLoop(model, mock);
+    (report.loop as unknown[]).push(loop);
+    console.log(`loop: ${loop.pass ? "PASS" : "FAIL"} — ` +
+      `cache-hit=${loop.cacheHit.score.toFixed(3)} ` +
+      `run-needed=${loop.runNeeded.score.toFixed(3)} ` +
+      `plan-integrity=${loop.planIntegrity.score.toFixed(3)}`);
+    for (const f of loop.failures) console.log(`  ✗ ${f}`);
+
     const modelPass = routing.pass && (steward?.pass ?? true) &&
-      Object.values(agentResults).every(Boolean) && coverage.pass;
+      Object.values(agentResults).every(Boolean) && coverage.pass && loop.pass;
     allPass = allPass && modelPass;
     await recordToEvents(runId, {
       eval: "model-scored",
@@ -994,7 +1540,47 @@ if (import.meta.main) {
       coverage_pass: coverage.pass,
       fabrications: coverage.fabrications,
       judged_faithful_rate: coverage.judged > 0 ? coverage.judgedFaithful / coverage.judged : null,
+      loop_pass: loop.pass,
+      plan_integrity: loop.planIntegrity.score,
     });
+
+    // H4 (§23.1/§23.2): one capability row per §23.2 id from this model's
+    // measured metrics; the write happens after every model is scored.
+    if (matrix) {
+      const { rows, missing } = matrixRowsFor(model.id, {
+        routing,
+        steward,
+        agents: agentMetricsById,
+        coverage,
+        loop,
+      });
+      matrixRows.push(...rows);
+      matrixMissing.push(...missing.map((c) => `${model.id} × ${c}`));
+      console.log(`matrix: ${rows.length}/${MATRIX_CAPABILITY_IDS.length} capabilities scored` +
+        (missing.length > 0 ? ` — MISSING: ${missing.join(", ")} (no row written; §23.4 fails open)` : ""));
+      for (const r of rows) {
+        console.log(`  ${r.pass ? "✓" : "✗"} ${r.capability_id.padEnd(26)} score=${r.score.toFixed(3)} target=${r.target}`);
+      }
+    }
+  }
+
+  // H4 (§23.1): the matrix write — one upsert for the whole run, refused on
+  // --mock, honest about skips/failures. The report carries EXACTLY the rows
+  // sent, so the report and the table agree by construction.
+  if (matrix) {
+    const measuredAt = new Date().toISOString();
+    const write = await writeMatrix(runId, matrixRows, { mock, measuredAt });
+    report.matrix = {
+      eval_run_id: `eval:${runId}`,
+      measured_at: measuredAt,
+      rows: matrixRows,
+      missing: matrixMissing,
+      write,
+    };
+    if ("refused" in write) console.log(`\nmatrix write REFUSED: ${write.refused}`);
+    else if ("skipped" in write) console.log(`\nmatrix write skipped: ${write.skipped}`);
+    else if ("failed" in write) console.log(`\nmatrix write FAILED: ${write.failed}`);
+    else console.log(`\nmatrix: upserted ${write.written} rows (eval_run_id eval:${runId})`);
   }
 
   report.pass = allPass;
@@ -1004,5 +1590,15 @@ if (import.meta.main) {
     console.log(`\nreport written to ${out}`);
   }
   console.log(`\n${mock ? "[MOCK RUN — not flag-flip evidence] " : ""}overall: ${allPass ? "PASS" : "FAIL"}`);
-  Deno.exit(allPass ? 0 : 1);
+  return { report, pass: allPass };
+}
+
+if (import.meta.main) {
+  try {
+    const { pass } = await runModelEval(parseArgs());
+    Deno.exit(pass ? 0 : 1);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e);
+    Deno.exit(2);
+  }
 }

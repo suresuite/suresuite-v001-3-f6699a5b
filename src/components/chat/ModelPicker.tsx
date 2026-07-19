@@ -1,5 +1,12 @@
+import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  modelMatrixEnabled,
+  summarizeModelMatrix,
+  type ModelCapabilityRow,
+} from "@/lib/modelMatrix";
 
 export const CHAT_MODELS = [
   { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
@@ -25,6 +32,30 @@ export function getModelLabel(id: string): string {
   return CHAT_MODELS.find((m) => m.id === id)?.label ?? id;
 }
 
+/** H4 (ai-agents.md §23.3): the per-model capability rows from
+ * get_model_capability_matrix(). Flag off, RPC missing, or an empty matrix
+ * all yield [] — the picker renders exactly as it did before H4. */
+function useModelMatrix(): ModelCapabilityRow[] {
+  const [rows, setRows] = useState<ModelCapabilityRow[]>([]);
+  useEffect(() => {
+    if (!modelMatrixEnabled()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (supabase as any).rpc("get_model_capability_matrix");
+        if (!cancelled && !error && Array.isArray(data)) setRows(data as ModelCapabilityRow[]);
+      } catch {
+        /* quality metadata only — the picker works without it */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return rows;
+}
+
 interface Props {
   value: string;
   onChange: (id: string) => void;
@@ -33,9 +64,12 @@ interface Props {
 
 export function ModelPicker({ value, onChange, className }: Props) {
   const { isModelAllowed } = useCapabilities();
+  const matrix = useModelMatrix();
   // Only surface models this user is permitted to call. Keep the current value
   // visible even if disallowed, so the trigger never renders blank (the send
-  // path blocks a disallowed model with a clear reason).
+  // path blocks a disallowed model with a clear reason). The capability hints
+  // below NEVER hide a model (§23.3 — the allowlist owns that); they inform
+  // the choice.
   const visible = CHAT_MODELS.filter((m) => isModelAllowed(m.id).ok || m.id === value);
   const options = visible.length > 0 ? visible : CHAT_MODELS;
   return (
@@ -43,14 +77,25 @@ export function ModelPicker({ value, onChange, className }: Props) {
       <SelectTrigger
         className={`h-8 w-auto gap-1 rounded-md border-border bg-transparent px-2 text-[12px] font-medium text-muted-foreground shadow-none hover:bg-muted hover:text-foreground focus:ring-0 ${className ?? ""}`}
       >
-        <SelectValue />
+        {/* Explicit children so the trigger shows the label only — the item
+            rows below may carry a second hint line (§23.3). */}
+        <SelectValue>{getModelLabel(value)}</SelectValue>
       </SelectTrigger>
       <SelectContent align="end" className="z-[110] min-w-[200px]">
-        {options.map((m) => (
-          <SelectItem key={m.id} value={m.id} className="text-[13px]">
-            {m.label}
-          </SelectItem>
-        ))}
+        {options.map((m) => {
+          const hint = summarizeModelMatrix(matrix, m.id);
+          return (
+            <SelectItem key={m.id} value={m.id} className="text-[13px]">
+              {m.label}
+              {hint && (
+                <span className="mt-0.5 block text-[11px] font-normal leading-tight text-muted-foreground">
+                  {hint.summary}
+                  {hint.stale && <span className="ml-1 text-amber-600">· matrix stale</span>}
+                </span>
+              )}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

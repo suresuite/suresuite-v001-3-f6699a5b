@@ -1647,6 +1647,7 @@ Commit/PR trailer for work under this document: `Phase B / §12 / AI agents: <sl
 | Coverage & fabrication *(v1.4)* | `fixtures/coverage/` | cov-01 … cov-12 (itemized in §7.7-1; cov-01 = `cov-01-supplier-materials`, the pinned supplier-10 regression) | §19.7, §7.7, §22.3 |
 | Closed loop *(v1.4)* | `fixtures/closed-loop/` | cl-01 … cl-10 | §20.6 |
 | Plan integrity *(v1.4)* | `fixtures/plans/` | pi-01 … pi-08 | §21.6 |
+| Capability matrix *(v1.4)* | `fixtures/matrix/` | mx-01 … mx-04 (mx-01 = the seeded below-target block; mx-02/03/04 = the §23.4 fail-open trio) | §23.4, §7.6 |
 
 Fixture file contract: `{id, description, project_snapshot: <minimal table rows>, utterance, mocked_llm?: <tool-call args for the deterministic tier>, expect: {route?, proposal?: <schema assertions>, error_code?, reply_assertions?: <regex list>}, retired_reason?: null}`.
 
@@ -2614,9 +2615,13 @@ CREATE TABLE IF NOT EXISTS public.ai_model_capabilities (
 -- (it is quality metadata, not project data); consumed by index.ts and ModelPicker.
 ```
 
+*As built (H4):* the migration also adds `model.below_target` to the `ai_chat_events` CHECK (the per-phase extension pattern). Writes are service-path only (no client grant, RLS with no policy); the writer sends `measured_at` explicitly so the merge-duplicates upsert advances freshness; a `--matrix` run requires the full agent roster (the closed §23.2 vocabulary admits no subset) and, per §7.4, `--mock` is refused. The shared server module is `project-ai-chat/matrix.ts` (vocabulary, plain-language capability names, the §22.5 template + renderer, the gate); the client mirror is `src/lib/modelMatrix.ts`, pinned byte-equal by `eval/matrix_test.ts`.
+
 ### 23.2 Capability vocabulary (closed set; grows only with new suites)
 
 `router` (the §6.5 composite) · `router.needs_run` · `router.cache_checkable` (§6.6) · `agent:data-steward` · `agent:policy-configurator` · `agent:vv-analyst` · `agent:experiment-designer` · `agent:report-builder` (each = its suite's fixture pass rate vs the §7.4 targets) · `loop:cache_hit` · `loop:run_needed` (the `cl-*` split) · `plan:integrity` (`pi-*` model-scored slice) · `coverage:relations` · `coverage:policy_reads` · `coverage:run_reads` (the §19.2 battery grouped I2–I6 / I8 / I9–I10) · `fabrication` (score = 1 − fabrication rate; target 1.0) · `faithfulness` (the §7.7 judged rate). Targets default to the §6.5/§7.4/§7.7 numbers; each row stores the target it was measured against, so threshold changes never rewrite history.
+
+*As built (H4), the concrete slices:* `router` = the fraction of §6.5 composite checks met (per-class precision/recall + advisory-false-artifact + mixed recall; the v2 signals are their own rows); the agent rows score fixture pass rate with `pass` = the full §7.4 gate (fixtures + schema validity + violation alarm); `loop:cache_hit` = the single-turn hit fixtures cl-01/08/09 and `loop:run_needed` = the miss fixtures cl-02/05/06, both driving the real B4 turn per model; `plan:integrity` = the plan-shaped miss turn (cl-04 turn 1) scoring the model-owned pi laws — plan filed before acting, zero rejected `update_task_plan` writes, no step left `active`, the card step waiting on the filed proposal, nothing dispatched (the multi-turn approve/resume fixtures stay deterministic-tier); the coverage groups are cov-01…05 / cov-06 / cov-07…08 (cov-09 scores through the fabrication metric); `fabrication` rate = fraction of battery replies carrying ≥ 1 fabricated entity/number. A capability with no measurable data in a run (a suite that did not execute; the judge unavailable) gets **no row** — absent beats invented, and §23.4 fails open on absent rows.
 
 ### 23.3 Publication
 
@@ -2626,6 +2631,8 @@ CREATE TABLE IF NOT EXISTS public.ai_model_capabilities (
 ### 23.4 Enforcement — honest template, never silent degradation
 
 At the routing boundary in `index.ts` (after `decideRoute`, before any agent turn): if the decision routes to an agent/loop whose `(model_code, capability_id)` row exists, is fresh (≤ 7 days), and `pass = false` ⇒ the agent turn is **not executed**; the server instantiates the §22.5 needs-a-stronger-model template (naming the best passing model, if any), attaches no card, and emits `model.below_target` telemetry (payload: model_code, capability_id — the single best signal for where the weakest tier actually stands). Fail-open rules, stated: no row, or a stale row, or an advisory route ⇒ proceed normally (the matrix subtracts nothing until fresh evidence exists — blocking on absent data would freeze the product on day one; advisory replies are separately guarded by the §22.3 verifier, which is why fail-open is safe). **Never auto-switch models** — the user chose the model; the platform's job is honesty about what that choice can do (the §15 posture, applied to model choice).
+
+*As built (H4), the deterministic route→capability mapping (`matrix.ts::routedCapabilityIds`):* a routed agent turn checks `agent:<slug>` first; when the routed turn IS the B4 closed loop (§6.6 rule 2 — experiment-designer ∧ `needs_run` ∧ `CLOSED_LOOP_ENABLED`) it additionally checks `loop:run_needed`, plus `loop:cache_hit` when `cache_checkable` joins the cache-first surface to that same turn; the first fresh failing capability names the template. "Best passing model" = the highest-scoring fresh passing row for that capability (ties by model_code), labeled via the registry. The §21.4 resume pre-step is **not** re-gated — a resume continues an already-authorized plan and is never re-classified; blocking it would strand a plan mid-flight. The blocked reply persists to the chat store like any assistant message and logs usage with status `blocked`.
 
 ---
 
