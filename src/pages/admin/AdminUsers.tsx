@@ -31,7 +31,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Loader2, Plus, SlidersHorizontal } from 'lucide-react';
-import { TableEmpty } from '@/components/shared/TableEmpty';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import { toast } from 'sonner';
 
 interface Props {
@@ -146,28 +146,24 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
         </div>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Organization</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Req (MTD)</TableHead>
-              <TableHead className="text-right">Cost (MTD)</TableHead>
-              <TableHead className="text-right">Budget</TableHead>
-              <TableHead className="w-[120px] text-right">Actions</TableHead>
+              <TableHead className={TH_DENSE}>Name</TableHead>
+              <TableHead className={TH_DENSE}>Email</TableHead>
+              <TableHead className={TH_DENSE}>Organization</TableHead>
+              <TableHead className={TH_DENSE}>Role</TableHead>
+              <TableHead className={TH_DENSE}>Status</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Req (MTD)</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Cost (MTD)</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Budget</TableHead>
+              <TableHead className={`${TH_DENSE} w-[120px] text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={9} />
             ) : filtered.length === 0 ? (
               <TableEmpty
                 colSpan={9}
@@ -219,10 +215,10 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         <Badge variant="secondary">Active</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       {Number(r.mtd_requests).toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       ${Number(r.mtd_cost_usd).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
@@ -268,7 +264,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
     </AdminLayout>
   );
 }

@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import { toast } from 'sonner';
 
 interface Props {
@@ -208,34 +209,32 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
         </Dialog>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Model</TableHead>
-              <TableHead>Code</TableHead>
-              <TableHead className="text-right">Input $/1k</TableHead>
-              <TableHead className="text-right">Output $/1k</TableHead>
-              <TableHead className="text-right">Context</TableHead>
-              <TableHead>Enabled</TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className={TH_DENSE}>Model</TableHead>
+              <TableHead className={TH_DENSE}>Code</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Input $/1k</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Output $/1k</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Context</TableHead>
+              <TableHead className={TH_DENSE}>Enabled</TableHead>
+              <TableHead className={`${TH_DENSE} w-[80px]`}></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={7} />
+            ) : models.length === 0 ? (
+              <TableEmpty colSpan={7} message="No models in the catalog yet." />
             ) : (
               models.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">{m.display_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{m.code}</TableCell>
-                  <TableCell className="text-right">${Number(m.input_cost_per_1k).toFixed(4)}</TableCell>
-                  <TableCell className="text-right">${Number(m.output_cost_per_1k).toFixed(4)}</TableCell>
-                  <TableCell className="text-right">{m.max_context.toLocaleString()}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{m.code}</TableCell>
+                  <TableCell className="text-right tabular-nums">${Number(m.input_cost_per_1k).toFixed(4)}</TableCell>
+                  <TableCell className="text-right tabular-nums">${Number(m.output_cost_per_1k).toFixed(4)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{m.max_context.toLocaleString()}</TableCell>
                   <TableCell>
                     <Switch checked={m.enabled} onCheckedChange={() => toggle(m)} />
                   </TableCell>
@@ -249,7 +248,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
     </AdminLayout>
   );
 }

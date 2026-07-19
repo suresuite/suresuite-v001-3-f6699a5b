@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2 } from 'lucide-react';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 
 interface Props {
   isCollapsed: boolean;
@@ -72,30 +72,22 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
         </Button>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Target</TableHead>
-              <TableHead>Changes</TableHead>
+              <TableHead className={TH_DENSE}>Time</TableHead>
+              <TableHead className={TH_DENSE}>Actor</TableHead>
+              <TableHead className={TH_DENSE}>Action</TableHead>
+              <TableHead className={TH_DENSE}>Target</TableHead>
+              <TableHead className={TH_DENSE}>Changes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={5} />
             ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                  No audit entries yet.
-                </TableCell>
-              </TableRow>
+              <TableEmpty colSpan={5} message="No audit entries yet." />
             ) : (
               rows.map((r) => (
                 <TableRow key={r.id}>
@@ -106,21 +98,23 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
                   <TableCell className="font-mono text-xs">{r.action}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {r.target_type}
-                    {r.target_id ? `:${r.target_id.slice(0, 8)}` : ''}
+                    {r.target_id ? (
+                      <span className="font-mono">:{r.target_id.slice(0, 8)}</span>
+                    ) : ''}
                   </TableCell>
                   <TableCell className="max-w-[400px] truncate text-xs">
                     <span className="text-muted-foreground">before:</span>{' '}
-                    {r.before ? JSON.stringify(r.before) : '—'}
+                    <span className="font-mono text-[11px]">{r.before ? JSON.stringify(r.before) : '—'}</span>
                     <br />
                     <span className="text-muted-foreground">after:</span>{' '}
-                    {r.after ? JSON.stringify(r.after) : '—'}
+                    <span className="font-mono text-[11px]">{r.after ? JSON.stringify(r.after) : '—'}</span>
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
     </AdminLayout>
   );
 }

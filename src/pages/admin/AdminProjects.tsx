@@ -46,6 +46,7 @@ import {
   Settings2,
   Trash2,
 } from 'lucide-react';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import { toast } from 'sonner';
 
 interface Props {
@@ -175,34 +176,36 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
         </div>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Organization</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Plant</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Last activity</TableHead>
-              <TableHead className="w-[60px] text-right">Actions</TableHead>
+              <TableHead className={TH_DENSE}>Name</TableHead>
+              <TableHead className={TH_DENSE}>Organization</TableHead>
+              <TableHead className={TH_DENSE}>Owner</TableHead>
+              <TableHead className={TH_DENSE}>Plant</TableHead>
+              <TableHead className={TH_DENSE}>Model</TableHead>
+              <TableHead className={TH_DENSE}>Status</TableHead>
+              <TableHead className={TH_DENSE}>Created</TableHead>
+              <TableHead className={TH_DENSE}>Last activity</TableHead>
+              <TableHead className={`${TH_DENSE} w-[60px] text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={9} />
             ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                  No projects match.
-                </TableCell>
-              </TableRow>
+              <TableEmpty
+                colSpan={9}
+                message={q ? 'No projects match these filters.' : 'No projects yet.'}
+                action={
+                  q ? (
+                    <Button variant="ghost" size="sm" onClick={() => setQ('')}>
+                      Clear search
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               filtered.map((p) => (
                 <TableRow key={p.id}>
@@ -272,7 +275,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
 
       {target && dialog === 'copy' && (
         <CopyDialog

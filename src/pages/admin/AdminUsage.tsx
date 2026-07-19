@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2 } from 'lucide-react';
+import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import {
   aggregateMatrixByModel,
   type ModelCapabilityRow,
@@ -168,34 +168,29 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
         </div>
       }
     >
-      <div className="rounded-md border border-border bg-card">
+      <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead className="text-right">Prompt</TableHead>
-              <TableHead className="text-right">Completion</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
-              <TableHead className="text-right">Latency</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className={TH_DENSE}>Time</TableHead>
+              <TableHead className={TH_DENSE}>User</TableHead>
+              <TableHead className={TH_DENSE}>Model</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Prompt</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Completion</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Total</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Cost</TableHead>
+              <TableHead className={`${TH_DENSE} text-right`}>Latency</TableHead>
+              <TableHead className={TH_DENSE}>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                </TableCell>
-              </TableRow>
+              <TableLoading colSpan={9} />
             ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                  No usage recorded yet. Trigger a chat request to see logs here.
-                </TableCell>
-              </TableRow>
+              <TableEmpty
+                colSpan={9}
+                message="No usage recorded yet. Trigger a chat request to see logs here."
+              />
             ) : (
               rows.map((r) => (
                 <TableRow key={r.id}>
@@ -203,12 +198,12 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
                     {new Date(r.created_at).toLocaleString()}
                   </TableCell>
                   <TableCell>{r.user_name || '—'}</TableCell>
-                  <TableCell className="text-xs">{r.model_code || '—'}</TableCell>
-                  <TableCell className="text-right">{r.prompt_tokens}</TableCell>
-                  <TableCell className="text-right">{r.completion_tokens}</TableCell>
-                  <TableCell className="text-right">{r.total_tokens}</TableCell>
-                  <TableCell className="text-right">${Number(r.cost_usd).toFixed(4)}</TableCell>
-                  <TableCell className="text-right">{r.latency_ms ?? '—'}</TableCell>
+                  <TableCell className="font-mono text-xs">{r.model_code || '—'}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.prompt_tokens}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.completion_tokens}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.total_tokens}</TableCell>
+                  <TableCell className="text-right tabular-nums">${Number(r.cost_usd).toFixed(4)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.latency_ms ?? '—'}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
@@ -227,7 +222,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableShell>
 
       {matrixRows.length > 0 && (
         <div className="mt-6">
@@ -237,21 +232,21 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
             informs the picker and the below-target refusal — it never hides a model and never
             switches one. Rows older than 7 days are stale and stop gating.
           </p>
-          <div className="rounded-md border border-border bg-card">
+          <TableShell>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">Capabilities passing</TableHead>
-                  <TableHead>Below target</TableHead>
-                  <TableHead>Measured</TableHead>
-                  <TableHead>Freshness</TableHead>
+                  <TableHead className={TH_DENSE}>Model</TableHead>
+                  <TableHead className={`${TH_DENSE} text-right`}>Capabilities passing</TableHead>
+                  <TableHead className={TH_DENSE}>Below target</TableHead>
+                  <TableHead className={TH_DENSE}>Measured</TableHead>
+                  <TableHead className={TH_DENSE}>Freshness</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {matrixRows.map((r) => (
                   <TableRow key={r.model_code}>
-                    <TableCell className="text-xs">{r.model_code}</TableCell>
+                    <TableCell className="font-mono text-xs">{r.model_code}</TableCell>
                     <TableCell className="text-right">
                       {r.passing}/{r.total}
                     </TableCell>
@@ -270,7 +265,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableShell>
         </div>
       )}
 
@@ -281,25 +276,25 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
             Rendered reports and exports per org (14-day retention unless Kept; 500 MB retained
             cap per user). Counts and bytes only — file contents stay private to their owners.
           </p>
-          <div className="rounded-md border border-border bg-card">
+          <TableShell>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Organization</TableHead>
-                  <TableHead className="text-right">Files</TableHead>
-                  <TableHead className="text-right">Total size</TableHead>
-                  <TableHead className="text-right">Kept size</TableHead>
-                  <TableHead className="text-right">Expiring ≤ 7d</TableHead>
+                  <TableHead className={TH_DENSE}>Organization</TableHead>
+                  <TableHead className={`${TH_DENSE} text-right`}>Files</TableHead>
+                  <TableHead className={`${TH_DENSE} text-right`}>Total size</TableHead>
+                  <TableHead className={`${TH_DENSE} text-right`}>Kept size</TableHead>
+                  <TableHead className={`${TH_DENSE} text-right`}>Expiring ≤ 7d</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {fileRows.map((r) => (
                   <TableRow key={r.org_id ?? 'none'}>
                     <TableCell>{r.org_name || (r.org_id ? r.org_id.slice(0, 8) : 'No organization')}</TableCell>
-                    <TableCell className="text-right">{r.file_count}</TableCell>
-                    <TableCell className="text-right">{humanBytes(Number(r.total_bytes))}</TableCell>
-                    <TableCell className="text-right">{humanBytes(Number(r.retained_bytes))}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">{r.file_count}</TableCell>
+                    <TableCell className="text-right tabular-nums">{humanBytes(Number(r.total_bytes))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{humanBytes(Number(r.retained_bytes))}</TableCell>
+                    <TableCell className="text-right tabular-nums">
                       {Number(r.expiring_7d) > 0 ? (
                         <Badge variant="outline">{r.expiring_7d}</Badge>
                       ) : (
@@ -310,7 +305,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableShell>
         </div>
       )}
     </AdminLayout>
