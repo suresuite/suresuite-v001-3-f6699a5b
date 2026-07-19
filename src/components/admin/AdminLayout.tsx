@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { PageLayout } from '@/components/shared/PageLayout';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
 
 interface AdminLayoutProps {
@@ -43,16 +44,8 @@ export function AdminLayout({
 }: AdminLayoutProps) {
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="mx-auto max-w-[1400px] px-6 py-6">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
-            {description && (
-              <div className="mt-1 text-sm text-muted-foreground">{description}</div>
-            )}
-          </div>
-          {actions}
-        </div>
+      <div className="px-12 py-6">
+        <PageHeader title={title} subtitle={description} rightContent={actions} />
 
         <div className="grid grid-cols-[180px_1fr] gap-6">
           <nav className="flex flex-col gap-0.5">
@@ -65,14 +58,14 @@ export function AdminLayout({
                   end={item.end}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors',
+                      'relative flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                       isActive
-                        ? 'bg-accent text-accent-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                        ? "bg-muted/80 text-foreground before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-primary"
+                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                     )
                   }
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3.5 w-3.5" />
                   {item.label}
                 </NavLink>
               );
