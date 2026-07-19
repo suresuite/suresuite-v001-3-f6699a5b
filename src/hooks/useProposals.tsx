@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { postPlanResume } from "@/lib/chat/planResume";
 
 /**
  * Proposal fabric client hooks (ai-agents.md §4.6): fetch via the
@@ -54,6 +55,40 @@ export interface ApplyOptions {
   acknowledgeWarnings?: boolean;
 }
 
+const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface BoundPlanStep {
+  planId: string;
+  threadId: string;
+  stepId: string;
+}
+
+/**
+ * §21.4 approval resume (ai-agents.md, Phase H3): find the thread's active
+ * plan step bound (`ref.proposal_id`) to this card. Best-effort — plan wiring
+ * must never break the approve/reject UX, so callers swallow failures.
+ */
+async function findBoundPlanStep(proposalId: string, userId: string): Promise<BoundPlanStep | null> {
+  const { data: prop } = await db
+    .from("proposals").select("thread_id").eq("id", proposalId).maybeSingle();
+  const threadId = (prop as { thread_id?: string | null } | null)?.thread_id ?? null;
+  if (!threadId || !uuidRe.test(threadId)) return null;
+  const { data: plans } = await db.rpc("list_chat_plans", { p_thread_id: threadId, p_user_id: userId });
+  interface PlanRowLite {
+    id: string;
+    status: string;
+    steps?: Array<{ id: string; status: string; ref?: { proposal_id?: string } }>;
+  }
+  for (const plan of (Array.isArray(plans) ? plans : []) as PlanRowLite[]) {
+    if (plan.status !== "active") continue;
+    const step = (plan.steps ?? []).find(
+      (s) => s.status === "awaiting_approval" && s.ref?.proposal_id === proposalId,
+    );
+    if (step) return { planId: plan.id, threadId, stepId: step.id };
+  }
+  return null;
+}
+
 interface ProposalActions {
   approve: (id: string, opts?: ApplyOptions) => Promise<string | null>;
   reject: (id: string, note?: string) => Promise<string | null>;
@@ -65,6 +100,48 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
   const { user } = useAuth();
   const [applyingIds, setApplyingIds] = useState<Set<string>>(new Set());
   const viewedRef = useRef<Set<string>>(new Set());
+
+  // §21.4 (H3): after the apply outcome, advance the bound plan step (ONE
+  // RPC — advance_chat_plan_step) and, on a dispatched run, post the resume
+  // turn. Rejection / typed apply failures (incl. quota_exceeded, §13.6 rule
+  // 3) mark the step failed with the message as its note. Best-effort:
+  // errors here never surface into the approve/reject UX.
+  const advanceBoundStep = useCallback(async (
+    id: string,
+    outcome: { kind: "applied" } | { kind: "failed"; note: string },
+  ): Promise<void> => {
+    if (!user?.id) return;
+    try {
+      const bound = await findBoundPlanStep(id, user.id);
+      if (!bound) return;
+      if (outcome.kind === "applied") {
+        const { data: prop } = await db
+          .from("proposals").select("applied_result").eq("id", id).maybeSingle();
+        const runId = (prop as { applied_result?: { run_id?: string } } | null)?.applied_result?.run_id;
+        if (!runId || !uuidRe.test(runId)) return;
+        const { error } = await db.rpc("advance_chat_plan_step", {
+          p_plan_id: bound.planId,
+          p_step_id: bound.stepId,
+          p_status: "awaiting_run",
+          p_user_id: user.id,
+          p_run_id: runId,
+        });
+        if (error) throw error;
+        postPlanResume(bound.threadId, bound.planId);
+      } else {
+        const { error } = await db.rpc("advance_chat_plan_step", {
+          p_plan_id: bound.planId,
+          p_step_id: bound.stepId,
+          p_status: "failed",
+          p_user_id: user.id,
+          p_note: outcome.note.slice(0, 200),
+        });
+        if (error) throw error;
+      }
+    } catch (e) {
+      console.warn("[plans] bound-step advance failed:", e instanceof Error ? e.message : e);
+    }
+  }, [user?.id]);
 
   const invokeApply = useCallback(async (id: string, opts?: ApplyOptions): Promise<string | null> => {
     setApplyingIds((prev) => new Set(prev).add(id));
@@ -78,11 +155,21 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
           ...(opts?.acknowledgeWarnings ? { acknowledgeWarnings: true } : {}),
         },
       });
-      if (error) return error.message ?? "Apply failed.";
-      if (data?.error) return String(data.error);
+      if (error) {
+        const msg = error.message ?? "Apply failed.";
+        await advanceBoundStep(id, { kind: "failed", note: msg });
+        return msg;
+      }
+      if (data?.error) {
+        await advanceBoundStep(id, { kind: "failed", note: String(data.error) });
+        return String(data.error);
+      }
+      await advanceBoundStep(id, { kind: "applied" });
       return null;
     } catch (e) {
-      return e instanceof Error ? e.message : "Apply failed.";
+      const msg = e instanceof Error ? e.message : "Apply failed.";
+      await advanceBoundStep(id, { kind: "failed", note: msg });
+      return msg;
     } finally {
       setApplyingIds((prev) => {
         const next = new Set(prev);
@@ -91,7 +178,7 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
       });
       onChanged?.();
     }
-  }, [user?.id, user?.email, onChanged]);
+  }, [user?.id, user?.email, onChanged, advanceBoundStep]);
 
   const approve = useCallback(async (id: string, opts?: ApplyOptions): Promise<string | null> => {
     const { error } = await db.rpc("review_agent_proposal", {
@@ -107,6 +194,9 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
   }, [user?.id, user?.email, invokeApply, onChanged]);
 
   const reject = useCallback(async (id: string, note?: string): Promise<string | null> => {
+    // §21.4: rejection fails the bound plan step (note "rejected") BEFORE the
+    // card leaves awaiting review — the persona acknowledges on the next turn.
+    await advanceBoundStep(id, { kind: "failed", note: "rejected" });
     const { error } = await db.rpc("review_agent_proposal", {
       p_proposal_id: id,
       p_action: "reject",
@@ -116,7 +206,7 @@ function useProposalActions(onChanged?: () => void): ProposalActions & { applyin
     });
     onChanged?.();
     return error ? error.message ?? "Reject failed." : null;
-  }, [user?.id, user?.email, onChanged]);
+  }, [user?.id, user?.email, onChanged, advanceBoundStep]);
 
   const retryApply = useCallback((id: string, opts?: ApplyOptions) => invokeApply(id, opts), [invokeApply]);
 

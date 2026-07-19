@@ -1,0 +1,198 @@
+{
+  "id": "cl-04-approve-resume-cite",
+  "description": "ai-agents.md §20.6 cl-04 (Phase H3) — the full arc: cl-02 miss state → plan filed + spec card → the plan binds the card (awaiting_approval, ref.proposal_id) → simulated approve → apply through the REAL dispatch module (queued run, full provenance) → the §21.4 client advance (advance_chat_plan_step → awaiting_run + resume) → the 'worker' marks the run done with KPIs → the resume turn reads persisted KPIs and closes every step. Asserts: the resumed reply's numbers ∈ the stub run rows, every citation resolves via the §22.2 resolver against the stub, and every plan step ends terminal.",
+  "stub": {
+    "graph_hash": "graph-hash-1",
+    "current_policy_hash": "ph-run"
+  },
+  "project_snapshot": {
+    "reuse": "cl-02-cache-miss-proposes"
+  },
+  "utterance": "test a 6-week outage of S1 with 30 reps and tell me the fill-rate impact",
+  "mocked_llm": {
+    "tool_calls": [
+      {
+        "tool": "update_task_plan",
+        "args": {
+          "title": "6-week S1 outage — fill-rate impact",
+          "steps": [
+            {
+              "id": "check",
+              "label": "Check for an existing run",
+              "status": "active"
+            },
+            {
+              "id": "card",
+              "label": "File and dispatch the experiment",
+              "status": "pending"
+            },
+            {
+              "id": "answer",
+              "label": "Answer from evidence",
+              "status": "pending"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "find_completed_run",
+        "args": {
+          "scenario": "outage",
+          "replications": 30
+        }
+      },
+      {
+        "tool": "draft_experiment_spec",
+        "args": {
+          "scenario_id": "55555555-5555-4555-8555-555555555502",
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "replications": 30,
+          "title": "6-week outage of S1 × baseline (30 reps)",
+          "question": "What is the fill-rate impact of a 6-week outage of S1?"
+        }
+      }
+    ],
+    "reply": "No completed run answers this yet — I filed the experiment card (30 replications against the saved baseline). Approve it and the thread resumes automatically when the run completes."
+  },
+  "worker_result": {
+    "aggregate_kpis": {
+      "fill_rate": 0.82,
+      "backlog_peak": 517
+    },
+    "replication_kpis": [
+      {
+        "rep_index": 1,
+        "kpis": {
+          "fill_rate": 0.81
+        }
+      },
+      {
+        "rep_index": 2,
+        "kpis": {
+          "fill_rate": 0.82
+        }
+      },
+      {
+        "rep_index": 3,
+        "kpis": {
+          "fill_rate": 0.83
+        }
+      }
+    ]
+  },
+  "resume_llm": {
+    "tool_calls": [
+      {
+        "tool": "get_run_results",
+        "args": {
+          "run_id": "{RUN_ID}"
+        }
+      },
+      {
+        "tool": "update_task_plan",
+        "args": {
+          "plan_id": "{PLAN_ID}",
+          "steps": [
+            {
+              "id": "check",
+              "label": "Check for an existing run",
+              "status": "done"
+            },
+            {
+              "id": "card",
+              "label": "File and dispatch the experiment",
+              "status": "done"
+            },
+            {
+              "id": "answer",
+              "label": "Answer from evidence",
+              "status": "active"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "update_task_plan",
+        "args": {
+          "plan_id": "{PLAN_ID}",
+          "steps": [
+            {
+              "id": "check",
+              "label": "Check for an existing run",
+              "status": "done"
+            },
+            {
+              "id": "card",
+              "label": "File and dispatch the experiment",
+              "status": "done"
+            },
+            {
+              "id": "answer",
+              "label": "Answer from evidence",
+              "status": "done"
+            }
+          ]
+        }
+      }
+    ],
+    "reply": "The 6-week outage of S1 drops fill rate to 0.82 with a peak backlog of 517 [1] — from run {RUN_ID} (30 replications)."
+  },
+  "expect": {
+    "reply_numbers_in_stub": [
+      "0.82",
+      "517"
+    ],
+    "proposal_count": 1,
+    "run_count": 1,
+    "terminal_step_statuses": {
+      "check": "done",
+      "card": "done",
+      "answer": "done"
+    },
+    "plan_status": "done"
+  },
+  "retired_reason": null,
+  "plan_binding_updates": [
+    {
+      "steps": [
+        {
+          "id": "check",
+          "label": "Check for an existing run",
+          "status": "done"
+        },
+        {
+          "id": "card",
+          "label": "File and dispatch the experiment",
+          "status": "active"
+        },
+        {
+          "id": "answer",
+          "label": "Answer from evidence",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "id": "check",
+          "label": "Check for an existing run",
+          "status": "done"
+        },
+        {
+          "id": "card",
+          "label": "File and dispatch the experiment",
+          "status": "awaiting_approval",
+          "ref": {
+            "proposal_id": "{PROPOSAL_ID}"
+          }
+        },
+        {
+          "id": "answer",
+          "label": "Answer from evidence",
+          "status": "pending"
+        }
+      ]
+    }
+  ]
+}

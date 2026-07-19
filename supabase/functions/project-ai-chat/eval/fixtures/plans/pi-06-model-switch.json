@@ -1,0 +1,28 @@
+{
+  "id": "pi-06-model-switch",
+  "description": "ai-agents.md §21.6 pi-06 — model-switch survival (D3): a resume with a different model_code advances the SAME plan row (the plan is data, not context); the row records the new model and resume_count increments only because this resume reaches the LLM.",
+  "seed_plan": {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02",
+    "title": "Outage question",
+    "model_code": "gemini-2.5-flash",
+    "steps": [
+      { "id": "run", "label": "Wait for the run", "status": "awaiting_run", "ref": { "run_id": "99999999-9999-4999-8999-999999999912" } },
+      { "id": "answer", "label": "Answer from evidence", "status": "pending" }
+    ],
+    "resume_count": 2
+  },
+  "seed_run": {
+    "id": "99999999-9999-4999-8999-999999999912",
+    "status": "done",
+    "rep_count_done": 30,
+    "rep_count_target": 30
+  },
+  "resume_model_code": "gpt-5",
+  "expect": {
+    "kind": "run_done",
+    "model_code_after": "gpt-5",
+    "resume_count_after": 3,
+    "step_status_after": "active"
+  },
+  "retired_reason": null
+}

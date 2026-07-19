@@ -1,0 +1,26 @@
+{
+  "id": "pi-07-caps",
+  "description": "ai-agents.md §21.6 pi-07 — the §21.5 plan budgets reject with the cap NAMED: a 13th step returns invalid_params naming 12; the 11th LLM-reaching resume marks the plan failed:resume_cap and the honest reply names the cap.",
+  "thirteen_steps_title": "Too many steps",
+  "seed_plan": {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa03",
+    "title": "Resume-capped plan",
+    "steps": [
+      { "id": "run", "label": "Wait for the run", "status": "awaiting_run", "ref": { "run_id": "99999999-9999-4999-8999-999999999913" } }
+    ],
+    "resume_count": 10
+  },
+  "seed_run": {
+    "id": "99999999-9999-4999-8999-999999999913",
+    "status": "done",
+    "rep_count_done": 30,
+    "rep_count_target": 30
+  },
+  "expect": {
+    "step_cap_error_includes": "12 steps",
+    "resume_reply_includes": "resume cap (10 resumes)",
+    "resume_step_note": "resume_cap",
+    "plan_status_after": "failed"
+  },
+  "retired_reason": null
+}

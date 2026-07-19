@@ -19,7 +19,8 @@ export type PartClass =
   | "memory"    // memory offers/saves — violet chip
   | "file"      // report/file cards (Phase 3 consumes this) — emerald rail
   | "error"     // errors & refusals — red-tinted card
-  | "evidence"; // §22.2 citation list — slate rail, one line per citation
+  | "evidence"  // §22.2 citation list — slate rail, one line per citation
+  | "plan";     // §21.2 task-plan checklist — indigo rail (Phase H3)
 
 export interface PartTreatment {
   /** Card container: surface card with the class-colored left rail. */
@@ -76,6 +77,16 @@ export const PART_TREATMENTS: Record<PartClass, PartTreatment> = {
     accent: "text-slate-600 dark:text-slate-400",
     chip: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
     icon: "text-slate-500 dark:text-slate-400",
+  },
+  // §21.2 (Phase H3): plans — the live task checklist. Indigo, a new content
+  // class (agent progress, neither data nor a reviewable mutation); the
+  // status word is always printed next to the glyph, and waiting is a
+  // visible plan state, never a hung spinner.
+  plan: {
+    card: "rounded-lg border border-border border-l-2 border-l-indigo-500 bg-surface-elevated/50 dark:border-l-indigo-400",
+    accent: "text-indigo-700 dark:text-indigo-400",
+    chip: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
+    icon: "text-indigo-600 dark:text-indigo-400",
   },
 };
 

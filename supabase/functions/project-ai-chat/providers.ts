@@ -4,6 +4,13 @@
 import { executeTool, ToolContext, ToolDeclaration, toolDeclarations, ToolEnvelope } from "./tools.ts";
 import { resolveAgent } from "./agents.ts";
 import { verifierEnabled } from "./verifier.ts";
+import {
+  budgetExhaustedLine,
+  noteCompletion,
+  tryConsumeLlmCall,
+  wallExceeded,
+  type RequestBudget,
+} from "./budgets.ts";
 
 export type ProviderId = "gemini" | "openai" | "deepseek";
 
@@ -34,7 +41,8 @@ export interface ChatTurn { role: "user" | "assistant"; content: string }
 // jittered ±25%); a second failure surfaces the typed error below honestly —
 // no queueing, no silent model substitution (§23.4's no-silent-degradation
 // rule). The retry is logged and its wait counts against the request's wall
-// time; the §21.5 budget COUNTERS land with Phase H3.
+// time — the §21.5 wall check between hops (Phase H3) sees the elapsed time
+// the retry burned, so a retried turn spends its real cost.
 export const PROVIDER_RETRY_MAX = 1;
 export const PROVIDER_RETRY_BASE_MS = 1000;
 export const PROVIDER_RETRY_JITTER = 0.25;
@@ -111,6 +119,13 @@ export interface RunChatOptions {
    * Only reachable with ROUTER_V2_SIGNALS on; absent ⇒ byte-identical
    * prompts. Ignored when `system` is supplied (agent turns own theirs). */
   cacheFirst?: boolean;
+  /** §21.5 (Phase H3): the request's spend meters, injected by the
+   * orchestrator. One LLM call is consumed per runChat invocation (turn
+   * level — MAX_HOPS still bounds the hops inside a turn); the wall budget is
+   * checked between hops (finish the current step, never start another —
+   * the §20.5 provider-retry wait counts because it burns real wall time).
+   * Absent ⇒ unmetered, byte-identical behavior (golden-transcript pinned). */
+  budget?: RequestBudget;
 }
 
 export interface ChatRunResult {
@@ -278,6 +293,7 @@ async function runGemini(
   userMessage: string, history: ChatTurn[], ctx: ToolContext | null,
   tools: ReadonlyArray<ToolDeclaration>,
   onToolResult?: RunChatOptions["onToolResult"],
+  budget?: RequestBudget,
 ): Promise<ChatRunResult> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`;
   const contents: GeminiContent[] = [];
@@ -290,6 +306,12 @@ async function runGemini(
   const toolCalls: ChatRunResult["toolCalls"] = [];
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
+    // §21.5 wall budget, checked between hops: finish the current step (the
+    // hop that already ran), never start another. Honest exhaustion — the
+    // reply names the meter; §21.3 closes any plan step at request end.
+    if (hop > 0 && budget && wallExceeded(budget)) {
+      return { reply: budgetExhaustedLine("wall"), parts: collectedParts, toolCalls, model: model.label };
+    }
     const res = await providerFetch("gemini", `${endpoint}?key=${encodeURIComponent(apiKey)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -333,6 +355,9 @@ async function runGemini(
       contents.push({ role: "function", parts: [{ functionResponse: { name, response: result as unknown as Record<string, unknown> } }] });
     }
   }
+  // MAX_HOPS exhaustion — the existing "ran out of steps" reply; when a
+  // budget rides the request the hit is recorded for the chat.reply spend.
+  if (budget && budget.budgetHit === null) budget.budgetHit = "hops";
   return { reply: "I ran out of steps on that one. Try narrowing the question.", parts: collectedParts, toolCalls, model: model.label };
 }
 
@@ -350,6 +375,7 @@ async function runOpenAICompatible(
   userMessage: string, history: ChatTurn[], ctx: ToolContext | null,
   tools: ReadonlyArray<ToolDeclaration>,
   onToolResult?: RunChatOptions["onToolResult"],
+  budget?: RequestBudget,
 ): Promise<ChatRunResult> {
   const messages: any[] = [{ role: "system", content: system }];
   for (const h of history.slice(-8)) messages.push({ role: h.role, content: h.content.slice(0, 2000) });
@@ -359,6 +385,10 @@ async function runOpenAICompatible(
   const toolCalls: ChatRunResult["toolCalls"] = [];
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
+    // §21.5 wall budget, checked between hops (see runGemini).
+    if (hop > 0 && budget && wallExceeded(budget)) {
+      return { reply: budgetExhaustedLine("wall"), parts: collectedParts, toolCalls, model: model.label };
+    }
     const body: any = {
       model: model.apiModel,
       messages,
@@ -415,6 +445,7 @@ async function runOpenAICompatible(
       });
     }
   }
+  if (budget && budget.budgetHit === null) budget.budgetHit = "hops";
   return { reply: "I ran out of steps on that one. Try narrowing the question.", parts: collectedParts, toolCalls, model: model.label };
 }
 
@@ -429,6 +460,18 @@ export async function runChat(
   opts?: RunChatOptions,
 ): Promise<ChatRunResult> {
   const model = resolveModel(modelId);
+  // §21.5: one LLM call consumed per runChat invocation (turn level; hops
+  // stay bounded by MAX_HOPS). A denial never truncates silently — the turn
+  // "runs" with the honest exhaustion line as its whole reply, the current
+  // step finishes with what it has, and §21.3 closes the plan at request end.
+  if (opts?.budget && !tryConsumeLlmCall(opts.budget)) {
+    return {
+      reply: budgetExhaustedLine(opts.budget.budgetHit),
+      parts: [],
+      toolCalls: [],
+      model: model.label,
+    };
+  }
   const builtSystem = opts?.system ??
     buildSystemPrompt(model.label, agentId, !!ctx, opts?.summary, opts?.cacheFirst === true);
   // §22.3: the corrective-retry addendum joins the system prompt; absent ⇒
@@ -436,20 +479,28 @@ export async function runChat(
   const system = opts?.systemAddendum ? `${builtSystem}\n\n${opts.systemAddendum}` : builtSystem;
   const tools = opts?.tools ?? toolDeclarations;
 
+  // §21.5: the output meter sums completion chars after each call (the
+  // orchestrator stops issuing calls once it trips).
+  const metered = async (p: Promise<ChatRunResult>): Promise<ChatRunResult> => {
+    const res = await p;
+    if (opts?.budget) noteCompletion(opts.budget, (res.reply ?? "").length);
+    return res;
+  };
+
   if (model.provider === "gemini") {
     const key = Deno.env.get("GEMINI_API_KEY");
     if (!key) throw new Error("GEMINI_API_KEY is not configured.");
-    return runGemini(key, model, system, userMessage, history, ctx, tools, opts?.onToolResult);
+    return metered(runGemini(key, model, system, userMessage, history, ctx, tools, opts?.onToolResult, opts?.budget));
   }
   if (model.provider === "openai") {
     const key = Deno.env.get("OPENAI_API_KEY");
     if (!key) throw new Error("OPENAI_API_KEY is not configured.");
-    return runOpenAICompatible("https://api.openai.com/v1", key, model, system, userMessage, history, ctx, tools, opts?.onToolResult);
+    return metered(runOpenAICompatible("https://api.openai.com/v1", key, model, system, userMessage, history, ctx, tools, opts?.onToolResult, opts?.budget));
   }
   if (model.provider === "deepseek") {
     const key = Deno.env.get("DEEPSEEK_API_KEY");
     if (!key) throw new Error("DEEPSEEK_API_KEY is not configured.");
-    return runOpenAICompatible("https://api.deepseek.com/v1", key, model, system, userMessage, history, ctx, tools, opts?.onToolResult);
+    return metered(runOpenAICompatible("https://api.deepseek.com/v1", key, model, system, userMessage, history, ctx, tools, opts?.onToolResult, opts?.budget));
   }
   throw new Error(`Unsupported provider: ${(model as any).provider}`);
 }

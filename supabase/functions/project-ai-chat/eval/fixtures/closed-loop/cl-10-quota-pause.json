@@ -1,0 +1,199 @@
+{
+  "id": "cl-10-quota-pause",
+  "description": "ai-agents.md §20.6 cl-10 (Phase H3) — the cl-04 flow but checkpoint 5's quota answers quota_exceeded at apply (§13.6 rule 3): the plan step goes failed with the remaining-allowance note, apply_attempts is NEVER incremented (Q21c — quota is a typed denial, not a failed execution), nothing dispatches, and the resume answers honestly with no silent retry.",
+  "stub": {
+    "graph_hash": "graph-hash-1",
+    "current_policy_hash": "ph-run"
+  },
+  "project_snapshot": {
+    "reuse": "cl-02-cache-miss-proposes",
+    "patch": {
+      "simulation_runs": [
+        {
+          "id": "99999999-9999-4999-8999-999999999931",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "scenario_id": "55555555-5555-4555-8555-555555555599",
+          "status": "queued",
+          "rep_count_done": 0,
+          "created_at": 200
+        },
+        {
+          "id": "99999999-9999-4999-8999-999999999932",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "scenario_id": "55555555-5555-4555-8555-555555555599",
+          "status": "running",
+          "rep_count_done": 4,
+          "created_at": 201
+        },
+        {
+          "id": "99999999-9999-4999-8999-999999999933",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "scenario_id": "55555555-5555-4555-8555-555555555599",
+          "status": "queued",
+          "rep_count_done": 0,
+          "created_at": 202
+        }
+      ],
+      "proposals": [
+        {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc31",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "agent_id": "experiment-designer",
+          "artifact_type": "experiment_spec",
+          "title": "prior run 1",
+          "status": "applied",
+          "idempotency_key": "prior-1",
+          "reviewed_by": "22222222-2222-4222-8222-222222222222",
+          "applied_result": {
+            "run_id": "99999999-9999-4999-8999-999999999931"
+          },
+          "apply_attempts": 0
+        },
+        {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc32",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "agent_id": "experiment-designer",
+          "artifact_type": "experiment_spec",
+          "title": "prior run 2",
+          "status": "applied",
+          "idempotency_key": "prior-2",
+          "reviewed_by": "22222222-2222-4222-8222-222222222222",
+          "applied_result": {
+            "run_id": "99999999-9999-4999-8999-999999999932"
+          },
+          "apply_attempts": 0
+        },
+        {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc33",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "agent_id": "experiment-designer",
+          "artifact_type": "experiment_spec",
+          "title": "prior run 3",
+          "status": "applied",
+          "idempotency_key": "prior-3",
+          "reviewed_by": "22222222-2222-4222-8222-222222222222",
+          "applied_result": {
+            "run_id": "99999999-9999-4999-8999-999999999933"
+          },
+          "apply_attempts": 0
+        }
+      ]
+    }
+  },
+  "utterance": "test a 6-week outage of S1 with 30 reps and tell me the fill-rate impact",
+  "mocked_llm": {
+    "tool_calls": [
+      {
+        "tool": "update_task_plan",
+        "args": {
+          "title": "6-week S1 outage — fill-rate impact",
+          "steps": [
+            {
+              "id": "check",
+              "label": "Check for an existing run",
+              "status": "active"
+            },
+            {
+              "id": "card",
+              "label": "File the experiment card",
+              "status": "pending"
+            },
+            {
+              "id": "run",
+              "label": "Wait for the approved run",
+              "status": "pending"
+            },
+            {
+              "id": "answer",
+              "label": "Answer from evidence",
+              "status": "pending"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "find_completed_run",
+        "args": {
+          "scenario": "outage",
+          "replications": 30
+        }
+      },
+      {
+        "tool": "draft_experiment_spec",
+        "args": {
+          "scenario_id": "55555555-5555-4555-8555-555555555502",
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "replications": 30,
+          "title": "6-week outage of S1 × baseline (30 reps)",
+          "question": "What is the fill-rate impact of a 6-week outage of S1?"
+        }
+      }
+    ],
+    "reply": "No completed run answers this yet — I filed the experiment card. Approve it and the thread resumes when the run completes."
+  },
+  "expect": {
+    "quota_violation_includes": [
+      "limit 3 concurrent",
+      "0 remaining"
+    ],
+    "card_step_status": "failed",
+    "plan_status": "failed",
+    "apply_attempts": 0,
+    "run_count": 3,
+    "resume_reply_includes": "failed"
+  },
+  "retired_reason": null,
+  "plan_binding_updates": [
+    {
+      "steps": [
+        {
+          "id": "check",
+          "label": "Check for an existing run",
+          "status": "done"
+        },
+        {
+          "id": "card",
+          "label": "File the experiment card",
+          "status": "active"
+        },
+        {
+          "id": "run",
+          "label": "Wait for the approved run",
+          "status": "pending"
+        },
+        {
+          "id": "answer",
+          "label": "Answer from evidence",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "id": "check",
+          "label": "Check for an existing run",
+          "status": "done"
+        },
+        {
+          "id": "card",
+          "label": "File the experiment card",
+          "status": "awaiting_approval",
+          "ref": {
+            "proposal_id": "{PROPOSAL_ID}"
+          }
+        },
+        {
+          "id": "run",
+          "label": "Wait for the approved run",
+          "status": "pending"
+        },
+        {
+          "id": "answer",
+          "label": "Answer from evidence",
+          "status": "pending"
+        }
+      ]
+    }
+  ]
+}

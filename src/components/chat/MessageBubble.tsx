@@ -12,6 +12,7 @@ import { KpiCards } from "./KpiCards";
 import { BulletList } from "./BulletList";
 import { ActivityGroup } from "./ActivityGroup";
 import { ProposalCard } from "./ProposalCard";
+import { PlanCard, type PlanPartData } from "./PlanCard";
 import { MemoryChip, type MemoryOfferData } from "./MemoryChip";
 import { ModeNotice, type ModeNoticeData } from "./ModeNotice";
 import { EvidenceList } from "./EvidenceList";
@@ -173,6 +174,11 @@ export function MessageBubble({ message, onSuggestUtterance }: MessageBubbleProp
           // N sources" chip; verifier fallbacks take the error treatment.
           if (p.kind === "evidence") {
             return <EvidenceList key={i} data={p.data} />;
+          }
+          // H3 (§21.2): the live task-plan checklist — the part carries a
+          // snapshot; the card subscribes to the chat_plans row.
+          if (p.kind === "plan") {
+            return <PlanCard key={i} data={p.data as PlanPartData} />;
           }
           return null;
         })}

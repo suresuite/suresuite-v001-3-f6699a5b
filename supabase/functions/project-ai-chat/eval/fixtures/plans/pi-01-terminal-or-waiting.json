@@ -1,0 +1,18 @@
+{
+  "id": "pi-01-terminal-or-waiting",
+  "description": "ai-agents.md §21.6 pi-01 — the §21.3 integrity law: at the end of EVERY request each step is terminal (done/failed/refused) or waiting (awaiting_approval/awaiting_run), never 'active', never vanished. A mocked mid-step provider crash (500 → §20.5 retry → 500 → typed error) leaves an 'active' step behind; the orchestrator's sweep fails it with note 'interrupted: <cause>' and recomputes the plan status.",
+  "create": {
+    "title": "Answer the outage question",
+    "steps": [
+      { "id": "check", "label": "Check for an existing run", "status": "active" },
+      { "id": "answer", "label": "Answer from evidence", "status": "pending" }
+    ]
+  },
+  "expect": {
+    "swept_step_status": "failed",
+    "swept_note_prefix": "interrupted",
+    "plan_status": "failed",
+    "step_count": 2
+  },
+  "retired_reason": null
+}

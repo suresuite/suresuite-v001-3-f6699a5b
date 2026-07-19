@@ -1,0 +1,23 @@
+{
+  "id": "pi-08-supersede",
+  "description": "ai-agents.md §21.6 pi-08 — §21.1 rule 1: one live plan per thread. A second create supersedes the first (§4.2-style): the old plan goes 'abandoned' VISIBLY — never deleted, steps intact — and the new plan is the thread's active one.",
+  "create_first": {
+    "title": "First plan",
+    "steps": [
+      { "id": "a", "label": "First plan step", "status": "active" }
+    ]
+  },
+  "create_second": {
+    "title": "Second plan",
+    "steps": [
+      { "id": "x", "label": "Second plan step", "status": "active" }
+    ]
+  },
+  "expect": {
+    "first_status": "abandoned",
+    "first_step_ids": ["a"],
+    "second_status": "active",
+    "plan_rows": 2
+  },
+  "retired_reason": null
+}

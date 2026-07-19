@@ -444,5 +444,105 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       if (m && m.status === "active") m.status = "archived";
       return null;
     },
+
+    // ── H3 mirrors (SQL original: 20260726000001_chat_plans.sql, pinned in
+    //    db_plans_test.ts) — the §21.2 plan store the update_task_plan
+    //    handler, the resume pre-step, and the client approve flow write. ───
+    upsert_chat_plan: (args) => {
+      const plan = (args.p_plan ?? {}) as Row;
+      const userId = String(args.p_user_id ?? "");
+      if (!userId) throw new Error("forbidden");
+      const threadId = String(plan.thread_id ?? "");
+      if (!threadId) throw new Error("upsert_chat_plan: p_plan.thread_id is required");
+      const steps = Array.isArray(plan.steps) ? (plan.steps as Row[]) : [];
+      if (steps.length > 12) throw new Error("invalid_params: a plan allows at most 12 steps");
+      const store = tables.chat_plans ?? (tables.chat_plans = []);
+      if (plan.id == null) {
+        for (const p of store) {
+          if (String(p.thread_id) === threadId && String(p.user_id) === userId && p.status === "active") {
+            p.status = "abandoned";
+          }
+        }
+        const id = nextUuid();
+        const row: Row = {
+          id,
+          thread_id: threadId,
+          project_id: plan.project_id ?? null,
+          user_id: userId,
+          agent_id: plan.agent_id ?? null,
+          title: String(plan.title ?? "Task plan").slice(0, 140),
+          status: plan.status ?? "active",
+          steps: structuredClone(steps),
+          resume_count: 0,
+          model_code: plan.model_code ?? null,
+          expires_at: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+          created_at: Date.now() + store.length,
+        };
+        store.push(row);
+        return structuredClone(row);
+      }
+      const row = store.find((p) => String(p.id) === String(plan.id));
+      if (!row) throw new Error(`plan ${plan.id} not found`);
+      if (String(row.user_id) !== userId) throw new Error("forbidden");
+      if (String(row.thread_id) !== threadId) throw new Error(`plan ${plan.id} is not in this thread`);
+      if (plan.title != null) row.title = String(plan.title).slice(0, 140);
+      if (plan.status != null) row.status = plan.status;
+      if (plan.steps != null) row.steps = structuredClone(steps);
+      if (plan.model_code != null) row.model_code = plan.model_code;
+      if (plan.increment_resume === true) row.resume_count = Number(row.resume_count ?? 0) + 1;
+      return structuredClone(row);
+    },
+    get_chat_plan: (args) =>
+      (tables.chat_plans ?? [])
+        .filter((p) => String(p.id) === String(args.p_plan_id) && String(p.user_id) === String(args.p_user_id))
+        .map((p) => structuredClone(p)),
+    expire_chat_plans: (args) => {
+      let n = 0;
+      for (const p of tables.chat_plans ?? []) {
+        if (String(p.thread_id) === String(args.p_thread_id) && p.status === "active" &&
+          Date.parse(String(p.expires_at ?? "")) < Date.now()) {
+          p.status = "expired";
+          n += 1;
+        }
+      }
+      return n;
+    },
+    list_chat_plans: (args) => {
+      for (const p of tables.chat_plans ?? []) {
+        if (String(p.thread_id) === String(args.p_thread_id) && p.status === "active" &&
+          Date.parse(String(p.expires_at ?? "")) < Date.now()) {
+          p.status = "expired";
+        }
+      }
+      return (tables.chat_plans ?? [])
+        .filter((p) => String(p.thread_id) === String(args.p_thread_id) && String(p.user_id) === String(args.p_user_id))
+        .sort((a, b) => Number(b.created_at ?? 0) - Number(a.created_at ?? 0))
+        .map((p) => structuredClone(p));
+    },
+    advance_chat_plan_step: (args) => {
+      const status = String(args.p_status ?? "");
+      if (!["awaiting_run", "failed"].includes(status)) {
+        throw new Error("invalid_params: advance_chat_plan_step allows only awaiting_run or failed");
+      }
+      if (status === "awaiting_run" && args.p_run_id == null) {
+        throw new Error("invalid_params: awaiting_run requires p_run_id (§21.1 rule 4)");
+      }
+      const row = (tables.chat_plans ?? []).find((p) => String(p.id) === String(args.p_plan_id));
+      if (!row) throw new Error(`plan ${args.p_plan_id} not found`);
+      if (String(row.user_id) !== String(args.p_user_id)) throw new Error("forbidden");
+      if (row.status !== "active") throw new Error(`plan ${args.p_plan_id} is not active (is ${row.status})`);
+      const steps = (row.steps ?? []) as Row[];
+      const step = steps.find((s) => String(s.id) === String(args.p_step_id));
+      if (!step) throw new Error(`step ${args.p_step_id} not found on plan ${args.p_plan_id}`);
+      if (step.status !== "awaiting_approval") {
+        throw new Error(`invalid_params: step ${args.p_step_id} is ${step.status} — only awaiting_approval steps advance here`);
+      }
+      step.status = status;
+      if (args.p_note != null) step.note = String(args.p_note).slice(0, 200);
+      if (args.p_run_id != null) {
+        step.ref = { ...((step.ref ?? {}) as Row), run_id: args.p_run_id };
+      }
+      return structuredClone(row);
+    },
   };
 }

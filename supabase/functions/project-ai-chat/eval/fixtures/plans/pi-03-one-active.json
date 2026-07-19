@@ -1,0 +1,16 @@
+{
+  "id": "pi-03-one-active",
+  "description": "ai-agents.md §21.6 pi-03 — §21.1 rule 3: at most one 'active' step. Two active steps in one call return invalid_params naming the rule; nothing is written.",
+  "create": {
+    "title": "Illegal double-active plan",
+    "steps": [
+      { "id": "a", "label": "First step", "status": "active" },
+      { "id": "b", "label": "Second step", "status": "active" }
+    ]
+  },
+  "expect": {
+    "error_includes": "at most one step",
+    "plan_rows": 0
+  },
+  "retired_reason": null
+}

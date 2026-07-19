@@ -57,6 +57,25 @@ import {
   memoryEnabled,
   saveExplicitMemory,
 } from "./memory.ts";
+// H3 (ai-agents.md §21): the plan harness — the §21.4 resume pre-step (a
+// client-caused turn carrying resume_plan_id; zero LLM while the run is
+// queued/running), the §21.3 integrity sweep after every plan-touching turn,
+// and the §21.5 request budgets (unflagged spend meters with honest
+// exhaustion; DEFAULTs generous enough that pre-H3 single-turn behavior
+// never hits them — golden-transcript pinned).
+import {
+  markPlanStepFailed,
+  planPart,
+  planToolEnabled,
+  runResumePreStep,
+  stepsByStatus,
+  sweepPlanIntegrity,
+} from "./planTools.ts";
+import {
+  budgetTelemetryPayload,
+  makeRequestBudget,
+  tryConsumeLlmCall,
+} from "./budgets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -345,6 +364,13 @@ serve(async (req) => {
     const ctx = projectId ? makeToolContext(projectId, userId) : null;
     const promptText = String(message).slice(0, 4000);
 
+    // --- §21.5 request budgets (H3, unflagged): one set of spend meters per
+    // request. runChat consumes an LLM call per invocation, executeTool a
+    // tool call per execution (via ToolContext), the wall is checked between
+    // calls and hops; every chat.reply event carries the spend.
+    const budget = makeRequestBudget();
+    if (ctx) ctx.budget = budget;
+
     // --- Telemetry (ai-agents.md §7; AGENT_TELEMETRY_ENABLED, default off) ---
     const requestId = crypto.randomUUID();
     let orgId: string | null = null;
@@ -381,6 +407,260 @@ serve(async (req) => {
       (slug) => capFeatures['agent_' + slug.replace(/-/g, '_')] === true,
     );
 
+    // --- H3 (§21.4): the resume pre-step — deterministic, before any LLM
+    // call and before the router (a resume carries its own deterministic
+    // instruction; it is never re-classified). The turn is CLIENT-caused
+    // (approve flow / run-completion subscription, D2/Q33): the server holds
+    // nothing open and schedules nothing. Checkpoint 1 (project access) ran
+    // above; checkpoint 2 (capabilities) re-runs below before any agent turn
+    // executes — a plan is never a pre-authorization (§13.6 rule 5).
+    const resumePlanId =
+      typeof body.resume_plan_id === 'string' && uuidRe.test(body.resume_plan_id)
+        ? body.resume_plan_id
+        : null;
+    if (resumePlanId && planToolEnabled()) {
+      const _t0 = Date.now();
+      const planTelemetryPayload = (plan: { id: string; steps: Parameters<typeof stepsByStatus>[0]; resume_count: number }) => ({
+        plan_id: plan.id,
+        steps_by_status: stepsByStatus(plan.steps),
+        resume_count: plan.resume_count,
+      });
+      const finishResume = async (result: ChatRunResult): Promise<Response> => {
+        const latencyMs = Date.now() - _t0;
+        for (const call of result.toolCalls ?? []) {
+          sha256Hex(canonicalJson(call.args ?? {})).then((argsSha) =>
+            telemetry.emit('tool.call', {
+              tool: call.name,
+              args_sha256: argsSha,
+              ok: call.ok,
+              row_count: call.row_count,
+            })
+          ).catch(() => { /* never blocks the reply */ });
+        }
+        telemetry.emit('chat.reply', {
+          reply_chars: (result.reply ?? '').length,
+          parts_kinds: (result.parts ?? []).map((p) => p.kind),
+          blocked: Boolean(result.blocked),
+          resumed_plan_id: resumePlanId,
+          ...budgetTelemetryPayload(budget),
+        }, { latency_ms: latencyMs });
+        let persisted = false;
+        const storeOn = (Deno.env.get('CHAT_STORE_ENABLED') ?? '').trim().toLowerCase() === 'true';
+        if (storeOn && typeof threadId === 'string' && uuidRe.test(threadId)) {
+          try {
+            const { error: appendErr } = await supabaseAdmin.rpc('append_chat_message', {
+              p_user_id: userId,
+              p_thread_id: threadId,
+              p_role: 'assistant',
+              p_content: result.reply ?? '',
+              p_parts: result.parts ?? [],
+              p_tool_calls: result.toolCalls ?? [],
+              p_proposal_id: null,
+              p_model_code: resolvedModel.id,
+            });
+            persisted = !appendErr;
+            if (appendErr) console.warn('[chat-store] resume append failed:', appendErr.message);
+          } catch (e) {
+            console.warn('[chat-store] resume append failed:', e instanceof Error ? e.message : e);
+          }
+        }
+        return jsonResponse(persisted ? { ...result, persisted: true } : result as unknown as Record<string, unknown>);
+      };
+
+      try {
+        const outcome = await runResumePreStep(supabaseAdmin, {
+          planId: resumePlanId,
+          userId,
+          modelCode: resolvedModel.id,
+        });
+
+        if (outcome.kind === 'error') {
+          return await finishResume({
+            reply: outcome.reply,
+            parts: outcome.plan ? [planPart(outcome.plan)] : [],
+            toolCalls: [],
+            model: resolvedModel.label,
+          });
+        }
+        if (outcome.kind === 'progress' || outcome.kind === 'closed') {
+          // Zero-LLM branches (§21.4: a poll costs nothing) — templated
+          // reply + the live plan part; resume_count untouched.
+          if (outcome.kind === 'closed') {
+            telemetry.emit('plan.step_changed', planTelemetryPayload(outcome.plan));
+            if (outcome.plan.status !== 'active') {
+              telemetry.emit('plan.closed', { ...planTelemetryPayload(outcome.plan), status: outcome.plan.status });
+            }
+          }
+          return await finishResume({
+            reply: outcome.reply,
+            parts: [planPart(outcome.plan)],
+            toolCalls: [],
+            model: resolvedModel.label,
+          });
+        }
+
+        // Run done ⇒ execute the read-and-cite step (§20.4 step 5) as this
+        // request's agent turn. Checkpoint 2 re-runs HERE: revoked grants ⇒
+        // the typed error and the step fails (§13.6 rule 5).
+        telemetry.emit('plan.step_changed', planTelemetryPayload(outcome.plan));
+        const planAgentId = outcome.plan.agent_id ?? 'experiment-designer';
+        if (!enabledAgents.includes(planAgentId) || !AGENT_TURNS[planAgentId] || ctx === null) {
+          const reason = ctx === null
+            ? 'the plan’s project is not attached to this request'
+            : `the ${planAgentId} agent is no longer enabled for your account`;
+          const fresh = await markPlanStepFailed(supabaseAdmin, outcome.plan, outcome.stepId, 'forbidden: capability revoked', userId);
+          telemetry.emit('plan.step_changed', planTelemetryPayload(fresh));
+          if (fresh.status !== 'active') {
+            telemetry.emit('plan.closed', { ...planTelemetryPayload(fresh), status: fresh.status });
+          }
+          return await finishResume({
+            reply: `forbidden: resuming this plan needs the same rights as starting it, and ${reason}. ` +
+              `Plan step "${outcome.stepId}" is marked failed.`,
+            parts: [planPart(fresh)],
+            toolCalls: [],
+            blocked: true,
+            model: resolvedModel.label,
+          });
+        }
+
+        const verifierOn = verifierEnabled();
+        const agentCtx: ToolContext = {
+          ...ctx,
+          draft: {
+            userEmail: userEmail ?? null,
+            threadId: typeof threadId === 'string' ? threadId : null,
+            modelCode: resolvedModel.id,
+            providerCode: resolvedModel.provider,
+            canProposals: capFeatures['agent_proposals'] === true,
+            utterance: outcome.utterance,
+            agentId: planAgentId,
+          },
+        };
+        const agentT0 = Date.now();
+        const agentCalls: RecordedToolCall[] = [];
+        let agentContext: string | undefined;
+        const agent = await runAgentTurn({
+          agentId: planAgentId,
+          modelId: model,
+          utterance: outcome.utterance,
+          ctx: agentCtx,
+          ...(verifierOn
+            ? {
+              onToolResult: (name: string, args: Record<string, unknown>, envelope: ToolEnvelope) => {
+                agentCalls.push({ name, args, envelope });
+              },
+              onContext: (text: string) => {
+                agentContext = text;
+              },
+            }
+            : {}),
+        });
+        logAiUsage({
+          status: agent.ok ? 'success' : 'error',
+          modelCode: model,
+          promptChars: outcome.utterance.length,
+          completionChars: agent.reply.length,
+          latencyMs: Date.now() - agentT0,
+          errorCode: agent.ok ? undefined : (agent.error ?? 'agent_turn_failed').slice(0, 200),
+        });
+
+        let reply = agent.ok
+          ? (agent.reply || 'The run completed — but I could not produce a report. Ask again to retry the read.')
+          : `The resumed step could not complete${agent.error ? ` (${agent.error})` : ''}. Ask again to retry.`;
+        let evidencePart: { kind: string; data: unknown } | null = null;
+        if (verifierOn && agent.ok) {
+          // §22.3 on the resume path: the agent's reply IS the user-facing
+          // answer — verified against its envelopes + CONTEXT, one
+          // corrective retry re-invoking the same turn.
+          const verdict = await verifyWithRetry<{ reply: string; calls: RecordedToolCall[] }>({
+            projectId: projectId as string,
+            db: ctx.supabase,
+            userMessage: outcome.utterance,
+            contextText: agentContext,
+            attempt: { reply, calls: agentCalls },
+            retry: async (addendum) => {
+              const retryCalls: RecordedToolCall[] = [];
+              try {
+                const second = await runAgentTurn({
+                  agentId: planAgentId,
+                  modelId: model,
+                  utterance: outcome.utterance,
+                  ctx: agentCtx,
+                  systemAddendum: addendum,
+                  onToolResult: (name, args, envelope) => {
+                    retryCalls.push({ name, args, envelope });
+                  },
+                });
+                if (!second.ok) return null;
+                return { reply: second.reply || reply, calls: retryCalls };
+              } catch {
+                return null;
+              }
+            },
+            nearestAction: () => Promise.resolve(null),
+          });
+          reply = verdict.reply;
+          if (verdict.citations.length > 0 || verdict.fallback) {
+            evidencePart = {
+              kind: 'evidence',
+              data: { citations: verdict.citations, verified: verdict.verified, fallback: verdict.fallback },
+            };
+          }
+          if (verdict.fallback) {
+            telemetry.emit('verifier.blocked_reply', {
+              violations: verdict.violationCounts,
+              retried: verdict.retried,
+              model_code: resolvedModel.id,
+            });
+          }
+        }
+
+        // §21.3: the integrity law at request end — a dangling active step
+        // (budget exhaustion, provider error, a model that stopped mid-step)
+        // fails with the cause in the note; the plan status is recomputed.
+        const cause = budget.budgetHit
+          ? `budget: ${budget.budgetHit}`
+          : agent.ok
+          ? undefined
+          : (agent.error ?? 'agent turn failed');
+        const sweep = await sweepPlanIntegrity(supabaseAdmin, {
+          planId: outcome.plan.id,
+          userId,
+          cause,
+        });
+        for (const ev of agentCtx.planEvents ?? []) telemetry.emit(ev.kind, ev.payload);
+        if (sweep.changed && sweep.plan) telemetry.emit('plan.step_changed', planTelemetryPayload(sweep.plan));
+        if (sweep.closed && sweep.plan) {
+          telemetry.emit('plan.closed', { ...planTelemetryPayload(sweep.plan), status: sweep.plan.status });
+        }
+        const livePlan = sweep.plan ?? outcome.plan;
+
+        return await finishResume({
+          reply,
+          parts: [
+            planPart(livePlan),
+            ...(evidencePart ? [evidencePart] : []),
+          ],
+          toolCalls: agent.toolCalls,
+          model: resolvedModel.label,
+        });
+      } catch (resumeErr) {
+        // Never leave a dangling active step behind an error (§21.3).
+        try {
+          await sweepPlanIntegrity(supabaseAdmin, {
+            planId: resumePlanId,
+            userId,
+            cause: resumeErr instanceof Error ? resumeErr.message : 'resume failed',
+          });
+        } catch { /* the sweep is best-effort here */ }
+        console.error('plan resume failed:', resumeErr);
+        return jsonResponse({
+          error: resumeErr instanceof Error ? resumeErr.message : 'Plan resume failed.',
+          type: 'AI_ERROR',
+        });
+      }
+    }
+
     // §15 mode (CHAT_MODES_ENABLED default off ⇒ 'review', no read): synced
     // threads resolve from chat_threads.mode; unsynced threads carry the mode
     // in the request body and the server STILL enforces it.
@@ -395,12 +675,25 @@ serve(async (req) => {
     // mutation ask is DETECTED and named (§15 voice: never silently drop an
     // intent); the mode then SUBTRACTS at checkpoint 2 — in Ask mode only the
     // §15 allowlist may execute. Modes never grant anything §13 doesn't.
+    // §21.5: the router's classifier call counts against the LLM-call budget
+    // (the "1 router" of router + ≤ 2 step turns + ≤ 1 wrap-up). A denial
+    // surfaces as a classifier failure, which decideRoute already resolves
+    // deterministically — never a silent drop.
+    const baseClassifier = makeClassifier(resolvedModel);
+    const meteredClassifier = baseClassifier
+      ? (prompt: string): Promise<string> => {
+        if (!tryConsumeLlmCall(budget)) {
+          return Promise.reject(new Error(`llm-call budget exhausted (${budget.maxLlmCalls})`));
+        }
+        return baseClassifier(prompt);
+      }
+      : null;
     const rawDecision = await decideRoute(routedUtterance, {
       personaId: agentId ?? null,
       hasProject: Boolean(projectId),
       enabledAgents,
       modelId: resolvedModel.id,
-    }, makeClassifier(resolvedModel));
+    }, meteredClassifier);
     const { decision: routeDecision, blocked: modeBlocked } = applyModeToRoute(rawDecision, chatMode);
     telemetry.emit('router.decision', {
       route: routeDecision.route,
@@ -500,8 +793,9 @@ serve(async (req) => {
         ])
         : personaToolDeclarations();
       // Spread into every persona runChat call so the built prompt carries
-      // the §20.4 cache-first instruction when rule 1 applies.
-      const personaCacheOpts = cacheCheckable ? { cacheFirst: true } : {};
+      // the §20.4 cache-first instruction when rule 1 applies — and, H3, the
+      // §21.5 spend meters (every persona call consumes the same budget).
+      const personaCacheOpts = { budget, ...(cacheCheckable ? { cacheFirst: true } : {}) };
       const recordInto = (arr: RecordedToolCall[]) =>
         (name: string, args: Record<string, unknown>, envelope: ToolEnvelope) => {
           arr.push({ name, args, envelope });
@@ -555,6 +849,8 @@ serve(async (req) => {
             // §15/§16.1: the one ask-mode-routable agent (report-builder)
             // phrases its evidence refusals per the thread's mode.
             mode: chatMode,
+            // H3 (§21.2): recorded on any chat_plans row this turn files.
+            agentId: routedAgentId,
           },
         };
         const agentT0 = Date.now();
@@ -690,7 +986,7 @@ serve(async (req) => {
           try {
             const wrap = await runChat(
               model, wrapMessage,
-              history, null, agentId, { summary: threadSummary },
+              history, null, agentId, { summary: threadSummary, budget },
             );
             wrapReply = wrap.reply ?? '';
           } catch (e) {
@@ -717,6 +1013,7 @@ serve(async (req) => {
                 try {
                   const wrap2 = await runChat(model, wrapMessage, history, null, agentId, {
                     summary: threadSummary,
+                    budget,
                     systemAddendum: addendum,
                   });
                   const reply2 = (wrap2.reply ?? '') || agent.reply || wrapDefault;
@@ -889,6 +1186,40 @@ serve(async (req) => {
         };
       }
 
+      // --- H3 (§21.3): the integrity law, enforced after EVERY request that
+      // touched a plan — any step still 'active' fails with the cause in its
+      // note (budget exhaustion lands as "budget: <meter>"); the plan status
+      // is recomputed; the reply carries the FRESH plan snapshot so the
+      // rendered checklist matches the stored row.
+      if (planToolEnabled() && ctx && (ctx.planTouchedId || routedAgentId)) {
+        try {
+          const sweep = await sweepPlanIntegrity(supabaseAdmin, {
+            planId: ctx.planTouchedId ?? null,
+            threadId: typeof threadId === 'string' && uuidRe.test(threadId) ? threadId : null,
+            userId,
+            cause: budget.budgetHit ? `budget: ${budget.budgetHit}` : undefined,
+          });
+          for (const ev of ctx.planEvents ?? []) telemetry.emit(ev.kind, ev.payload);
+          const planPayload = (p: NonNullable<typeof sweep.plan>) => ({
+            plan_id: p.id,
+            steps_by_status: stepsByStatus(p.steps),
+            resume_count: p.resume_count,
+          });
+          if (sweep.changed && sweep.plan) telemetry.emit('plan.step_changed', planPayload(sweep.plan));
+          if (sweep.closed && sweep.plan) {
+            telemetry.emit('plan.closed', { status: sweep.plan.status, ...planPayload(sweep.plan) });
+          }
+          if (ctx.planTouchedId && sweep.plan && sweep.plan.id === ctx.planTouchedId) {
+            result = {
+              ...result,
+              parts: [...(result.parts ?? []).filter((p) => p.kind !== 'plan'), planPart(sweep.plan)],
+            };
+          }
+        } catch (e) {
+          console.warn('[plan] integrity sweep failed:', e instanceof Error ? e.message : e);
+        }
+      }
+
       const latencyMs = Date.now() - _t0;
       logAiUsage({
         status: 'success',
@@ -907,10 +1238,13 @@ serve(async (req) => {
           })
         ).catch(() => { /* never blocks the reply */ });
       }
+      // §21.5: every chat.reply event carries the spend
+      // ({llm_calls, tool_calls, wall_ms, budget_hit} — §7.7-4).
       telemetry.emit('chat.reply', {
         reply_chars: (result?.reply ?? '').length,
         parts_kinds: (result.parts ?? []).map((p) => p.kind),
         blocked: Boolean(result.blocked),
+        ...budgetTelemetryPayload(budget),
       }, { latency_ms: latencyMs });
 
       // --- Chat store (workstream M0, CHAT_STORE_ENABLED default off): the
@@ -962,6 +1296,18 @@ serve(async (req) => {
         latencyMs: Date.now() - _t0,
         errorCode: innerErr instanceof Error ? innerErr.message.slice(0, 200) : 'unknown',
       });
+      // §21.3 (pi-01): a mid-step provider crash must never leave a dangling
+      // 'active' step — the sweep fails it with note 'interrupted: <cause>'.
+      if (planToolEnabled() && ctx && (ctx.planTouchedId || typeof threadId === 'string' && uuidRe.test(threadId))) {
+        try {
+          await sweepPlanIntegrity(supabaseAdmin, {
+            planId: ctx.planTouchedId ?? null,
+            threadId: typeof threadId === 'string' && uuidRe.test(threadId) ? threadId : null,
+            userId,
+            cause: innerErr instanceof Error ? innerErr.message : 'request failed',
+          });
+        } catch { /* best effort — the lazy sweep on the next read converges */ }
+      }
       throw innerErr;
     }
   } catch (err) {
