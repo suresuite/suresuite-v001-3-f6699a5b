@@ -137,7 +137,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
             placeholder="Search name, email, org…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-64"
+            className="h-9 w-64"
           />
           <Button variant="outline" size="sm" onClick={load}>
             Refresh
@@ -243,12 +243,12 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => navigate(`/admin/users/${r.user_id}`)}
                         title="Manage this individual user's pages, features, AI models & budget"
                       >
-                        <SlidersHorizontal className="mr-1 h-3 w-3" /> Access
+                        <SlidersHorizontal className="mr-1 h-3.5 w-3.5" /> Access
                       </Button>
                       <Button
                         variant="ghost"

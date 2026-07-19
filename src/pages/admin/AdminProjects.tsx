@@ -168,7 +168,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
             placeholder="Search name, org, owner, plant…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-64"
+            className="h-9 w-64"
           />
           <Button variant="outline" size="sm" onClick={load}>
             Refresh
@@ -243,7 +243,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

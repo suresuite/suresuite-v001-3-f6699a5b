@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
+import { SectionCard, TableEmpty, TableLoading, TableShell, TH_DENSE } from '@/components/shared';
 import {
   aggregateMatrixByModel,
   type ModelCapabilityRow,
@@ -225,13 +225,13 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
       </TableShell>
 
       {matrixRows.length > 0 && (
-        <div className="mt-6">
-          <h2 className="mb-1 text-sm font-semibold">Model capability matrix</h2>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Per-model quality from the nightly model-scored eval (ai-agents.md §23). The matrix
+        <SectionCard
+          className="mt-6"
+          title="Model capability matrix"
+          description="Per-model quality from the nightly model-scored eval (ai-agents.md §23). The matrix
             informs the picker and the below-target refusal — it never hides a model and never
-            switches one. Rows older than 7 days are stale and stop gating.
-          </p>
+            switches one. Rows older than 7 days are stale and stop gating."
+        >
           <TableShell>
             <Table>
               <TableHeader>
@@ -266,16 +266,16 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
               </TableBody>
             </Table>
           </TableShell>
-        </div>
+        </SectionCard>
       )}
 
       {fileRows.length > 0 && (
-        <div className="mt-6">
-          <h2 className="mb-1 text-sm font-semibold">File workspace by organization</h2>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Rendered reports and exports per org (14-day retention unless Kept; 500 MB retained
-            cap per user). Counts and bytes only — file contents stay private to their owners.
-          </p>
+        <SectionCard
+          className="mt-6"
+          title="File workspace by organization"
+          description="Rendered reports and exports per org (14-day retention unless Kept; 500 MB retained
+            cap per user). Counts and bytes only — file contents stay private to their owners."
+        >
           <TableShell>
             <Table>
               <TableHeader>
@@ -306,7 +306,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
               </TableBody>
             </Table>
           </TableShell>
-        </div>
+        </SectionCard>
       )}
     </AdminLayout>
   );

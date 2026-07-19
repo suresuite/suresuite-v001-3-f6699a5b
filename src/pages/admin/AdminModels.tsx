@@ -130,7 +130,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
             </DialogHeader>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <Label>Provider</Label>
+                <Label className="text-xs">Provider</Label>
                 <Select
                   value={draft.provider_id ?? ''}
                   onValueChange={(v) => setDraft({ ...draft, provider_id: v || null })}
@@ -148,7 +148,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 </Select>
               </div>
               <div className="col-span-2">
-                <Label>Code (e.g. openai/gpt-5.5)</Label>
+                <Label className="text-xs">Code (e.g. openai/gpt-5.5)</Label>
                 <Input
                   value={draft.code}
                   onChange={(e) => setDraft({ ...draft, code: e.target.value })}
@@ -156,7 +156,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div className="col-span-2">
-                <Label>Display name</Label>
+                <Label className="text-xs">Display name</Label>
                 <Input
                   value={draft.display_name}
                   onChange={(e) => setDraft({ ...draft, display_name: e.target.value })}
@@ -164,7 +164,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div>
-                <Label>Input $/1k</Label>
+                <Label className="text-xs">Input $/1k</Label>
                 <Input
                   type="number"
                   step="0.0001"
@@ -176,7 +176,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div>
-                <Label>Output $/1k</Label>
+                <Label className="text-xs">Output $/1k</Label>
                 <Input
                   type="number"
                   step="0.0001"
@@ -188,7 +188,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                 />
               </div>
               <div className="col-span-2">
-                <Label>Max context</Label>
+                <Label className="text-xs">Max context</Label>
                 <Input
                   type="number"
                   value={draft.max_context}

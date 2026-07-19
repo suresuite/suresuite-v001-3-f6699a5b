@@ -165,7 +165,7 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
           </div>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           <section>
             <SectionHeader label="Reach" />
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
