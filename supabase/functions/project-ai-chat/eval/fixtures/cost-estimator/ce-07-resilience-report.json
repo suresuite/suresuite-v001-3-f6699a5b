@@ -1,0 +1,23 @@
+{
+  "id": "ce-07-resilience-report",
+  "description": "'what would maintaining a backup supplier cost?' → get_parameter_estimates(include_resilience) returns the P-S.1/P-P.5 firm-level rows (factors declared in assumptions, C^res mapping named); a draft row targeting them ⇒ invalid_params; NO proposal (ai-agents.md §18.1 #7).",
+  "project_snapshot": { "reuse": "ce-01-estimate-costs" },
+  "utterance": "What would maintaining a backup supplier cost us per year?",
+  "mocked_llm": {
+    "tool": "draft_parameter_estimate",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "method": "resilience_backup_coordination@1", "value": 1, "low": 1, "high": 1 }
+      ]
+    }
+  },
+  "expect": {
+    "firm_rows": [
+      { "method": "resilience_backup_coordination@1", "cres": "coordination", "catalog_ref": "P-S.1" },
+      { "method": "resilience_flex_capacity@1", "cres": "capacity", "catalog_ref": "P-P.5" }
+    ],
+    "error_code": "invalid_params",
+    "reason_includes": "firm-level"
+  },
+  "retired_reason": null
+}

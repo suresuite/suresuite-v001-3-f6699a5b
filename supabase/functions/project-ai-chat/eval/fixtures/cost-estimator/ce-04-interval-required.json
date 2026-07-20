@@ -1,0 +1,19 @@
+{
+  "id": "ce-04-interval-required",
+  "description": "Mocked args omit low/high → invalid_params, no proposal — the interval is REQUIRED on every row (ai-agents.md §18.1 hard gate 2, #4).",
+  "project_snapshot": { "reuse": "ce-01-estimate-costs" },
+  "utterance": "Estimate the missing material costs for me",
+  "mocked_llm": {
+    "tool": "draft_parameter_estimate",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "method": "direct_cheapest_inbound@1", "value": 3.75 }
+      ]
+    }
+  },
+  "expect": {
+    "error_code": "invalid_params",
+    "reason_includes": "interval"
+  },
+  "retired_reason": null
+}

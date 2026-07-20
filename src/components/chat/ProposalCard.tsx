@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   BadgeCheck,
+  Calculator,
   CircleDashed,
   Database,
   ExternalLink,
@@ -34,6 +35,7 @@ import { APPLY_RETRY_CAP, useProposal, type Proposal } from "@/hooks/useProposal
 
 const AGENT_META: Record<string, { name: string; Icon: typeof Database }> = {
   "data-steward": { name: "Data Steward", Icon: Database },
+  "cost-estimator": { name: "Cost Estimator", Icon: Calculator },
   "policy-configurator": { name: "Policy Configurator", Icon: SlidersHorizontal },
   "vv-analyst": { name: "V&V Analyst", Icon: BadgeCheck },
   "experiment-designer": { name: "Experiment Designer", Icon: FlaskConical },
@@ -50,6 +52,7 @@ const PROVENANCE_CHIP: Record<Proposal["provenance"], { label: string; className
 // artifact type → room deep link + apply-gate name (§4.4 / §4.6)
 const ARTIFACT_META: Record<string, { room: string | null; roomLabel: string; gate: string }> = {
   item_master_diff: { room: "/project-manager", roomLabel: "Project Manager", gate: "the item-master write RPCs" },
+  parameter_estimate: { room: "/project-manager", roomLabel: "Project Manager", gate: "the item-master write RPCs" },
   policy_bundle_diff: { room: "/policies", roomLabel: "Policies", gate: "save_policy_defaults + snapshot_policy" },
   model_card_draft: { room: "/policies", roomLabel: "Run & Validate", gate: "record_model_validation" },
   experiment_spec: { room: "/simulation-lab", roomLabel: "Simulation Lab", gate: "the experiment dispatch gate" },
@@ -99,6 +102,66 @@ function ItemMasterDiff({ rows }: { rows: Array<Record<string, unknown>> }) {
         <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
           show all {rows.length}
         </button>
+      )}
+    </div>
+  );
+}
+
+/** parameter_estimate body (§18.1 card contract): per-row value + [low,
+ * high] + method@version + source dataset/vintage + assumptions — every
+ * number straight from the payload, never recomputed client-side (§4.6). */
+function ParameterEstimate({ rows }: { rows: Array<Record<string, unknown>> }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? rows : rows.slice(0, DIFF_COLLAPSE_LIMIT);
+  const sourceLabel = (r: Record<string, unknown>): string => {
+    const sources = Array.isArray(r.sources) ? (r.sources as Array<Record<string, unknown>>) : [];
+    return sources.map((s) => `${String(s.dataset ?? "")} (${String(s.vintage ?? "")})`).join("; ");
+  };
+  const assumptions = [
+    ...new Set(
+      rows.flatMap((r) => (Array.isArray(r.assumptions) ? (r.assumptions as string[]) : [])),
+    ),
+  ];
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12.5px]">
+          <thead>
+            <tr className="border-b border-border text-left text-muted-foreground">
+              <th className="py-1 pr-3 font-medium">Entity</th>
+              <th className="py-1 pr-3 font-medium">Field</th>
+              <th className="py-1 pr-3 font-medium">Value</th>
+              <th className="py-1 pr-3 font-medium">[low, high]</th>
+              <th className="py-1 pr-3 font-medium">Method</th>
+              <th className="py-1 font-medium">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r, i) => (
+              <tr key={i} className="border-b border-border/50">
+                <td className="py-1 pr-3 font-mono">{String(r.entity_id ?? "")}</td>
+                <td className="py-1 pr-3">{String(r.table ?? "")}.{String(r.field ?? "")}</td>
+                <td className="py-1 pr-3 font-mono">{r.value == null ? "—" : String(r.value)}</td>
+                <td className="py-1 pr-3 font-mono">[{String(r.low ?? "—")}, {String(r.high ?? "—")}]</td>
+                <td className="py-1 pr-3 font-mono">{String(r.method ?? "")}</td>
+                <td className="py-1">{sourceLabel(r)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length > DIFF_COLLAPSE_LIMIT && !showAll && (
+          <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
+            show all {rows.length}
+          </button>
+        )}
+      </div>
+      {assumptions.length > 0 && (
+        <div className="mt-2 text-[11.5px] text-muted-foreground">
+          <span className="font-medium">Declared assumptions:</span>
+          <ul className="ml-4 list-disc">
+            {assumptions.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
+        </div>
       )}
     </div>
   );
@@ -394,6 +457,9 @@ function ProposalBody({ proposal }: { proposal: Proposal }) {
   const rows = (payload as { rows?: Array<Record<string, unknown>> }).rows;
   if (proposal.artifact_type === "item_master_diff" && Array.isArray(rows)) {
     return <ItemMasterDiff rows={rows} />;
+  }
+  if (proposal.artifact_type === "parameter_estimate" && Array.isArray(rows)) {
+    return <ParameterEstimate rows={rows} />;
   }
   if (proposal.artifact_type === "policy_bundle_diff" && (payload as PolicyDiffPayload).diff) {
     return <PolicyBundleDiff payload={payload as PolicyDiffPayload} />;

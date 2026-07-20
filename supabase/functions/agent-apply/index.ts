@@ -25,6 +25,7 @@ import {
   type ApplyErrorCode,
   type ItemMasterApplyResult,
 } from "./itemMasterApply.ts";
+import { applyParameterEstimate, type ParameterEstimateApplyResult } from "./parameterEstimateApply.ts";
 import { applyPolicyBundle, type PolicyBundleApplyResult } from "./policyBundleApply.ts";
 import { applyModelCard, type ModelCardApplyResult } from "./modelCardApply.ts";
 import { applyExperimentSpec, type ExperimentSpecApplyResult } from "./experimentSpecApply.ts";
@@ -57,6 +58,9 @@ const APPLY_RETRY_CAP = 3;
  * on Run & Validate (a /policies stage). */
 export const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string[] }> = {
   item_master_diff: { features: ["data_editing"], pages: [] },
+  // §13.3 parameter_estimate row (v1.5): identical to item_master_diff —
+  // the apply writes the same item-master fields through the same RPCs.
+  parameter_estimate: { features: ["data_editing"], pages: [] },
   policy_bundle_diff: { features: ["data_editing"], pages: ["/policies"] },
   model_card_draft: { features: [], pages: ["/policies"] },
   // §13.3 row 4 — "this is the 'agents can run simulations' right": exactly
@@ -326,11 +330,20 @@ serve(async (req) => {
       return jsonResponse({ error: message, code, type: "APPLY_FAILED" });
     };
 
-    let result: ItemMasterApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult | DecisionReportApplyResult;
+    let result: ItemMasterApplyResult | ParameterEstimateApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult | DecisionReportApplyResult;
     try {
       switch (String(proposal.artifact_type)) {
         case "item_master_diff":
           result = await applyItemMasterDiff(svc, {
+            projectId,
+            payload: (proposal.payload ?? {}) as Record<string, unknown>,
+            grounding: (proposal.grounding ?? {}) as Record<string, unknown>,
+          });
+          break;
+        case "parameter_estimate":
+          // §4.4 row (v1.5): the item_master_diff sequence with the method
+          // recomputation swapped in (parameterEstimateApply.ts).
+          result = await applyParameterEstimate(svc, {
             projectId,
             payload: (proposal.payload ?? {}) as Record<string, unknown>,
             grounding: (proposal.grounding ?? {}) as Record<string, unknown>,

@@ -41,6 +41,11 @@ import {
   REPORT_AGENT_ID,
   reportToolDeclarations,
 } from "./reportTools.ts";
+import {
+  buildEstimatorContext,
+  ESTIMATOR_AGENT_ID,
+  estimatorToolDeclarations,
+} from "./estimatorTools.ts";
 import { getProjectMemoryDeclaration, memoryEnabled } from "./memory.ts";
 
 export interface AgentTurnResult {
@@ -72,6 +77,15 @@ export const AGENT_TURNS: Record<string, AgentSpec> = {
     // §14.4: get_project_memory joins every agent's surface when M2 is on.
     tools: () => [
       ...stewardToolDeclarations,
+      ...(memoryEnabled() ? [getProjectMemoryDeclaration] : []),
+    ],
+  },
+  [ESTIMATOR_AGENT_ID]: {
+    name: "Cost Estimator",
+    buildContext: (ctx, args) => buildEstimatorContext(ctx, args),
+    // §14.4: get_project_memory joins every agent's surface when M2 is on.
+    tools: () => [
+      ...estimatorToolDeclarations,
       ...(memoryEnabled() ? [getProjectMemoryDeclaration] : []),
     ],
   },

@@ -1,0 +1,68 @@
+{
+  "table_version": 1,
+  "target_vintage": 2025,
+  "retrieved_at": "2026-07-20",
+  "note": "B7 Cost Estimator benchmark seed table (ai-agents.md §18.5). SEED VALUES PENDING OWNER-CONFIRMED REFRESH. Free-tier sources only; never fetched at runtime — this file is code, reviewed and versioned like code. Changing any consumed figure requires bumping the consuming method's version in estimators.ts (§18.1 failure-mode law).",
+  "ppi": {
+    "dataset": "FRED/BLS PPIACO — Producer Price Index by Commodity: All Commodities, annual averages, index 1982=100",
+    "license_tier": "free",
+    "values": { "2013": 203.4, "2025": 262.1 }
+  },
+  "rows": [
+    {
+      "id": "asm_materials_share",
+      "dataset": "U.S. Census Annual Survey of Manufactures — total cost of materials ÷ total value of shipments, all manufacturing (NAICS 31-33)",
+      "vintage": 2013,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "share",
+      "value": 0.55,
+      "low": 0.45,
+      "high": 0.62
+    },
+    {
+      "id": "holding_rate_annual",
+      "dataset": "Inventory holding-rate consensus range used by the Talluri et al. 2013 cost model (annual % of unit value)",
+      "vintage": 2013,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "rate",
+      "value": 0.25,
+      "low": 0.18,
+      "high": 0.35
+    },
+    {
+      "id": "procurement_admin_cost_per_supplier",
+      "dataset": "Procurement-administration cost per active supplier relationship, annual USD (Talluri et al. 2013 inputs; derived from Census ASM payroll aggregates)",
+      "vintage": 2013,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "currency",
+      "value": 12000,
+      "low": 8000,
+      "high": 20000
+    },
+    {
+      "id": "talluri_backup_coordination_factor",
+      "dataset": "Talluri, Kull, Yildiz & Yoon 2013, JBL 34(4), doi:10.1111/jbl.12025 — backup-sourcing coordination adjustment factor",
+      "vintage": 2013,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "factor",
+      "value": 0.2,
+      "low": 0.15,
+      "high": 0.25
+    },
+    {
+      "id": "talluri_flex_capacity_factor",
+      "dataset": "Talluri, Kull, Yildiz & Yoon 2013, JBL 34(4), doi:10.1111/jbl.12025 — flexible-capacity adjustment factor",
+      "vintage": 2013,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "factor",
+      "value": 0.1,
+      "low": 0.08,
+      "high": 0.12
+    }
+  ]
+}

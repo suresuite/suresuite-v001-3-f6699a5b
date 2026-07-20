@@ -194,7 +194,7 @@ export function weeklyDemand(outbound: Row[]): Map<string, number> {
   return out;
 }
 
-interface ReducerCtx {
+export interface ReducerCtx {
   cheapestInbound: Map<string, number>;
   weightedPrice: Map<string, number>;
   weeklyDemand: Map<string, number>;
@@ -204,8 +204,10 @@ interface ReducerCtx {
   policyCapacity: number;
 }
 
-/** Named reducers — the shared vocabulary of registry `fallback_spec`. */
-const REDUCERS: Record<string, (id: string, ctx: ReducerCtx) => number | undefined> = {
+/** Named reducers — the shared vocabulary of registry `fallback_spec`.
+ * Exported (v1.5) so the §18.1 estimator family (a) delegates to THIS library
+ * instead of duplicating it — one derivation per value, everywhere. */
+export const REDUCERS: Record<string, (id: string, ctx: ReducerCtx) => number | undefined> = {
   cheapest_inbound_price: (id, c) => c.cheapestInbound.get(id),
   demand_weighted_outbound_price: (id, c) => c.weightedPrice.get(id),
   weekly_outbound_volume: (id, c) => {
@@ -403,7 +405,7 @@ const FIELD_BINDINGS: Record<string, FieldBinding> = {
   "outbound_logistics.unit_price": { rows: (d) => d.outbound, id: laneId, master: (r) => num(r.unit_price) },
 };
 
-function buildReducerCtx(dataset: GradingDataset, defaults: Row): ReducerCtx {
+export function buildReducerCtx(dataset: GradingDataset, defaults: Row): ReducerCtx {
   const weekly = weeklyDemand(dataset.outbound);
   const effectiveDemand = new Map<string, number>();
   for (const p of dataset.products) {

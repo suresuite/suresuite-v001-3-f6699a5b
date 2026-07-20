@@ -1,0 +1,19 @@
+{
+  "id": "ce-06-scope",
+  "description": "A row names an entity id from another project → project_scope_violation, no proposal (ai-agents.md §18.1 hard gate 3, #6).",
+  "project_snapshot": { "reuse": "ce-01-estimate-costs" },
+  "utterance": "Estimate the cost for MAT-OTHER",
+  "mocked_llm": {
+    "tool": "draft_parameter_estimate",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "MAT-OTHER", "field": "cost", "method": "direct_cheapest_inbound@1", "value": 3.75, "low": 3.75, "high": 4.5 }
+      ]
+    }
+  },
+  "expect": {
+    "error_code": "project_scope_violation",
+    "reason_includes": "not in this project"
+  },
+  "retired_reason": null
+}
