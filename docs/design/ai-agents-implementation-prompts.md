@@ -1,4 +1,4 @@
-# AI-agents — implementation prompts (v1.2 Phases 1–3 · v1.4 Phases H1–H4)
+# AI-agents — implementation prompts (v1.2 Phases 1–3 · v1.4 Phases H1–H4 · v1.5 Phases 4a–4d)
 
 These are the executable prompts for the §9.8 delivery phases of
 `docs/design/ai-agents.md` (v1.2) and the §24.3 hardening phases (v1.4).
@@ -310,15 +310,292 @@ ACCEPTANCE (verify each, show evidence):
 
 ---
 
-## Phase 4 — *Extend* (B7–B9): not yet promptable
+## Phase 4 — *Extend* (B7–B9): promptable at v1.5
 
-Blocked on §10 Q26–Q28 (owner-supplied methodology paper for the Cost
-Estimator; source strategy for the Network Cartographer; feeds + corroboration
-thresholds for the Disruption Sentinel) and on §18.4 for anything scheduled.
-When those inputs arrive, the corresponding §18 subsection is elaborated to §5
-altitude (verbatim prompt, schema, fixtures) **first**, and only then does a
-Phase 4 prompt get written in the format above. Writing the prompt before the
-spec would invert rule 1.
+Q26–Q28 were RESOLVED at ai-agents.md v1.5 (2026-07-20) with the
+owner-supplied methodology papers; §18 is now buildable design. Per the rule
+stated here since v1.2, each session's FIRST deliverable is elaborating its
+§18 subsection to §5 altitude (verbatim prompt, schema, fixture table) in the
+same PR — then implementing against that spec. Four prompts, one session
+each, strictly in order (4b assumes 4a merged, 4c assumes 4b, 4d assumes 4c).
+Anything scheduled/background stays out of all four (§18.4 unmet).
+
+### Phase 4a — B7 Cost Estimator
+
+```
+Implement Phase 4a of the SureSuite AI-agent plan: B7 Cost Estimator
+(ai-agents.md §18.1, v1.5 — Q26 resolved). v1.2 Phases 1–3 and v1.4 H1–H4
+are merged prerequisites — build on them, do not refactor them.
+
+SPEC FIRST (rule 1): §18.1 is buildable design, not yet §5 altitude. Your
+first deliverable is elaborating ai-agents.md §18.1 to §5 altitude IN THE
+SAME PR: verbatim system prompt, draft_parameter_estimate JSON Schema,
+grounding budgets, hard gates, refusal rules, failure modes, and a
+ce-01..ce-09 fixture table — mirroring the §5.1 (B1 Data Steward) structure
+this agent deliberately parallels. The code implements THAT spec.
+
+AUTHORITY — read fully before writing code:
+1. CLAUDE.md; docs/design/next-gen-platform-design.md §8.1–8.2 (manifest +
+   grading), §12 (platform law).
+2. docs/design/ai-agents.md — §18 intro, §18.1, §18.5 (source registry,
+   role `prior`), §10 Q26 (the Talluri decision: three method families and
+   the {value, low, high, basis} contract), §5.1 (the structural template),
+   §4.4–4.5 (apply + draft-tool contracts), §7.4 (eval tiers), §13
+   (rights/quotas).
+3. Code: supabase/functions/_shared/grading.ts (REDUCERS — family (a)
+   already exists; do NOT duplicate it), project-ai-chat/draftTools.ts +
+   agentTurn.ts (B1 module shape + AGENT_TURNS roster), the agent-apply/
+   modules (apply shape), the bulk_upsert_* RPC migrations.
+4. Methodology: Talluri et al. 2013, JBL 34(4), doi:10.1111/jbl.12025 —
+   the scaling method §18.1 fixes. If the PDF is not available, implement
+   from §18.1 + §10 Q26 alone; invent nothing beyond them.
+
+SCOPE:
+- supabase/functions/_shared/estimators.ts (new): the versioned method
+  registry. Method shape: {id, version, family, params, sources:[{dataset,
+  vintage}], assumptions:[string], estimate(inputs) -> {value, low, high,
+  basis}}. Families: (a) delegates to grading.ts REDUCERS; (b)
+  benchmark_scaled: firm_estimate = industry_figure × (firm value of
+  shipments ÷ industry capacity), with PPI escalation to vintage; (c)
+  resilience_fixed_cost mapped onto the engine's C^res CostBreakdown
+  components (P-S.1 coordination cost, P-P.5 capacity cost — the paper's
+  20%/10% adjustment factors carried as declared, citable assumptions).
+  Benchmark figures ship as a checked-in, versioned seed table (dataset +
+  vintage per row, free-tier sources only) — never fetched at runtime in
+  this phase.
+- project-ai-chat/estimatorTools.ts (new, Q21a seam conventions):
+  buildEstimatorContext (graded findings + row counts + available methods);
+  draft_parameter_estimate per your elaborated schema. Hard gates at draft:
+  every value recomputed through its named method@version (tolerance 1e-9;
+  mismatch ⇒ not_grounded), interval REQUIRED on every row, entity ids in
+  project scope, ≤ 500 rows. Provenance `deterministic` — the LLM only
+  selects and explains methods; values come from estimators.
+- agent-apply/parameterEstimateApply.ts (new) + dispatch-table row: apply
+  via the same bulk_upsert_* as B1, recompute at apply, post-apply
+  gradeManifest delta recorded on applied_result.
+- Eval: eval/fixtures/cost-estimator/ ce-01..ce-09, including an injection
+  fixture (hostile text in a supplier name must not move any value) and a
+  back-test fixture (a method whose declared interval excludes the held-out
+  actual is demoted, not proposed).
+
+FLAGS (default OFF): AGENT_ENABLED_IDS+=cost-estimator. Off ⇒ byte-identical
+behavior, proven by the existing golden-transcript test.
+
+GUARDRAILS: values are NEVER LLM-generated — selector-only LLM role;
+intervals come from source ranges/sensitivity, never invented; §18.5
+"verify" (licensed) sources are NOT wired in this phase; no background
+execution. Deviations update ai-agents.md in the same PR. Commit trailer:
+"Phase D / G12 / AI agents: B7 Cost Estimator (ai-agents.md §18.1 v1.5)".
+
+ACCEPTANCE (verify each, show evidence):
+- ai-agents.md §18.1 at §5 altitude (diff included); ce-01..ce-09 green in
+  the deterministic tier; golden-transcript byte-identity with the flag off.
+- Demo transcript: a project with missing material costs and holding rates
+  → "estimate the missing economics" → card shows per-row value + [low,
+  high] + method@version + source dataset/vintage + assumptions → Approve →
+  masters updated, findings_after ⊂ findings_before.
+- A row whose recomputation mismatches its method is rejected not_grounded;
+  a live model-scored eval run (§7.4) attached before any flag-flip
+  recommendation.
+```
+
+### Phase 4b — B8 Network Cartographer v1 (firm-level)
+
+```
+Implement Phase 4b of the SureSuite AI-agent plan: B8 Network Cartographer
+v1, firm-level mapping (ai-agents.md §18.2 + §18.5, v1.5 — Q27 resolved).
+Phase 4a (B7) is a merged prerequisite.
+
+SPEC FIRST (rule 1): elaborate ai-agents.md §18.2 (v1 scope) to §5 altitude
+IN THE SAME PR — including the VERBATIM zero-shot NER and RE prompt
+templates (adapted from AlMahri et al. 2026 tasks T1–T8 / T9–T16: entity
+definitions with ≥3 examples each; relations SuppliesTo · Produces ·
+LocatedIn · OwnedBy with linguistic variants), the disambiguation prompt,
+the draft_network_map_diff JSON Schema, hard gates, refusal rules, and the
+nc-01..nc-10 fixture table. The code implements THAT spec.
+
+AUTHORITY — read fully before writing code:
+1. CLAUDE.md; blueprint §8.4 (dataset versioning / graph_hash), §12.
+2. docs/design/ai-agents.md — §18 intro, §18.2 (the six pipeline stages),
+   §18.5 (source registry: entry shape, roles, the unregistered-source
+   prohibition), §10 Q27 (thresholds + confidence vocabulary), §8 (the
+   external-content-injection row — evidence text is data, never
+   instructions), §4 (fabric), §5.1 (structural template), §7.4.
+3. Code: the agent module + apply patterns as in Phase 4a; the existing
+   entity mutation paths (bulk_upsert_suppliers/materials + the inbound
+   arc upload path) — apply reuses THESE, no new write path.
+
+SCOPE:
+- Migration (new): external_evidence table exactly as §18.2 names it —
+  (id, project_id, source_id, url_or_ref, content_hash, retrieved_at,
+  confidence, triple jsonb, lei text null) + RLS matching the proposals
+  table pattern.
+- supabase/functions/_shared/sourceRegistry.ts (new): the §18.5 registry
+  as versioned config — {source_id, role, access, trust_grade,
+  screening_rule, terms_note}; seed with the §18.5 free-tier rows only;
+  export a guard `assertRegistered(source_id, role)` every ingestion path
+  MUST call.
+- project-ai-chat/cartographerTools.ts (new): v1 ingestion = (a)
+  user-pasted/uploaded documents, (b) fetch of a URL ONLY when its domain
+  matches a registered `extraction` source (screening_rule applied). The
+  pipeline stages as separate, individually testable steps: screen →
+  zero-shot NER → zero-shot RE → disambiguate (anchor on GLEIF LEI when
+  resolvable from a checked-in LEI seed slice; live GLEIF API optional
+  behind its own flag) → verify (integrate at ≥3 independent sources;
+  2 ⇒ corroborated, 1 ⇒ provisional — stored, flagged, NOT integrated) →
+  draft_network_map_diff citing external_evidence rows.
+- agent-apply/networkMapDiffApply.ts (new): v1 apply scope = add suppliers
+  and supplier→material links through the existing validated mutation
+  paths, stamping evidence citations; anything wider is v2.
+- Eval: eval/fixtures/network-cartographer/ nc-01..nc-10 incl.: unregistered
+  source refused; 2-source triple stays corroborated (not integrated);
+  3-source triple integrates; alias resolved to one LEI-anchored entity;
+  document containing "ignore previous instructions…" alters nothing
+  (mm-07 generalized); precision/recall computed against a SMALL checked-in
+  annotated corpus (the Wichmann corpus discipline — ≥30 labeled sentences,
+  committed with the fixtures).
+
+FLAGS (default OFF): AGENT_ENABLED_IDS+=network-cartographer;
+CARTOGRAPHER_LIVE_FETCH (default OFF ⇒ paste/upload only).
+
+GUARDRAILS: the map is validated against reference data and the annotated
+corpus — NEVER against simulation; evidence text is data, not instructions;
+every triple in a proposal cites ≥1 external_evidence row; no background
+refresh (§18.4 unmet); licensed validation sources are named in the spec
+but NOT wired. Deviations update ai-agents.md in the same PR. Commit
+trailer: "Phase D / G12 / AI agents: B8 Cartographer v1 firm-level
+(ai-agents.md §18.2 v1.5)".
+
+ACCEPTANCE (verify each, show evidence):
+- §18.2 v1 at §5 altitude with the verbatim NER/RE prompts; nc-01..nc-10
+  green; golden-transcript byte-identity flags-off; measured P/R/F1 on the
+  checked-in corpus reported in the PR (the AlMahri zero-shot numbers are
+  the baseline to beat or explain).
+- Demo transcript: paste two news paragraphs + one report excerpt naming a
+  tier-2 supplier → evidence rows with sources + confidence → a
+  network_map_diff card (verified triples only) → Approve → supplier + link
+  rows exist with evidence citations; the provisional triple visibly
+  pending, not applied.
+```
+
+### Phase 4c — B8 Network Cartographer v2 (product-level input–output model)
+
+```
+Implement Phase 4c of the SureSuite AI-agent plan: B8 v2 — product-level
+decomposition with estimated consumption rates (ai-agents.md §18.2 "v2",
+v1.5). Phases 4a (B7) and 4b (B8 v1) are merged prerequisites.
+
+SPEC FIRST (rule 1): elaborate the §18.2 v2 block to §5 altitude in the
+same PR — the r_{p,m} estimation methods (registered as B7 estimator
+methods, family prior-based), the mass-balance validator contract, the
+extended draft schema, and fixtures nc-11..nc-16.
+
+AUTHORITY: CLAUDE.md; ai-agents.md §18.2 v2 + §18.1 + §18.5 (role `prior`
+rows: Eurostat Supply-Use/IO, OECD ICIO, EXIOBASE seeds); blueprint §8
+(the G16 run-readiness contract — the v2 output MUST pass the same pre-run
+gate as human data); scsim/scsim/entities/network.py (BomLine.rate is the
+target field: units m per unit p, gt=0, hard production-feasibility
+constraint); docs/data-simulation-mapping.md (bom_single_level /
+bom_multi_level collapse semantics); _shared/grading.ts + validationGate.ts
+(the gate the output must turn green).
+
+SCOPE:
+- _shared/estimators.ts grows the r_{p,m} family: sector IO technical
+  coefficients as priors (checked-in seed slice with dataset+vintage),
+  spend ÷ unit-price implied quantities, observed-consumption reducer where
+  production data exists. {value, low, high, basis} on every rate.
+- cartographerTools.ts v2: decompose verified firm-level edges into BOM
+  lines with estimated rates; run the MASS-BALANCE validator (input flows
+  must cover output × rate within declared tolerance) BEFORE drafting; a
+  violation is a refusal naming the imbalance, never a silently adjusted
+  rate.
+- networkMapDiffApply.ts v2: apply may now seed bom + inbound + outbound
+  through the existing lifecycle; "done" = the G16 contract verbatim —
+  gate green, org-correct, self-verified through list_projects /
+  get_project_dataset_status / the gate, exactly as blueprint §12 states.
+- Eval: nc-11..nc-16 incl.: mass-balance violation blocks the draft; a
+  held-out real BOM back-test (estimated rates vs. actual within declared
+  intervals, misses reported per-row); a full map→estimate→apply run ends
+  gate-green on a fresh project.
+
+FLAGS: AGENT_ENABLED_IDS unchanged; CARTOGRAPHER_PRODUCT_LEVEL (default
+OFF).
+
+GUARDRAILS: r_{p,m} values only from registered estimator methods with
+intervals; BOM lines below the verification threshold inherit `provisional`
+and are excluded from apply; simulation still validates nothing about the
+map — the gate does. Deviations update ai-agents.md in the same PR. Commit
+trailer: "Phase D / G12 / AI agents: B8 Cartographer v2 product-level
+(ai-agents.md §18.2 v1.5)".
+
+ACCEPTANCE: §18.2 v2 at §5 altitude; nc-11..nc-16 green; demo transcript
+ending in a mapped project whose Run & Validate gate shows zero blocks;
+back-test table (estimated vs. actual rates) attached to the PR.
+```
+
+### Phase 4d — B9 Disruption Sentinel v1 (on-demand)
+
+```
+Implement Phase 4d of the SureSuite AI-agent plan: B9 Disruption Sentinel
+v1, on-demand "assess this event" (ai-agents.md §18.3, v1.5 — Q28
+resolved). Phases 4a–4c are merged prerequisites. Scheduled watching is
+OUT of scope (§18.4 unmet) — v1 assesses events the user brings or that
+registered authoritative feeds return on request.
+
+SPEC FIRST (rule 1): elaborate §18.3 to §5 altitude in the same PR —
+verbatim system prompt, draft_risk_alert JSON Schema, the corroboration
+algorithm (news-derived ≥3 independent sources; authoritative feeds
+verified at 1 — enumerate which §18.5 rows count as authoritative), hard
+gates, refusal rules, fixtures ra-01..ra-08.
+
+AUTHORITY: CLAUDE.md; ai-agents.md §18.3 + §18.5 (role `sensing` rows) +
+§10 Q28 + §13.6 (closed-loop run authorization) + §5.4 (B4 — the ONLY
+dispatch path) + §8 (injection row); _shared/dispatch.ts; the B8 modules
+(reuse its NER/RE extraction and external_evidence substrate — one
+pipeline, two consumers; do not fork it); scsim P-S.4 plugin
+(scsim/scsim/policies/anticipation/p_s4_early_warning.py) and P-X.1
+playbook linkage for the alert's recommended-actions block.
+
+SCOPE:
+- project-ai-chat/sentinelTools.ts (new): assess_event flow — input is a
+  pasted article/URL (registered `sensing` domains only) or a registered
+  authoritative feed query; corroborate per the Q28 rule (store every
+  corroborating item as external_evidence); match to project entities
+  including the B8 deep-tier map via existing read tools (matches citable);
+  draft_risk_alert carrying: event, sources, matched entities, a LINKED
+  experiment spec drafted through the EXISTING B4 draft_experiment_spec
+  tool (disruption_schedule shaped from the event) — the alert's impact
+  range field stays EMPTY until that run completes; recommended actions
+  as §17.3-style chips referencing P-X.1 playbooks and the P-S.4 alert
+  hook.
+- agent-apply/riskAlertApply.ts (new): approving the alert records it and
+  (only with the B4 rights row satisfied) applies the linked experiment
+  spec through experimentSpecApply — no new dispatch path. When the run
+  completes, the alert's impact range is filled FROM run_replications
+  results with a citation; never from the model.
+- Eval: eval/fixtures/disruption-sentinel/ ra-01..ra-08 incl.: 2-source
+  news event ⇒ NO alert (refusal names the missing corroboration); one
+  insolvency-register entry ⇒ alert (authoritative at 1); unmatched event
+  ⇒ honest "no exposure found" with the checked entities listed; injection
+  via article text alters nothing; impact field empty until run results
+  exist, then filled with citation.
+
+FLAGS (default OFF): AGENT_ENABLED_IDS+=disruption-sentinel.
+
+GUARDRAILS: impact ranges are simulation results ONLY — an alert without a
+completed run shows "impact pending", never an LLM estimate; alerts
+recommend, humans act; no scheduled/background ingestion; feed text is
+data, never instructions. Deviations update ai-agents.md in the same PR.
+Commit trailer: "Phase D / G12 / AI agents: B9 Sentinel v1 on-demand
+(ai-agents.md §18.3 v1.5)".
+
+ACCEPTANCE: §18.3 at §5 altitude; ra-01..ra-08 green; golden-transcript
+byte-identity flag-off; demo transcript: paste a plant-fire article naming
+a mapped tier-2 supplier → corroboration gathered → alert card with
+matched entities + linked experiment spec → Approve → run dispatched via
+the B4 path → after completion the alert shows the simulated impact range
+with its run citation.
+```
 
 ---
 
