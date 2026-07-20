@@ -62,7 +62,7 @@ export type FeatureKey =
   | 'reports'
   | 'agent_report_builder'
   // v1.5 Phase 4a (ai-agents.md §18.1/§13.1; seeded in
-  // 20260726000001_cost_estimator.sql):
+  // 20260726193000_cost_estimator.sql):
   | 'agent_cost_estimator';
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
