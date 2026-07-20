@@ -1,0 +1,19 @@
+{
+  "id": "ce-05-mismatch",
+  "description": "A row's value differs from recomputation by 0.01 → not_grounded naming the method and the recomputed value; apply twin: a stored row that no longer recomputes ⇒ stale_values (ai-agents.md §18.1 hard gate 1, #5).",
+  "project_snapshot": { "reuse": "ce-01-estimate-costs" },
+  "utterance": "Estimate the missing material costs for me",
+  "mocked_llm": {
+    "tool": "draft_parameter_estimate",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "method": "direct_cheapest_inbound@1", "value": 3.76, "low": 3.75, "high": 4.5 }
+      ]
+    }
+  },
+  "expect": {
+    "error_code": "not_grounded",
+    "reason_includes": "does not match the recomputed"
+  },
+  "retired_reason": null
+}

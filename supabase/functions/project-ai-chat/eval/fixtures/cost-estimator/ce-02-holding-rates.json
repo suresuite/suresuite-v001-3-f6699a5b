@@ -1,0 +1,54 @@
+{
+  "id": "ce-02-holding-rates",
+  "description": "3 materials NULL holding_cost_pct; 'estimate the holding rates' → 3 rows via benchmark_holding_rate@1, interval = the seed row's [low, high]; payload rows carry dataset + vintage + assumptions (ai-agents.md §18.1 #2).",
+  "project_snapshot": {
+    "materials": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "M-1", "name": "Steel", "cost": 5, "holding_cost_pct": null, "moq": 10, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "M-2", "name": "Copper", "cost": 6, "holding_cost_pct": null, "moq": 10, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "M-3", "name": "Glass", "cost": 7, "holding_cost_pct": null, "moq": 10, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null }
+    ],
+    "products": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "product_id": "P-1", "name": "Widget", "sell_price": 25, "production_capacity": 1000, "fulfillment_mode": "mts", "demand_distribution": "triangular", "demand_mean": 100, "demand_cv": 0.2 }
+    ],
+    "suppliers": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "name": "Alpha Supply", "capacity_per_week": 500, "reliability_score": 1 }
+    ],
+    "inbound_logistics": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "material_id": "M-1", "unit_price": 5, "lead_time": 2, "volume": 100, "time_unit": "week" },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "material_id": "M-2", "unit_price": 6, "lead_time": 2, "volume": 100, "time_unit": "week" },
+      { "project_id": "11111111-1111-4111-8111-111111111111", "supplier_id": "S1", "material_id": "M-3", "unit_price": 7, "lead_time": 2, "volume": 100, "time_unit": "week" }
+    ],
+    "outbound_logistics": [
+      { "project_id": "11111111-1111-4111-8111-111111111111", "product_id": "P-1", "customer_id": "C1", "unit_price": 25, "volume": 100, "time_unit": "week" }
+    ],
+    "bom_single_level": [],
+    "bom_multi_level": [],
+    "policy_defaults": [ { "project_id": "11111111-1111-4111-8111-111111111111" } ]
+  },
+  "utterance": "Estimate the holding rates for my materials",
+  "mocked_llm": {
+    "tool": "draft_parameter_estimate",
+    "args": {
+      "rows": [
+        { "table": "materials", "entity_id": "M-1", "field": "holding_cost_pct", "method": "benchmark_holding_rate@1", "value": 0.25, "low": 0.18, "high": 0.35 },
+        { "table": "materials", "entity_id": "M-2", "field": "holding_cost_pct", "method": "benchmark_holding_rate@1", "value": 0.25, "low": 0.18, "high": 0.35 },
+        { "table": "materials", "entity_id": "M-3", "field": "holding_cost_pct", "method": "benchmark_holding_rate@1", "value": 0.25, "low": 0.18, "high": 0.35 }
+      ],
+      "title": "Estimate holding rates from the industry benchmark range"
+    }
+  },
+  "expect": {
+    "candidates": [
+      { "field": "materials.holding_cost_pct", "entity_id": "M-1", "method": "benchmark_holding_rate@1", "value": 0.25, "low": 0.18, "high": 0.35, "status": "ok" }
+    ],
+    "proposal": {
+      "rows": 3,
+      "provenance": "deterministic",
+      "methods": ["benchmark_holding_rate@1"],
+      "basis": ["prior_range"],
+      "payload_rows_carry": ["sources", "assumptions"],
+      "citation_kinds": ["document"]
+    }
+  },
+  "retired_reason": null
+}

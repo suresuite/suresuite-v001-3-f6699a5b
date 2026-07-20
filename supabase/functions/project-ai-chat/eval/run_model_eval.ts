@@ -435,7 +435,7 @@ async function evalSteward(model: ModelSpec, mock: boolean): Promise<StewardMetr
 // ── B2/B3 fixture evaluation (generic draft-agent runner, §9.3/§9.4) ─────────
 
 interface AgentEvalConfig {
-  agentId: "policy-configurator" | "vv-analyst" | "experiment-designer" | "report-builder";
+  agentId: "policy-configurator" | "vv-analyst" | "experiment-designer" | "report-builder" | "cost-estimator";
   fixtureDir: string;
   draftTool: string;
   artifactType: string;
@@ -484,6 +484,19 @@ const AGENT_EVAL: Record<string, AgentEvalConfig> = {
     fixtures: [
       "rb-01-run-results", "rb-02-disruption-brief", "rb-03-citation-required",
       "rb-04-no-evidence-run", "rb-05-template-vocabulary",
+    ],
+  },
+  // Phase 4a (§18.1): draft-time fixtures only — ce-01's apply delta and
+  // ce-05's stale_values apply twin stay in the CI tier.
+  "cost-estimator": {
+    agentId: "cost-estimator",
+    fixtureDir: "cost-estimator",
+    draftTool: "draft_parameter_estimate",
+    artifactType: "parameter_estimate",
+    fixtures: [
+      "ce-01-estimate-costs", "ce-02-holding-rates", "ce-03-benchmark-scaled",
+      "ce-04-interval-required", "ce-05-mismatch", "ce-06-scope",
+      "ce-07-resilience-report", "ce-08-injection", "ce-09-backtest-demoted",
     ],
   },
 };
@@ -548,6 +561,27 @@ function scoreAgentOutcome(cfg: AgentEvalConfig, proposals: Row[], exp: Record<s
     if (exp.proposal.grounding_policy_hash &&
         (p.grounding as Record<string, unknown> | null)?.policy_hash !== exp.proposal.grounding_policy_hash) {
       return { pass: false, detail: `grounding.policy_hash must bind the version's hash` };
+    }
+  } else if (cfg.agentId === "cost-estimator") {
+    const rows = (payload.rows as Array<Record<string, unknown>>) ?? [];
+    if (exp.proposal.rows !== undefined && rows.length !== exp.proposal.rows) {
+      return { pass: false, detail: `expected ${exp.proposal.rows} rows, got ${rows.length}` };
+    }
+    if (exp.proposal.methods) {
+      const used = [...new Set(rows.map((r) => String(r.method)))].sort();
+      if (JSON.stringify(used) !== JSON.stringify([...exp.proposal.methods].sort())) {
+        return { pass: false, detail: `methods mismatch: ${used}` };
+      }
+    }
+    // §18.1 hard gate 2: the interval is REQUIRED on every stored row.
+    for (const r of rows) {
+      if (typeof r.low !== "number" || typeof r.high !== "number") {
+        return { pass: false, detail: `row ${r.entity_id} stored without an interval` };
+      }
+    }
+    if (exp.proposal.no_value !== undefined &&
+        JSON.stringify(payload).includes(String(exp.proposal.no_value))) {
+      return { pass: false, detail: `payload contains the injected value ${exp.proposal.no_value}` };
     }
   } else {
     if (exp.proposal.verdict && payload.verdict !== exp.proposal.verdict) {

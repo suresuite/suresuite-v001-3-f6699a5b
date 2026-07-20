@@ -60,7 +60,10 @@ export type FeatureKey =
   // v1.2 Phase 3 (ai-agents.md §16.1/§13.3; seeded in
   // 20260723000001_reports_and_file_workspace.sql):
   | 'reports'
-  | 'agent_report_builder';
+  | 'agent_report_builder'
+  // v1.5 Phase 4a (ai-agents.md §18.1/§13.1; seeded in
+  // 20260726000001_cost_estimator.sql):
+  | 'agent_cost_estimator';
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'ai_chat', kind: 'feature', label: 'AI Assistant' },
@@ -79,6 +82,7 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'project_memory', kind: 'feature', label: 'Project Memory' },
   { key: 'reports', kind: 'feature', label: 'Decision Reports' },
   { key: 'agent_report_builder', kind: 'feature', label: 'Report Builder Agent' },
+  { key: 'agent_cost_estimator', kind: 'feature', label: 'Cost Estimator Agent' },
 ];
 
 /** `/profile` is a system page — always reachable, never deniable. */
@@ -185,6 +189,7 @@ export function roleFallbackCapabilities(
     agent_vv_analyst: false,
     agent_experiment_designer: false,
     agent_explainer: false,
+    agent_cost_estimator: false,
     chat_history_sync: false,
     project_memory: false,
   };

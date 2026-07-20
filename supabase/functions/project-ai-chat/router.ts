@@ -12,6 +12,7 @@ export interface RouteDecision {
   route: Route;
   agent_id:
     | "data-steward"
+    | "cost-estimator"
     | "policy-configurator"
     | "vv-analyst"
     | "experiment-designer"
@@ -51,10 +52,13 @@ export type ClassifierCall = (prompt: string) => Promise<string>;
 export const ROUTER_CONFIDENCE_MIN = 0.70; // DEFAULT (§6.2 step 3)
 
 // §6.2 step 4 tie-break: dependency order — upstream artifacts first.
-// report-builder sits last: reports CONSUME what every other agent produces
-// (runs, validations, data), so any tie resolves to the producing agent.
+// cost-estimator sits directly after data-steward (§18.1): on a tie, real
+// data beats estimates — the Estimator exists for what the Steward must
+// refuse. report-builder sits last: reports CONSUME what every other agent
+// produces (runs, validations, data), so any tie resolves to the producer.
 export const AGENT_PRECEDENCE = [
   "data-steward",
+  "cost-estimator",
   "policy-configurator",
   "vv-analyst",
   "experiment-designer",
@@ -71,6 +75,11 @@ export const AGENT_ROSTER: Record<AgentSlug, { mission: string; intents: string[
     mission:
       "completes and corrects item-master data (materials, products, suppliers) as reviewable diffs",
     intents: ["steward.fill_missing", "steward.explain_gaps", "steward.correct_values"],
+  },
+  "cost-estimator": {
+    mission:
+      "estimates missing item-master economics with method-cited values and uncertainty intervals where the data alone cannot supply them",
+    intents: ["estimator.estimate_missing", "estimator.explain_methods", "estimator.resilience_cost"],
   },
   "policy-configurator": {
     mission:
