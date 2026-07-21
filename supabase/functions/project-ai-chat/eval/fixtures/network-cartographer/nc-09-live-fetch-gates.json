@@ -1,0 +1,103 @@
+{
+  "id": "nc-09-live-fetch-gates",
+  "description": "ai-agents.md §18.2 nc-09 — url ingestion with CARTOGRAPHER_LIVE_FETCH off is refused (paste offered); flag on with an unregistered domain is refused by the source's screening_rule; flag on with a paste-only source (news-wire) is refused; flag on with a registered domain ingests through a stubbed fetch. All offline.",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S-HELIX",
+        "name": "Helix Drives GmbH",
+        "capacity_per_week": 800,
+        "reliability_score": 1
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-CTH",
+        "name": "battery cathodes"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "supplier_id": "S-HELIX",
+        "material_id": "MAT-PM",
+        "unit_price": 120,
+        "lead_time": 2,
+        "volume": 40,
+        "time_unit": "week"
+      }
+    ],
+    "external_evidence": []
+  },
+  "utterance": "Fetch and map this filing",
+  "docs": [
+    {
+      "source_id": "sec-edgar",
+      "title": "10-K excerpt: supplier disclosures",
+      "text": "Helix Drives GmbH sources power modules from Nordwind Semiconductor GmbH. Nordwind Semiconductor GmbH produces power modules and is headquartered in Dresden.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Company",
+            "text": "Nordwind Semiconductor GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "power modules"
+          },
+          {
+            "type": "Location",
+            "text": "Dresden"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Helix Drives GmbH sources power modules from Nordwind Semiconductor GmbH."
+          },
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "Produces",
+            "object": "power modules",
+            "quote": "Nordwind Semiconductor GmbH produces power modules and is headquartered in Dresden."
+          }
+        ]
+      }
+    }
+  ],
+  "urls": {
+    "registered": "https://www.sec.gov/Archives/edgar/data/0000000000/filing.htm",
+    "unregistered_domain": "https://evil.example.com/filing.htm",
+    "paste_only_source": "news-wire",
+    "insecure": "http://www.sec.gov/Archives/filing.htm"
+  },
+  "expect": {
+    "flag_off_reason_includes": "CARTOGRAPHER_LIVE_FETCH",
+    "bad_domain_reason_includes": "screening allowlist",
+    "paste_only_reason_includes": "paste/upload only",
+    "insecure_reason_includes": "https",
+    "fetched_evidence_rows": 2
+  },
+  "retired_reason": null
+}

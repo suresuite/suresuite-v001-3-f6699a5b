@@ -1,0 +1,84 @@
+{
+  "slice_version": 1,
+  "retrieved_at": "2026-07-21",
+  "note": "GLEIF LEI seed slice — the B8 disambiguation backbone (ai-agents.md §18.2 stage 4, §10 note 36g). This file is code: reviewed, versioned, never fetched at runtime (live GLEIF lookup is CARTOGRAPHER_GLEIF_LIVE, default off). The committed slice carries shape-valid SYNTHETIC records (ISO 17442 shape; check digits not asserted) for the eval corpus's FICTIONAL firms — no real-world legal-entity identity is claimed. A production slice regenerates from the GLEIF Golden Copy (free bulk download, CC0) and lands as an ordinary reviewed change; changing any consumed record bumps slice_version.",
+  "records": [
+    {
+      "lei": "529900ALPINEMOT00011",
+      "legal_name": "Alpine Motors AG",
+      "aliases": ["Alpine Motors"],
+      "country": "DE",
+      "parent_lei": null
+    },
+    {
+      "lei": "529900HELIXDRV000022",
+      "legal_name": "Helix Drives GmbH",
+      "aliases": ["Helix Drives"],
+      "country": "AT",
+      "parent_lei": "529900MERIDIAN000066"
+    },
+    {
+      "lei": "549300HELIXSYS000033",
+      "legal_name": "Helix Drive Systems Inc",
+      "aliases": ["Helix Drive Systems"],
+      "country": "US",
+      "parent_lei": null
+    },
+    {
+      "lei": "529900NORDWIND000044",
+      "legal_name": "Nordwind Semiconductor GmbH",
+      "aliases": ["Nordwind Semi", "Nordwind Semiconductor"],
+      "country": "DE",
+      "parent_lei": "529900MERIDIAN000066"
+    },
+    {
+      "lei": "529900BALTICCW000055",
+      "legal_name": "Baltic Cathode Works Sp. z o.o.",
+      "aliases": ["Baltic Cathode Works", "Baltic Cathode"],
+      "country": "PL",
+      "parent_lei": "529900VEKTRAGP000077"
+    },
+    {
+      "lei": "529900MERIDIAN000066",
+      "legal_name": "Meridian Industries AG",
+      "aliases": ["Meridian Industries", "Meridian"],
+      "country": "DE",
+      "parent_lei": null
+    },
+    {
+      "lei": "529900VEKTRAGP000077",
+      "legal_name": "Vektra Group SE",
+      "aliases": ["Vektra Group"],
+      "country": "DE",
+      "parent_lei": null
+    },
+    {
+      "lei": "213800VEYRONLG000088",
+      "legal_name": "Veyron Logistics Ltd",
+      "aliases": ["Veyron Logistics"],
+      "country": "GB",
+      "parent_lei": null
+    },
+    {
+      "lei": "506700TESSINPL000099",
+      "legal_name": "Tessin Polymer SA",
+      "aliases": ["Tessin Polymer"],
+      "country": "CH",
+      "parent_lei": null
+    },
+    {
+      "lei": "549300AURORABT000101",
+      "legal_name": "Aurora Battery Systems AB",
+      "aliases": ["Aurora Battery Systems", "Aurora Battery"],
+      "country": "SE",
+      "parent_lei": null
+    },
+    {
+      "lei": "213800KESTRELF000112",
+      "legal_name": "Kestrel Foundry Ltd",
+      "aliases": ["Kestrel Foundry"],
+      "country": "GB",
+      "parent_lei": null
+    }
+  ]
+}

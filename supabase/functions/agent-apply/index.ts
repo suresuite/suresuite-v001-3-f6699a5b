@@ -26,6 +26,7 @@ import {
   type ItemMasterApplyResult,
 } from "./itemMasterApply.ts";
 import { applyParameterEstimate, type ParameterEstimateApplyResult } from "./parameterEstimateApply.ts";
+import { applyNetworkMapDiff, type NetworkMapApplyResult } from "./networkMapDiffApply.ts";
 import { applyPolicyBundle, type PolicyBundleApplyResult } from "./policyBundleApply.ts";
 import { applyModelCard, type ModelCardApplyResult } from "./modelCardApply.ts";
 import { applyExperimentSpec, type ExperimentSpecApplyResult } from "./experimentSpecApply.ts";
@@ -61,6 +62,10 @@ export const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string
   // §13.3 parameter_estimate row (v1.5): identical to item_master_diff —
   // the apply writes the same item-master fields through the same RPCs.
   parameter_estimate: { features: ["data_editing"], pages: [] },
+  // §13.3 network_map_diff row (v1.5 Phase 4b): data_editing gates manual
+  // supplier/arc entry, and assign_material_supplier is the exact RPC the
+  // /policies grid's "assign supplier" action calls.
+  network_map_diff: { features: ["data_editing"], pages: [] },
   policy_bundle_diff: { features: ["data_editing"], pages: ["/policies"] },
   model_card_draft: { features: [], pages: ["/policies"] },
   // §13.3 row 4 — "this is the 'agents can run simulations' right": exactly
@@ -330,7 +335,7 @@ serve(async (req) => {
       return jsonResponse({ error: message, code, type: "APPLY_FAILED" });
     };
 
-    let result: ItemMasterApplyResult | ParameterEstimateApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult | DecisionReportApplyResult;
+    let result: ItemMasterApplyResult | ParameterEstimateApplyResult | NetworkMapApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult | DecisionReportApplyResult;
     try {
       switch (String(proposal.artifact_type)) {
         case "item_master_diff":
@@ -347,6 +352,18 @@ serve(async (req) => {
             projectId,
             payload: (proposal.payload ?? {}) as Record<string, unknown>,
             grounding: (proposal.grounding ?? {}) as Record<string, unknown>,
+          });
+          break;
+        case "network_map_diff":
+          // §4.4 row (v1.5 Phase 4b): live evidence re-verification, then
+          // the existing supplier/lane mutation paths — no new write path
+          // (networkMapDiffApply.ts).
+          result = await applyNetworkMapDiff(svc, {
+            projectId,
+            payload: (proposal.payload ?? {}) as Record<string, unknown>,
+            grounding: (proposal.grounding ?? {}) as Record<string, unknown>,
+            userId,
+            userEmail,
           });
           break;
         case "policy_bundle_diff":

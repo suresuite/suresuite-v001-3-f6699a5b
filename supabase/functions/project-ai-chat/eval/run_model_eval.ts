@@ -18,7 +18,16 @@
 // Usage (from this directory, so eval/deno.json applies):
 //   deno run --allow-env --allow-read --allow-write --allow-net run_model_eval.ts \
 //     [--models=gemini-2.5-flash,gpt-5] [--agents=data-steward] [--mock] [--out=report.json] \
-//     [--matrix]
+//     [--matrix] [--corpus]
+//
+// --corpus (Phase 4b, ai-agents.md §18.2 nc-10 / §10 note 36h): score each
+// model's ZERO-SHOT NER/RE extraction against the checked-in annotated
+// corpus (fixtures/network-cartographer/corpus.json) with the same verbatim
+// prompts and deterministic gates the ingest pipeline runs. Targets: the
+// AlMahri et al. 2026 zero-shot numbers (NER F1 0.52, RE F1 0.33) — the
+// baseline to beat; the committed rule-based extractor's scores are printed
+// beside them as the reproducible floor. A --mock corpus run substitutes the
+// rule-based extractor (runner validation only, never flag-flip evidence).
 //
 // --mock runs fully offline (oracle classifier + the fixtures' mocked args):
 // it validates the RUNNER and the deterministic gates, and its report is
@@ -58,6 +67,22 @@ import {
 import { MATRIX_CAPABILITY_IDS, type MatrixCapabilityId } from "../matrix.ts";
 import { type PlanStep } from "../planTools.ts";
 import { makeAgentRpcs, makeStubDb, type Row } from "./harness/stub_db.ts";
+// Phase 4b (§18.2 nc-10): the corpus surface — the ingest pipeline's verbatim
+// prompts + deterministic gates, the scorer, and the committed rule floor.
+import { buildNerPrompt, buildRePrompt, makeExtractor } from "../cartographerTools.ts";
+import {
+  gateMentions,
+  gateTriples,
+  parseNerResponse,
+  parseReResponse,
+} from "../../_shared/networkEvidence.ts";
+import { baselineExtract } from "./harness/baseline_extractor.ts";
+import {
+  scoreCorpus,
+  type CorpusFile,
+  type CorpusScores,
+  type Prediction,
+} from "./harness/corpus_score.ts";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
 const USER = "22222222-2222-4222-8222-222222222222";
@@ -120,17 +145,20 @@ function parseArgs(): {
   mock: boolean;
   out: string | null;
   matrix: boolean;
+  corpus: boolean;
 } {
   let models: string[] | null = null;
   let agents: string[] | null = null;
   let mock = false;
   let out: string | null = null;
   let matrix = false;
+  let corpus = false;
   for (const a of Deno.args) {
     if (a.startsWith("--models=")) models = a.slice(9).split(",").map((s) => s.trim()).filter(Boolean);
     else if (a.startsWith("--agents=")) agents = a.slice(9).split(",").map((s) => s.trim()).filter(Boolean);
     else if (a === "--mock") mock = true;
     else if (a === "--matrix") matrix = true;
+    else if (a === "--corpus") corpus = true;
     else if (a.startsWith("--out=")) out = a.slice(6);
   }
   if (matrix && agents !== null && MATRIX_AGENTS.some((a) => !agents!.includes(a))) {
@@ -140,7 +168,86 @@ function parseArgs(): {
     );
     Deno.exit(2);
   }
-  return { models, agents: agents ?? (matrix ? [...MATRIX_AGENTS] : ["data-steward"]), mock, out, matrix };
+  return { models, agents: agents ?? (matrix ? [...MATRIX_AGENTS] : ["data-steward"]), mock, out, matrix, corpus };
+}
+
+// ── Phase 4b: zero-shot corpus scoring (§18.2 nc-10, §10 note 36h) ──────────
+
+/** The AlMahri et al. 2026 controlled zero-shot benchmark — the numbers a
+ * model must beat on this corpus (or the gap explained in the eval report)
+ * before network-cartographer flips on. */
+export const ALMAHRI_NER_F1 = 0.52;
+export const ALMAHRI_RE_F1 = 0.33;
+
+interface CorpusMetrics {
+  model: string;
+  mode: "mock" | "model";
+  sentences: number;
+  scores: CorpusScores;
+  baseline: CorpusScores;
+  targets: { ner_f1: number; re_f1: number };
+  beats_almahri: boolean;
+  beats_baseline: boolean;
+  pass: boolean;
+  failures: string[];
+}
+
+async function evalCorpus(model: ModelSpec, mock: boolean): Promise<CorpusMetrics> {
+  const corpus: CorpusFile = JSON.parse(
+    await Deno.readTextFile(new URL("./fixtures/network-cartographer/corpus.json", import.meta.url)),
+  );
+  const baseline = scoreCorpus(corpus.sentences, corpus.sentences.map((s) => baselineExtract(s.text)));
+
+  const predictions: Prediction[] = [];
+  if (mock) {
+    // Runner validation only: the rule floor stands in for the model.
+    for (const s of corpus.sentences) predictions.push(baselineExtract(s.text));
+  } else {
+    const extract = makeExtractor(model.id);
+    if (!extract) throw new Error(`no provider key for ${model.id}`);
+    for (const s of corpus.sentences) {
+      // The SAME pipeline the ingest handler runs: verbatim prompts, tolerant
+      // parsers, verbatim-substring gates — fabrications never score as hits.
+      let entities: Prediction["entities"] = [];
+      let triples: Prediction["triples"] = [];
+      try {
+        const mentions = parseNerResponse(await extract(buildNerPrompt(s.text))) ?? [];
+        const gatedM = gateMentions(mentions, s.text).accepted;
+        entities = gatedM.map(({ type, text }) => ({ type, text }));
+        const re = parseReResponse(await extract(buildRePrompt(s.text, JSON.stringify(gatedM)))) ?? [];
+        triples = gateTriples(re, gatedM, s.text).accepted
+          .map(({ subject, relation, object }) => ({ subject, relation, object }));
+      } catch (e) {
+        console.warn(`corpus ${s.id}: extraction failed (${(e as Error).message}) — scored as empty`);
+      }
+      predictions.push({ entities, triples });
+    }
+  }
+
+  const scores = scoreCorpus(corpus.sentences, predictions);
+  const beatsAlmahri = scores.ner.f1 >= ALMAHRI_NER_F1 && scores.re.f1 >= ALMAHRI_RE_F1;
+  const beatsBaseline = scores.ner.f1 >= baseline.ner.f1 && scores.re.f1 >= baseline.re.f1;
+  const failures: string[] = [];
+  if (!mock && !beatsAlmahri) {
+    failures.push(
+      `zero-shot scores below the AlMahri bar: NER F1 ${scores.ner.f1.toFixed(3)} (target ${ALMAHRI_NER_F1}), ` +
+        `RE F1 ${scores.re.f1.toFixed(3)} (target ${ALMAHRI_RE_F1})`,
+    );
+  }
+  return {
+    model: model.id,
+    mode: mock ? "mock" : "model",
+    sentences: corpus.sentences.length,
+    scores,
+    baseline,
+    targets: { ner_f1: ALMAHRI_NER_F1, re_f1: ALMAHRI_RE_F1 },
+    beats_almahri: beatsAlmahri,
+    beats_baseline: beatsBaseline,
+    // Mock validates the runner only; live gates on the AlMahri bar (beating
+    // the committed rule floor is reported for the flag-flip review, §18.2).
+    pass: mock ? true : beatsAlmahri,
+    failures,
+  };
 }
 
 function keyFor(provider: ModelSpec["provider"]): string {
@@ -1440,8 +1547,9 @@ export async function runModelEval(opts: {
   mock: boolean;
   out: string | null;
   matrix: boolean;
+  corpus?: boolean;
 }): Promise<{ report: Record<string, unknown>; pass: boolean }> {
-  const { models: modelArg, agents, mock, out, matrix } = opts;
+  const { models: modelArg, agents, mock, out, matrix, corpus } = opts;
   const runId = crypto.randomUUID().slice(0, 8);
 
   const candidates = modelArg ?? Object.keys(MODEL_REGISTRY);
@@ -1487,6 +1595,7 @@ export async function runModelEval(opts: {
     agents: [] as unknown[],
     coverage: [] as unknown[],
     loop: [] as unknown[],
+    ...(corpus ? { corpus: [] as unknown[] } : {}),
   };
   const matrixRows: CapabilityRow[] = [];
   const matrixMissing: string[] = [];
@@ -1556,8 +1665,23 @@ export async function runModelEval(opts: {
       `plan-integrity=${loop.planIntegrity.score.toFixed(3)}`);
     for (const f of loop.failures) console.log(`  ✗ ${f}`);
 
+    // Phase 4b (§18.2 nc-10): zero-shot corpus scoring for the Cartographer.
+    let corpusMetrics: CorpusMetrics | null = null;
+    if (corpus) {
+      corpusMetrics = await evalCorpus(model, mock);
+      (report.corpus as unknown[]).push(corpusMetrics);
+      console.log(`corpus: ${corpusMetrics.pass ? "PASS" : "FAIL"} — ` +
+        `NER P=${corpusMetrics.scores.ner.precision.toFixed(3)} R=${corpusMetrics.scores.ner.recall.toFixed(3)} F1=${corpusMetrics.scores.ner.f1.toFixed(3)} ` +
+        `RE P=${corpusMetrics.scores.re.precision.toFixed(3)} R=${corpusMetrics.scores.re.recall.toFixed(3)} F1=${corpusMetrics.scores.re.f1.toFixed(3)} ` +
+        `(AlMahri bar ${ALMAHRI_NER_F1}/${ALMAHRI_RE_F1}; rule floor ` +
+        `${corpusMetrics.baseline.ner.f1.toFixed(3)}/${corpusMetrics.baseline.re.f1.toFixed(3)}` +
+        `${corpusMetrics.beats_baseline ? ", beaten" : ", NOT beaten — explain before any flag flip"})`);
+      for (const f of corpusMetrics.failures) console.log(`  ✗ ${f}`);
+    }
+
     const modelPass = routing.pass && (steward?.pass ?? true) &&
-      Object.values(agentResults).every(Boolean) && coverage.pass && loop.pass;
+      Object.values(agentResults).every(Boolean) && coverage.pass && loop.pass &&
+      (corpusMetrics?.pass ?? true);
     allPass = allPass && modelPass;
     await recordToEvents(runId, {
       eval: "model-scored",
@@ -1576,6 +1700,13 @@ export async function runModelEval(opts: {
       judged_faithful_rate: coverage.judged > 0 ? coverage.judgedFaithful / coverage.judged : null,
       loop_pass: loop.pass,
       plan_integrity: loop.planIntegrity.score,
+      ...(corpusMetrics
+        ? {
+          corpus_pass: corpusMetrics.pass,
+          corpus_ner_f1: corpusMetrics.scores.ner.f1,
+          corpus_re_f1: corpusMetrics.scores.re.f1,
+        }
+        : {}),
     });
 
     // H4 (§23.1/§23.2): one capability row per §23.2 id from this model's

@@ -59,6 +59,12 @@ export interface ToolContext {
   planEvents?: Array<{ kind: "plan.created" | "plan.step_changed" | "plan.closed"; payload: Record<string, unknown> }>;
   /** The plan this request touched (drives the §21.3 integrity sweep). */
   planTouchedId?: string;
+  /** §18.2 stages 2–4 (Phase 4b): the extraction sub-call seam. The B8
+   * ingest handler uses this injected temperature-0 JSON call when present
+   * (the eval tier scripts it) and falls back to the provider registry
+   * (`makeExtractor`) otherwise. Absent everywhere else ⇒ zero behavior
+   * change. */
+  extract?: (prompt: string) => Promise<string>;
 }
 
 function envelope(

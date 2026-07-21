@@ -221,7 +221,8 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       if (!id) continue;
       const existing = store.find((row) => String(row[idCol] ?? "") === id);
       if (existing) Object.assign(existing, r);
-      else store.push({ ...r });
+      // Mirror fidelity: the SQL RPCs stamp project_id on every inserted row.
+      else store.push({ project_id: args.p_project_id, ...r });
     }
     return rows.length;
   };
@@ -280,6 +281,71 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       }
       return null;
     },
+    // ── Phase 4b mirrors (SQL originals: 20260727000001_network_cartographer
+    //    + 20260705000002_assign_material_supplier) ─────────────────────────
+    record_external_evidence: (args) => {
+      const store = tables.external_evidence ?? (tables.external_evidence = []);
+      const tripleJson = JSON.stringify(args.p_triple ?? {});
+      const existing = store.find((r) =>
+        String(r.project_id) === String(args.p_project_id) &&
+        String(r.source_id) === String(args.p_source_id) &&
+        String(r.content_hash) === String(args.p_content_hash) &&
+        JSON.stringify(r.triple) === tripleJson
+      );
+      if (existing) return existing.id;
+      if (store.filter((r) => String(r.project_id) === String(args.p_project_id)).length >= 5000) {
+        throw new Error("too_large: external-evidence cap (5000) reached for this project");
+      }
+      const id = nextUuid();
+      store.push({
+        id,
+        project_id: args.p_project_id,
+        source_id: args.p_source_id,
+        url_or_ref: args.p_url_or_ref ?? null,
+        content_hash: args.p_content_hash,
+        retrieved_at: new Date().toISOString(),
+        confidence: args.p_confidence,
+        triple: structuredClone(args.p_triple),
+        lei: args.p_lei ?? null,
+      });
+      return id;
+    },
+    assign_material_supplier: (args) => {
+      const materialId = String(args.p_material_id ?? "");
+      const supplierId = String(args.p_supplier_id ?? "");
+      if (!materialId || !supplierId) throw new Error("material_id and supplier_id are required");
+      const project = (tables.projects ?? []).find((p) => String(p.id) === String(args.p_project_id));
+      if (!project) throw new Error("project_not_found");
+      const plant = String(project.plant_name ?? "");
+      const lanes = tables.inbound_logistics ?? (tables.inbound_logistics = []);
+      if (!lanes.some((l) =>
+        String(l.project_id) === String(args.p_project_id) &&
+        String(l.supplier_id) === supplierId && String(l.material_id) === materialId
+      )) {
+        lanes.push({ project_id: args.p_project_id, plant_name: plant, supplier_id: supplierId, material_id: materialId });
+      }
+      const edges = tables.supply_chain_data ?? (tables.supply_chain_data = []);
+      if (!edges.some((e) =>
+        String(e.project_id) === String(args.p_project_id) &&
+        String(e.data_source) === "inbound" &&
+        String(e.from_location) === supplierId && String(e.to_location) === materialId
+      )) {
+        edges.push({
+          project_id: args.p_project_id, plant_name: plant, data_source: "inbound",
+          from_location: supplierId, to_location: materialId,
+          material_consumption_rate: 0, sourcing_ratio: 1.0, weighted: 0,
+          uploaded_by: args.p_user_id ?? null, organization: project.organization ?? null,
+        });
+      }
+      const sups = tables.suppliers ?? (tables.suppliers = []);
+      if (!sups.some((s) =>
+        String(s.project_id) === String(args.p_project_id) && String(s.supplier_id) === supplierId
+      )) {
+        sups.push({ project_id: args.p_project_id, supplier_id: supplierId });
+      }
+      return null;
+    },
+
     bulk_upsert_materials: upsert("materials", "material_id", {
       lead_time_dist: ["deterministic", "lognormal", "gamma"],
     }),
