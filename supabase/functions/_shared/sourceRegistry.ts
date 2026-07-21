@@ -20,7 +20,7 @@
 // TypeScript — no Deno.*, no clients — so the deterministic eval tier
 // drives it byte-identically offline.
 
-export const REGISTRY_VERSION = 1;
+export const REGISTRY_VERSION = 2;
 
 /** §18.5 roles. `role` is a role SET per entry (§10 note 36b): §18.5's own
  * table assigns multiple roles to one source (GDELT: extraction + sensing).
@@ -188,6 +188,23 @@ export const SOURCE_REGISTRY: readonly SourceRegistryEntry[] = [
     },
     terms_note: "Excerpt-level quotation by the user; bulk/live ingestion requires a wire license.",
   },
+  // §18.3/§10 note 37b (REGISTRY_VERSION 2): the four wire agencies as
+  // SEPARATE rows, because one source_id counts once toward the Q28
+  // independent-source threshold — a single collective wire row made
+  // >= 3-source news verification unreachable. Same posture as news-wire:
+  // extraction covers user-supplied excerpts; paste-only (no live fetch).
+  ...(["reuters", "ap", "afp", "dpa"] as const).map((agency): SourceRegistryEntry => ({
+    source_id: `${agency}-wire`,
+    label: `${agency.toUpperCase()} wire copy (user-supplied excerpts)`,
+    role: ["extraction", "sensing"],
+    access: "free tiers / licensing",
+    trust_grade: "B",
+    screening_rule: {
+      ...PASTE_ONLY,
+      note: "Curated wire (single agency): user-pasted article excerpts only; live RSS fetch is not wired in v1 (licensing).",
+    },
+    terms_note: "Excerpt-level quotation by the user; bulk/live ingestion requires a wire license.",
+  })),
   {
     source_id: "gdacs",
     label: "GDACS disaster alerts",
@@ -402,6 +419,15 @@ export function assertRegistered(sourceId: string, role: SourceRole): SourceRegi
 /** Deterministic evidence confidence (§10 note 36e) — never LLM-scored. */
 export function sourceConfidence(entry: SourceRegistryEntry): number {
   return CONFIDENCE_BY_TRUST[entry.trust_grade];
+}
+
+/** Q28 authoritative rule, made mechanical (§18.3 stage 6, §10 note 37c): a
+ * source is authoritative iff its registry row carries role `sensing` AND
+ * trust grade A — the issuer is the ground truth, so ONE such source
+ * verifies an event. Derived from the registry, never hand-listed. */
+export function isAuthoritativeSensingSource(sourceId: string): boolean {
+  const entry = getRegisteredSource(sourceId);
+  return Boolean(entry && entry.role.includes("sensing") && entry.trust_grade === "A");
 }
 
 export interface ScreeningResult {

@@ -30,6 +30,7 @@ import { applyNetworkMapDiff, type NetworkMapApplyResult } from "./networkMapDif
 import { applyPolicyBundle, type PolicyBundleApplyResult } from "./policyBundleApply.ts";
 import { applyModelCard, type ModelCardApplyResult } from "./modelCardApply.ts";
 import { applyExperimentSpec, type ExperimentSpecApplyResult } from "./experimentSpecApply.ts";
+import { applyRiskAlert, fillRiskAlertImpact, type RiskAlertApplyResult } from "./riskAlertApply.ts";
 import { applyDecisionReport, type DecisionReportApplyResult } from "./decisionReportApply.ts";
 import { makeWriters } from "../report-render/writers.ts";
 import { cleanEnv } from "../_shared/env.ts";
@@ -71,6 +72,10 @@ export const ARTIFACT_RIGHTS: Record<string, { features: string[]; pages: string
   // §13.3 row 4 — "this is the 'agents can run simulations' right": exactly
   // the feature + page that gate the Lab's own Run button.
   experiment_spec: { features: ["simulation_lab"], pages: ["/simulation-lab"] },
+  // §13.3 risk_alert row (v1.5 Phase 4d, §10 note 37h): approving an alert
+  // dispatches the linked sizing run, so it demands EXACTLY the experiment
+  // row's rights — never less than the equivalent manual action.
+  risk_alert: { features: ["simulation_lab"], pages: ["/simulation-lab"] },
   // §13.3 decision_report row — same-as-UI proof: a future manual "Export
   // report" button would demand exactly `reports`. NOT data_editing —
   // rendering mutates no project state.
@@ -137,7 +142,11 @@ export async function checkApplyQuota(db: any, args: {
       return "The report-render quota could not be verified — try again.";
     }
   }
-  if (args.artifactType !== "experiment_spec") return null;
+  // §10 note 37h: a risk_alert apply dispatches a run through the linked
+  // experiment_spec, so it consumes the SAME §13.4 experiment quota (the
+  // counting query below stays on experiment_spec proposals — the linked
+  // proposal lands there as applied with the approving user as reviewer).
+  if (args.artifactType !== "experiment_spec" && args.artifactType !== "risk_alert") return null;
   try {
     const { data: applied, error } = await db
       .from("proposals")
@@ -215,6 +224,22 @@ serve(async (req) => {
 
     // Idempotent re-POST (§4.4): applied is terminal — return the stored result.
     if (proposal.status === "applied") {
+      // §18.3 hard gate 8: an applied risk_alert whose linked run has since
+      // completed gets its impact range filled FROM run_replications on this
+      // on-demand re-POST (never a background job — §18.4 stays unmet).
+      if (String(proposal.artifact_type) === "risk_alert") {
+        try {
+          const refreshed = await fillRiskAlertImpact(svc, {
+            id: proposalId,
+            applied_result: (proposal.applied_result ?? null) as Record<string, unknown> | null,
+          });
+          if (refreshed) {
+            return jsonResponse({ ok: true, applied_result: refreshed, already_applied: true });
+          }
+        } catch (e) {
+          console.warn("risk-alert impact refresh skipped:", e instanceof Error ? e.message : e);
+        }
+      }
       return jsonResponse({ ok: true, applied_result: proposal.applied_result ?? null, already_applied: true });
     }
     if (proposal.status !== "approved") {
@@ -335,7 +360,7 @@ serve(async (req) => {
       return jsonResponse({ error: message, code, type: "APPLY_FAILED" });
     };
 
-    let result: ItemMasterApplyResult | ParameterEstimateApplyResult | NetworkMapApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult | DecisionReportApplyResult;
+    let result: ItemMasterApplyResult | ParameterEstimateApplyResult | NetworkMapApplyResult | PolicyBundleApplyResult | ModelCardApplyResult | ExperimentSpecApplyResult | DecisionReportApplyResult | RiskAlertApplyResult;
     try {
       switch (String(proposal.artifact_type)) {
         case "item_master_diff":
@@ -409,6 +434,34 @@ serve(async (req) => {
             userId,
             // The approving human's checkbox from the card — honored inside
             // only when the stored findings_preview displayed warn findings.
+            acknowledgeWarnings: body.acknowledgeWarnings === true,
+          });
+          break;
+        }
+        case "risk_alert": {
+          // §4.4 risk_alert row (v1.5 Phase 4d): live re-verification, then
+          // the LINKED experiment_spec applies through applyExperimentSpec →
+          // dispatchExperimentRun — the ONLY dispatch path, never a parallel
+          // one. Impact stays pending until the run completes (§18.3).
+          const upstashUrl = cleanEnv("UPSTASH_REDIS_REST_URL");
+          const upstashToken = cleanEnv("UPSTASH_REDIS_REST_TOKEN");
+          if (!upstashUrl || !upstashToken) {
+            return await fail("rpc_error", "the worker queue is not configured in this deployment (UPSTASH_REDIS_REST_URL/TOKEN)");
+          }
+          const upstash = async (cmd: (string | number)[]): Promise<unknown> => {
+            const res = await fetch(upstashUrl, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${upstashToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify(cmd),
+            });
+            if (!res.ok) throw new Error(`upstash ${res.status}: ${await res.text()}`);
+            return res.json();
+          };
+          result = await applyRiskAlert(svc, { upstash }, {
+            projectId,
+            payload: (proposal.payload ?? {}) as Record<string, unknown>,
+            grounding: (proposal.grounding ?? {}) as Record<string, unknown>,
+            userId,
             acknowledgeWarnings: body.acknowledgeWarnings === true,
           });
           break;

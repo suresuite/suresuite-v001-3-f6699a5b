@@ -1,0 +1,132 @@
+{
+  "id": "ra-04-three-source-deep-tier",
+  "description": "ai-agents.md §18.3 ra-04 — a fire at a MAPPED tier-2 supplier (Nordwind, verified in the B8 evidence store) reported by three independent sensing sources verifies at 3; the exposure is matched THROUGH the deep-tier map with the mapping evidence ids cited; the shaped disruption targets the tier-1 project supplier the mapped SuppliesTo triple reaches; a re-draft converges (duplicate).",
+  "project_snapshot": {
+    "reuse": "ra-03-authoritative-single",
+    "patch": {
+      "suppliers": [
+        {
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "supplier_id": "S1",
+          "name": "Acme Alloys GmbH",
+          "capacity_per_week": 1200,
+          "reliability_score": 0.95
+        },
+        {
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "supplier_id": "S-HELIX",
+          "name": "Helix Drives GmbH",
+          "capacity_per_week": 800,
+          "reliability_score": 1
+        }
+      ],
+      "external_evidence": [
+        {
+          "id": "eeeeeeee-0000-4000-8000-000000000001",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "source_id": "news-wire",
+          "url_or_ref": "Wire: Nordwind-Helix supply agreement",
+          "content_hash": "maphash-wire-0001",
+          "retrieved_at": "2026-07-10T00:00:00Z",
+          "confidence": 0.7,
+          "triple": {
+            "subject": { "name": "Nordwind Semiconductor GmbH", "lei": "529900NORDWIND000044" },
+            "relation": "SuppliesTo",
+            "object": { "name": "Helix Drives GmbH", "type": "Company" },
+            "quote": "Nordwind Semiconductor GmbH has signed a three-year agreement to supply power modules to Helix Drives GmbH."
+          },
+          "lei": "529900NORDWIND000044"
+        },
+        {
+          "id": "eeeeeeee-0000-4000-8000-000000000002",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "source_id": "sec-edgar",
+          "url_or_ref": "10-K excerpt: supplier disclosures",
+          "content_hash": "maphash-edgar-0002",
+          "retrieved_at": "2026-07-10T00:00:00Z",
+          "confidence": 0.9,
+          "triple": {
+            "subject": { "name": "Nordwind Semiconductor GmbH", "lei": "529900NORDWIND000044" },
+            "relation": "SuppliesTo",
+            "object": { "name": "Helix Drives GmbH", "type": "Company" },
+            "quote": "Helix Drives GmbH sources power modules from Nordwind Semiconductor GmbH."
+          },
+          "lei": "529900NORDWIND000044"
+        },
+        {
+          "id": "eeeeeeee-0000-4000-8000-000000000003",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "source_id": "lksg-csrd-disclosures",
+          "url_or_ref": "LkSG due-diligence disclosure",
+          "content_hash": "maphash-lksg-0003",
+          "retrieved_at": "2026-07-10T00:00:00Z",
+          "confidence": 0.7,
+          "triple": {
+            "subject": { "name": "Nordwind Semiconductor GmbH", "lei": "529900NORDWIND000044" },
+            "relation": "SuppliesTo",
+            "object": { "name": "Helix Drives GmbH", "type": "Company" },
+            "quote": "Helix Drives GmbH lists Nordwind Semiconductor GmbH as a direct supplier of power modules."
+          },
+          "lei": "529900NORDWIND000044"
+        }
+      ]
+    }
+  },
+  "utterance": "Three reports of a fab fire at Nordwind - they supply our supplier Helix. Assess it.",
+  "docs": [
+    {
+      "source_id": "gdelt",
+      "title": "Screened article: Nordwind fab fire",
+      "text": "A large fire has severely damaged the Dresden fab of Nordwind Semiconductor GmbH, halting wafer processing. Industrial customers were notified of expected shipment delays.",
+      "extraction": {
+        "entities": [
+          { "type": "Company", "text": "Nordwind Semiconductor GmbH" }
+        ],
+        "triples": []
+      }
+    },
+    {
+      "source_id": "reuters-wire",
+      "title": "Wire: Nordwind fire",
+      "text": "Nordwind Semiconductor GmbH said a fire at its Dresden site has stopped production lines while the damage is assessed; the company gave no restart estimate.",
+      "extraction": {
+        "entities": [
+          { "type": "Company", "text": "Nordwind Semiconductor GmbH" }
+        ],
+        "triples": []
+      }
+    },
+    {
+      "source_id": "dpa-wire",
+      "title": "Wire: Dresden fab blaze",
+      "text": "Dresden firefighters spent the night containing a fire at the semiconductor plant of Nordwind Semiconductor GmbH; authorities reported no injuries but significant equipment damage.",
+      "extraction": {
+        "entities": [
+          { "type": "Company", "text": "Nordwind Semiconductor GmbH" }
+        ],
+        "triples": []
+      }
+    }
+  ],
+  "expect": {
+    "event_type": "fire",
+    "status": "verified",
+    "independent_sources": 3,
+    "authoritative_sources": 0,
+    "subject_lei": "529900NORDWIND000044",
+    "matches_include": "deep_tier_supplier:S-HELIX",
+    "map_evidence_ids": [
+      "eeeeeeee-0000-4000-8000-000000000001",
+      "eeeeeeee-0000-4000-8000-000000000002",
+      "eeeeeeee-0000-4000-8000-000000000003"
+    ],
+    "proposal": {
+      "severity": "watch",
+      "disruption_target": "S-HELIX",
+      "duration_days": 56,
+      "impact_status": "pending"
+    },
+    "proposal_count": 2
+  },
+  "retired_reason": null
+}

@@ -1,0 +1,38 @@
+{
+  "id": "ra-07-apply-dispatch",
+  "description": "ai-agents.md §18.3 ra-07 — approving the alert re-verifies live and applies the LINKED experiment spec through applyExperimentSpec → dispatchExperimentRun (the ONLY dispatch path): queued run with the FULL provenance stamps (ed-08 indistinguishability), worker envelope enqueued, linked proposal applied; the alert's applied_result.impact stays pending; re-apply is idempotent (same run, no second dispatch); corroboration dropped below threshold before apply ⇒ stale_values with nothing dispatched.",
+  "project_snapshot": { "reuse": "ra-03-authoritative-single" },
+  "utterance": "This insolvency-register entry names Acme Alloys - what's our exposure?",
+  "docs": [
+    {
+      "source_id": "insolvency-register-de",
+      "title": "Insolvenzbekanntmachung: Acme Alloys GmbH",
+      "text": "Amtsgericht Graz - Insolvenzbekanntmachung. Insolvency proceedings (Insolvenzverfahren) have been opened over the assets of Acme Alloys GmbH, a registered supplier of industrial alloy compounds. A provisional insolvency administrator has been appointed for Acme Alloys GmbH.",
+      "extraction": {
+        "entities": [
+          { "type": "Company", "text": "Acme Alloys GmbH" }
+        ],
+        "triples": []
+      }
+    }
+  ],
+  "expect": {
+    "apply": {
+      "runs_created": 1,
+      "provenance_stamp_fields": [
+        "policy_version_id",
+        "policy_hash",
+        "graph_hash",
+        "dataset_version_id",
+        "scenario_hash"
+      ],
+      "policy_version_id": "44444444-4444-4444-8444-444444444401",
+      "policy_hash": "ph-run",
+      "impact_status": "pending"
+    },
+    "stale": {
+      "error_code": "stale_values"
+    }
+  },
+  "retired_reason": null
+}

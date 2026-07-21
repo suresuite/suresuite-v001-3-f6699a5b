@@ -14,6 +14,7 @@ export interface RouteDecision {
     | "data-steward"
     | "cost-estimator"
     | "network-cartographer"
+    | "disruption-sentinel"
     | "policy-configurator"
     | "vv-analyst"
     | "experiment-designer"
@@ -64,6 +65,10 @@ export const AGENT_PRECEDENCE = [
   // tie, the project's own data beats estimates beats external evidence —
   // internal ground truth always outranks mined text.
   "network-cartographer",
+  // disruption-sentinel sits directly after network-cartographer (§18.3):
+  // an event assessment CONSUMES the map, so ties resolve to the producer —
+  // internal data > estimates > mined structure > sensed events.
+  "disruption-sentinel",
   "policy-configurator",
   "vv-analyst",
   "experiment-designer",
@@ -90,6 +95,11 @@ export const AGENT_ROSTER: Record<AgentSlug, { mission: string; intents: string[
     mission:
       "maps the supply network beyond tier 1 from user-provided documents and registered external sources, as evidence-cited reviewable graph extensions",
     intents: ["cartographer.map_from_documents", "cartographer.evidence_status"],
+  },
+  "disruption-sentinel": {
+    mission:
+      "assesses disruption events on demand against registered sensing feeds and files corroborated, simulation-sized risk alerts for the project's network",
+    intents: ["sentinel.assess_event", "sentinel.alert_status"],
   },
   "policy-configurator": {
     mission:

@@ -12,6 +12,7 @@ import {
   Loader2,
   MessageSquareQuote,
   Network,
+  Siren,
   SlidersHorizontal,
 } from "lucide-react";
 import { AppliedReportFiles } from "@/components/chat/FileCard";
@@ -38,6 +39,7 @@ const AGENT_META: Record<string, { name: string; Icon: typeof Database }> = {
   "data-steward": { name: "Data Steward", Icon: Database },
   "cost-estimator": { name: "Cost Estimator", Icon: Calculator },
   "network-cartographer": { name: "Network Cartographer", Icon: Network },
+  "disruption-sentinel": { name: "Disruption Sentinel", Icon: Siren },
   "policy-configurator": { name: "Policy Configurator", Icon: SlidersHorizontal },
   "vv-analyst": { name: "V&V Analyst", Icon: BadgeCheck },
   "experiment-designer": { name: "Experiment Designer", Icon: FlaskConical },
@@ -59,6 +61,7 @@ const ARTIFACT_META: Record<string, { room: string | null; roomLabel: string; ga
   policy_bundle_diff: { room: "/policies", roomLabel: "Policies", gate: "save_policy_defaults + snapshot_policy" },
   model_card_draft: { room: "/policies", roomLabel: "Run & Validate", gate: "record_model_validation" },
   experiment_spec: { room: "/simulation-lab", roomLabel: "Simulation Lab", gate: "the experiment dispatch gate" },
+  risk_alert: { room: "/simulation-lab", roomLabel: "Simulation Lab", gate: "the experiment dispatch gate (linked sizing run)" },
   trace_explanation: { room: null, roomLabel: "", gate: "" },
   decision_report: { room: null, roomLabel: "", gate: "the report renderer (workspace)" },
 };
@@ -220,6 +223,80 @@ function NetworkMapDiff({ payload }: { payload: { rows?: Array<Record<string, un
               <li key={i}>
                 {String(p.subject ?? "")} {String(p.relation ?? "")} {String(p.object ?? "")} — {String(p.status ?? "")} ({String(p.independent_sources ?? "?")})
               </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** risk_alert body (§18.3 card contract): the event with its corroboration,
+ * the matched exposure, the LINKED sizing experiment, the impact block
+ * (pending until the run completes — then min/max/mean with the run
+ * citation, straight from applied_result), and the §17.3 action chips —
+ * everything from payload/applied_result, never recomputed client-side. */
+function RiskAlert({ payload, appliedResult }: {
+  payload: Record<string, unknown>;
+  appliedResult: Record<string, unknown> | null;
+}) {
+  const event = (payload.event ?? {}) as Record<string, unknown>;
+  const subject = (event.subject ?? {}) as Record<string, unknown>;
+  const corroboration = (event.corroboration ?? {}) as Record<string, unknown>;
+  const matches = Array.isArray(payload.matched_entities) ? (payload.matched_entities as Array<Record<string, unknown>>) : [];
+  const linked = (payload.linked_experiment ?? {}) as Record<string, unknown>;
+  const chips = Array.isArray(payload.recommended_actions) ? (payload.recommended_actions as Array<Record<string, unknown>>) : [];
+  // The impact law (§18.3): applied_result.impact is the only complete source.
+  const impact = ((appliedResult?.impact ?? payload.impact ?? {}) as Record<string, unknown>);
+  const impactComplete = String(impact.status ?? "") === "complete";
+  return (
+    <div className="space-y-2 text-[12.5px]">
+      <div>
+        <span className="font-medium capitalize">{String(payload.severity ?? "")}</span>
+        {" · "}
+        <span className="capitalize">{String(event.event_type ?? "")}</span> at{" "}
+        <span className="font-medium">{String(subject.name ?? "")}</span>
+        {subject.lei ? <span className="font-mono text-muted-foreground"> (LEI {String(subject.lei)})</span> : null}
+        {" — "}
+        {String(corroboration.status ?? "")} ({String(corroboration.independent_sources ?? "?")} source(s)
+        {Number(corroboration.authoritative_sources ?? 0) > 0
+          ? `, ${String(corroboration.authoritative_sources)} authoritative`
+          : ""})
+      </div>
+      {matches.length > 0 && (
+        <div>
+          <span className="font-medium">Matched exposure:</span>
+          <ul className="ml-4 list-disc">
+            {matches.map((m, i) => (
+              <li key={i}>
+                {String(m.kind ?? "").replace(/_/g, " ")}: {String(m.entity_name ?? m.entity_id ?? "")}{" "}
+                <span className="font-mono text-muted-foreground">({String(m.entity_id ?? "")})</span>
+                {Array.isArray(m.sole_source_materials) && (m.sole_source_materials as unknown[]).length > 0
+                  ? ` — sole-sources ${(m.sole_source_materials as string[]).join(", ")}`
+                  : ""}
+                {m.map_status ? ` [${String(m.map_status)} map triple]` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div>
+        <span className="font-medium">Linked sizing run:</span>{" "}
+        {String(linked.scenario_name ?? "")} · {String(linked.replications ?? "?")} reps ·{" "}
+        {String(linked.horizon_days ?? "?")} days — dispatches through the Experiment Designer's gate on approval.
+      </div>
+      <div className={cn("rounded px-2 py-1.5", impactComplete ? "bg-emerald-500/10" : "bg-muted")}>
+        <span className="font-medium">Impact:</span>{" "}
+        {impactComplete
+          ? `${String(impact.kpi ?? "")} ${String(impact.min)}–${String(impact.max)} (mean ${String(impact.mean)}, ${String(impact.replications)} reps; run ${String(impact.run_id ?? "")})`
+          : "pending — simulation results only; fills after the linked run completes"}
+      </div>
+      {chips.length > 0 && (
+        <div className="text-[11.5px] text-muted-foreground">
+          <span className="font-medium">Recommended actions:</span>
+          <ul className="ml-4 list-disc">
+            {chips.map((c, i) => (
+              <li key={i}>{String(c.label ?? "")} — {String(c.reason ?? "")}</li>
             ))}
           </ul>
         </div>
@@ -536,6 +613,14 @@ function ProposalBody({ proposal }: { proposal: Proposal }) {
   }
   if (proposal.artifact_type === "decision_report" && (payload as DecisionReportPayload).template_id) {
     return <DecisionReportSpec payload={payload as DecisionReportPayload} />;
+  }
+  if (proposal.artifact_type === "risk_alert" && (payload as { event?: unknown }).event) {
+    return (
+      <RiskAlert
+        payload={payload as Record<string, unknown>}
+        appliedResult={(proposal.applied_result ?? null) as Record<string, unknown> | null}
+      />
+    );
   }
   const narrative = (payload as { narrative_md?: string; explanation_md?: string });
   const text = narrative.explanation_md ?? narrative.narrative_md;

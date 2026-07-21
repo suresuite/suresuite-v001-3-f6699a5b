@@ -1,0 +1,108 @@
+{
+  "id": "ra-08-impact-from-run",
+  "description": "ai-agents.md §18.3 ra-08 — the impact law end-to-end: while the linked run is not done the alert's impact stays pending (fill returns null, get_risk_alerts says pending); once the run completes, fillRiskAlertImpact writes {kpi, min, max, mean, replications, run_id} BYTE-EQUAL to values recomputed from the fixture's run_replications rows, with the run citation, exactly once (idempotent) through the service-role-only update_risk_alert_impact RPC; and draft_risk_alert has NO impact parameter — a model-supplied range is a schema violation.",
+  "project_snapshot": {
+    "reuse": "ra-03-authoritative-single",
+    "patch": {
+      "simulation_runs": [
+        {
+          "id": "99999999-9999-4999-8999-999999999901",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "scenario_id": "55555555-5555-4555-8555-555555555599",
+          "status": "running",
+          "rep_count_done": 3,
+          "rep_count_target": 3,
+          "policy_version_id": "44444444-4444-4444-8444-444444444401",
+          "policy_hash": "ph-run",
+          "graph_hash": "graph-hash-1",
+          "scenario_hash": "scen-55555555-5555-4555-8555-555555555599",
+          "created_at": 100
+        }
+      ],
+      "run_replications": [
+        {
+          "run_id": "99999999-9999-4999-8999-999999999901",
+          "rep_index": 0,
+          "status": "done",
+          "kpis": { "fill_rate": 0.62, "total_cost": 10500 }
+        },
+        {
+          "run_id": "99999999-9999-4999-8999-999999999901",
+          "rep_index": 1,
+          "status": "done",
+          "kpis": { "fill_rate": 0.71, "total_cost": 9800 }
+        },
+        {
+          "run_id": "99999999-9999-4999-8999-999999999901",
+          "rep_index": 2,
+          "status": "done",
+          "kpis": { "fill_rate": 0.66, "total_cost": 10100 }
+        }
+      ],
+      "proposals": [
+        {
+          "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01",
+          "project_id": "11111111-1111-4111-8111-111111111111",
+          "agent_id": "disruption-sentinel",
+          "artifact_type": "risk_alert",
+          "title": "Risk alert: insolvency at Acme Alloys GmbH",
+          "status": "applied",
+          "provenance": "llm_drafted",
+          "payload": {
+            "schema_version": 1,
+            "prompt_version": 1,
+            "event": {
+              "event_type": "insolvency",
+              "subject": { "name": "Acme Alloys GmbH", "lei": null },
+              "corroboration": {
+                "status": "verified",
+                "independent_sources": 1,
+                "authoritative_sources": 1
+              }
+            },
+            "severity": "critical",
+            "impact": { "status": "pending" }
+          },
+          "citations": [],
+          "grounding": {},
+          "apply_attempts": 1,
+          "apply_error": null,
+          "applied_result": {
+            "recorded": true,
+            "linked_proposal_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02",
+            "run_id": "99999999-9999-4999-8999-999999999901",
+            "scenario_id": "55555555-5555-4555-8555-555555555599",
+            "policy_version_id": "44444444-4444-4444-8444-444444444401",
+            "policy_hash": "ph-run",
+            "graph_hash": "graph-hash-1",
+            "replications": 3,
+            "impact": {
+              "status": "pending",
+              "note": "Impact ranges are simulation results only — this alert shows none until the linked run completes."
+            }
+          },
+          "created_at": 90
+        }
+      ]
+    }
+  },
+  "utterance": "Did the sizing run for the Acme alert finish?",
+  "docs": [],
+  "expect": {
+    "run_id": "99999999-9999-4999-8999-999999999901",
+    "impact": {
+      "status": "complete",
+      "kpi": "fill_rate",
+      "min": 0.62,
+      "max": 0.71,
+      "mean": 0.663333,
+      "replications": 3
+    },
+    "citation": {
+      "kind": "table_rows",
+      "ref": "run_replications",
+      "rows": ["99999999-9999-4999-8999-999999999901"]
+    }
+  },
+  "retired_reason": null
+}

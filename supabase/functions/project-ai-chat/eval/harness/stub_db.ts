@@ -281,6 +281,28 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       }
       return null;
     },
+    // ── Phase 4d mirror (SQL original: 20260728000001_disruption_sentinel) ──
+    // The ONLY writer of a complete risk-alert impact block (§18.3 hard
+    // gate 8): fills a pending impact exactly once, applied risk_alerts only.
+    update_risk_alert_impact: (args) => {
+      const impact = (args.p_impact ?? {}) as Row;
+      if (String(impact.status ?? "") !== "complete" || !impact.run_id) {
+        throw new Error("impact must be a complete impact object with a run_id");
+      }
+      const p = tables.proposals.find((r) =>
+        String(r.id) === String(args.p_proposal_id) && String(r.artifact_type) === "risk_alert"
+      );
+      if (!p) throw new Error(`risk_alert proposal ${args.p_proposal_id} not found`);
+      if (p.status === "applied") {
+        const stored = (p.applied_result ?? {}) as Row;
+        const current = (stored.impact ?? {}) as Row;
+        if (String(current.status ?? "pending") === "pending") {
+          p.applied_result = { ...stored, impact: structuredClone(impact) };
+        }
+      }
+      return structuredClone(p.applied_result);
+    },
+
     // ── Phase 4b mirrors (SQL originals: 20260727000001_network_cartographer
     //    + 20260705000002_assign_material_supplier) ─────────────────────────
     record_external_evidence: (args) => {

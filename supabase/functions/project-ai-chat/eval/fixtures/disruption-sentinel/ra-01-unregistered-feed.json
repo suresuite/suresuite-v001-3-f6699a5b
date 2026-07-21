@@ -1,0 +1,27 @@
+{
+  "id": "ra-01-unregistered-feed",
+  "description": "ai-agents.md §18.3 ra-01 — an unregistered source AND an extraction-only (non-sensing) source are both refused by the registry guard naming the registered SENSING ids; no evidence row is stored and no extraction call is made (the §18.5 law).",
+  "project_snapshot": { "reuse": "ra-03-authoritative-single" },
+  "utterance": "Assess this article from my favourite blog",
+  "docs": [
+    {
+      "source_id": "acme-blog",
+      "title": "Blog post",
+      "text": "A large fire has reportedly damaged the main production hall of Acme Alloys GmbH according to unverified social media posts circulating this morning.",
+      "extraction": { "entities": [], "triples": [] }
+    },
+    {
+      "source_id": "sec-edgar",
+      "title": "10-K excerpt",
+      "text": "A large fire has reportedly damaged the main production hall of Acme Alloys GmbH according to a risk-factor disclosure in the company's annual filing.",
+      "extraction": { "entities": [], "triples": [] }
+    }
+  ],
+  "expect": {
+    "error_code": "invalid_params",
+    "reason_includes": "sensing",
+    "names_registered_source": "gdacs",
+    "evidence_rows": 0
+  },
+  "retired_reason": null
+}

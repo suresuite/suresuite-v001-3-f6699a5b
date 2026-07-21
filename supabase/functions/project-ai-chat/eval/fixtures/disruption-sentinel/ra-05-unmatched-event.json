@@ -1,0 +1,31 @@
+{
+  "id": "ra-05-unmatched-event",
+  "description": "ai-agents.md §18.3 ra-05 — a VERIFIED event (authoritative insolvency entry) about a firm with no project exposure: the assessment honestly reports 'no exposure found' with the checked entity inventory, and a draft attempt is refused not_grounded listing the same; no proposal.",
+  "project_snapshot": { "reuse": "ra-03-authoritative-single" },
+  "utterance": "The register lists Tessin Polymer as insolvent - are we exposed?",
+  "docs": [
+    {
+      "source_id": "insolvency-register-de",
+      "title": "Insolvenzbekanntmachung: Tessin Polymer SA",
+      "text": "Amtsgericht Muenchen - Insolvenzbekanntmachung. Insolvency proceedings (Insolvenzverfahren) have been opened over the assets of Tessin Polymer SA. Creditors are requested to file their claims with the appointed administrator.",
+      "extraction": {
+        "entities": [
+          { "type": "Company", "text": "Tessin Polymer SA" }
+        ],
+        "triples": []
+      }
+    }
+  ],
+  "expect": {
+    "event_type": "insolvency",
+    "status": "verified",
+    "authoritative_sources": 1,
+    "subject_lei": "506700TESSINPL000099",
+    "matches": "none",
+    "checked": "suppliers:1;materials:1;mapped_triples:0",
+    "draft_error_code": "not_grounded",
+    "draft_reason_includes": "no exposure found",
+    "proposals": 0
+  },
+  "retired_reason": null
+}
