@@ -353,11 +353,37 @@ export function supplierIdFor(name: string, lei: string | null): string {
   return `ext-${slug || "unnamed"}`;
 }
 
+/** v1 ops plus the §18.2 v2 product-level ops (CARTOGRAPHER_PRODUCT_LEVEL):
+ * `add_bom_line` decomposes a verified firm-level edge into a product ×
+ * material BOM line with a method-estimated consumption rate; and
+ * `add_outbound_lane` seeds a structural product → customer lane from
+ * verified SuppliesTo evidence about the shipping firm (economics are NEVER
+ * estimated — no registered method targets demand; they stay NULL for the
+ * firm's own data). */
+export type MapRowOp =
+  | "add_supplier"
+  | "add_supply_link"
+  | "add_bom_line"
+  | "add_outbound_lane";
+
 export interface MapRowInput {
-  op: "add_supplier" | "add_supply_link";
+  op: MapRowOp;
+  /** The evidence SUBJECT: the supplier for v1 ops and add_bom_line (the
+   * firm whose verified Produces grounds the material), the shipping firm
+   * for add_outbound_lane. */
   supplier_name: string;
   lei?: string;
   material_id?: string;
+  /** v2: an EXISTING project product (add_bom_line / add_outbound_lane). */
+  product_id?: string;
+  /** v2 add_outbound_lane: the customer named as the SuppliesTo object. */
+  customer_name?: string;
+  /** v2 add_bom_line: the estimated r_{p,m} — method "<id>@<version>" from
+   * the rate registry; rate/rate_low/rate_high recomputed server-side. */
+  rate_method?: string;
+  rate?: number;
+  rate_low?: number;
+  rate_high?: number;
   evidence_ids: string[];
   why?: string;
 }
@@ -446,8 +472,11 @@ export function verifyMapRow(
       };
     }
   }
-  // …with the op's qualifying relation present among the citations.
-  const wantRelation: RelationType = row.op === "add_supplier" ? "SuppliesTo" : "Produces";
+  // …with the op's qualifying relation present among the citations:
+  // SuppliesTo grounds a supplier or an outbound lane (the subject ships);
+  // Produces grounds a material link or a BOM line (the subject makes it).
+  const wantRelation: RelationType =
+    row.op === "add_supplier" || row.op === "add_outbound_lane" ? "SuppliesTo" : "Produces";
   const qualifying = cited.find((ev) => ev.triple.relation === wantRelation);
   if (!qualifying) {
     return {
@@ -458,10 +487,25 @@ export function verifyMapRow(
         `none of the cited rows states that relation`,
     };
   }
-  if (row.op === "add_supply_link") {
+  if (row.op === "add_supply_link" || row.op === "add_bom_line") {
     const objNorm = normalizeEntityName(qualifying.triple.object.name);
     if (!objNorm) {
       return { ok: false, code: "not_grounded", reason: "the cited Produces evidence names no object" };
+    }
+  }
+  if (row.op === "add_outbound_lane") {
+    // The SuppliesTo object must be the named customer — the citation must
+    // match the claim (§18.2 hard gate 1 applied to the lane target).
+    const objNorm = normalizeEntityName(qualifying.triple.object.name);
+    const wantNorm = normalizeEntityName(row.customer_name ?? "");
+    if (!objNorm || !wantNorm || objNorm !== wantNorm) {
+      return {
+        ok: false,
+        code: "not_grounded",
+        reason:
+          `the verified SuppliesTo evidence names "${qualifying.triple.object.name}" as the ` +
+          `customer, not "${row.customer_name ?? ""}" — the citation does not match the claim`,
+      };
     }
   }
 

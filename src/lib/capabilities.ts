@@ -68,7 +68,7 @@ export type FeatureKey =
   // 20260727000001_network_cartographer.sql):
   | 'agent_network_cartographer'
   // v1.5 Phase 4d (ai-agents.md §18.3/§13.1; seeded in
-  // 20260728000001_disruption_sentinel.sql):
+  // 20260729000001_disruption_sentinel.sql):
   | 'agent_disruption_sentinel';
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [

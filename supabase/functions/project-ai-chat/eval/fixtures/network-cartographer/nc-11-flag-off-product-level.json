@@ -1,0 +1,45 @@
+{
+  "id": "nc-11-flag-off-product-level",
+  "description": "ai-agents.md \u00a718.2 v2 nc-11 \u2014 CARTOGRAPHER_PRODUCT_LEVEL off (DEFAULT): v2 ops are refused with the byte-identical v1 message, get_bom_rate_estimates is refused naming the flag, the declared tool surface stays the v1 four, the v1 prompt template is byte-identical, and a stored v2 payload does not apply (gate_blocked naming the flag).",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "PRD-INV",
+        "name": "industrial inverters",
+        "sell_price": 400.0,
+        "demand_mean": 100.0
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules",
+        "cost": 120
+      }
+    ],
+    "external_evidence": []
+  },
+  "utterance": "Decompose the mapped edges into BOM lines",
+  "docs": [],
+  "expect": {
+    "draft_error_code": "invalid_params",
+    "draft_reason_includes": "v1 supports add_supplier and add_supply_link",
+    "tool_error_code": "invalid_params",
+    "tool_reason_includes": "CARTOGRAPHER_PRODUCT_LEVEL",
+    "apply_error_code": "gate_blocked",
+    "apply_reason_includes": "CARTOGRAPHER_PRODUCT_LEVEL",
+    "v1_declarations": 4,
+    "v2_declarations": 5,
+    "proposals": 0
+  },
+  "retired_reason": null
+}
