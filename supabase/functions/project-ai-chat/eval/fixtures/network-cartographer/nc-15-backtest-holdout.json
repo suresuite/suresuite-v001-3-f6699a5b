@@ -1,0 +1,253 @@
+{
+  "id": "nc-15-backtest-holdout",
+  "description": "ai-agents.md \u00a718.2 v2 nc-15 \u2014 the held-out real-BOM back-test: observed consumption rates are scored against each prior method's declared interval per-row (hold-out by construction: no rate method reads the target pair's own rate); coverage < 0.5 demotes the method on this project, misses are reported per-row, a draft citing the demoted method is not_grounded, and a draft via the surviving method files.",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "PRD-INV",
+        "name": "industrial inverters",
+        "sell_price": 400.0,
+        "demand_mean": 100.0
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules",
+        "cost": 120
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-CTH",
+        "name": "battery cathodes",
+        "cost": 80
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-RES",
+        "name": "epoxy resin",
+        "cost": 10
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-STL",
+        "name": "cold-rolled steel",
+        "cost": 25
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S-HELIX",
+        "name": "Helix Drives GmbH"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "supplier_id": "S-HELIX",
+        "material_id": "MAT-STL",
+        "unit_price": 25,
+        "lead_time": 2,
+        "volume": 300,
+        "time_unit": "week"
+      }
+    ],
+    "outbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "product_id": "PRD-INV",
+        "customer_id": "CUST-EU",
+        "volume": 100.0,
+        "time_unit": "week",
+        "unit_price": 400.0
+      }
+    ],
+    "bom_single_level": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "product_id": "PRD-INV",
+        "material_id": "MAT-PM",
+        "consumption_rate": 0.45
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "product_id": "PRD-INV",
+        "material_id": "MAT-CTH",
+        "consumption_rate": 0.7
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "product_id": "PRD-INV",
+        "material_id": "MAT-RES",
+        "consumption_rate": 2.0
+      }
+    ],
+    "external_evidence": [
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000003061",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "news-wire",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-news-wire-061",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Kestrel Foundry Ltd",
+            "lei": "213800KESTRELF000112"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "cold-rolled steel",
+            "type": "Material"
+          },
+          "quote": "Kestrel Foundry Ltd produces cold-rolled steel at its Sheffield mill."
+        },
+        "lei": "213800KESTRELF000112"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000003062",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "sec-edgar",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-sec-edgar-062",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.9,
+        "triple": {
+          "subject": {
+            "name": "Kestrel Foundry Ltd",
+            "lei": "213800KESTRELF000112"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "cold-rolled steel",
+            "type": "Material"
+          },
+          "quote": "Kestrel Foundry Ltd produces cold-rolled steel at its Sheffield mill."
+        },
+        "lei": "213800KESTRELF000112"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000003063",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "lksg-csrd-disclosures",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-lksg-csrd-disclosures-063",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Kestrel Foundry Ltd",
+            "lei": "213800KESTRELF000112"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "cold-rolled steel",
+            "type": "Material"
+          },
+          "quote": "Kestrel Foundry Ltd produces cold-rolled steel at its Sheffield mill."
+        },
+        "lei": "213800KESTRELF000112"
+      }
+    ]
+  },
+  "utterance": "Estimate the steel consumption rate for the inverters",
+  "docs": [],
+  "evidence_ids": {
+    "produces": [
+      "eeeeeeee-0000-4000-8000-000000003061",
+      "eeeeeeee-0000-4000-8000-000000003062",
+      "eeeeeeee-0000-4000-8000-000000003063"
+    ]
+  },
+  "expect": {
+    "io_backtest": {
+      "n": 3,
+      "covered": 0,
+      "demoted": true,
+      "outliers": 3
+    },
+    "spend_backtest": {
+      "n": 3,
+      "covered": 2,
+      "demoted": false,
+      "outliers": 1
+    },
+    "spend_stl": {
+      "method": "rate_spend_implied@1",
+      "value": 2.2,
+      "low": 1.8,
+      "high": 2.48,
+      "basis": "prior_range"
+    },
+    "io_stl": {
+      "method": "rate_io_technical_coefficient@1",
+      "value": 3.84,
+      "low": 2.4,
+      "high": 5.6
+    },
+    "demoted_error_code": "not_grounded",
+    "demoted_reason_includes": "demoted",
+    "backtest_rows": [
+      {
+        "pair": "PRD-INV\u00d7MAT-PM",
+        "actual": 0.45,
+        "io": [
+          0.7333333333333334,
+          1.5
+        ],
+        "io_hit": false,
+        "spend": [
+          0.375,
+          0.5166666666666666
+        ],
+        "spend_hit": true
+      },
+      {
+        "pair": "PRD-INV\u00d7MAT-CTH",
+        "actual": 0.7,
+        "io": [
+          0.8999999999999999,
+          2.0
+        ],
+        "io_hit": false,
+        "spend": [
+          0.5625,
+          0.775
+        ],
+        "spend_hit": true
+      },
+      {
+        "pair": "PRD-INV\u00d7MAT-RES",
+        "actual": 2.0,
+        "io": [
+          4.0,
+          11.200000000000001
+        ],
+        "io_hit": false,
+        "spend": [
+          4.5,
+          6.2
+        ],
+        "spend_hit": false
+      }
+    ],
+    "supplier_id": "213800KESTRELF000112"
+  },
+  "retired_reason": null
+}

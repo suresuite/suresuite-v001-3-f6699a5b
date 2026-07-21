@@ -1,0 +1,72 @@
+{
+  "slice_version": 1,
+  "retrieved_at": "2026-07-21",
+  "note": "B8 v2 sector input-output technical-coefficient seed slice (ai-agents.md §18.2 v2, §18.5 role `prior`). SEED VALUES PENDING OWNER-CONFIRMED REFRESH. Each row is a monetary technical coefficient a (EUR of the input sector consumed per EUR of the output sector's production) with the source dataset and vintage named verbatim for citations; the rate method converts it to physical units via the product/material price ratio (r = a x u_p / c_m). Free-tier sources only; never fetched at runtime - this file is code, reviewed and versioned like code (the leiSeed.json / estimatorBenchmarks.json discipline). Changing any row requires bumping the consuming rate method's version in estimators.ts (§18.1 failure-mode law). match_tokens are matched against the NORMALIZED material name; the composite row (empty match_tokens) is the deterministic fallback.",
+  "rows": [
+    {
+      "id": "io_semiconductors_electronics",
+      "sector": "computer & electronic products (CPA C26)",
+      "match_tokens": ["semiconductor", "power module", "power modules", "chip", "electronic", "inverter", "pcb", "sensor"],
+      "dataset": "Eurostat FIGARO Supply-Use/Input-Output tables - technical coefficient, computer/electronic products (C26) into machinery & equipment output",
+      "vintage": 2021,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "share",
+      "value": 0.32,
+      "low": 0.22,
+      "high": 0.45
+    },
+    {
+      "id": "io_battery_electrical",
+      "sector": "electrical equipment & battery components (CPA C27)",
+      "match_tokens": ["battery", "cathode", "cathodes", "anode", "lithium", "cell"],
+      "dataset": "EXIOBASE 3.8.2 - technical coefficient, electrical equipment (C27) intermediate inputs into transport-equipment output",
+      "vintage": 2022,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "share",
+      "value": 0.28,
+      "low": 0.18,
+      "high": 0.4
+    },
+    {
+      "id": "io_basic_metals",
+      "sector": "basic & fabricated metals (CPA C24-C25)",
+      "match_tokens": ["steel", "aluminium", "aluminum", "metal", "casting", "forging", "frame"],
+      "dataset": "OECD Inter-Country Input-Output (ICIO) tables - technical coefficient, basic metals (C24) into fabricated products & machinery output",
+      "vintage": 2021,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "share",
+      "value": 0.24,
+      "low": 0.15,
+      "high": 0.35
+    },
+    {
+      "id": "io_chemicals_polymers",
+      "sector": "chemicals & plastics (CPA C20/C22)",
+      "match_tokens": ["resin", "polymer", "plastic", "chemical", "epoxy", "coating", "adhesive"],
+      "dataset": "Eurostat FIGARO Supply-Use/Input-Output tables - technical coefficients, chemicals (C20) and rubber/plastics (C22) into manufacturing output",
+      "vintage": 2021,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "share",
+      "value": 0.18,
+      "low": 0.1,
+      "high": 0.28
+    },
+    {
+      "id": "io_composite_manufacturing",
+      "sector": "manufacturing composite (CPA C10-C33) - fallback when no sector row matches",
+      "match_tokens": [],
+      "dataset": "OECD Inter-Country Input-Output (ICIO) tables - average single-input intermediate coefficient, manufacturing composite (C10-C33)",
+      "vintage": 2021,
+      "role": "prior",
+      "license_tier": "free",
+      "kind": "share",
+      "value": 0.21,
+      "low": 0.12,
+      "high": 0.33
+    }
+  ]
+}

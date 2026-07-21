@@ -1,0 +1,181 @@
+{
+  "id": "nc-12-rate-methods",
+  "description": "ai-agents.md \u00a718.2 v2 nc-12 \u2014 the three registered r_{p,m} methods recompute deterministically with {value, low, high, basis} on every rate: observed-consumption (flow \u00f7 output, sole consumer), IO technical coefficient (a \u00d7 u_p/c_m from the checked-in seed slice, dataset + vintage cited), spend \u00f7 unit-price implied. A rate off by 0.01 is not_grounded naming the recomputation; a missing interval is invalid_params; no proposal either way.",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "products": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "product_id": "PRD-INV",
+        "name": "industrial inverters",
+        "sell_price": 400.0,
+        "demand_mean": 100.0
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules",
+        "cost": 120
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-CTH",
+        "name": "battery cathodes",
+        "cost": 80
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-RES",
+        "name": "epoxy resin",
+        "cost": 10
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S-HELIX",
+        "name": "Helix Drives GmbH"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "supplier_id": "S-HELIX",
+        "material_id": "MAT-PM",
+        "unit_price": 120,
+        "lead_time": 2,
+        "volume": 250,
+        "time_unit": "week"
+      }
+    ],
+    "outbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "product_id": "PRD-INV",
+        "customer_id": "CUST-EU",
+        "volume": 100.0,
+        "time_unit": "week",
+        "unit_price": 400.0
+      }
+    ],
+    "bom_single_level": [],
+    "external_evidence": [
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000001011",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "news-wire",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-news-wire-011",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "power modules",
+            "type": "Material"
+          },
+          "quote": "Nordwind Semiconductor GmbH produces power modules."
+        },
+        "lei": "529900NORDWIND000044"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000001012",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "sec-edgar",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-sec-edgar-012",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.9,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "power modules",
+            "type": "Material"
+          },
+          "quote": "Nordwind Semiconductor GmbH produces power modules."
+        },
+        "lei": "529900NORDWIND000044"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000001013",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "lksg-csrd-disclosures",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-lksg-csrd-disclosures-013",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "power modules",
+            "type": "Material"
+          },
+          "quote": "Nordwind Semiconductor GmbH produces power modules."
+        },
+        "lei": "529900NORDWIND000044"
+      }
+    ]
+  },
+  "utterance": "Estimate the consumption rates for the mapped materials",
+  "docs": [],
+  "evidence_ids": {
+    "produces": [
+      "eeeeeeee-0000-4000-8000-000000001011",
+      "eeeeeeee-0000-4000-8000-000000001012",
+      "eeeeeeee-0000-4000-8000-000000001013"
+    ]
+  },
+  "expect": {
+    "observed": {
+      "method": "rate_observed_consumption@1",
+      "value": 2.5,
+      "low": 2.5,
+      "high": 2.5,
+      "basis": "direct_sum"
+    },
+    "io": {
+      "method": "rate_io_technical_coefficient@1",
+      "value": 1.0666666666666667,
+      "low": 0.7333333333333334,
+      "high": 1.5,
+      "basis": "prior_range",
+      "dataset_includes": "Eurostat FIGARO",
+      "vintage": "2021"
+    },
+    "spend": {
+      "method": "rate_spend_implied@1",
+      "value": 0.6111111111111112,
+      "low": 0.5,
+      "high": 0.6888888888888889,
+      "basis": "prior_range"
+    },
+    "mismatch_error_code": "not_grounded",
+    "mismatch_reason_includes": "does not match the recomputed",
+    "missing_interval_code": "invalid_params",
+    "missing_interval_reason_includes": "rate, rate_low and rate_high are mandatory",
+    "proposals": 0
+  },
+  "retired_reason": null
+}

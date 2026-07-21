@@ -49,7 +49,7 @@ import {
 import {
   buildCartographerContext,
   CARTOGRAPHER_AGENT_ID,
-  cartographerToolDeclarations,
+  cartographerToolDeclarationList,
 } from "./cartographerTools.ts";
 import { getProjectMemoryDeclaration, memoryEnabled } from "./memory.ts";
 
@@ -98,8 +98,10 @@ export const AGENT_TURNS: Record<string, AgentSpec> = {
     name: "Network Cartographer",
     buildContext: (ctx, args) => buildCartographerContext(ctx, args),
     // §14.4: get_project_memory joins every agent's surface when M2 is on.
+    // §18.2 v2: get_bom_rate_estimates joins only under
+    // CARTOGRAPHER_PRODUCT_LEVEL (flag off ⇒ byte-identical v1 surface).
     tools: () => [
-      ...cartographerToolDeclarations,
+      ...cartographerToolDeclarationList(),
       ...(memoryEnabled() ? [getProjectMemoryDeclaration] : []),
     ],
   },
