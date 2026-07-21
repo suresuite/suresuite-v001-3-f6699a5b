@@ -345,6 +345,92 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       }
       return null;
     },
+    // ── Phase 4c mirrors (SQL originals: 20260728000001_cartographer_product
+    //    _level) — the BOM-line / outbound-lane assign sequence, WHERE-NOT-
+    //    EXISTS idempotent like assign_material_supplier above. ────────────
+    assign_bom_line: (args) => {
+      const productId = String(args.p_product_id ?? "");
+      const materialId = String(args.p_material_id ?? "");
+      const rate = Number(args.p_rate);
+      if (!productId || !materialId) throw new Error("product_id and material_id are required");
+      if (!Number.isFinite(rate) || rate <= 0) {
+        throw new Error("consumption rate must be > 0 (BomLine.rate is a hard engine constraint)");
+      }
+      const project = (tables.projects ?? []).find((p) => String(p.id) === String(args.p_project_id));
+      if (!project) throw new Error("project_not_found");
+      const plant = String(project.plant_name ?? "");
+      const bom = tables.bom_single_level ?? (tables.bom_single_level = []);
+      if (!bom.some((b) =>
+        String(b.project_id) === String(args.p_project_id) &&
+        String(b.product_id) === productId && String(b.material_id) === materialId
+      )) {
+        bom.push({ project_id: args.p_project_id, plant_name: plant, product_id: productId, material_id: materialId, consumption_rate: rate });
+      }
+      const edges = tables.supply_chain_data ?? (tables.supply_chain_data = []);
+      if (!edges.some((e) =>
+        String(e.project_id) === String(args.p_project_id) &&
+        String(e.data_source) === "bom" &&
+        String(e.from_location) === materialId && String(e.to_location) === productId
+      )) {
+        edges.push({
+          project_id: args.p_project_id, plant_name: plant, data_source: "bom",
+          from_location: materialId, to_location: productId,
+          material_consumption_rate: rate, sourcing_ratio: 1.0, weighted: 0,
+          uploaded_by: args.p_user_id ?? null, organization: project.organization ?? null,
+        });
+      }
+      return null;
+    },
+    assign_outbound_customer: (args) => {
+      const productId = String(args.p_product_id ?? "");
+      const customerId = String(args.p_customer_id ?? "");
+      if (!productId || !customerId) throw new Error("product_id and customer_id are required");
+      const project = (tables.projects ?? []).find((p) => String(p.id) === String(args.p_project_id));
+      if (!project) throw new Error("project_not_found");
+      const plant = String(project.plant_name ?? "");
+      const lanes = tables.outbound_logistics ?? (tables.outbound_logistics = []);
+      if (!lanes.some((l) =>
+        String(l.project_id) === String(args.p_project_id) &&
+        String(l.product_id) === productId && String(l.customer_id) === customerId
+      )) {
+        lanes.push({ project_id: args.p_project_id, plant_name: plant, product_id: productId, customer_id: customerId });
+      }
+      const edges = tables.supply_chain_data ?? (tables.supply_chain_data = []);
+      if (!edges.some((e) =>
+        String(e.project_id) === String(args.p_project_id) &&
+        String(e.data_source) === "outbound" &&
+        String(e.from_location) === productId && String(e.to_location) === customerId
+      )) {
+        edges.push({
+          project_id: args.p_project_id, plant_name: plant, data_source: "outbound",
+          from_location: productId, to_location: customerId,
+          material_consumption_rate: 0, sourcing_ratio: 1.0, weighted: 0,
+          uploaded_by: args.p_user_id ?? null, organization: project.organization ?? null,
+        });
+      }
+      return null;
+    },
+    // G16 self-verification read paths (blueprint §12). The SQL originals
+    // filter by the caller's org via set_current_user_context; the mirror's
+    // caller IS the project owner, so it returns the seeded projects.
+    list_projects: () => structuredClone(tables.projects ?? []),
+    get_project_dataset_status: (args) => {
+      const project = (tables.projects ?? []).find((p) => String(p.id) === String(args.p_project_id));
+      if (!project) throw new Error("project_not_found");
+      const inProject = (t: string) =>
+        (tables[t] ?? []).some((r) => String(r.project_id) === String(args.p_project_id));
+      const hasBom = inProject("bom_single_level") || inProject("bom_multi_level");
+      const hasInbound = inProject("inbound_logistics");
+      const hasOutbound = inProject("outbound_logistics");
+      return {
+        bom_level: project.bom_level ?? "single",
+        deep_tier_enabled: false,
+        has_bom: hasBom,
+        has_inbound: hasInbound,
+        has_outbound: hasOutbound,
+        completed: hasBom && hasInbound && hasOutbound,
+      };
+    },
 
     bulk_upsert_materials: upsert("materials", "material_id", {
       lead_time_dist: ["deterministic", "lognormal", "gamma"],

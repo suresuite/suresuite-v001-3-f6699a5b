@@ -46,6 +46,7 @@ import {
   parseDisambiguationResponse,
   parseNerResponse,
   parseReResponse,
+  supplierIdFor,
   tallyEvidence,
   VERIFY_MIN_SOURCES,
   verifyMapRow,
@@ -67,11 +68,30 @@ import {
 import { canonicalJson, sha256Hex } from "./telemetry.ts";
 import { deploymentEnabledAgents } from "./router.ts";
 import { resolveModel } from "./providers.ts";
+import { loadGateDataset } from "../_shared/validationGate.ts";
+import { loadPolicyDefaults } from "../_shared/itemMasterCandidates.ts";
+import { normalizeBomRows } from "../_shared/grading.ts";
+import {
+  backTestRateMethod,
+  BENCHMARK_TABLE_VERSION,
+  checkMassBalance,
+  IO_SEED_VERSION,
+  MASS_BALANCE_TOLERANCE,
+  RATE_ESTIMATOR_METHODS,
+  rateCandidates,
+  rateMethodRef,
+  verifyRateRow,
+  type EstimatorInputs,
+  type RatePair,
+} from "../_shared/estimators.ts";
 
 export const CARTOGRAPHER_AGENT_ID = "network-cartographer";
 export const CARTOGRAPHER_ARTIFACT_TYPE = "network_map_diff";
 /** §10 Q10: prompt versioning — bumped on any §18.2 template change. */
 export const CARTOGRAPHER_PROMPT_VERSION = 1;
+/** §18.2 v2: the product-level template (flag on) is its own version — flag
+ * off stays byte-identical at version 1. */
+export const CARTOGRAPHER_PROMPT_VERSION_V2 = 2;
 
 /** §18.2 v1 size caps (DEFAULT). */
 export const MAX_MAP_ROWS = 100;
@@ -97,6 +117,17 @@ export function liveFetchEnabled(): boolean {
 export function gleifLiveEnabled(): boolean {
   return (Deno.env.get("CARTOGRAPHER_GLEIF_LIVE") ?? "").trim().toLowerCase() === "true";
 }
+
+/** Flag (default OFF): §18.2 v2 product-level decomposition — the
+ * add_bom_line / add_outbound_lane ops, the get_bom_rate_estimates tool and
+ * the v2 prompt block. Off ⇒ byte-identical v1 firm-level behavior. */
+export function productLevelEnabled(): boolean {
+  return (Deno.env.get("CARTOGRAPHER_PRODUCT_LEVEL") ?? "").trim().toLowerCase() === "true";
+}
+
+/** §18.2 v2 caps (DEFAULT). */
+export const MAX_RATE_PAIRS = 200;
+export const RATE_METHODS_BUDGET_BYTES = 4 * 1024;
 
 // ---------- declarations (§18.2 schemas, provider-safe subset) ----------
 
@@ -165,6 +196,21 @@ export const draftNetworkMapDiffDeclaration: ToolDeclaration = {
   },
 };
 
+/** §18.2 v2 (flag-gated): candidate consumption rates for missing product ×
+ * material BOM pairs, computed by the registered rate-method registry. */
+export const getBomRateEstimatesDeclaration: ToolDeclaration = {
+  name: "get_bom_rate_estimates",
+  description:
+    "Compute candidate BOM consumption rates r (units of material per unit of product) for product x material pairs that have no BOM line yet. The platform's versioned rate-method registry derives, per pair and per applicable method, a rate with a REQUIRED uncertainty interval [low, high], its basis, sources (dataset + vintage) and assumptions. Methods demoted by this project's BOM back-test are marked and must not be proposed. Copy rate, low and high EXACTLY into add_bom_line rows.",
+  parameters: {
+    type: "object",
+    properties: {
+      product_id: { type: "string", description: "Restrict candidates to one project product." },
+      material_id: { type: "string", description: "Restrict candidates to one project material." },
+    },
+  },
+};
+
 /** The Cartographer's complete least-privilege tool surface (§18.2): nothing
  * else is declared to the model. */
 export const cartographerToolDeclarations: ReadonlyArray<ToolDeclaration> = [
@@ -174,6 +220,14 @@ export const cartographerToolDeclarations: ReadonlyArray<ToolDeclaration> = [
   draftNetworkMapDiffDeclaration,
 ];
 
+/** The flag-aware surface: v1's four tools, plus get_bom_rate_estimates only
+ * under CARTOGRAPHER_PRODUCT_LEVEL (off ⇒ byte-identical v1 declarations). */
+export function cartographerToolDeclarationList(): ReadonlyArray<ToolDeclaration> {
+  return productLevelEnabled()
+    ? [...cartographerToolDeclarations, getBomRateEstimatesDeclaration]
+    : cartographerToolDeclarations;
+}
+
 // ---------- §18.2 prompt templates (verbatim) ----------
 
 export function buildCartographerPrompt(args: {
@@ -182,7 +236,33 @@ export function buildCartographerPrompt(args: {
   sourcesJson: string;
   evidenceJson: string;
   entitiesJson: string;
+  /** §18.2 v2: present only under CARTOGRAPHER_PRODUCT_LEVEL — appends the
+   * verbatim product-level block. Absent ⇒ byte-identical v1 template. */
+  rateMethodsJson?: string;
 }): string {
+  const productLevelBlock = args.rateMethodsJson === undefined ? "" : `
+PRODUCT-LEVEL DECOMPOSITION (enabled)
+- Available consumption-rate methods (versioned; computed by the platform,
+  not by you - a demoted method failed this project's BOM back-test and
+  must not be proposed):
+${args.rateMethodsJson}
+- To decompose verified firm-level edges into BOM structure, call
+  get_bom_rate_estimates and include add_bom_line rows (product_id,
+  material_id, rate_method, rate, rate_low, rate_high) in the SAME
+  draft_network_map_diff call. Copy rate, rate_low and rate_high EXACTLY
+  from the candidate rows - never adjust, round, or invent a rate or an
+  interval; the platform recomputes every rate and refuses mismatches.
+- A BOM line needs verified Produces evidence for its material and an
+  inbound supply link (existing, or an add_supply_link row in the same
+  proposal) - an unsourced BOM line cannot be simulated.
+- add_outbound_lane rows (product_id, customer_name) are structural: they
+  ride verified SuppliesTo evidence about the shipping firm; volumes and
+  prices are never estimated and stay empty for the user to fill.
+- The platform runs a mass-balance check before drafting: when the proposed
+  rates imply more consumption than the mapped inbound flows supply, the
+  draft is refused naming the imbalance - report that to the user instead
+  of adjusting any rate.
+`;
   return `You are the Network Cartographer, the SureSuite agent that maps the supply
 network beyond tier 1 from user-provided documents and registered external
 sources, proposing reviewable graph extensions grounded in stored evidence.
@@ -215,7 +295,7 @@ TASK
 - After the tool returns, reply in 2-4 sentences: what was ingested, what
   is verified vs pending (with source counts), and that the card must be
   reviewed before anything applies.
-
+${productLevelBlock}
 ${AGENT_COMMON}`;
 }
 
@@ -513,12 +593,40 @@ export async function buildCartographerContext(
     }
   } catch { /* entity list is context, not a gate */ }
 
+  // §18.2 v2: the rate-method table joins the context only under the flag
+  // (serialized from the registry, never hand-written; assumptions dropped
+  // first when the budget binds — the §18.1 serializeMethods fold).
+  let rateMethodsJson: string | undefined;
+  if (productLevelEnabled()) {
+    try {
+      const [dataset, defaults] = await Promise.all([
+        loadGateDataset(ctx.supabase, ctx.projectId),
+        loadPolicyDefaults(ctx.supabase, ctx.projectId),
+      ]);
+      const inputs: EstimatorInputs = { dataset, defaults };
+      const rows = RATE_ESTIMATOR_METHODS.map((m) => ({
+        method: rateMethodRef(m),
+        family: m.family,
+        target: "bom_single_level.consumption_rate",
+        assumptions: m.assumptions,
+        status: backTestRateMethod(m, inputs).demoted ? "demoted" : "ok",
+      }));
+      rateMethodsJson = JSON.stringify(rows);
+      if (rateMethodsJson.length > RATE_METHODS_BUDGET_BYTES) {
+        rateMethodsJson = JSON.stringify(rows.map(({ assumptions: _a, ...rest }) => rest));
+      }
+    } catch {
+      rateMethodsJson = "[]"; // the method table is context, not a gate
+    }
+  }
+
   return buildCartographerPrompt({
     projectId: ctx.projectId,
     utterance: args.utterance.slice(0, 4000),
     sourcesJson: serializeUnderBudget(sources, SOURCES_BUDGET_BYTES),
     evidenceJson,
     entitiesJson: serializeUnderBudget(entities, ENTITIES_BUDGET_BYTES),
+    ...(rateMethodsJson !== undefined ? { rateMethodsJson } : {}),
   });
 }
 
@@ -795,19 +903,129 @@ async function getNetworkEvidence(
   }
 }
 
+// ---------- get_bom_rate_estimates handler (§18.2 v2) ----------
+
+async function getBomRateEstimates(
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<ToolEnvelope> {
+  const tool = "get_bom_rate_estimates";
+  if (!productLevelEnabled()) {
+    return failure(
+      tool,
+      "invalid_params",
+      "Product-level mapping is disabled in this deployment (CARTOGRAPHER_PRODUCT_LEVEL) — v1 firm-level ops remain available.",
+    );
+  }
+  if (!deploymentEnabledAgents().includes(CARTOGRAPHER_AGENT_ID)) {
+    return failure(tool, "agent_disabled", "The Network Cartographer agent is not enabled in this deployment.");
+  }
+  try {
+    const [dataset, defaults] = await Promise.all([
+      loadGateDataset(ctx.supabase, ctx.projectId),
+      loadPolicyDefaults(ctx.supabase, ctx.projectId),
+    ]);
+    const inputs: EstimatorInputs = { dataset, defaults };
+
+    // Candidate pairs: project products × supply-mapped materials — a
+    // material counts as mapped when it has an inbound lane OR a VERIFIED
+    // Produces tally naming it (the v1 output this decomposition consumes).
+    const mapped = new Set(
+      dataset.inbound.map((a) => String(a.material_id ?? "")).filter(Boolean),
+    );
+    try {
+      for (const t of tallyEvidence(await loadEvidenceRows(ctx))) {
+        if (t.relation !== "Produces" || t.status !== "verified") continue;
+        const matched = matchProjectMaterial(t.object, dataset.materials);
+        if (matched) mapped.add(matched);
+      }
+    } catch { /* evidence enrichment of the pair set is best-effort */ }
+
+    const productFilter = typeof args.product_id === "string" && args.product_id.trim()
+      ? args.product_id.trim()
+      : null;
+    const materialFilter = typeof args.material_id === "string" && args.material_id.trim()
+      ? args.material_id.trim()
+      : null;
+    const pairs: RatePair[] = [];
+    for (const p of dataset.products) {
+      const productId = String(p.product_id ?? "");
+      if (!productId || (productFilter && productId !== productFilter)) continue;
+      for (const materialId of [...mapped].sort()) {
+        if (materialFilter && materialId !== materialFilter) continue;
+        pairs.push({ product_id: productId, material_id: materialId });
+        if (pairs.length >= MAX_RATE_PAIRS) break;
+      }
+      if (pairs.length >= MAX_RATE_PAIRS) break;
+    }
+
+    const candidates = rateCandidates(inputs, pairs);
+    if (candidates.length === 0) {
+      return {
+        kind: "text",
+        data:
+          "No estimable BOM pairs — every product × mapped-material pair either has a BOM line already or no registered method grounds a rate.",
+        meta: { tool, row_count: 0, note: "empty" },
+      };
+    }
+    return {
+      kind: "table",
+      data: {
+        columns: ["product_id", "material_id", "method", "rate", "low", "high", "basis", "dataset", "vintage", "status", "assumptions"],
+        rows: candidates.map((c) => {
+          const prior = c.sources.find((s) => s.role === "prior") ?? c.sources[0];
+          return [
+            c.product_id,
+            c.material_id,
+            c.method,
+            c.value,
+            c.low,
+            c.high,
+            c.basis,
+            prior?.dataset ?? "project (live)",
+            String(prior?.vintage ?? "live"),
+            c.status,
+            c.assumptions.join(" | "),
+          ];
+        }),
+      },
+      meta: { tool, row_count: candidates.length },
+    };
+  } catch (e) {
+    console.warn("get_bom_rate_estimates failed:", (e as Error).message);
+    return { kind: "text", data: "BOM-rate estimation failed.", meta: { tool, row_count: 0, note: "error" } };
+  }
+}
+
 // ---------- draft_network_map_diff handler ----------
 
-/** Validate + normalize the raw model arguments against the §18.2 schema. */
+/** Per-op key vocabulary (§18.2 schema; v2 ops exist only under
+ * CARTOGRAPHER_PRODUCT_LEVEL). */
+const V1_OPS = new Set(["add_supplier", "add_supply_link"]);
+const V2_OPS = new Set(["add_bom_line", "add_outbound_lane"]);
+const ROW_KEYS: Record<string, ReadonlySet<string>> = {
+  add_supplier: new Set(["op", "supplier_name", "lei", "evidence_ids", "why"]),
+  add_supply_link: new Set(["op", "supplier_name", "lei", "material_id", "evidence_ids", "why"]),
+  add_bom_line: new Set([
+    "op", "supplier_name", "lei", "material_id", "product_id",
+    "rate_method", "rate", "rate_low", "rate_high", "evidence_ids", "why",
+  ]),
+  add_outbound_lane: new Set(["op", "supplier_name", "lei", "product_id", "customer_name", "evidence_ids", "why"]),
+};
+
+/** Validate + normalize the raw model arguments against the §18.2 schema.
+ * `productLevel` admits the v2 ops; off (DEFAULT) is byte-identical v1. */
 export function normalizeMapRows(
   rawRows: unknown,
+  opts?: { productLevel?: boolean },
 ): { rows: MapRowInput[] } | { code: DraftErrorCode; reason: string } {
+  const productLevel = opts?.productLevel === true;
   if (!Array.isArray(rawRows) || rawRows.length === 0) {
     return { code: "invalid_params", reason: "rows must be a non-empty array of map additions" };
   }
   if (rawRows.length > MAX_MAP_ROWS) {
     return { code: "too_large", reason: `rows exceed the ${MAX_MAP_ROWS}-row limit — narrow the ask` };
   }
-  const allowedKeys = new Set(["op", "supplier_name", "lei", "material_id", "evidence_ids", "why"]);
   const seen = new Set<string>();
   const rows: MapRowInput[] = [];
   for (const raw of rawRows) {
@@ -815,12 +1033,18 @@ export function normalizeMapRows(
       return { code: "invalid_params", reason: "each row must be an object" };
     }
     const r = raw as Record<string, unknown>;
+    const op = String(r.op ?? "");
+    if (!V1_OPS.has(op) && !(productLevel && V2_OPS.has(op))) {
+      return {
+        code: "invalid_params",
+        reason: productLevel
+          ? `unknown op "${op}" — supported: add_supplier, add_supply_link, add_bom_line, add_outbound_lane`
+          : `unknown op "${op}" — v1 supports add_supplier and add_supply_link`,
+      };
+    }
+    const allowedKeys = ROW_KEYS[op];
     for (const k of Object.keys(r)) {
       if (!allowedKeys.has(k)) return { code: "invalid_params", reason: `unknown row property "${k}"` };
-    }
-    const op = String(r.op ?? "");
-    if (op !== "add_supplier" && op !== "add_supply_link") {
-      return { code: "invalid_params", reason: `unknown op "${op}" — v1 supports add_supplier and add_supply_link` };
     }
     const supplierName = String(r.supplier_name ?? "").trim();
     if (!supplierName || supplierName.length > 120) {
@@ -831,14 +1055,73 @@ export function normalizeMapRows(
       return { code: "invalid_params", reason: `lei "${r.lei}" is not a 20-character LEI` };
     }
     const materialId = r.material_id == null ? undefined : String(r.material_id).trim();
-    if (op === "add_supply_link" && !materialId) {
-      return { code: "invalid_params", reason: `add_supply_link for "${supplierName}" requires material_id` };
+    if ((op === "add_supply_link" || op === "add_bom_line") && !materialId) {
+      return { code: "invalid_params", reason: `${op} for "${supplierName}" requires material_id` };
     }
     if (op === "add_supplier" && materialId) {
       return { code: "invalid_params", reason: "material_id is only valid on add_supply_link rows" };
     }
     if (materialId && materialId.length > 120) {
       return { code: "invalid_params", reason: "material_id must be at most 120 chars" };
+    }
+    const productId = r.product_id == null ? undefined : String(r.product_id).trim();
+    if (V2_OPS.has(op) && !productId) {
+      return { code: "invalid_params", reason: `${op} requires product_id (an existing project product)` };
+    }
+    if (productId && productId.length > 120) {
+      return { code: "invalid_params", reason: "product_id must be at most 120 chars" };
+    }
+    const customerName = r.customer_name == null ? undefined : String(r.customer_name).trim();
+    if (op === "add_outbound_lane" && (!customerName || customerName.length > 120)) {
+      return {
+        code: "invalid_params",
+        reason: "add_outbound_lane requires customer_name (max 120 chars) verbatim from the evidence",
+      };
+    }
+    let rateFields: Pick<MapRowInput, "rate_method" | "rate" | "rate_low" | "rate_high"> = {};
+    if (op === "add_bom_line") {
+      const rateMethod = String(r.rate_method ?? "").trim();
+      if (!rateMethod || rateMethod.length > 80) {
+        return {
+          code: "invalid_params",
+          reason: "add_bom_line requires rate_method — a '<id>@<version>' reference from get_bom_rate_estimates",
+        };
+      }
+      // The §18.1 interval law applied to rates: low and high are mandatory.
+      if (r.rate == null || r.rate_low == null || r.rate_high == null) {
+        return {
+          code: "invalid_params",
+          reason:
+            `consumption rate for ${productId} × ${materialId}: every rate requires an ` +
+            `interval — rate, rate_low and rate_high are mandatory`,
+        };
+      }
+      const toNum = (v: unknown): number => (typeof v === "number" ? v : Number(String(v ?? "").trim()));
+      const rate = toNum(r.rate);
+      const low = toNum(r.rate_low);
+      const high = toNum(r.rate_high);
+      if (![rate, low, high].every(Number.isFinite)) {
+        return {
+          code: "invalid_params",
+          reason: `consumption rate for ${productId} × ${materialId}: rate, rate_low and rate_high must all be finite numbers`,
+        };
+      }
+      // BomLine.rate is gt 0 — the engine's hard production-feasibility law.
+      if (rate <= 0) {
+        return {
+          code: "invalid_params",
+          reason: `consumption rate for ${productId} × ${materialId} must be > 0 (BomLine.rate is a hard engine constraint)`,
+        };
+      }
+      if (!(low <= rate && rate <= high)) {
+        return {
+          code: "invalid_params",
+          reason:
+            `consumption rate for ${productId} × ${materialId}: the interval must satisfy ` +
+            `low ≤ rate ≤ high (got ${rate} ∉ [${low}, ${high}])`,
+        };
+      }
+      rateFields = { rate_method: rateMethod, rate, rate_low: low, rate_high: high };
     }
     const evidenceIds = Array.isArray(r.evidence_ids) ? r.evidence_ids.map((v) => String(v).trim()) : [];
     if (evidenceIds.length === 0 || evidenceIds.length > MAX_EVIDENCE_IDS_PER_ROW || evidenceIds.some((v) => !v)) {
@@ -850,16 +1133,23 @@ export function normalizeMapRows(
     if (r.why != null && (typeof r.why !== "string" || r.why.length > 300)) {
       return { code: "invalid_params", reason: "why must be a string (max 300 chars)" };
     }
-    const dupKey = `${op}|${normalizeEntityName(supplierName)}|${materialId ?? ""}`;
+    const dupKey = op === "add_bom_line"
+      ? `${op}|${productId}|${materialId}`
+      : op === "add_outbound_lane"
+      ? `${op}|${productId}|${normalizeEntityName(customerName ?? "")}`
+      : `${op}|${normalizeEntityName(supplierName)}|${materialId ?? ""}`;
     if (seen.has(dupKey)) {
       return { code: "invalid_params", reason: `duplicate ${op} row for "${supplierName}"` };
     }
     seen.add(dupKey);
     rows.push({
-      op,
+      op: op as MapRowInput["op"],
       supplier_name: supplierName,
       ...(lei !== undefined ? { lei } : {}),
       ...(materialId !== undefined ? { material_id: materialId } : {}),
+      ...(productId !== undefined ? { product_id: productId } : {}),
+      ...(customerName !== undefined ? { customer_name: customerName } : {}),
+      ...rateFields,
       evidence_ids: [...new Set(evidenceIds)],
       ...(typeof r.why === "string" && r.why ? { why: r.why } : {}),
     });
@@ -868,16 +1158,27 @@ export function normalizeMapRows(
 }
 
 /** §4.5 idempotency key: the payload core drops free-text (`why`) so
- * re-phrasings of the same substantive diff converge. */
+ * re-phrasings of the same substantive diff converge. v1 rows keep their
+ * exact pre-v2 shape so existing cards still converge; v2 rows add their
+ * substantive fields (rate INCLUDED — a different estimate is a different
+ * diff). */
 export async function cartographerIdempotencyKey(rows: MapRowInput[]): Promise<string> {
   const core = {
     schema_version: 1,
-    rows: rows.map(({ op, supplier_name, lei, material_id, evidence_ids }) => ({
-      op,
-      supplier_name,
-      lei: lei ?? null,
-      material_id: material_id ?? null,
-      evidence_ids: [...evidence_ids].sort(),
+    rows: rows.map((r) => ({
+      op: r.op,
+      supplier_name: r.supplier_name,
+      lei: r.lei ?? null,
+      material_id: r.material_id ?? null,
+      evidence_ids: [...r.evidence_ids].sort(),
+      ...(r.op === "add_bom_line" || r.op === "add_outbound_lane"
+        ? {
+          product_id: r.product_id ?? null,
+          customer_name: r.customer_name ?? null,
+          rate_method: r.rate_method ?? null,
+          rate: r.rate ?? null,
+        }
+        : {}),
     })),
   };
   return await sha256Hex(`${CARTOGRAPHER_AGENT_ID} ${CARTOGRAPHER_ARTIFACT_TYPE} ${canonicalJson(core)}`);
@@ -897,15 +1198,20 @@ async function draftNetworkMapDiff(
     return failure(tool, "agent_disabled", "Proposal drafting is not enabled for this account (agent_proposals).");
   }
 
-  const normalized = normalizeMapRows(args.rows);
+  const normalized = normalizeMapRows(args.rows, { productLevel: productLevelEnabled() });
   if ("code" in normalized) return failure(tool, normalized.code, normalized.reason);
   const rows = normalized.rows;
+  const hasV2 = rows.some((r) => r.op === "add_bom_line" || r.op === "add_outbound_lane");
 
   // Grounding data: the evidence store + the live entity tables.
   let evidence: EvidenceRow[];
   let materials: Array<Record<string, unknown>>;
   let suppliers: Array<Record<string, unknown>>;
   let lanes: Array<Record<string, unknown>>;
+  // §18.2 v2 only: the full grader dataset + live policy defaults, for rate
+  // recomputation and the mass-balance validator (the same rows the gate
+  // grades — one derivation per value, everywhere).
+  let inputs: EstimatorInputs | null = null;
   try {
     evidence = await loadEvidenceRows(ctx);
     const [m, s, l] = await Promise.all([
@@ -917,6 +1223,13 @@ async function draftNetworkMapDiff(
     materials = (m.data ?? []) as Array<Record<string, unknown>>;
     suppliers = (s.data ?? []) as Array<Record<string, unknown>>;
     lanes = (l.data ?? []) as Array<Record<string, unknown>>;
+    if (hasV2) {
+      const [dataset, defaults] = await Promise.all([
+        loadGateDataset(ctx.supabase, ctx.projectId),
+        loadPolicyDefaults(ctx.supabase, ctx.projectId),
+      ]);
+      inputs = { dataset, defaults };
+    }
   } catch (e) {
     console.warn("draft_network_map_diff load failed:", (e as Error).message);
     return failure(tool, "dependency_missing", "Could not load the evidence store or project tables — try again.");
@@ -924,23 +1237,62 @@ async function draftNetworkMapDiff(
   const supplierIds = new Set(suppliers.map((s) => String(s.supplier_id ?? "")));
   const laneKeys = new Set(lanes.map((l) => `${String(l.supplier_id ?? "")}|${String(l.material_id ?? "")}`));
   const addedIds = new Set<string>();
+  // v2 feasibility inputs: which materials already have any inbound lane,
+  // which get one from this payload, existing BOM pairs, existing outbound
+  // lane keys.
+  const materialsWithLanes = new Set(lanes.map((l) => String(l.material_id ?? "")).filter(Boolean));
+  const linkedInPayload = new Set(
+    rows.filter((r) => r.op === "add_supply_link" && r.material_id).map((r) => r.material_id!),
+  );
+  const existingBomPairs = new Set<string>();
+  const existingOutboundKeys = new Set<string>();
+  if (inputs) {
+    for (const b of normalizeBomRows(inputs.dataset.bom)) {
+      const p = String(b.product_id ?? "");
+      const mt = String(b.material_id ?? "");
+      if (p && mt) existingBomPairs.add(`${p}|${mt}`);
+    }
+    for (const o of inputs.dataset.outbound) {
+      const p = String(o.product_id ?? "");
+      const c = String(o.customer_id ?? "");
+      if (p && c) existingOutboundKeys.add(`${p}|${c}`);
+    }
+  }
+  const productExists = (id: string): boolean =>
+    inputs !== null && inputs.dataset.products.some((p) => String(p.product_id ?? "") === id);
 
-  // §18.2 hard gates 1/2/3/4/5, per row.
+  // §18.2 hard gates 1/2/3/4/5 (+ the v2 gates 8–10), per row.
   const enriched: Array<Record<string, unknown>> = [];
   const citedEvidenceIds = new Set<string>();
   const evidenceById = new Map(evidence.map((r) => [String(r.id), r]));
+  const proposedBomLines: Array<RatePair & { rate: number }> = [];
   for (const row of rows) {
     const check = verifyMapRow(row, evidence);
     if (!check.ok || !check.supplierId || !check.tally) {
       return failure(tool, check.code ?? "not_grounded", check.reason ?? "evidence verification failed");
     }
     const supplierId = check.supplierId;
+    const base: Record<string, unknown> = {
+      op: row.op,
+      supplier_id: supplierId,
+      supplier_name: row.supplier_name,
+      lei: check.lei,
+      subject: check.tally.subject,
+      relation: check.tally.relation,
+      object: check.tally.object,
+      status: check.tally.status,
+      independent_sources: check.tally.sourceIds.length,
+      source_ids: check.tally.sourceIds,
+      evidence_ids: row.evidence_ids,
+      quotes: check.tally.quotes.slice(0, 2),
+      ...(row.why ? { why: row.why } : {}),
+    };
     if (row.op === "add_supplier") {
       if (supplierIds.has(supplierId)) {
         return failure(tool, "invalid_params", `supplier ${supplierId} ("${row.supplier_name}") already exists — nothing to add`);
       }
       addedIds.add(supplierId);
-    } else {
+    } else if (row.op === "add_supply_link") {
       const materialId = row.material_id!;
       // Gate 3: the link target must be an EXISTING project material.
       if (!materials.some((m) => String(m.material_id ?? "") === materialId)) {
@@ -967,28 +1319,112 @@ async function draftNetworkMapDiff(
           `add_supply_link for "${row.supplier_name}" needs an add_supplier row in the same proposal (or an existing supplier)`,
         );
       }
+    } else if (row.op === "add_bom_line") {
+      const materialId = row.material_id!;
+      const productId = row.product_id!;
+      // v2 gate 8a: both endpoints must be EXISTING project entities.
+      if (!productExists(productId)) {
+        return failure(tool, "project_scope_violation", `product ${productId} is not in this project`);
+      }
+      if (!materials.some((m) => String(m.material_id ?? "") === materialId)) {
+        return failure(tool, "project_scope_violation", `material ${materialId} is not in this project`);
+      }
+      // The cited Produces evidence must name THIS material (gate 1 applied
+      // to the decomposed edge).
+      const matched = matchProjectMaterial(check.tally.object, materials);
+      if (matched !== materialId) {
+        return failure(
+          tool,
+          "not_grounded",
+          `the verified Produces evidence names "${check.tally.object}"` +
+            (matched ? ` (project material ${matched})` : " (no matching project material)") +
+            `, not ${materialId}`,
+        );
+      }
+      if (existingBomPairs.has(`${productId}|${materialId}`)) {
+        return failure(tool, "invalid_params", `the ${productId} × ${materialId} BOM line already exists — nothing to add`);
+      }
+      // v2 gate 8b: production feasibility — an unsourced BOM material is
+      // the engine's hard failure (materials.supplier_link block); the line
+      // may only land beside a supply lane.
+      if (!materialsWithLanes.has(materialId) && !linkedInPayload.has(materialId)) {
+        return failure(
+          tool,
+          "invalid_params",
+          `add_bom_line for ${productId} × ${materialId} needs an inbound supply lane — ` +
+            `add an add_supply_link row in the same proposal (an unsourced BOM material hard-blocks the run gate)`,
+        );
+      }
+      // v2 gate 9: the rate must recompute through its named registered
+      // method within tolerance; demoted methods are refused.
+      const rateCheck = verifyRateRow(
+        {
+          product_id: productId,
+          material_id: materialId,
+          method: row.rate_method!,
+          rate: row.rate!,
+          low: row.rate_low!,
+          high: row.rate_high!,
+        },
+        inputs!,
+      );
+      if (!rateCheck.ok || !rateCheck.method || !rateCheck.estimate) {
+        return failure(tool, rateCheck.code ?? "not_grounded", rateCheck.reason ?? "rate recomputation failed");
+      }
+      proposedBomLines.push({ product_id: productId, material_id: materialId, rate: rateCheck.estimate.value });
+      Object.assign(base, {
+        product_id: productId,
+        material_id: materialId,
+        rate: rateCheck.estimate.value,
+        rate_low: rateCheck.estimate.low,
+        rate_high: rateCheck.estimate.high,
+        rate_basis: rateCheck.estimate.basis,
+        rate_method: rateMethodRef(rateCheck.method),
+        rate_family: rateCheck.method.family,
+        rate_sources: rateCheck.method
+          .sources({ product_id: productId, material_id: materialId }, inputs!)
+          .map((s) => ({ dataset: s.dataset, vintage: s.vintage })),
+        rate_assumptions: rateCheck.method.assumptions,
+      });
+    } else {
+      // add_outbound_lane — structural only; verifyMapRow already matched
+      // the SuppliesTo object against customer_name.
+      const productId = row.product_id!;
+      if (!productExists(productId)) {
+        return failure(tool, "project_scope_violation", `product ${productId} is not in this project`);
+      }
+      const customerId = supplierIdFor(row.customer_name!, null);
+      if (existingOutboundKeys.has(`${productId}|${customerId}`)) {
+        return failure(tool, "invalid_params", `the ${productId} → ${customerId} outbound lane already exists — nothing to add`);
+      }
+      Object.assign(base, { product_id: productId, customer_id: customerId, customer_name: row.customer_name });
     }
     const confidence = Math.max(
       ...row.evidence_ids.map((id) => Number(evidenceById.get(id)?.confidence ?? 0)),
     );
+    base.confidence = confidence;
+    if (row.material_id && row.op === "add_supply_link") base.material_id = row.material_id;
     for (const id of row.evidence_ids) citedEvidenceIds.add(id);
-    enriched.push({
-      op: row.op,
-      supplier_id: supplierId,
-      supplier_name: row.supplier_name,
-      lei: check.lei,
-      ...(row.material_id ? { material_id: row.material_id } : {}),
-      subject: check.tally.subject,
-      relation: check.tally.relation,
-      object: check.tally.object,
-      status: check.tally.status,
-      independent_sources: check.tally.sourceIds.length,
-      source_ids: check.tally.sourceIds,
-      confidence,
-      evidence_ids: row.evidence_ids,
-      quotes: check.tally.quotes.slice(0, 2),
-      ...(row.why ? { why: row.why } : {}),
-    });
+    enriched.push(base);
+  }
+
+  // §18.2 v2: the MASS-BALANCE validator runs BEFORE drafting — a violation
+  // is a refusal naming the imbalance, never a silently adjusted rate.
+  if (proposedBomLines.length > 0) {
+    const violations = checkMassBalance(inputs!, proposedBomLines);
+    if (violations.length > 0) {
+      const named = violations.map((v) =>
+        `${v.material_id}: the BOM implies ${v.required_weekly.toFixed(2)} units/week but the ` +
+        `volumed inbound arcs supply ${v.available_weekly.toFixed(2)} units/week ` +
+        `(tolerance ${Math.round(v.tolerance * 100)}%)`
+      ).join("; ");
+      return failure(
+        tool,
+        "gate_blocked",
+        `mass balance violated — ${named}. Map more inbound supply or revisit the pairing; ` +
+          `rates are never silently adjusted to close the balance.`,
+      );
+    }
   }
 
   // The visibly-pending block (§18.2): sub-threshold tallies, display-only,
@@ -1006,8 +1442,9 @@ async function draftNetworkMapDiff(
     }));
 
   const payload = {
-    schema_version: 1,
-    prompt_version: CARTOGRAPHER_PROMPT_VERSION,
+    // v2 payloads carry their extended shape honestly; v1 stays at 1.
+    schema_version: hasV2 ? 2 : 1,
+    prompt_version: productLevelEnabled() ? CARTOGRAPHER_PROMPT_VERSION_V2 : CARTOGRAPHER_PROMPT_VERSION,
     rows: enriched,
     pending,
   };
@@ -1030,6 +1467,31 @@ async function draftNetworkMapDiff(
   if (linkMaterials.length > 0) {
     citations.push({ kind: "table_rows", ref: "materials", rows: linkMaterials.slice(0, 200) });
   }
+  if (hasV2) {
+    // §18.2 v2 citations: the touched products, each rate method (the §18.1
+    // registry-anchor idiom), and the consumed seed tables.
+    const v2Products = [...new Set(rows.filter((r) => r.product_id).map((r) => r.product_id!))];
+    if (v2Products.length > 0) {
+      citations.push({ kind: "table_rows", ref: "products", rows: v2Products.slice(0, 200) });
+    }
+    const usedRateMethods = [...new Set(rows.filter((r) => r.rate_method).map((r) => r.rate_method!))];
+    for (const ref of usedRateMethods) {
+      citations.push({ kind: "document", ref: `supabase/functions/_shared/estimators.ts#${ref}` });
+    }
+    if (usedRateMethods.some((m) => m.startsWith("rate_io_technical_coefficient@"))) {
+      citations.push({
+        kind: "document",
+        ref: `supabase/functions/_shared/ioCoefficientsSeed.json#v${IO_SEED_VERSION}`,
+      });
+    }
+    if (usedRateMethods.some((m) => m.startsWith("rate_spend_implied@"))) {
+      citations.push({
+        kind: "document",
+        ref: `supabase/functions/_shared/estimatorBenchmarks.json#v${BENCHMARK_TABLE_VERSION}`,
+      });
+    }
+    if (citations.length > MAX_CITATIONS) citations.length = MAX_CITATIONS;
+  }
 
   // Grounding freshness (§4.2): map diffs expire on graph_hash drift.
   let grounding: Record<string, unknown> = {};
@@ -1040,12 +1502,18 @@ async function draftNetworkMapDiff(
 
   const idemKey = await cartographerIdempotencyKey(rows);
   const nAdd = rows.filter((r) => r.op === "add_supplier").length;
-  const nLink = rows.length - nAdd;
+  const nLink = rows.filter((r) => r.op === "add_supply_link").length;
+  const nBom = rows.filter((r) => r.op === "add_bom_line").length;
+  const nOut = rows.filter((r) => r.op === "add_outbound_lane").length;
   const title = (typeof args.title === "string" && args.title.trim()
     ? args.title.trim()
+    : hasV2
+    ? `Network map: ${nAdd} supplier(s), ${nLink} link(s), ${nBom} BOM line(s), ${nOut} outbound lane(s) from verified external evidence`
     : `Network map: ${nAdd} supplier(s), ${nLink} link(s) from verified external evidence`)
     .slice(0, 140);
-  const summary = `${nAdd} × add_supplier; ${nLink} × add_supply_link — every row verified at >= ${VERIFY_MIN_SOURCES} independent sources; ${pending.length} triple(s) still pending`;
+  const summary = hasV2
+    ? `${nAdd} × add_supplier; ${nLink} × add_supply_link; ${nBom} × add_bom_line (method-estimated rates, mass balance checked); ${nOut} × add_outbound_lane — every row verified at >= ${VERIFY_MIN_SOURCES} independent sources; ${pending.length} triple(s) still pending`
+    : `${nAdd} × add_supplier; ${nLink} × add_supply_link — every row verified at >= ${VERIFY_MIN_SOURCES} independent sources; ${pending.length} triple(s) still pending`;
 
   // §4.2: an identical live ask converges on the existing card.
   try {
@@ -1109,4 +1577,5 @@ async function draftNetworkMapDiff(
 // (cartographerToolDeclarations) declares them.
 registerToolHandler("ingest_network_evidence", ingestNetworkEvidence);
 registerToolHandler("get_network_evidence", getNetworkEvidence);
+registerToolHandler("get_bom_rate_estimates", getBomRateEstimates);
 registerToolHandler("draft_network_map_diff", draftNetworkMapDiff);

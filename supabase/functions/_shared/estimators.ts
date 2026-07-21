@@ -27,6 +27,7 @@
 // estimatorBenchmarks.json is code (§18.5 law 1).
 
 import benchmarks from "./estimatorBenchmarks.json" with { type: "json" };
+import ioSeed from "./ioCoefficientsSeed.json" with { type: "json" };
 import {
   buildReducerCtx,
   ENGINE_DEFAULT_PRICE,
@@ -663,4 +664,510 @@ export function verifyEstimateRow(
     };
   }
   return { ok: true, method, estimate: est };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// B8 v2 — BOM consumption-rate methods r_{p,m} (ai-agents.md §18.2 v2).
+//
+// The engine field is BomLine.rate ("units m / unit p", gt 0 — the hard
+// production-feasibility constraint, scsim/scsim/entities/network.py). No
+// external database publishes r_{p,m}; every value below is DERIVED from the
+// project's own rows plus the checked-in IO-coefficient seed slice — the
+// §18.1 posture (LLM selects, registry computes) applied to a graph edge
+// instead of an item-master cell. Same laws: {value, low, high, basis} on
+// every rate, hold-out by construction (no rate method ever reads the target
+// pair's own observed rate — the observed BOM contributes set membership
+// only), back-test demotion for prior-sourced methods, 1e-9 recomputation at
+// draft AND apply.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** §18.2 v2 mass-balance tolerance (DEFAULT): the volumed inbound flow of a
+ * material must cover the BOM-implied weekly consumption within this relative
+ * slack; beyond it the draft is refused naming the imbalance — a rate is
+ * never silently adjusted to fit. */
+export const MASS_BALANCE_TOLERANCE = 0.10;
+
+export interface RatePair {
+  product_id: string;
+  material_id: string;
+}
+
+interface IoCoefficientRow {
+  id: string;
+  sector: string;
+  match_tokens: string[];
+  dataset: string;
+  vintage: number;
+  role: string;
+  license_tier: string;
+  kind: string;
+  value: number;
+  low: number;
+  high: number;
+}
+
+export const IO_SEED_VERSION: number = ioSeed.slice_version;
+const IO_ROWS: IoCoefficientRow[] = ioSeed.rows as IoCoefficientRow[];
+
+/** Deterministic sector match: first seed row (file order) with a
+ * match_token contained in the normalized material name; the composite row
+ * (empty match_tokens) is the declared fallback. Never fuzzy, never scored. */
+export function matchIoCoefficient(materialName: string): IoCoefficientRow | undefined {
+  const name = String(materialName ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  let composite: IoCoefficientRow | undefined;
+  for (const row of IO_ROWS) {
+    if (row.match_tokens.length === 0) {
+      composite = composite ?? row;
+      continue;
+    }
+    if (name && row.match_tokens.some((t) => name.includes(t))) return row;
+  }
+  return composite;
+}
+
+/** Weekly volumed inbound flow per material — Σ rateToWeekly(volume) over
+ * arcs with volume > 0. Arcs without a volume are UNCONSTRAINED (they carry
+ * no flow information); a material with zero volumed arcs is absent. */
+export function weeklyInboundFlow(dataset: GradingDataset): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const arc of dataset.inbound) {
+    const mat = String(arc.material_id ?? "");
+    if (!mat) continue;
+    const vol = num(arc.volume);
+    if (vol <= 0) continue;
+    out.set(mat, (out.get(mat) ?? 0) + rateToWeekly(vol, arc.time_unit as string | null));
+  }
+  return out;
+}
+
+/** Consuming products per material from the normalized (single or flattened
+ * multi-level) BOM — membership only, never the rate values (the hold-out
+ * law). */
+export function bomConsumers(dataset: GradingDataset): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const b of normalizeBomRows(dataset.bom)) {
+    const product = String(b.product_id ?? "");
+    const material = String(b.material_id ?? "");
+    if (!product || !material) continue;
+    if (!out.has(material)) out.set(material, new Set());
+    out.get(material)!.add(product);
+  }
+  return out;
+}
+
+/** Resolved unit price of a material: master cost when set, else the
+ * engine's own cheapest-inbound fallback (arc prices ≤ 0 default to 1.0
+ * before the min — exactly the project_map.py chain). */
+function materialUnitPrice(materialId: string, inputs: EstimatorInputs): number | undefined {
+  const master = inputs.dataset.materials.find(
+    (m) => String(m.material_id ?? "") === materialId,
+  );
+  if (!master) return undefined;
+  const cost = num(master.cost);
+  if (cost > 0) return cost;
+  return reducerCtx(inputs).cheapestInbound.get(materialId);
+}
+
+/** Resolved unit price of a product: master sell_price when set, else the
+ * engine's demand-weighted outbound fallback. */
+function productUnitPrice(productId: string, inputs: EstimatorInputs): number | undefined {
+  const master = inputs.dataset.products.find(
+    (p) => String(p.product_id ?? "") === productId,
+  );
+  if (!master) return undefined;
+  const price = num(master.sell_price);
+  if (price > 0) return price;
+  return reducerCtx(inputs).weightedPrice.get(productId);
+}
+
+export interface RateEstimatorMethod {
+  id: string;
+  version: number;
+  family: MethodFamily;
+  /** Fixed target: the BOM edge field the engine reads. */
+  target: { table: "bom_single_level"; field: "consumption_rate" };
+  params: Record<string, number | string>;
+  /** Per-pair sources (the io method cites the MATCHED seed row's dataset +
+   * vintage verbatim — §18.5 law 2). */
+  sources(pair: RatePair, inputs: EstimatorInputs): EstimatorSource[];
+  assumptions: string[];
+  groundTables: string[];
+  estimate(pair: RatePair, inputs: EstimatorInputs): Estimate | undefined;
+}
+
+export const rateMethodRef = (m: RateEstimatorMethod): string => `${m.id}@${m.version}`;
+
+export const RATE_ESTIMATOR_METHODS: RateEstimatorMethod[] = [
+  {
+    id: "rate_observed_consumption",
+    version: 1,
+    family: "direct_from_project",
+    target: { table: "bom_single_level", field: "consumption_rate" },
+    params: {},
+    sources: () => [GROUND_LIVE],
+    assumptions: [
+      "r = weekly volumed inbound flow of the material ÷ weekly effective " +
+      "output of the product — valid only when the product is the material's " +
+      "SOLE consumer (any other consuming product makes the allocation " +
+      "ill-posed and the method returns undefined rather than guess).",
+      "An exact quotient of two complete-data sums carries a degenerate " +
+      "interval (basis direct_sum — the §18.1 law extended to quotients of " +
+      "complete sums).",
+    ],
+    groundTables: ["inbound_logistics", "outbound_logistics", "bom_single_level"],
+    estimate(pair, inputs) {
+      const flow = weeklyInboundFlow(inputs.dataset).get(pair.material_id);
+      if (!flow || flow <= 0) return undefined;
+      const demand = reducerCtx(inputs).effectiveDemand.get(pair.product_id) ?? 0;
+      if (demand <= 0) return undefined;
+      const others = [...(bomConsumers(inputs.dataset).get(pair.material_id) ?? [])]
+        .filter((p) => p !== pair.product_id);
+      if (others.length > 0) return undefined;
+      const value = flow / demand;
+      return { value, low: value, high: value, basis: "direct_sum" };
+    },
+  },
+  {
+    id: "rate_spend_implied",
+    version: 1,
+    family: "benchmark_scaled",
+    target: { table: "bom_single_level", field: "consumption_rate" },
+    params: { benchmark: "asm_materials_share" },
+    sources: () => [priorSource("asm_materials_share"), GROUND_LIVE],
+    assumptions: [
+      "Spend ÷ unit-price implied quantity: the firm materials budget (ASM " +
+      "materials-cost share × annualized outbound revenue, the Talluri " +
+      "scaling) is apportioned uniformly across the project's priceable " +
+      "materials; dividing the material's budget slice by its unit price " +
+      "implies an annual quantity, and dividing that by the annual output of " +
+      "the material's consuming products (the candidate pair included) " +
+      "yields units m per unit p.",
+      "Uniform budget apportionment and uniform intensity across consumers " +
+      "are declared crude priors — the interval carries the share row's " +
+      "published range, and the human review gate sees it.",
+    ],
+    groundTables: ["outbound_logistics", "inbound_logistics", "materials", "bom_single_level"],
+    estimate(pair, inputs) {
+      const fig = benchmarkFigure("asm_materials_share");
+      if (!fig) return undefined;
+      const vos = annualValueOfShipments(inputs.dataset);
+      if (vos <= 0) return undefined;
+      const priceable = inputs.dataset.materials
+        .map((m) => String(m.material_id ?? ""))
+        .filter((id) => id && materialUnitPrice(id, inputs) !== undefined);
+      if (priceable.length === 0 || !priceable.includes(pair.material_id)) return undefined;
+      const price = materialUnitPrice(pair.material_id, inputs);
+      if (!price || price <= 0) return undefined;
+      const consumers = new Set(bomConsumers(inputs.dataset).get(pair.material_id) ?? []);
+      consumers.add(pair.product_id);
+      const ctx = reducerCtx(inputs);
+      let annualOutput = 0;
+      for (const p of consumers) annualOutput += (ctx.effectiveDemand.get(p) ?? 0) * 52;
+      if (annualOutput <= 0) return undefined;
+      const perShare = vos / priceable.length / price / annualOutput;
+      return {
+        value: fig.value * perShare,
+        low: fig.low * perShare,
+        high: fig.high * perShare,
+        basis: "prior_range",
+      };
+    },
+  },
+  {
+    id: "rate_io_technical_coefficient",
+    version: 1,
+    family: "benchmark_scaled",
+    target: { table: "bom_single_level", field: "consumption_rate" },
+    params: { seed: "ioCoefficientsSeed.json" },
+    sources: (pair, inputs) => {
+      const master = inputs.dataset.materials.find(
+        (m) => String(m.material_id ?? "") === pair.material_id,
+      );
+      const row = matchIoCoefficient(String(master?.name ?? pair.material_id));
+      return [
+        {
+          dataset: row?.dataset ?? "ioCoefficientsSeed.json",
+          vintage: row?.vintage ?? "unknown",
+          role: "prior",
+        },
+        GROUND_LIVE,
+      ];
+    },
+    assumptions: [
+      "Sector IO technical coefficient as a prior: a = EUR of the input " +
+      "sector per EUR of the output sector's production (Eurostat " +
+      "Supply-Use/IO, OECD ICIO, EXIOBASE — the checked-in seed slice), " +
+      "converted to physical units via the price ratio: r = a × u_p ÷ c_m.",
+      "Sector assignment is a deterministic token match of the material name " +
+      "against the seed rows; the manufacturing-composite row is the " +
+      "declared fallback.",
+      "u_p = product master sell_price else the demand-weighted outbound " +
+      "price; c_m = material master cost else the cheapest inbound price — " +
+      "the engine's own fallback chains.",
+    ],
+    groundTables: ["materials", "products", "inbound_logistics", "outbound_logistics"],
+    estimate(pair, inputs) {
+      const master = inputs.dataset.materials.find(
+        (m) => String(m.material_id ?? "") === pair.material_id,
+      );
+      if (!master) return undefined;
+      const row = matchIoCoefficient(String(master.name ?? pair.material_id));
+      if (!row) return undefined;
+      const up = productUnitPrice(pair.product_id, inputs);
+      const cm = materialUnitPrice(pair.material_id, inputs);
+      if (!up || up <= 0 || !cm || cm <= 0) return undefined;
+      const scale = up / cm;
+      return {
+        value: row.value * scale,
+        low: row.low * scale,
+        high: row.high * scale,
+        basis: "prior_range",
+      };
+    },
+  },
+];
+
+/** Resolve a rate-method `<id>@<version>` reference; exact version match
+ * (the §18.1 loud-failure law — a bumped registry invalidates stored rows). */
+export function findRateMethod(ref: string): RateEstimatorMethod | undefined {
+  const at = ref.lastIndexOf("@");
+  if (at <= 0) return undefined;
+  const id = ref.slice(0, at);
+  const version = Number(ref.slice(at + 1));
+  return RATE_ESTIMATOR_METHODS.find((m) => m.id === id && m.version === version);
+}
+
+/** Observed (product, material, rate) rows from the normalized BOM — the
+ * back-test ground truth (§18.2 v2: held-out real BOM). */
+export function observedBomRates(
+  dataset: GradingDataset,
+): Array<RatePair & { rate: number }> {
+  const out: Array<RatePair & { rate: number }> = [];
+  for (const b of normalizeBomRows(dataset.bom)) {
+    const product = String(b.product_id ?? "");
+    const material = String(b.material_id ?? "");
+    const rate = num(b.consumption_rate);
+    if (!product || !material || rate <= 0) continue;
+    out.push({ product_id: product, material_id: material, rate });
+  }
+  return out;
+}
+
+/** Back-test a prior-sourced rate method against this project's observed BOM
+ * rates: coverage = fraction of observed rates inside the method's declared
+ * [low, high]. Hold-out is by construction — no rate method reads the target
+ * pair's own observed rate (the BOM contributes consumer-set membership
+ * only). Family (a) is exempt (its source IS the project's own flows).
+ * Misses are reported per-row (§18.2 v2). */
+export function backTestRateMethod(
+  method: RateEstimatorMethod,
+  inputs: EstimatorInputs,
+): BackTestResult {
+  const none: BackTestResult = { n: 0, covered: 0, coverage: 1, demoted: false, outliers: [] };
+  if (method.family !== "benchmark_scaled") return none;
+  let n = 0;
+  let covered = 0;
+  const outliers: BackTestResult["outliers"] = [];
+  for (const obs of observedBomRates(inputs.dataset)) {
+    const est = method.estimate(obs, inputs);
+    if (!est) continue;
+    n += 1;
+    if (obs.rate >= est.low - ESTIMATE_TOLERANCE && obs.rate <= est.high + ESTIMATE_TOLERANCE) {
+      covered += 1;
+    } else if (outliers.length < 5) {
+      outliers.push({ entity_id: `${obs.product_id}×${obs.material_id}`, actual: obs.rate });
+    }
+  }
+  if (n === 0) return none;
+  const coverage = covered / n;
+  return { n, covered, coverage, demoted: coverage < BACKTEST_MIN_COVERAGE, outliers };
+}
+
+export interface RateCandidateRow {
+  product_id: string;
+  material_id: string;
+  method: string; // "<id>@<version>"
+  family: MethodFamily;
+  value: number;
+  low: number;
+  high: number;
+  basis: EstimateBasis;
+  sources: EstimatorSource[];
+  assumptions: string[];
+  status: "ok" | "demoted";
+}
+
+/** One candidate per (missing BOM pair × applicable rate method). Pairs with
+ * an existing BOM line are gaps already filled — nothing to estimate.
+ * Demoted methods still appear, marked, so the agent can explain WHY a pair
+ * stays open (the ce-09 discipline). */
+export function rateCandidates(
+  inputs: EstimatorInputs,
+  pairs: RatePair[],
+): RateCandidateRow[] {
+  const existing = new Set(
+    observedBomRates(inputs.dataset).map((o) => `${o.product_id}|${o.material_id}`),
+  );
+  // Pairs present in the BOM without a stored rate (rate defaulted) are
+  // still existing lines — exclude on membership, not on rate.
+  for (const b of normalizeBomRows(inputs.dataset.bom)) {
+    const p = String(b.product_id ?? "");
+    const m = String(b.material_id ?? "");
+    if (p && m) existing.add(`${p}|${m}`);
+  }
+  const out: RateCandidateRow[] = [];
+  for (const method of RATE_ESTIMATOR_METHODS) {
+    const status = backTestRateMethod(method, inputs).demoted ? "demoted" : "ok";
+    for (const pair of pairs) {
+      if (existing.has(`${pair.product_id}|${pair.material_id}`)) continue;
+      const est = method.estimate(pair, inputs);
+      if (!est) continue;
+      out.push({
+        product_id: pair.product_id,
+        material_id: pair.material_id,
+        method: rateMethodRef(method),
+        family: method.family,
+        ...est,
+        sources: method.sources(pair, inputs),
+        assumptions: method.assumptions,
+        status,
+      });
+    }
+  }
+  return out.sort((a, b) =>
+    a.product_id.localeCompare(b.product_id) ||
+    a.material_id.localeCompare(b.material_id) ||
+    a.method.localeCompare(b.method)
+  );
+}
+
+export interface RateRowInput {
+  product_id: string;
+  material_id: string;
+  method: string;
+  rate: number;
+  low: number;
+  high: number;
+}
+
+export interface RateVerification {
+  ok: boolean;
+  code?: "not_grounded" | "invalid_params";
+  reason?: string;
+  method?: RateEstimatorMethod;
+  estimate?: Estimate;
+}
+
+/** The §18.1 hard gates applied to ONE BOM-rate row: named method exists,
+ * is not demoted on this project, and re-derives {value, low, high} within
+ * tolerance. Missingness-independent, so apply retries verify cleanly. */
+export function verifyRateRow(
+  row: RateRowInput,
+  inputs: EstimatorInputs,
+): RateVerification {
+  const method = findRateMethod(row.method);
+  if (!method) {
+    return {
+      ok: false,
+      code: "not_grounded",
+      reason: `unknown rate-estimation method "${row.method}" — use a method@version from get_bom_rate_estimates`,
+    };
+  }
+  if (backTestRateMethod(method, inputs).demoted) {
+    return {
+      ok: false,
+      code: "not_grounded",
+      reason:
+        `${row.method} is demoted on this project — its declared interval excludes ` +
+        `the observed BOM consumption rates (back-test coverage < ${BACKTEST_MIN_COVERAGE})`,
+    };
+  }
+  const est = method.estimate(
+    { product_id: row.product_id, material_id: row.material_id },
+    inputs,
+  );
+  if (!est) {
+    return {
+      ok: false,
+      code: "not_grounded",
+      reason:
+        `${row.method} produces no grounded consumption rate for ` +
+        `${row.product_id} × ${row.material_id}`,
+    };
+  }
+  const off = (a: number, b: number) => Math.abs(a - b) > ESTIMATE_TOLERANCE;
+  if (off(est.value, row.rate) || off(est.low, row.low) || off(est.high, row.high)) {
+    return {
+      ok: false,
+      code: "not_grounded",
+      reason:
+        `consumption rate for ${row.product_id} × ${row.material_id}: proposed ` +
+        `{${row.rate}, [${row.low}, ${row.high}]} does not match the recomputed ` +
+        `${row.method} estimate {${est.value}, [${est.low}, ${est.high}]}`,
+    };
+  }
+  return { ok: true, method, estimate: est };
+}
+
+// ── The mass-balance validator (§18.2 v2 — runs BEFORE drafting) ────────────
+
+export interface MassBalanceViolation {
+  material_id: string;
+  /** Σ rate × weekly effective product output over ALL lines (existing
+   * normalized BOM + the proposed lines). */
+  required_weekly: number;
+  /** Σ weekly volumed inbound flow of the material. */
+  available_weekly: number;
+  tolerance: number;
+}
+
+/**
+ * §18.2 v2 mass-balance closure: for every material touched by a proposed
+ * BOM line, the volumed inbound flow must cover the total BOM-implied weekly
+ * consumption within MASS_BALANCE_TOLERANCE. Materials with no volumed arc
+ * are unconstrained (no flow information exists — declared, not assumed).
+ * A violation is a refusal naming the imbalance; a rate is NEVER silently
+ * adjusted to close the balance.
+ */
+export function checkMassBalance(
+  inputs: EstimatorInputs,
+  proposedLines: Array<RatePair & { rate: number }>,
+): MassBalanceViolation[] {
+  if (proposedLines.length === 0) return [];
+  const flow = weeklyInboundFlow(inputs.dataset);
+  const ctx = reducerCtx(inputs);
+  const touched = new Set(proposedLines.map((l) => l.material_id));
+
+  const requiredByMat = new Map<string, number>();
+  const addLine = (materialId: string, productId: string, rate: number) => {
+    if (!touched.has(materialId)) return;
+    const weekly = ctx.effectiveDemand.get(productId) ?? 0;
+    if (weekly <= 0) return;
+    requiredByMat.set(materialId, (requiredByMat.get(materialId) ?? 0) + rate * weekly);
+  };
+  for (const b of normalizeBomRows(inputs.dataset.bom)) {
+    const product = String(b.product_id ?? "");
+    const material = String(b.material_id ?? "");
+    if (!product || !material) continue;
+    addLine(material, product, num(b.consumption_rate) || 1.0);
+  }
+  for (const line of proposedLines) {
+    addLine(line.material_id, line.product_id, line.rate);
+  }
+
+  const out: MassBalanceViolation[] = [];
+  for (const material of [...touched].sort()) {
+    const available = flow.get(material);
+    if (available === undefined) continue; // no volumed arc — unconstrained
+    const required = requiredByMat.get(material) ?? 0;
+    if (required > available * (1 + MASS_BALANCE_TOLERANCE)) {
+      out.push({
+        material_id: material,
+        required_weekly: required,
+        available_weekly: available,
+        tolerance: MASS_BALANCE_TOLERANCE,
+      });
+    }
+  }
+  return out;
 }

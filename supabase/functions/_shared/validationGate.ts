@@ -50,13 +50,18 @@ export type { GradingDataset as GateDataset };
 // deno-lint-ignore no-explicit-any
 export async function loadGateDataset(sb: any, projectId: string): Promise<GradingDataset> {
   const [materials, products, suppliers, inbound, outbound, bomSingle, bomMulti] = await Promise.all([
-    sb.from("materials").select("material_id,cost,moq,holding_cost_pct").eq("project_id", projectId),
+    // `name` rides along for the B8 v2 IO-coefficient sector match
+    // (estimators.ts::matchIoCoefficient) — the grader itself ignores it.
+    sb.from("materials").select("material_id,name,cost,moq,holding_cost_pct").eq("project_id", projectId),
     sb.from("products").select("product_id,sell_price,demand_mean,production_capacity,demand_cv").eq("project_id", projectId),
     sb.from("suppliers").select("supplier_id,capacity_per_week,reliability_score").eq("project_id", projectId),
     sb.from("inbound_logistics").select("supplier_id,material_id,unit_price,lead_time,volume,time_unit").eq("project_id", projectId),
     sb.from("outbound_logistics").select("product_id,customer_id,unit_price,volume,time_unit").eq("project_id", projectId),
-    sb.from("bom_single_level").select("product_id,material_id").eq("project_id", projectId),
-    sb.from("bom_multi_level").select("material_id,higher_level_component_id").eq("project_id", projectId),
+    // consumption_rate rides along for the B8 v2 rate back-test and the
+    // mass-balance validator (estimators.ts) — the flatten already read it,
+    // defaulting absent rates to 1.0 exactly as the engine does.
+    sb.from("bom_single_level").select("product_id,material_id,consumption_rate").eq("project_id", projectId),
+    sb.from("bom_multi_level").select("material_id,higher_level_component_id,consumption_rate").eq("project_id", projectId),
   ]);
   // Multi-level rows win when they exist — the same rule the engine's
   // datamap and the frontend lanes apply. Rows pass through RAW: shape
