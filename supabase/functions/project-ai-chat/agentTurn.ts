@@ -51,6 +51,11 @@ import {
   CARTOGRAPHER_AGENT_ID,
   cartographerToolDeclarationList,
 } from "./cartographerTools.ts";
+import {
+  buildSentinelContext,
+  SENTINEL_AGENT_ID,
+  sentinelToolDeclarations,
+} from "./sentinelTools.ts";
 import { getProjectMemoryDeclaration, memoryEnabled } from "./memory.ts";
 
 export interface AgentTurnResult {
@@ -102,6 +107,15 @@ export const AGENT_TURNS: Record<string, AgentSpec> = {
     // CARTOGRAPHER_PRODUCT_LEVEL (flag off ⇒ byte-identical v1 surface).
     tools: () => [
       ...cartographerToolDeclarationList(),
+      ...(memoryEnabled() ? [getProjectMemoryDeclaration] : []),
+    ],
+  },
+  [SENTINEL_AGENT_ID]: {
+    name: "Disruption Sentinel",
+    buildContext: (ctx, args) => buildSentinelContext(ctx, args),
+    // §14.4: get_project_memory joins every agent's surface when M2 is on.
+    tools: () => [
+      ...sentinelToolDeclarations,
       ...(memoryEnabled() ? [getProjectMemoryDeclaration] : []),
     ],
   },

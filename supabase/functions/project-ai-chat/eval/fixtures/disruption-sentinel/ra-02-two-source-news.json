@@ -1,0 +1,41 @@
+{
+  "id": "ra-02-two-source-news",
+  "description": "ai-agents.md §18.3 ra-02 — the same plant-fire event from TWO independent news-class sources tallies corroborated (2 < 3, none authoritative); draft_risk_alert refuses not_grounded NAMING the missing corroboration (one authoritative feed or one more independent source); no proposal.",
+  "project_snapshot": { "reuse": "ra-03-authoritative-single" },
+  "utterance": "Two outlets report a fire at Acme Alloys - does it touch our network?",
+  "docs": [
+    {
+      "source_id": "gdelt",
+      "title": "Screened article: Acme fire",
+      "text": "A major fire broke out overnight at the Acme Alloys GmbH plant in Graz, interrupting alloy compound production. Firefighters contained the blaze by early morning, the company said.",
+      "extraction": {
+        "entities": [
+          { "type": "Company", "text": "Acme Alloys GmbH" }
+        ],
+        "triples": []
+      }
+    },
+    {
+      "source_id": "reuters-wire",
+      "title": "Wire: Fire at Acme Alloys facility",
+      "text": "Fire at Acme Alloys GmbH facility disrupts alloy output. The company said a damage assessment is under way at its Graz site and gave no restart date.",
+      "extraction": {
+        "entities": [
+          { "type": "Company", "text": "Acme Alloys GmbH" }
+        ],
+        "triples": []
+      }
+    }
+  ],
+  "expect": {
+    "event_type": "fire",
+    "status": "corroborated",
+    "independent_sources": 2,
+    "authoritative_sources": 0,
+    "draft_error_code": "not_grounded",
+    "draft_reason_includes": "authoritative",
+    "draft_reason_also_includes": "1 more independent source",
+    "proposals": 0
+  },
+  "retired_reason": null
+}

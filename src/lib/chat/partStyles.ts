@@ -108,6 +108,7 @@ export const ARTIFACT_AGENT_NAMES: Record<string, string> = {
   experiment_spec: "Experiment Designer",
   trace_explanation: "Explainer",
   decision_report: "Report Builder",
+  risk_alert: "Disruption Sentinel",
 };
 
 export function agentTurnLabel(artifactType: string | undefined): string | null {

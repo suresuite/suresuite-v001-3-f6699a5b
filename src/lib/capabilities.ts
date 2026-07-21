@@ -66,7 +66,10 @@ export type FeatureKey =
   | 'agent_cost_estimator'
   // v1.5 Phase 4b (ai-agents.md §18.2/§13.1; seeded in
   // 20260727000001_network_cartographer.sql):
-  | 'agent_network_cartographer';
+  | 'agent_network_cartographer'
+  // v1.5 Phase 4d (ai-agents.md §18.3/§13.1; seeded in
+  // 20260729000001_disruption_sentinel.sql):
+  | 'agent_disruption_sentinel';
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'ai_chat', kind: 'feature', label: 'AI Assistant' },
@@ -87,6 +90,7 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'agent_report_builder', kind: 'feature', label: 'Report Builder Agent' },
   { key: 'agent_cost_estimator', kind: 'feature', label: 'Cost Estimator Agent' },
   { key: 'agent_network_cartographer', kind: 'feature', label: 'Network Cartographer Agent' },
+  { key: 'agent_disruption_sentinel', kind: 'feature', label: 'Disruption Sentinel Agent' },
 ];
 
 /** `/profile` is a system page — always reachable, never deniable. */
@@ -195,6 +199,7 @@ export function roleFallbackCapabilities(
     agent_explainer: false,
     agent_cost_estimator: false,
     agent_network_cartographer: false,
+    agent_disruption_sentinel: false,
     chat_history_sync: false,
     project_memory: false,
   };

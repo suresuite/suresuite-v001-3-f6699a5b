@@ -308,6 +308,10 @@ export function tallyEvidence(rows: EvidenceRow[]): TripleTally[] {
   const byKey = new Map<string, TripleTally>();
   for (const row of rows) {
     if (!row?.triple?.subject?.name || !row.triple.object?.name) continue;
+    // §10 note 37d: B9 event rows (relation "EventReported") share the store
+    // but not the map vocabulary — the graph tally reads only the closed
+    // relation set, so the two views stay disjoint.
+    if (!(RELATION_TYPES as readonly string[]).includes(row.triple.relation)) continue;
     const key = canonicalTripleKey(row.triple);
     let t = byKey.get(key);
     if (!t) {
