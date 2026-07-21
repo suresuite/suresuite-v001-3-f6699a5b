@@ -171,10 +171,13 @@ export async function resolveCitation(
           : { ok: false, reason: `registry ref ${ref} not found in the registry export` };
       }
       case "document": {
-        // Repo path (+ optional anchor); shape-checked only.
-        return /^[\w./-]+(#[\w.-]+)?$/.test(ref)
+        // Repo path (+ optional anchor), or a store-scoped ref
+        // `<store>:<id>` — the Q22g idiom (`project_memory:<id>`,
+        // `external_evidence:<id>`; §10 note 36f). Shape-checked only; the
+        // draft/apply gates that consume store refs verify real existence.
+        return /^[\w./-]+(:[\w-]+)?(#[\w.@-]+)?$/.test(ref)
           ? { ok: true }
-          : { ok: false, reason: "document ref is not a repo path" };
+          : { ok: false, reason: "document ref is not a repo path or store-scoped ref" };
       }
       case "user_message": {
         return /^thread:.+#.+$/.test(ref)

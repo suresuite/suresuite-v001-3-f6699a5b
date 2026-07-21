@@ -1,0 +1,23 @@
+{
+  "id": "nc-10-corpus-metrics",
+  "description": "ai-agents.md §18.2 nc-10 — the checked-in annotated corpus (>= 30 labeled sentences, the Wichmann discipline) loads; the scorer's P/R/F1 math is verified on planted predictions; the committed rule-based baseline extractor's scores are computed and PINNED here (the reproducible CI floor). The live zero-shot measurement runs in the §7.4 model-scored tier (run_model_eval.ts --corpus), where the AlMahri numbers (NER F1 ~0.52, RE F1 ~0.33) are the baseline to beat.",
+  "project_snapshot": {},
+  "utterance": "",
+  "docs": [],
+  "expect": {
+    "min_sentences": 30,
+    "baseline": {
+      "ner": {
+        "tp": 70,
+        "fp": 2,
+        "fn": 10
+      },
+      "re": {
+        "tp": 23,
+        "fp": 1,
+        "fn": 9
+      }
+    }
+  },
+  "retired_reason": null
+}

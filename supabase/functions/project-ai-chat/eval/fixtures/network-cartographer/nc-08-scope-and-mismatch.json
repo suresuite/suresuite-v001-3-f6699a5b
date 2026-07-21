@@ -1,0 +1,201 @@
+{
+  "id": "nc-08-scope-and-mismatch",
+  "description": "ai-agents.md §18.2 nc-08 — a link row naming a material absent from the project is project_scope_violation; a row citing evidence whose stored triple names a different subject is not_grounded; no proposal either way.",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S-HELIX",
+        "name": "Helix Drives GmbH",
+        "capacity_per_week": 800,
+        "reliability_score": 1
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-CTH",
+        "name": "battery cathodes"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "supplier_id": "S-HELIX",
+        "material_id": "MAT-PM",
+        "unit_price": 120,
+        "lead_time": 2,
+        "volume": 40,
+        "time_unit": "week"
+      }
+    ],
+    "external_evidence": [
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000000001",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "news-wire",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-news-wire-1",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "SuppliesTo",
+          "object": {
+            "name": "Helix Drives GmbH",
+            "type": "Company"
+          },
+          "quote": "Nordwind Semiconductor GmbH supplies power modules to Helix Drives GmbH."
+        },
+        "lei": "529900NORDWIND000044"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000000002",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "sec-edgar",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-sec-edgar-2",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "SuppliesTo",
+          "object": {
+            "name": "Helix Drives GmbH",
+            "type": "Company"
+          },
+          "quote": "Nordwind Semiconductor GmbH supplies power modules to Helix Drives GmbH."
+        },
+        "lei": "529900NORDWIND000044"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000000003",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "lksg-csrd-disclosures",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-lksg-csrd-disclosures-3",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "SuppliesTo",
+          "object": {
+            "name": "Helix Drives GmbH",
+            "type": "Company"
+          },
+          "quote": "Nordwind Semiconductor GmbH supplies power modules to Helix Drives GmbH."
+        },
+        "lei": "529900NORDWIND000044"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "news-wire",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-news-wire-4",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "power modules",
+            "type": "Material"
+          },
+          "quote": "Nordwind Semiconductor GmbH produces power modules."
+        },
+        "lei": "529900NORDWIND000044"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000000005",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "sec-edgar",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-sec-edgar-5",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "power modules",
+            "type": "Material"
+          },
+          "quote": "Nordwind Semiconductor GmbH produces power modules."
+        },
+        "lei": "529900NORDWIND000044"
+      },
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000000006",
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "source_id": "lksg-csrd-disclosures",
+        "url_or_ref": "stored fixture",
+        "content_hash": "hash-lksg-csrd-disclosures-6",
+        "retrieved_at": "2026-07-20T00:00:00Z",
+        "confidence": 0.7,
+        "triple": {
+          "subject": {
+            "name": "Nordwind Semiconductor GmbH",
+            "lei": "529900NORDWIND000044"
+          },
+          "relation": "Produces",
+          "object": {
+            "name": "power modules",
+            "type": "Material"
+          },
+          "quote": "Nordwind Semiconductor GmbH produces power modules."
+        },
+        "lei": "529900NORDWIND000044"
+      }
+    ]
+  },
+  "utterance": "Add the verified Nordwind link",
+  "docs": [],
+  "evidence_ids": {
+    "supplies": [
+      "eeeeeeee-0000-4000-8000-000000000001",
+      "eeeeeeee-0000-4000-8000-000000000002",
+      "eeeeeeee-0000-4000-8000-000000000003"
+    ],
+    "produces": [
+      "eeeeeeee-0000-4000-8000-000000000004",
+      "eeeeeeee-0000-4000-8000-000000000005",
+      "eeeeeeee-0000-4000-8000-000000000006"
+    ]
+  },
+  "expect": {
+    "scope_error_code": "project_scope_violation",
+    "mismatch_error_code": "not_grounded",
+    "mismatch_reason_includes": "is about",
+    "proposals": 0
+  },
+  "retired_reason": null
+}

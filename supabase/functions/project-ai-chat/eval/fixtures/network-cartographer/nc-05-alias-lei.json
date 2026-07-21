@@ -1,0 +1,172 @@
+{
+  "id": "nc-05-alias-lei",
+  "description": "ai-agents.md §18.2 nc-05 — one document names the firm by a seed-slice alias ('Nordwind Semi'); all three mentions resolve to ONE LEI-anchored canonical entity, the tally verifies at 3, and apply creates a single supplier row keyed on the LEI; evidence rows carry the lei.",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S-HELIX",
+        "name": "Helix Drives GmbH",
+        "capacity_per_week": 800,
+        "reliability_score": 1
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-CTH",
+        "name": "battery cathodes"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "supplier_id": "S-HELIX",
+        "material_id": "MAT-PM",
+        "unit_price": 120,
+        "lead_time": 2,
+        "volume": 40,
+        "time_unit": "week"
+      }
+    ],
+    "external_evidence": []
+  },
+  "utterance": "Map the Nordwind evidence, one report calls them Nordwind Semi",
+  "docs": [
+    {
+      "source_id": "news-wire",
+      "title": "Wire: Nordwind-Helix supply agreement",
+      "text": "Nordwind Semiconductor GmbH has signed a three-year agreement to supply power modules to Helix Drives GmbH. Nordwind Semiconductor GmbH produces power modules at its Dresden fab.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Nordwind Semiconductor GmbH"
+          },
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "power modules"
+          },
+          {
+            "type": "Location",
+            "text": "Dresden"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Nordwind Semiconductor GmbH has signed a three-year agreement to supply power modules to Helix Drives GmbH."
+          },
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "Produces",
+            "object": "power modules",
+            "quote": "Nordwind Semiconductor GmbH produces power modules at its Dresden fab."
+          }
+        ]
+      }
+    },
+    {
+      "source_id": "sec-edgar",
+      "title": "10-K excerpt: supplier disclosures",
+      "text": "Helix Drives GmbH sources power modules from Nordwind Semiconductor GmbH. Nordwind Semiconductor GmbH produces power modules and is headquartered in Dresden.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Company",
+            "text": "Nordwind Semiconductor GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "power modules"
+          },
+          {
+            "type": "Location",
+            "text": "Dresden"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Helix Drives GmbH sources power modules from Nordwind Semiconductor GmbH."
+          },
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "Produces",
+            "object": "power modules",
+            "quote": "Nordwind Semiconductor GmbH produces power modules and is headquartered in Dresden."
+          }
+        ]
+      }
+    },
+    {
+      "source_id": "lksg-csrd-disclosures",
+      "title": "LkSG due-diligence disclosure (alias form)",
+      "text": "Under its supply-chain due-diligence disclosure, Helix Drives GmbH lists Nordwind Semi as a direct supplier of power modules. Nordwind Semi produces power modules.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Company",
+            "text": "Nordwind Semi"
+          },
+          {
+            "type": "Material",
+            "text": "power modules"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Nordwind Semi",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Under its supply-chain due-diligence disclosure, Helix Drives GmbH lists Nordwind Semi as a direct supplier of power modules."
+          },
+          {
+            "subject": "Nordwind Semi",
+            "relation": "Produces",
+            "object": "power modules",
+            "quote": "Nordwind Semi produces power modules."
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "lei": "529900NORDWIND000044",
+    "verified_status": "verified",
+    "independent_sources": 3,
+    "apply": {
+      "added_suppliers": 1
+    }
+  },
+  "retired_reason": null
+}

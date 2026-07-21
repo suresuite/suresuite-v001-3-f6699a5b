@@ -46,6 +46,11 @@ import {
   ESTIMATOR_AGENT_ID,
   estimatorToolDeclarations,
 } from "./estimatorTools.ts";
+import {
+  buildCartographerContext,
+  CARTOGRAPHER_AGENT_ID,
+  cartographerToolDeclarations,
+} from "./cartographerTools.ts";
 import { getProjectMemoryDeclaration, memoryEnabled } from "./memory.ts";
 
 export interface AgentTurnResult {
@@ -86,6 +91,15 @@ export const AGENT_TURNS: Record<string, AgentSpec> = {
     // §14.4: get_project_memory joins every agent's surface when M2 is on.
     tools: () => [
       ...estimatorToolDeclarations,
+      ...(memoryEnabled() ? [getProjectMemoryDeclaration] : []),
+    ],
+  },
+  [CARTOGRAPHER_AGENT_ID]: {
+    name: "Network Cartographer",
+    buildContext: (ctx, args) => buildCartographerContext(ctx, args),
+    // §14.4: get_project_memory joins every agent's surface when M2 is on.
+    tools: () => [
+      ...cartographerToolDeclarations,
       ...(memoryEnabled() ? [getProjectMemoryDeclaration] : []),
     ],
   },

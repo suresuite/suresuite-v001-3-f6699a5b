@@ -1,0 +1,136 @@
+{
+  "id": "nc-03-two-source-corroborated",
+  "description": "ai-agents.md §18.2 nc-03 — the same triple from 2 independent registered sources tallies corroborated: stored, flagged, NOT integrated; a draft is not_grounded; re-ingesting the same document from the same source converges via content_hash idempotency.",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S-HELIX",
+        "name": "Helix Drives GmbH",
+        "capacity_per_week": 800,
+        "reliability_score": 1
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-CTH",
+        "name": "battery cathodes"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "supplier_id": "S-HELIX",
+        "material_id": "MAT-PM",
+        "unit_price": 120,
+        "lead_time": 2,
+        "volume": 40,
+        "time_unit": "week"
+      }
+    ],
+    "external_evidence": []
+  },
+  "utterance": "Two sources now name Baltic Cathode Works — map it",
+  "docs": [
+    {
+      "source_id": "wikipedia-wikidata",
+      "title": "Encyclopedia entry: Baltic Cathode Works",
+      "text": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Baltic Cathode Works"
+          },
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "battery cathodes"
+          },
+          {
+            "type": "Location",
+            "text": "Gdansk"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Baltic Cathode Works",
+            "relation": "Produces",
+            "object": "battery cathodes",
+            "quote": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant."
+          },
+          {
+            "subject": "Baltic Cathode Works",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant."
+          }
+        ]
+      }
+    },
+    {
+      "source_id": "gdelt",
+      "title": "GDELT-screened article",
+      "text": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Baltic Cathode Works"
+          },
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "battery cathodes"
+          },
+          {
+            "type": "Location",
+            "text": "Gdansk"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Baltic Cathode Works",
+            "relation": "Produces",
+            "object": "battery cathodes",
+            "quote": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant."
+          },
+          {
+            "subject": "Baltic Cathode Works",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant."
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "status": "corroborated",
+    "independent_sources": 2,
+    "draft_error_code": "not_grounded",
+    "draft_reason_includes": "corroborated (2 independent sources)",
+    "proposals": 0
+  },
+  "retired_reason": null
+}

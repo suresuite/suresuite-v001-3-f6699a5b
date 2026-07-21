@@ -11,6 +11,7 @@ import {
   Lightbulb,
   Loader2,
   MessageSquareQuote,
+  Network,
   SlidersHorizontal,
 } from "lucide-react";
 import { AppliedReportFiles } from "@/components/chat/FileCard";
@@ -36,6 +37,7 @@ import { APPLY_RETRY_CAP, useProposal, type Proposal } from "@/hooks/useProposal
 const AGENT_META: Record<string, { name: string; Icon: typeof Database }> = {
   "data-steward": { name: "Data Steward", Icon: Database },
   "cost-estimator": { name: "Cost Estimator", Icon: Calculator },
+  "network-cartographer": { name: "Network Cartographer", Icon: Network },
   "policy-configurator": { name: "Policy Configurator", Icon: SlidersHorizontal },
   "vv-analyst": { name: "V&V Analyst", Icon: BadgeCheck },
   "experiment-designer": { name: "Experiment Designer", Icon: FlaskConical },
@@ -53,6 +55,7 @@ const PROVENANCE_CHIP: Record<Proposal["provenance"], { label: string; className
 const ARTIFACT_META: Record<string, { room: string | null; roomLabel: string; gate: string }> = {
   item_master_diff: { room: "/project-manager", roomLabel: "Project Manager", gate: "the item-master write RPCs" },
   parameter_estimate: { room: "/project-manager", roomLabel: "Project Manager", gate: "the item-master write RPCs" },
+  network_map_diff: { room: "/project-manager", roomLabel: "Project Manager", gate: "the supplier/lane write RPCs" },
   policy_bundle_diff: { room: "/policies", roomLabel: "Policies", gate: "save_policy_defaults + snapshot_policy" },
   model_card_draft: { room: "/policies", roomLabel: "Run & Validate", gate: "record_model_validation" },
   experiment_spec: { room: "/simulation-lab", roomLabel: "Simulation Lab", gate: "the experiment dispatch gate" },
@@ -160,6 +163,64 @@ function ParameterEstimate({ rows }: { rows: Array<Record<string, unknown>> }) {
           <span className="font-medium">Declared assumptions:</span>
           <ul className="ml-4 list-disc">
             {assumptions.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** network_map_diff body (§18.2 card contract): per-row op + supplier +
+ * LEI + verification status/source count + sources + quotes, plus the
+ * visibly-pending sub-threshold triples — everything straight from the
+ * payload, never recomputed client-side (§4.6). */
+function NetworkMapDiff({ payload }: { payload: { rows?: Array<Record<string, unknown>>; pending?: Array<Record<string, unknown>> } }) {
+  const [showAll, setShowAll] = useState(false);
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const pending = Array.isArray(payload.pending) ? payload.pending : [];
+  const visible = showAll ? rows : rows.slice(0, DIFF_COLLAPSE_LIMIT);
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12.5px]">
+          <thead>
+            <tr className="border-b border-border text-left text-muted-foreground">
+              <th className="py-1 pr-3 font-medium">Change</th>
+              <th className="py-1 pr-3 font-medium">Supplier</th>
+              <th className="py-1 pr-3 font-medium">LEI</th>
+              <th className="py-1 pr-3 font-medium">Claim</th>
+              <th className="py-1 pr-3 font-medium">Status</th>
+              <th className="py-1 font-medium">Sources</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r, i) => (
+              <tr key={i} className="border-b border-border/50">
+                <td className="py-1 pr-3">{r.op === "add_supply_link" ? `link → ${String(r.material_id ?? "")}` : "add supplier"}</td>
+                <td className="py-1 pr-3">{String(r.supplier_name ?? "")} <span className="font-mono text-muted-foreground">({String(r.supplier_id ?? "")})</span></td>
+                <td className="py-1 pr-3 font-mono">{r.lei ? String(r.lei) : "—"}</td>
+                <td className="py-1 pr-3">{String(r.subject ?? "")} {String(r.relation ?? "")} {String(r.object ?? "")}</td>
+                <td className="py-1 pr-3">{String(r.status ?? "")} ({String(r.independent_sources ?? "?")})</td>
+                <td className="py-1">{Array.isArray(r.source_ids) ? (r.source_ids as string[]).join("; ") : ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length > DIFF_COLLAPSE_LIMIT && !showAll && (
+          <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
+            show all {rows.length}
+          </button>
+        )}
+      </div>
+      {pending.length > 0 && (
+        <div className="mt-2 text-[11.5px] text-muted-foreground">
+          <span className="font-medium">Pending — stored, not applied (needs 3+ independent sources):</span>
+          <ul className="ml-4 list-disc">
+            {pending.map((p, i) => (
+              <li key={i}>
+                {String(p.subject ?? "")} {String(p.relation ?? "")} {String(p.object ?? "")} — {String(p.status ?? "")} ({String(p.independent_sources ?? "?")})
+              </li>
+            ))}
           </ul>
         </div>
       )}
@@ -460,6 +521,9 @@ function ProposalBody({ proposal }: { proposal: Proposal }) {
   }
   if (proposal.artifact_type === "parameter_estimate" && Array.isArray(rows)) {
     return <ParameterEstimate rows={rows} />;
+  }
+  if (proposal.artifact_type === "network_map_diff" && Array.isArray(rows)) {
+    return <NetworkMapDiff payload={payload as { rows?: Array<Record<string, unknown>>; pending?: Array<Record<string, unknown>> }} />;
   }
   if (proposal.artifact_type === "policy_bundle_diff" && (payload as PolicyDiffPayload).diff) {
     return <PolicyBundleDiff payload={payload as PolicyDiffPayload} />;

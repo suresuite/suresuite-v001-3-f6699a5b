@@ -13,6 +13,7 @@ export interface RouteDecision {
   agent_id:
     | "data-steward"
     | "cost-estimator"
+    | "network-cartographer"
     | "policy-configurator"
     | "vv-analyst"
     | "experiment-designer"
@@ -59,6 +60,10 @@ export const ROUTER_CONFIDENCE_MIN = 0.70; // DEFAULT (§6.2 step 3)
 export const AGENT_PRECEDENCE = [
   "data-steward",
   "cost-estimator",
+  // network-cartographer sits directly after cost-estimator (§18.2): on a
+  // tie, the project's own data beats estimates beats external evidence —
+  // internal ground truth always outranks mined text.
+  "network-cartographer",
   "policy-configurator",
   "vv-analyst",
   "experiment-designer",
@@ -80,6 +85,11 @@ export const AGENT_ROSTER: Record<AgentSlug, { mission: string; intents: string[
     mission:
       "estimates missing item-master economics with method-cited values and uncertainty intervals where the data alone cannot supply them",
     intents: ["estimator.estimate_missing", "estimator.explain_methods", "estimator.resilience_cost"],
+  },
+  "network-cartographer": {
+    mission:
+      "maps the supply network beyond tier 1 from user-provided documents and registered external sources, as evidence-cited reviewable graph extensions",
+    intents: ["cartographer.map_from_documents", "cartographer.evidence_status"],
   },
   "policy-configurator": {
     mission:

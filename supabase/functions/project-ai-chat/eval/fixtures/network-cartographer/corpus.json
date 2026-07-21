@@ -1,0 +1,371 @@
+{
+  "corpus_version": 1,
+  "note": "B8 annotated extraction corpus (ai-agents.md §18.2 nc-10 — the Wichmann et al. corpus discipline: every extraction source class gets annotated evaluation sentences before its output counts toward CI metrics). 32 labeled sentences over a FICTIONAL supply-chain world (no real-world relationship is asserted); gold entities are (type, verbatim text) pairs and gold triples are (subject, relation, object) with the §18.2 closed relation set. Scored by eval/harness/corpus_score.ts: exact-match micro P/R/F1. The committed rule-based baseline (eval/harness/baseline_extractor.ts) is the reproducible CI floor; per-model zero-shot extraction is scored by run_model_eval.ts --corpus, where the AlMahri et al. 2026 zero-shot numbers (NER F1 ~0.52, RE F1 ~0.33) are the baseline to beat.",
+  "sentences": [
+    {
+      "id": "s01",
+      "text": "Nordwind Semiconductor GmbH supplies power modules to Helix Drives GmbH under a three-year agreement.",
+      "entities": [
+        { "type": "Company", "text": "Nordwind Semiconductor GmbH" },
+        { "type": "Company", "text": "Helix Drives GmbH" },
+        { "type": "Material", "text": "power modules" }
+      ],
+      "triples": [
+        { "subject": "Nordwind Semiconductor GmbH", "relation": "SuppliesTo", "object": "Helix Drives GmbH" }
+      ]
+    },
+    {
+      "id": "s02",
+      "text": "Nordwind Semiconductor GmbH produces power modules at its Dresden fab.",
+      "entities": [
+        { "type": "Company", "text": "Nordwind Semiconductor GmbH" },
+        { "type": "Material", "text": "power modules" },
+        { "type": "Location", "text": "Dresden" }
+      ],
+      "triples": [
+        { "subject": "Nordwind Semiconductor GmbH", "relation": "Produces", "object": "power modules" },
+        { "subject": "Nordwind Semiconductor GmbH", "relation": "LocatedIn", "object": "Dresden" }
+      ]
+    },
+    {
+      "id": "s03",
+      "text": "Helix Drives GmbH is headquartered in Graz.",
+      "entities": [
+        { "type": "Company", "text": "Helix Drives GmbH" },
+        { "type": "Location", "text": "Graz" }
+      ],
+      "triples": [
+        { "subject": "Helix Drives GmbH", "relation": "LocatedIn", "object": "Graz" }
+      ]
+    },
+    {
+      "id": "s04",
+      "text": "Baltic Cathode Works is a maker of battery cathodes.",
+      "entities": [
+        { "type": "Company", "text": "Baltic Cathode Works" },
+        { "type": "Material", "text": "battery cathodes" }
+      ],
+      "triples": [
+        { "subject": "Baltic Cathode Works", "relation": "Produces", "object": "battery cathodes" }
+      ]
+    },
+    {
+      "id": "s05",
+      "text": "Alpine Motors AG sources battery cathodes from Baltic Cathode Works.",
+      "entities": [
+        { "type": "Company", "text": "Alpine Motors AG" },
+        { "type": "Company", "text": "Baltic Cathode Works" },
+        { "type": "Material", "text": "battery cathodes" }
+      ],
+      "triples": [
+        { "subject": "Baltic Cathode Works", "relation": "SuppliesTo", "object": "Alpine Motors AG" }
+      ]
+    },
+    {
+      "id": "s06",
+      "text": "Nordwind Semiconductor GmbH, a subsidiary of Meridian Industries AG, reported record output.",
+      "entities": [
+        { "type": "Company", "text": "Nordwind Semiconductor GmbH" },
+        { "type": "Company", "text": "Meridian Industries AG" }
+      ],
+      "triples": [
+        { "subject": "Nordwind Semiconductor GmbH", "relation": "OwnedBy", "object": "Meridian Industries AG" }
+      ]
+    },
+    {
+      "id": "s07",
+      "text": "Veyron Logistics Ltd signed a supply contract with Helix Drives GmbH.",
+      "entities": [
+        { "type": "Company", "text": "Veyron Logistics Ltd" },
+        { "type": "Company", "text": "Helix Drives GmbH" }
+      ],
+      "triples": [
+        { "subject": "Veyron Logistics Ltd", "relation": "SuppliesTo", "object": "Helix Drives GmbH" }
+      ]
+    },
+    {
+      "id": "s08",
+      "text": "Tessin Polymer SA delivers epoxy resin to Alpine Motors AG.",
+      "entities": [
+        { "type": "Company", "text": "Tessin Polymer SA" },
+        { "type": "Company", "text": "Alpine Motors AG" },
+        { "type": "Material", "text": "epoxy resin" }
+      ],
+      "triples": [
+        { "subject": "Tessin Polymer SA", "relation": "SuppliesTo", "object": "Alpine Motors AG" }
+      ]
+    },
+    {
+      "id": "s09",
+      "text": "Tessin Polymer SA manufactures epoxy resin in Bavaria.",
+      "entities": [
+        { "type": "Company", "text": "Tessin Polymer SA" },
+        { "type": "Material", "text": "epoxy resin" },
+        { "type": "Location", "text": "Bavaria" }
+      ],
+      "triples": [
+        { "subject": "Tessin Polymer SA", "relation": "Produces", "object": "epoxy resin" },
+        { "subject": "Tessin Polymer SA", "relation": "LocatedIn", "object": "Bavaria" }
+      ]
+    },
+    {
+      "id": "s10",
+      "text": "Aurora Battery Systems AB is based in Sweden.",
+      "entities": [
+        { "type": "Company", "text": "Aurora Battery Systems AB" },
+        { "type": "Location", "text": "Sweden" }
+      ],
+      "triples": [
+        { "subject": "Aurora Battery Systems AB", "relation": "LocatedIn", "object": "Sweden" }
+      ]
+    },
+    {
+      "id": "s11",
+      "text": "Aurora Battery Systems AB procures lithium carbonate from Vektra Group SE.",
+      "entities": [
+        { "type": "Company", "text": "Aurora Battery Systems AB" },
+        { "type": "Company", "text": "Vektra Group SE" },
+        { "type": "Material", "text": "lithium carbonate" }
+      ],
+      "triples": [
+        { "subject": "Vektra Group SE", "relation": "SuppliesTo", "object": "Aurora Battery Systems AB" }
+      ]
+    },
+    {
+      "id": "s12",
+      "text": "Kestrel Foundry Ltd fabricates aluminium castings for the automotive sector.",
+      "entities": [
+        { "type": "Company", "text": "Kestrel Foundry Ltd" },
+        { "type": "Material", "text": "aluminium castings" }
+      ],
+      "triples": [
+        { "subject": "Kestrel Foundry Ltd", "relation": "Produces", "object": "aluminium castings" }
+      ]
+    },
+    {
+      "id": "s13",
+      "text": "Kestrel Foundry Ltd ships aluminium castings to Alpine Motors AG each week.",
+      "entities": [
+        { "type": "Company", "text": "Kestrel Foundry Ltd" },
+        { "type": "Company", "text": "Alpine Motors AG" },
+        { "type": "Material", "text": "aluminium castings" }
+      ],
+      "triples": [
+        { "subject": "Kestrel Foundry Ltd", "relation": "SuppliesTo", "object": "Alpine Motors AG" }
+      ]
+    },
+    {
+      "id": "s14",
+      "text": "Baltic Cathode Works operates a plant in Gdansk.",
+      "entities": [
+        { "type": "Company", "text": "Baltic Cathode Works" },
+        { "type": "Location", "text": "Gdansk" }
+      ],
+      "triples": [
+        { "subject": "Baltic Cathode Works", "relation": "LocatedIn", "object": "Gdansk" }
+      ]
+    },
+    {
+      "id": "s15",
+      "text": "Baltic Cathode Works, a unit of Vektra Group SE, expanded capacity last year.",
+      "entities": [
+        { "type": "Company", "text": "Baltic Cathode Works" },
+        { "type": "Company", "text": "Vektra Group SE" }
+      ],
+      "triples": [
+        { "subject": "Baltic Cathode Works", "relation": "OwnedBy", "object": "Vektra Group SE" }
+      ]
+    },
+    {
+      "id": "s16",
+      "text": "Helix Drives GmbH assembles electric drive units for Alpine Motors AG.",
+      "entities": [
+        { "type": "Company", "text": "Helix Drives GmbH" },
+        { "type": "Company", "text": "Alpine Motors AG" },
+        { "type": "Product", "text": "electric drive units" }
+      ],
+      "triples": [
+        { "subject": "Helix Drives GmbH", "relation": "Produces", "object": "electric drive units" },
+        { "subject": "Helix Drives GmbH", "relation": "SuppliesTo", "object": "Alpine Motors AG" }
+      ]
+    },
+    {
+      "id": "s17",
+      "text": "CEO Jonas Brandt said Nordwind Semiconductor GmbH will double its Dresden capacity.",
+      "entities": [
+        { "type": "Person", "text": "Jonas Brandt" },
+        { "type": "Company", "text": "Nordwind Semiconductor GmbH" },
+        { "type": "Location", "text": "Dresden" }
+      ],
+      "triples": [
+        { "subject": "Nordwind Semiconductor GmbH", "relation": "LocatedIn", "object": "Dresden" }
+      ]
+    },
+    {
+      "id": "s18",
+      "text": "Marta Keller, spokesperson for Meridian Industries AG, confirmed the acquisition.",
+      "entities": [
+        { "type": "Person", "text": "Marta Keller" },
+        { "type": "Company", "text": "Meridian Industries AG" }
+      ],
+      "triples": []
+    },
+    {
+      "id": "s19",
+      "text": "Meridian Industries AG acquired Helix Drives GmbH in 2024.",
+      "entities": [
+        { "type": "Company", "text": "Meridian Industries AG" },
+        { "type": "Company", "text": "Helix Drives GmbH" }
+      ],
+      "triples": [
+        { "subject": "Helix Drives GmbH", "relation": "OwnedBy", "object": "Meridian Industries AG" }
+      ]
+    },
+    {
+      "id": "s20",
+      "text": "Alpine Motors AG buys wiring harnesses from Veyron Logistics Ltd.",
+      "entities": [
+        { "type": "Company", "text": "Alpine Motors AG" },
+        { "type": "Company", "text": "Veyron Logistics Ltd" },
+        { "type": "Material", "text": "wiring harnesses" }
+      ],
+      "triples": [
+        { "subject": "Veyron Logistics Ltd", "relation": "SuppliesTo", "object": "Alpine Motors AG" }
+      ]
+    },
+    {
+      "id": "s21",
+      "text": "Veyron Logistics Ltd distributes wiring harnesses produced by Tessin Polymer SA.",
+      "entities": [
+        { "type": "Company", "text": "Veyron Logistics Ltd" },
+        { "type": "Company", "text": "Tessin Polymer SA" },
+        { "type": "Material", "text": "wiring harnesses" }
+      ],
+      "triples": [
+        { "subject": "Tessin Polymer SA", "relation": "Produces", "object": "wiring harnesses" }
+      ]
+    },
+    {
+      "id": "s22",
+      "text": "The industrial inverters assembled by Helix Drives GmbH use sintered magnets.",
+      "entities": [
+        { "type": "Product", "text": "industrial inverters" },
+        { "type": "Company", "text": "Helix Drives GmbH" },
+        { "type": "Material", "text": "sintered magnets" }
+      ],
+      "triples": [
+        { "subject": "Helix Drives GmbH", "relation": "Produces", "object": "industrial inverters" }
+      ]
+    },
+    {
+      "id": "s23",
+      "text": "Aurora Battery Systems AB supplies copper foil to Nordwind Semiconductor GmbH.",
+      "entities": [
+        { "type": "Company", "text": "Aurora Battery Systems AB" },
+        { "type": "Company", "text": "Nordwind Semiconductor GmbH" },
+        { "type": "Material", "text": "copper foil" }
+      ],
+      "triples": [
+        { "subject": "Aurora Battery Systems AB", "relation": "SuppliesTo", "object": "Nordwind Semiconductor GmbH" }
+      ]
+    },
+    {
+      "id": "s24",
+      "text": "Dr. Elif Aydin of Aurora Battery Systems AB presented the new cathode line.",
+      "entities": [
+        { "type": "Person", "text": "Elif Aydin" },
+        { "type": "Company", "text": "Aurora Battery Systems AB" }
+      ],
+      "triples": []
+    },
+    {
+      "id": "s25",
+      "text": "Kestrel Foundry Ltd is a supplier to Helix Drives GmbH.",
+      "entities": [
+        { "type": "Company", "text": "Kestrel Foundry Ltd" },
+        { "type": "Company", "text": "Helix Drives GmbH" }
+      ],
+      "triples": [
+        { "subject": "Kestrel Foundry Ltd", "relation": "SuppliesTo", "object": "Helix Drives GmbH" }
+      ]
+    },
+    {
+      "id": "s26",
+      "text": "Vektra Group SE is headquartered in Munich.",
+      "entities": [
+        { "type": "Company", "text": "Vektra Group SE" },
+        { "type": "Location", "text": "Munich" }
+      ],
+      "triples": [
+        { "subject": "Vektra Group SE", "relation": "LocatedIn", "object": "Munich" }
+      ]
+    },
+    {
+      "id": "s27",
+      "text": "Alpine Motors AG makes the E-Trek cargo bike.",
+      "entities": [
+        { "type": "Company", "text": "Alpine Motors AG" },
+        { "type": "Product", "text": "E-Trek cargo bike" }
+      ],
+      "triples": [
+        { "subject": "Alpine Motors AG", "relation": "Produces", "object": "E-Trek cargo bike" }
+      ]
+    },
+    {
+      "id": "s28",
+      "text": "Nordwind Semi provides power modules to Aurora Battery Systems AB.",
+      "entities": [
+        { "type": "Company", "text": "Nordwind Semi" },
+        { "type": "Company", "text": "Aurora Battery Systems AB" },
+        { "type": "Material", "text": "power modules" }
+      ],
+      "triples": [
+        { "subject": "Nordwind Semi", "relation": "SuppliesTo", "object": "Aurora Battery Systems AB" }
+      ]
+    },
+    {
+      "id": "s29",
+      "text": "Baltic Cathode Works procures lithium carbonate from Vektra Group SE.",
+      "entities": [
+        { "type": "Company", "text": "Baltic Cathode Works" },
+        { "type": "Company", "text": "Vektra Group SE" },
+        { "type": "Material", "text": "lithium carbonate" }
+      ],
+      "triples": [
+        { "subject": "Vektra Group SE", "relation": "SuppliesTo", "object": "Baltic Cathode Works" }
+      ]
+    },
+    {
+      "id": "s30",
+      "text": "Helix Drives GmbH operates a plant in Graz and a warehouse near the Port of Hamburg.",
+      "entities": [
+        { "type": "Company", "text": "Helix Drives GmbH" },
+        { "type": "Location", "text": "Graz" },
+        { "type": "Location", "text": "Port of Hamburg" }
+      ],
+      "triples": [
+        { "subject": "Helix Drives GmbH", "relation": "LocatedIn", "object": "Graz" }
+      ]
+    },
+    {
+      "id": "s31",
+      "text": "Meridian Industries AG is majority-owned by no outside investor and remains independent.",
+      "entities": [
+        { "type": "Company", "text": "Meridian Industries AG" }
+      ],
+      "triples": []
+    },
+    {
+      "id": "s32",
+      "text": "Under a long-term agreement, cold-rolled steel from Kestrel Foundry Ltd reaches Alpine Motors AG weekly.",
+      "entities": [
+        { "type": "Material", "text": "cold-rolled steel" },
+        { "type": "Company", "text": "Kestrel Foundry Ltd" },
+        { "type": "Company", "text": "Alpine Motors AG" }
+      ],
+      "triples": [
+        { "subject": "Kestrel Foundry Ltd", "relation": "SuppliesTo", "object": "Alpine Motors AG" }
+      ]
+    }
+  ]
+}

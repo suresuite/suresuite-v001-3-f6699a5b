@@ -1,0 +1,226 @@
+{
+  "id": "nc-04-three-source-verified",
+  "description": "ai-agents.md §18.2 nc-04 — three independent registered sources verify the Nordwind triples; the draft files a network_map_diff (add_supplier + add_supply_link, provenance llm_drafted, external_evidence document citations); re-draft converges (duplicate); apply creates the supplier + inbound lane + supply_chain_data edge with the evidence stamp; the single-source Baltic triple sits in payload.pending, visibly pending, not applied.",
+  "project_snapshot": {
+    "projects": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "organization": "demo-org"
+      }
+    ],
+    "suppliers": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "supplier_id": "S-HELIX",
+        "name": "Helix Drives GmbH",
+        "capacity_per_week": 800,
+        "reliability_score": 1
+      }
+    ],
+    "materials": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-PM",
+        "name": "power modules"
+      },
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "material_id": "MAT-CTH",
+        "name": "battery cathodes"
+      }
+    ],
+    "inbound_logistics": [
+      {
+        "project_id": "11111111-1111-4111-8111-111111111111",
+        "plant_name": "Alpine Assembly Graz",
+        "supplier_id": "S-HELIX",
+        "material_id": "MAT-PM",
+        "unit_price": 120,
+        "lead_time": 2,
+        "volume": 40,
+        "time_unit": "week"
+      }
+    ],
+    "external_evidence": []
+  },
+  "utterance": "Map the Nordwind evidence into the network",
+  "docs": [
+    {
+      "source_id": "news-wire",
+      "title": "Wire: Nordwind-Helix supply agreement",
+      "text": "Nordwind Semiconductor GmbH has signed a three-year agreement to supply power modules to Helix Drives GmbH. Nordwind Semiconductor GmbH produces power modules at its Dresden fab.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Nordwind Semiconductor GmbH"
+          },
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "power modules"
+          },
+          {
+            "type": "Location",
+            "text": "Dresden"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Nordwind Semiconductor GmbH has signed a three-year agreement to supply power modules to Helix Drives GmbH."
+          },
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "Produces",
+            "object": "power modules",
+            "quote": "Nordwind Semiconductor GmbH produces power modules at its Dresden fab."
+          }
+        ]
+      }
+    },
+    {
+      "source_id": "sec-edgar",
+      "title": "10-K excerpt: supplier disclosures",
+      "text": "Helix Drives GmbH sources power modules from Nordwind Semiconductor GmbH. Nordwind Semiconductor GmbH produces power modules and is headquartered in Dresden.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Company",
+            "text": "Nordwind Semiconductor GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "power modules"
+          },
+          {
+            "type": "Location",
+            "text": "Dresden"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Helix Drives GmbH sources power modules from Nordwind Semiconductor GmbH."
+          },
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "Produces",
+            "object": "power modules",
+            "quote": "Nordwind Semiconductor GmbH produces power modules and is headquartered in Dresden."
+          }
+        ]
+      }
+    },
+    {
+      "source_id": "lksg-csrd-disclosures",
+      "title": "LkSG due-diligence disclosure",
+      "text": "Under its supply-chain due-diligence disclosure, Helix Drives GmbH lists Nordwind Semiconductor GmbH as a direct supplier of power modules. Nordwind Semiconductor GmbH produces power modules.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Company",
+            "text": "Nordwind Semiconductor GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "power modules"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Under its supply-chain due-diligence disclosure, Helix Drives GmbH lists Nordwind Semiconductor GmbH as a direct supplier of power modules."
+          },
+          {
+            "subject": "Nordwind Semiconductor GmbH",
+            "relation": "Produces",
+            "object": "power modules",
+            "quote": "Nordwind Semiconductor GmbH produces power modules."
+          }
+        ]
+      }
+    },
+    {
+      "source_id": "wikipedia-wikidata",
+      "title": "Encyclopedia entry: Baltic Cathode Works",
+      "text": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant.",
+      "extraction": {
+        "entities": [
+          {
+            "type": "Company",
+            "text": "Baltic Cathode Works"
+          },
+          {
+            "type": "Company",
+            "text": "Helix Drives GmbH"
+          },
+          {
+            "type": "Material",
+            "text": "battery cathodes"
+          },
+          {
+            "type": "Location",
+            "text": "Gdansk"
+          }
+        ],
+        "triples": [
+          {
+            "subject": "Baltic Cathode Works",
+            "relation": "Produces",
+            "object": "battery cathodes",
+            "quote": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant."
+          },
+          {
+            "subject": "Baltic Cathode Works",
+            "relation": "SuppliesTo",
+            "object": "Helix Drives GmbH",
+            "quote": "Baltic Cathode Works is a maker of battery cathodes and supplies battery cathodes to Helix Drives GmbH from its Gdansk plant."
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "verified_status": "verified",
+    "independent_sources": 3,
+    "proposal": {
+      "rows": 2,
+      "provenance": "llm_drafted",
+      "supplier_id": "529900NORDWIND000044",
+      "citation_kinds": [
+        "document",
+        "table_rows"
+      ]
+    },
+    "apply": {
+      "added_suppliers": 1,
+      "added_links": 1,
+      "supplier_name": "Nordwind Semiconductor GmbH",
+      "material_id": "MAT-PM"
+    },
+    "pending_includes": {
+      "subject": "Baltic Cathode Works",
+      "status": "provisional"
+    }
+  },
+  "retired_reason": null
+}
