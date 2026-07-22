@@ -357,7 +357,7 @@ export default function Landing() {
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#BF2330]">
                   Deep network AI
                 </span>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight leading-[1.1]">
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight leading-[1.1] text-white">
                   One network, <span className="font-serif italic font-medium">three lenses.</span>
                 </h2>
                 <p className="mt-4 text-base leading-relaxed text-white/70">
@@ -378,7 +378,7 @@ export default function Landing() {
                         style={{ background: lens.color, boxShadow: `0 0 10px ${lens.color}80` }}
                       />
                       <div>
-                        <h4 className="text-[15px] font-semibold">{lens.title}</h4>
+                        <h4 className="text-[15px] font-semibold text-white">{lens.title}</h4>
                         <p className="mt-1 text-[13.5px] leading-relaxed text-white/60">
                           {lens.body}
                         </p>
@@ -624,7 +624,7 @@ export default function Landing() {
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
                   Next step
                 </span>
-                <h3 className="mt-3.5 max-w-2xl text-3xl font-semibold tracking-tight leading-tight">
+                <h3 className="mt-3.5 max-w-2xl text-3xl font-semibold tracking-tight leading-tight text-white">
                   Put your supply chain under pressure —{' '}
                   <span className="font-serif italic font-medium">on purpose.</span>
                 </h3>
