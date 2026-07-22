@@ -401,7 +401,7 @@ export default function Landing() {
                         'radial-gradient(ellipse 54% 26% at 46% 72%, rgba(214,168,20,0.16), transparent 70%)',
                     }}
                   />
-                  <div className="relative h-[420px] lg:h-[500px]">
+                  <div className="relative h-[460px] lg:h-[560px]">
                     <NetworkVisualization3D />
                   </div>
                 </div>
@@ -471,7 +471,7 @@ export default function Landing() {
                     onClick={() => setActiveTech(key)}
                     className={`px-4 py-2 rounded-sm text-sm font-medium transition-colors ${
                       activeTech === key
-                        ? 'bg-secondary text-foreground'
+                        ? 'bg-foreground text-background'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
