@@ -14,14 +14,20 @@ interface Node {
 interface Edge { source: string; target: string; isInterlayer: boolean; }
 interface NetworkData { nodes: Node[]; edges: Edge[]; }
 
+// Layer heights — shared everywhere (planes, labels, rectangles, nodes).
+// Spacing widened a touch: process→product 2.4, product→firm 1.8.
+const PROCESS_Y = 0;
+const PRODUCT_Y = 2.4;
+const FIRM_Y = 4.2;
+
 // === DATA ===
 const generateNetworkData = (): NetworkData => {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
   // Layer positions
-  const processY = 0;
-  const productY = 2;
-  const firmY = 3.5;
+  const processY = PROCESS_Y;
+  const productY = PRODUCT_Y;
+  const firmY = FIRM_Y;
 
   // Global size tweak: ~20% smaller nodes
   const SIZE_SCALE = 0.8;
@@ -91,7 +97,7 @@ const generateNetworkData = (): NetworkData => {
   pushNode({ id: 'process_product',  position: new THREE.Vector3(xProductP,  processY, 0), type: 'product'  });
   pushNode({ id: 'process_customer', position: new THREE.Vector3(xCustomerP, processY, 0), type: 'customer' });
 
-  // === Product-level (y=2) — 3 suppliers, equally spaced in z, 1 customer ===
+  // === Product-level (y=PRODUCT_Y) — 3 suppliers, equally spaced in z, 1 customer ===
   const prodSupplierZs = [-0.9 * Z_SCALE, 0, 0.9 * Z_SCALE];
   const productNodes = [
     { id: 'product_material1', position: new THREE.Vector3(-0.67, productY, -1.0 * Z_SCALE), type: 'material' as const },
@@ -109,7 +115,7 @@ const generateNetworkData = (): NetworkData => {
   }));
   productNodes.forEach(nd => pushNode(nd));
 
-  // === Firm-level (y=3.5) — 3 suppliers, equally spaced in z ===
+  // === Firm-level (y=FIRM_Y) — 3 suppliers, equally spaced in z ===
   const firmSupplierZs = [-0.9 * Z_SCALE, 0, 0.9 * Z_SCALE];
   const firmNodes = [
     { id: 'firm_focal',    position: new THREE.Vector3( 0,   firmY,  0), type: 'focal'    as const },
@@ -130,36 +136,27 @@ const generateNetworkData = (): NetworkData => {
   edges.push({ source: 'firm_focal', target: 'firm_customer', isInterlayer: false });
 
   // Product layer
-  // Ensure every material connects to (at least one) supplier and to the product.
-  // Connect suppliers to materials round-robin: s1->m1, s2->m2, s3->m3
   ['product_supplier1','product_supplier2','product_supplier3'].forEach((s, idx) => {
     const targetMaterial = `product_material${idx + 1}`;
     edges.push({ source: s, target: targetMaterial, isInterlayer: false });
   });
-  // EXTRA supplier->material link (adds one more S-M edge)
   edges.push({ source: 'product_supplier1', target: 'product_material2', isInterlayer: false });
 
-  // Materials -> product (no material-to-material edges)
   edges.push({ source: 'product_material1', target: 'product_product', isInterlayer: false });
   edges.push({ source: 'product_material2', target: 'product_product', isInterlayer: false });
   edges.push({ source: 'product_material3', target: 'product_product', isInterlayer: false });
-  // Product -> single customer
   edges.push({ source: 'product_product', target: 'product_customer1', isInterlayer: false });
 
-  // Process layer — wiring honoring x ordering
-  // COPY the supplier->material logic from product layer
+  // Process layer
   ['process_supplier1','process_supplier2','process_supplier3'].forEach((s, idx) => {
     const targetMaterial = `process_material${idx + 1}`;
     edges.push({ source: s, target: targetMaterial, isInterlayer: false });
   });
-  // EXTRA supplier->material link mirroring product layer
   edges.push({ source: 'process_supplier1', target: 'process_material2', isInterlayer: false });
 
-  // Each material -> a process node (no material-to-material)
   edges.push({ source: 'process_material1', target: 'process_process1', isInterlayer: false });
   edges.push({ source: 'process_material2', target: 'process_process2', isInterlayer: false });
   edges.push({ source: 'process_material3', target: 'process_process1', isInterlayer: false });
-  // Processes -> product -> customer
   edges.push({ source: 'process_process1',  target: 'process_product',  isInterlayer: false });
   edges.push({ source: 'process_process2',  target: 'process_product',  isInterlayer: false });
   edges.push({ source: 'process_product',   target: 'process_customer', isInterlayer: false });
@@ -196,7 +193,6 @@ const NetworkEdge = ({ edge, nodes }: { edge: Edge; nodes: Node[] }) => {
   if (!sourceNode || !targetNode) return null;
   const points = [sourceNode.position, targetNode.position];
   const color = edge.isInterlayer ? '#ef4444' : '#64748b';
-  // Visibility +20% (lineWidth and opacity)
   const baseWidth = edge.isInterlayer ? 2 : 1;
   const baseOpacity = edge.isInterlayer ? 0.8 : 0.4;
   const lineWidth = baseWidth * 1.2;
@@ -213,8 +209,8 @@ const NetworkScene = () => {
   }, []);
 
   return (
-    // Scale everything down by 10%
-    <group scale={[0.9, 0.9, 0.9]}>
+    // Figure enlarged: scene scale 0.9 → 1.0
+    <group scale={[1.0, 1.0, 1.0]}>
       {/* Lights */}
       <ambientLight intensity={0.6} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
@@ -222,9 +218,9 @@ const NetworkScene = () => {
 
       {/* Layer planes + labels */}
       {[
-        { y: 0,   color: '#fbbf24', name: 'Process-level' },
-        { y: 2,   color: '#8b5cf6', name: 'Product-level' },
-        { y: 3.5, color: '#6b7280', name: 'Firm-level' }
+        { y: PROCESS_Y, color: '#fbbf24', name: 'Process-level' },
+        { y: PRODUCT_Y, color: '#8b5cf6', name: 'Product-level' },
+        { y: FIRM_Y,    color: '#6b7280', name: 'Firm-level' }
       ].map((layer, index) => (
         <group key={index}>
           <mesh position={[0, layer.y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -244,8 +240,8 @@ const NetworkScene = () => {
         </group>
       ))}
 
-      {/* === Highlight: small yellow rectangle around the firm focal node === */}
-      <group position={[0, 3.5, 0]}>
+      {/* Highlight rectangle around the firm focal node */}
+      <group position={[0, FIRM_Y, 0]}>
         <Line
           points={[
             new THREE.Vector3(-0.5, 0, -0.5),
@@ -259,11 +255,11 @@ const NetworkScene = () => {
         />
       </group>
 
-      {/* Product-level rectangle (y=2) — unchanged */}
-      <group position={[0, 2, 0]}>
+      {/* Product-level rectangle */}
+      <group position={[0, PRODUCT_Y, 0]}>
         <Line
           points={[
-            new THREE.Vector3(-1.177, 0, -1.4), // -1.308 * 0.9, -1.74 * 0.9
+            new THREE.Vector3(-1.177, 0, -1.4),
             new THREE.Vector3( 1.177, 0, -1.4),
             new THREE.Vector3( 1.177, 0,  1.4),
             new THREE.Vector3(-1.177, 0,  1.4),
@@ -274,8 +270,8 @@ const NetworkScene = () => {
         />
       </group>
 
-      {/* Process-level rectangle (y=0) — reduced by 8% */}
-      <group position={[0, 0, 0]}>
+      {/* Process-level rectangle */}
+      <group position={[0, PROCESS_Y, 0]}>
         <Line
           points={[
             new THREE.Vector3(-1.70476, 0, -1.81424),
@@ -326,14 +322,14 @@ const NetworkScene = () => {
 const NetworkVisualization3D = () => {
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <Canvas 
-        className="!absolute !inset-0" 
-        camera={{ position: [-4.5, 5, 7], fov: 50 }} 
+      <Canvas
+        className="!absolute !inset-0"
+        camera={{ position: [-5, 5.8, 8.4], fov: 50 }}
         style={{ background: 'transparent' }}
-        gl={{ 
-          alpha: true, 
+        gl={{
+          alpha: true,
           antialias: true,
-          powerPreference: "high-performance" 
+          powerPreference: "high-performance"
         }}
         onCreated={({ gl }) => {
           gl.setSize(gl.domElement.clientWidth, gl.domElement.clientHeight, false);
@@ -341,41 +337,6 @@ const NetworkVisualization3D = () => {
       >
         <NetworkScene />
       </Canvas>
-
-      {/* Legend — positioned to work better in the layout */}
-      <div className="absolute bottom-4 left-4 rounded-lg p-3 text-[10px] text-white">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
-            <span>Supplier</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#10b981' }} />
-            <span>Customer</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
-            <span>Focal</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#8b5cf6' }} />
-            <span>Material</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#ef4444' }} />
-            <span>Product</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#06b6d4' }} />
-            <span>Process</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
