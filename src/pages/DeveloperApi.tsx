@@ -8,40 +8,32 @@
 // entirely by the SECURITY DEFINER RPCs (create/list/rotate/revoke_api_key);
 // the plaintext secret exists only in this browser tab, once.
 //
-// The Notebook tab serves the §12 analyst/notebook audience: pick an
-// accessible project, see every id the API needs (scenarios, policy versions,
-// dataset versions), and download the canonical quickstart notebook
-// (public/notebooks/suresuite_api_quickstart.ipynb) with its CONFIG cell
-// pre-filled — or open the same notebook straight in Google Colab.
-//
-// ── Redesign deltas (SuReSuite design system, 2026-07) ──────────────────────
-//   • "Create API key" moved out of the PageHeader into the Organization-keys
-//     card header (it's a keys-tab action, not a page-level one).
-//   • Key-hygiene alert relocated ABOVE the keys table so it's read first.
-//   • Notebook actions relabelled to signal a starter, not the user's own file:
-//     "Open example in Colab" + brand-yellow "Download template (.ipynb)".
-//   • Copy trimmed of redundant explanation.
+// ── SuReSuite redesign (2026-07) ────────────────────────────────────────────
+// This page carries the SuReSuite visual language rather than raw shadcn
+// defaults: sharp rounded-sm corners, 1px #ebebeb borders, JetBrains-mono
+// UPPERCASE table headers + kicker labels, a black-pill active tab
+// (bg-foreground text-background), teal/red status dots, a bespoke red-kicker
+// "Key hygiene" card ABOVE the table, "Create API key" living in the
+// Organization-keys card header (not the PageHeader), and a two-column notebook
+// config panel with "Open example in Colab" + a brand-yellow
+// "Download template (.ipynb)". Local class constants below hold the shared
+// treatment so every table/card is consistent. All data flow, RPCs, hooks and
+// interactive primitives (Button/Dialog/Select/Input/Checkbox) are unchanged.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ApiCodeBlock, InlineCode, TableEmpty, TableLoading, TH_DENSE } from '@/components/shared';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ApiCodeBlock, InlineCode } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import {
   AlertTriangle, Check, Copy, Download, ExternalLink, KeyRound, Loader2,
   NotebookText, Plus, RefreshCcw, ShieldOff,
@@ -118,8 +110,13 @@ const NOTEBOOK_ASSET_PATH = '/notebooks/suresuite_api_quickstart.ipynb';
 const NOTEBOOK_COLAB_URL =
   'https://colab.research.google.com/github/suresuite/suresuite-v001-3-f6699a5b/blob/main/public/notebooks/suresuite_api_quickstart.ipynb';
 
-// Brand-yellow accent for the "download a template" action — signals a starter
-// artifact (3c) without competing with the black primary used elsewhere.
+// ── Shared SuReSuite treatment (sharp corners, thin borders, mono labels) ────
+const SURFACE = 'rounded-sm border border-[#ebebeb] bg-white';
+const KX = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
+const TH = 'text-left font-mono text-[11px] uppercase tracking-[0.04em] font-medium text-[#8a8a8a] bg-[#fafafa] border-b border-[#ebebeb] px-4 py-2 whitespace-nowrap';
+const TD = 'px-4 py-[11px] border-b border-[#f4f4f4] align-middle';
+// Brand-yellow accent for the "download a template" action — flags a starter
+// artifact without competing with the black primary used elsewhere.
 const TEMPLATE_BTN =
   'bg-[#F8D448] text-foreground border border-[#e6c02f] shadow-sm hover:bg-[#f0c93a] active:bg-[#e9c22f]';
 
@@ -140,6 +137,20 @@ const EXPIRY_OPTIONS = [
   { value: '365', label: '1 year' },
 ];
 
+const ENDPOINTS: [string, string, string][] = [
+  ['GET /projects · GET /projects/{id}', 'read:data', 'List / read projects'],
+  ['POST /projects/{id}/datasets:freeze', 'write:data', 'Freeze an immutable dataset version (graph_hash)'],
+  ['GET /projects/{id}/dataset-versions', 'read:data', 'Dataset provenance history'],
+  ['GET /projects/{id}/policy-catalog', 'read:policies', 'Engine policy catalog (registry export)'],
+  ['GET · PUT /projects/{id}/policies', 'read/write:policies', 'Read / edit policy defaults & overrides'],
+  ['GET · POST /projects/{id}/policy-versions', 'read/write:policies', 'List / snapshot immutable policy versions'],
+  ['GET · POST /projects/{id}/scenarios', 'read/write:runs', 'List / create scenarios'],
+  ['POST /projects/{id}/runs', 'write:runs', 'Dispatch a run (Idempotency-Key supported)'],
+  ['GET /runs/{id} · /replications · /validation', 'read:runs', 'Status, KPIs, per-rep rows, credibility badge'],
+  ['POST /runs/{id}:cancel · :add-reps', 'write:runs', 'Cancel or extend an in-flight run'],
+  ['GET /keys · POST /keys/{id}:revoke', 'admin:keys', 'Key inventory / kill switch over the API'],
+];
+
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -147,6 +158,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
       type="button"
       variant="outline"
       size="sm"
+      className="rounded-sm"
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
@@ -413,13 +425,16 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
     load();
   };
 
-  const keyStatus = (k: ApiKeyRow): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } => {
-    if (k.status === 'revoked') return { label: 'revoked', variant: 'destructive' };
+  // active | expired | revoked → dot color + label, matching the prototype.
+  const keyStatus = (k: ApiKeyRow): { label: string; dot: string; text: string } => {
+    if (k.status === 'revoked') return { label: 'revoked', dot: '#bf2330', text: 'text-[#bf2330]' };
     if (k.expires_at && new Date(k.expires_at).getTime() < Date.now()) {
-      return { label: 'expired', variant: 'outline' };
+      return { label: 'expired', dot: '#a3a3a3', text: 'text-muted-foreground' };
     }
-    return { label: 'active', variant: 'secondary' };
+    return { label: 'active', dot: '#14b8c4', text: 'text-foreground' };
   };
+
+  const activeCount = keys.filter((k) => keyStatus(k).label === 'active').length;
 
   const exampleKey = 'sk_live_1a2b3c4d_…your-key…';
   const curlList = `curl -s ${API_BASE}/projects \\
@@ -474,257 +489,266 @@ print(r["aggregate_kpis"], len(reps))`;
         />
 
         <Tabs defaultValue="keys" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="keys">API keys</TabsTrigger>
-            <TabsTrigger value="quickstart">Quickstart</TabsTrigger>
-            <TabsTrigger value="notebook">Notebook</TabsTrigger>
+          {/* Black-pill active tab (bg-foreground text-background), sharp corners */}
+          <TabsList className="inline-flex h-auto items-center gap-0.5 rounded-sm border border-[#ebebeb] bg-white p-[3px]">
+            <TabsTrigger
+              value="keys"
+              className="rounded-[2px] px-[15px] py-[7px] text-[12.5px] font-medium text-muted-foreground data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-none"
+            >
+              API keys
+            </TabsTrigger>
+            <TabsTrigger
+              value="quickstart"
+              className="rounded-[2px] px-[15px] py-[7px] text-[12.5px] font-medium text-muted-foreground data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-none"
+            >
+              Quickstart
+            </TabsTrigger>
+            <TabsTrigger
+              value="notebook"
+              className="rounded-[2px] px-[15px] py-[7px] text-[12.5px] font-medium text-muted-foreground data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-none"
+            >
+              Notebook
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Keys ─────────────────────────────────────────────────────── */}
-          <TabsContent value="keys" className="space-y-4">
-            {/* Hygiene note sits ABOVE the table so it's read before acting. */}
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle className="text-sm">Key hygiene</AlertTitle>
-              <AlertDescription className="text-xs">
-                Store keys in a secret manager or environment variable, never in source control. Start
-                on <span className="font-mono">test</span> keys (stricter limits, one concurrent run),
-                give each system its own key with the narrowest scopes that work — a leaked key is one
-                click to revoke here.
-              </AlertDescription>
-            </Alert>
+          <TabsContent value="keys" className="space-y-3.5">
+            {/* Key hygiene — bespoke red-kicker card, ABOVE the table */}
+            <div className={`${SURFACE} flex gap-3 px-4 py-3.5`}>
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#bf2330]" />
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#bf2330]">
+                  Key hygiene
+                </div>
+                <div className="mt-1.5 max-w-3xl text-[12.5px] leading-[1.55] text-[#525252]">
+                  Store keys in a secret manager, never in source control. Start on{' '}
+                  <span className="font-mono">test</span> keys, give each system its own key with the
+                  narrowest scopes that work — a leaked key is one click to revoke.
+                </div>
+              </div>
+            </div>
 
-            <Card className="shadow-xs">
-              <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <KeyRound className="h-4 w-4" /> Organization API keys
-                </CardTitle>
-                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Create API key
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className={TH_DENSE}>Name</TableHead>
-                      <TableHead className={TH_DENSE}>Key</TableHead>
-                      <TableHead className={TH_DENSE}>Env</TableHead>
-                      <TableHead className={TH_DENSE}>Scopes</TableHead>
-                      <TableHead className={TH_DENSE}>Projects</TableHead>
-                      <TableHead className={TH_DENSE}>Status</TableHead>
-                      <TableHead className={`${TH_DENSE} text-right`}>Requests (30d)</TableHead>
-                      <TableHead className={TH_DENSE}>Last used</TableHead>
-                      <TableHead className={`${TH_DENSE} w-[1%] text-right`}>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+            <div className={`${SURFACE} overflow-hidden`}>
+              <div className="flex items-center justify-between gap-3 border-b border-[#f2f2f2] px-[18px] py-3.5">
+                <div className="flex items-center gap-2 text-[13px] font-semibold">
+                  <KeyRound className="h-3.5 w-3.5" /> Organization keys
+                </div>
+                <div className="flex items-center gap-3.5">
+                  <span className={KX}>
+                    {keys.length} {keys.length === 1 ? 'key' : 'keys'} · {activeCount} active
+                  </span>
+                  <Button size="sm" className="rounded-sm" onClick={() => setCreateOpen(true)}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Create API key
+                  </Button>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className={TH}>Name</th>
+                      <th className={TH}>Key</th>
+                      <th className={TH}>Env</th>
+                      <th className={TH}>Scopes</th>
+                      <th className={TH}>Projects</th>
+                      <th className={TH}>Status</th>
+                      <th className={`${TH} text-right`}>Req 30d</th>
+                      <th className={TH}>Last used</th>
+                      <th className={`${TH} w-[1%]`} />
+                    </tr>
+                  </thead>
+                  <tbody>
                     {loading ? (
-                      <TableLoading colSpan={9} />
+                      <tr>
+                        <td colSpan={9} className="px-4 py-12 text-center">
+                          <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+                        </td>
+                      </tr>
                     ) : keys.length === 0 ? (
-                      <TableEmpty
-                        colSpan={9}
-                        message="No API keys yet. Create one to call the API from scripts, notebooks, or CI."
-                      />
+                      <tr>
+                        <td colSpan={9} className="px-4 py-14">
+                          <div className="mx-auto flex max-w-sm flex-col items-center text-center">
+                            <div className="grid h-11 w-11 place-items-center rounded-md border border-[#ebebeb] text-muted-foreground">
+                              <KeyRound className="h-[18px] w-[18px]" />
+                            </div>
+                            <div className="mt-4 text-[15px] font-semibold">No API keys yet</div>
+                            <div className="mt-1.5 text-[13px] leading-[1.5] text-muted-foreground">
+                              Create one to call the API from scripts, notebooks, or CI. The secret is
+                              shown once.
+                            </div>
+                            <Button size="sm" className="mt-[18px] rounded-sm" onClick={() => setCreateOpen(true)}>
+                              <Plus className="mr-1.5 h-3.5 w-3.5" /> Create API key
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
                     ) : (
                       keys.map((k) => {
                         const st = keyStatus(k);
                         const u = usage[k.id];
                         return (
-                          <TableRow key={k.id}>
-                            <TableCell className="max-w-[280px] truncate font-medium text-sm">{k.name}</TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">
+                          <tr key={k.id} className="hover:bg-[#fcfcfc]">
+                            <td className={`${TD} whitespace-nowrap text-[13px] font-medium`}>{k.name}</td>
+                            <td className={`${TD} font-mono text-[11px] text-muted-foreground`}>
                               sk_{k.env}_{k.key_prefix}_••••
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={k.env === 'live' ? 'outline' : 'secondary'}
-                                className={k.env === 'live' ? 'font-mono text-[10px]' : undefined}
-                              >
-                                {k.env}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="max-w-[220px]">
+                            </td>
+                            <td className={TD}>
+                              {k.env === 'test' ? (
+                                <span className="rounded-[3px] bg-[#f0f0f0] px-[7px] py-0.5 font-mono text-[10px] text-[#525252]">
+                                  test
+                                </span>
+                              ) : (
+                                <span className="rounded-[3px] border border-[#d4d4d4] px-[7px] py-0.5 font-mono text-[10px] text-foreground">
+                                  live
+                                </span>
+                              )}
+                            </td>
+                            <td className={`${TD} max-w-[220px]`}>
                               <div className="flex flex-wrap gap-1">
                                 {k.scopes.map((s) => (
-                                  <Badge key={s} variant="outline" className="font-mono text-[10px]">
+                                  <span
+                                    key={s}
+                                    className="rounded-[3px] border border-[#e4e4e4] px-1.5 py-px font-mono text-[10px] text-muted-foreground"
+                                  >
                                     {s}
-                                  </Badge>
+                                  </span>
                                 ))}
                               </div>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
+                            </td>
+                            <td className={`${TD} text-xs text-muted-foreground`}>
                               {k.project_ids ? `${k.project_ids.length} selected` : 'All'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={st.variant}>{st.label}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right text-xs tabular-nums">
+                            </td>
+                            <td className={TD}>
+                              <span className={`inline-flex items-center gap-1.5 text-[11.5px] ${st.text}`}>
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full"
+                                  style={{ background: st.dot }}
+                                />
+                                {st.label}
+                              </span>
+                            </td>
+                            <td className={`${TD} whitespace-nowrap text-right font-mono text-xs tabular-nums`}>
                               {u ? (
                                 <>
                                   {Number(u.requests_30d).toLocaleString()}
                                   {u.errors_30d > 0 && (
-                                    <span className="text-destructive"> · {u.errors_30d} err</span>
+                                    <span className="text-[#bf2330]"> · {u.errors_30d} err</span>
                                   )}
                                 </>
                               ) : '0'}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            </td>
+                            <td className={`${TD} whitespace-nowrap text-xs text-muted-foreground`}>
                               {k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'never'}
-                            </TableCell>
-                            <TableCell className="text-right whitespace-nowrap">
+                            </td>
+                            <td className={`${TD} whitespace-nowrap text-right`}>
                               {k.status === 'active' && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
+                                <div className="inline-flex items-center gap-2 text-[#a3a3a3]">
+                                  <button
+                                    type="button"
                                     title="Rotate: mints a new secret; the old one keeps working for 72 h"
+                                    className="hover:text-foreground"
                                     onClick={() => setRotateTarget(k)}
                                   >
                                     <RefreshCcw className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
+                                  </button>
+                                  <button
+                                    type="button"
                                     title="Revoke immediately"
+                                    className="hover:text-[#bf2330]"
                                     onClick={() => setRevokeTarget(k)}
                                   >
-                                    <ShieldOff className="h-3.5 w-3.5 text-destructive" />
-                                  </Button>
-                                </>
+                                    <ShieldOff className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               )}
-                            </TableCell>
-                          </TableRow>
+                            </td>
+                          </tr>
                         );
                       })
                     )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </TabsContent>
 
           {/* ── Quickstart ───────────────────────────────────────────────── */}
           <TabsContent value="quickstart" className="space-y-4">
-            <Card className="shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Base URL</CardTitle>
-                <CardDescription className="text-xs">
-                  All endpoints are versioned under <span className="font-mono">/v1</span> and
-                  authenticated with <span className="font-mono">Authorization: Bearer sk_…</span>.
-                  Errors use a consistent{' '}
-                  <span className="font-mono">{'{"error":{"code","message"}}'}</span> envelope;
-                  rate-limit state is returned in <span className="font-mono">X-RateLimit-*</span> headers.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <InlineCode className="text-xs">{API_BASE}</InlineCode>
-                  <CopyButton text={API_BASE} />
-                </div>
-                <ApiCodeBlock title="List your projects" code={curlList} />
-                <ApiCodeBlock title="Dispatch a simulation run (202 → run_id; retried submits with the same Idempotency-Key return the same run)" code={curlRun} />
-                <ApiCodeBlock title="Poll a run until it finishes" code={curlPoll} />
-                <ApiCodeBlock title="Python: end-to-end (snapshot policy → dispatch → poll → replications)" code={pythonSnippet} />
-              </CardContent>
-            </Card>
+            <div>
+              <div className="text-[14px] font-semibold">Base URL</div>
+              <div className="mt-2 flex items-center gap-2.5">
+                <InlineCode className="flex-1 truncate rounded-sm border-[#ebebeb] text-[11.5px]">
+                  {API_BASE}
+                </InlineCode>
+                <CopyButton text={API_BASE} label="Copy" />
+              </div>
+              <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
+                All endpoints are versioned under <span className="font-mono">/v1</span> and
+                authenticated with <span className="font-mono">Authorization: Bearer sk_…</span>.
+                Errors use a consistent{' '}
+                <span className="font-mono">{'{"error":{"code","message"}}'}</span> envelope;
+                rate-limit state is returned in <span className="font-mono">X-RateLimit-*</span> headers.
+              </p>
+            </div>
 
-            <Card className="shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Endpoints (v1)</CardTitle>
-                <CardDescription className="text-xs">
-                  Full reference: <span className="font-mono">docs/api/README.md</span> in the repository.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className={TH_DENSE}>Endpoint</TableHead>
-                      <TableHead className={TH_DENSE}>Scope</TableHead>
-                      <TableHead className={TH_DENSE}>Purpose</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[
-                      ['GET /projects · GET /projects/{id}', 'read:data', 'List / read projects'],
-                      ['POST /projects/{id}/datasets:freeze', 'write:data', 'Freeze an immutable dataset version (graph_hash)'],
-                      ['GET /projects/{id}/dataset-versions', 'read:data', 'Dataset provenance history'],
-                      ['GET /projects/{id}/policy-catalog', 'read:policies', 'Engine policy catalog (registry export)'],
-                      ['GET · PUT /projects/{id}/policies', 'read/write:policies', 'Read / edit policy defaults & overrides'],
-                      ['GET · POST /projects/{id}/policy-versions', 'read/write:policies', 'List / snapshot immutable policy versions'],
-                      ['GET · POST /projects/{id}/scenarios', 'read/write:runs', 'List / create scenarios'],
-                      ['POST /projects/{id}/runs', 'write:runs', 'Dispatch a run (Idempotency-Key supported)'],
-                      ['GET /runs/{id} · /replications · /validation', 'read:runs', 'Status, KPIs, per-rep rows, credibility badge'],
-                      ['POST /runs/{id}:cancel · :add-reps', 'write:runs', 'Cancel or extend an in-flight run'],
-                      ['GET /keys · POST /keys/{id}:revoke', 'admin:keys', 'Key inventory / kill switch over the API'],
-                    ].map(([ep, scope, what]) => (
-                      <TableRow key={ep}>
-                        <TableCell className="font-mono text-[11px]">{ep}</TableCell>
-                        <TableCell className="font-mono text-[11px] text-muted-foreground">{scope}</TableCell>
-                        <TableCell className="text-xs">{what}</TableCell>
-                      </TableRow>
+            <div className="grid gap-3.5 lg:grid-cols-2">
+              <ApiCodeBlock title="List your projects" code={curlList} />
+              <ApiCodeBlock title="Dispatch a run (202 → run_id; a retried submit with the same Idempotency-Key returns the same run)" code={curlRun} />
+              <ApiCodeBlock title="Poll a run until it finishes" code={curlPoll} />
+              <ApiCodeBlock title="Python: end-to-end (snapshot → dispatch → poll → replications)" code={pythonSnippet} />
+            </div>
+
+            <div className={`${SURFACE} overflow-hidden`}>
+              <div className="border-b border-[#ebebeb] px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.04em] text-[#8a8a8a]">
+                Endpoints · v1
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <tbody>
+                    {ENDPOINTS.map(([ep, scope, what]) => (
+                      <tr key={ep} className="hover:bg-[#fcfcfc]">
+                        <td className={`${TD} whitespace-nowrap font-mono text-[11px] text-foreground`}>{ep}</td>
+                        <td className={`${TD} whitespace-nowrap font-mono text-[11px] text-muted-foreground`}>{scope}</td>
+                        <td className={`${TD} text-xs text-[#525252]`}>{what}</td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-t border-[#f2f2f2] px-4 py-2.5 text-[11px] text-muted-foreground">
+                Full reference: <span className="font-mono">docs/api/README.md</span> in the repository.
+              </div>
+            </div>
           </TabsContent>
 
           {/* ── Notebook ─────────────────────────────────────────────────── */}
           <TabsContent value="notebook" className="space-y-4">
-            <Card className="shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <NotebookText className="h-4 w-4" /> Jupyter notebook quickstart
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  One runnable notebook covering every v1 use case — connect, read input data, snapshot
-                  policies, dispatch runs, and analyze replications. Pick a project and the downloaded
-                  copy comes with its CONFIG cell pre-filled.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="outline" asChild>
-                    <a href={NOTEBOOK_COLAB_URL} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open example in Colab
-                    </a>
-                  </Button>
-                  <Button size="sm" className={TEMPLATE_BTN} onClick={downloadNotebook} disabled={nbDownloading}>
-                    {nbDownloading
-                      ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      : <Download className="mr-1.5 h-3.5 w-3.5" />}
-                    Download template (.ipynb){nbProject ? ` for “${nbProject.name}”` : ''}
-                  </Button>
-                </div>
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Never paste your API key into a notebook cell. In Colab, store it once in the{' '}
-                    <span className="font-medium">Secrets</span> panel as{' '}
-                    <span className="font-mono">SURESUITE_API_KEY</span> — the notebook reads it from
-                    there (or from the environment / a hidden prompt when run locally). If Colab
-                    can’t open the repository directly, download the pre-filled notebook and use
-                    Colab’s <span className="font-medium">File → Upload notebook</span>.
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="flex items-center gap-2 text-[14px] font-semibold">
+                <NotebookText className="h-3.5 w-3.5" /> Ready-to-run quickstart
+              </div>
+              <div className="flex flex-none gap-2">
+                <Button size="sm" variant="outline" className="rounded-sm" asChild>
+                  <a href={NOTEBOOK_COLAB_URL} target="_blank" rel="noreferrer">
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open example in Colab
+                  </a>
+                </Button>
+                <Button size="sm" className={`rounded-sm ${TEMPLATE_BTN}`} onClick={downloadNotebook} disabled={nbDownloading}>
+                  {nbDownloading
+                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    : <Download className="mr-1.5 h-3.5 w-3.5" />}
+                  Download template (.ipynb){nbProject ? ` for “${nbProject.name}”` : ''}
+                </Button>
+              </div>
+            </div>
 
-            <Card className="shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Project configuration</CardTitle>
-                <CardDescription className="text-xs">
-                  Select one of your accessible projects to see every id the notebook (and any API
-                  call) needs — copy the CONFIG cell, or download the notebook above with it filled in.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="max-w-md space-y-1.5">
-                  <Label>Project</Label>
+            <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+              {/* Project + CONFIG cell */}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-[#404040]">Project</Label>
                   <Select value={nbProjectId} onValueChange={setNbProjectId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="rounded-sm">
                       <SelectValue placeholder={projects.length ? 'Select a project…' : 'No projects available'} />
                     </SelectTrigger>
                     <SelectContent>
@@ -735,145 +759,171 @@ print(r["aggregate_kpis"], len(reps))`;
                   </Select>
                 </div>
 
+                {nbProject && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Project ID</p>
+                    <div className="flex items-center gap-2">
+                      <InlineCode className="flex-1 truncate rounded-sm border-[#ebebeb]">{nbProject.id}</InlineCode>
+                      <CopyButton text={nbProject.id} />
+                    </div>
+                  </div>
+                )}
+
+                <ApiCodeBlock
+                  title="Notebook CONFIG cell (pre-filled — paste over the notebook's first code cell)"
+                  code={nbConfigCell || '# Select a project to fill in BASE_URL, PROJECT_ID, SCENARIO_ID, POLICY_VERSION_ID'}
+                />
+              </div>
+
+              {/* Id reference tables */}
+              <div className="space-y-3.5">
                 {!nbProject ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    Select a project to see its API configuration.
-                  </p>
+                  <div className={`${SURFACE} px-4 py-10 text-center text-sm text-muted-foreground`}>
+                    Select a project to see every id the notebook needs.
+                  </div>
                 ) : nbLoading ? (
-                  <div className="py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></div>
+                  <div className={`${SURFACE} px-4 py-10 text-center`}>
+                    <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
                 ) : (
                   <>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-muted-foreground">Base URL</p>
-                        <div className="flex items-center gap-2">
-                          <InlineCode className="flex-1 truncate">{API_BASE}</InlineCode>
-                          <CopyButton text={API_BASE} />
-                        </div>
+                    <div>
+                      <div className={`${KX} mb-1.5 tracking-[0.06em]`}>
+                        Scenarios ({nbScenarios.length}) · SCENARIO_ID
                       </div>
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-muted-foreground">Project ID</p>
-                        <div className="flex items-center gap-2">
-                          <InlineCode className="flex-1 truncate">{nbProject.id}</InlineCode>
-                          <CopyButton text={nbProject.id} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <ApiCodeBlock title="Notebook CONFIG cell (pre-filled — paste over the notebook's first code cell)" code={nbConfigCell} />
-
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Scenarios ({nbScenarios.length}) — <span className="font-mono">SCENARIO_ID</span>
-                      </p>
                       {nbScenarios.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          None yet — §6 of the notebook creates one via <span className="font-mono">POST …/scenarios</span>.
+                          None yet — §6 of the notebook creates one via{' '}
+                          <span className="font-mono">POST …/scenarios</span>.
                         </p>
                       ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className={TH_DENSE}>Name</TableHead>
-                              <TableHead className={TH_DENSE}>ID</TableHead>
-                              <TableHead className={TH_DENSE}>Horizon</TableHead>
-                              <TableHead className={TH_DENSE}>Reps</TableHead>
-                              <TableHead className={TH_DENSE}>Seed</TableHead>
-                              <TableHead className={TH_DENSE}>Primary KPI</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {nbScenarios.map((s) => (
-                              <TableRow key={s.id}>
-                                <TableCell className="text-xs font-medium">{s.name}</TableCell>
-                                <TableCell><IdCell value={s.id} /></TableCell>
-                                <TableCell className="text-xs">{s.horizon_days} d (+{s.warmup_days} warm-up)</TableCell>
-                                <TableCell className="text-xs">{s.replications}</TableCell>
-                                <TableCell className="text-xs">{s.seed}</TableCell>
-                                <TableCell className="font-mono text-[11px]">{s.primary_kpi}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        <div className={`${SURFACE} overflow-hidden`}>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr>
+                                  <th className={TH}>Name</th>
+                                  <th className={TH}>ID</th>
+                                  <th className={TH}>Horizon</th>
+                                  <th className={TH}>Reps</th>
+                                  <th className={TH}>Primary KPI</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {nbScenarios.map((s) => (
+                                  <tr key={s.id} className="hover:bg-[#fcfcfc]">
+                                    <td className={`${TD} text-xs font-medium`}>{s.name}</td>
+                                    <td className={TD}><IdCell value={s.id} /></td>
+                                    <td className={`${TD} text-xs`}>{s.horizon_days} d (+{s.warmup_days})</td>
+                                    <td className={`${TD} text-xs`}>{s.replications}</td>
+                                    <td className={`${TD} font-mono text-[11px]`}>{s.primary_kpi}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       )}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Policy versions ({nbPolicyVersions.length}) — <span className="font-mono">POLICY_VERSION_ID</span>
-                      </p>
+                    <div>
+                      <div className={`${KX} mb-1.5 tracking-[0.06em]`}>
+                        Policy versions ({nbPolicyVersions.length}) · POLICY_VERSION_ID
+                      </div>
                       {nbPolicyVersions.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          None yet — §5 of the notebook snapshots one via <span className="font-mono">POST …/policy-versions</span>.
+                          None yet — §5 of the notebook snapshots one via{' '}
+                          <span className="font-mono">POST …/policy-versions</span>.
                         </p>
                       ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className={TH_DENSE}>Label</TableHead>
-                              <TableHead className={TH_DENSE}>ID</TableHead>
-                              <TableHead className={TH_DENSE}>policy_hash</TableHead>
-                              <TableHead className={TH_DENSE}>Runs</TableHead>
-                              <TableHead className={TH_DENSE}>Created</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {nbPolicyVersions.slice(0, 8).map((v) => (
-                              <TableRow key={v.id}>
-                                <TableCell className="text-xs font-medium">{v.label ?? 'unlabelled'}</TableCell>
-                                <TableCell><IdCell value={v.id} /></TableCell>
-                                <TableCell className="font-mono text-[11px] text-muted-foreground">{(v.policy_hash ?? '').slice(0, 12)}…</TableCell>
-                                <TableCell className="text-xs">{v.run_count}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(v.created_at).toLocaleDateString()}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        <div className={`${SURFACE} overflow-hidden`}>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr>
+                                  <th className={TH}>Label</th>
+                                  <th className={TH}>ID</th>
+                                  <th className={TH}>policy_hash</th>
+                                  <th className={TH}>Runs</th>
+                                  <th className={TH}>Created</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {nbPolicyVersions.slice(0, 8).map((v) => (
+                                  <tr key={v.id} className="hover:bg-[#fcfcfc]">
+                                    <td className={`${TD} text-xs font-medium`}>{v.label ?? 'unlabelled'}</td>
+                                    <td className={TD}><IdCell value={v.id} /></td>
+                                    <td className={`${TD} font-mono text-[11px] text-muted-foreground`}>{(v.policy_hash ?? '').slice(0, 12)}…</td>
+                                    <td className={`${TD} text-xs`}>{v.run_count}</td>
+                                    <td className={`${TD} whitespace-nowrap text-xs text-muted-foreground`}>{new Date(v.created_at).toLocaleDateString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       )}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Dataset versions ({nbDatasetVersions.length}) — input-data provenance
-                      </p>
+                    <div>
+                      <div className={`${KX} mb-1.5 tracking-[0.06em]`}>
+                        Dataset versions ({nbDatasetVersions.length}) · input-data provenance
+                      </div>
                       {nbDatasetVersions.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          None yet — §2 of the notebook freezes one via <span className="font-mono">POST …/datasets:freeze</span>.
+                          None yet — §2 of the notebook freezes one via{' '}
+                          <span className="font-mono">POST …/datasets:freeze</span>.
                         </p>
                       ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className={TH_DENSE}>Label</TableHead>
-                              <TableHead className={TH_DENSE}>ID</TableHead>
-                              <TableHead className={TH_DENSE}>graph_hash</TableHead>
-                              <TableHead className={TH_DENSE}>Created</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {nbDatasetVersions.slice(0, 8).map((v) => (
-                              <TableRow key={v.id}>
-                                <TableCell className="text-xs font-medium">{v.label ?? 'unlabelled'}</TableCell>
-                                <TableCell><IdCell value={v.id} /></TableCell>
-                                <TableCell className="font-mono text-[11px] text-muted-foreground">{(v.graph_hash ?? '').slice(0, 12)}…</TableCell>
-                                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(v.created_at).toLocaleDateString()}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        <div className={`${SURFACE} overflow-hidden`}>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr>
+                                  <th className={TH}>Label</th>
+                                  <th className={TH}>ID</th>
+                                  <th className={TH}>graph_hash</th>
+                                  <th className={TH}>Created</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {nbDatasetVersions.slice(0, 8).map((v) => (
+                                  <tr key={v.id} className="hover:bg-[#fcfcfc]">
+                                    <td className={`${TD} text-xs font-medium`}>{v.label ?? 'unlabelled'}</td>
+                                    <td className={TD}><IdCell value={v.id} /></td>
+                                    <td className={`${TD} font-mono text-[11px] text-muted-foreground`}>{(v.graph_hash ?? '').slice(0, 12)}…</td>
+                                    <td className={`${TD} whitespace-nowrap text-xs text-muted-foreground`}>{new Date(v.created_at).toLocaleDateString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+
+            <div className={`${SURFACE} flex gap-3 px-4 py-3.5`}>
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#bf2330]" />
+              <div className="text-xs leading-[1.55] text-[#525252]">
+                Never paste your API key into a notebook cell. In Colab, store it once in the{' '}
+                <span className="font-medium">Secrets</span> panel as{' '}
+                <span className="font-mono">SURESUITE_API_KEY</span> — the notebook reads it from
+                there (or from the environment / a hidden prompt when run locally). If Colab can’t
+                open the repository directly, download the template and use Colab’s{' '}
+                <span className="font-medium">File → Upload notebook</span>.
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
 
       {/* ── Create key dialog ─────────────────────────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetCreateForm(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg rounded-sm">
           <DialogHeader>
             <DialogTitle>Create API key</DialogTitle>
             <DialogDescription>
@@ -885,6 +935,7 @@ print(r["aggregate_kpis"], len(reps))`;
               <Label htmlFor="key-name">Name</Label>
               <Input
                 id="key-name"
+                className="rounded-sm"
                 placeholder="e.g. CI pipeline, analyst notebook"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -893,7 +944,7 @@ print(r["aggregate_kpis"], len(reps))`;
             <div className="space-y-1.5">
               <Label>Environment</Label>
               <Select value={env} onValueChange={(v) => setEnv(v as 'live' | 'test')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="test">test — stricter limits, 1 concurrent run (recommended to start)</SelectItem>
                   <SelectItem value="live">live — production traffic</SelectItem>
@@ -902,9 +953,9 @@ print(r["aggregate_kpis"], len(reps))`;
             </div>
             <div className="space-y-1.5">
               <Label>Scopes (least privilege: pick only what the caller needs)</Label>
-              <div className="grid grid-cols-1 gap-1.5 rounded-md border border-border p-3 max-h-48 overflow-y-auto">
+              <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto rounded-sm border border-[#ebebeb] p-3">
                 {SCOPES.map((s) => (
-                  <label key={s.id} className="flex items-start gap-2 text-sm cursor-pointer">
+                  <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm">
                     <Checkbox
                       checked={scopes.includes(s.id)}
                       onCheckedChange={(c) =>
@@ -921,17 +972,17 @@ print(r["aggregate_kpis"], len(reps))`;
             </div>
             <div className="space-y-1.5">
               <Label>Project access</Label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <Checkbox checked={allProjects} onCheckedChange={(c) => setAllProjects(!!c)} />
                 All projects in my organization
               </label>
               {!allProjects && (
-                <div className="rounded-md border border-border p-3 max-h-36 overflow-y-auto space-y-1.5">
+                <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-sm border border-[#ebebeb] p-3">
                   {projects.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No projects found.</p>
                   ) : (
                     projects.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <label key={p.id} className="flex cursor-pointer items-center gap-2 text-sm">
                         <Checkbox
                           checked={projectIds.includes(p.id)}
                           onCheckedChange={(c) =>
@@ -947,7 +998,7 @@ print(r["aggregate_kpis"], len(reps))`;
             <div className="space-y-1.5">
               <Label>Expiry</Label>
               <Select value={expiry} onValueChange={setExpiry}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EXPIRY_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -957,8 +1008,8 @@ print(r["aggregate_kpis"], len(reps))`;
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={onCreate} disabled={creating}>
+            <Button variant="outline" className="rounded-sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button className="rounded-sm" onClick={onCreate} disabled={creating}>
               {creating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Create key
             </Button>
           </DialogFooter>
@@ -967,7 +1018,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
       {/* ── Show-once secret dialog ───────────────────────────────────────── */}
       <Dialog open={!!mintedKey} onOpenChange={(o) => { if (!o) setMintedKey(null); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg rounded-sm">
           <DialogHeader>
             <DialogTitle>Copy your API key now</DialogTitle>
             <DialogDescription>
@@ -976,27 +1027,27 @@ print(r["aggregate_kpis"], len(reps))`;
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2">
-            <InlineCode className="flex-1 px-3 py-2 text-xs break-all">
+            <InlineCode className="flex-1 break-all rounded-sm border-[#ebebeb] px-3 py-2 text-xs">
               {mintedKey?.plaintext}
             </InlineCode>
             <CopyButton text={mintedKey?.plaintext ?? ''} />
           </div>
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
+          <div className={`${SURFACE} flex gap-3 px-4 py-3`}>
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#bf2330]" />
+            <div className="text-xs leading-[1.5] text-[#525252]">
               Store it in a secret manager or environment variable (e.g.{' '}
               <span className="font-mono">SURESUITE_API_KEY</span>). Never commit it to source control.
-            </AlertDescription>
-          </Alert>
+            </div>
+          </div>
           <DialogFooter>
-            <Button onClick={() => setMintedKey(null)}>I've stored it safely</Button>
+            <Button className="rounded-sm" onClick={() => setMintedKey(null)}>I've stored it safely</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* ── Rotate confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!rotateTarget} onOpenChange={(o) => { if (!o) setRotateTarget(null); }}>
-        <DialogContent>
+        <DialogContent className="rounded-sm">
           <DialogHeader>
             <DialogTitle>Rotate “{rotateTarget?.name}”?</DialogTitle>
             <DialogDescription>
@@ -1005,8 +1056,8 @@ print(r["aggregate_kpis"], len(reps))`;
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRotateTarget(null)}>Cancel</Button>
-            <Button onClick={onRotate} disabled={mutating}>
+            <Button variant="outline" className="rounded-sm" onClick={() => setRotateTarget(null)}>Cancel</Button>
+            <Button className="rounded-sm" onClick={onRotate} disabled={mutating}>
               {mutating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Rotate key
             </Button>
           </DialogFooter>
@@ -1015,7 +1066,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
       {/* ── Revoke confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!revokeTarget} onOpenChange={(o) => { if (!o) setRevokeTarget(null); }}>
-        <DialogContent>
+        <DialogContent className="rounded-sm">
           <DialogHeader>
             <DialogTitle>Revoke “{revokeTarget?.name}”?</DialogTitle>
             <DialogDescription>
@@ -1024,8 +1075,8 @@ print(r["aggregate_kpis"], len(reps))`;
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRevokeTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={onRevoke} disabled={mutating}>
+            <Button variant="outline" className="rounded-sm" onClick={() => setRevokeTarget(null)}>Cancel</Button>
+            <Button variant="destructive" className="rounded-sm" onClick={onRevoke} disabled={mutating}>
               {mutating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Revoke key
             </Button>
           </DialogFooter>
