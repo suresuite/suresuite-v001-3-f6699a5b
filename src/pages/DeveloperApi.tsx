@@ -13,6 +13,14 @@
 // dataset versions), and download the canonical quickstart notebook
 // (public/notebooks/suresuite_api_quickstart.ipynb) with its CONFIG cell
 // pre-filled — or open the same notebook straight in Google Colab.
+//
+// ── Redesign deltas (SuReSuite design system, 2026-07) ──────────────────────
+//   • "Create API key" moved out of the PageHeader into the Organization-keys
+//     card header (it's a keys-tab action, not a page-level one).
+//   • Key-hygiene alert relocated ABOVE the keys table so it's read first.
+//   • Notebook actions relabelled to signal a starter, not the user's own file:
+//     "Open example in Colab" + brand-yellow "Download template (.ipynb)".
+//   • Copy trimmed of redundant explanation.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -109,6 +117,11 @@ const API_BASE = `${SUPABASE_URL}/functions/v1/api/v1`;
 const NOTEBOOK_ASSET_PATH = '/notebooks/suresuite_api_quickstart.ipynb';
 const NOTEBOOK_COLAB_URL =
   'https://colab.research.google.com/github/suresuite/suresuite-v001-3-f6699a5b/blob/main/public/notebooks/suresuite_api_quickstart.ipynb';
+
+// Brand-yellow accent for the "download a template" action — signals a starter
+// artifact (3c) without competing with the black primary used elsewhere.
+const TEMPLATE_BTN =
+  'bg-[#F8D448] text-foreground border border-[#e6c02f] shadow-sm hover:bg-[#f0c93a] active:bg-[#e9c22f]';
 
 const SCOPES: { id: string; label: string; hint: string }[] = [
   { id: 'read:data', label: 'read:data', hint: 'List/read projects, item masters, dataset versions' },
@@ -458,11 +471,6 @@ print(r["aggregate_kpis"], len(reps))`;
           subtitle="Drive SureSuite programmatically — API keys, scopes, and quickstarts for the /v1 gateway"
           onRefresh={load}
           refreshLoading={loading}
-          rightContent={
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> Create API key
-            </Button>
-          }
         />
 
         <Tabs defaultValue="keys" className="space-y-4">
@@ -474,16 +482,26 @@ print(r["aggregate_kpis"], len(reps))`;
 
           {/* ── Keys ─────────────────────────────────────────────────────── */}
           <TabsContent value="keys" className="space-y-4">
+            {/* Hygiene note sits ABOVE the table so it's read before acting. */}
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-sm">Key hygiene</AlertTitle>
+              <AlertDescription className="text-xs">
+                Store keys in a secret manager or environment variable, never in source control. Start
+                on <span className="font-mono">test</span> keys (stricter limits, one concurrent run),
+                give each system its own key with the narrowest scopes that work — a leaked key is one
+                click to revoke here.
+              </AlertDescription>
+            </Alert>
+
             <Card className="shadow-xs">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <KeyRound className="h-4 w-4" /> Organization API keys
                 </CardTitle>
-                <CardDescription className="text-xs">
-                  Keys authenticate external callers to the public API. The secret is shown once at
-                  creation and stored only as a hash — rotate or revoke a key at any time; every
-                  request made with it is audited.
-                </CardDescription>
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Create API key
+                </Button>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -584,17 +602,6 @@ print(r["aggregate_kpis"], len(reps))`;
                 </Table>
               </CardContent>
             </Card>
-
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle className="text-sm">Key hygiene</AlertTitle>
-              <AlertDescription className="text-xs">
-                Treat keys like passwords: store them in a secret manager or environment variable,
-                never in source control. Use <span className="font-mono">test</span> keys (stricter
-                limits, one concurrent run) while integrating, and give each system its own key with
-                the narrowest scopes that work — a leaked key is one click to revoke here.
-              </AlertDescription>
-            </Alert>
           </TabsContent>
 
           {/* ── Quickstart ───────────────────────────────────────────────── */}
@@ -672,25 +679,23 @@ print(r["aggregate_kpis"], len(reps))`;
                   <NotebookText className="h-4 w-4" /> Jupyter notebook quickstart
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  One runnable notebook covering every v1 use case: connect, read input data,
-                  freeze dataset versions, explore the policy catalog, edit &amp; snapshot policies,
-                  create scenarios, dispatch runs, analyze replications with pandas/matplotlib,
-                  check credibility, and run A/B and disruption experiments. Pick a project below
-                  and the downloaded copy comes with its CONFIG cell pre-filled.
+                  One runnable notebook covering every v1 use case — connect, read input data, snapshot
+                  policies, dispatch runs, and analyze replications. Pick a project and the downloaded
+                  copy comes with its CONFIG cell pre-filled.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button size="sm" variant="outline" asChild>
                     <a href={NOTEBOOK_COLAB_URL} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Google Colab
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open example in Colab
                     </a>
                   </Button>
-                  <Button size="sm" onClick={downloadNotebook} disabled={nbDownloading}>
+                  <Button size="sm" className={TEMPLATE_BTN} onClick={downloadNotebook} disabled={nbDownloading}>
                     {nbDownloading
                       ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                       : <Download className="mr-1.5 h-3.5 w-3.5" />}
-                    Download .ipynb{nbProject ? ` for “${nbProject.name}”` : ''}
+                    Download template (.ipynb){nbProject ? ` for “${nbProject.name}”` : ''}
                   </Button>
                 </div>
                 <Alert>
@@ -711,9 +716,8 @@ print(r["aggregate_kpis"], len(reps))`;
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Project configuration</CardTitle>
                 <CardDescription className="text-xs">
-                  These are the projects your account can access. Select one to see every id the
-                  notebook (and any API call) needs — copy the CONFIG cell, or just download the
-                  notebook above with it already filled in.
+                  Select one of your accessible projects to see every id the notebook (and any API
+                  call) needs — copy the CONFIG cell, or download the notebook above with it filled in.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -992,12 +996,12 @@ print(r["aggregate_kpis"], len(reps))`;
 
       {/* ── Rotate confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!rotateTarget} onOpenChange={(o) => { if (!o) setRotateTarget(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Rotate “{rotateTarget?.name}”?</DialogTitle>
             <DialogDescription>
-              A new secret is minted with the same scopes and project access. The current secret
-              keeps working for 72 hours so callers can switch over without downtime, then expires.
+              A new secret is minted and shown once. The current secret keeps working for a 72-hour
+              overlap so you can roll it out, then stops automatically.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1011,12 +1015,12 @@ print(r["aggregate_kpis"], len(reps))`;
 
       {/* ── Revoke confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!revokeTarget} onOpenChange={(o) => { if (!o) setRevokeTarget(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Revoke “{revokeTarget?.name}”?</DialogTitle>
             <DialogDescription>
-              The key stops working on its next request. This cannot be undone — create a new key
-              if the caller should regain access.
+              This is immediate and cannot be undone — the key stops working on its next request.
+              Any system still using it will start getting 401s.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
