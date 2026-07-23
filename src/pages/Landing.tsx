@@ -2,7 +2,7 @@
 // Authenticated users are redirected to `/app` (their app home).
 
 import { Link, Navigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import NetworkVisualization3D from '@/components/NetworkVisualization3D';
@@ -158,7 +158,75 @@ function StatViewport({ stats }: { stats: { label: string; value: string }[] }) 
 }
 
 // Animated shockwave/ripple that sits in the hero's top-right corner.
+// Animated square-pixel ripple that radiates slowly from the hero's top-right
+// epicenter (an always-on round red dot). Canvas-based; respects reduced-motion.
 function HeroRipple() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const reduce =
+      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let raf = 0;
+    const draw = (t: number) => {
+      const W = cvs.clientWidth;
+      const H = cvs.clientHeight;
+      if (cvs.width !== W || cvs.height !== H) {
+        cvs.width = W;
+        cvs.height = H;
+      }
+      const ctx = cvs.getContext('2d')!;
+      ctx.clearRect(0, 0, W, H);
+      const cx = W * 0.97;
+      const cy = H * -0.02;
+      const maxR = Math.min(W, H) * 0.42; // effect ~1/3 of the hero, top-right only
+
+      // subtle ambient wash toward the epicenter
+      const amb = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+      amb.addColorStop(0, 'rgba(191,35,48,0.10)');
+      amb.addColorStop(0.5, 'rgba(191,35,48,0.035)');
+      amb.addColorStop(1, 'rgba(191,35,48,0)');
+      ctx.fillStyle = amb;
+      ctx.fillRect(0, 0, W, H);
+
+      // two gentle expanding wavefronts, offset in phase
+      const period = 9;
+      const band = maxR * 0.16;
+      for (let i = 0; i < 2; i++) {
+        const phase = (t / period + i * 0.5) % 1;
+        const ringR = phase * maxR;
+        const strength = (1 - phase) * 0.28;
+        const inner = Math.max(0, (ringR - band) / maxR);
+        const outer = Math.min(1, (ringR + band) / maxR);
+        const g = ctx.createRadialGradient(cx, cy, inner * maxR, cx, cy, outer * maxR + 1);
+        g.addColorStop(0, 'rgba(191,35,48,0)');
+        g.addColorStop(0.5, `rgba(233,80,90,${strength})`);
+        g.addColorStop(1, 'rgba(191,35,48,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // soft epicenter glow
+      const gl = ctx.createRadialGradient(cx, cy, 0, cx, cy, 90);
+      gl.addColorStop(0, 'rgba(191,35,48,0.28)');
+      gl.addColorStop(1, 'rgba(191,35,48,0)');
+      ctx.fillStyle = gl;
+      ctx.fillRect(0, 0, W, H);
+    };
+
+    const start = performance.now();
+    const loop = (now: number) => {
+      draw((now - start) / 1000);
+      raf = requestAnimationFrame(loop);
+    };
+    draw(0);
+    if (reduce) draw(2.4);
+    else raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       {/* soft red haze at the epicenter */}
@@ -166,54 +234,10 @@ function HeroRipple() {
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(circle at 88% 7%, rgba(191,35,48,0.18), rgba(191,35,48,0.05) 26%, transparent 52%)',
+            'radial-gradient(circle at 88% 7%, rgba(191,35,48,0.16), rgba(191,35,48,0.04) 26%, transparent 52%)',
         }}
       />
-      {/* epicenter + rings, pinned near the top-right */}
-      <div className="absolute" style={{ top: 56, right: '12%' }}>
-        {/* faint static structure rings */}
-        {[116, 232, 356].map((d, i) => (
-          <div
-            key={d}
-            className="absolute rounded-full"
-            style={{
-              width: d,
-              height: d,
-              left: -d / 2,
-              top: -d / 2,
-              border: `1px solid rgba(191,35,48,${[0.15, 0.09, 0.05][i]})`,
-            }}
-          />
-        ))}
-        {/* slow expanding waves */}
-        {[0, 4.5].map((delay) => (
-          <div
-            key={delay}
-            className="absolute rounded-full"
-            style={{
-              width: 64,
-              height: 64,
-              left: -32,
-              top: -32,
-              border: '1.4px solid #BF2330',
-              filter: 'blur(0.4px)',
-              animation: `sc-wave 9s cubic-bezier(0.16,0.62,0.24,1) ${delay}s infinite`,
-            }}
-          />
-        ))}
-        {/* epicenter dot */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: 16,
-            height: 16,
-            left: -8,
-            top: -8,
-            background: '#BF2330',
-            boxShadow: '0 0 16px rgba(191,35,48,0.55)',
-          }}
-        />
-      </div>
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );
 }
@@ -234,23 +258,11 @@ export default function Landing() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-background text-foreground">
-      {/* keyframes for the hero ripple (respecting reduced-motion) */}
-      <style>{`
-        @keyframes sc-wave {
-          0%   { transform: scale(0.28); opacity: 0; }
-          12%  { opacity: 0.5; }
-          100% { transform: scale(4.6); opacity: 0; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          [style*="sc-wave"] { animation: none !important; }
-        }
-      `}</style>
-
       {/* Top bar */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="SuReSuite" className="h-6 object-contain" />
+        <div className="mx-auto flex h-[83px] max-w-6xl items-center justify-between px-6">
+          <Link to="/" className="flex items-center">
+            <img src="/logo-lockup.png" alt="SuReSuite — Supply Chain Resilience Suite" className="h-[84px] object-contain" />
           </Link>
           <nav className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
