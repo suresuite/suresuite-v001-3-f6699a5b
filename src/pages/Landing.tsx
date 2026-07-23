@@ -260,9 +260,9 @@ export default function Landing() {
     <div className="min-h-dvh flex flex-col bg-background text-foreground">
       {/* Top bar */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-[83px] max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-[64px] max-w-6xl items-center justify-between px-6">
           <Link to="/" className="flex items-center">
-            <img src="/logo-lockup.png" alt="SuReSuite — Supply Chain Resilience Suite" className="h-[84px] object-contain" />
+            <img src="/logo-lockup.png" alt="SuReSuite — Supply Chain Resilience Suite" className="h-[58px] object-contain" />
           </Link>
           <nav className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
