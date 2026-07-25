@@ -1,8 +1,16 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 const Forbidden = () => {
+  const { user } = useAuth();
+  const { homePath } = useCapabilities();
+  // Signed in: the first page they may actually open. A plain `/` would bounce
+  // through the landing page straight back to the page that denied them.
+  const backTo = user ? homePath : '/';
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-6">
@@ -17,7 +25,7 @@ const Forbidden = () => {
           </p>
         </div>
         <Button asChild>
-          <Link to="/">Return to home</Link>
+          <Link to={backTo} replace>Return to home</Link>
         </Button>
       </div>
     </div>

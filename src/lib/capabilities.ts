@@ -23,6 +23,17 @@ export interface CapabilityMeta {
   description?: string;
 }
 
+/**
+ * Route → capability key aliases. The app home moved from `/` to `/app` when
+ * `/` became the public marketing landing, but the seeded capability key (and
+ * the `capabilities` table row) is still `/`. Mapping the route here keeps
+ * `/app` gated by the existing "Getting Started" grant without a migration.
+ * `/` itself is the public landing page and is never gated.
+ */
+const PATH_ALIASES: Record<string, string> = {
+  '/app': '/',
+};
+
 export const PAGE_CAPABILITIES: CapabilityMeta[] = [
   { key: '/', kind: 'page', label: 'Getting Started' },
   { key: '/project-manager', kind: 'page', label: 'Project Manager' },
@@ -143,6 +154,7 @@ export interface EffectiveCapabilities {
  * (e.g. `/help`, `/auth`) — such routes are treated as open.
  */
 export function pageKeyForPath(pathname: string): string | null {
+  if (pathname in PATH_ALIASES) return PATH_ALIASES[pathname];
   let best: string | null = null;
   for (const { key } of PAGE_CAPABILITIES) {
     const matches =
@@ -150,6 +162,36 @@ export function pageKeyForPath(pathname: string): string | null {
     if (matches && (best === null || key.length > best.length)) best = key;
   }
   return best;
+}
+
+/**
+ * Candidate landing routes, most-preferred first. `/app` is the app home; the
+ * rest are the fallbacks used when it isn't granted, ending at `/profile`,
+ * which is always on. Without this, a user denied the app home lands on
+ * `/forbidden`, whose "return to home" sends them to `/` → `/app` →
+ * `/forbidden` — a dead-end cycle with no way into the product.
+ */
+export const HOME_ROUTE_CANDIDATES: string[] = [
+  '/app',
+  '/project-manager',
+  '/network/firm-level',
+  '/network/product-level',
+  '/network/process-level',
+  '/policies',
+  '/simulation-lab',
+  '/project-intelligence',
+  '/admin',
+  '/profile',
+];
+
+/** First landing route the resolved capability set actually permits. */
+export function homePathFor(caps: EffectiveCapabilities | null): string {
+  if (!caps) return '/app';
+  for (const path of HOME_ROUTE_CANDIDATES) {
+    const key = pageKeyForPath(path);
+    if (key === null || (caps.pages[key] ?? false)) return path;
+  }
+  return '/profile';
 }
 
 const EMPTY_BUDGETS: EffectiveBudgets = {

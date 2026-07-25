@@ -1,10 +1,11 @@
 // Public marketing landing at `/`. No sidebar, no auth required.
-// Authenticated users are redirected to `/app` (their app home).
+// Authenticated users are redirected to their app home (`/app` when granted).
 
 import { Link, Navigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import NetworkVisualization3D from '@/components/NetworkVisualization3D';
 import {
   ArrowRight,
@@ -244,6 +245,7 @@ function HeroRipple() {
 
 export default function Landing() {
   const { user, loading } = useAuth();
+  const { homePath } = useCapabilities();
   const [activeTech, setActiveTech] = useState<TechKey>('network');
 
   if (loading) {
@@ -254,7 +256,7 @@ export default function Landing() {
     );
   }
 
-  if (user) return <Navigate to="/app" replace />;
+  if (user) return <Navigate to={homePath} replace />;
 
   return (
     <div className="min-h-dvh flex flex-col bg-background text-foreground">
