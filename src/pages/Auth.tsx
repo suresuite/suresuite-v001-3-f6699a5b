@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -26,13 +27,24 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { homePath } = useCapabilities();
   const { toast } = useToast();
 
+  // Where to land once authenticated: the page they were sent here from, or the
+  // first app page they may open. Never `/` — that is the public landing page,
+  // which would only bounce onward through an extra redirect.
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+  const redirectTo = from && !from.startsWith('/auth') ? from : homePath;
+
+  // Single redirect owner: fires both for a fresh login and for an already
+  // authenticated user who lands on /auth. `replace` keeps the login screen out
+  // of history, so Back from the app doesn't return to it.
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate(redirectTo, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, redirectTo]);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -55,8 +67,10 @@ const Auth = () => {
         title: 'Login successful',
         description: 'Welcome back!',
       });
-      console.log('[AUTH-PAGE] Redirecting to home page');
-      navigate('/');
+      // The redirect is owned by the effect above, which fires as soon as the
+      // auth context has a user — navigating here too would push a duplicate
+      // history entry.
+      console.log('[AUTH-PAGE] Authenticated, redirecting to', redirectTo);
     } else {
       toast({
         title: 'Login failed',
@@ -64,7 +78,7 @@ const Auth = () => {
         variant: 'destructive',
       });
     }
-    
+
     setIsLoading(false);
   };
 

@@ -190,7 +190,11 @@ function App() {
                 <Route path="/admin/audit" element={<ProtectedRoute><RoleGuard><AdminAudit isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
               </Routes>
               </RouteErrorBoundary>
-              <FloatingChatBubble />
+              {/* Own boundary: the bubble renders on every route, so a throw
+                  here must not take the routed page down with it. */}
+              <RouteErrorBoundary fallback={null}>
+                <FloatingChatBubble />
+              </RouteErrorBoundary>
             </Router>
           </GlobalProjectProvider>
           </CapabilitiesProvider>

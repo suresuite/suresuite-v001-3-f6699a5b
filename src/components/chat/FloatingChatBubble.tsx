@@ -213,6 +213,14 @@ export function FloatingChatBubble() {
     };
   }, [panelDragging, panelPos]);
 
+  // Keep the full selectedProject in sync with the active id (e.g. after a cross-page pick).
+  // Must stay above the `hidden` early return — see the note there.
+  useEffect(() => {
+    if (!projectId) return;
+    const match = projects.find((p) => p.id === projectId);
+    if (match && match.id !== selectedProject?.id) setSelectedProject(match as any);
+  }, [projectId, projects, selectedProject?.id, setSelectedProject]);
+
   // Panel resize handlers (bottom-right grip)
   useEffect(() => {
     if (!resizing) return;
@@ -235,6 +243,10 @@ export function FloatingChatBubble() {
     };
   }, [resizing]);
 
+  // Every hook must be called above this line. `hidden` flips whenever the user
+  // logs in/out, navigates to /auth, or the capability set resolves — a hook
+  // below the return would change the hook count between renders and throw
+  // "Rendered more hooks than during the previous render", unmounting the app.
   if (hidden) return null;
 
   const onSubmit = async (e?: React.FormEvent) => {
@@ -250,13 +262,6 @@ export function FloatingChatBubble() {
   };
 
   const projectLabel = selectedProject?.name ?? (projectId ? "Project" : null);
-
-  // Keep the full selectedProject in sync with the active id (e.g. after a cross-page pick).
-  useEffect(() => {
-    if (!projectId) return;
-    const match = projects.find((p) => p.id === projectId);
-    if (match && match.id !== selectedProject?.id) setSelectedProject(match as any);
-  }, [projectId, projects, selectedProject?.id, setSelectedProject]);
 
   const chooseProject = (id: string) => {
     setGlobalSelectedProjectId(id);

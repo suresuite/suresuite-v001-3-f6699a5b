@@ -134,23 +134,22 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
   // t=3s: nexus
   // t=6s: simulation
   // t=9s: back to network (then stop)
+  //
+  // The selection is React state only. It used to also be mirrored into
+  // `window.location.hash`, which pushed four history entries per visit behind
+  // React Router's back and left `history.state` without the router's index —
+  // breaking the Back button. No element carries these ids, so nothing read them.
   useEffect(() => {
-    // reflect selection in the hash (optional)
-    window.location.hash = "tech-network";
-
     const t1 = setTimeout(() => {
       setActiveTech('nexus');
-      window.location.hash = "tech-nexus";
     }, 3000);
 
     const t2 = setTimeout(() => {
       setActiveTech('simulation');
-      window.location.hash = "tech-simulation";
     }, 6000);
 
     const t3 = setTimeout(() => {
       setActiveTech('network');
-      window.location.hash = "tech-network";
       // stop here (do not loop further)
     }, 9000);
 
@@ -380,7 +379,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
             <div className="flex justify-center mb-8">
               <div className="flex bg-muted rounded-xl p-1 max-w-md mx-auto">
                 <button
-                  onClick={() => { setActiveTech('network'); window.location.hash = 'tech-network'; }}
+                  onClick={() => setActiveTech('network')}
                   className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     activeTech === 'network' 
                       ? 'bg-background text-[#BF2330] shadow-sm' 
@@ -390,7 +389,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
                   Network
                 </button>
                 <button
-                  onClick={() => { setActiveTech('nexus'); window.location.hash = 'tech-nexus'; }}
+                  onClick={() => setActiveTech('nexus')}
                   className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     activeTech === 'nexus' 
                       ? 'bg-background text-purple-600 shadow-sm' 
@@ -400,7 +399,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
                   Nexus Detection
                 </button>
                 <button
-                  onClick={() => { setActiveTech('simulation'); window.location.hash = 'tech-simulation'; }}
+                  onClick={() => setActiveTech('simulation')}
                   className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     activeTech === 'simulation' 
                       ? 'bg-background text-[#BF2330] shadow-sm' 

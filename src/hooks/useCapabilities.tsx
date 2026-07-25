@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { UserRole } from '@/hooks/useUserRole';
 import {
   checkBudget as checkBudgetPure,
+  homePathFor,
   isModelAllowed as isModelAllowedPure,
   normalizeCapabilities,
   pageKeyForPath,
@@ -34,6 +35,8 @@ interface CapabilitiesContextValue {
   can: (key: FeatureKey | string) => boolean;
   canFeature: (key: FeatureKey) => boolean;
   canAccessPage: (pathname: string) => boolean;
+  /** First landing route this user may actually open (post-login, "go home"). */
+  homePath: string;
   isModelAllowed: (clientModelId: string) => ModelGateResult;
   checkBudget: () => ModelGateResult;
   allowedModelCodes: string[];
@@ -110,6 +113,7 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
       can,
       canFeature,
       canAccessPage,
+      homePath: homePathFor(capabilities),
       isModelAllowed: (id: string) =>
         capabilities ? isModelAllowedPure(capabilities, id) : { ok: true },
       checkBudget: () => (capabilities ? checkBudgetPure(capabilities) : { ok: true }),

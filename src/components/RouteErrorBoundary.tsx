@@ -49,6 +49,9 @@ interface BoundaryProps {
   /** Changing this value resets the boundary (used to recover on navigation). */
   resetKey: string;
   onReset: () => void;
+  /** Rendered instead of the full-page fallback — use `null` for chrome that
+   * should fail silently rather than replace the page. */
+  fallback?: ReactNode;
 }
 
 interface BoundaryState {
@@ -77,6 +80,7 @@ class ErrorBoundaryInner extends Component<BoundaryProps, BoundaryState> {
 
   render() {
     if (this.state.error) {
+      if ('fallback' in this.props) return <>{this.props.fallback}</>;
       return (
         <RouteErrorFallback
           error={this.state.error}
@@ -97,13 +101,17 @@ class ErrorBoundaryInner extends Component<BoundaryProps, BoundaryState> {
  * tree and leaves a blank white page (previously seen intermittently on heavier
  * pages such as /simulation-lab).
  */
-export default function RouteErrorBoundary({ children }: { children: ReactNode }) {
+export default function RouteErrorBoundary({
+  children,
+  ...rest
+}: { children: ReactNode } & Partial<Pick<BoundaryProps, 'fallback'>>) {
   const location = useLocation();
   const navigate = useNavigate();
   return (
     <ErrorBoundaryInner
       resetKey={location.pathname}
       onReset={() => navigate(0)}
+      {...rest}
     >
       {children}
     </ErrorBoundaryInner>
