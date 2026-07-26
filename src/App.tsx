@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProvider } from '@/hooks/useAuth';
@@ -27,6 +27,7 @@ import Forbidden from './pages/Forbidden';
 import DocsLayout from '@/components/docs/DocsLayout';
 import HelpPage from './pages/help/HelpPage';
 import Landing from './pages/Landing';
+import About from './pages/About';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -176,7 +177,7 @@ function App() {
                   <Route index element={<HelpPage slug="overview" />} />
                   <Route path=":slug" element={<HelpPage />} />
                 </Route>
-                <Route path="/about" element={<Navigate to="/help" replace />} />
+                <Route path="/about" element={<About />} />
 
                 {/* Super Admin routes */}
                 <Route path="/admin" element={<ProtectedRoute><RoleGuard><AdminDashboard isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
