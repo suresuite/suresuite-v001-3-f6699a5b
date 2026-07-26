@@ -1,8 +1,8 @@
 # sim-worker (Fly.io)
 
 Long-running Python worker that turns scenario commands into KPI deltas in
-real time. This is the "Sim Worker" box from
-`.lovable/plan.md` (Phase 1 architecture).
+real time. This is the "Sim Worker" box of the Phase 1 architecture — see
+`docs/simulation-data-lifecycle.md` for how it sits between Redis and Postgres.
 
 ## Responsibilities
 

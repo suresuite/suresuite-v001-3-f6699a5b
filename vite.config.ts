@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { execSync } from "child_process";
-import { componentTagger } from "lovable-tagger";
 
 // Build-provenance marker shown in the UI so "is the new code live?" is
 // answerable at a glance. Prefer Vercel's commit SHA env var, else git.
@@ -17,7 +16,7 @@ function buildSha(): string {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   define: {
     __BUILD_SHA__: JSON.stringify(buildSha()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace("T", " ")),
@@ -31,10 +30,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
-  plugins: [
-    react(),
-    mode === 'development' && componentTagger(),
-  ].filter(Boolean),
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
