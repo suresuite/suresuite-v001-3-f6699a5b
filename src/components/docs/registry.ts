@@ -1,6 +1,6 @@
 // Documentation registry — the single source of truth for the /help docs site.
 // Drives the left nav tree, breadcrumbs, prev/next pager, related links, and
-// search. Each `slug` matches a key in DOC_BODIES (src/pages/About.tsx).
+// search. Each `slug` matches a key in DOC_BODIES (src/pages/help/docBodies.tsx).
 
 export type DocPage = {
   slug: string;

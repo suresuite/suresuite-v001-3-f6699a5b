@@ -268,6 +268,9 @@ export default function Landing() {
           </Link>
           <nav className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
+              <Link to="/about">About</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
               <a href="#video">Demo</a>
             </Button>
             <Button asChild variant="ghost" size="sm">

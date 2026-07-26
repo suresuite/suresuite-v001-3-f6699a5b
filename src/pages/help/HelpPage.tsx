@@ -1,9 +1,9 @@
 // Renders one documentation page body (by slug) inside the DocsLayout Outlet.
-// Bodies live in DOC_BODIES (src/pages/About.tsx); chrome lives in DocsLayout.
+// Bodies live in DOC_BODIES (src/pages/help/docBodies.tsx); chrome lives in DocsLayout.
 
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { DOC_BODIES } from "@/pages/About";
+import { DOC_BODIES } from "@/pages/help/docBodies";
 import { DEFAULT_SLUG, getPage } from "@/components/docs/registry";
 
 export default function HelpPage({ slug: slugProp }: { slug?: string }) {
