@@ -1,72 +1,43 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Lightbulb, Loader2 } from "lucide-react";
 import {
-  BadgeCheck,
-  Calculator,
-  CircleDashed,
-  Database,
-  ExternalLink,
-  FileText,
-  FlaskConical,
-  Lightbulb,
-  Loader2,
-  MessageSquareQuote,
-  Network,
-  Siren,
-  SlidersHorizontal,
-} from "lucide-react";
-import { AppliedReportFiles } from "@/components/chat/FileCard";
-import { fileWorkspaceUiEnabled } from "@/hooks/useUserFiles";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { FIELD_LABELS } from "@/lib/policies/schemas";
-import { errorRemedy, PART_TREATMENTS, typedErrorCode } from "@/lib/chat/partStyles";
-import { APPLY_RETRY_CAP, useProposal, type Proposal } from "@/hooks/useProposals";
+  ProposalCardView,
+  type Proposal as ProposalView,
+  type ProposalRow,
+} from "@/components/chat/ProposalCardView";
+import { useProposal, type Proposal } from "@/hooks/useProposals";
 
 /**
  * Proposal card (ai-agents.md §4.6) — the reviewable unit of Layer B output,
- * anchored in-thread at the message that produced it. Card states map 1:1 to
- * proposals.status + apply bookkeeping; the card never renders numbers that
- * are not in payload/applied_result (no client-side recomputation).
+ * anchored in-thread at the message that produced it.
  *
- * §17.2 (v1.2 Phase 2): the card sits in the readability grammar — amber left
- * rail (the proposal content class, never the agent) + agent chip + status
- * pill; apply errors render in the errors-and-refusals treatment with the
- * typed code and its one-line remedy. All treatments from partStyles.ts.
+ * This is the CONTAINER: it resolves the proposal by id (live status via the
+ * realtime publication) and owns the approve / reject / retry-apply actions.
+ * The visuals are delegated to the presentational `ProposalCardView` (SureSuite
+ * visual language) — the card never renders numbers that aren't in the resolved
+ * payload/applied_result (no client-side recomputation). Every existing call
+ * site (`MessageBubble`, `ChatWorkspace`) keeps passing `{ proposalId }`.
  */
 
-const AGENT_META: Record<string, { name: string; Icon: typeof Database }> = {
-  "data-steward": { name: "Data Steward", Icon: Database },
-  "cost-estimator": { name: "Cost Estimator", Icon: Calculator },
-  "network-cartographer": { name: "Network Cartographer", Icon: Network },
-  "disruption-sentinel": { name: "Disruption Sentinel", Icon: Siren },
-  "policy-configurator": { name: "Policy Configurator", Icon: SlidersHorizontal },
-  "vv-analyst": { name: "V&V Analyst", Icon: BadgeCheck },
-  "experiment-designer": { name: "Experiment Designer", Icon: FlaskConical },
-  explainer: { name: "Explainer", Icon: MessageSquareQuote },
-  "report-builder": { name: "Report Builder", Icon: FileText },
+/** agent_id → display name (§4.5). */
+const AGENT_NAME: Record<string, string> = {
+  "data-steward": "Data Steward",
+  "cost-estimator": "Cost Estimator",
+  "network-cartographer": "Network Cartographer",
+  "disruption-sentinel": "Disruption Sentinel",
+  "policy-configurator": "Policy Configurator",
+  "vv-analyst": "V&V Analyst",
+  "experiment-designer": "Experiment Designer",
+  explainer: "Explainer",
+  "report-builder": "Report Builder",
 };
 
-const PROVENANCE_CHIP: Record<Proposal["provenance"], { label: string; className: string }> = {
-  deterministic: { label: "computed from your data", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
-  llm_drafted: { label: "AI-drafted — verify", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
-  user_supplied: { label: "as you specified", className: "bg-sky-500/10 text-sky-700 dark:text-sky-400" },
+/** provenance → the label the card shows; provenance is never implied (§4.6). */
+const PROVENANCE_LABEL: Record<Proposal["provenance"], string> = {
+  deterministic: "computed from your data",
+  llm_drafted: "AI-drafted — verify",
+  user_supplied: "as you specified",
 };
-
-// artifact type → room deep link + apply-gate name (§4.4 / §4.6)
-const ARTIFACT_META: Record<string, { room: string | null; roomLabel: string; gate: string }> = {
-  item_master_diff: { room: "/project-manager", roomLabel: "Project Manager", gate: "the item-master write RPCs" },
-  parameter_estimate: { room: "/project-manager", roomLabel: "Project Manager", gate: "the item-master write RPCs" },
-  network_map_diff: { room: "/project-manager", roomLabel: "Project Manager", gate: "the supplier/lane write RPCs" },
-  policy_bundle_diff: { room: "/policies", roomLabel: "Policies", gate: "save_policy_defaults + snapshot_policy" },
-  model_card_draft: { room: "/policies", roomLabel: "Run & Validate", gate: "record_model_validation" },
-  experiment_spec: { room: "/simulation-lab", roomLabel: "Simulation Lab", gate: "the experiment dispatch gate" },
-  risk_alert: { room: "/simulation-lab", roomLabel: "Simulation Lab", gate: "the experiment dispatch gate (linked sizing run)" },
-  trace_explanation: { room: null, roomLabel: "", gate: "" },
-  decision_report: { room: null, roomLabel: "", gate: "the report renderer (workspace)" },
-};
-
-const DIFF_COLLAPSE_LIMIT = 20;
 
 function expiresIn(expiresAt: string): string {
   const ms = Date.parse(expiresAt) - Date.now();
@@ -77,575 +48,44 @@ function expiresIn(expiresAt: string): string {
   return `expires in ${hours}h`;
 }
 
-function ItemMasterDiff({ rows }: { rows: Array<Record<string, unknown>> }) {
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? rows : rows.slice(0, DIFF_COLLAPSE_LIMIT);
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[12.5px]">
-        <thead>
-          <tr className="border-b border-border text-left text-muted-foreground">
-            <th className="py-1 pr-3 font-medium">Table</th>
-            <th className="py-1 pr-3 font-medium">Entity</th>
-            <th className="py-1 pr-3 font-medium">Field</th>
-            <th className="py-1 pr-3 font-medium">New value</th>
-            <th className="py-1 font-medium">Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map((r, i) => (
-            <tr key={i} className="border-b border-border/50">
-              <td className="py-1 pr-3">{String(r.table ?? "")}</td>
-              <td className="py-1 pr-3 font-mono">{String(r.entity_id ?? "")}</td>
-              <td className="py-1 pr-3">{String(r.field ?? "")}</td>
-              <td className="py-1 pr-3 font-mono">{r.value == null ? "—" : String(r.value)}</td>
-              <td className="py-1">{String(r.source ?? "")}{r.reducer ? ` (${String(r.reducer)})` : ""}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {rows.length > DIFF_COLLAPSE_LIMIT && !showAll && (
-        <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
-          show all {rows.length}
-        </button>
-      )}
-    </div>
-  );
+/** The view knows four states; map draft→proposed (still actionable) and the
+ * lazily-expired card to the dimmed rejected treatment. */
+function toViewStatus(status: Proposal["status"]): ProposalView["status"] {
+  if (status === "expired") return "rejected";
+  if (status === "draft") return "proposed";
+  return status;
 }
 
-/** parameter_estimate body (§18.1 card contract): per-row value + [low,
- * high] + method@version + source dataset/vintage + assumptions — every
- * number straight from the payload, never recomputed client-side (§4.6). */
-function ParameterEstimate({ rows }: { rows: Array<Record<string, unknown>> }) {
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? rows : rows.slice(0, DIFF_COLLAPSE_LIMIT);
-  const sourceLabel = (r: Record<string, unknown>): string => {
-    const sources = Array.isArray(r.sources) ? (r.sources as Array<Record<string, unknown>>) : [];
-    return sources.map((s) => `${String(s.dataset ?? "")} (${String(s.vintage ?? "")})`).join("; ");
-  };
-  const assumptions = [
-    ...new Set(
-      rows.flatMap((r) => (Array.isArray(r.assumptions) ? (r.assumptions as string[]) : [])),
-    ),
-  ];
-  return (
-    <div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[12.5px]">
-          <thead>
-            <tr className="border-b border-border text-left text-muted-foreground">
-              <th className="py-1 pr-3 font-medium">Entity</th>
-              <th className="py-1 pr-3 font-medium">Field</th>
-              <th className="py-1 pr-3 font-medium">Value</th>
-              <th className="py-1 pr-3 font-medium">[low, high]</th>
-              <th className="py-1 pr-3 font-medium">Method</th>
-              <th className="py-1 font-medium">Source</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((r, i) => (
-              <tr key={i} className="border-b border-border/50">
-                <td className="py-1 pr-3 font-mono">{String(r.entity_id ?? "")}</td>
-                <td className="py-1 pr-3">{String(r.table ?? "")}.{String(r.field ?? "")}</td>
-                <td className="py-1 pr-3 font-mono">{r.value == null ? "—" : String(r.value)}</td>
-                <td className="py-1 pr-3 font-mono">[{String(r.low ?? "—")}, {String(r.high ?? "—")}]</td>
-                <td className="py-1 pr-3 font-mono">{String(r.method ?? "")}</td>
-                <td className="py-1">{sourceLabel(r)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length > DIFF_COLLAPSE_LIMIT && !showAll && (
-          <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
-            show all {rows.length}
-          </button>
-        )}
-      </div>
-      {assumptions.length > 0 && (
-        <div className="mt-2 text-[11.5px] text-muted-foreground">
-          <span className="font-medium">Declared assumptions:</span>
-          <ul className="ml-4 list-disc">
-            {assumptions.map((a, i) => <li key={i}>{a}</li>)}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
+/** Flatten the artifact payload rows into the view's [table/entity/field/value/
+ * low/high/method/source] shape — straight from the payload, never recomputed. */
+function toRows(payload: Record<string, unknown> | undefined): ProposalRow[] {
+  const rows = Array.isArray((payload as { rows?: unknown })?.rows)
+    ? ((payload as { rows: Array<Record<string, unknown>> }).rows)
+    : [];
+  return rows.map((r) => {
+    const sources = Array.isArray(r.sources)
+      ? (r.sources as Array<Record<string, unknown>>)
+          .map((s) => `${String(s.dataset ?? "")} (${String(s.vintage ?? "")})`)
+          .join("; ")
+      : undefined;
+    return {
+      table: r.table != null ? String(r.table) : undefined,
+      entity: String(r.entity_id ?? r.entity ?? ""),
+      field: String(r.field ?? ""),
+      value: r.value == null ? "—" : String(r.value),
+      low: r.low != null ? String(r.low) : undefined,
+      high: r.high != null ? String(r.high) : undefined,
+      method: r.method != null ? String(r.method) : undefined,
+      source: sources ?? (r.source != null ? String(r.source) : undefined),
+    };
+  });
 }
 
-/** network_map_diff body (§18.2 card contract): per-row op + supplier +
- * LEI + verification status/source count + sources + quotes, plus the
- * visibly-pending sub-threshold triples — everything straight from the
- * payload, never recomputed client-side (§4.6). */
-function NetworkMapDiff({ payload }: { payload: { rows?: Array<Record<string, unknown>>; pending?: Array<Record<string, unknown>> } }) {
-  const [showAll, setShowAll] = useState(false);
-  const rows = Array.isArray(payload.rows) ? payload.rows : [];
-  const pending = Array.isArray(payload.pending) ? payload.pending : [];
-  const visible = showAll ? rows : rows.slice(0, DIFF_COLLAPSE_LIMIT);
-  return (
-    <div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[12.5px]">
-          <thead>
-            <tr className="border-b border-border text-left text-muted-foreground">
-              <th className="py-1 pr-3 font-medium">Change</th>
-              <th className="py-1 pr-3 font-medium">Supplier</th>
-              <th className="py-1 pr-3 font-medium">LEI</th>
-              <th className="py-1 pr-3 font-medium">Claim</th>
-              <th className="py-1 pr-3 font-medium">Status</th>
-              <th className="py-1 font-medium">Sources</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((r, i) => (
-              <tr key={i} className="border-b border-border/50">
-                <td className="py-1 pr-3">{r.op === "add_supply_link" ? `link → ${String(r.material_id ?? "")}` : "add supplier"}</td>
-                <td className="py-1 pr-3">{String(r.supplier_name ?? "")} <span className="font-mono text-muted-foreground">({String(r.supplier_id ?? "")})</span></td>
-                <td className="py-1 pr-3 font-mono">{r.lei ? String(r.lei) : "—"}</td>
-                <td className="py-1 pr-3">{String(r.subject ?? "")} {String(r.relation ?? "")} {String(r.object ?? "")}</td>
-                <td className="py-1 pr-3">{String(r.status ?? "")} ({String(r.independent_sources ?? "?")})</td>
-                <td className="py-1">{Array.isArray(r.source_ids) ? (r.source_ids as string[]).join("; ") : ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length > DIFF_COLLAPSE_LIMIT && !showAll && (
-          <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
-            show all {rows.length}
-          </button>
-        )}
-      </div>
-      {pending.length > 0 && (
-        <div className="mt-2 text-[11.5px] text-muted-foreground">
-          <span className="font-medium">Pending — stored, not applied (needs 3+ independent sources):</span>
-          <ul className="ml-4 list-disc">
-            {pending.map((p, i) => (
-              <li key={i}>
-                {String(p.subject ?? "")} {String(p.relation ?? "")} {String(p.object ?? "")} — {String(p.status ?? "")} ({String(p.independent_sources ?? "?")})
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** risk_alert body (§18.3 card contract): the event with its corroboration,
- * the matched exposure, the LINKED sizing experiment, the impact block
- * (pending until the run completes — then min/max/mean with the run
- * citation, straight from applied_result), and the §17.3 action chips —
- * everything from payload/applied_result, never recomputed client-side. */
-function RiskAlert({ payload, appliedResult }: {
-  payload: Record<string, unknown>;
-  appliedResult: Record<string, unknown> | null;
-}) {
-  const event = (payload.event ?? {}) as Record<string, unknown>;
-  const subject = (event.subject ?? {}) as Record<string, unknown>;
-  const corroboration = (event.corroboration ?? {}) as Record<string, unknown>;
-  const matches = Array.isArray(payload.matched_entities) ? (payload.matched_entities as Array<Record<string, unknown>>) : [];
-  const linked = (payload.linked_experiment ?? {}) as Record<string, unknown>;
-  const chips = Array.isArray(payload.recommended_actions) ? (payload.recommended_actions as Array<Record<string, unknown>>) : [];
-  // The impact law (§18.3): applied_result.impact is the only complete source.
-  const impact = ((appliedResult?.impact ?? payload.impact ?? {}) as Record<string, unknown>);
-  const impactComplete = String(impact.status ?? "") === "complete";
-  return (
-    <div className="space-y-2 text-[12.5px]">
-      <div>
-        <span className="font-medium capitalize">{String(payload.severity ?? "")}</span>
-        {" · "}
-        <span className="capitalize">{String(event.event_type ?? "")}</span> at{" "}
-        <span className="font-medium">{String(subject.name ?? "")}</span>
-        {subject.lei ? <span className="font-mono text-muted-foreground"> (LEI {String(subject.lei)})</span> : null}
-        {" — "}
-        {String(corroboration.status ?? "")} ({String(corroboration.independent_sources ?? "?")} source(s)
-        {Number(corroboration.authoritative_sources ?? 0) > 0
-          ? `, ${String(corroboration.authoritative_sources)} authoritative`
-          : ""})
-      </div>
-      {matches.length > 0 && (
-        <div>
-          <span className="font-medium">Matched exposure:</span>
-          <ul className="ml-4 list-disc">
-            {matches.map((m, i) => (
-              <li key={i}>
-                {String(m.kind ?? "").replace(/_/g, " ")}: {String(m.entity_name ?? m.entity_id ?? "")}{" "}
-                <span className="font-mono text-muted-foreground">({String(m.entity_id ?? "")})</span>
-                {Array.isArray(m.sole_source_materials) && (m.sole_source_materials as unknown[]).length > 0
-                  ? ` — sole-sources ${(m.sole_source_materials as string[]).join(", ")}`
-                  : ""}
-                {m.map_status ? ` [${String(m.map_status)} map triple]` : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <div>
-        <span className="font-medium">Linked sizing run:</span>{" "}
-        {String(linked.scenario_name ?? "")} · {String(linked.replications ?? "?")} reps ·{" "}
-        {String(linked.horizon_days ?? "?")} days — dispatches through the Experiment Designer's gate on approval.
-      </div>
-      <div className={cn("rounded px-2 py-1.5", impactComplete ? "bg-emerald-500/10" : "bg-muted")}>
-        <span className="font-medium">Impact:</span>{" "}
-        {impactComplete
-          ? `${String(impact.kpi ?? "")} ${String(impact.min)}–${String(impact.max)} (mean ${String(impact.mean)}, ${String(impact.replications)} reps; run ${String(impact.run_id ?? "")})`
-          : "pending — simulation results only; fills after the linked run completes"}
-      </div>
-      {chips.length > 0 && (
-        <div className="text-[11.5px] text-muted-foreground">
-          <span className="font-medium">Recommended actions:</span>
-          <ul className="ml-4 list-disc">
-            {chips.map((c, i) => (
-              <li key={i}>{String(c.label ?? "")} — {String(c.reason ?? "")}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const fieldLabel = (f: string) => FIELD_LABELS[f] ?? f;
-
-const fmtValue = (v: unknown): string => {
-  if (v == null) return "—";
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
-};
-
-interface PolicyDiffPayload {
-  diff?: {
-    defaults?: Record<string, Record<string, unknown>>;
-    overrides?: Array<{ scope: string; target_key: string; family: string; patch: Record<string, unknown> }>;
-  };
-  rationale?: string;
-  newly_required?: string[];
-  findings_preview?: Array<{ severity: string; field: string; message: string }>;
-}
-
-/** §4.6 policy diff view: per-field family/override rows with the registry
- * labels the /policies grid uses — the reviewer reads the storage vocabulary. */
-function PolicyBundleDiff({ payload }: { payload: PolicyDiffPayload }) {
-  const [showAll, setShowAll] = useState(false);
-  const rows: Array<{ target: string; family: string; field: string; value: unknown }> = [];
-  for (const [family, patch] of Object.entries(payload.diff?.defaults ?? {})) {
-    for (const [field, value] of Object.entries(patch ?? {})) {
-      rows.push({ target: "project default", family, field, value });
-    }
-  }
-  for (const o of payload.diff?.overrides ?? []) {
-    for (const [field, value] of Object.entries(o.patch ?? {})) {
-      rows.push({ target: o.target_key, family: o.family, field, value });
-    }
-  }
-  const visible = showAll ? rows : rows.slice(0, DIFF_COLLAPSE_LIMIT);
-  const newlyRequired = payload.newly_required ?? [];
-  return (
-    <div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[12.5px]">
-          <thead>
-            <tr className="border-b border-border text-left text-muted-foreground">
-              <th className="py-1 pr-3 font-medium">Target</th>
-              <th className="py-1 pr-3 font-medium">Family</th>
-              <th className="py-1 pr-3 font-medium">Parameter</th>
-              <th className="py-1 font-medium">New value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((r, i) => (
-              <tr key={i} className="border-b border-border/50">
-                <td className="py-1 pr-3 font-mono">{r.target}</td>
-                <td className="py-1 pr-3">{r.family}</td>
-                <td className="py-1 pr-3">{fieldLabel(r.field)}</td>
-                <td className="py-1 font-mono">{fmtValue(r.value)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length > DIFF_COLLAPSE_LIMIT && !showAll && (
-          <button type="button" className="mt-1 text-[12px] text-primary underline" onClick={() => setShowAll(true)}>
-            show all {rows.length}
-          </button>
-        )}
-      </div>
-      {payload.rationale && (
-        <div className="mt-1.5 text-[12px] text-muted-foreground">{payload.rationale}</div>
-      )}
-      {newlyRequired.length > 0 && (
-        <div className={cn("mt-1.5 rounded px-2 py-1 text-[12px]", PART_TREATMENTS.proposal.chip)}>
-          Newly required data (from the recompiled manifest): {newlyRequired.join(", ")} — the Data
-          Steward can fill these.
-        </div>
-      )}
-      <div className="mt-1 text-[11.5px] text-muted-foreground">
-        Outcomes are not predicted — verify with a simulation run (unvalidated configuration).
-      </div>
-    </div>
-  );
-}
-
-interface ModelCardPayload {
-  verdict?: string;
-  basis?: string;
-  downgrade_note?: string | null;
-  narrative_md?: string;
-  computed?: {
-    adopted_warmup_days?: number;
-    warmup_method?: string;
-    recommended_replications?: number;
-    replication_basis?: { confidence?: number; target_precision?: number; per_kpi?: Record<string, { mean: number; half: number; n: number; n_star: number }> };
-    validation_tests?: Array<{ kpi: string; pass: boolean }>;
-  };
-}
-
-/** §4.6 model-card view: the machine-computed adopted numbers printed next to
- * the AI-drafted narrative, so prose can never contradict silently (§5.3). */
-function ModelCardDraft({ payload }: { payload: ModelCardPayload }) {
-  const c = payload.computed ?? {};
-  const perKpi = c.replication_basis?.per_kpi ?? {};
-  return (
-    <div className="space-y-1.5 text-[12.5px]">
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded bg-muted px-1.5 py-px font-mono">
-          verdict: {payload.verdict ?? "—"} ({payload.basis ?? "—"})
-        </span>
-        <span className="rounded bg-muted px-1.5 py-px font-mono">
-          warm-up: {c.adopted_warmup_days ?? "—"}d ({c.warmup_method ?? "—"})
-        </span>
-        <span className="rounded bg-muted px-1.5 py-px font-mono">
-          recommended replications: {c.recommended_replications ?? "—"}
-        </span>
-      </div>
-      {payload.downgrade_note && (
-        <div className={cn("rounded px-2 py-1 text-[12px]", PART_TREATMENTS.proposal.chip)}>
-          Downgraded by the platform: {payload.downgrade_note}
-        </div>
-      )}
-      {Object.keys(perKpi).length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-0.5 pr-3 font-medium">KPI</th>
-                <th className="py-0.5 pr-3 font-medium">Mean</th>
-                <th className="py-0.5 pr-3 font-medium">± CI</th>
-                <th className="py-0.5 pr-3 font-medium">n</th>
-                <th className="py-0.5 font-medium">n*</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(perKpi).map(([kpi, s]) => (
-                <tr key={kpi} className="border-b border-border/50">
-                  <td className="py-0.5 pr-3 font-mono">{kpi}</td>
-                  <td className="py-0.5 pr-3 font-mono">{Number(s.mean).toFixed(4)}</td>
-                  <td className="py-0.5 pr-3 font-mono">{Number(s.half).toFixed(4)}</td>
-                  <td className="py-0.5 pr-3 font-mono">{s.n}</td>
-                  <td className="py-0.5 font-mono">{s.n_star}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {payload.narrative_md && (
-        <div>
-          <div className={cn("mb-0.5 text-[11px] font-medium uppercase tracking-wide", PART_TREATMENTS.proposal.accent)}>
-            Narrative — AI-drafted, verify
-          </div>
-          <div className="whitespace-pre-wrap text-[13px]">{payload.narrative_md}</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface ExperimentSpecPayload {
-  scenario_id?: string;
-  scenario_name?: string;
-  new_scenario?: {
-    name?: string;
-    horizon_days?: number;
-    disruption_schedule?: Array<Record<string, unknown>>;
-  };
-  policy_version_id?: string;
-  policy_version_label?: string | null;
-  newer_version_exists?: boolean;
-  replications?: number;
-  question?: string;
-  gate_status?: string;
-  findings_preview?: Array<{ severity: string; field: string; message: string }>;
-}
-
-/** §4.6 experiment view: spec summary + the read-only gate pre-check result
- * (findings_preview) the acknowledgment checkbox is informed by (§5.4). */
-function ExperimentSpec({ payload, grounding }: { payload: ExperimentSpecPayload; grounding: Record<string, unknown> }) {
-  const ns = payload.new_scenario;
-  const events = ns?.disruption_schedule ?? [];
-  const findings = payload.findings_preview ?? [];
-  const policyHash = typeof grounding?.policy_hash === "string" ? String(grounding.policy_hash) : null;
-  return (
-    <div className="space-y-1.5 text-[12.5px]">
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded bg-muted px-1.5 py-px font-mono">
-          scenario: {ns ? `${ns.name ?? "—"} (new, ${ns.horizon_days ?? "—"}d, ${events.length} events)` : payload.scenario_name ?? payload.scenario_id ?? "—"}
-        </span>
-        <span className="rounded bg-muted px-1.5 py-px font-mono">
-          policy version: {payload.policy_version_label ?? payload.policy_version_id?.slice(0, 8) ?? "—"}
-          {policyHash ? ` (${policyHash.slice(0, 12)})` : ""}
-        </span>
-        <span className="rounded bg-muted px-1.5 py-px font-mono">replications: {payload.replications ?? "—"}</span>
-      </div>
-      {payload.question && <div className="text-[12px] text-muted-foreground">Question: {payload.question}</div>}
-      {payload.newer_version_exists && (
-        <div className={cn("rounded px-2 py-1 text-[12px]", PART_TREATMENTS.proposal.chip)}>
-          A newer saved policy version exists — this spec binds an older one (versions are immutable, so the run stays reproducible).
-        </div>
-      )}
-      <div className="text-[12px]">
-        Gate pre-check: <span className="font-mono">{payload.gate_status ?? "—"}</span>
-        {findings.length > 0 && (
-          <ul className="mt-1 space-y-0.5">
-            {findings.slice(0, 8).map((f, i) => (
-              <li key={i} className={f.severity === "block" ? PART_TREATMENTS.error.accent : f.severity === "warn" ? PART_TREATMENTS.proposal.accent : "text-muted-foreground"}>
-                [{f.severity}] {f.field}: {f.message}
-              </li>
-            ))}
-            {findings.length > 8 && <li className="text-muted-foreground">(+{findings.length - 8} more)</li>}
-          </ul>
-        )}
-      </div>
-      <div className="text-[11.5px] text-muted-foreground">
-        Approving dispatches this run through the standard gate — the engine computes the results; nothing here predicts them.
-      </div>
-    </div>
-  );
-}
-
-interface DecisionReportPayload {
-  template_id?: string;
-  template_label?: string;
-  format?: string;
-  sections?: Array<{
-    kind: string;
-    title?: string;
-    source?: { tool?: string; args?: Record<string, unknown>; baseline_run_id?: string; scenario_run_id?: string };
-    narrative_md?: string;
-    citations?: Array<{ kind: string; ref: string }>;
-  }>;
-  evidence_runs?: string[];
-}
-
-type ReportSpecSection = NonNullable<DecisionReportPayload["sections"]>[number];
-
-/** §16.1 spec view: the proposal is a report SPEC, never the file —
- * deterministic sections show ONLY their source references (data resolves
- * at render time); the narrative shows under the AI-drafted label. */
-function DecisionReportSpec({ payload }: { payload: DecisionReportPayload }) {
-  const sections = payload.sections ?? [];
-  const narrative = sections.find((s) => s.kind === "narrative");
-  const deterministic = sections.filter((s) => s.kind !== "narrative");
-  const sourceRef = (s: ReportSpecSection): string => {
-    if (s.source?.tool) return `tool: ${s.source.tool}`;
-    if (s.source?.baseline_run_id) {
-      return `runs: ${String(s.source.baseline_run_id).slice(0, 8)} vs ${String(s.source.scenario_run_id ?? "").slice(0, 8)}`;
-    }
-    return "—";
-  };
-  return (
-    <div className="space-y-1.5 text-[12.5px]">
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded bg-muted px-1.5 py-px font-mono">
-          template: {payload.template_id ?? "—"}
-        </span>
-        <span className="rounded bg-muted px-1.5 py-px font-mono">format: {payload.format ?? "—"}</span>
-        {(payload.evidence_runs ?? []).length > 0 && (
-          <span className="rounded bg-muted px-1.5 py-px font-mono">
-            cites: {(payload.evidence_runs ?? []).map((r) => r.slice(0, 8)).join(", ")}
-          </span>
-        )}
-      </div>
-      <ul className="space-y-0.5">
-        {deterministic.map((s, i) => (
-          <li key={i} className="flex flex-wrap items-center gap-1.5">
-            <span className={cn("rounded px-1 py-px text-[11px]", PART_TREATMENTS.data.chip)}>{s.kind}</span>
-            <span>{s.title ?? "—"}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">{sourceRef(s)}</span>
-          </li>
-        ))}
-      </ul>
-      {narrative && (
-        <div>
-          <div className={cn("mb-0.5 text-[11px] font-medium uppercase tracking-wide", PART_TREATMENTS.proposal.accent)}>
-            AI-drafted commentary — verify
-          </div>
-          <div className="whitespace-pre-wrap text-[13px]">{narrative.narrative_md}</div>
-        </div>
-      )}
-      <div className="mt-1 text-[11.5px] text-muted-foreground">
-        Every number in the rendered document is resolved from the project database at render
-        time — the sections above store source references, never data.
-      </div>
-    </div>
-  );
-}
-
-function ProposalBody({ proposal }: { proposal: Proposal }) {
-  const payload = proposal.payload ?? {};
-  const rows = (payload as { rows?: Array<Record<string, unknown>> }).rows;
-  if (proposal.artifact_type === "item_master_diff" && Array.isArray(rows)) {
-    return <ItemMasterDiff rows={rows} />;
-  }
-  if (proposal.artifact_type === "parameter_estimate" && Array.isArray(rows)) {
-    return <ParameterEstimate rows={rows} />;
-  }
-  if (proposal.artifact_type === "network_map_diff" && Array.isArray(rows)) {
-    return <NetworkMapDiff payload={payload as { rows?: Array<Record<string, unknown>>; pending?: Array<Record<string, unknown>> }} />;
-  }
-  if (proposal.artifact_type === "policy_bundle_diff" && (payload as PolicyDiffPayload).diff) {
-    return <PolicyBundleDiff payload={payload as PolicyDiffPayload} />;
-  }
-  if (proposal.artifact_type === "model_card_draft" && (payload as ModelCardPayload).computed) {
-    return <ModelCardDraft payload={payload as ModelCardPayload} />;
-  }
-  if (proposal.artifact_type === "experiment_spec" && (payload as ExperimentSpecPayload).policy_version_id) {
-    return <ExperimentSpec payload={payload as ExperimentSpecPayload} grounding={proposal.grounding ?? {}} />;
-  }
-  if (proposal.artifact_type === "decision_report" && (payload as DecisionReportPayload).template_id) {
-    return <DecisionReportSpec payload={payload as DecisionReportPayload} />;
-  }
-  if (proposal.artifact_type === "risk_alert" && (payload as { event?: unknown }).event) {
-    return (
-      <RiskAlert
-        payload={payload as Record<string, unknown>}
-        appliedResult={(proposal.applied_result ?? null) as Record<string, unknown> | null}
-      />
-    );
-  }
-  const narrative = (payload as { narrative_md?: string; explanation_md?: string });
-  const text = narrative.explanation_md ?? narrative.narrative_md;
-  if (typeof text === "string" && text.length > 0) {
-    return <div className="whitespace-pre-wrap text-[13px]">{text}</div>;
-  }
-  return (
-    <pre className="max-h-64 overflow-auto rounded bg-muted px-2 py-1.5 text-[12px]">
-      {JSON.stringify(payload, null, 2)}
-    </pre>
-  );
-}
-
-function Citations({ citations }: { citations: Proposal["citations"] }) {
-  if (!Array.isArray(citations) || citations.length === 0) return null;
-  return (
-    <ul className="mt-2 space-y-0.5 text-[11.5px] text-muted-foreground">
-      {citations.map((c, i) => (
-        <li key={i} className="truncate">
-          <span className="rounded bg-muted px-1 py-px font-mono">{String(c.kind ?? "ref")}</span>{" "}
-          {String(c.ref ?? "")}
-        </li>
-      ))}
-    </ul>
-  );
+function toCitations(citations: Proposal["citations"]): string[] {
+  if (!Array.isArray(citations)) return [];
+  return citations
+    .map((c) => `${String(c.kind ?? "ref")} ${String(c.ref ?? "")}`.trim())
+    .filter(Boolean);
 }
 
 interface ProposalCardProps {
@@ -656,17 +96,11 @@ interface ProposalCardProps {
 }
 
 export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardProps) {
-  const { proposal, loading, applying, approve, reject, retryApply, recordViewed } = useProposal(proposalId ?? null);
+  const { proposal, loading, approve, reject, retryApply, recordViewed } = useProposal(proposalId ?? null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // §5.4: only the approving human can acknowledge warn findings — this
-  // checkbox is that act. It renders only when the card DISPLAYS warn (and
-  // no block) findings from the stored findings_preview; the server honors
-  // it only under the same condition.
-  const [ackWarnings, setAckWarnings] = useState(false);
   // §17.4: the save-the-rationale suggestion appears only when THIS session
-  // watched the card transition to applied — the moment memory is most
-  // valuable — never retroactively on old applied cards in history.
+  // watched the card transition to applied — never retroactively on old cards.
   const [justApplied, setJustApplied] = useState(false);
   const prevStatusRef = useRef<string | null>(null);
 
@@ -684,34 +118,21 @@ export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardPro
   if (!proposalId) return null;
   if (loading) {
     return (
-      <div className="my-2 flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-muted-foreground">
+      <div className="mt-2 flex items-center gap-2 rounded-sm border border-[#ebebeb] px-3 py-2 text-[13px] text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading proposal…
       </div>
     );
   }
   if (!proposal) {
     return (
-      <div className="my-2 rounded-lg border border-border px-3 py-2 text-[13px] text-muted-foreground">
+      <div className="mt-2 rounded-sm border border-[#ebebeb] px-3 py-2 text-[13px] text-muted-foreground">
         This proposal is no longer available.
       </div>
     );
   }
 
-  const agent = AGENT_META[proposal.agent_id] ?? { name: proposal.agent_id, Icon: CircleDashed };
-  const provenance = PROVENANCE_CHIP[proposal.provenance];
-  const artifact = ARTIFACT_META[proposal.artifact_type] ?? { room: null, roomLabel: "", gate: "" };
-  const dimmed = proposal.status === "rejected" || proposal.status === "expired";
-  const isApplying = proposal.status === "approved" && !proposal.apply_error;
-  const retryDisabled = proposal.apply_attempts >= APPLY_RETRY_CAP;
-  const findingsPreview = Array.isArray((proposal.payload as { findings_preview?: unknown })?.findings_preview)
-    ? ((proposal.payload as { findings_preview: Array<{ severity: string }> }).findings_preview)
-    : [];
-  const ackAvailable = proposal.artifact_type === "experiment_spec" &&
-    findingsPreview.some((f) => f.severity === "warn") &&
-    !findingsPreview.some((f) => f.severity === "block");
-  const applyOpts = ackAvailable ? { acknowledgeWarnings: ackWarnings } : undefined;
-
   const run = async (fn: () => Promise<string | null>) => {
+    if (busy) return;
     setBusy(true);
     setActionError(null);
     const err = await fn();
@@ -719,168 +140,47 @@ export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardPro
     setBusy(false);
   };
 
+  const view: ProposalView = {
+    id: proposal.id,
+    title: proposal.title,
+    agent: AGENT_NAME[proposal.agent_id] ?? proposal.agent_id,
+    agentId: proposal.agent_id,
+    artifactType: proposal.artifact_type,
+    provenance: PROVENANCE_LABEL[proposal.provenance] ?? proposal.provenance,
+    status: toViewStatus(proposal.status),
+    applyError: proposal.apply_error,
+    appliedAt: proposal.applied_at ? new Date(proposal.applied_at).toLocaleString() : null,
+    expiresLabel: expiresIn(proposal.expires_at),
+    rows: toRows(proposal.payload),
+    citations: toCitations(proposal.citations),
+  };
+
   return (
-    <div
-      role="region"
-      aria-label={`Proposal: ${proposal.title}`}
-      className={cn(
-        "my-2 px-3 py-2.5",
-        PART_TREATMENTS.proposal.card,
-        dimmed && "opacity-60",
-      )}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <agent.Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="text-[13px] font-semibold">{agent.name}</span>
-        <span className={cn("rounded-full px-2 py-px text-[11px] font-medium", provenance.className)}>
-          {provenance.label}
-        </span>
-        <span aria-live="polite" className="ml-auto text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">
-          {proposal.status}
-        </span>
-      </div>
-
-      <div className="mt-1 text-[13.5px] font-medium">{proposal.title}</div>
-
-      {proposal.status === "draft" && (
-        <div className={cn("mt-2 rounded px-2 py-1.5 text-[12.5px]", PART_TREATMENTS.proposal.chip)}>
-          Needs input — answer the agent's question in the chat to continue.
+    <>
+      <ProposalCardView
+        proposal={view}
+        onApprove={(id) => run(() => approve(id))}
+        onReject={(id) => run(() => reject(id))}
+        onRetry={(id) => run(() => retryApply(id))}
+      />
+      {actionError && (
+        <div className="mt-2 rounded-sm border border-[#f0c7cb] bg-[#fdf2f3] px-2.5 py-1.5 text-[12.5px] text-[#8a2a30]">
+          {actionError}
         </div>
       )}
-
-      {(proposal.status === "proposed" || proposal.status === "draft") && (
-        <>
-          <div className="mt-2">
-            <ProposalBody proposal={proposal} />
-          </div>
-          <Citations citations={proposal.citations} />
-          <div className="mt-1 text-[11.5px] text-muted-foreground">{expiresIn(proposal.expires_at)}</div>
-        </>
-      )}
-
-      {isApplying && proposal.status === "approved" && (
-        <div className="mt-2 flex items-center gap-2 text-[12.5px] text-muted-foreground" aria-live="polite">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          applying through {artifact.gate || "the platform gates"}
-        </div>
-      )}
-
-      {proposal.status === "approved" && proposal.apply_error && (
-        <div className={cn("mt-2 px-2 py-1.5 text-[12.5px]", PART_TREATMENTS.error.card)}>
-          {typedErrorCode(proposal.apply_error) && (
-            <span className={cn("mr-1.5 rounded px-1 py-px font-mono text-[11px]", PART_TREATMENTS.error.chip)}>
-              {typedErrorCode(proposal.apply_error)}
-            </span>
-          )}
-          <span className={PART_TREATMENTS.error.accent}>{proposal.apply_error}</span>
-          {errorRemedy(typedErrorCode(proposal.apply_error)) && (
-            <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-              {errorRemedy(typedErrorCode(proposal.apply_error))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {proposal.status === "applied" && (
-        <div className="mt-2 rounded bg-emerald-500/10 px-2 py-1.5 text-[12.5px] text-emerald-700 dark:text-emerald-400">
-          Applied{proposal.applied_at ? ` · ${new Date(proposal.applied_at).toLocaleString()}` : ""}
-          {/* §16.1: a rendered decision_report flips to file cards (emerald
-              treatment) — Download via 60-min signed URL, Keep toggle. */}
-          {proposal.artifact_type === "decision_report" && fileWorkspaceUiEnabled() &&
-            Array.isArray((proposal.applied_result as { file_ids?: string[] } | null)?.file_ids) ? (
-            <AppliedReportFiles
-              fileIds={((proposal.applied_result as { file_ids: string[] }).file_ids).map(String)}
-            />
-          ) : proposal.applied_result && (
-            <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted/60 px-2 py-1 text-[11.5px] text-foreground">
-              {JSON.stringify(proposal.applied_result, null, 2)}
-            </pre>
-          )}
-        </div>
-      )}
-
-      {/* §17.4: post-apply guidance — offer to save the decision rationale at
-          the moment it's most valuable. The chip only PREFILLS the composer
-          with a "Remember that …" sentence; the save itself rides the §14.4
-          consent path (a) when the user sends it — no new write path. */}
+      {/* §17.4: post-apply guidance — prefills a "Remember that…" message; the
+          save itself rides the §14.4 consent path when the user sends it. */}
       {justApplied && proposal.status === "applied" && onSuggestUtterance && (
         <button
           type="button"
-          onClick={() =>
-            onSuggestUtterance(`Remember that we applied "${proposal.title}" because `)
-          }
-          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-elevated px-2.5 py-1 text-[12px] text-muted-foreground transition hover:text-foreground"
+          onClick={() => onSuggestUtterance(`Remember that we applied "${proposal.title}" because `)}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-[#ebebeb] bg-background px-2.5 py-1 text-[12px] text-muted-foreground transition hover:text-foreground"
           title="Prefills a 'Remember that…' message — you add the rationale and send"
         >
           <Lightbulb className="h-3 w-3 shrink-0" />
           Save this decision to project memory
         </button>
       )}
-
-      {dimmed && proposal.status_reason && (
-        <div className="mt-1.5 text-[12px] text-muted-foreground">{proposal.status_reason}</div>
-      )}
-
-      {actionError && (
-        <div className={cn("mt-2 px-2 py-1.5 text-[12.5px]", PART_TREATMENTS.error.card, PART_TREATMENTS.error.accent)}>{actionError}</div>
-      )}
-
-      {ackAvailable && (proposal.status === "proposed" || (proposal.status === "approved" && proposal.apply_error)) && (
-        <label className={cn("mt-2 flex items-start gap-2 text-[12px]", PART_TREATMENTS.proposal.accent)}>
-          <input
-            type="checkbox"
-            checked={ackWarnings}
-            onChange={(e) => setAckWarnings(e.target.checked)}
-            className="mt-0.5 h-3.5 w-3.5 accent-amber-600"
-          />
-          <span>
-            I've read the warn findings above and want the run dispatched anyway
-            (the same "Run anyway" acknowledgment the Lab asks for).
-          </span>
-        </label>
-      )}
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-        {proposal.status === "proposed" && (
-          <>
-            <Button size="sm" className="h-7 px-3 text-[12.5px]" disabled={busy}
-              onClick={() => run(() => approve(proposal.id, applyOpts))}>
-              Approve
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 px-3 text-[12.5px]" disabled={busy}
-              onClick={() => run(() => reject(proposal.id))}>
-              Reject
-            </Button>
-          </>
-        )}
-        {proposal.status === "approved" && proposal.apply_error && (
-          <>
-            <Button size="sm" className="h-7 px-3 text-[12.5px]" disabled={busy || applying || retryDisabled}
-              title={retryDisabled ? `Retry limit reached (${APPLY_RETRY_CAP})` : undefined}
-              onClick={() => run(() => retryApply(proposal.id, applyOpts))}>
-              Retry
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 px-3 text-[12.5px]" disabled={busy}
-              onClick={() => run(() => reject(proposal.id))}>
-              Reject
-            </Button>
-          </>
-        )}
-        {proposal.status === "applied" && proposal.artifact_type !== "decision_report" && (
-          <Button size="sm" variant="outline" className="h-7 px-3 text-[12.5px]" disabled
-            title="Revert drafting ships with the owning agent">
-            Draft revert
-          </Button>
-        )}
-        {artifact.room && (
-          <Link
-            to={artifact.room}
-            className="ml-auto inline-flex items-center gap-1 text-[12px] text-primary hover:underline"
-          >
-            Open in {artifact.roomLabel} <ExternalLink className="h-3 w-3" />
-          </Link>
-        )}
-      </div>
-    </div>
+    </>
   );
 }

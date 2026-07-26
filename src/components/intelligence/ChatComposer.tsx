@@ -1,106 +1,192 @@
-import { useRef, useEffect, useState } from "react";
-import { ArrowUp, Loader2 } from "lucide-react";
-import { ModelPicker } from "@/components/chat/ModelPicker";
-import { chatModesUiEnabled, ModeSwitch, type ThreadMode } from "@/components/chat/ModeSwitch";
-import { AttachProjectButton } from "./AttachProjectButton";
+/**
+ * ChatComposer — auto-growing textarea + attach/mode/model/send row.
+ *
+ * Height behavior (the part that matters): the textarea grows with content up
+ * to 160px, and the expand toggle raises the ceiling to 420px with a 220px
+ * floor for drafting long, careful prompts. Do NOT put a static `height` in
+ * the style prop — React re-applies it on every render and clobbers the
+ * imperative resize.
+ *
+ * Ask / Review are the only real modes; Auto is rendered disabled on purpose
+ * (§10 Q23 — it does not exist and must not look available).
+ */
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Maximize2, Minimize2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CHAT_MODELS, getModelLabel } from "@/components/chat/ModelPicker";
+import { chatModesUiEnabled } from "@/components/chat/ModeSwitch";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { cn } from "@/lib/utils";
 
-interface Project { id: string; name: string; plant_name?: string | null }
-
-interface Props {
-  input: string;
-  onInputChange: (v: string) => void;
+interface ChatComposerProps {
+  value: string;
+  onChange: (v: string) => void;
   onSubmit: () => void;
-  loading: boolean;
-  model: string;
-  onModelChange: (id: string) => void;
-  projects: Project[];
+  placeholder?: string;
+  disabled?: boolean;
+  projects: Array<{ id: string; name: string }>;
   projectId: string | null;
   onProjectChange: (id: string | null) => void;
-  /** §15 mode control, rendered beside the model picker when the modes UI
-   * flag is on and both props are provided. */
-  mode?: ThreadMode;
-  onModeChange?: (mode: ThreadMode) => void;
-  placeholder?: string;
-  autoFocus?: boolean;
-  minRows?: number;
-  className?: string;
+  model: string;
+  onModelChange: (id: string) => void;
+  mode: "ask" | "review";
+  onModeChange: (m: "ask" | "review") => void;
 }
 
+const COLLAPSED_MAX = 160;
+const EXPANDED_MAX = 420;
+const EXPANDED_MIN = 220;
+const BASE = 40;
+
 export function ChatComposer({
-  input,
-  onInputChange,
+  value,
+  onChange,
   onSubmit,
-  loading,
-  model,
-  onModelChange,
+  placeholder = "How can I help you today?",
+  disabled,
   projects,
   projectId,
   onProjectChange,
+  model,
+  onModelChange,
   mode,
   onModeChange,
-  placeholder = "How can I help you today?",
-  autoFocus,
-  minRows = 2,
-  className,
-}: Props) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const [focused, setFocused] = useState(false);
-  useEffect(() => { if (autoFocus) setTimeout(() => ref.current?.focus(), 40); }, [autoFocus]);
+}: ChatComposerProps) {
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
-  const disabled = !input.trim() || loading;
+  const resize = useCallback(() => {
+    const el = taRef.current;
+    if (!el) return;
+    const max = expanded ? EXPANDED_MAX : COLLAPSED_MAX;
+    const min = expanded ? EXPANDED_MIN : BASE;
+    el.style.height = BASE + "px";
+    el.style.height = Math.max(min, Math.min(el.scrollHeight, max)) + "px";
+    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+  }, [expanded]);
+
+  useEffect(() => {
+    resize();
+  }, [value, expanded, resize]);
+
+  const toggleExpand = () => {
+    setExpanded((v) => !v);
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onSubmit();
+    }
+  };
+
+  const canSend = Boolean(value.trim()) && !disabled;
+  const modesOn = chatModesUiEnabled();
+
+  // Same allowlist rule as ModelPicker: only permitted models, but never hide
+  // the current value or the trigger renders blank.
+  const { isModelAllowed } = useCapabilities();
+  const visibleModels = CHAT_MODELS.filter((m) => isModelAllowed(m.id).ok || m.id === model);
+  const modelOptions = visibleModels.length > 0 ? visibleModels : CHAT_MODELS;
 
   return (
-    <div
-      className={cn(
-        "rounded-xl border bg-surface-elevated transition-all duration-150",
-        focused ? "border-strong shadow-sharp-sm" : "border-border shadow-xs",
-        className,
-      )}
-    >
+    <div className="rounded-sm border border-[#ebebeb] bg-background">
       <textarea
-        ref={ref}
-        value={input}
-        onChange={(e) => onInputChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !disabled) {
-            e.preventDefault();
-            onSubmit();
-          }
-        }}
+        ref={taRef}
+        rows={1}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
         placeholder={placeholder}
-        rows={minRows}
-        className="w-full resize-none rounded-t-xl bg-transparent px-3.5 py-3 text-[14px] leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-        style={{ minHeight: 56, maxHeight: 200 }}
-        disabled={loading}
+        className="block w-full resize-none rounded-t-sm border-none bg-transparent px-3 pb-2 pt-[11px] text-[14px] leading-[1.4] text-foreground outline-none placeholder:text-[#a8a8a8]"
+        style={{ minHeight: BASE, overflow: "hidden" }}
       />
-      <div className="flex items-center justify-between gap-2 px-2 pb-2">
-        <AttachProjectButton
-          projects={projects}
-          projectId={projectId}
-          onChange={onProjectChange}
-          disabled={loading}
-        />
-        <div className="flex items-center gap-1.5">
-          {chatModesUiEnabled() && mode && onModeChange && (
-            <ModeSwitch value={mode} onChange={onModeChange} disabled={loading} />
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-[#f4f4f4] px-2 py-1.5">
+        <Select value={projectId ?? "none"} onValueChange={(v) => onProjectChange(v === "none" ? null : v)}>
+          <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[#ebebeb] px-1.5 text-[11.5px] text-muted-foreground">
+            {/* Explicit children so an unattached thread reads "+ Project"
+                instead of the "No project" item label. */}
+            <SelectValue>
+              {projectId ? (projects.find((p) => p.id === projectId)?.name ?? "Project") : "+ Project"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="rounded-sm">
+            <SelectItem value="none" className="text-[12px]">
+              No project
+            </SelectItem>
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id} className="text-[12px]">
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleExpand}
+            title={expanded ? "Collapse composer" : "Expand composer for longer input"}
+            className={cn(
+              "flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-sm border border-[#ebebeb]",
+              expanded ? "bg-foreground text-background" : "bg-background text-muted-foreground",
+            )}
+          >
+            {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+          </button>
+
+          {modesOn && (
+            <div className="inline-flex rounded-sm border border-[#ebebeb] p-[2px]">
+              {(["ask", "review"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onModeChange(m)}
+                  className={cn(
+                    "rounded-[1px] px-[9px] py-[3px] text-[12px] capitalize",
+                    mode === m ? "bg-foreground text-background" : "text-muted-foreground",
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+              {/* Auto does not exist (§10 Q23) — visible, disabled, explained. */}
+              <button
+                type="button"
+                disabled
+                title="Auto isn't available: it unlocks only after sustained accepted-proposal rates, org opt-in, and resolved identities."
+                className="cursor-not-allowed px-[9px] py-[3px] text-[12px] text-[#c9c9c9]"
+              >
+                Auto
+              </button>
+            </div>
           )}
-          <ModelPicker value={model} onChange={onModelChange} />
+
+          <Select value={model} onValueChange={onModelChange}>
+            <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[#ebebeb] px-1.5 text-[11.5px] text-muted-foreground">
+              <SelectValue>{getModelLabel(model)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent align="end" className="rounded-sm">
+              {modelOptions.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-[12px]">
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <button
             type="button"
             onClick={onSubmit}
-            disabled={disabled}
-            aria-label="Send"
+            disabled={!canSend}
             className={cn(
-              "inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150",
-              disabled
-                ? "bg-muted text-muted-foreground/50"
-                : "bg-foreground text-background hover:opacity-90 active:scale-95",
+              "flex h-[30px] w-[30px] items-center justify-center rounded-sm",
+              canSend ? "bg-foreground text-background" : "cursor-default bg-[#f0f0f0] text-[#b8b8b8]",
             )}
           >
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}
+            <ArrowUp className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
