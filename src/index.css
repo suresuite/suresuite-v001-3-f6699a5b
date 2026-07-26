@@ -34,6 +34,7 @@
     --input: 0 0% 92%;
     --surface-elevated: 0 0% 99%;
     --surface-sunken: 0 0% 98%;
+    --surface-band: 0 0% 92%;
     --header-background: 0 0% 99%;
     --header-border: 0 0% 92%;
     --ring: 0 0% 9%;
@@ -90,6 +91,7 @@
     --input: 0 0% 16%;
     --surface-elevated: 0 0% 6.5%;
     --surface-sunken: 0 0% 2.5%;
+    --surface-band: 0 0% 16%;
     --header-background: 0 0% 5%;
     --header-border: 0 0% 14%;
     --ring: 0 0% 83.1%;
@@ -138,6 +140,7 @@
     --input: 0 0% 92%;
     --surface-elevated: 0 0% 99%;
     --surface-sunken: 0 0% 98%;
+    --surface-band: 0 0% 92%;
     --header-background: 0 0% 99%;
     --header-border: 0 0% 92%;
     --ring: 0 0% 9%;
@@ -227,7 +230,9 @@
 
   .bg-surface-elevated { background-color: hsl(var(--surface-elevated)); }
   .bg-surface-sunken { background-color: hsl(var(--surface-sunken)); }
+  .bg-surface-band { background-color: hsl(var(--surface-band)); }
   .border-strong { border-color: hsl(var(--border-strong)); }
+  .bg-border-strong { background-color: hsl(var(--border-strong)); }
 
   /* Subtle grid background used in hero sections */
   .bg-grid {
