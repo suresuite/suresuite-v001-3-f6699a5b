@@ -1,3 +1,7 @@
+// Reskinned AdminLayout — same API and 180px sub-nav as the original, but the
+// active item uses the SuReSuite red rail + soft-grey pill (bg-muted/80), and
+// spacing is tightened to the Ledger language. Drop-in replacement for
+// src/components/admin/AdminLayout.tsx.
 import { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
@@ -18,8 +22,9 @@ interface AdminLayoutProps {
   isCollapsed: boolean;
   setIsCollapsed: (v: boolean) => void;
   title: string;
-  description?: ReactNode;
   actions?: ReactNode;
+  onRefresh?: () => void;
+  refreshLoading?: boolean;
   children: ReactNode;
 }
 
@@ -38,41 +43,45 @@ export function AdminLayout({
   isCollapsed,
   setIsCollapsed,
   title,
-  description,
   actions,
+  onRefresh,
+  refreshLoading,
   children,
 }: AdminLayoutProps) {
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className="px-12 py-6">
-        <PageHeader title={title} subtitle={description} rightContent={actions} />
+        <PageHeader
+          title={title}
+          rightContent={actions}
+          onRefresh={onRefresh}
+          refreshLoading={refreshLoading}
+        />
 
-        <div className="grid grid-cols-[180px_1fr] gap-6">
-          <nav className="flex flex-col gap-0.5">
-            {ADMIN_NAV.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    cn(
-                      'relative flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                      isActive
-                        ? "bg-muted/80 text-foreground before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-primary"
-                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                    )
-                  }
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {item.label}
-                </NavLink>
-              );
-            })}
-          </nav>
-          <main className="min-w-0">{children}</main>
+        {/* Horizontal tab nav — same TabsList/TabsTrigger treatment as Developer API */}
+        <div className="mb-5 inline-flex h-auto items-center gap-0.5 rounded-sm border border-[#ebebeb] bg-white p-[3px]">
+          {ADMIN_NAV.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn(
+                    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-[2px] px-[15px] py-[7px] text-[12.5px] font-medium transition-colors',
+                    isActive ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                  )
+                }
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                {item.label}
+              </NavLink>
+            );
+          })}
         </div>
+
+        <main className="min-w-0">{children}</main>
       </div>
     </PageLayout>
   );
