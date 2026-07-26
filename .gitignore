@@ -13,6 +13,17 @@ dist-ssr
 *.local
 .env
 
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
+# This project standardizes on npm (package-lock.json). Other lockfiles are
+# ignored so a stray `bun install` / `yarn install` can't reintroduce a second
+# source of truth — Vercel picks its package manager by which lockfile it finds.
+bun.lock
+bun.lockb
+pnpm-lock.yaml
+yarn.lock
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

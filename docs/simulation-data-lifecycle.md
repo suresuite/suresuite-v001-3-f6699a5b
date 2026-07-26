@@ -12,7 +12,7 @@ How user input flows from the browser through to permanent storage, and where ea
                                          │ Save changes
                                          ▼
                             ┌──────────────────────────┐
-                            │ Postgres (Lovable Cloud) │   PERMANENT
+                            │ Postgres (Supabase)      │   PERMANENT
                             │ policy_defaults          │   per project,
                             │ policy_overrides         │   RLS-scoped to
                             │ scenarios / experiments  │   project members
@@ -51,7 +51,7 @@ Cleared on **Save** or **Revert**. Lost on refresh. Never leaves the client.
 
 Designed to be cheap and replaceable. If the worker misses one, the next save or run reconstructs the world from Postgres.
 
-### 3. Permanent — Postgres (Lovable Cloud)
+### 3. Permanent — Postgres (Supabase)
 
 | Table              | Written by             | Holds                                                  |
 | ------------------ | ---------------------- | ------------------------------------------------------ |
