@@ -146,12 +146,12 @@ function FundingStrip() {
   }, [auto, single]);
 
   return (
-    <div className="relative border-t border-border bg-surface-band">
+    <div className="relative border-t border-border bg-border">
       {/* hairline grid: the divider IS the 1px gap, so it turns horizontal when
           the two columns stack instead of leaving a stray left border */}
       <div className="mx-auto grid max-w-6xl grid-cols-[repeat(auto-fit,minmax(330px,1fr))] gap-px bg-border-strong">
         {/* Home — HWR / lab identity */}
-        <div className="bg-surface-band py-[22px] pb-6 pl-6 pr-[30px]">
+        <div className="bg-border py-[22px] pb-6 pl-6 pr-[30px]">
           <span className={KICKER}>Home</span>
           <img
             src="/funding/hwr-berlin.png"
@@ -167,7 +167,7 @@ function FundingStrip() {
         </div>
 
         {/* Funded by — programme logo + EU logo, always paired */}
-        <div className="bg-surface-band py-[22px] pb-6 pl-[30px] pr-6">
+        <div className="bg-border py-[22px] pb-6 pl-[30px] pr-6">
           <div className="flex items-center justify-between gap-4">
             <span className={`${KICKER} whitespace-nowrap`}>Funded by</span>
             {!single && (
