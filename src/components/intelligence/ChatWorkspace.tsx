@@ -1,16 +1,22 @@
-import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
-import { MessageBubble } from "@/components/chat/MessageBubble";
-import { AssistantMascot } from "@/components/chat/AssistantMascot";
+/**
+ * ChatWorkspace — agent strip, memory strip, message stream, composer.
+ *
+ * Data flow is unchanged: useProjectChat(threadId) owns messages/loading/
+ * error/send; this component only renders them. Empty threads show the agent
+ * picker; populated threads show the stream with the composer docked below.
+ *
+ * The min-w-0 on the column and the agent strip matters — without it a long
+ * agent blurb widens the grid track and pushes the composer off-screen.
+ */
+import React, { useEffect, useRef, useState } from "react";
+import { AGENTS, getAgent } from "@/lib/chat/agents";
 import { useProjectChat } from "@/hooks/useProjectChat";
-import type { ThreadMode } from "@/components/chat/ModeSwitch";
-import { AgentPicker } from "./AgentPicker";
+import { AGENT_COLOR, AGENT_MONO, KX_TIGHT, LAYER, tint } from "./piUi";
 import { ChatComposer } from "./ChatComposer";
-import { SuggestedActions, suggestedActionsUiEnabled } from "./SuggestedActions";
-import { ThreadInfoPanel } from "./ThreadInfoPanel";
-import { getAgent } from "@/lib/chat/agents";
-
-interface Project { id: string; name: string; plant_name?: string | null }
+import { ActivityGroup, AgentDivider, MessagePart } from "./MessageParts";
+import { ThreadInfoStrip } from "./SidebarPanels";
+import { ProposalCard } from "@/components/chat/ProposalCard";
+import { cn } from "@/lib/utils";
 
 interface ChatWorkspaceProps {
   threadId: string | null;
@@ -18,22 +24,23 @@ interface ChatWorkspaceProps {
   agentId: string | null;
   onAgentChange: (id: string) => void;
   onProjectChange: (id: string | null) => void;
-  projects: Project[];
-  userName?: string | null;
+  projects: Array<{ id: string; name: string }>;
+  userName: string;
   input: string;
   onInputChange: (v: string) => void;
   model: string;
   onModelChange: (id: string) => void;
-  /** §15 per-thread interaction mode (Review when absent). */
-  threadMode?: ThreadMode;
-  onModeChange?: (mode: ThreadMode) => void;
+  threadMode: "ask" | "review";
+  onModeChange: (m: "ask" | "review") => void;
+  threadSummary?: string | null;
+  onDeleteSummary?: () => void;
 }
 
-function greeting(name?: string | null) {
+const greeting = (name: string) => {
   const h = new Date().getHours();
   const part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-  return name ? `${part}, ${name}` : part;
-}
+  return name ? part + ", " + name : part;
+};
 
 export function ChatWorkspace({
   threadId,
@@ -47,166 +54,229 @@ export function ChatWorkspace({
   onInputChange,
   model,
   onModelChange,
-  threadMode = "review",
+  threadMode,
   onModeChange,
+  threadSummary = null,
+  onDeleteSummary = () => {},
 }: ChatWorkspaceProps) {
   const { messages, loading, error, send } = useProjectChat(threadId);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const agent = agentId ? getAgent(agentId) : null;
+  const streamRef = useRef<HTMLDivElement | null>(null);
+  const [savedMemory, setSavedMemory] = useState<Record<string, boolean>>({});
 
+  // Keep the newest turn in view without scrollIntoView.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, loading]);
+    const el = streamRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, loading]);
 
-  const submit = async () => {
-    const text = input;
+  const submit = () => {
+    const text = input.trim();
+    if (!text || loading) return;
     onInputChange("");
-    await send(text, { model, projectId, agentId });
+    void send(text, { model, projectId, agentId });
   };
 
-  // §17.3: a picked chip sends its utterance — a plain sentence the user
-  // could have typed (the chips teach the interface by example).
-  const pickSuggestion = (utterance: string) => {
-    if (!loading) void send(utterance, { model, projectId, agentId });
-  };
+  const suggestions = projectId
+    ? ["Summarize this project's key risks", "What changed in my network this week?"]
+    : [];
 
-  const empty = messages.length === 0;
-  const suggestionsOn = suggestedActionsUiEnabled() && Boolean(projectId);
-  const activeAgent = agentId ? getAgent(agentId) : null;
+  const composer = (
+    <ChatComposer
+      value={input}
+      onChange={onInputChange}
+      onSubmit={submit}
+      disabled={loading}
+      placeholder={agent ? "Ask the " + agent.name + "…" : "How can I help you today?"}
+      projects={projects}
+      projectId={projectId}
+      onProjectChange={onProjectChange}
+      model={model}
+      onModelChange={onModelChange}
+      mode={threadMode}
+      onModeChange={onModeChange}
+    />
+  );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      {/* Persistent agent strip */}
-      {activeAgent && (
-        <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-elevated px-4 py-2">
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <activeAgent.icon className={`h-3.5 w-3.5 ${activeAgent.color}`} />
-            <span className="font-medium text-foreground">{activeAgent.name}</span>
-            <span className="text-muted-foreground/60">·</span>
-            <span className="truncate">{activeAgent.blurb}</span>
+    <div className="flex min-h-0 min-w-0 flex-col bg-background">
+      {/* agent strip */}
+      {agent && (
+        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[#ebebeb] bg-[#fcfcfc] px-4 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-muted-foreground">
+            <span
+              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm font-mono text-[9px] font-semibold"
+              style={{
+                background: tint(AGENT_COLOR[agent.id] ?? "#111111", 0.12),
+                color: AGENT_COLOR[agent.id] ?? "#111111",
+              }}
+            >
+              {AGENT_MONO[agent.id] ?? "GA"}
+            </span>
+            <span className="shrink-0 font-semibold text-foreground">{agent.name}</span>
+            <span className="shrink-0 text-[#c4c4c4]">·</span>
+            <span className="min-w-0 flex-1 truncate">{agent.blurb}</span>
           </div>
           <button
             type="button"
             onClick={() => onAgentChange("")}
-            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            aria-label="Change agent"
+            className="shrink-0 text-[13px] text-muted-foreground"
           >
-            <X className="h-3.5 w-3.5" />
+            ✕
           </button>
         </div>
       )}
 
-      {/* M1 (§14.3): rolling-summary visibility + deletion; renders nothing
-          until the server has maintained a summary for this thread. */}
-      <ThreadInfoPanel threadId={threadId} />
+      {/* memory strip (M1 §14.3) */}
+      {(threadSummary || projectId) && (
+        <ThreadInfoStrip summary={threadSummary} onDeleteSummary={onDeleteSummary} />
+      )}
 
-      {empty ? (
-        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-10">
-          <div className="w-full max-w-[640px] space-y-6">
-            <div className="flex items-center justify-center gap-3">
-              <AssistantMascot className="h-9 w-9" />
-              <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
-                {greeting(userName)}
-              </h2>
+      {messages.length === 0 ? (
+        /* ── empty state ─────────────────────────────────────────────── */
+        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto p-6">
+          <div className="w-full max-w-[640px]">
+            <div className="mb-5 flex items-center justify-center gap-2.5">
+              <div className="h-7 w-7 rounded-sm bg-foreground" />
+              <h2 className="m-0 text-[21px] font-semibold text-foreground">{greeting(userName)}</h2>
             </div>
 
-            {!activeAgent && (
-              <div className="space-y-2.5">
-                <p className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                  Choose an agent
-                </p>
-                <AgentPicker activeId={agentId} onSelect={onAgentChange} />
+            {!agent && (
+              <div className="mb-[18px]">
+                <p className={cn(KX_TIGHT, "mb-2 flex justify-center")}>Choose an agent</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {AGENTS.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => onAgentChange(a.id)}
+                      className="rounded-sm border border-[#ebebeb] bg-background p-2.5 text-left hover:bg-[#fcfcfc]"
+                    >
+                      <span
+                        className="flex h-6 w-6 items-center justify-center rounded-sm font-mono text-[10px] font-semibold"
+                        style={{
+                          background: tint(AGENT_COLOR[a.id] ?? "#111111", 0.12),
+                          color: AGENT_COLOR[a.id] ?? "#111111",
+                        }}
+                      >
+                        {AGENT_MONO[a.id]}
+                      </span>
+                      <div className="mt-2 text-[13px] font-medium text-foreground">{a.name}</div>
+                      <div className="mt-0.5 text-[11.5px] leading-[1.4] text-muted-foreground">{a.blurb}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* §17.3: empty-thread starters — the same server-computed chips */}
-            {suggestionsOn && (
-              <SuggestedActions
-                projectId={projectId}
-                threadId={threadId}
-                threadMode={threadMode}
-                onPick={pickSuggestion}
-                disabled={loading}
-              />
+            {agent && suggestions.length > 0 && (
+              <div className="mb-2.5 flex flex-wrap gap-1.5">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      onInputChange(s);
+                      void send(s, { model, projectId, agentId });
+                    }}
+                    className="rounded-sm border border-[#ebebeb] bg-[#fcfcfc] px-2.5 py-[5px] text-[12px] text-muted-foreground"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             )}
 
-            <ChatComposer
-              input={input}
-              onInputChange={onInputChange}
-              onSubmit={submit}
-              loading={loading}
-              model={model}
-              onModelChange={onModelChange}
-              projects={projects}
-              projectId={projectId}
-              onProjectChange={onProjectChange}
-              mode={threadMode}
-              onModeChange={onModeChange}
-              placeholder={activeAgent ? `Ask the ${activeAgent.name}…` : "How can I help you today?"}
-              autoFocus
-            />
-
+            {composer}
             {error && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+              <div className="mt-2 rounded-sm border border-[#f0c7cb] bg-[#fdf2f3] px-3 py-2 text-[12.5px] text-[#8a2a30]">
                 {error}
               </div>
             )}
           </div>
         </div>
       ) : (
+        /* ── populated thread ────────────────────────────────────────── */
         <>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-[720px] space-y-5 px-6 py-8">
-              {messages.map((m) => (
-                <MessageBubble
-                  key={m.id}
-                  message={m}
-                  onSuggestUtterance={onInputChange}
-                />
-              ))}
+          <div ref={streamRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="mx-auto flex max-w-[740px] flex-col gap-4 px-5 pb-7 pt-5">
+              {messages.map((m) => {
+                if (m.role === "user") {
+                  return (
+                    <div key={m.id} className="flex justify-end">
+                      <div className="max-w-[78%] whitespace-pre-wrap rounded-sm bg-foreground px-3 py-2 text-[14px] leading-[1.55] text-background">
+                        {m.content}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={m.id}>
+                    {m.content && (
+                      <div className="whitespace-pre-wrap text-[14px] leading-[1.65] text-foreground">
+                        {m.content}
+                      </div>
+                    )}
+                    {(m.parts ?? []).map((part, i) => {
+                      // Proposals render via ProposalCard in the app (they need
+                      // the proposals hook for approve/apply state).
+                      if (part.kind === "proposal") {
+                        const d = part.data as any;
+                        return (
+                          <React.Fragment key={i}>
+                            {d?.agent && <AgentDivider agentName={d.agent} />}
+                            {/* The container resolves the proposal (approve/
+                                apply state) and renders ProposalCardView. */}
+                            <ProposalCard proposalId={d.proposal_id} />
+                          </React.Fragment>
+                        );
+                      }
+                      const key = m.id + ":" + i;
+                      return (
+                        <MessagePart
+                          key={key}
+                          part={part}
+                          onSwitchToReview={threadMode === "ask" ? () => onModeChange("review") : undefined}
+                          onSaveMemory={() => setSavedMemory((s) => ({ ...s, [key]: true }))}
+                          onDismissMemory={() => setSavedMemory((s) => ({ ...s, [key]: false }))}
+                        />
+                      );
+                    })}
+                    {m.toolCalls && m.toolCalls.length > 0 && <ActivityGroup toolCalls={m.toolCalls} />}
+                  </div>
+                );
+              })}
+
               {loading && (
                 <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground opacity-40" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
-                  </span>
-                  Thinking…
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground" /> Thinking…
                 </div>
               )}
               {error && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+                <div className="rounded-sm border border-[#f0c7cb] bg-[#fdf2f3] px-3 py-2 text-[12.5px] text-[#8a2a30]">
                   {error}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="border-t border-border bg-surface-sunken">
-            <div className="mx-auto max-w-[720px] px-4 py-3">
-              {/* §17.3: chips above the composer */}
-              {suggestionsOn && (
-                <SuggestedActions
-                  projectId={projectId}
-                  threadId={threadId}
-                  threadMode={threadMode}
-                  onPick={pickSuggestion}
-                  disabled={loading}
-                />
+          <div className="border-t border-[#ebebeb] bg-[#fcfcfc] px-4 py-3">
+            <div className="mx-auto max-w-[740px]">
+              {suggestions.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => void send(s, { model, projectId, agentId })}
+                      className="rounded-sm border border-[#ebebeb] bg-background px-2.5 py-[5px] text-[12px] text-muted-foreground"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               )}
-              <ChatComposer
-                input={input}
-                onInputChange={onInputChange}
-                onSubmit={submit}
-                loading={loading}
-                model={model}
-                onModelChange={onModelChange}
-                projects={projects}
-                projectId={projectId}
-                onProjectChange={onProjectChange}
-                mode={threadMode}
-                onModeChange={onModeChange}
-                placeholder="Reply…"
-                minRows={1}
-              />
+              {composer}
             </div>
           </div>
         </>
