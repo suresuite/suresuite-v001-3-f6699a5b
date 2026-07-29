@@ -1,0 +1,894 @@
+%==============================================================================
+%  The Harness Is the Guarantee
+%  Draft for an AI-engineering venue (CAIN / ICSE-SEIP). IEEEtran, conference.
+%
+%  Build:  latexmk -pdf ai-harness.tex
+%  Numbers marked  % FILL  need the live model-scored eval run; see README.md \S2.
+%==============================================================================
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% Repo-derived numbers. Regenerate with:
+%   node docs/paper/scripts/paper_metrics.mjs --tex > generated/metrics.tex
+\input{generated/metrics.tex}
+
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\FILL}{\textcolor{red}{\textbf{--}}}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  captionpos=b
+}
+
+\begin{document}
+
+\title{The Harness Is the Guarantee: Deterministic Gates for\\
+       LLM Agents over a Validated Simulation Platform}
+
+\author{
+  \IEEEauthorblockN{\TODO{Author One}}
+  \IEEEauthorblockA{\textit{\TODO{Affiliation}} \\ \TODO{email}}
+  \and
+  \IEEEauthorblockN{\TODO{Author Two}}
+  \IEEEauthorblockA{\textit{\TODO{Affiliation}} \\ \TODO{email}}
+}
+
+\maketitle
+
+%==============================================================================
+\begin{abstract}
+Large language models are increasingly placed in front of operational systems
+whose outputs carry consequence---supply-chain plans, capacity commitments,
+sourcing decisions. The prevailing engineering response is to improve the model:
+better prompts, stronger checkpoints, richer retrieval. We argue this misplaces
+the guarantee. We report on the design, implementation, and evaluation of an
+\emph{agent harness} for a production supply-chain simulation platform, built on
+a single organising claim: every trustworthiness property that matters must be
+enforced by deterministic platform code, so that the property holds identically
+on the strongest and the weakest model the user may select.
+
+The work is motivated by a reproduced production failure. Asked which materials a
+particular supplier provides, the assistant returned five plausible material
+identifiers, all of which belonged to a different supplier. A deterministic audit
+established the cause was not a buggy tool but an \emph{absent} one: no interface
+mapped a supplier to its materials, and the model filled the vacuum. We describe
+the seven mechanisms the harness interposes in response---a proposal fabric that
+makes every mutation human-approved and gate-checked, a grounded read surface
+derived from an explicit intent taxonomy, a two-layer pre-send verifier that
+blocks ungrounded replies before a user sees them, an append-only plan tool with
+a tested integrity law, per-request spend budgets with honest exhaustion, a
+cache-first closed decision loop that reuses completed simulation runs, and a
+published per-model capability matrix---and the two-tier evaluation apparatus
+that gates them: \TestCount{} deterministic tests over \FixtureCount{} golden
+fixtures on every change, plus a nightly model-scored tier over \GoldenRows{}
+labelled utterances and every enabled model.
+
+Our central empirical result is a capability-coverage audit on a real
+operational network (60 suppliers, 560 materials): after the harness landed, all
+twelve probed intent families answer from grounded artifacts, with zero gaps,
+and every new tool's output matches independently recomputed ground truth. We
+argue the resulting architecture is portable: the pattern is to identify the
+seams where a check \emph{can} be deterministic and to insist that at those seams
+it \emph{must} be.
+\end{abstract}
+
+\begin{IEEEkeywords}
+LLM agents, AI engineering, grounding, hallucination, discrete-event simulation,
+supply chain, evaluation harness, software architecture
+\end{IEEEkeywords}
+
+%==============================================================================
+\section{Introduction}
+
+An LLM agent placed in front of an operational system inherits none of that
+system's guarantees. The simulation engine underneath our platform is
+deterministic, seeded, and validated against golden traces; its results are
+reproducible to the hash. The moment a conversational agent describes those
+results, that chain of custody is broken---unless something deterministic
+reconstitutes it.
+
+The dominant industry response to this problem is \emph{model improvement}:
+sharper prompts, larger context, retrieval augmentation~\cite{lewis2020rag},
+self-critique~\cite{shinn2023reflexion}. Each helps. None of them
+\emph{guarantees}, because each degrades continuously with model strength, and in
+a product where the user selects the model---as they do in ours, across four
+models from three vendors---a continuously degrading property is not a property
+at all. It is a hope with a service-level agreement attached.
+
+This paper reports an alternative posture, developed while engineering
+SureSuite, a supply-chain simulation platform. \TODO{State the development
+period; the authoring environment could not establish it from repository history
+alone.} We call it the \emph{deterministic floor}:
+
+\begin{quote}
+\itshape
+Where a check \emph{can} be deterministic---recomputation, schema validation, a
+gate, a hash match, a citation resolution---it \emph{must} be. A critic LLM is
+strictly weaker than the gate it imitates. The model's remaining jobs are
+phrasing, tool selection, and schema filling; every property a user relies on is
+carried by first-party code.
+\end{quote}
+
+The consequence is a specific architecture. The agent cannot mutate project data;
+it can only emit a \emph{proposal} that a human approves and that then flows
+through the identical validation gates a human edit flows through. The agent
+cannot compute a KPI; it can only propose a simulation run and later cite the
+persisted result. The agent cannot assert an entity that no tool returned; a
+deterministic verifier inspects the reply before it ships and replaces it if it
+does. Each of these is a subtraction from the model's authority, and each is
+independently tested.
+
+\subsection*{Contributions}
+
+\begin{enumerate}
+  \item \textbf{A reproduced, root-caused production failure} (\S\ref{sec:incident})
+        that distinguishes \emph{capability-coverage} gaps from faithfulness
+        gaps, with a deterministic audit recomputing ground truth from the
+        operational tables. We argue this distinction is under-recognised: the
+        failure looked like hallucination but was caused by a missing interface.
+  \item \textbf{Seven composable harness mechanisms} (\S\ref{sec:harness}), each
+        stated as a contract with its enforcement point and its failure
+        behaviour, and each mapped to the layer of defence it provides.
+  \item \textbf{A two-tier evaluation apparatus} (\S\ref{sec:eval}) that makes
+        agent changes CI-gateable without model calls, in the way golden traces
+        gate a simulation engine---plus a model-scored tier that publishes a
+        per-model capability matrix rather than a pass/fail verdict.
+  \item \textbf{An empirical coverage audit} (\S\ref{sec:results}) on a real
+        operational network showing all twelve probed intent families grounded,
+        zero gaps, with tool outputs matching recomputed truth.
+  \item \textbf{An adopt/adapt/reject analysis} (\S\ref{sec:related}) of
+        contemporary agent frameworks against this posture, with the rationale
+        for rejecting in-process orchestration frameworks in favour of a durable
+        state machine in the database.
+\end{enumerate}
+
+%==============================================================================
+\section{Context and System}
+\label{sec:context}
+
+\subsection{The platform}
+
+SureSuite models multi-echelon supply networks and evaluates them by
+discrete-event simulation. A project comprises item masters (suppliers,
+materials, plants, customers), a bill-of-materials graph, transport arcs, and a
+policy configuration drawn from a registry of parameterised policies. Users
+compose disruption scenarios---a supplier outage, a demand shock---and run
+replicated simulations that report fill rate, time-to-recover, time-to-survive,
+and value-at-risk, following standard practice for output analysis and warm-up
+determination~\cite{law2015simulation,welch1983warmup}. The domain motivation is
+the ripple-effect and viability literature~\cite{ivanov2020ripple,ivanov2021viable};
+model credibility follows Sargent's V\&V framing~\cite{sargent2013vv}.
+
+Three platform properties matter for what follows. First, \textbf{the registry is
+the single source of truth} for policy schemas: the configured form of a policy
+is exactly what executes. Second, \textbf{runs are provenance-hashed} on three
+independent hashes---a policy hash, a graph hash, and a scenario
+fingerprint---so a completed run is identifiable by the exact configuration that
+produced it. Third, \textbf{no result is ever computed outside the engine};
+KPIs live in persisted rows.
+
+\subsection{The AI layer}
+
+The conversational layer is a single serverless function
+(\HarnessLoc{}~LOC across \HarnessModules{} modules) that dispatches to four
+models across three vendors, chosen \emph{by the user per message}: a free-tier
+Gemini Flash, two GPT-5 variants, and DeepSeek. Multi-vendor model choice is a
+deliberate product decision, and it is precisely what forces the
+model-agnosticism requirement: a guarantee that holds only on the strongest model
+is not a guarantee the product can make.
+
+The layer has two tiers. \emph{Advisory personas} answer questions with read-only,
+project-scoped tools. \emph{Artifact agents}---a data steward, a policy
+configurator, a V\&V analyst, an experiment designer, an explainer, a report
+builder---perform work, but their sole output channel is a proposal. A
+deterministic intent router hands "do it for me" utterances from the persona
+surface to the owning agent, and the resulting proposal card returns into the
+same conversation.
+
+\subsection{The platform law}
+
+One sentence governs every mechanism below, and predates them:
+
+\begin{quote}
+\itshape
+Every agent output is a proposal that passes the same gates as human input;
+simulation results, KPIs, and rankings are never LLM-generated; every agent tool
+is a subset of the platform's existing public interfaces---no privileged path;
+agents are stateless per task; a golden task suite per agent gates changes in CI.
+\end{quote}
+
+Every mechanism in \S\ref{sec:harness} is an application of this law. None is an
+exception to it. We stress this because the most common architectural failure we
+observed in ourselves was the temptation to give the agent "just one" privileged
+shortcut---a direct write, a cached value, a computed KPI---each of which would
+have silently voided the chain of custody the engine works to maintain.
+
+%==============================================================================
+\section{The Motivating Failure}
+\label{sec:incident}
+
+\subsection{What happened}
+
+On an operational project---60 suppliers, 560 materials, 560 inbound arcs---a modeler
+asked what supplier~10 supplies. The platform's own policies page correctly
+displays supplier~10 sourcing a particular material. The assistant instead
+returned five material identifiers.
+
+A deterministic audit script recomputed ground truth directly from the
+operational tables. The findings, summarised in Table~\ref{tab:incident}, are
+worse than a simple error:
+
+\begin{table}[t]
+\caption{The reproduced incident, against recomputed ground truth.}
+\label{tab:incident}
+\centering
+\footnotesize
+\begin{tabular}{@{}lp{4.6cm}@{}}
+\toprule
+\textbf{Fact} & \textbf{Value} \\
+\midrule
+Materials supplier 10 actually supplies & \textbf{187} (all sole-sourced) \\
+Supplier 10's rank by procurement spend & \textbf{\#1} in the project \\
+Count returned by the risk tool         & 187 (\emph{correct}) \\
+Identifiers the assistant claimed       & 5 \\
+Of those, belonging to supplier 10      & \textbf{0} \\
+Their actual supplier                   & a single \emph{different} supplier \\
+Present in the first page of the generic entity list & \textbf{none} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All five claimed identifiers belong to one other supplier. None appears in the
+first page the generic entity-listing tool would have returned---so the answer
+was not even a mis-sliced tool result. It was ungrounded by construction.
+
+\subsection{Root cause: an absent interface, not a broken one}
+
+The tools that applied were correct. The risk tool returned the true count, 187.
+The failure was that \emph{no tool mapped a supplier to the list of its
+materials}. One tool \emph{counted} a supplier's materials without enumerating
+them; another listed materials \emph{unscoped} by supplier. With no grounded path
+to the requested answer, the model interpolated one---continuing an identifier
+pattern it had seen elsewhere in the project.
+
+We draw a distinction we found essential and under-discussed. The literature
+treats hallucination largely as a property of models~\cite{ji2023hallucination}.
+This failure was a property of the \emph{tool surface}:
+
+\begin{itemize}
+  \item A \textbf{capability-coverage gap}: a question the system had no grounded
+        way to answer, yet answered anyway.
+  \item A \textbf{faithfulness gap}: no rule forbade converting a count into a
+        list, so nothing stopped the interpolation.
+\end{itemize}
+
+The engineering implication is sharp. Prompt hardening alone would have addressed
+only the second gap, and would have produced a system that reliably refused a
+question it should have been able to answer. Tooling alone would have addressed
+only the first, leaving the next uncovered intent to fail identically. Both were
+needed, and---because both are model-dependent in their effect---a third,
+deterministic layer was needed underneath them.
+
+\subsection{The coverage law}
+
+We generalised the incident into a contract:
+
+\begin{quote}
+\itshape
+For every in-scope user message, the assistant must answer correctly from a
+grounded artifact, or state plainly that it cannot and offer the nearest
+supported action. It must never present an ungrounded entity, number, or
+relationship as fact.
+\end{quote}
+
+Note what this does \emph{not} say. It does not say the assistant answers
+everything. "Handled" is \emph{answer-or-honest-refuse}. The measurable target is
+therefore not an accuracy rate but a \textbf{fabrication rate of zero}: every
+entity identifier, name, count, or relationship in a reply must be traceable to a
+tool result on this project. Coverage is then raised by closing gaps, so that
+more intents fall into the "answer" branch rather than the "refuse" branch---but
+no gap-closing work is allowed to move anything into the "fabricate" branch.
+
+%==============================================================================
+\section{The Harness}
+\label{sec:harness}
+
+We describe seven mechanisms. Table~\ref{tab:layers} maps them to the layers of
+defence they provide against the incident class.
+
+\begin{table}[t]
+\caption{Layered defence. Each layer independently suffices to prevent the
+         \S\ref{sec:incident} failure; none depends on model strength.}
+\label{tab:layers}
+\centering
+\footnotesize
+\begin{tabular}{@{}clp{3.5cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Layer} & \textbf{Engages when} \\
+\midrule
+1 & Grounded read surface  & the question has a tool \\
+2 & Faithfulness grammar   & no tool covers it \\
+3 & Pre-send verifier      & the model ignores the grammar \\
+4 & Golden fixture in CI   & a change would regress any of 1--3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The proposal fabric}
+\label{sec:proposals}
+
+No agent writes project data. An agent emits a row into a \texttt{proposals}
+table with a lifecycle state machine---\texttt{proposed} $\rightarrow$
+\texttt{approved} $\rightarrow$ \texttt{applied}, with \texttt{rejected} and
+\texttt{expired} as the other terminals. Approval is a human action in the UI.
+Application runs server-side through the \emph{same} stored procedures a human
+edit uses, re-checking the grounding hashes at apply time; if the underlying data
+drifted between proposal and approval, the apply fails with the stale values
+named rather than overwriting.
+
+Three design points proved load-bearing:
+
+\begin{itemize}
+  \item \textbf{Terminal rows are never edited.} "Change my mind" after an apply
+        is a new \emph{inverse} proposal, never an un-apply. The proposal table
+        is an audit artifact, and audit artifacts that can be rewritten are not
+        audit artifacts.
+  \item \textbf{Idempotency is keyed on content.} A re-proposal with an unseen
+        idempotency key returns the existing row rather than creating a duplicate
+        card---which matters because model retries are routine.
+  \item \textbf{Apply failure is a visible, bounded state.} The row stays
+        \texttt{approved} with the error and attempt count on the card; after
+        three attempts the retry affordance is withdrawn.
+\end{itemize}
+
+This is the mechanism that makes the incremental risk of an acting agent
+\emph{bounded by gates that already bound human error}---rather than a new risk
+surface requiring new controls.
+
+\subsection{The grounded read surface}
+\label{sec:reads}
+
+We enumerated the space of things a modeler asks into fifteen intent families
+(entity enumeration, entity detail, four relation families, risk/concentration,
+policy reads, readiness, run results, disruption advice, how-to, navigation,
+action, and out-of-scope). Each family must have \emph{either} a grounded tool
+\emph{or} a defined honest refusal. Auditing the shipped tool set against this
+taxonomy is what turned one anecdote into a systematic finding: of the fourteen
+answerable families, \textbf{six had no grounded path at all} and two returned
+aggregates where an identity was asked for---leaving six fully grounded.
+
+Closing them required four new read tools---supplier$\rightarrow$materials,
+material$\rightarrow$suppliers, bill-of-materials relations in both directions,
+and entity detail---plus exposing six existing internal reads to the advisory
+surface. Every one is project-scoped by construction, returns a strict typed
+envelope, and wraps an interface that already existed. Critically, they enumerate
+with a cap and carry the \emph{true} total in the envelope metadata, so a
+truncated list is reported as truncated rather than presented as complete.
+
+\subsection{The faithfulness grammar}
+
+Four rules were added verbatim to the system prompt. They are contracts, not
+tone:
+
+\begin{lstlisting}[caption={The faithfulness rules (abridged).}]
+- Relationships are FACTS, not guesses. Never state that a
+  supplier supplies a material ... unless a tool result on
+  THIS project shows that exact pair.
+- A COUNT is not a LIST. If a tool gives you only a count,
+  report the count. Do NOT enumerate individual ids you did
+  not receive from a tool. Never continue a partial list by
+  pattern.
+- Every entity id, name, or number you state must appear in a
+  tool result you received this turn.
+- When you cannot answer from data, use ONE sentence: what you
+  can't do, and the nearest thing you can.
+\end{lstlisting}
+
+The second rule is the incident, stated as a prohibition. We note it is also the
+rule most likely to be violated under distribution shift, which is exactly why it
+is not the last line of defence.
+
+\subsection{The pre-send verifier}
+\label{sec:verifier}
+
+This is the mechanism that makes the floor deterministic. Every reply---persona
+or agent---passes \texttt{verifyReply} before it is returned and before it is
+appended to the chat store. Two layers:
+
+\textbf{Layer 1, membership} (no database reads; every reply, every model). The
+harness builds the turn's \emph{grounded vocabulary}: every token appearing in
+this turn's tool-result payloads, the serialised context block, and the user's
+own message. From the reply it extracts (a) entity-identifier-shaped tokens and
+(b) numeric claims---numbers with at least three significant digits or carrying
+percent/currency markers. Every extracted token must be a member of the grounded
+vocabulary.
+
+The identifier lexicon is \textbf{learned per request} from the shapes the tools
+actually returned, never a hardcoded regular expression. This matters for
+generalisation: a project-shaped pattern would have worked on the audited network
+and failed on the identifier convention of the next project.
+
+\textbf{Layer 2, resolution} (database reads; when the reply carries citation
+markers). Every marker binds to a citation; every citation resolves against the
+platform's own tables; every sentence containing a simulation-derived number
+carries a run citation.
+
+The outcomes are exactly three---\textbf{pass}, \textbf{retry once},
+\textbf{replace}:
+
+\begin{enumerate}
+  \item On failure, one corrective retry, with the violations named verbatim in a
+        system-side addendum. This spends one unit of the request's LLM-call
+        budget.
+  \item If the retry also fails, the reply is \textbf{replaced} by a
+        server-instantiated honest-refusal template built from the turn's actual
+        grounded facts. The typed data parts still render---data the tools
+        returned is never withheld.
+\end{enumerate}
+
+\textbf{The verifier never edits a reply.} We considered and rejected surgical
+correction: a partially rewritten reply is one whose remaining sentences carry an
+unearned implication of verification.
+
+False-positive posture is deliberately asymmetric. Extraction is narrow: hedged
+prose with no identifiers and no precise numbers always passes. The verifier
+polices facts, not style. This is the design choice that made the gate
+deployable---an aggressive verifier that blocked ordinary conversational prose
+would have been switched off within a week.
+
+Applied to the incident: the five fabricated identifiers are identifier-shaped
+tokens absent from the turn's grounded vocabulary. Layer 1 fails, the retry is
+attempted, and the fallback template ships instead. \emph{The user cannot see the
+fabrication}, on any model.
+
+\subsection{The plan tool and the integrity law}
+\label{sec:plan}
+
+Multi-step work---which spans an approval and a simulation run that takes
+minutes---needs a visible task plan. We implemented one first-party
+(\texttt{update\_task\_plan}, 777~LOC of handler), writing to a
+\texttt{chat\_plans} table that the UI subscribes to over the existing realtime
+channel. Handler-enforced rules: at most twelve steps; \textbf{steps are
+append-only} (an update must contain every existing step identifier---a step that
+turned out wrong goes to \texttt{refused} with a note, never silently deleted);
+at most one \texttt{active} step; waiting states must carry the reference to the
+proposal or run they wait on.
+
+The property we consider the paper's most transferable contribution about agent
+UX is the \textbf{integrity law}:
+
+\begin{quote}
+\itshape
+At the end of every request that touched a plan, each step is in a terminal
+(\texttt{done}/\texttt{failed}/\texttt{refused}) or waiting
+(\texttt{awaiting\_approval}/\texttt{awaiting\_run}) status---never
+\texttt{active}, never vanished.
+\end{quote}
+
+The model is \emph{invited} to close its steps by prompt; the platform
+\emph{guarantees} it by code. After the agent turn returns, the orchestrator reads
+the plan row and forces any still-\texttt{active} step to \texttt{failed} with the
+cause in the note. A provider crash mid-step therefore yields a visibly failed
+step, not a dangling spinner. Reference agent harnesses leave this to convention;
+here it is a tested behaviour with eight dedicated fixtures.
+
+Execution locus deserves a note because it is where we diverged most from
+contemporary practice. Long-running turns run \emph{nowhere long}: every request
+completes within the serverless function, waits are \emph{persisted statuses},
+and resumption is an idempotent client-caused turn. A poll against a still-running
+simulation costs \textbf{zero LLM calls}---the server reads the run row and
+returns a templated progress line. We adopted the insight of durable-execution
+systems (externalise workflow state; make resumption deterministic) without
+adopting a workflow engine, because the state machine we needed already had to
+live in the database for audit reasons.
+
+\subsection{Turn budgets with honest exhaustion}
+
+Five meters bound each request: LLM calls (default 4), tool calls (15),
+completion characters (48{,}000), wall time (60\,s soft), and tool-calling hops
+per turn (5). Budgets ship \emph{unflagged}---a feature flag on a bound would mean
+"unbounded", which is not a state anyone wants to be able to reach.
+
+The contract on exhaustion is what distinguishes a budget from a timeout:
+\textbf{finish the current step, name the exhausted meter, never truncate
+silently}. Every reply's telemetry carries which meter, if any, was hit. A user
+told "I stopped at the tool-call budget with two steps remaining" can act; a user
+handed a silently shortened answer cannot.
+
+\subsection{The closed decision loop}
+\label{sec:loop}
+
+The capability the harness ultimately delivers: a user asks a decision
+question---\emph{what would a six-week outage of this supplier do to fill
+rate?}---and the system understands it, \textbf{checks whether the answer already
+exists}, proposes a gated experiment only on a miss, reads the persisted results,
+and answers with machine-recheckable evidence.
+
+The cache-first step is worth isolating. Because runs are identified by three
+grounding hashes plus a replication count, "has this exact question already been
+answered?" is a \emph{deterministic database predicate}, not a semantic judgment.
+The same predicate that already detected reusable runs at dispatch time was
+extracted into a read tool, so a cache hit and an apply-time reuse can never
+disagree. A hit answers instantly, citing the stored run identifier and its
+hashes, and creates \emph{no proposal and no run row}. A miss files exactly one
+experiment proposal and dispatches nothing until a human approves. Drift is named
+rather than hidden: a re-uploaded dataset produces a \texttt{cache\_stale} reply
+that says \emph{which} hash moved.
+
+This is the platform law in its sharpest form. The LLM chooses the tool and
+phrases the answer. It never computes a KPI, and it cannot cause a simulation to
+run.
+
+\subsection{The per-model capability matrix}
+\label{sec:matrix}
+
+Model-agnosticism is easy to assert and hard to evidence. We made it a published
+artifact. The nightly evaluation writes one row per (model, capability) pair into
+a table---score, target, pass, and the evaluation run correlator---over a closed
+vocabulary of sixteen capabilities: router quality and its two v2 signals, one
+per artifact agent, two closed-loop slices, plan integrity, three coverage
+groups, fabrication, and judged faithfulness.
+
+Two enforcement decisions matter. First, when a user's selected model has a
+\emph{fresh, failing} row for the capability their request routes to, the agent
+turn is \textbf{not executed}; the server instantiates a template naming the best
+passing model. Second, the system \textbf{never auto-switches models}. The user
+chose the model; the platform's obligation is honesty about what that choice can
+do, not silent substitution.
+
+The matrix fails \emph{open}: an absent row, a stale row (older than seven days),
+or an advisory route proceeds normally. Blocking on absent evidence would have
+frozen the product on day one, and advisory replies are separately guarded by the
+verifier---which is exactly why failing open is safe here. This interaction
+between mechanisms is characteristic: the layers are designed so that each one's
+permissive edge is covered by another's strict one.
+
+%==============================================================================
+\section{Evaluation Apparatus}
+\label{sec:eval}
+
+The engine is gated by golden traces: no engine change ships without them. We
+applied the same discipline to the agent layer, which required making agent
+behaviour testable \emph{without} model calls.
+
+\subsection{Tier 1: deterministic, every change}
+
+\TestCount{} test cases across \TestFileCount{} files run on every pull request
+with no network access and no LLM calls. Providers are fetch-mocked; the database
+client is import-mapped to a local stub; the stored procedures run against a
+throwaway Postgres booted from the real migration files. Fixtures carry the
+\emph{mocked tool-call arguments}, so the tests exercise the real handlers---the
+recomputation, the enum and scope gates, the idempotency keys, the state-machine
+preconditions, the router fallbacks---while holding the model constant.
+
+This is the design decision that made the harness maintainable. It means a
+contributor can refactor the proposal lifecycle and get a red build in seconds,
+rather than discovering the regression in a nightly scored run.
+Table~\ref{tab:suites} shows the distribution.
+
+\begin{table}[t]
+\caption{Golden fixtures by suite (\FixtureCount{} total across \SuiteCount{}
+         suites). Suites only grow; a fixture is retired only with a recorded
+         reason.}
+\label{tab:suites}
+\centering
+\footnotesize
+\begin{tabular}{@{}lr@{\hspace{4mm}}lr@{}}
+\toprule
+\textbf{Suite} & \textbf{n} & \textbf{Suite} & \textbf{n} \\
+\midrule
+network-cartographer & 15 & experiment-designer & 8 \\
+coverage             & 12 & plans               & 8 \\
+closed-loop          & 10 & report-builder      & 8 \\
+cost-estimator       &  9 & vv-analyst          & 8 \\
+data-steward         &  9 & memory              & 7 \\
+policy-configurator  &  9 & suggestions         & 5 \\
+disruption-sentinel  &  8 & matrix              & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Fixture growth is driven by production telemetry, not by intuition: every
+misroute, every rejected proposal carrying a note, and every apply failure
+becomes a candidate fixture with the behaviour recorded \emph{as it should have
+been}.
+
+\subsection{Tier 2: model-scored, nightly and pre-flag}
+
+The scored tier executes every enabled agent's fixtures and a routing golden set
+of \GoldenRows{} labelled utterances against every enabled model. Class quotas
+are enforced---at least 25 per agent class, 25 advisory, 15 mixed, 10
+adversarial---so that a model cannot score well by collapsing to a single route.
+Targets: schema validity $\geq 0.95$, citation coverage $\geq 0.90$, judged
+faithfulness $\geq 0.95$, needs-run recall $\geq 0.80$, cache-checkable precision
+$\geq 0.85$, and \textbf{fabrication rate $= 0$}. A single fabrication fails the
+run and blocks any flag flip.
+
+An LLM-as-judge~\cite{zheng2023judge} scores only the residue determinism cannot
+reach---paraphrase drift, implied causality, overselling. It is deliberately
+\emph{not} a gate that a deterministic check could be, and it is itself gated: a
+judge output that fails schema validation is recorded as a judge error, never
+counted as faithful, and judge/verifier disagreement is auto-sampled into human
+triage. Production replies are never sent to a judge.
+
+\subsection{The verifier as its own test subject}
+
+The verifier module is used three ways from one implementation: as the runtime
+gate, as the CI checker (unit-tested against a corpus containing planted
+fabricated identifiers, planted unresolvable citations, and clean replies---it
+must catch every planted violation and pass every clean one), and as the scorer
+for the model-scored fabrication metric. Building it once means the number the
+nightly run reports is produced by the same code that protects users.
+
+%==============================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Capability coverage on a real network}
+
+Table~\ref{tab:coverage} reports the deterministic audit on the operational project
+where the incident occurred, before and after the harness landed. Ground truth
+is recomputed from the operational tables by an independent script; "grounded"
+means a tool exists, applies, and matches truth.
+
+\begin{table}[t]
+\caption{Capability coverage on the audited network (60 suppliers, 560
+         materials, 560 inbound arcs), over twelve probed intents.}
+\label{tab:coverage}
+\centering
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\toprule
+& \textbf{Grounded} & \textbf{Partial} & \textbf{Gap} \\
+\midrule
+Before (shipped tool set) & 5  & 2 & 5 \\
+After  (harness)          & \textbf{12} & \textbf{0} & \textbf{0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Every one of the four new tools was checked against recomputed truth:
+
+\begin{itemize}
+  \item supplier$\rightarrow$materials on the incident supplier: 187 materials,
+        \emph{set-equal} to truth; none of the five incident identifiers present;
+        truncation note carries the true total.
+  \item material$\rightarrow$suppliers on the incident material: exact match.
+  \item bill-of-materials relations, both directions: parents and components
+        match on sampled nodes.
+  \item entity detail: verbatim master-record values, never imputed.
+\end{itemize}
+
+The incident question now answers with the real 187-material list. Under the
+harness, it is prevented four independent ways---the tool exists; failing that
+the grammar refuses; failing that the verifier blocks; failing that the pinned
+regression fixture fails CI---and \emph{none of the four depends on model
+strength}.
+
+\subsection{Deterministic tier}
+
+\TestCount{} cases over \FixtureCount{} fixtures, green on every change.
+\TODO{Insert wall-clock runtime and pass rate from a local \texttt{deno test}
+run; Deno was unavailable in the authoring environment.}
+
+\subsection{Model-scored tier}
+
+\TODO{This subsection requires the live nightly run described in README \S2. The
+tables below are the intended shape.}
+
+\begin{table}[t]
+\caption{Per-model results over the scored battery. \textbf{The claim under test
+         is that the fabrication column reads 0 on every row}, including the
+         free-tier model.}
+\label{tab:permodel}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{Fabr.} & \textbf{Verifier} & \textbf{Judged} & \textbf{Router} \\
+               & \textbf{rate}  & \textbf{fired}    & \textbf{faithful} & \textbf{F1} \\
+\midrule
+gemini-2.5-flash & \FILL & \FILL & \FILL & \FILL \\ % FILL
+gpt-5            & \FILL & \FILL & \FILL & \FILL \\ % FILL
+gpt-5-mini       & \FILL & \FILL & \FILL & \FILL \\ % FILL
+deepseek-chat    & \FILL & \FILL & \FILL & \FILL \\ % FILL
+\midrule
+\textbf{Target}  & \textbf{0} & --- & $\geq 0.95$ & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The interpretive frame we propose for Table~\ref{tab:permodel}: the
+\emph{fabrication} column is the floor and must be zero everywhere; the
+\emph{verifier-fired} column is expected to \emph{vary} with model strength. That
+combination is the thesis. A stronger model buys fewer retries and lower latency;
+it does not buy a different guarantee. If a future run shows a non-zero
+fabrication rate on any model, the thesis is falsified for that configuration and
+the corresponding flag does not flip---which is the point of building the gate as
+a gate.
+
+%==============================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What we would tell another team}
+
+\textbf{Audit your tool surface against an intent taxonomy before you harden
+prompts.} Our instinct after the incident was to strengthen the prompt. The
+taxonomy audit showed five families with no grounded path---prompt work would
+have converted five wrong answers into five refusals and declared victory.
+
+\textbf{Make the last line of defence deterministic and narrow.} The verifier's
+value comes from being both unconditional (every reply, every model) and
+conservative (identifier-shaped tokens and high-precision numbers only). Teams we
+have compared notes with tend to build the opposite: a broad semantic critic that
+is switched off in production because it fires on ordinary prose.
+
+\textbf{Put the durable state machine in the database, not in the framework.} We
+rejected in-process agent-orchestration frameworks not on performance grounds but
+because the state machine we needed---proposals, plans---had to be durable,
+access-controlled, and auditable regardless. Once it lives in Postgres, an
+in-process graph is a second, weaker copy.
+
+\textbf{Budgets are a UX feature.} Naming the exhausted meter converts an opaque
+truncation into an actionable statement.
+
+\textbf{Publish per-model quality instead of hiding it.} A capability matrix is
+uncomfortable---it says in public that your free tier is weaker at something. It
+is also the only honest way to offer model choice, and it converts
+model-agnosticism from a claim into a measurement.
+
+\subsection{Generalisation}
+
+Nothing above is supply-chain-specific. The pattern instantiates wherever an
+agent fronts a system of record with its own validation: identify the seams where
+a check can be deterministic (recomputation, schema, gate, hash, citation
+resolution) and make it mandatory there; route all mutation through a
+human-approved proposal that reuses existing validation; learn the verifier's
+lexicon from the data rather than hardcoding it; and gate the whole thing with a
+deterministic tier that needs no model calls.
+
+The two components most tied to our domain are the cache-first run reuse (which
+requires content-addressable computation---though any system with hashed,
+reproducible jobs qualifies) and the intent taxonomy (which must be re-derived
+per domain, though the \emph{method}---enumerate families, mark each grounded,
+partial, or gap---transfers directly).
+
+%==============================================================================
+\section{Threats to Validity}
+\label{sec:threats}
+
+\textbf{Single-system, single-network.} The coverage audit is one project on one
+platform. The audit method generalises; the specific 12/12 result does not. We
+mitigated project-shape dependence by learning the verifier's identifier lexicon
+per request and by re-running the closed-loop battery on a multi-sourced project
+topology, but we have not audited a second operational network.
+
+\textbf{The scored tier is pending.} At the time of writing the model-scored
+results in Table~\ref{tab:permodel} are unfilled. The central claim---that the
+floor holds identically across models---is therefore \emph{argued from
+construction} (the gates are deterministic code executing on every reply) rather
+than \emph{demonstrated across models}. This is the paper's principal
+limitation. \TODO{Remove this paragraph once the nightly run lands.}
+
+\textbf{The verifier's false-negative surface.} Layer 1 catches
+identifier-shaped tokens and high-precision numbers. A fabricated \emph{causal
+claim} in hedged prose---"this supplier is likely your bottleneck"---passes
+membership checking. That residue is what the LLM judge scores nightly, and a
+judge is a weaker instrument than a gate. We claim a zero fabrication rate for
+entities and numbers, not for all forms of unfaithfulness.
+
+\textbf{Construct validity of the fabrication metric.} We measure whether tokens
+appear in the grounded vocabulary, not whether the reply is \emph{useful}. A
+system that refuses everything scores perfectly. Coverage (Table~\ref{tab:coverage})
+is the counterweight, and the two must be read together.
+
+\textbf{Author bias.} The audit script, the harness, and the evaluation were built
+by the same team. The audit recomputes truth independently of the tool
+implementations, but it is not an independent replication.
+
+%==============================================================================
+\section{Related Work}
+\label{sec:related}
+
+\textbf{Agent architectures.} The bounded reason--act--observe loop is
+ReAct~\cite{yao2023react}, which we adopt directly as the tool-calling loop.
+Tool-use learning~\cite{schick2023toolformer} and the broader agent
+literature~\cite{wang2024agentsurvey} focus on \emph{acquiring} capability; our
+concern is bounding an agent whose capability is already adequate.
+Reflexion-style self-critique~\cite{shinn2023reflexion} we adapt with a sharp
+restriction: where a check can be deterministic it must be, so a critic LLM
+appears only in nightly scoring. Hierarchical agent memory~\cite{packer2023memgpt}
+we adapt in tiering but not in implementation---long-term memories here are
+explicit, user-visible, provenance-cited artifacts written only with consent,
+never an opaque store the model writes to silently.
+
+\textbf{Grounding and attribution.} Hallucination is well
+surveyed~\cite{ji2023hallucination}; retrieval augmentation~\cite{lewis2020rag} is
+the standard mitigation. Our setting differs in that grounding is
+\emph{structured} retrieval---SQL over typed operational artifacts---which
+dominates vector retrieval for tabular data. Work on measuring
+attribution~\cite{rashkin2021attributable} shares our goal, but provider-attributed
+spans are the wrong \emph{authority} for operational data: our citations are
+references the platform resolves against its own tables, verified by first-party
+code before send.
+
+\textbf{Agent evaluation.} AgentBench~\cite{liu2024agentbench} and
+$\tau$-bench~\cite{yao2024taubench} evaluate agents across tasks and simulated
+users. These measure \emph{models}; our two-tier harness measures a
+\emph{deployed system}, with the deterministic tier holding the model constant to
+isolate platform regressions---the complement to, not a substitute for, benchmark
+evaluation. The per-model matrix (\S\ref{sec:matrix}) is the point where the two
+meet.
+
+\textbf{Software engineering for ML systems.} Our posture is a direct descendant
+of the technical-debt~\cite{sculley2015debt} and production-readiness
+rubric~\cite{breck2017mltest} tradition, and of case studies of ML in
+practice~\cite{amershi2019se4ml}. The specific contribution is applying golden-trace
+discipline---long standard for simulation engines---to an LLM agent layer, by
+making the agent's deterministic machinery testable with the model mocked out.
+
+\textbf{Governance.} The mechanisms map onto NIST AI RMF~\cite{nist2023airmf}
+functions (MAP: the as-built inventory and threat model; MEASURE: the metrics and
+golden suites; MANAGE: flags and kill switches; GOVERN: the platform law), and
+onto ISO/IEC 42001~\cite{iso42001} and the EU AI Act's transparency
+obligations~\cite{euaiact2024}---every proposal card carries its provenance and
+the drafting model code. We report this as evidence structure rather than as a
+compliance claim.
+
+\textbf{Frameworks we rejected.} Graph and state-machine orchestration
+frameworks, and vendor agent SDKs, were rejected as \emph{runtime dependencies}
+while their patterns were absorbed: typed state, checkpointing, and interrupts map
+onto proposals, the event store, and human approval respectively. Nested
+agent-spawning was rejected for this version because it multiplies cost and
+removes the per-turn authorization checkpoints. Standardised tool
+exposure~\cite{anthropic2024mcp} is planned via the public API gateway rather than
+as a parallel tool stack.
+
+%==============================================================================
+\section{Conclusion}
+
+We set out to make an LLM agent safe over a validated simulation platform and
+concluded that safety could not live in the model. It had to live in the harness:
+a proposal fabric that makes every mutation human-approved and gate-checked, a
+read surface derived from an audited intent taxonomy, a deterministic pre-send
+verifier that no reply escapes, an append-only plan with a tested integrity law,
+budgets that name what they exhausted, a closed decision loop that reuses
+provenance-hashed runs instead of recomputing them, and a published per-model
+capability matrix that turns model-agnosticism from a claim into a measurement.
+
+The failure that started this work looked like a hallucination and was in fact a
+missing interface---a distinction that changes the engineering response entirely.
+The system that answered it wrongly had correct tools and a reasonable prompt; it
+lacked a deterministic reason to be unable to be wrong.
+
+We offer the resulting posture as a general one. Find the seams where a check can
+be deterministic, and insist that at those seams it must be. What remains for the
+model is phrasing, tool choice, and schema filling---and what remains for the
+user is a floor that does not move when they change models.
+
+%==============================================================================
+\section*{Acknowledgements}
+\TODO{Acknowledgements; customer consent statement for the audited network.}
+
+\section*{Data and Artifact Availability}
+The evaluation harness, golden fixtures, and the metrics-extraction script are
+part of the platform repository. \TODO{State the artifact-availability position:
+public release, on-request access, or synthetic-fixture subset.}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
