@@ -5,16 +5,24 @@
 // headers, walk-to links into /project-manager (dataMap.ts vocabulary), and
 // a per-finding action slot (e.g. the assign-supplier one-click fix).
 import { Link } from "react-router-dom";
-import { AlertOctagon, AlertTriangle, ArrowUpRight, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LAYER, tint } from "@/components/intelligence/piUi";
 import type { Finding, Severity } from "@/lib/policies/validationService";
 
-const SEV_ICON = { block: AlertOctagon, warn: AlertTriangle, info: Info } as const;
-const SEV_COLOR = {
-  block: "text-destructive border-destructive/40 bg-destructive/10",
-  warn: "text-amber-700 dark:text-amber-300 border-amber-500/40 bg-amber-500/10",
-  info: "text-muted-foreground border-border bg-muted/40",
-} as const;
+/** Severity → layer color: blocking is brand red, a warning is the firm
+ *  amber, a note is neutral. */
+const SEV_COLOR: Record<Severity, string | null> = {
+  block: LAYER.brand,
+  warn: LAYER.firm,
+  info: null,
+};
+
+function sevStyle(severity: Severity): React.CSSProperties {
+  const c = SEV_COLOR[severity];
+  return c
+    ? { color: c, borderColor: tint(c, 0.4), background: tint(c, 0.06) }
+    : { color: "#8a8a8a", borderColor: "#ebebeb", background: "#fafafa" };
+}
 
 const GROUP_LABEL: Record<Severity, string> = {
   block: "Blocking — must be fixed before the run can dispatch",
@@ -42,40 +50,50 @@ export function FindingsList({ findings, groupBySeverity, walkTo, action, classN
     : [{ severity: null, items: findings }];
 
   return (
-    <div className={cn("max-h-72 overflow-auto rounded-md border", className)}>
+    <div className={cn("max-h-72 overflow-auto rounded-sm border border-[#ebebeb]", className)}>
       {groups.map((g, gi) => (
         <div key={g.severity ?? gi}>
           {g.severity && (
-            <div className={cn("px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest border-b", SEV_COLOR[g.severity])}>
+            <div
+              className="border-b border-[#ebebeb] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
+              style={sevStyle(g.severity)}
+            >
               {GROUP_LABEL[g.severity]}
             </div>
           )}
-          <ul className="text-xs divide-y">
+          <ul className="divide-y divide-[#f4f4f4] text-[12px]">
             {g.items.map((f) => {
-              const Icon = SEV_ICON[f.severity];
               const route = walkTo?.(f) ?? null;
+              const c = SEV_COLOR[f.severity];
               return (
-                <li key={f.id} className={cn("flex items-start gap-2 px-2.5 py-1.5 border-l-2", SEV_COLOR[f.severity])}>
-                  <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <div className="flex-1 min-w-0">
+                <li
+                  key={f.id}
+                  className="flex items-start gap-2 border-l-2 px-2.5 py-1.5"
+                  style={sevStyle(f.severity)}
+                >
+                  <span
+                    className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: c ?? "#c4c4c4" }}
+                  />
+                  <div className="min-w-0 flex-1">
                     <div className="font-medium">{f.message}</div>
                     {(f.rowKey || f.field || f.policy) && (
-                      <div className="text-[10px] opacity-70 font-mono">
+                      <div className="font-mono text-[10px] opacity-70">
                         {[f.rowKey, f.field, f.policy && f.policy !== "engine" ? `demanded by ${f.policy}` : f.policy]
                           .filter(Boolean)
                           .join(" · ")}
                       </div>
                     )}
-                    {f.hint && <div className="text-[10px] opacity-80 mt-0.5">{f.hint}</div>}
+                    {f.hint && <div className="mt-0.5 text-[10.5px] opacity-80">{f.hint}</div>}
                     {action?.(f)}
                   </div>
                   {route && (
                     <Link
                       to={route}
-                      className="shrink-0 inline-flex items-center gap-0.5 text-[10px] underline-offset-2 hover:underline whitespace-nowrap"
+                      className="shrink-0 whitespace-nowrap font-mono text-[10px] underline-offset-2 hover:underline"
                       title="Open the editor for this field in the Project Manager"
                     >
-                      Fix data <ArrowUpRight className="h-3 w-3" />
+                      fix data ↗
                     </Link>
                   )}
                 </li>

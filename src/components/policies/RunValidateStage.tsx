@@ -26,36 +26,28 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertOctagon,
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  BadgeCheck,
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  Database,
-  Gauge,
-  PlayCircle,
-  Repeat,
-  ShieldCheck,
-  Sparkles,
-  Timer,
-  Upload,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  KX_TIGHT,
+  LAYER,
+  MonoChip,
+  Segmented,
+  StatusDot,
+  SURFACE,
+  TD,
+  TH,
+  Toggle,
+  tint,
+} from "@/components/intelligence/piUi";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useStageRows } from "@/hooks/useStageRows";
+import type { StageRow } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
@@ -89,7 +81,6 @@ import { ReplicationSeedExplorer } from "@/components/sim/ReplicationSeedExplore
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { PolicyBundle, FulfillmentStrategy } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
-import { PolicyRunStepper } from "./PolicyRunStepper";
 import { MappingWarningsCard } from "@/components/sim/RunProgressPanel";
 import { RunQueueConsole } from "@/components/sim/RunQueueConsole";
 
@@ -108,6 +99,11 @@ interface Props {
    *  selected version and whether live edits have drifted from it. */
   selectedVersionId: string | null;
   policyDirty: boolean;
+  /** The lines of each setup stage, loaded once at the page level (the step
+   *  track counts them) and verified here. */
+  supplierRows: StageRow[];
+  plantRows: StageRow[];
+  customerRows: StageRow[];
 }
 
 // Engine KPI vocabulary (kpi/compute.py::compute_replication_kpis) — every
@@ -219,11 +215,11 @@ const DEFAULT_MULTI: MultiRunCfg = {
 const DEFAULT_WARMUP: WarmupCfg = { warmup_days: 30, method: "engine", target_precision: 0.05 };
 
 const STEPS = [
-  { id: "verify", label: "Verification", description: "Catch input issues" },
-  { id: "run", label: "Run simulation", description: "Single + replications" },
-  { id: "warmup", label: "Warm-up detection", description: "Adequacy + estimation" },
-  { id: "validate", label: "Validation", description: "Compare with empirical" },
-  { id: "adopt", label: "Adopt", description: "Persist the model card" },
+  { id: "verify", label: "Verification" },
+  { id: "run", label: "Run simulation" },
+  { id: "warmup", label: "Warm-up detection" },
+  { id: "validate", label: "Validation" },
+  { id: "adopt", label: "Adopt" },
 ];
 
 function meanCI(values: number[], confidence: number) {
@@ -247,10 +243,10 @@ export function RunValidateStage({
   saveSnapshot,
   selectedVersionId,
   policyDirty,
+  supplierRows,
+  plantRows,
+  customerRows,
 }: Props) {
-  const supRows = useStageRows({ projectId, plantName, stage: "supplier" });
-  const plantRowsQ = useStageRows({ projectId, plantName, stage: "plant" });
-  const custRows = useStageRows({ projectId, plantName, stage: "customer" });
   const itemMasters = useItemMasters(projectId);
   const dataset = useDatasetVersion(projectId);
   const { unit: timeUnit } = useTimeUnit(projectId);
@@ -659,9 +655,9 @@ export function RunValidateStage({
       defaults,
       overrides,
       fulfillmentStrategy,
-      supplierRows: supRows.rows,
-      plantRows: plantRowsQ.rows,
-      customerRows: custRows.rows,
+      supplierRows,
+      plantRows,
+      customerRows,
       timeUnit: timeUnit ?? null,
       materials: itemMasters.materials,
       products: itemMasters.products,
@@ -1280,95 +1276,137 @@ export function RunValidateStage({
   };
 
   // --- render --------------------------------------------------------------
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Stage header: the derived credibility badge (§9.5 — validated /
-          stale / unvalidated, computed by hash comparison, never stored). */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[11px] font-medium text-muted-foreground">Model credibility</span>
-        <CredibilityBadge credibility={liveCredibility} />
-        {liveCredibility.state === "stale" && (
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => setStep(4)}>
-            Re-validate →
-          </Button>
-        )}
-        {liveCredibility.state === "validated" && (
-          <span className="text-[10px] text-muted-foreground">
-            card {liveCredibility.card.id.slice(0, 8)} · {new Date(liveCredibility.card.validated_at).toLocaleDateString()}
-          </span>
-        )}
-      </div>
-      {warmupComputed && (
-        <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
-          <Timer className="h-3.5 w-3.5 text-primary" />
-          <span className="font-semibold">Warm-up detected</span>
-          <Badge className="h-5 bg-primary/15 text-primary border-primary/30">
-            {warmCfg.warmup_days} days
-          </Badge>
-          <span className="text-muted-foreground">
-            method <b className="text-foreground">{warmCfg.method}</b> · target half-width{" "}
-            <b className="text-foreground">{(warmCfg.target_precision * 100).toFixed(0)}%</b>
-          </span>
-          <div className="flex-1" />
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setStep(2)}>
-            Tune
-          </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(3)}>
-            Go to validation
-          </Button>
-        </div>
-      )}
-      <PolicyRunStepper steps={STEPS} current={step} completed={completed} onJump={setStep} />
+  const stepMeta = (i: number): { text: string; blocked?: boolean } => {
+    if (i === 0)
+      return findings === null
+        ? { text: "not run" }
+        : blockCount > 0
+          ? { text: `${blockCount} blocker(s)`, blocked: true }
+          : { text: `${findings.length} finding(s)` };
+    if (i === 1)
+      return hasRealData
+        ? { text: `${doneReps.length} replication(s)` }
+        : { text: "no run yet" };
+    if (i === 2)
+      return warmupComputed && warmCfg.warmup_days > 0
+        ? { text: `${warmCfg.warmup_days} days · ${warmCfg.method}` }
+        : { text: "not detected" };
+    if (i === 3)
+      return validationResult
+        ? { text: `${testsRan.filter((r) => r.pass).length}/${testsRan.length} passed` }
+        : { text: "not run" };
+    return { text: liveCredibility.state };
+  };
 
-      <div className="rounded-lg border bg-card p-5 min-h-[320px]">
+  return (
+    <div className="flex flex-col gap-2.5">
+      {/* Five step cards — same treatment as the setup bar's step track. */}
+      <div className="flex flex-wrap items-stretch gap-[5px]">
+        {STEPS.map((s, i) => {
+          const meta = stepMeta(i);
+          const active = step === i;
+          const done = completed.has(i);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setStep(i)}
+              className={cn(
+                "flex flex-[0_1_auto] items-center gap-[9px] rounded-sm border px-[10px] py-1.5 text-left transition-colors",
+                active
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-[#ebebeb] bg-background shadow-[0_1px_0_rgba(0,0,0,0.04)] hover:border-foreground hover:bg-[#fafafa]",
+              )}
+            >
+              <span
+                className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full font-mono text-[10px] font-medium"
+                style={
+                  active
+                    ? { background: "#ffffff", color: "#111111" }
+                    : done
+                      ? { background: LAYER.process, color: "#ffffff" }
+                      : meta.blocked
+                        ? { background: LAYER.brand, color: "#ffffff" }
+                        : { background: "#f4f4f4", color: "#8a8a8a" }
+                }
+              >
+                {done && !active ? "✓" : i + 1}
+              </span>
+              <span className="flex min-w-0 flex-col items-start gap-px">
+                <span className="whitespace-nowrap text-[12.5px] font-medium tracking-[-0.01em]">
+                  {s.label}
+                </span>
+                <span
+                  className="whitespace-nowrap font-mono text-[10px]"
+                  style={{
+                    color: active
+                      ? "rgba(255,255,255,0.62)"
+                      : meta.blocked
+                        ? LAYER.brand
+                        : "#8a8a8a",
+                  }}
+                >
+                  {meta.text}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <>
         {/* 1 — VERIFICATION */}
         {step === 0 && (
           <StepShell
-            icon={ShieldCheck}
-            title="Verify your inputs"
+            index={0}
+            title="Verification"
             action={
-              <Button size="sm" onClick={onVerify} className="h-8">
-                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
+              <Button size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={onVerify}>
                 Run checks
               </Button>
             }
           >
-            <div className="flex items-center flex-wrap gap-2 text-[11px] text-muted-foreground mb-2">
-              <Database className="h-3.5 w-3.5" />
-              <span>Dataset</span>
-              {dataset.currentHash ? (
-                <code className="font-mono">{dataset.currentHash.slice(0, 8)}</code>
-              ) : (
-                <span className="opacity-60">—</span>
+            <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+              <span className={KX_TIGHT}>Dataset</span>
+              <span className="text-foreground">{dataset.currentHash?.slice(0, 8) ?? "—"}</span>
+              <MonoChip>
+                {dataset.neverSnapshotted
+                  ? "not snapshotted"
+                  : dataset.isDirty
+                    ? "changed since snapshot"
+                    : "up to date"}
+              </MonoChip>
+              <span className={KX_TIGHT}>Credibility</span>
+              <CredibilityBadge credibility={liveCredibility} />
+              {liveCredibility.state === "validated" && (
+                <span>
+                  card {liveCredibility.card.id.slice(0, 8)} ·{" "}
+                  {new Date(liveCredibility.card.validated_at).toLocaleDateString()}
+                </span>
               )}
-              {dataset.neverSnapshotted ? (
-                <Badge variant="secondary" className="h-5">not snapshotted</Badge>
-              ) : dataset.isDirty ? (
-                <Badge variant="secondary" className="h-5">changed since last snapshot</Badge>
-              ) : (
-                <Badge variant="outline" className="h-5">up to date</Badge>
-              )}
-              <span className="opacity-70">· a snapshot is captured automatically when you run</span>
+              {verifiedAt && <span>verified {verifiedAt.toLocaleTimeString()}</span>}
             </div>
-            {findings === null ? (
-              <p className="text-xs text-muted-foreground">No checks run yet. Click <b>Run checks</b> to start.</p>
-            ) : findings.length === 0 ? (
-              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="h-4 w-4" /> All checks passed.
-              </div>
-            ) : (
+            {findings !== null && (
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <Badge variant="outline" className="h-5">{findings.length} finding(s)</Badge>
-                  {blockCount > 0 && <Badge variant="destructive" className="h-5">{blockCount} blocker(s)</Badge>}
-                  {warnCount > 0 && <Badge variant="secondary" className="h-5">{warnCount} warning(s)</Badge>}
-                  {verifiedAt && <span>· verified {verifiedAt.toLocaleTimeString()}</span>}
+                <div className="flex items-center gap-2.5 font-mono text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <StatusDot ok={blockCount === 0} />
+                    {findings.length} finding(s)
+                  </span>
+                  {blockCount > 0 && (
+                    <span style={{ color: LAYER.brand }}>{blockCount} blocker(s)</span>
+                  )}
+                  {warnCount > 0 && (
+                    <span style={{ color: LAYER.firm }}>{warnCount} warning(s)</span>
+                  )}
                 </div>
-                <FindingsList
-                  findings={findings}
-                  className="max-h-60"
-                  walkTo={(f) => (f.field ? fieldWalkToRoute(f.field, projectId) : null)}
-                />
+                {findings.length > 0 && (
+                  <FindingsList
+                    findings={findings}
+                    className="max-h-60"
+                    walkTo={(f) => (f.field ? fieldWalkToRoute(f.field, projectId) : null)}
+                  />
+                )}
               </div>
             )}
           </StepShell>
@@ -1377,8 +1415,19 @@ export function RunValidateStage({
         {/* 2 — RUN SIMULATION */}
         {step === 1 && (
           <StepShell
-            icon={PlayCircle}
-            title="Run the simulation"
+            index={1}
+            title="Run simulation"
+            action={
+              <Segmented<ComputeMode>
+                size="sm"
+                value={computeMode}
+                onChange={setComputeMode}
+                options={[
+                  { value: "server", label: "server", title: "Compute on the simulation server" },
+                  { value: "browser", label: "browser", title: "Offline fallback — the same engine, locally" },
+                ]}
+              />
+            }
           >
             {/* Diagnostics: engine self-test + build marker. Real signals, but
                 not model evidence — collapsed so the step reads as engine
@@ -1386,116 +1435,71 @@ export function RunValidateStage({
             <button
               type="button"
               onClick={() => setShowDiagnostics((v) => !v)}
-              className="self-start flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 self-start font-mono text-[10.5px] text-muted-foreground transition-colors hover:text-foreground"
             >
               {showDiagnostics ? (
-                <ChevronDown className="h-3.5 w-3.5" />
+                <ChevronDown className="h-3 w-3" />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
+                <ChevronRight className="h-3 w-3" />
               )}
-              Diagnostics — engine self-test &amp; build info
+              diagnostics
             </button>
             {showDiagnostics && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
-              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+            <div className={cn(SURFACE, "flex flex-wrap items-center gap-2 px-2.5 py-1.5")}>
+              <Button size="sm" variant="outline" className="h-[24px] px-2.5 text-[11px]"
                 onClick={onSelfTest} disabled={selfTestState.kind === "running"}>
-                <Gauge className="h-3.5 w-3.5" />
                 {selfTestState.kind === "running" ? "Testing…" : "Test engine"}
               </Button>
               {selfTestState.kind === "running" && (
-                <span className="text-[11px] text-muted-foreground">{selfTestState.detail}</span>
+                <span className="font-mono text-[11px] text-muted-foreground">{selfTestState.detail}</span>
               )}
               {selfTestState.kind === "ok" && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Engine works — scsim {selfTestState.version}, fill rate {(selfTestState.fillRate * 100).toFixed(1)}% ({selfTestState.reps} reps)
+                <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+                  <StatusDot ok /> scsim {selfTestState.version} · fill rate{" "}
+                  {(selfTestState.fillRate * 100).toFixed(1)}% · {selfTestState.reps} reps
                 </span>
               )}
               {selfTestState.kind === "fail" && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-destructive">
-                  <AlertOctagon className="h-3.5 w-3.5" /> Engine failed: {selfTestState.error}
+                <span className="inline-flex items-center gap-1.5 font-mono text-[11px]" style={{ color: LAYER.brand }}>
+                  <StatusDot /> {selfTestState.error}
                 </span>
               )}
               {selfTestState.kind === "idle" && engineWarming && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/50 border-t-transparent" />
-                  Preparing engine (one-time ~20 MB download)…
+                <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                  <StatusDot pending /> preparing engine…
                 </span>
               )}
               {selfTestState.kind === "idle" && engineWarm && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Engine ready
+                <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+                  <StatusDot ok /> engine ready
                 </span>
               )}
-              <span className="ml-auto text-[10px] font-mono text-muted-foreground/60" title="Deployed build — if this doesn't change after a deploy, the new code isn't live yet">
+              <span className="ml-auto font-mono text-[10px] text-[#c4c4c4]" title="Deployed build">
                 build {String(__BUILD_SHA__)} · {String(__BUILD_TIME__)}
               </span>
             </div>
             )}
 
-            {/* Compute location. Server is the default — heavy runs must not
-                freeze the tab; the in-browser engine remains the offline
-                fallback and is auto-used when the server can't be reached. */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-md border p-0.5" role="group" aria-label="Compute location">
-                <button
-                  type="button"
-                  onClick={() => setComputeMode("server")}
-                  className={cn(
-                    "rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
-                    computeMode === "server"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Run on server (default)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setComputeMode("browser")}
-                  className={cn(
-                    "rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
-                    computeMode === "browser"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Run in browser (offline)
-                </button>
-              </div>
-              <span className="text-[10px] text-muted-foreground">
-                {computeMode === "server"
-                  ? "Runs compute on the simulation server and stream in live — the tab stays free, long runs are safe."
-                  : "Offline fallback — the same engine runs locally (WebAssembly, slower; keep the tab open)."}
-              </span>
-            </div>
-
             {runPhase.kind !== "idle" && <RunStatusBanner phase={runPhase} />}
 
             <Tabs value={runTab} onValueChange={(v) => setRunTab(v as "single" | "multi")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-9">
-                <TabsTrigger value="single" className="text-xs gap-1.5">
-                  <PlayCircle className="h-3.5 w-3.5" /> Single run
-                  {singleQueuedAt && <Badge variant="outline" className="h-4 px-1 text-[9px] ml-1">queued</Badge>}
+              <TabsList className="grid h-8 w-full grid-cols-2">
+                <TabsTrigger value="single" className="text-[11.5px]">
+                  Single run
+                  {singleQueuedAt && <MonoChip className="ml-1.5">queued</MonoChip>}
                 </TabsTrigger>
-                <TabsTrigger value="multi" className="text-xs gap-1.5">
-                  <Repeat className="h-3.5 w-3.5" /> Multiple runs
-                  {multiQueuedAt && <Badge variant="outline" className="h-4 px-1 text-[9px] ml-1">queued</Badge>}
+                <TabsTrigger value="multi" className="text-[11.5px]">
+                  Multiple runs
+                  {multiQueuedAt && <MonoChip className="ml-1.5">queued</MonoChip>}
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="single" className="mt-3 flex flex-col gap-3">
-                <p className="text-[11px] text-muted-foreground">
-                  Single run validates one deterministic trajectory. When it finishes, the
-                  panel below reads as a model-behavior inspection dashboard — inventory
-                  dynamics, the financial statement, every persisted weekly series, and
-                  sanity-check scalars — all computed from the run output the worker
-                  persisted.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <TabsContent value="single" className="mt-2.5 flex flex-col gap-2.5">
+                <div className="flex flex-wrap items-end gap-[18px]">
                   <Field label="Seed">
                     <Input
                       type="number"
-                      className="h-8 text-xs"
+                      className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
                       value={singleCfg.seed}
                       onChange={(e) => setSingleCfg((c) => ({ ...c, seed: parseInt(e.target.value, 10) || 1 }))}
                     />
@@ -1503,70 +1507,59 @@ export function RunValidateStage({
                   <Field label="Horizon (days)">
                     <Input
                       type="number"
-                      className="h-8 text-xs"
+                      className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
                       value={singleCfg.horizon_days}
                       onChange={(e) => setSingleCfg((c) => ({ ...c, horizon_days: parseInt(e.target.value, 10) || 1 }))}
                     />
                   </Field>
-                  <div className="flex items-end">
-                    <Button size="sm" onClick={onRunSingle} disabled={submitting === "single"} className="w-full gap-1.5">
-                      <PlayCircle className="h-3.5 w-3.5" />
-                      {submitting === "single" ? "Queueing…" : singleQueuedAt ? "Re-run single" : "Run single"}
-                    </Button>
-                  </div>
+                  {/* Inspection mode (G17/§9.5.1 — W3): opt-in per-item evidence
+                      for this ONE replication at the chosen seed. */}
+                  <Field label="Inspection mode">
+                    <Toggle
+                      checked={singleCfg.inspection}
+                      onChange={(v) => setSingleCfg((c) => ({ ...c, inspection: v }))}
+                      label="per-item weekly series"
+                    />
+                  </Field>
+                  <Button
+                    size="sm"
+                    className="h-[26px] px-2.5 text-[11.5px]"
+                    onClick={onRunSingle}
+                    disabled={submitting === "single"}
+                  >
+                    {submitting === "single" ? "Queueing…" : singleQueuedAt ? "Re-run single" : "Run single"}
+                  </Button>
                 </div>
-                {/* Inspection mode (G17/§9.5.1 — W3): opt-in per-item evidence
-                    for this ONE replication at the chosen seed. */}
-                <label className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={singleCfg.inspection}
-                    onChange={(e) =>
-                      setSingleCfg((c) => ({ ...c, inspection: e.target.checked }))
-                    }
-                  />
-                  <span className="text-[11px]">
-                    <b>Inspection mode</b> — raise the engine trace and persist the
-                    per-product / per-material weekly series (on-hand, in-transit, orders,
-                    demand, production, fulfillment) of this single replication. A
-                    product/material picker appears in the run output below. Single-run
-                    only; multi-replication runs never persist per-item series.
-                  </span>
-                </label>
               </TabsContent>
 
-              <TabsContent value="multi" className="mt-3 flex flex-col gap-3">
-                <p className="text-[11px] text-muted-foreground">
-                  Multiple runs ensure statistical significance — estimates KPI mean ± CI across seeds.
-                </p>
-                <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-3">
+              <TabsContent value="multi" className="mt-2.5 flex flex-col gap-2.5">
+                <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[320px_1fr]">
                   {/* Setup card (compact, fixed width on desktop) */}
-                  <div className="rounded-md border p-3 flex flex-col gap-3">
-                    <h4 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Setup</h4>
+                  <div className={cn(SURFACE, "flex flex-col gap-2.5 p-2.5")}>
+                    <span className={KX_TIGHT}>Setup</span>
                     <Field label="Seeds">
                       <div className="flex items-center gap-2">
                         <Select
                           value={multiCfg.seeds_mode}
                           onValueChange={(v) => setMultiCfg((c) => ({ ...c, seeds_mode: v as MultiRunCfg["seeds_mode"] }))}
                         >
-                          <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-6 w-20 font-mono text-[11px]"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="auto">Auto</SelectItem>
-                            <SelectItem value="list">List</SelectItem>
+                            <SelectItem value="auto">auto</SelectItem>
+                            <SelectItem value="list">list</SelectItem>
                           </SelectContent>
                         </Select>
                         {multiCfg.seeds_mode === "auto" ? (
                           <Input
                             type="number"
                             min={1}
-                            className="h-8 text-xs flex-1"
+                            className="h-6 flex-1 text-right font-mono text-[11.5px] tabular-nums"
                             value={multiCfg.replications}
                             onChange={(e) => setMultiCfg((c) => ({ ...c, replications: parseInt(e.target.value, 10) || 1 }))}
                           />
                         ) : (
                           <Input
-                            className="h-8 text-xs flex-1"
+                            className="h-6 flex-1 font-mono text-[11.5px]"
                             placeholder="1,2,3,4,5"
                             value={multiCfg.seeds_list}
                             onChange={(e) => setMultiCfg((c) => ({ ...c, seeds_list: e.target.value }))}
@@ -1577,26 +1570,25 @@ export function RunValidateStage({
                     <Field label="Simulation time (days)">
                       <Input
                         type="number"
-                        className="h-8 text-xs"
+                        className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
                         value={multiCfg.horizon_days}
                         onChange={(e) => setMultiCfg((c) => ({ ...c, horizon_days: parseInt(e.target.value, 10) || 1 }))}
                       />
                     </Field>
                     <Field label="Confidence">
-                      <Select
+                      <Segmented<string>
+                        size="sm"
                         value={String(multiCfg.confidence)}
-                        onValueChange={(v) => setMultiCfg((c) => ({ ...c, confidence: parseFloat(v) }))}
-                      >
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0.9">90%</SelectItem>
-                          <SelectItem value="0.95">95%</SelectItem>
-                          <SelectItem value="0.99">99%</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        onChange={(v) => setMultiCfg((c) => ({ ...c, confidence: parseFloat(v) }))}
+                        options={[
+                          { value: "0.9", label: "90%" },
+                          { value: "0.95", label: "95%" },
+                          { value: "0.99", label: "99%" },
+                        ]}
+                      />
                     </Field>
                     <Field label="Focal KPIs">
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1">
                         {KPI_OPTIONS.map((k) => {
                           const selected = multiCfg.kpis.includes(k.id);
                           return (
@@ -1610,10 +1602,10 @@ export function RunValidateStage({
                                 }))
                               }
                               className={cn(
-                                "h-6 px-2 rounded-full text-[11px] border transition-colors",
+                                "rounded-sm border px-[7px] py-px font-mono text-[10px] transition-colors",
                                 selected
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-card hover:bg-muted/50 border-border",
+                                  ? "border-foreground bg-foreground text-background"
+                                  : "border-[#ebebeb] bg-background text-[#9a9a9a] hover:border-foreground hover:text-foreground",
                               )}
                             >
                               {k.label}
@@ -1622,8 +1614,12 @@ export function RunValidateStage({
                         })}
                       </div>
                     </Field>
-                    <Button size="sm" onClick={onRunMulti} disabled={submitting === "multi"} className="mt-auto gap-1.5">
-                      <Repeat className="h-3.5 w-3.5" />
+                    <Button
+                      size="sm"
+                      className="mt-auto h-[26px] px-2.5 text-[11.5px]"
+                      onClick={onRunMulti}
+                      disabled={submitting === "multi"}
+                    >
                       {submitting === "multi" ? "Queueing…" : multiQueuedAt ? "Re-run replications" : "Run replications"}
                     </Button>
                   </div>
@@ -1646,10 +1642,8 @@ export function RunValidateStage({
                 worker writes it. This section, not the animation above, is
                 the proof the simulation actually ran. */}
             {validationScenarioId && (
-              <div className="mt-5 border-t pt-4 flex flex-col gap-3">
-                <h4 className="text-xs font-semibold">
-                  Engine run — live status &amp; persisted output
-                </h4>
+              <div className="mt-2 flex flex-col gap-2.5 border-t border-[#ebebeb] pt-3">
+                <span className={KX_TIGHT}>Engine run</span>
                 {/* Run-queue console (6.E): every job from history, not just
                     the latest — per-row Cancel/View/Retry, status tally, filter
                     and bulk Cancel-all / Clear-finished. cancelJob reuses the
@@ -1691,17 +1685,15 @@ export function RunValidateStage({
 
         {/* 3 — WARM-UP DETECTION */}
         {step === 2 && (
-          <StepShell
-            icon={Timer}
-            title="Warm-up detection"
-          >
-            <div className="flex flex-col gap-5">
+          <StepShell index={2} title="Warm-up detection">
+            <div className="flex flex-col gap-4">
               {/* (a) replication adequacy */}
               <section className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                  <Gauge className="h-3.5 w-3.5 text-primary" />
-                  <h4 className="text-xs font-semibold">a) Replication adequacy</h4>
-                  <span className="text-[10px] text-muted-foreground">target half-width ≤ {(warmCfg.target_precision * 100).toFixed(0)}% of mean</span>
+                  <span className={KX_TIGHT}>a · Replication adequacy</span>
+                  <span className="font-mono text-[10.5px] text-muted-foreground">
+                    half-width ≤ {(warmCfg.target_precision * 100).toFixed(0)}% of mean
+                  </span>
                 </div>
                 <ReplicationAdequacy
                   kpis={multiCfg.kpis}
@@ -1719,14 +1711,10 @@ export function RunValidateStage({
               </section>
 
               {/* (b) warm-up estimation */}
-              <section className="flex flex-col gap-2 border-t pt-4">
-                <div className="flex items-center gap-2">
-                  <Timer className="h-3.5 w-3.5 text-primary" />
-                  <h4 className="text-xs font-semibold">b) Warm-up estimation</h4>
-                </div>
-                <div>
-                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Indicators</Label>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <section className="flex flex-col gap-2 border-t border-[#ebebeb] pt-3">
+                <span className={KX_TIGHT}>b · Warm-up estimation</span>
+                <Field label="Indicators">
+                  <div className="flex flex-wrap gap-1">
                     {KPI_OPTIONS.map((ind) => {
                       const selected = indicators.some((x) => x.id === ind.id);
                       return (
@@ -1739,10 +1727,10 @@ export function RunValidateStage({
                             )
                           }
                           className={cn(
-                            "h-7 px-2.5 rounded-full text-xs border transition-colors",
+                            "rounded-sm border px-[7px] py-px font-mono text-[10px] transition-colors",
                             selected
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-card hover:bg-muted/50 border-border",
+                              ? "border-foreground bg-foreground text-background"
+                              : "border-[#ebebeb] bg-background text-[#9a9a9a] hover:border-foreground hover:text-foreground",
                           )}
                         >
                           {ind.label}
@@ -1750,92 +1738,93 @@ export function RunValidateStage({
                       );
                     })}
                   </div>
-                </div>
+                </Field>
                 {indicators.length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Upload empirical time-series (optional)</Label>
-                    {indicators.map((ind) => {
-                      const meta = KPI_OPTIONS.find((x) => x.id === ind.id)!;
-                      return (
-                        <div key={ind.id} className="flex items-center gap-2 rounded-md border p-2">
-                          <span className="text-xs font-medium w-40 shrink-0">{meta.label}</span>
-                          <label className="flex-1 cursor-pointer">
-                            <input
-                              type="file"
-                              accept=".csv,text/csv"
-                              className="hidden"
-                              onChange={(e) => onIndicatorFile(ind.id, e.target.files?.[0] ?? null)}
-                            />
-                            <div className="flex items-center gap-2 h-8 px-2 rounded-md border border-dashed text-xs text-muted-foreground hover:bg-muted/30">
-                              <Upload className="h-3.5 w-3.5" />
-                              {ind.fileName ? (
-                                <span className="truncate">
-                                  <b className="text-foreground">{ind.fileName}</b> · {ind.points} pts
-                                </span>
-                              ) : (
-                                <span>Click to upload CSV (t,value)</span>
-                              )}
-                            </div>
-                          </label>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setIndicators((cur) => cur.filter((x) => x.id !== ind.id))}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <Field label="Empirical time-series (optional)">
+                    <div className="flex w-full flex-col gap-1">
+                      {indicators.map((ind) => {
+                        const meta = KPI_OPTIONS.find((x) => x.id === ind.id)!;
+                        return (
+                          <div key={ind.id} className={cn(SURFACE, "flex items-center gap-2 p-1.5")}>
+                            <span className="w-40 shrink-0 text-[12px]">{meta.label}</span>
+                            <label className="flex-1 cursor-pointer">
+                              <input
+                                type="file"
+                                accept=".csv,text/csv"
+                                className="hidden"
+                                onChange={(e) => onIndicatorFile(ind.id, e.target.files?.[0] ?? null)}
+                              />
+                              <div className="flex h-6 items-center gap-1.5 rounded-sm border border-dashed border-[#ebebeb] px-2 font-mono text-[11px] text-muted-foreground hover:border-foreground">
+                                <Upload className="h-3 w-3" />
+                                {ind.fileName ? (
+                                  <span className="truncate">
+                                    {ind.fileName} · {ind.points} pts
+                                  </span>
+                                ) : (
+                                  <span>CSV (t,value)</span>
+                                )}
+                              </div>
+                            </label>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => setIndicators((cur) => cur.filter((x) => x.id !== ind.id))}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Field>
                 )}
-                <div className="flex flex-wrap items-end gap-2 pt-1">
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-[10px] uppercase tracking-widest">Method</Label>
-                    <Select
+                <div className="flex flex-wrap items-end gap-[18px] pt-1">
+                  <Field label="Method">
+                    <Segmented<WarmupCfg["method"]>
+                      size="sm"
                       value={warmCfg.method}
-                      onValueChange={(v) => setWarmCfg((c) => ({ ...c, method: v as WarmupCfg["method"] }))}
-                    >
-                      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="engine">Engine (most conservative)</SelectItem>
-                        <SelectItem value="welch">Welch moving average</SelectItem>
-                        <SelectItem value="mser5">MSER-5</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-[10px] uppercase tracking-widest">Warm-up (days)</Label>
+                      onChange={(v) => setWarmCfg((c) => ({ ...c, method: v }))}
+                      options={[
+                        { value: "engine", label: "engine", title: "Engine (most conservative)" },
+                        { value: "welch", label: "welch", title: "Welch moving average" },
+                        { value: "mser5", label: "mser5", title: "MSER-5" },
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Warm-up (days)">
                     <Input
                       type="number"
-                      className="h-8 w-32 text-xs"
+                      className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
                       value={warmCfg.warmup_days}
                       onChange={(e) => setWarmCfg((c) => ({ ...c, warmup_days: parseInt(e.target.value, 10) || 0 }))}
                     />
-                  </div>
-                  <Button size="sm" variant="outline" className="h-8" onClick={detectWarmup}>
+                  </Field>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-[26px] px-2.5 text-[11.5px]"
+                    onClick={detectWarmup}
+                  >
                     Auto-detect
                   </Button>
                 </div>
                 {warmupComputed && (
-                  <div className="flex flex-col gap-3 mt-2">
-                    <div className="rounded-md border bg-card p-3 flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Timer className="h-3.5 w-3.5 text-primary" />
-                        <span className="text-xs font-semibold">Detected warm-up</span>
-                      </div>
-                      <Badge className="h-5 bg-primary/15 text-primary border-primary/30">
-                        {warmCfg.warmup_days} days
-                      </Badge>
-                      <span className="text-[11px] text-muted-foreground">
-                        method: <b className="text-foreground">{warmCfg.method}</b>
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        reps: <b className="text-foreground">{doneReps.length}</b>
+                  <div className="mt-1 flex flex-col gap-2.5">
+                    <div className={cn(SURFACE, "flex flex-wrap items-center gap-2.5 px-2.5 py-1.5")}>
+                      <span className={KX_TIGHT}>Detected warm-up</span>
+                      <span className="font-mono text-[11.5px] font-medium">{warmCfg.warmup_days} days</span>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        method <b className="font-medium text-foreground">{warmCfg.method}</b> · reps{" "}
+                        <b className="font-medium text-foreground">{doneReps.length}</b>
                       </span>
                       <div className="flex-1" />
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(3)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-[24px] px-2.5 text-[11px]"
+                        onClick={() => setStep(3)}
+                      >
                         Apply to validation
                       </Button>
                     </div>
@@ -1859,106 +1848,118 @@ export function RunValidateStage({
         {/* 4 — VALIDATION */}
         {step === 3 && (
           <StepShell
-            icon={Sparkles}
-            title="Validate against empirical data"
-            subtitle={`Steady-state (t > ${warmCfg.warmup_days}d) · KS + Welch t-test`}
+            index={3}
+            title="Validation"
+            sub={`t > ${warmCfg.warmup_days}d · KS + Welch t`}
+            action={
+              <Button
+                size="sm"
+                className="h-[26px] px-2.5 text-[11.5px]"
+                onClick={runValidation}
+                disabled={Object.keys(empirical).length === 0}
+              >
+                Run validation
+              </Button>
+            }
           >
-            <div className="flex flex-col gap-3">
-              {multiCfg.kpis.length === 0 ? (
-                <div className="rounded-md border border-dashed p-4 text-xs text-muted-foreground">
-                  Pick at least one focal KPI in <b>Run simulation</b> first.
+            {multiCfg.kpis.length === 0 ? (
+              <span className="font-mono text-[11px] text-muted-foreground">
+                no focal KPI selected in step 2
+              </span>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1">
+                  {multiCfg.kpis.map((kpi) => {
+                    const meta = KPI_OPTIONS.find((x) => x.id === kpi)!;
+                    const emp = empirical[kpi];
+                    return (
+                      <div key={kpi} className={cn(SURFACE, "flex items-center gap-2 p-1.5")}>
+                        <span className="w-40 shrink-0 text-[12px]">{meta.label}</span>
+                        <label className="flex-1 cursor-pointer">
+                          <input
+                            type="file"
+                            accept=".csv,text/csv"
+                            className="hidden"
+                            onChange={(e) => onEmpiricalFile(kpi, e.target.files?.[0] ?? null)}
+                          />
+                          <div className="flex h-6 items-center gap-1.5 rounded-sm border border-dashed border-[#ebebeb] px-2 font-mono text-[11px] text-muted-foreground hover:border-foreground">
+                            <Upload className="h-3 w-3" />
+                            {emp ? (
+                              <span className="truncate">
+                                {emp.fileName} · {emp.values.length} pts
+                              </span>
+                            ) : (
+                              <span>CSV ({meta.unit})</span>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-2">
-                    {multiCfg.kpis.map((kpi) => {
-                      const meta = KPI_OPTIONS.find((x) => x.id === kpi)!;
-                      const emp = empirical[kpi];
-                      return (
-                        <div key={kpi} className="flex items-center gap-2 rounded-md border p-2">
-                          <span className="text-xs font-medium w-40 shrink-0">{meta.label}</span>
-                          <label className="flex-1 cursor-pointer">
-                            <input
-                              type="file"
-                              accept=".csv,text/csv"
-                              className="hidden"
-                              onChange={(e) => onEmpiricalFile(kpi, e.target.files?.[0] ?? null)}
-                            />
-                            <div className="flex items-center gap-2 h-8 px-2 rounded-md border border-dashed text-xs text-muted-foreground hover:bg-muted/30">
-                              <Upload className="h-3.5 w-3.5" />
-                              {emp ? (
-                                <span className="truncate">
-                                  <b className="text-foreground">{emp.fileName}</b> · {emp.values.length} pts
-                                </span>
-                              ) : (
-                                <span>Click to upload empirical CSV ({meta.unit})</span>
-                              )}
-                            </div>
-                          </label>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={runValidation} disabled={Object.keys(empirical).length === 0}>
-                      Run validation
-                    </Button>
-                  </div>
-                  {validationResult && (
-                    <div className="rounded-md border">
-                      <table className="w-full text-xs">
-                        <thead className="bg-muted/40">
-                          <tr>
-                            <th className="text-left px-2 py-1.5">KPI</th>
-                            <th className="text-right px-2 py-1.5">KS D</th>
-                            <th className="text-right px-2 py-1.5">KS p</th>
-                            <th className="text-right px-2 py-1.5">t</th>
-                            <th className="text-right px-2 py-1.5">t p</th>
-                            <th className="text-right px-2 py-1.5">n sim</th>
-                            <th className="text-left px-2 py-1.5">Source</th>
-                            <th className="text-right px-2 py-1.5">Result</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {validationResult.map((r) => {
-                            const meta = KPI_OPTIONS.find((x) => x.id === r.kpi)!;
-                            return (
-                              <tr key={r.kpi}>
-                                <td className="px-2 py-1.5">{meta.label}</td>
-                                <td className="text-right px-2 py-1.5 font-mono">{Number.isNaN(r.ks) ? "—" : r.ks}</td>
-                                <td className="text-right px-2 py-1.5 font-mono">{Number.isNaN(r.ksP) ? "—" : r.ksP}</td>
-                                <td className="text-right px-2 py-1.5 font-mono">{Number.isNaN(r.t) ? "—" : r.t}</td>
-                                <td className="text-right px-2 py-1.5 font-mono">{Number.isNaN(r.tP) ? "—" : r.tP}</td>
-                                <td className="text-right px-2 py-1.5 font-mono">{r.n || "—"}</td>
-                                <td className="px-2 py-1.5 text-muted-foreground">{r.source}</td>
-                                <td className="text-right px-2 py-1.5">
+                {validationResult && (
+                  <div className={cn(SURFACE, "overflow-x-auto")}>
+                    <table className="w-full">
+                      <thead>
+                        <tr>
+                          <th className={TH}>KPI</th>
+                          <th className={cn(TH, "text-right")}>KS D</th>
+                          <th className={cn(TH, "text-right")}>KS p</th>
+                          <th className={cn(TH, "text-right")}>t</th>
+                          <th className={cn(TH, "text-right")}>t p</th>
+                          <th className={cn(TH, "text-right")}>n sim</th>
+                          <th className={TH}>Source</th>
+                          <th className={cn(TH, "text-right")}>Result</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {validationResult.map((r) => {
+                          const meta = KPI_OPTIONS.find((x) => x.id === r.kpi)!;
+                          const num = (v: number) =>
+                            Number.isNaN(v) ? "—" : String(v);
+                          return (
+                            <tr key={r.kpi}>
+                              <td className={TD}>{meta.label}</td>
+                              <td className={cn(TD, "text-right font-mono tabular-nums")}>{num(r.ks)}</td>
+                              <td className={cn(TD, "text-right font-mono tabular-nums")}>{num(r.ksP)}</td>
+                              <td className={cn(TD, "text-right font-mono tabular-nums")}>{num(r.t)}</td>
+                              <td className={cn(TD, "text-right font-mono tabular-nums")}>{num(r.tP)}</td>
+                              <td className={cn(TD, "text-right font-mono tabular-nums")}>{r.n || "—"}</td>
+                              <td className={cn(TD, "font-mono text-[11px] text-muted-foreground")}>{r.source}</td>
+                              <td className={cn(TD, "text-right")}>
+                                <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
                                   {Number.isNaN(r.ks) ? (
-                                    <Badge variant="outline" className="h-5">no data</Badge>
+                                    <>
+                                      <StatusDot pending /> no data
+                                    </>
                                   ) : r.pass ? (
-                                    <Badge className="h-5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">pass</Badge>
+                                    <>
+                                      <StatusDot ok /> pass
+                                    </>
                                   ) : (
-                                    <Badge variant="destructive" className="h-5">fail</Badge>
+                                    <>
+                                      <StatusDot /> fail
+                                    </>
                                   )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
           </StepShell>
         )}
 
         {/* 5 — ADOPT (§9.5 step 6, G13): persist the validated model card */}
         {step === 4 && (
           <StepShell
-            icon={BadgeCheck}
-            title="Adopt the validated model"
-            subtitle="Persist the pipeline outcome as a model card — bound to this exact policy version, dataset and baseline scenario"
+            index={4}
+            title="Adopt"
             action={<CredibilityBadge credibility={liveCredibility} />}
           >
             <AdoptStep
@@ -1990,28 +1991,30 @@ export function RunValidateStage({
             />
           </StepShell>
         )}
-      </div>
+      </>
 
       {/* Persistent footer */}
-      <div className="flex items-center justify-between border-t pt-3">
+      <div className="flex items-center justify-between">
         <Button
           variant="outline"
           size="sm"
+          className="h-[26px] px-2.5 text-[11.5px]"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0}
         >
-          <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Back
+          Back
         </Button>
-        <span className="text-xs text-muted-foreground">
-          Step {step + 1} of {STEPS.length}
+        <span className="font-mono text-[11px] text-muted-foreground">
+          step {step + 1} / {STEPS.length}
         </span>
         <Button
           size="sm"
+          className="h-[26px] px-2.5 text-[11.5px]"
           onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
           disabled={step === STEPS.length - 1 || !canContinue(step)}
           title={!canContinue(step) ? "Complete the current step first" : undefined}
         >
-          Continue <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+          Continue
         </Button>
       </div>
     </div>
@@ -2020,32 +2023,31 @@ export function RunValidateStage({
 
 // ============= Inline sub-components ==========================================
 
+/** The step panel: mono STEP kicker, title, optional action — tied to the
+ *  selected step card by the same 2px top rule the grid uses. */
 function StepShell({
-  icon: Icon,
+  index,
   title,
-  subtitle,
+  sub,
   action,
   children,
 }: {
-  icon: typeof PlayCircle;
+  index: number;
   title: string;
-  subtitle?: string;
+  sub?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-start gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
-        </div>
+    <div className={cn(SURFACE, "min-h-[340px] border-t-2 border-t-foreground")}>
+      <div className="flex flex-wrap items-center gap-[9px] border-b border-[#ebebeb] bg-[#fafafa] px-3 py-2">
+        <span className={KX_TIGHT}>step {index + 1}</span>
+        <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
+        {sub && <span className="font-mono text-[11px] text-muted-foreground">{sub}</span>}
+        <div className="flex-1" />
         {action}
       </div>
-      {children}
+      <div className="flex flex-col gap-3 p-3">{children}</div>
     </div>
   );
 }
@@ -2053,7 +2055,9 @@ function StepShell({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <Label className="text-[10px] uppercase tracking-widest">{label}</Label>
+      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </span>
       {children}
     </div>
   );
@@ -2101,17 +2105,13 @@ interface AdoptStepProps {
 
 function AdoptChecklistRow({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
-    <li className="flex items-start gap-2 px-2.5 py-1.5">
-      {ok ? (
-        <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-      ) : (
-        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-      )}
-      <div className="flex-1 min-w-0">
-        <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground"> — {detail}</span>
-      </div>
-    </li>
+    <tr>
+      <td className={cn(TD, "w-6")}>
+        <StatusDot ok={ok} pending={!ok} />
+      </td>
+      <td className={cn(TD, "w-48 font-medium")}>{label}</td>
+      <td className={cn(TD, "font-mono text-[11px] text-muted-foreground")}>{detail}</td>
+    </tr>
   );
 }
 
@@ -2140,10 +2140,10 @@ function AdoptStep({
   const testsRan = (validationResult ?? []).filter((r) => r.n > 0);
   const passing = testsRan.filter((r) => r.pass).length;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* pipeline prerequisites — the §2.5 enablement, made visible */}
-      <div className="rounded-md border">
-        <ul className="text-xs divide-y">
+      <div className={cn(SURFACE, "overflow-x-auto")}>
+        <table className="w-full"><tbody>
           <AdoptChecklistRow
             ok={findings !== null && blockCount === 0}
             label="Verification"
@@ -2190,46 +2190,45 @@ function AdoptStep({
             detail={
               testsRan.length > 0
                 ? `${passing}/${testsRan.length} KPI(s) passed KS + Welch-t (statistical basis)`
-                : "no empirical series uploaded — face validation requires the acknowledgment below"
+                : "no empirical series — face validation requires the acknowledgment below"
             }
           />
-        </ul>
+        </tbody></table>
       </div>
 
       {/* replication recommendation per focal KPI — the adequacy math the
           card stores as replication_basis */}
       {adequacy && (
-        <div className="rounded-md border overflow-hidden">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40">
+        <div className={cn(SURFACE, "overflow-x-auto")}>
+          <table className="w-full">
+            <thead>
               <tr>
-                <th className="text-left px-2 py-1.5">Focal KPI</th>
-                <th className="text-right px-2 py-1.5">Mean</th>
-                <th className="text-right px-2 py-1.5">Half-width</th>
-                <th className="text-right px-2 py-1.5">Rel.</th>
-                <th className="text-right px-2 py-1.5">n run</th>
-                <th className="text-right px-2 py-1.5">n* required</th>
+                <th className={TH}>Focal KPI</th>
+                <th className={cn(TH, "text-right")}>Mean</th>
+                <th className={cn(TH, "text-right")}>Half-width</th>
+                <th className={cn(TH, "text-right")}>Rel.</th>
+                <th className={cn(TH, "text-right")}>n run</th>
+                <th className={cn(TH, "text-right")}>n* required</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {Object.entries(adequacy.perKpi).map(([kpi, s]) => {
                 const meta = KPI_OPTIONS.find((x) => x.id === kpi);
                 return (
                   <tr key={kpi}>
-                    <td className="px-2 py-1.5">{meta?.label ?? kpi}</td>
-                    <td className="text-right px-2 py-1.5 font-mono">{s.mean.toFixed(3)}</td>
-                    <td className="text-right px-2 py-1.5 font-mono">{s.half.toFixed(3)}</td>
-                    <td className="text-right px-2 py-1.5 font-mono">{(s.rel * 100).toFixed(1)}%</td>
-                    <td className="text-right px-2 py-1.5 font-mono">{s.n}</td>
-                    <td className="text-right px-2 py-1.5 font-mono font-semibold">{s.n_star}</td>
+                    <td className={TD}>{meta?.label ?? kpi}</td>
+                    <td className={cn(TD, "text-right font-mono tabular-nums")}>{s.mean.toFixed(3)}</td>
+                    <td className={cn(TD, "text-right font-mono tabular-nums")}>{s.half.toFixed(3)}</td>
+                    <td className={cn(TD, "text-right font-mono tabular-nums")}>{(s.rel * 100).toFixed(1)}%</td>
+                    <td className={cn(TD, "text-right font-mono tabular-nums")}>{s.n}</td>
+                    <td className={cn(TD, "text-right font-mono font-medium tabular-nums")}>{s.n_star}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          <div className="border-t px-3 py-1.5 text-[10px] text-muted-foreground">
-            n* = (z·s / (ε·x̄))² per KPI; the card recommends the maximum ({adequacy.recommended}) so
-            every focal KPI reaches the target precision.
+          <div className="border-t border-[#ebebeb] px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
+            n* = (z·s / (ε·x̄))² · card recommends {adequacy.recommended}
           </div>
         </div>
       )}
@@ -2237,62 +2236,60 @@ function AdoptStep({
       {/* face-validation acknowledgment (legitimate Sargent-style outcome for
           greenfield models — the badge tooltip discloses the basis) */}
       {testsRan.length === 0 && (
-        <label className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs cursor-pointer">
+        <label
+          className="flex cursor-pointer items-start gap-2 rounded-sm border p-2.5 text-[12px]"
+          style={{ borderColor: tint(LAYER.firm, 0.4), background: tint(LAYER.firm, 0.06) }}
+        >
           <Checkbox
             checked={faceAck}
             onCheckedChange={(v) => onFaceAck(v === true)}
             className="mt-0.5"
           />
           <span>
-            <b>Face validation.</b> No empirical series were uploaded, so no statistical tests ran.
-            I have inspected the model's behavior (weekly traces, financial statement, sanity
-            scalars) and judge it plausible for its purpose. The card will record{" "}
-            <b>basis: face</b> — every consuming surface discloses this.
+            <b>Face validation</b> — no empirical series, no statistical tests. I judge the
+            model's behavior plausible for its purpose. The card records <b>basis: face</b>.
           </span>
         </label>
       )}
 
       {/* the provenance triple the card binds to (§9.5 identity) */}
-      <div className="rounded-md border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+      <div className={cn(SURFACE, "flex flex-wrap gap-x-4 gap-y-1 bg-[#fafafa] px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground")}>
         <span>
           policy version{" "}
-          <code className="font-mono">{triple.versionId ? triple.versionId.slice(0, 8) : "unsaved"}</code>
-          {triple.policyDirty && <b className="text-amber-600 dark:text-amber-400"> · dirty — a new version is saved on adoption</b>}
+          <b className="font-medium text-foreground">
+            {triple.versionId ? triple.versionId.slice(0, 8) : "unsaved"}
+          </b>
+          {triple.policyDirty && (
+            <b className="font-medium" style={{ color: LAYER.firm }}>
+              {" "}· dirty — a new version is saved on adoption
+            </b>
+          )}
         </span>
         <span>
-          graph <code className="font-mono">{triple.graphHash?.slice(0, 8) ?? "—"}</code>
+          graph <b className="font-medium text-foreground">{triple.graphHash?.slice(0, 8) ?? "—"}</b>
         </span>
         <span>
-          scenario <code className="font-mono">{triple.scenarioHash?.slice(0, 8) ?? "—"}</code>
+          scenario <b className="font-medium text-foreground">{triple.scenarioHash?.slice(0, 8) ?? "—"}</b>
         </span>
       </div>
 
       {credibility.state === "validated" && (
-        <div className="flex items-start gap-2 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2.5 text-xs">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <div>
-            <div className="font-semibold text-emerald-700 dark:text-emerald-300">
-              An active card already covers this exact configuration
-            </div>
-            <div className="text-foreground/80 mt-0.5">
-              Recorded {new Date(credibility.card.validated_at).toLocaleString()}
-              {credibility.card.author_email ? ` by ${credibility.card.author_email}` : ""} · basis{" "}
-              {credibility.card.basis}. Re-adopting supersedes it with the current pipeline outcome.
-            </div>
-          </div>
+        <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+          <StatusDot ok />
+          active card {new Date(credibility.card.validated_at).toLocaleString()}
+          {credibility.card.author_email ? ` · ${credibility.card.author_email}` : ""} · basis{" "}
+          {credibility.card.basis} · re-adopting supersedes it
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button onClick={onMarkValid} disabled={!ready || adopting} className="gap-1.5">
-          <BadgeCheck className="h-4 w-4" />
-          {adopting ? "Recording…" : "Mark model valid"}
-        </Button>
-        <span className="text-[11px] text-muted-foreground">
-          Persists the card; Lab scenarios under this configuration inherit the adopted warm-up
-          and replication count.
-        </span>
-      </div>
+      <Button
+        className="h-[26px] self-start px-2.5 text-[11.5px]"
+        size="sm"
+        onClick={onMarkValid}
+        disabled={!ready || adopting}
+      >
+        {adopting ? "Recording…" : "Mark model valid"}
+      </Button>
     </div>
   );
 }
@@ -2329,17 +2326,18 @@ function WeeklySeriesChart({
 
   if (data.length === 0) {
     return (
-      <div className="rounded-md border border-dashed bg-card p-3 text-[11px] text-muted-foreground">
-        <b className="text-foreground">{title}</b>: run the simulation to see the real weekly
-        traces here.
+      <div className={cn(SURFACE, "border-dashed p-2.5 font-mono text-[11px] text-muted-foreground")}>
+        {title} · no weekly trace yet
       </div>
     );
   }
   return (
-    <div className="rounded-md border bg-card p-2">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
-        {title} <span className="font-normal opacity-70">({unit})</span>
-        <span className="ml-2 font-normal normal-case tracking-normal text-emerald-600 dark:text-emerald-400">
+    <div className={cn(SURFACE, "p-2")}>
+      <div className="mb-1 flex items-center gap-2">
+        <span className={KX_TIGHT}>
+          {title} ({unit})
+        </span>
+        <span className="font-mono text-[10px] text-muted-foreground">
           engine data · {traces.length} rep(s)
         </span>
       </div>
@@ -2350,7 +2348,7 @@ function WeeklySeriesChart({
           <YAxis tick={{ fontSize: 9 }} width={36} domain={["auto", "auto"]} />
           <RTooltip contentStyle={{ fontSize: 10 }} />
           {warmupWeeks != null && warmupWeeks > 0 && (
-            <ReferenceLine x={warmupWeeks} stroke="hsl(var(--destructive))" strokeDasharray="4 3" label={{ value: "warm-up", fontSize: 9, fill: "hsl(var(--destructive))" }} />
+            <ReferenceLine x={warmupWeeks} stroke={LAYER.brand} strokeDasharray="4 3" label={{ value: "warm-up", fontSize: 9, fill: LAYER.brand }} />
           )}
           {traces.map((_, i) => (
             <Line
@@ -2384,9 +2382,8 @@ function KpiWeeklyChart({
   const key = SERIES_KEY[kpi];
   if (!key) {
     return (
-      <div className="rounded-md border border-dashed bg-card p-3 text-[11px] text-muted-foreground">
-        <b className="text-foreground">{meta.label}</b>: no weekly series persisted for this KPI
-        — it is validated from per-replication values instead.
+      <div className={cn(SURFACE, "border-dashed p-2.5 font-mono text-[11px] text-muted-foreground")}>
+        {meta.label} · no weekly series — validated from per-replication values
       </div>
     );
   }
@@ -2439,69 +2436,67 @@ function ReplicationAdequacy({
 
   if (kpis.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-3 text-[11px] text-muted-foreground">
-        Select focal KPIs in <b>Run simulation</b> to assess replication adequacy.
-      </div>
+      <span className="font-mono text-[11px] text-muted-foreground">
+        no focal KPI selected in step 2
+      </span>
     );
   }
   if (reps.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-3 text-[11px] text-muted-foreground">
-        No completed replications yet — run replications in <b>Run simulation</b>; adequacy is
-        computed from the real per-replication KPIs.
-      </div>
+      <span className="font-mono text-[11px] text-muted-foreground">
+        no completed replications yet
+      </span>
     );
   }
   const insufficient = rows.filter((r) => !r.adequate);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <Label className="text-[10px] uppercase tracking-widest">Target half-width</Label>
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+          Target half-width
+        </span>
         <Input
           type="number"
           step={0.01}
           min={0.01}
           max={0.5}
-          className="h-7 w-20 text-xs"
+          className="h-6 w-20 text-right font-mono text-[11.5px] tabular-nums"
           value={target}
           onChange={(e) => onTargetChange(parseFloat(e.target.value) || 0.05)}
         />
       </div>
-      <div className="rounded-md border overflow-hidden">
-        <table className="w-full text-xs">
-          <thead className="bg-muted/40">
+      <div className={cn(SURFACE, "overflow-x-auto")}>
+        <table className="w-full">
+          <thead>
             <tr>
-              <th className="text-left px-2 py-1.5">KPI</th>
-              <th className="text-right px-2 py-1.5">Mean</th>
-              <th className="text-right px-2 py-1.5">Std</th>
-              <th className="text-right px-2 py-1.5">n</th>
-              <th className="text-right px-2 py-1.5">Half-width</th>
-              <th className="text-right px-2 py-1.5">Rel.</th>
-              <th className="text-right px-2 py-1.5">Status</th>
+              <th className={TH}>KPI</th>
+              <th className={cn(TH, "text-right")}>Mean</th>
+              <th className={cn(TH, "text-right")}>Std</th>
+              <th className={cn(TH, "text-right")}>n</th>
+              <th className={cn(TH, "text-right")}>Half-width</th>
+              <th className={cn(TH, "text-right")}>Rel.</th>
+              <th className={cn(TH, "text-right")}>Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {rows.map((r) => {
               const meta = KPI_OPTIONS.find((x) => x.id === r.kpi)!;
               return (
                 <tr key={r.kpi} className={r.focal ? undefined : "text-muted-foreground"}>
-                  <td className="px-2 py-1.5">
+                  <td className={TD}>
                     {meta.label}
-                    {!r.focal && (
-                      <span className="ml-1.5 text-[9px] uppercase tracking-widest opacity-70">cost</span>
-                    )}
+                    {!r.focal && <MonoChip className="ml-1.5">cost</MonoChip>}
                   </td>
-                  <td className="text-right px-2 py-1.5 font-mono">{r.mean.toFixed(3)}</td>
-                  <td className="text-right px-2 py-1.5 font-mono">{r.std.toFixed(3)}</td>
-                  <td className="text-right px-2 py-1.5 font-mono">{r.n}</td>
-                  <td className="text-right px-2 py-1.5 font-mono">{r.half.toFixed(3)}</td>
-                  <td className="text-right px-2 py-1.5 font-mono">{(r.rel * 100).toFixed(1)}%</td>
-                  <td className="text-right px-2 py-1.5">
-                    {r.adequate ? (
-                      <Badge className="h-5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">adequate</Badge>
-                    ) : (
-                      <Badge variant="destructive" className="h-5">need more</Badge>
-                    )}
+                  <td className={cn(TD, "text-right font-mono tabular-nums")}>{r.mean.toFixed(3)}</td>
+                  <td className={cn(TD, "text-right font-mono tabular-nums")}>{r.std.toFixed(3)}</td>
+                  <td className={cn(TD, "text-right font-mono tabular-nums")}>{r.n}</td>
+                  <td className={cn(TD, "text-right font-mono tabular-nums")}>{r.half.toFixed(3)}</td>
+                  <td className={cn(TD, "text-right font-mono tabular-nums")}>{(r.rel * 100).toFixed(1)}%</td>
+                  <td className={cn(TD, "text-right")}>
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+                      <StatusDot ok={r.adequate} />
+                      {r.adequate ? "adequate" : "need more"}
+                    </span>
                   </td>
                 </tr>
               );
@@ -2510,7 +2505,12 @@ function ReplicationAdequacy({
         </table>
       </div>
       {insufficient.length > 0 && (
-        <Button size="sm" variant="outline" className="self-start" onClick={() => onAddReps(10)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-[26px] self-start px-2.5 text-[11.5px]"
+          onClick={() => onAddReps(10)}
+        >
           Add 10 replications
         </Button>
       )}
@@ -2541,17 +2541,16 @@ function MultiRunResultsPanel({
 
   if (kpis.length === 0 || !activeKpi) {
     return (
-      <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground flex items-center justify-center">
-        Pick at least one focal KPI to analyse.
+      <div className={cn(SURFACE, "flex items-center justify-center border-dashed p-6 font-mono text-[11px] text-muted-foreground")}>
+        no focal KPI selected
       </div>
     );
   }
 
   if (reps.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground flex items-center justify-center">
-        No replications yet — run replications to see the persisted weekly traces and
-        convergence here. Every chart on this surface is real engine output.
+      <div className={cn(SURFACE, "flex items-center justify-center border-dashed p-6 font-mono text-[11px] text-muted-foreground")}>
+        no replications yet
       </div>
     );
   }
@@ -2561,10 +2560,9 @@ function MultiRunResultsPanel({
     .map((r) => Number(r.kpis[activeKpi]))
     .filter((n) => Number.isFinite(n));
   const overall = meanCI(values, confidence);
-  const weekly = repsSeries(reps, activeKpi);
   return (
-    <div className="rounded-md border bg-card flex flex-col">
-      <div className="flex items-center gap-1 border-b px-2 py-1.5 overflow-x-auto">
+    <div className={cn(SURFACE, "flex flex-col")}>
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-[#ebebeb] bg-[#fafafa] px-2 py-1.5">
         {kpis.map((id) => {
           const k = KPI_OPTIONS.find((x) => x.id === id)!;
           const active = id === activeKpi;
@@ -2574,27 +2572,27 @@ function MultiRunResultsPanel({
               type="button"
               onClick={() => setActiveKpi(id)}
               className={cn(
-                "h-7 px-2.5 rounded-md text-[11px] border transition-colors whitespace-nowrap",
+                "whitespace-nowrap rounded-sm border px-[7px] py-px font-mono text-[10px] transition-colors",
                 active
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-transparent hover:bg-muted/50 border-transparent",
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-transparent text-[#9a9a9a] hover:text-foreground",
               )}
             >
               {k.label}
             </button>
           );
         })}
-        <span className="ml-auto text-[10px] text-emerald-600 dark:text-emerald-400 whitespace-nowrap pr-1">
+        <span className="ml-auto whitespace-nowrap pr-1 font-mono text-[10px] text-muted-foreground">
           engine data · {reps.length} rep(s)
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-2 border-b px-3 py-2 text-[11px]">
+      <div className="grid grid-cols-4 gap-2 border-b border-[#ebebeb] px-2.5 py-1.5 text-[11px]">
         <Stat label="Mean" value={overall.mean.toFixed(3)} unit={meta.unit} />
         <Stat label="Std" value={overall.std.toFixed(3)} />
         <Stat label="CI half-width" value={overall.half.toFixed(3)} />
         <Stat label="n reps" value={String(values.length)} />
       </div>
-      <div className="p-2 flex flex-col gap-2">
+      <div className="flex flex-col gap-2 p-2">
         {/* Per-seed filter (W1): mean ± CI band by default; selecting a seed
             overlays or isolates that replication's trace + its KPI row. */}
         <ReplicationSeedExplorer
@@ -2604,11 +2602,6 @@ function MultiRunResultsPanel({
           title="Weekly traces by seed"
         />
         <ConvergencePlot reps={reps} primaryKpi={activeKpi} warmupAt={null} />
-      </div>
-      <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">
-        {weekly.length > 0
-          ? "Weekly per-replication series (engine output) with cross-rep mean ± CI and the adopted warm-up cut — filterable to a single seed — plus the running mean ± 95% CI vs. replication count."
-          : "No weekly series persisted for this KPI — running mean ± 95% CI of the per-replication values as replications accumulate."}
       </div>
     </div>
   );
@@ -2645,46 +2638,34 @@ type RunPhaseT =
 
 function RunStatusBanner({ phase }: { phase: RunPhaseT }) {
   if (phase.kind === "idle") return null;
-  if (phase.kind === "loading" || phase.kind === "computing") {
-    const label =
-      phase.kind === "computing"
-        ? phase.total
-          ? `Running the engine — replication ${Math.min((phase.done ?? 0) + 1, phase.total)} / ${phase.total}…`
-          : "Running the engine…"
-        : phase.detail;
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-        <span className="font-medium">{label}</span>
-        <span className="text-[11px] font-normal text-amber-700/80 dark:text-amber-300/80">
-          the page stays responsive — you can keep working, or Cancel below
-        </span>
-      </div>
-    );
-  }
-  if (phase.kind === "failed") {
-    return (
-      <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2.5 text-sm">
-        <AlertOctagon className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
-        <div>
-          <div className="font-semibold text-destructive">Simulation failed at {phase.step}</div>
-          <div className="text-xs text-destructive/90 mt-0.5 break-words">{phase.message}</div>
-        </div>
-      </div>
-    );
-  }
+  const head =
+    phase.kind === "failed"
+      ? `failed at ${phase.step}`
+      : phase.kind === "succeeded"
+        ? "succeeded"
+        : phase.kind === "computing"
+          ? "running"
+          : "loading";
+  const detail =
+    phase.kind === "failed"
+      ? phase.message
+      : phase.kind === "succeeded"
+        ? phase.summary + (phase.persisted === false ? " · this session only — not persisted" : "")
+        : phase.kind === "computing"
+          ? phase.total
+            ? `replication ${Math.min((phase.done ?? 0) + 1, phase.total)} / ${phase.total}`
+            : "engine running"
+          : phase.detail;
+  const color =
+    phase.kind === "failed" ? LAYER.brand : phase.kind === "succeeded" ? LAYER.process : LAYER.firm;
   return (
-    <div className="flex items-start gap-2 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2.5 text-sm">
-      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-      <div>
-        <div className="font-semibold text-emerald-700 dark:text-emerald-300">Simulation ran successfully</div>
-        <div className="text-xs text-foreground/80 mt-0.5">{phase.summary}</div>
-        {phase.persisted === false && (
-          <div className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">
-            Shown from this session only — not saved to history (DB write grants not yet applied); it will disappear on reload.
-          </div>
-        )}
-      </div>
+    <div
+      className="flex flex-wrap items-center gap-2 rounded-sm border px-2.5 py-1.5"
+      style={{ borderColor: tint(color, 0.4), background: tint(color, 0.06) }}
+    >
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+      <span className="font-mono text-[11.5px] font-medium">{head}</span>
+      <span className="break-words font-mono text-[11.5px] text-muted-foreground">{detail}</span>
     </div>
   );
 }
@@ -2807,35 +2788,31 @@ function EngineOutputSummary({
   const ci = run.ci_half_widths ?? {};
   const streaming = run.status === "running" || run.status === "queued";
   return (
-    <div className="rounded-md border bg-card">
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-        <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-        <span className="text-xs font-semibold">Engine output</span>
-        {streaming ? (
-          <span className="text-[10px] text-amber-600 dark:text-amber-400 animate-pulse">
-            ● live — {reps.length} replication(s) streamed, run in progress
-          </span>
-        ) : (
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-            complete · {reps.length} replication(s)
-          </span>
-        )}
+    <div className={SURFACE}>
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#ebebeb] bg-[#fafafa] px-2.5 py-1.5">
+        <span className={KX_TIGHT}>Engine output</span>
+        <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground">
+          <StatusDot ok={!streaming} pending={streaming} />
+          {streaming
+            ? `live · ${reps.length} replication(s) streamed`
+            : `complete · ${reps.length} replication(s)`}
+        </span>
         <div className="flex-1" />
         {run.policy_hash && (
           <span
-            className="text-[10px] font-mono text-muted-foreground"
+            className="font-mono text-[10px] text-muted-foreground"
             title="SHA-256 of the policy version this run is bound to"
           >
             policy {run.policy_hash.slice(0, 8)}
           </span>
         )}
         {run.ended_at && (
-          <span className="text-[10px] text-muted-foreground">
+          <span className="font-mono text-[10px] text-muted-foreground">
             finished {new Date(run.ended_at).toLocaleString()}
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 border-b px-3 py-2 text-[11px]">
+      <div className="grid grid-cols-2 gap-2 border-b border-[#ebebeb] px-2.5 py-1.5 text-[11px] md:grid-cols-4">
         {SUMMARY_TILES.map((t) => (
           <div key={t.id} className="flex flex-col">
             <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
@@ -2906,38 +2883,37 @@ function FinancialStatement({ reps }: { reps: Replication[] }) {
   const margin = revenue != null && totalCost != null ? revenue - totalCost : null;
   const lostSales = avg("lost_sales_value");
   return (
-    <div className="rounded-md border bg-card">
-      <div className="px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        Financial statement
-        <span className="ml-2 font-normal normal-case tracking-normal text-emerald-600 dark:text-emerald-400">
-          engine data · mean over {reps.length} rep(s)
+    <div className={SURFACE}>
+      <div className="flex items-center gap-2 border-b border-[#ebebeb] bg-[#fafafa] px-2.5 py-1.5">
+        <span className={KX_TIGHT}>Financial statement</span>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          mean over {reps.length} rep(s)
         </span>
       </div>
-      <table className="w-full text-xs">
-        <tbody className="divide-y">
+      <table className="w-full">
+        <tbody>
           <tr>
-            <td className="px-3 py-1.5 font-medium">Revenue</td>
-            <td className="px-3 py-1.5 text-right font-mono tabular-nums">{fmtEuro(revenue)}</td>
+            <td className={cn(TD, "font-medium")}>Revenue</td>
+            <td className={cn(TD, "text-right font-mono tabular-nums")}>{fmtEuro(revenue)}</td>
           </tr>
           {COST_COMPONENT_OPTIONS.map((c) => {
             const v = avg(c.id);
-            const zero = v === 0;
             return (
-              <tr key={c.id} className={zero ? "text-muted-foreground/60" : "text-muted-foreground"}>
-                <td className="px-3 py-1.5 pl-6">− {c.label.replace("Cost — ", "")}</td>
-                <td className="px-3 py-1.5 text-right font-mono tabular-nums">{fmtEuro(v)}</td>
+              <tr key={c.id} className={v === 0 ? "text-[#c4c4c4]" : "text-muted-foreground"}>
+                <td className={cn(TD, "pl-6")}>− {c.label.replace("Cost — ", "")}</td>
+                <td className={cn(TD, "text-right font-mono tabular-nums")}>{fmtEuro(v)}</td>
               </tr>
             );
           })}
-          <tr className="border-t-2">
-            <td className="px-3 py-1.5 font-semibold">= Margin (revenue − cost of resilience)</td>
-            <td className="px-3 py-1.5 text-right font-mono tabular-nums font-semibold">
+          <tr className="border-t border-foreground">
+            <td className={cn(TD, "font-medium")}>= Margin</td>
+            <td className={cn(TD, "text-right font-mono font-medium tabular-nums")}>
               {fmtEuro(margin)}
             </td>
           </tr>
           <tr className="text-muted-foreground">
-            <td className="px-3 py-1.5 italic">Lost-sales value (demand not served)</td>
-            <td className="px-3 py-1.5 text-right font-mono tabular-nums">{fmtEuro(lostSales)}</td>
+            <td className={TD}>Lost-sales value</td>
+            <td className={cn(TD, "text-right font-mono tabular-nums")}>{fmtEuro(lostSales)}</td>
           </tr>
         </tbody>
       </table>
@@ -2955,34 +2931,28 @@ function SanityScalars({ reps }: { reps: Replication[] }) {
   const util = avg("capacity_utilization");
   const lostInbound = avg("lost_inbound_units");
   return (
-    <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/20 px-3 py-2 text-[11px]">
-      <div className="flex flex-col">
-        <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-          Capacity utilization (sanity check)
-        </span>
-        <span className="font-mono tabular-nums">
-          {util != null ? fmtKpi("capacity_utilization", util) : "not recorded on this run (needs debug trace)"}
-        </span>
-      </div>
-      <div className="flex flex-col">
-        <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-          Lost inbound units (sanity check)
-        </span>
-        <span className="font-mono tabular-nums">
-          {lostInbound != null ? fmtKpi("lost_inbound_units", lostInbound) : "—"}
-        </span>
-      </div>
+    <div className={cn(SURFACE, "grid grid-cols-2 gap-2 bg-[#fafafa] px-2.5 py-1.5")}>
+      <Stat
+        label="Capacity utilization"
+        value={util != null ? fmtKpi("capacity_utilization", util) : "not recorded"}
+      />
+      <Stat
+        label="Lost inbound units"
+        value={lostInbound != null ? fmtKpi("lost_inbound_units", lostInbound) : "—"}
+      />
     </div>
   );
 }
 
 function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{label}</span>
-      <span className="font-mono tabular-nums text-foreground">
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="font-mono text-[14px] font-medium tabular-nums text-foreground">
         {value}
-        {unit && <span className="text-muted-foreground/70 ml-1 text-[10px]">{unit}</span>}
+        {unit && <span className="ml-1 text-[10px] font-normal text-muted-foreground">{unit}</span>}
       </span>
     </div>
   );
