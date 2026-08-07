@@ -6,8 +6,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Download, Sparkles, Upload, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { LAYER, tint } from "@/components/intelligence/piUi";
 import * as XLSX from "xlsx";
 import { StagePolicyTable } from "./StagePolicyTable";
 import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
@@ -15,6 +15,7 @@ import { ApplyPresetDialog } from "./ApplyPresetDialog";
 import { PresetDiffBanner } from "./PresetDiffBanner";
 import { RunValidateStage } from "./RunValidateStage";
 import { getStage, type StageKey } from "@/lib/policies/stages";
+import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import { getStagePresets } from "@/lib/policies/presets/stagePresets";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
@@ -44,6 +45,9 @@ interface Props {
   /** Policy-version context for the Run & Validate credibility card (§9.5). */
   selectedVersionId: string | null;
   policyDirty: boolean;
+  /** Lines per setup stage, loaded once at the page level for the step track —
+   *  the grid and stage 4's verification read them instead of refetching. */
+  rowsByStage: Record<Exclude<StageKey, "run_validate">, StageRowsQuery>;
 }
 
 export function FocusedStage({
@@ -64,6 +68,7 @@ export function FocusedStage({
   saveSnapshot,
   selectedVersionId,
   policyDirty,
+  rowsByStage,
 }: Props) {
   const stage = getStage(stageKey);
   const presets = useMemo(() => getStagePresets(stageKey), [stageKey]);
@@ -128,27 +133,19 @@ export function FocusedStage({
 
   if (stageKey === "run_validate") {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-2 flex-wrap pt-3">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold leading-tight tracking-tight">
-              {stage.title}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1">{stage.role}</p>
-          </div>
-        </div>
-
-        <RunValidateStage
-          projectId={projectId}
-          plantName={ctx?.plant_name}
-          defaults={defaults}
-          overrides={overrides}
-          fulfillmentStrategy={fulfillmentStrategy}
-          saveSnapshot={saveSnapshot}
-          selectedVersionId={selectedVersionId}
-          policyDirty={policyDirty}
-        />
-      </div>
+      <RunValidateStage
+        projectId={projectId}
+        plantName={ctx?.plant_name}
+        defaults={defaults}
+        overrides={overrides}
+        fulfillmentStrategy={fulfillmentStrategy}
+        saveSnapshot={saveSnapshot}
+        selectedVersionId={selectedVersionId}
+        policyDirty={policyDirty}
+        supplierRows={rowsByStage.supplier.rows}
+        plantRows={rowsByStage.plant.rows}
+        customerRows={rowsByStage.customer.rows}
+      />
     );
   }
 
@@ -168,38 +165,35 @@ export function FocusedStage({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8 gap-1 text-xs">
-            Excel
-            <ChevronDown className="h-3 w-3 opacity-70" />
+          <Button variant="outline" size="sm" className="h-[26px] px-2.5 text-[11.5px]">
+            Excel ▾
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleExport}>
-            <Download className="h-3.5 w-3.5 mr-2" /> Export
+          <DropdownMenuItem onClick={handleExport} className="text-[12px]">
+            Export
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => fileRef.current?.click()}>
-            <Upload className="h-3.5 w-3.5 mr-2" /> Import
+          <DropdownMenuItem onClick={() => fileRef.current?.click()} className="text-[12px]">
+            Import
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
-            <Sparkles className="h-3 w-3" />
-            Apply preset
-            <ChevronDown className="h-3 w-3 opacity-70" />
+          <Button size="sm" variant="outline" className="h-[26px] px-2.5 text-[11.5px]">
+            Apply preset ▾
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuContent align="end" className="w-[340px]">
           {presets.map((p) => (
             <DropdownMenuItem
               key={p.slug}
               onClick={() => setPresetDraft(p)}
-              className="flex flex-col items-start gap-0.5 py-2"
+              className="flex flex-col items-start gap-0.5 py-1.5"
             >
-              <span className="font-medium text-sm">{p.name}</span>
-              <span className="text-[11px] text-muted-foreground line-clamp-2">
+              <span className="text-[12px] font-medium">{p.name}</span>
+              <span className="font-mono text-[10.5px] text-muted-foreground line-clamp-2">
                 {p.description}
               </span>
             </DropdownMenuItem>
@@ -210,23 +204,14 @@ export function FocusedStage({
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-2 flex-wrap pt-3">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-base font-semibold leading-tight tracking-tight">
-            {stage.title} policies
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1">{stage.role}</p>
-        </div>
-      </div>
-
-
+    <div className="flex flex-col gap-2">
       {showNoData && (
-        <div className="flex items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-2 text-xs">
-          <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
-          <span>
-            No supply-chain data yet — upload and combine datasets in <strong>Data Manager</strong>.
-          </span>
+        <div
+          className="flex items-center gap-2 rounded-sm border px-2.5 py-1.5 font-mono text-[11px]"
+          style={{ borderColor: tint(LAYER.brand, 0.4), color: LAYER.brand }}
+        >
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.brand }} />
+          no supply-chain data — upload and combine datasets in Data Manager
         </div>
       )}
 
@@ -254,6 +239,7 @@ export function FocusedStage({
         deleteOverride={deleteOverride}
         saveSnapshot={saveSnapshot}
         leftActions={tableLeftActions}
+        stageRows={rowsByStage[stageKey]}
       />
 
       {/* Fulfillment (allocation, backorder, service level) is consumed by the

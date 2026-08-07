@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,9 +12,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown, Info } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { LAYER, MonoChip, Toggle, tint } from "@/components/intelligence/piUi";
+import {
+  CellSegmented,
+  FamilyBand,
+  FamilyChip,
+  NumCell,
+  POLICY_TYPE_OPTIONS,
+  ProvenanceDot,
+  ProvenanceLegend,
+  ReplenishmentCell,
+  RowFlag,
+  SortHeader,
+  rowAccent,
+  type Provenance,
+} from "./policyGridUi";
 import {
   specFor,
   familiesForStage,
@@ -29,15 +41,16 @@ import {
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
+import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
 import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
-import { useStageRows } from "@/hooks/useStageRows";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
+import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import type { StageKey } from "@/lib/policies/stages";
 
 interface Props {
@@ -52,11 +65,17 @@ interface Props {
   /** Save a policy version snapshot — offered after saving grid edits. */
   saveSnapshot?: (label?: string) => Promise<string | null>;
   leftActions?: React.ReactNode;
+  /** The stage's lines, loaded once at the page level (see useStageGuards). */
+  stageRows: StageRowsQuery;
 }
 
 type RowDraft = Record<string, unknown>;
 
-// Canonical ordering and palette for family bands (GitHub-style colored bands).
+// Grid actions live on the left of the toolbar — keep the pointer's travel to
+// their confirmation short.
+const TOAST = { position: "bottom-left" } as const;
+
+// Canonical ordering for family bands.
 const FAMILY_ORDER: PolicyFamily[] = [
   "sourcing",
   "inventory",
@@ -66,138 +85,33 @@ const FAMILY_ORDER: PolicyFamily[] = [
   "demand",
 ];
 
-const FAMILY_HUE: Record<PolicyFamily, number> = {
-  sourcing: 210,
-  inventory: 270,
-  transport: 35,
-  production: 340,
-  fulfillment: 150,
-  demand: 190,
-  recovery: 0,
+/** Frozen key-column widths per stage (the ids carry the row's identity). */
+const KEY_WIDTHS: Record<StageKey, number[]> = {
+  supplier: [216, 152],
+  plant: [152, 216],
+  customer: [216, 216],
+  run_validate: [],
 };
 
-function familyBandStyle(family: PolicyFamily): React.CSSProperties {
-  const h = FAMILY_HUE[family] ?? 220;
-  return {
-    backgroundColor: `hsl(${h} 60% 96%)`,
-    color: `hsl(${h} 60% 30%)`,
-    borderColor: `hsl(${h} 50% 80%)`,
-  };
-}
-function familyDotStyle(family: PolicyFamily): React.CSSProperties {
-  const h = FAMILY_HUE[family] ?? 220;
-  return { backgroundColor: `hsl(${h} 65% 50%)` };
-}
+/** Value-column widths; everything else takes the default. */
+const COL_WIDTH: Record<string, number> = {
+  __inv_params: 216,
+  fg_safety_stock: 196,
+  type: 136,
+  mode: 176,
+  sourcing_firm: 152,
+  primary_source: 86,
+};
+const DEFAULT_COL_WIDTH = 118;
+const widthOf = (col: ColSpec) => COL_WIDTH[col.field] ?? DEFAULT_COL_WIDTH;
 
-function ValueCell({
-  spec,
-  value,
-  defaultValue,
-  firmsAvailable,
-  onChange,
-}: {
-  spec: ColSpec;
-  value: unknown;
-  defaultValue: unknown;
-  firmsAvailable?: string[];
-  onChange: (v: unknown) => void;
-}) {
-  // Read-only synthetic columns (e.g. share_pct) render as a static badge.
-  // Milestone-pending fields render dimmed with the "not consumed yet" title.
-  if (spec.readOnly) {
-    const raw = value ?? defaultValue;
-    const n = typeof raw === "number" ? raw : null;
-    const text =
-      n != null && Number.isFinite(n)
-        ? spec.format
-          ? spec.format(n)
-          : String(n)
-        : typeof raw === "string" && raw !== ""
-        ? raw
-        : "—";
-    return (
-      <div
-        className={`flex items-center justify-end h-6 px-2 ${spec.engineStatus ? "opacity-50" : ""}`}
-        title={
-          spec.engineStatus
-            ? `Not consumed by the engine yet — activates with ${spec.engineStatus.milestone}.`
-            : undefined
-        }
-      >
-        <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
-          {text}
-        </span>
-      </div>
-    );
-  }
-  // Sourcing-firm dropdown when we know the candidate firms from project data.
-  if (spec.field === "sourcing_firm" && firmsAvailable && firmsAvailable.length > 0) {
-    const v = String(value ?? defaultValue ?? "");
-    return (
-      <Select value={v || undefined} onValueChange={onChange}>
-        <SelectTrigger className="h-6 text-xs border-transparent bg-transparent hover:bg-muted/50 px-2">
-          <SelectValue placeholder="(none)" />
-        </SelectTrigger>
-        <SelectContent>
-          {firmsAvailable.map((f) => (
-            <SelectItem key={f} value={f} className="text-xs">
-              {f}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-  const opts = SCSIM_ENUM_OPTIONS[spec.field] ?? ENUM_OPTIONS[spec.field];
-  if (opts) {
-    // The inventory Policy Type is the discriminated-union tag (§II.2): show the
-    // registry library's labels ("Min-max (s, S)", "(R, Q)", …), not raw tags.
-    const isPolicyType = spec.field === "type" && spec.family === "inventory";
-    const optLabel = (o: string) => (isPolicyType ? policyTypeLabel("inventory", o) : o);
-    return (
-      <Select value={String(value ?? defaultValue ?? "")} onValueChange={onChange}>
-        <SelectTrigger className="h-6 text-xs border-transparent bg-transparent hover:bg-muted/50 px-2">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {opts.map((o) => (
-            <SelectItem key={o} value={o} className="text-xs">{optLabel(o)}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-  if (typeof defaultValue === "boolean") {
-    const v = typeof value === "boolean" ? value : (defaultValue as boolean);
-    return (
-      <div className="flex items-center justify-center h-6">
-        <Switch size="sm" checked={v} onCheckedChange={onChange} />
-      </div>
-    );
-  }
-  if (typeof defaultValue === "number") {
-    return (
-      <Input
-        type="number"
-        step="any"
-        value={value === undefined || value === null ? "" : (value as number)}
-        placeholder={String(defaultValue)}
-        onChange={(e) => {
-          const s = e.target.value;
-          onChange(s === "" ? undefined : parseFloat(s));
-        }}
-        className="h-6 text-xs text-right font-mono tabular-nums border-transparent bg-transparent hover:bg-muted/50 focus:bg-background px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-      />
-    );
-  }
-  return (
-    <Input
-      value={(value ?? defaultValue ?? "") as string}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-6 text-xs border-transparent bg-transparent hover:bg-muted/50 focus:bg-background px-2"
-    />
-  );
-}
+/** Short segmented labels for the inventory Policy Type (titles stay the
+ *  registry library's own labels — "Min-max (s, S)", "(R, Q)", …). */
+const POLICY_TYPE_SHORT: Record<string, string> = Object.fromEntries(
+  POLICY_TYPE_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+type CellKind = "readonly" | "segmented" | "select" | "toggle" | "number" | "text";
 
 /** Supabase errors are plain objects, not Error instances — extract either. */
 function errMsg(e: unknown, fallback: string): string {
@@ -222,11 +136,12 @@ export function StagePolicyTable({
   deleteOverride,
   saveSnapshot,
   leftActions,
+  stageRows,
 }: Props) {
   const spec = specFor(stageKey);
   const families = familiesForStage(stageKey);
-  const { rows: dataRows, loading, fallback, reload: reloadRows } = useStageRows({ projectId, plantName, stage: stageKey });
-  const { unit, adaptLabel } = useTimeUnit(projectId);
+  const { rows: dataRows, loading, fallback, reload: reloadRows } = stageRows;
+  const { adaptLabel } = useTimeUnit(projectId);
   const { user } = useAuth();
   const { selectedProject } = useGlobalProject();
 
@@ -291,7 +206,7 @@ export function StagePolicyTable({
         p_user_email: user.email,
       });
       if (error) throw error;
-      toast.success(`Assigned ${supplierId} to ${materialId}. Fill in its price/lead time in the grid.`);
+      toast.success(`Assigned ${supplierId} to ${materialId}`, TOAST);
       reloadRows();
     } catch (rpcErr) {
       // Fallback: the upload pipeline that provably works in every deployed
@@ -348,11 +263,11 @@ export function StagePolicyTable({
           p_user_id: user.id,
           p_user_email: user.email,
         });
-        toast.success(`Assigned ${supplierId} to ${materialId} via the upload pipeline. Fill in its price/lead time in the grid.`);
+        toast.success(`Assigned ${supplierId} to ${materialId}`, TOAST);
         reloadRows();
       } catch (fallbackErr) {
         const msg = (e: unknown) => (e as { message?: string })?.message ?? String(e);
-        toast.error(`Failed to assign supplier: ${msg(rpcErr)} · fallback: ${msg(fallbackErr)}`);
+        toast.error(`Failed to assign supplier: ${msg(rpcErr)} · fallback: ${msg(fallbackErr)}`, TOAST);
       }
     } finally {
       setAssigning(null);
@@ -452,6 +367,10 @@ export function StagePolicyTable({
     [colGroups, collapsed],
   );
 
+  // Frozen key columns: cumulative left offsets from the per-stage widths.
+  const keyWidths = KEY_WIDTHS[stageKey] ?? [];
+  const keyLeft = (i: number) => keyWidths.slice(0, i).reduce((a, b) => a + b, 0);
+  const keyTotal = keyWidths.reduce((a, b) => a + b, 0);
 
   // Reset drafts + filters/sort when stage / project changes.
   useEffect(() => {
@@ -495,6 +414,10 @@ export function StagePolicyTable({
   const getDefault = (field: string, family: PolicyFamily): unknown =>
     ((defaults[family] ?? {}) as Record<string, unknown>)[field];
 
+  /** Saved-state + draft resolver shared with the step track's guardrail. */
+  const resolveForGuard = (row: Record<string, unknown>, field: string): unknown =>
+    getEffective(String(row.key), row, field);
+
   // Full field→col map (includes vectorized inventory params hidden from the
   // header) so save/prefill can resolve a param's family even though it renders
   // inside the "Replenishment parameters" vector cell rather than its own column.
@@ -511,56 +434,49 @@ export function StagePolicyTable({
     return m;
   }, [stageKey]);
 
-  /** The dynamic "Replenishment parameters" cell: a 2-column (parameter → value)
-   *  vector showing ONLY the params the row's chosen policy type needs (§II.3).
-   *  Reshapes live when the `type` dropdown changes. */
+  /** Enum choices for a column, with the registry's own labels for Policy Type. */
+  const enumOptionsFor = (
+    col: ColSpec,
+  ): Array<{ value: string; label: string; title?: string }> | null => {
+    const opts = SCSIM_ENUM_OPTIONS[col.field] ?? ENUM_OPTIONS[col.field];
+    if (!opts) return null;
+    if (col.field === "type" && col.family === "inventory") {
+      return opts.map((o) => ({
+        value: o,
+        label: POLICY_TYPE_SHORT[o] ?? o,
+        title: policyTypeLabel("inventory", o),
+      }));
+    }
+    return opts.map((o) => ({ value: o, label: o }));
+  };
+
+  /**
+   * The dynamic "Replenishment parameters" cell (§II.3): only the params the
+   * row's chosen policy type needs, each as symbol + input. The per-row Policy
+   * Basis control is hidden while the line uses the default basis — it repeated
+   * identically on every line.
+   */
   const renderInvParamsCell = (rowKey: string, r: Record<string, unknown>) => {
-    const rowDraft = drafts[rowKey] ?? {};
     const type = String(getEffective(rowKey, r, "type", "inventory") ?? "min_max");
-    const params = inventoryParamsForType(type);
-    const bundleInv = effectivePolicy(defaults, overrides, spec.scope, rowKey).inventory as
-      | Record<string, unknown>
-      | undefined;
+    const regParams = inventoryParamsForType(type).filter((p) => p.field !== "basis");
+    const basis = String(getEffective(rowKey, r, "basis", "inventory") ?? "days_of_supply");
     return (
-      <div className="flex flex-col divide-y divide-border/50 min-w-[220px]">
-        {params.map((p) => {
-          const pcol = invParamColByField.get(p.field);
-          if (!pcol) return null;
+      <ReplenishmentCell
+        policyType={type}
+        params={regParams.map((p) => {
           const value = getEffective(rowKey, r, p.field, "inventory");
-          const bundleVal = bundleInv?.[p.field];
-          const liveDefault =
-            bundleVal !== undefined
-              ? bundleVal
-              : pcol.defaultWhenMissing !== undefined
-                ? pcol.defaultWhenMissing
-                : getDefault(p.field, "inventory");
-          const edited = rowDraft[p.field] !== undefined;
-          const feas = paramFeasibility(p, value ?? undefined);
-          return (
-            <div key={p.field} className="flex items-center gap-1.5 px-1.5 py-0.5">
-              <span
-                className="flex-1 text-[10px] text-muted-foreground truncate"
-                title={pcol.label}
-              >
-                {adaptLabel(pcol.label)}
-              </span>
-              <div className={cn("w-24 shrink-0 rounded", edited && "bg-primary/10")}>
-                <ValueCell
-                  spec={pcol}
-                  value={value}
-                  defaultValue={liveDefault}
-                  onChange={(v) => onCellChange(rowKey, p.field, v)}
-                />
-              </div>
-              {feas && (
-                <span className="shrink-0 text-[9px] text-destructive cursor-help" title={feas}>
-                  !
-                </span>
-              )}
-            </div>
-          );
+          const n = typeof value === "number" ? value : value == null ? undefined : Number(value);
+          return {
+            field: p.field,
+            value: n !== undefined && Number.isFinite(n) ? n : undefined,
+            onCommit: (v: number | undefined) => onCellChange(rowKey, p.field, v),
+            invalid: paramFeasibility(p, value ?? undefined) ?? undefined,
+          };
         })}
-      </div>
+        labelFor={(f) => adaptLabel(invParamColByField.get(f)?.label ?? f)}
+        basis={basis as "days_of_supply" | "forward_visible"}
+        onBasisChange={(b) => onCellChange(rowKey, "basis", b)}
+      />
     );
   };
 
@@ -624,14 +540,6 @@ export function StagePolicyTable({
 
   const dirtyKeys = Object.keys(drafts).filter((k) => Object.keys(drafts[k] ?? {}).length > 0);
 
-  /** Group key used to enforce one-primary-per-group. */
-  const groupKeyFor = (r: Record<string, unknown>): string | null => {
-    if (stageKey === "supplier") return r.material_id ? `mat::${r.material_id}` : null;
-    if (stageKey === "customer")
-      return r.customer_id && r.product_id ? `cp::${r.customer_id}::${r.product_id}` : null;
-    return null;
-  };
-
   const onCellChange = (rowKey: string, field: string, v: unknown) => {
     setDrafts((d) => {
       const next: Record<string, RowDraft> = {
@@ -641,11 +549,11 @@ export function StagePolicyTable({
       // Mutual exclusion: only one primary per material / per (customer, product).
       if (field === "primary_source" && v === true) {
         const me = dataRows.find((row) => row.key === rowKey);
-        const gk = me ? groupKeyFor(me as Record<string, unknown>) : null;
+        const gk = me ? groupKeyFor(stageKey, me as Record<string, unknown>) : null;
         if (gk) {
           for (const other of dataRows) {
             if (other.key === rowKey) continue;
-            if (groupKeyFor(other as Record<string, unknown>) !== gk) continue;
+            if (groupKeyFor(stageKey, other as Record<string, unknown>) !== gk) continue;
             const cur = getEffective(String(other.key), other as Record<string, unknown>, "primary_source");
             if (cur === true) {
               next[String(other.key)] = {
@@ -714,7 +622,7 @@ export function StagePolicyTable({
       masterMerged.materials.size + masterMerged.products.size + masterMerged.suppliers.size;
     if (toUpsert.length === 0 && masterRowCount === 0) {
       setDrafts({});
-      toast.info("No effective changes to save.");
+      toast.info("No effective changes to save.", TOAST);
       return;
     }
     const masterTablesToSave = (["materials", "products", "suppliers"] as ItemMasterTable[]).filter(
@@ -723,10 +631,7 @@ export function StagePolicyTable({
     if (masterTablesToSave.length > 0 && mastersError) {
       // Don't pretend: if the masters failed to load (missing table/RPC in
       // this environment), a save would clobber unseen data or fail anyway.
-      toast.error(
-        `Cannot save master data — item masters failed to load: ${mastersError}. ` +
-          "Apply the item-master DB migrations, then retry.",
-      );
+      toast.error(`Cannot save master data — item masters failed to load: ${mastersError}`, TOAST);
       return;
     }
     try {
@@ -740,7 +645,7 @@ export function StagePolicyTable({
     } catch (e) {
       // Surface RPC failures (e.g. bulk_upsert_* missing in this DB) instead
       // of swallowing them — the click handler has no other catch.
-      toast.error(errMsg(e, "Failed to save changes"));
+      toast.error(errMsg(e, "Failed to save changes"), TOAST);
       return;
     }
     setDrafts({});
@@ -749,7 +654,8 @@ export function StagePolicyTable({
     // (policy version snapshot) — runs bind to both.
     const savedMasters = masterRowCount > 0;
     const savedOverrides = toUpsert.length > 0;
-    toast.success(`Saved ${dirtyKeys.length} row(s)`, {
+    toast.success(`Saved ${dirtyKeys.length} line(s)`, {
+      ...TOAST,
       action: {
         label: "Save version",
         onClick: () => {
@@ -763,9 +669,9 @@ export function StagePolicyTable({
                 // run picker has a labeled point-in-time to bind to.
                 await saveSnapshot(`Data edits — ${new Date().toLocaleString()}`);
               }
-              toast.success("Version saved — runs can now bind to this state.");
+              toast.success("Version saved", TOAST);
             } catch (e) {
-              toast.error(errMsg(e, "Failed to save version"));
+              toast.error(errMsg(e, "Failed to save version"), TOAST);
             }
           })();
         },
@@ -799,9 +705,9 @@ export function StagePolicyTable({
         await deleteOverride(spec.scope, o.target_key, o.family);
       }
       setDrafts({});
-      toast.success(`Removed ${stageOverrides.length} saved override(s) — showing project data + defaults.`);
+      toast.success(`Removed ${stageOverrides.length} saved override(s)`, TOAST);
     } catch (e) {
-      toast.error(errMsg(e, "Failed to reset overrides"));
+      toast.error(errMsg(e, "Failed to reset overrides"), TOAST);
     } finally {
       setResetting(false);
       setConfirmResetAll(false);
@@ -873,7 +779,7 @@ export function StagePolicyTable({
     }
     if (toUpsert.length === 0) {
       setConfirmPrefill(false);
-      toast.info("Nothing to persist — no resolved rows with prefill values.");
+      toast.info("Nothing to persist", TOAST);
       return;
     }
     setApplying(true);
@@ -881,8 +787,8 @@ export function StagePolicyTable({
       await bulkUpsertOverrides(toUpsert);
       setDrafts({});
       toast.success(
-        `Persisted prefill for ${written} row(s)` +
-          (skipped > 0 ? ` — ${skipped} skipped (need a supplier/primary)` : ""),
+        `Persisted prefill for ${written} line(s)` + (skipped > 0 ? ` · ${skipped} skipped` : ""),
+        TOAST,
       );
     } finally {
       setApplying(false);
@@ -922,486 +828,381 @@ export function StagePolicyTable({
     for (const o of rowOverrides) {
       await deleteOverride(spec.scope, rowKey, o.family);
     }
-    if (rowOverrides.length > 0) toast.success("Reverted to project data");
+    if (rowOverrides.length > 0) toast.success("Reverted to project data", TOAST);
   };
 
   /** Does the primary-source group for this row already have a chosen primary? */
-  const groupHasPrimary = (r: Record<string, unknown>): boolean => {
-    const gk = groupKeyFor(r);
-    if (!gk) return true;
-    return dataRows.some(
-      (o) =>
-        groupKeyFor(o as Record<string, unknown>) === gk &&
-        getEffective(String(o.key), o as Record<string, unknown>, "primary_source") === true,
-    );
+  const groupHasPrimary = (r: Record<string, unknown>): boolean =>
+    groupHasPrimaryFor(stageKey, r, dataRows as Record<string, unknown>[], resolveForGuard);
+
+  /** Line needs the user's input — the same rule the step track counts. */
+  const rowNeedsAttention = (r: Record<string, unknown>): boolean =>
+    lineNeedsInput(stageKey, r, dataRows as Record<string, unknown>[], resolveForGuard);
+
+  const imputedLines = useMemo(
+    () =>
+      dataRows.filter(
+        (r: any) => r.__imputed && Object.keys(r.__imputed).length > 0,
+      ).length,
+    [dataRows],
+  );
+
+  /** Which control a column's value renders as. */
+  const kindOf = (
+    col: ColSpec,
+    opts: ReturnType<typeof enumOptionsFor>,
+    firms: string[] | undefined,
+    value: unknown,
+    liveDefault: unknown,
+  ): CellKind => {
+    if (col.readOnly) return "readonly";
+    if (col.field === "sourcing_firm" && firms && firms.length > 0)
+      return firms.length <= 4 ? "segmented" : "select";
+    if (opts) return opts.length <= 4 ? "segmented" : "select";
+    if (typeof liveDefault === "boolean" || typeof value === "boolean") return "toggle";
+    if (typeof liveDefault === "number" || typeof value === "number") return "number";
+    return "text";
   };
 
-  /** Row needs the user's attention (red): no supplier, or multi-source with no primary picked. */
-  const rowNeedsAttention = (r: Record<string, unknown>): boolean => {
-    if (r.__needs_supplier) return true;
-    if (
-      (stageKey === "supplier" || stageKey === "customer") &&
-      Number(r.__lane_count ?? 0) > 1 &&
-      !groupHasPrimary(r)
-    ) {
-      return true;
-    }
-    return false;
-  };
-
-  /** Sortable label + type-to-filter box rendered inside a column header. */
-  const renderSortFilter = (colId: string, label: string) => {
-    const active = sort?.col === colId;
-    return (
-      <div className="flex flex-col gap-1">
-        <button
-          type="button"
-          onClick={() => toggleSort(colId)}
-          className="inline-flex items-center gap-1 hover:text-foreground transition-colors w-full text-left"
-          title="Sort"
-        >
-          <span className="truncate">{label}</span>
-          {active ? (
-            sort!.dir === "asc" ? (
-              <ArrowUp className="h-3 w-3 shrink-0" />
-            ) : (
-              <ArrowDown className="h-3 w-3 shrink-0" />
-            )
-          ) : (
-            <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-30" />
-          )}
-        </button>
-        <Input
-          placeholder="Filter"
-          value={colFilters[colId] ?? ""}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => setColFilter(colId, e.target.value)}
-          className="h-6 text-[11px] bg-background px-1.5 font-normal normal-case tracking-normal"
-        />
-      </div>
-    );
-  };
+  const colCount = spec.keyCols.length + cols.length + collapsed.size;
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Item masters unavailable → master-backed columns can't save. */}
+    <div className="flex flex-col gap-2">
       {mastersError && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
-          Item masters failed to load ({mastersError}) — master-data columns (cost, capacity,
-          demand, MOQ, reliability) cannot be saved until the item-master DB migrations are
-          applied to this environment.
+        <div
+          className="flex items-center gap-2 rounded-sm border px-2.5 py-1.5 font-mono text-[11px]"
+          style={{ borderColor: tint(LAYER.brand, 0.4), color: LAYER.brand }}
+        >
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.brand }} />
+          item masters unavailable ({mastersError}) — master-data columns cannot be saved
         </div>
       )}
-      {/* Project data status banner */}
-      {dataBannerState === "seeded" && (
-        <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-          Policies seeded from your uploaded project data.
-        </div>
-      )}
-      {dataBannerState === "pending" && (
-        <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/8 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-          <span className="flex-1">Uploaded data has not been applied to policies yet.</span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 text-[11px] border-amber-500/40 hover:bg-amber-500/10"
-            onClick={() => setConfirmPrefill(true)}
-          >
-            Apply now
-          </Button>
-        </div>
-      )}
-      {dataBannerState === "seeding" && (
-        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 animate-pulse" />
-          Seeding policies from project data…
-        </div>
-      )}
-      {dataBannerState === "no_data" && !loading && (
-        <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-          No uploaded project data found — using default values.
-        </div>
-      )}
-      {/* GitHub-style toolbar: dense, single line, sticky-feeling chrome. */}
-      <div className="flex items-center gap-2 flex-wrap rounded-md border bg-muted/30 px-3 py-2">
-        <span className="text-[11px] text-muted-foreground">
-          {filtered.length}/{dataRows.length} rows
+
+      {/* Toolbar — sticky under the page header so the actions follow the grid. */}
+      <div className="sticky top-[62px] z-20 flex flex-wrap items-center gap-2 bg-background py-0.5">
+        <span className="font-mono text-[11px] text-muted-foreground">
+          {filtered.length}/{dataRows.length} lines
         </span>
         {hasActiveQuery && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 text-[11px]"
+          <button
+            type="button"
+            className="rounded-sm px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground hover:bg-[#fafafa] hover:text-foreground"
             onClick={() => {
               setColFilters({});
               setSort(null);
             }}
           >
-            Clear filters
-          </Button>
+            clear filters
+          </button>
         )}
         {dirtyKeys.length > 0 && (
-          <Badge variant="secondary" className="text-[10px]">
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-[#f4f4f4] px-1.5 py-px font-mono text-[10px]">
+            <span className="h-[5px] w-[5px] rounded-full bg-foreground" />
             {dirtyKeys.length} edited
-          </Badge>
+          </span>
         )}
-        {/* family chips for quick show/hide */}
         <div className="flex items-center gap-1">
-          {colGroups.map((g) => {
-            const isCollapsed = collapsed.has(g.family);
-            return (
-              <button
-                key={g.family}
-                type="button"
-                onClick={() => toggleFamily(g.family)}
-                className={cn(
-                  "h-6 px-2 rounded-full text-[10px] border transition-colors flex items-center gap-1 uppercase tracking-wide",
-                  isCollapsed ? "opacity-40 line-through" : "",
-                )}
-                style={familyBandStyle(g.family)}
-                title={isCollapsed ? `Show ${g.family}` : `Hide ${g.family}`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={familyDotStyle(g.family)} />
-                {g.family}
-              </button>
-            );
-          })}
+          {colGroups.map((g) => (
+            <FamilyChip
+              key={g.family}
+              family={g.family}
+              hidden={collapsed.has(g.family)}
+              onToggle={() => toggleFamily(g.family)}
+            />
+          ))}
         </div>
+        {dataBannerState === "pending" && (
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px]" style={{ color: LAYER.firm }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.firm }} />
+            uploaded data not applied
+          </span>
+        )}
+        {dataBannerState === "seeding" && (
+          <span className="font-mono text-[10.5px] text-muted-foreground">seeding from project data…</span>
+        )}
+        {dataBannerState === "no_data" && !loading && (
+          <span className="font-mono text-[10.5px] text-muted-foreground">no uploaded data — bundle defaults</span>
+        )}
+        {fallback && dataRows.length > 0 && (
+          <span className="font-mono text-[10.5px]" style={{ color: LAYER.firm }}>
+            one line per location — upload logistics + BOM for per-material lines
+          </span>
+        )}
         <div className="flex-1" />
         {leftActions}
-        <div className="mx-1 h-6 w-px bg-border" aria-hidden />
-        {dirtyKeys.length > 0 && (
-          <Button size="sm" variant="ghost" className="h-8" onClick={revertAll}>
-            Revert
-          </Button>
-        )}
         <Button
-          size="sm"
           variant="outline"
-          className="h-8"
+          size="sm"
+          className="h-[26px] px-2.5 text-[11.5px]"
           disabled={dataRows.length === 0 || applying}
           onClick={() => setConfirmPrefill(true)}
-          title="Save the project-data prefill values as real rows for every resolved row"
         >
           Apply prefill
         </Button>
         {deleteOverride && stageOverrides.length > 0 && (
           <Button
-            size="sm"
             variant="outline"
-            className="h-8"
+            size="sm"
+            className="h-[26px] px-2.5 text-[11.5px]"
             disabled={resetting}
             onClick={() => setConfirmResetAll(true)}
-            title="Delete every saved override in this stage — the grid falls back to project data + defaults"
           >
-            Reset overrides ({stageOverrides.length})
+            Reset overrides {stageOverrides.length}
           </Button>
         )}
-        <Button size="sm" className="h-8" disabled={dirtyKeys.length === 0} onClick={saveAll}>
+        {dirtyKeys.length > 0 && (
+          <Button variant="ghost" size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={revertAll}>
+            Revert
+          </Button>
+        )}
+        <Button
+          size="sm"
+          className="h-[26px] px-2.5 text-[11.5px]"
+          disabled={dirtyKeys.length === 0}
+          onClick={saveAll}
+        >
           Save changes
         </Button>
       </div>
 
+      {dataRows.length > 0 && <ProvenanceLegend imputedLines={imputedLines} />}
 
-      {!unit && (
-        <div className="rounded-md border border-destructive bg-destructive/5 px-2.5 py-1.5 text-[11px] text-destructive">
-          Select a planning time unit above before editing — cell labels depend on it.
-        </div>
-      )}
-
-      {fallback && dataRows.length > 0 && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
-          No material/product columns found in raw uploads — showing one row per location. Upload
-          inbound/outbound logistics + BOM to unlock per-material editing.
-        </div>
-      )}
-
-      {/* Provenance legend — explains the corner dots on each cell. */}
-      {dataRows.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-0.5 text-[10px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-sky-500" /> from project data
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-destructive" /> imputed average — verify
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> derived fallback (≈)
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> saved override
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> edited
-          </span>
-          {(() => {
-            const imputedRows = dataRows.filter(
-              (r: any) => r.__imputed && Object.keys(r.__imputed).length > 0,
-            ).length;
-            return imputedRows > 0 ? (
-              <span className="text-destructive">
-                {imputedRows} row{imputedRows === 1 ? "" : "s"} use estimated values — please review
-              </span>
-            ) : null;
-          })()}
-        </div>
-      )}
-
-      <div className="border rounded-md relative min-w-0">
-        <div className="overflow-auto max-h-[65vh] [scrollbar-gutter:stable]">
-        <table className="w-max min-w-full text-xs border-separate border-spacing-0">
-          <thead className="sticky top-0 z-30 bg-muted backdrop-blur">
-            {/* Row 1: family bands (GitHub-style colored group headers). */}
+      <div className="max-h-[614px] overflow-auto rounded-sm border border-[#ebebeb] border-t-2 border-t-foreground [scrollbar-gutter:stable]">
+        <table className="w-max min-w-full border-separate border-spacing-0">
+          <thead>
+            {/* Row 1 — family bands. */}
             <tr>
-              {spec.keyCols.map((c, i) => {
-                const isLast = i === spec.keyCols.length - 1;
-                return (
-                  <th
-                    key={c.id}
-                    rowSpan={2}
-                    className={cn(
-                      "py-2 px-3 text-left text-[10px] uppercase tracking-wide font-semibold text-muted-foreground border-b border-r bg-muted sticky z-40 align-bottom",
-                      isLast && "shadow-[4px_0_6px_-2px_hsl(var(--border))]",
-                    )}
-                    style={{ left: `${i * 140}px`, width: 140, minWidth: 140 }}
-                  >
-                    {renderSortFilter(c.id, c.label)}
-                  </th>
-                );
-              })}
+              <th
+                colSpan={spec.keyCols.length}
+                className="sticky left-0 top-0 z-40 h-[23px] border-b border-r border-[#ebebeb] bg-background p-0"
+                style={{ width: keyTotal, minWidth: keyTotal }}
+              />
               {colGroups.map((g) => {
                 const isCollapsed = collapsed.has(g.family);
+                const width = isCollapsed
+                  ? DEFAULT_COL_WIDTH
+                  : g.cols.reduce((a, c) => a + widthOf(c), 0);
                 return (
                   <th
                     key={g.family}
                     colSpan={isCollapsed ? 1 : g.cols.length}
-                    className="text-left text-[10px] uppercase tracking-wider font-semibold border-b border-r px-2 py-1"
-                    style={familyBandStyle(g.family)}
+                    className="sticky top-0 z-30 h-[23px] border-b border-[#ebebeb] bg-background p-0 align-middle"
                   >
-                    <button
-                      type="button"
-                      onClick={() => toggleFamily(g.family)}
-                      className="inline-flex items-center gap-1.5 hover:opacity-80"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={familyDotStyle(g.family)} />
-                      {g.family}
-                      {isCollapsed ? (
-                        <ChevronRight className="h-3 w-3" />
-                      ) : (
-                        <ChevronDown className="h-3 w-3" />
-                      )}
-                    </button>
+                    <FamilyBand
+                      family={g.family}
+                      width={width}
+                      collapsed={isCollapsed}
+                      onToggle={() => toggleFamily(g.family)}
+                    />
                   </th>
                 );
               })}
             </tr>
-            {/* Row 2: per-column labels (skipped for collapsed families). */}
+            {/* Row 2 — column heads. */}
             <tr>
+              {spec.keyCols.map((c, i) => (
+                <th
+                  key={c.id}
+                  className="sticky top-[23px] z-40 border-b border-[#ebebeb] bg-[#fafafa] p-0 align-top"
+                  style={{
+                    left: keyLeft(i),
+                    width: keyWidths[i],
+                    minWidth: keyWidths[i],
+                  }}
+                >
+                  <SortHeader
+                    label={c.label}
+                    dir={sort?.col === c.id ? sort.dir : null}
+                    onSort={() => toggleSort(c.id)}
+                    filter={colFilters[c.id] ?? ""}
+                    onFilter={(v) => setColFilter(c.id, v)}
+                  />
+                </th>
+              ))}
               {colGroups.flatMap((g) => {
                 if (collapsed.has(g.family)) {
                   return [
                     <th
                       key={`${g.family}-collapsed`}
-                      className="border-b border-r px-2 py-1 text-[10px] text-muted-foreground/60 text-center"
+                      className="sticky top-[23px] z-30 border-b border-r border-[#ebebeb] bg-[#fafafa] px-2 py-1 text-center font-mono text-[9.5px] text-[#c4c4c4]"
+                      style={{ width: DEFAULT_COL_WIDTH, minWidth: DEFAULT_COL_WIDTH }}
                     >
-                      {g.cols.length} cols hidden
+                      {g.cols.length} hidden
                     </th>,
                   ];
                 }
-                return g.cols.map((col) => (
-                  <th
-                    key={col.field}
-                    className="py-1.5 px-2 text-left text-[10px] font-medium text-muted-foreground border-b border-r whitespace-nowrap bg-muted/70"
-                  >
-                    {col.synthetic ? (
-                      // Vector cell anchor: a plain label (no sort/filter/info) —
-                      // its params carry their own meaning inside the cell.
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        {adaptLabel(col.label)}
-                      </span>
-                    ) : (
-                    <span className="inline-flex items-center gap-1">
-                      {renderSortFilter(col.field, adaptLabel(col.label))}
-                      <button
-                        type="button"
-                        title={`What is “${adaptLabel(col.label)}”? — unit, range, meaning & engine use`}
-                        aria-label={`Explain ${adaptLabel(col.label)}`}
-                        className="text-muted-foreground/60 hover:text-primary transition-colors"
-                        onClick={() => setParamSheetCol(col)}
-                      >
-                        <Info className="h-3 w-3" />
-                      </button>
-                      {col.engineStatus && (
-                        <span
-                          className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-[9px] text-amber-700 dark:text-amber-300 cursor-help"
-                          title={`Stored + versioned, not consumed by the engine yet — activates with ${col.engineStatus.milestone}.`}
-                        >
-                          {col.engineStatus.milestone.split(" ")[0]}
-                        </span>
+                return g.cols.map((col) => {
+                  const width = widthOf(col);
+                  return (
+                    <th
+                      key={col.field}
+                      className="sticky top-[23px] z-30 border-b border-[#ebebeb] bg-[#fafafa] p-0 align-top"
+                      style={{ width, minWidth: width }}
+                    >
+                      {col.synthetic ? (
+                        // Vector cell anchor: a plain label — its params carry
+                        // their own meaning inside the cell.
+                        <div className="flex h-full items-start border-r border-[#ebebeb] px-1.5 py-1 font-mono text-[10px] uppercase leading-[1.25] tracking-[0.08em] text-muted-foreground">
+                          {adaptLabel(col.label)}
+                        </div>
+                      ) : (
+                        <SortHeader
+                          label={adaptLabel(col.label)}
+                          dir={sort?.col === col.field ? sort.dir : null}
+                          onSort={() => toggleSort(col.field)}
+                          onInfo={() => setParamSheetCol(col)}
+                          pending={!!col.engineStatus}
+                          filter={colFilters[col.field] ?? ""}
+                          onFilter={(v) => setColFilter(col.field, v)}
+                        />
                       )}
-                    </span>
-                    )}
-                  </th>
-                ));
+                    </th>
+                  );
+                });
               })}
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={spec.keyCols.length + cols.length + collapsed.size} className="py-6 text-center text-muted-foreground">
-                  Loading data…
+                <td colSpan={colCount} className="py-6 text-center font-mono text-[11px] text-muted-foreground">
+                  loading lines…
                 </td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={spec.keyCols.length + cols.length + collapsed.size} className="py-8 text-center text-muted-foreground">
-                  No {stageKey === "plant" ? "focal plant" : stageKey + "s"} found for this project. Upload supply-chain data first.
+                <td colSpan={colCount} className="py-8 text-center font-mono text-[11px] text-muted-foreground">
+                  no {stageKey === "plant" ? "focal plant" : `${stageKey}`} lines for this project
                 </td>
               </tr>
             )}
             {!loading &&
-              filtered.map((r, rowIdx) => {
+              filtered.map((r) => {
                 const rowKey = r.key;
                 const isDirty = (drafts[rowKey] && Object.keys(drafts[rowKey]).length > 0) ?? false;
                 const overrode = hasOverride(rowKey);
                 const attention = rowNeedsAttention(r as Record<string, unknown>);
-                // Multi-source pairs stay highlighted permanently for review,
-                // even once a primary is chosen.
+                // Multi-source pairs stay marked permanently for review, even
+                // once a primary is chosen.
                 const isMultiSource = Number((r as Record<string, unknown>).__lane_count ?? 0) > 1;
+                const accent = rowAccent({ edited: isDirty, attention, multiSource: isMultiSource });
                 return (
-                  <tr
-                    key={rowKey}
-                    className={cn(
-                      "group transition-colors",
-                      rowIdx % 2 === 1 && !isDirty && "bg-muted/15",
-                      isDirty && "bg-primary/5",
-                      (attention || isMultiSource) && "bg-destructive/5",
-                      "hover:bg-accent/40",
-                    )}
-                  >
-                    {spec.keyCols.map((c, i) => {
-                      const isLast = i === spec.keyCols.length - 1;
-                      return (
-                        <td
-                          key={c.id}
-                          className={cn(
-                            "py-1.5 px-3 font-mono text-[11px] border-b border-r sticky z-20 bg-card group-hover:bg-accent truncate",
-                            rowIdx % 2 === 1 && !isDirty && "bg-muted",
-                            isDirty && "bg-accent",
-                            isDirty && i === 0 && "border-l-2 border-l-primary",
-                            isLast && "shadow-[4px_0_6px_-2px_hsl(var(--border))]",
-                          )}
-                          style={{ left: `${i * 140}px`, width: 140, minWidth: 140, maxWidth: 140 }}
-                          title={String(r[c.id] ?? "")}
-                        >
-                          <span className="inline-flex items-center gap-1.5">
-                            {i === 0 && overrode && !isDirty && (
-                              <span
-                                className="h-1.5 w-1.5 rounded-full bg-primary/70 shrink-0"
-                                title="Row has saved overrides"
-                              />
-                            )}
-                            {c.id === "supplier_id" && r.__needs_supplier ? (
-                              newSupplierFor === rowKey ? (
-                                // Typing a brand-new supplier id: Enter confirms,
-                                // Escape cancels.
-                                <Input
-                                  autoFocus
-                                  value={newSupplierId}
-                                  placeholder="new supplier id…"
-                                  className="h-6 text-[11px] px-2 border-destructive/40"
-                                  disabled={assigning === String(r.material_id)}
-                                  onChange={(e) => setNewSupplierId(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Escape") {
-                                      setNewSupplierFor(null);
-                                      setNewSupplierId("");
-                                    }
-                                    if (e.key === "Enter") {
-                                      const id = newSupplierId.trim();
-                                      if (!id || id.startsWith("(")) {
-                                        toast.warning("Enter a valid supplier id.");
-                                        return;
-                                      }
-                                      setNewSupplierFor(null);
-                                      setNewSupplierId("");
-                                      void assignSupplier(String(r.material_id), id);
-                                    }
-                                  }}
-                                  onBlur={() => {
+                  <tr key={rowKey} className="group">
+                    {spec.keyCols.map((c, i) => (
+                      <td
+                        key={c.id}
+                        className={cn(
+                          "sticky z-20 border-b border-r border-[#f4f4f4] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
+                          i === spec.keyCols.length - 1 && "border-r-[#ebebeb]",
+                        )}
+                        style={{
+                          left: keyLeft(i),
+                          width: keyWidths[i],
+                          minWidth: keyWidths[i],
+                          maxWidth: keyWidths[i],
+                          ...(i === 0 && accent
+                            ? { borderLeft: `2px solid ${accent}` }
+                            : {}),
+                        }}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {c.id === "supplier_id" && r.__needs_supplier ? (
+                            newSupplierFor === rowKey ? (
+                              // Typing a brand-new supplier id: Enter confirms,
+                              // Escape cancels.
+                              <Input
+                                autoFocus
+                                value={newSupplierId}
+                                placeholder="new supplier id"
+                                className="h-5 border-[#ebebeb] px-1.5 font-mono text-[11px]"
+                                disabled={assigning === String(r.material_id)}
+                                onChange={(e) => setNewSupplierId(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") {
                                     setNewSupplierFor(null);
                                     setNewSupplierId("");
-                                  }}
-                                />
-                              ) : (
-                                // Unassigned material: pick (or create) a supplier —
-                                // creates the sourcing lane.
-                                <Select
-                                  disabled={assigning === String(r.material_id)}
-                                  onValueChange={(v) => {
-                                    if (v === "__new__") {
-                                      setNewSupplierFor(rowKey);
-                                      setNewSupplierId("");
+                                  }
+                                  if (e.key === "Enter") {
+                                    const id = newSupplierId.trim();
+                                    if (!id || id.startsWith("(")) {
+                                      toast.warning("Enter a valid supplier id.", TOAST);
                                       return;
                                     }
-                                    void assignSupplier(String(r.material_id), v);
-                                  }}
-                                >
-                                  <SelectTrigger className="h-6 w-full text-[11px] border-destructive/40 bg-destructive/5 px-2">
-                                    <SelectValue
-                                      placeholder={
-                                        assigning === String(r.material_id)
-                                          ? "Assigning…"
-                                          : "assign supplier…"
-                                      }
-                                    />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__new__" className="text-xs font-medium">
-                                      + New supplier…
-                                    </SelectItem>
-                                    {knownSuppliers.map((s) => (
-                                      <SelectItem key={s} value={s} className="text-xs">
-                                        {s}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )
+                                    setNewSupplierFor(null);
+                                    setNewSupplierId("");
+                                    void assignSupplier(String(r.material_id), id);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  setNewSupplierFor(null);
+                                  setNewSupplierId("");
+                                }}
+                              />
                             ) : (
-                              <span className="truncate">{String(r[c.id] ?? "")}</span>
-                            )}
-                          </span>
-                          {/* material-level required actions (red) */}
-                          {i === 0 && r.__needs_supplier && (
+                              // Unassigned material: pick (or create) a supplier —
+                              // creates the sourcing lane.
+                              <Select
+                                disabled={assigning === String(r.material_id)}
+                                onValueChange={(v) => {
+                                  if (v === "__new__") {
+                                    setNewSupplierFor(rowKey);
+                                    setNewSupplierId("");
+                                    return;
+                                  }
+                                  void assignSupplier(String(r.material_id), v);
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="h-5 w-full px-1.5 font-mono text-[10.5px]"
+                                  style={{ borderColor: LAYER.brand, color: LAYER.brand }}
+                                >
+                                  <SelectValue
+                                    placeholder={
+                                      assigning === String(r.material_id) ? "assigning…" : "assign supplier"
+                                    }
+                                  />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__new__" className="text-xs font-medium">
+                                    + new supplier
+                                  </SelectItem>
+                                  {knownSuppliers.map((s) => (
+                                    <SelectItem key={s} value={s} className="text-xs">
+                                      {s}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )
+                          ) : (
                             <span
-                              className="ml-1.5 inline-block rounded-sm bg-destructive/15 text-destructive px-1 text-[9px] align-middle"
-                              title="This material has no supplier in the project data — assign one in the Supplier column."
+                              className="min-w-[62px] flex-1 truncate"
+                              title={String(r[c.id] ?? "")}
                             >
-                              needs supplier
+                              {String(r[c.id] ?? "")}
                             </span>
+                          )}
+
+                          {/* material-level required actions */}
+                          {i === 0 && r.__needs_supplier && (
+                            <RowFlag title="This material has no supplier in the project data — assign one in the Supplier column.">
+                              needs supplier
+                            </RowFlag>
                           )}
                           {i === 0 &&
                             !r.__needs_supplier &&
                             Number(r.__lane_count ?? 0) > 1 &&
                             !groupHasPrimary(r as Record<string, unknown>) && (
-                              <span
-                                className="ml-1.5 inline-block rounded-sm bg-destructive/15 text-destructive px-1 text-[9px] align-middle"
-                                title="Multiple sources — pick exactly one primary."
-                              >
+                              <RowFlag title="Multiple sources — pick exactly one primary.">
                                 pick primary
-                              </span>
+                              </RowFlag>
                             )}
                           {c.id === "product_id" && r.__unknown_product && (
                             <span
-                              className="ml-1.5 inline-block rounded-sm bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 text-[9px] align-middle"
                               title="Not found in BOM"
+                              className="shrink-0 rounded-sm px-1 font-mono text-[9px]"
+                              style={{ background: tint(LAYER.firm, 0.12), color: LAYER.firm }}
                             >
                               !
                             </span>
@@ -1411,12 +1212,9 @@ export function StagePolicyTable({
                             stageKey === "customer" &&
                             (!r.__firms_available || (r.__firms_available as string[]).length === 0) &&
                             !getEffective(rowKey, r, "sourcing_firm") && (
-                              <span
-                                className="ml-1.5 inline-block rounded-sm bg-destructive/15 text-destructive px-1 text-[9px] align-middle"
-                                title="No firms detected for this product — type a sourcing firm"
-                              >
+                              <RowFlag title="No firms detected for this product — type a sourcing firm">
                                 set firm
-                              </span>
+                              </RowFlag>
                             )}
                           {/* Per-row reset (drafts + saved overrides) */}
                           {i === 0 && deleteOverride && (overrode || isDirty) && (
@@ -1426,28 +1224,29 @@ export function StagePolicyTable({
                                 e.stopPropagation();
                                 resetRow(rowKey);
                               }}
-                              className="ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] text-muted-foreground hover:text-foreground underline align-middle"
-                              title="Revert this row to project-data prefill"
+                              className="shrink-0 font-mono text-[9.5px] text-[#c4c4c4] opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                              title="Revert this line to project data"
                             >
-                              reset
+                              ↺
                             </button>
                           )}
-                        </td>
-                      );
-                    })}
+                        </span>
+                      </td>
+                    ))}
 
                     {colGroups.flatMap((g) => {
                       if (collapsed.has(g.family)) {
                         return [
                           <td
                             key={`${rowKey}-${g.family}-collapsed`}
-                            className="border-b border-r bg-muted/10"
+                            className="border-b border-r border-[#f4f4f4] bg-[#fcfcfc]"
                           />,
                         ];
                       }
                       return g.cols.map((col) => {
                         const rowDraft = drafts[rowKey] ?? {};
                         const eff = rowEffective.get(rowKey);
+                        const width = widthOf(col);
                         // per-row gating: hide cells whose policy choice doesn't apply
                         const isVisibleForRow = !col.visibleWhen || col.visibleWhen({
                           fulfillmentStrategy,
@@ -1459,7 +1258,8 @@ export function StagePolicyTable({
                           return (
                             <td
                               key={col.field}
-                              className="border-b border-r p-0 min-w-[120px] bg-muted/10 text-center text-[10px] text-muted-foreground/40"
+                              className="border-b border-r border-[#f4f4f4] p-0 text-center font-mono text-[10px] text-[#dcdcdc]"
+                              style={{ width, minWidth: width }}
                               title="Not applicable for the current policy choice"
                             >
                               —
@@ -1471,7 +1271,8 @@ export function StagePolicyTable({
                           return (
                             <td
                               key={col.field}
-                              className="border-b border-r p-0 min-w-[240px] align-top group-hover:bg-accent/30"
+                              className="border-b border-r border-[#f4f4f4] p-0 align-middle group-hover:bg-[#fafafa]"
+                              style={{ width, minWidth: width }}
                             >
                               {renderInvParamsCell(rowKey, r as Record<string, unknown>)}
                             </td>
@@ -1517,53 +1318,129 @@ export function StagePolicyTable({
                           !edited && !imputed && !fromData && !col.master && overrides.some(
                             (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
                           );
-                        const dotClass = edited
-                          ? "bg-primary"
+                        const prov: Provenance = edited
+                          ? "edited"
                           : imputed
-                          ? "bg-destructive"
-                          : fromData
-                          ? "bg-sky-500"
-                          : derivedFallback
-                          ? "bg-amber-500"
-                          : fromOverride
-                          ? "bg-emerald-500"
-                          : null;
-                        const dotTitle = edited
-                          ? "Edited"
-                          : imputed
-                          ? "Imputed project average — verify"
+                          ? "imputed"
                           : fromData
                           ? col.master
-                            ? "From item master"
-                            : "From project data"
+                            ? "master"
+                            : "data"
                           : derivedFallback
-                          ? "Derived fallback (≈) — engine computes this from your inbound/outbound uploads"
+                          ? "derived"
                           : fromOverride
-                          ? "Saved override"
-                          : "Bundle default";
+                          ? "override"
+                          : "default";
+
+                        const firms = r.__firms_available as string[] | undefined;
+                        const opts = enumOptionsFor(col);
+                        const kind = kindOf(col, opts, firms, cellValue, liveDefault);
+                        const commit = (v: unknown) => onCellChange(rowKey, col.field, v);
+
                         return (
                           <td
                             key={col.field}
                             className={cn(
-                              "border-b border-r p-0 min-w-[120px] group-hover:bg-accent/30 relative",
-                              edited && "bg-primary/10",
+                              "relative border-b border-r border-[#f4f4f4] px-1 py-[3px] align-middle group-hover:bg-[#fafafa]",
                             )}
+                            style={{
+                              width,
+                              minWidth: width,
+                              ...(edited ? { background: "rgba(17,17,17,0.04)" } : {}),
+                            }}
                           >
-                            {dotClass && (
+                            {kind !== "number" && <ProvenanceDot p={prov} />}
+
+                            {kind === "readonly" && (
                               <span
-                                className={cn("absolute top-0.5 right-0.5 h-1 w-1 rounded-full", dotClass)}
-                                aria-hidden
-                                title={dotTitle}
+                                title={
+                                  col.engineStatus
+                                    ? `Activates with ${col.engineStatus.milestone}`
+                                    : undefined
+                                }
+                                className="block w-full px-[5px] text-right font-mono text-[11px] tabular-nums text-[#c4c4c4]"
+                              >
+                                {(() => {
+                                  const raw = cellValue ?? liveDefault;
+                                  const n = typeof raw === "number" ? raw : null;
+                                  if (n != null && Number.isFinite(n))
+                                    return col.format ? col.format(n) : String(n);
+                                  return typeof raw === "string" && raw !== "" ? raw : "—";
+                                })()}
+                              </span>
+                            )}
+
+                            {kind === "segmented" && (
+                              <CellSegmented
+                                value={String(
+                                  cellValue ??
+                                    liveDefault ??
+                                    (col.field === "sourcing_firm" ? firms?.[0] : opts?.[0]?.value) ??
+                                    "",
+                                )}
+                                options={
+                                  col.field === "sourcing_firm" && firms
+                                    ? firms.map((f) => ({ value: f, label: f }))
+                                    : opts!
+                                }
+                                onChange={commit}
                               />
                             )}
-                            <ValueCell
-                              spec={col}
-                              value={cellValue}
-                              defaultValue={liveDefault}
-                              firmsAvailable={r.__firms_available as string[] | undefined}
-                              onChange={(v) => onCellChange(rowKey, col.field, v)}
-                            />
 
+                            {kind === "select" && (
+                              <Select
+                                value={String(cellValue ?? liveDefault ?? "")}
+                                onValueChange={commit}
+                              >
+                                <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
+                                  <SelectValue placeholder="—" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(col.field === "sourcing_firm" && firms
+                                    ? firms.map((f) => ({ value: f, label: f, title: undefined }))
+                                    : opts ?? []
+                                  ).map((o) => (
+                                    <SelectItem key={o.value} value={o.value} className="text-xs">
+                                      {o.title ?? o.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+
+                            {kind === "toggle" && (
+                              <span className="flex justify-center">
+                                <Toggle
+                                  checked={
+                                    typeof cellValue === "boolean"
+                                      ? cellValue
+                                      : Boolean(liveDefault)
+                                  }
+                                  onChange={commit}
+                                />
+                              </span>
+                            )}
+
+                            {kind === "number" && (
+                              <NumCell
+                                value={(() => {
+                                  const n =
+                                    typeof cellValue === "number" ? cellValue : Number(cellValue);
+                                  return cellValue == null || !Number.isFinite(n) ? undefined : n;
+                                })()}
+                                provenance={prov}
+                                decimals={prov === "derived" ? 2 : undefined}
+                                onCommit={commit}
+                              />
+                            )}
+
+                            {kind === "text" && (
+                              <input
+                                value={String(cellValue ?? liveDefault ?? "")}
+                                onChange={(e) => commit(e.target.value)}
+                                className="h-5 w-full rounded-[3px] border border-transparent bg-transparent px-[5px] font-mono text-[11.5px] outline-none hover:bg-[#fafafa] focus:border-[#ebebeb] focus:bg-background"
+                              />
+                            )}
                           </td>
                         );
                       });
@@ -1573,30 +1450,31 @@ export function StagePolicyTable({
               })}
           </tbody>
         </table>
-        </div>
-        {dirtyKeys.length > 0 && (
-          <div className="sticky bottom-0 left-0 right-0 z-30 flex items-center justify-end gap-2 border-t bg-card/95 backdrop-blur px-3 py-2">
-            <span className="text-[11px] text-muted-foreground mr-auto">
-              {dirtyKeys.length} row(s) with unsaved changes
-            </span>
-            <Button size="sm" variant="ghost" className="h-8" onClick={revertAll}>
-              Revert
-            </Button>
-            <Button size="sm" className="h-8" onClick={saveAll}>
-              Save changes
-            </Button>
-          </div>
-        )}
       </div>
+
+      {/* The edited/Revert/Save cluster follows the cursor: the toolbar copy is
+          at the top of a 614px-tall grid, this one is always in reach. */}
+      {dirtyKeys.length > 0 && (
+        <div className="fixed bottom-[18px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-[9px] rounded-sm border border-foreground bg-background px-2.5 py-[7px] shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+          <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="h-[5px] w-[5px] rounded-full bg-foreground" />
+            {dirtyKeys.length} edited
+          </span>
+          <Button variant="ghost" size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={revertAll}>
+            Revert
+          </Button>
+          <Button size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={saveAll}>
+            Save changes
+          </Button>
+        </div>
+      )}
 
       <AlertDialog open={confirmPrefill} onOpenChange={setConfirmPrefill}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Apply prefill to all rows?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This saves the project-data prefill values (plus any unsaved edits) as real
-              rows for every resolved row in this stage. Rows still missing a supplier or a
-              primary source are skipped. You can still edit any value afterward.
+            <AlertDialogTitle className="text-[13px]">Apply prefill to all lines?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[12px]">
+              Saves the resolved values as overrides. Lines that need input are skipped.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1617,12 +1495,12 @@ export function StagePolicyTable({
       <AlertDialog open={confirmResetAll} onOpenChange={setConfirmResetAll}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset all saved overrides in this stage?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This deletes {stageOverrides.length} saved override(s) for the rows in this stage.
-              The grid falls back to your uploaded project data and the bundle defaults — use it
-              to clear stale values (e.g. zeros frozen by an earlier auto-prefill). Uploaded
-              data and item masters are not touched.
+            <AlertDialogTitle className="text-[13px]">
+              Reset {stageOverrides.length} saved override(s)?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[12px]">
+              The grid falls back to project data + bundle defaults. Uploads and item masters are
+              not touched.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
