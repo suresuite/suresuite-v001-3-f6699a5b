@@ -681,6 +681,14 @@ A **`run_cache`** consults the key before dispatch: an exact hit returns stored 
 
 Two runs are *comparable* iff they are CRN-paired (same seed spec) and their RunKeys differ in **exactly one** component — different policies on the same world (policy evaluation), different graphs under the same policies (network redesign), different scenarios (disruption impact). The Compare UI enforces this: it is not a chart of two arbitrary runs, it is a paired experiment with valid statistics. This turns A7 from an engine property into a product guarantee.
 
+> **Implementation note (read-path slice, delivered).** The Lab's Compare pane
+> (`src/components/sim/CompareScenariosPanel.tsx`) applies the predicate above to the newest
+> completed run of two scenarios: CRN off or mismatched seeds, zero differing components, more
+> than one differing component (`policy_version_id` vs the stamped `scenario_hash`), or mismatched
+> engine versions each block the table and name the reason instead. The paired *statistics* remain
+> Phase C: the pane reports the stored aggregates, their 95% CI half-widths, and whether the
+> intervals separate — not yet a paired-t over the CRN-matched replication pairs.
+
 ### 9.4 Worker orchestration
 
 The Redis-stream worker (A11) generalizes from one job type to a typed job family: `simulate`, `battery`, `portfolio`, `train_surrogate`, `rank_criticality` (§11.5). Sweeps shard across workers safely because the seed tree and snapshot store are already shard-safe (`scsim/docs/roadmap.md` notes this explicitly — the missing piece is only the orchestrator). Jobs check the run cache before executing; workers remain the sole writers of results.

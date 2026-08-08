@@ -9,15 +9,14 @@
 // (assign_material_supplier for the unsourced-BOM blocker) the fix is offered
 // inline on the finding row.
 import { useState } from "react";
-import { CheckCircle2, ShieldCheck, Wrench } from "lucide-react";
+import { Link } from "react-router-dom";
+import { CheckCircle2, Wrench } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { FindingsList } from "@/components/policies/FindingsList";
+import { FindingsPanel } from "./RunGate";
 import { fieldWalkToRoute } from "@/lib/policies/dataMap";
 import type { Finding } from "@/lib/policies/validationService";
 
@@ -133,74 +132,50 @@ export function PreRunValidationPanel({
 }: Props) {
   if (findings === null) {
     return (
-      <div className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-[11px] text-muted-foreground">
-        <span className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/50 border-t-transparent" />
+      <div className="flex items-center gap-2 rounded-sm border border-[#e0e0e3] bg-white px-3 py-[10px] text-[12.5px] text-[#52525b]">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#d4d4d8] border-t-transparent" />
         Checking required data for this run…
       </div>
     );
   }
 
-  const blocks = findings.filter((f) => f.severity === "block");
-  const warns = findings.filter((f) => f.severity === "warn");
-
-  if (findings.length === 0) {
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-700 dark:text-emerald-300">
-        <ShieldCheck className="h-3.5 w-3.5" />
-        Required-data gate: all clear — this configuration dispatches without findings.
-      </div>
-    );
-  }
+  const warns = findings.filter((f) => f.severity === "warn").length;
 
   return (
-    <div className="rounded-md border bg-card">
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-        <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-        <span className="text-xs font-semibold">Required-data gate</span>
-        <span className="text-[10px] text-muted-foreground">({source})</span>
-        {blocks.length > 0 && (
-          <Badge variant="destructive" className="h-5 text-[10px]">{blocks.length} blocking</Badge>
-        )}
-        {warns.length > 0 && (
-          <Badge variant="secondary" className="h-5 text-[10px]">{warns.length} warning(s)</Badge>
-        )}
-      </div>
-      <div className="p-2">
-        <FindingsList
-          findings={findings}
-          groupBySeverity
-          walkTo={(f) => (f.field ? fieldWalkToRoute(f.field, projectId) : null)}
-          action={(f) =>
-            f.severity === "block" && f.field === "materials.supplier_link" && f.rows?.length ? (
-              <SupplierLinkFix
-                projectId={projectId}
-                materialIds={f.rows}
-                supplierIds={supplierIds}
-              />
-            ) : null
-          }
-        />
-      </div>
-      {warns.length > 0 && (
-        <label className="flex items-start gap-2 border-t px-3 py-2 cursor-pointer">
-          <Checkbox
-            checked={acknowledged}
-            onCheckedChange={(v) => onAcknowledgedChange(v === true)}
-            className="mt-0.5"
-          />
-          <span className="text-[11px]">
-            <b>Acknowledge {warns.length} warning(s) and allow the run</b> — the engine applies its
-            neutral defaults to the fields above; the affected KPIs will reflect placeholder
-            economics until the data is filled in.
-          </span>
-        </label>
-      )}
-      {blocks.length > 0 && (
-        <div className="border-t px-3 py-2 text-[11px] text-destructive">
-          Blocking findings mirror engine hard failures and cannot be acknowledged — fix them
-          above (or via the Project Manager links) to run.
-        </div>
-      )}
-    </div>
+    <FindingsPanel
+      findings={findings}
+      source={source}
+      warns={warns}
+      acknowledged={acknowledged}
+      onAcknowledge={() => onAcknowledgedChange(!acknowledged)}
+      renderFix={(finding) => {
+        const route = finding.field ? fieldWalkToRoute(finding.field, projectId) : null;
+        const supplierFix =
+          finding.severity === "block" &&
+          finding.field === "materials.supplier_link" &&
+          finding.rows?.length ? (
+            <SupplierLinkFix
+              projectId={projectId}
+              materialIds={finding.rows}
+              supplierIds={supplierIds}
+            />
+          ) : null;
+        if (!route && !supplierFix) return null;
+        return (
+          <>
+            {supplierFix}
+            {route && (
+              <Link
+                to={route}
+                className="mt-[3px] inline-block text-[11.5px] text-[#52525b] underline-offset-2 hover:text-foreground hover:underline"
+                title="Open the editor for this field in the Project Manager"
+              >
+                fix data ↗
+              </Link>
+            )}
+          </>
+        );
+      }}
+    />
   );
 }

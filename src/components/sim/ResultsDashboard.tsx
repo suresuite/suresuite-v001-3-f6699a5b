@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { KpiStatTable } from "./KpiStatTable";
 import { UtilizationHeatmap } from "./UtilizationHeatmap";
@@ -38,13 +37,9 @@ function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | 
 export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility }: Props) {
   if (!run) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
-            Run a simulation to see results.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="rounded-sm border border-[#e0e0e3] bg-white px-3 py-[10px] text-[12.5px] text-[#71717a]">
+        No run yet
+      </div>
     );
   }
   const meta = extractMeta(run, reps);
@@ -103,7 +98,7 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility 
         reps={reps.filter((r) => r.status === "done" && r.kpis)}
         warmupWeeks={run.warmup_detected_at}
       />
-      <KpiStatTable reps={reps} />
+      <KpiStatTable reps={reps} primaryKpi={primaryKpi} />
       <UtilizationHeatmap reps={reps} />
       {/* Per-item weekly series (W3 / G17): inspection runs only — renders
           nothing when the run persisted no run_item_series rows. */}

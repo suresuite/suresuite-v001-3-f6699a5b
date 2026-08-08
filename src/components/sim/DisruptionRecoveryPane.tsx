@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -108,7 +108,10 @@ const DEFAULT_RECOVERY: RecoveryConfig = {
   response: [],
 };
 
-function mergeRecovery(
+/** Project defaults overlaid with the scenario's overrides — the config the
+ *  run actually uses. Exported so the page can read the effective lever count
+ *  for the stage rail without re-deriving the merge. */
+export function mergeRecovery(
   defaults: RecoveryConfig | null,
   overrides: Record<string, unknown> | null,
 ): RecoveryConfig {
@@ -257,9 +260,6 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Disruption schedule</CardTitle>
-          <CardDescription className="text-xs">
-            Schedule shocks across the horizon. The recovery strategies below decide how the network responds.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <DisruptionScheduleEditor
@@ -279,9 +279,6 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
                 <ShieldCheck className="h-4 w-4 text-primary" />
                 Recovery playbook
               </CardTitle>
-              <CardDescription className="text-xs">
-                Select response strategies and configure their parameters for this scenario.
-              </CardDescription>
             </div>
             {overriddenFields > 0 && (
               <Badge variant="secondary" className="text-[10px]">
@@ -304,13 +301,11 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
           />
 
           {/* Recovery enabled switch */}
-          <div className="flex items-center justify-between rounded-sm border border-border/60 bg-muted/20 px-3 py-2">
-            <div>
-              <div className="text-xs font-medium">Recovery enabled</div>
-              <div className="text-[10px] text-muted-foreground">
-                When off, disruptions hit raw — no mitigation runs.
-              </div>
-            </div>
+          <div
+            className="flex items-center justify-between rounded-sm border border-border/60 bg-muted/20 px-3 py-2"
+            title="When off, disruptions hit raw — no mitigation runs."
+          >
+            <div className="text-xs font-medium">Recovery enabled</div>
             <Switch
               checked={effective.enabled}
               onCheckedChange={(v) => patchOverride("enabled", v)}
@@ -337,6 +332,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
                     <button
                       type="button"
                       className="w-full flex items-start gap-3 px-3 py-2.5 text-left"
+                      title={STRATEGY_DESCRIPTIONS[opt]}
                       onClick={() => toggleResponse(opt)}
                     >
                       <div
@@ -348,9 +344,6 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
                       <div className="flex flex-col gap-0.5 min-w-0">
                         <span className={cn("text-xs font-medium", active ? "text-foreground" : "text-muted-foreground")}>
                           {RESPONSE_LABELS[opt]}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground leading-snug">
-                          {STRATEGY_DESCRIPTIONS[opt]}
                         </span>
                       </div>
                     </button>
