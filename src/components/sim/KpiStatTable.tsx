@@ -1,75 +1,53 @@
 import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { KpiStatTable as KpiStatTableView, type KpiStat } from "./resultTables";
 import type { Replication } from "@/hooks/useSimulationRun";
 import { summarize } from "@/lib/sim/stats";
+import { KPI_DISPLAY } from "@/lib/sim/kpiDisplay";
 
 interface Props {
   reps: Replication[];
+  /** The scenario's objective — its row is banded and rule-marked. */
+  primaryKpi?: string;
 }
 
-const KPI_DISPLAY: Array<{ key: string; label: string; format: (n: number) => string }> = [
-  { key: "fill_rate", label: "Fill rate (α)", format: (n) => `${(n * 100).toFixed(2)}%` },
-  { key: "fill_rate_beta", label: "Fill rate (β)", format: (n) => `${(n * 100).toFixed(2)}%` },
-  { key: "otif", label: "OTIF", format: (n) => `${(n * 100).toFixed(2)}%` },
-  { key: "lead_time_days", label: "Lead time (days)", format: (n) => n.toFixed(2) },
-  { key: "lead_time_p95", label: "Lead time p95", format: (n) => n.toFixed(2) },
-  { key: "revenue", label: "Revenue", format: (n) => `$${Math.round(n).toLocaleString()}` },
-  { key: "cost", label: "Cost", format: (n) => `$${Math.round(n).toLocaleString()}` },
-  { key: "profit", label: "Profit", format: (n) => `$${Math.round(n).toLocaleString()}` },
-  { key: "utilization", label: "Utilization (avg)", format: (n) => `${(n * 100).toFixed(1)}%` },
-  { key: "inventory_turns", label: "Inventory turns", format: (n) => n.toFixed(2) },
-  { key: "backorder_days", label: "Backorder days", format: (n) => n.toFixed(1) },
-  { key: "ttr_days", label: "Time-to-recover", format: (n) => n.toFixed(1) },
-  { key: "resilience_index", label: "Resilience index", format: (n) => n.toFixed(3) },
-];
-
-export function KpiStatTable({ reps }: Props) {
-  const stats = useMemo(() => {
+/** Cross-replication KPI summary. The math is unchanged — the formatting now
+ *  happens here and the table only renders strings. */
+export function KpiStatTable({ reps, primaryKpi }: Props) {
+  const rows = useMemo<KpiStat[]>(() => {
     const done = reps.filter((r) => r.status === "done");
     return KPI_DISPLAY.map((kpi) => {
       const xs = done.map((r) => r.kpis[kpi.key]).filter((n): n is number => typeof n === "number");
-      return { ...kpi, stat: summarize(xs) };
-    }).filter((row) => row.stat.n > 0);
+      const stat = summarize(xs);
+      return {
+        key: kpi.key,
+        label: kpi.label,
+        mean: kpi.format(stat.mean),
+        ci: `± ${kpi.format(stat.ci95)}`,
+        std: kpi.format(stat.std),
+        min: kpi.format(stat.min),
+        max: kpi.format(stat.max),
+        n: stat.n,
+      };
+    }).filter((row) => row.n > 0);
   }, [reps]);
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">KPI summary across replications</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {stats.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No completed replications yet.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-[11px]">KPI</TableHead>
-                <TableHead className="text-[11px] text-right">Mean</TableHead>
-                <TableHead className="text-[11px] text-right">± 95% CI</TableHead>
-                <TableHead className="text-[11px] text-right">σ</TableHead>
-                <TableHead className="text-[11px] text-right">Min</TableHead>
-                <TableHead className="text-[11px] text-right">Max</TableHead>
-                <TableHead className="text-[11px] text-right">n</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stats.map((row) => (
-                <TableRow key={row.key}>
-                  <TableCell className="text-xs font-medium">{row.label}</TableCell>
-                  <TableCell className="text-xs text-right font-mono">{row.format(row.stat.mean)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono">{row.format(row.stat.ci95)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono">{row.format(row.stat.std)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono">{row.format(row.stat.min)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono">{row.format(row.stat.max)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono">{row.stat.n}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+    <section className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
+      <div className="flex items-center gap-[9px] border-b border-[#e0e0e3] px-3 py-[9px]">
+        <span className="text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">
+          KPI summary across replications
+        </span>
+        <span className="ml-auto text-[11.5px] tabular-nums text-[#52525b]">
+          {rows.length} {rows.length === 1 ? "KPI" : "KPIs"}
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-3 py-[10px] text-[12.5px] text-[#71717a]">
+          No completed replications yet
+        </div>
+      ) : (
+        <KpiStatTableView rows={rows} primaryKpi={primaryKpi ?? ""} />
+      )}
+    </section>
   );
 }

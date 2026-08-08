@@ -1,31 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjects } from "@/hooks/useProjects";
 import { useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
+import { useScenarioRuns } from "@/hooks/useScenarioRuns";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useModelValidation } from "@/hooks/useModelValidation";
-import { ScenarioRail } from "@/components/sim/ScenarioRail";
+import { StageRail, buildStages, type PaneId } from "@/components/sim/StageRail";
+import { ExperimentLibraryBox, ScenarioList } from "@/components/sim/ScenarioRail";
 import { ScenarioSetupForm } from "@/components/sim/ScenarioSetupForm";
 import { ScenarioLibraryPanel } from "@/components/sim/ScenarioLibraryPanel";
 import { RunProgressPanel } from "@/components/sim/RunProgressPanel";
 import { ResultsDashboard } from "@/components/sim/ResultsDashboard";
 import { CompareScenariosPanel } from "@/components/sim/CompareScenariosPanel";
-import { DisruptionRecoveryPane } from "@/components/sim/DisruptionRecoveryPane";
-import { StressTestCard, type StressTestPreset } from "@/components/sim/StressTestCard";
+import { DisruptionRecoveryPane, mergeRecovery } from "@/components/sim/DisruptionRecoveryPane";
+import {
+  StressTestDrawer,
+  STRESS_TESTS,
+  type StressTestPreset,
+} from "@/components/sim/StressTestCard";
 import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
+import { GateBar } from "@/components/sim/RunGate";
 import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import {
   compileGateFindings,
@@ -39,7 +41,7 @@ interface Props {
   setIsCollapsed: (c: boolean) => void;
 }
 
-type Pane = "setup" | "recovery" | "run" | "results" | "compare";
+type Pane = PaneId;
 
 export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [searchParams] = useSearchParams();
@@ -47,6 +49,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const projectId = globalSelectedProjectId;
   const { projects } = useProjects();
   const { scenarios, loading, create, update, remove, duplicate } = useScenarios(projectId);
+  const { runsByScenario } = useScenarioRuns(projectId);
   const {
     defaults: policyDefaults,
     versions: policyVersions,
@@ -58,6 +61,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>("setup");
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [stressOpen, setStressOpen] = useState(false);
 
   // If navigated from a network page with ?scenario_id=XYZ, auto-select that scenario
   // and jump to the recovery pane so the user sees the pre-filled disruption.
@@ -248,12 +252,34 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fromNetwork = !!(selected && (selected as any).from_network);
 
+  // ── Stage rail (UI pass) ──────────────────────────────────────────────────
+  // Every sub-label is a fact the page already holds. "Results done" means the
+  // newest completed run was dispatched under the model version in force —
+  // a run from a superseded version is history, not the current answer.
+  const effectiveRecovery = useMemo(
+    () => mergeRecovery(projectRecovery, (selected?.recovery_overrides ?? null) as Record<string, unknown> | null),
+    [projectRecovery, selected?.recovery_overrides],
+  );
+  const { stages, gate: gateReadout } = buildStages({
+    scenario: selected ?? { horizon_days: 0, replications: 0, primary_kpi: "" },
+    eventCount: selected?.disruption_schedule?.length ?? 0,
+    leverCount: effectiveRecovery.response?.length ?? 0,
+    recoveryEnabled: !!effectiveRecovery.enabled,
+    gate: { blocks: gateBlocks, warns: gateWarns, reason: runBlockedReason },
+    run: latestRun && {
+      status: latestRun.status,
+      rep_count_done: latestRun.rep_count_done,
+      rep_count_target: latestRun.rep_count_target,
+      current: !policyDirty && latestRun.policy_version_id === policyVersionId,
+    },
+    scenariosWithResults: scenarios.filter((s) => runsByScenario[s.id]).length,
+  });
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className="px-12 py-6">
         <PageHeader
           title="Simulation Lab"
-          subtitle="Scenarios, replications, warm-up auto-detection, and utilization-first KPIs."
           rightContent={
             <div className="flex items-center gap-2">
               <Select
@@ -277,124 +303,103 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
         />
 
         {!projectId ? (
-          <Alert>
-            <AlertDescription>Select a project to start designing experiments.</AlertDescription>
-          </Alert>
+          <div className="rounded-sm border border-[#e0e0e3] bg-white px-3 py-[10px] text-[12.5px] text-[#71717a]">
+            No project selected
+          </div>
         ) : (
-          <div className="flex gap-4 items-start">
-            <aside className="flex flex-col gap-3 shrink-0">
-              <StressTestCard
-                onLaunch={async (preset: StressTestPreset) => {
-                  const s = await create(preset.name);
-                  if (!s) return;
-                  await update(s.id, {
-                    description: preset.description,
-                    disruption_schedule: preset.disruption_schedule,
-                  });
-                  // Stress scenarios share the baseline world (events are
-                  // excluded from the fingerprint, §2.3) — they inherit too.
-                  inheritTried.current.add(s.id);
-                  void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty });
-                  setSelectedId(s.id);
-                  setPane("recovery");
-                  toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
-                }}
-              />
-              <ScenarioRail
-                scenarios={scenarios}
-                selectedId={selectedId}
-                loading={loading}
-                credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
-                onSelect={setSelectedId}
-                onCreate={async () => {
-                  const s = await create(`Scenario ${scenarios.length + 1}`);
-                  if (!s) return;
-                  // §2.6: scenarios created under a validated triple inherit
-                  // the adopted warm-up + replication count at birth.
-                  inheritTried.current.add(s.id);
-                  void cred
-                    .applyIfValidated(s, policyVersionId, { dirty: policyDirty })
-                    .then((cardId) => {
-                      if (cardId) {
-                        toast.message("Warm-up & replications inherited from the model validation.");
-                      }
-                    });
-                  setSelectedId(s.id);
-                }}
-                onDuplicate={async (s) => {
-                  const d = await duplicate(s);
-                  if (d) setSelectedId(d.id);
-                }}
-                onDelete={async (id) => {
-                  await remove(id);
-                  if (selectedId === id) setSelectedId(null);
-                }}
-              />
-            </aside>
+          <div className="flex flex-col gap-3">
+            {selected ? (
+              <StageRail stages={stages} active={pane} onSelect={setPane} gate={gateReadout} />
+            ) : null}
 
+            <div className="flex gap-4 items-start">
+              <aside className="w-64 shrink-0">
+                <ExperimentLibraryBox
+                  count={STRESS_TESTS.length}
+                  open={stressOpen}
+                  onToggle={() => setStressOpen((v) => !v)}
+                />
+                {stressOpen ? (
+                  <StressTestDrawer
+                    onLaunch={async (preset: StressTestPreset) => {
+                      const s = await create(preset.name);
+                      if (!s) return;
+                      await update(s.id, {
+                        description: preset.description,
+                        disruption_schedule: preset.disruption_schedule,
+                      });
+                      // Stress scenarios share the baseline world (events are
+                      // excluded from the fingerprint, §2.3) — they inherit too.
+                      inheritTried.current.add(s.id);
+                      void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty });
+                      setSelectedId(s.id);
+                      setPane("recovery");
+                      toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
+                    }}
+                  />
+                ) : null}
+                <ScenarioList
+                  scenarios={scenarios}
+                  selectedId={selectedId}
+                  loading={loading}
+                  credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
+                  onSelect={setSelectedId}
+                  onBrowseSaved={() => setLibraryOpen(true)}
+                  onCreate={async () => {
+                    const s = await create(`Scenario ${scenarios.length + 1}`);
+                    if (!s) return;
+                    // §2.6: scenarios created under a validated triple inherit
+                    // the adopted warm-up + replication count at birth.
+                    inheritTried.current.add(s.id);
+                    void cred
+                      .applyIfValidated(s, policyVersionId, { dirty: policyDirty })
+                      .then((cardId) => {
+                        if (cardId) {
+                          toast.message("Warm-up & replications inherited from the model validation.");
+                        }
+                      });
+                    setSelectedId(s.id);
+                  }}
+                  onDuplicate={async (s) => {
+                    const d = await duplicate(s);
+                    if (d) setSelectedId(d.id);
+                  }}
+                  onDelete={async (id) => {
+                    await remove(id);
+                    if (selectedId === id) setSelectedId(null);
+                  }}
+                />
+              </aside>
 
-            <div className="flex-1 min-w-0 flex flex-col gap-3">
-              {/* Toolbar row: pane tabs + Browse library button */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <ToggleGroup
-                  type="single"
-                  value={pane}
-                  onValueChange={(v) => v && setPane(v as Pane)}
-                  className="justify-start flex-1"
-                >
-                  <ToggleGroupItem value="setup" className="text-xs">Setup</ToggleGroupItem>
-                  <ToggleGroupItem value="recovery" className="text-xs">Recovery playbook</ToggleGroupItem>
-                  <ToggleGroupItem value="run" className="text-xs">Run</ToggleGroupItem>
-                  <ToggleGroupItem value="results" className="text-xs">Results</ToggleGroupItem>
-                  <ToggleGroupItem value="compare" className="text-xs">Compare</ToggleGroupItem>
-                </ToggleGroup>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 text-xs"
-                  onClick={() => setLibraryOpen(true)}
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  Browse library
-                </Button>
-              </div>
-
-              {/* From-network badge */}
-              {fromNetwork && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px] gap-1">
-                    From network map
-                  </Badge>
-                  <span className="text-[11px] text-muted-foreground">
-                    Disruption was pre-configured from the supply chain network view.
+              <div className="flex-1 min-w-0 flex flex-col gap-3">
+                {fromNetwork && (
+                  <span className="w-fit rounded-sm bg-[#f0f0f2] px-[7px] py-px text-[11px] text-[#52525b]">
+                    from network map
                   </span>
-                </div>
-              )}
+                )}
 
-              {!selected ? (
-                <Alert>
-                  <AlertDescription>
-                    No scenario selected. Create one in the rail or browse the library to get started.
-                  </AlertDescription>
-                </Alert>
-              ) : pane === "setup" ? (
-                <ScenarioSetupForm
-                  scenario={selected}
-                  projectId={projectId}
-                  onSave={(patch) => update(selected.id, patch)}
-                />
-              ) : pane === "recovery" ? (
-                <DisruptionRecoveryPane
-                  scenario={selected}
-                  projectRecovery={projectRecovery}
-                  onSave={(patch) => update(selected.id, patch)}
-                />
-              ) : pane === "run" ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-3 flex-wrap rounded-md border bg-card px-3 py-2.5">
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-xs font-medium flex items-center gap-2 flex-wrap">
+                {!selected ? (
+                  <div className="rounded-sm border border-[#e0e0e3] bg-white px-3 py-[10px] text-[12.5px] text-[#71717a]">
+                    No scenario selected
+                  </div>
+                ) : pane === "setup" ? (
+                  <ScenarioSetupForm
+                    scenario={selected}
+                    projectId={projectId}
+                    onSave={(patch) => update(selected.id, patch)}
+                  />
+                ) : pane === "recovery" ? (
+                  <DisruptionRecoveryPane
+                    scenario={selected}
+                    projectRecovery={projectRecovery}
+                    onSave={(patch) => update(selected.id, patch)}
+                  />
+                ) : pane === "run" ? (
+                  <div className="flex flex-col gap-3">
+                    {/* Model version + the gate, with the blocked reason as
+                        visible text instead of a title attribute. */}
+                    <section className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
+                      <div className="flex flex-wrap items-center gap-2 px-3 py-[9px] text-[12.5px] text-[#18181b]">
                         {policyDirty
                           ? policyVersionId
                             ? `Policy settings changed since version "${
@@ -407,66 +412,52 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                               policyVersionId?.slice(0, 8)
                             }`}
                         <CredibilityBadge credibility={credibility} />
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        Policies are versioned; network data is current.
-                      </span>
-                    </div>
-                    {policyDirty ? (
-                      <Button
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={handleSaveVersionAndRun}
-                        disabled={runBlockedReason !== null}
-                        title={runBlockedReason ?? undefined}
-                      >
-                        Save version &amp; run
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={handleRun}
-                        disabled={runBlockedReason !== null}
-                        title={runBlockedReason ?? undefined}
-                      >
-                        {gateWarns > 0 && ackWarnings ? "Acknowledge & run" : "Run"}
-                      </Button>
-                    )}
+                      </div>
+                      <GateBar
+                        blocks={gateBlocks}
+                        warns={gateWarns}
+                        acknowledged={ackWarnings}
+                        reason={runBlockedReason}
+                        dirty={policyDirty}
+                        onRun={handleRun}
+                        onSaveVersionAndRun={handleSaveVersionAndRun}
+                        onShowFindings={() => setPane("run")}
+                      />
+                    </section>
+                    <PreRunValidationPanel
+                      projectId={projectId}
+                      findings={gateFindings}
+                      source={serverFindings ? "gate rejection" : "pre-run check"}
+                      acknowledged={ackWarnings}
+                      onAcknowledgedChange={setAckWarnings}
+                      supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
+                    />
+                    <RunProgressPanel
+                      run={latestRun}
+                      reps={reps}
+                      versionLabel={
+                        latestRun?.policy_version_id
+                          ? policyVersions.find((v) => v.id === latestRun.policy_version_id)?.label ??
+                            latestRun.policy_version_id.slice(0, 8)
+                          : null
+                      }
+                      credibility={cred.resolveRun(latestRun)}
+                      onCancel={handleCancel}
+                      onAddReps={handleAddReps}
+                    />
                   </div>
-                  <PreRunValidationPanel
-                    projectId={projectId}
-                    findings={gateFindings}
-                    source={serverFindings ? "gate rejection" : "pre-run check"}
-                    acknowledged={ackWarnings}
-                    onAcknowledgedChange={setAckWarnings}
-                    supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
-                  />
-                  <RunProgressPanel
+                ) : pane === "results" ? (
+                  <ResultsDashboard
                     run={latestRun}
                     reps={reps}
-                    versionLabel={
-                      latestRun?.policy_version_id
-                        ? policyVersions.find((v) => v.id === latestRun.policy_version_id)?.label ??
-                          latestRun.policy_version_id.slice(0, 8)
-                        : null
-                    }
+                    primaryKpi={selected.primary_kpi}
+                    scenario={selected}
                     credibility={cred.resolveRun(latestRun)}
-                    onCancel={handleCancel}
-                    onAddReps={handleAddReps}
                   />
-                </div>
-              ) : pane === "results" ? (
-                <ResultsDashboard
-                  run={latestRun}
-                  reps={reps}
-                  primaryKpi={selected.primary_kpi}
-                  scenario={selected}
-                  credibility={cred.resolveRun(latestRun)}
-                />
-              ) : (
-                <CompareScenariosPanel />
-              )}
+                ) : (
+                  <CompareScenariosPanel scenarios={scenarios} runsByScenario={runsByScenario} />
+                )}
+              </div>
             </div>
           </div>
         )}

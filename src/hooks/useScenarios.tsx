@@ -31,9 +31,10 @@ export interface Scenario {
   updated_at: string;
 }
 
-const SCENARIO_DEFAULTS = (projectId: string, name = "Baseline"): Partial<Scenario> => ({
-  project_id: projectId,
-  name,
+/** The engine's neutral starting point for a new scenario. Exported so the
+ *  setup form can mark a field "edited" against ONE source of truth instead of
+ *  re-declaring the defaults next to the inputs. */
+export const SCENARIO_ENGINE_DEFAULTS = {
   description: "",
   horizon_days: 90,
   time_step: "day",
@@ -47,6 +48,12 @@ const SCENARIO_DEFAULTS = (projectId: string, name = "Baseline"): Partial<Scenar
   recovery_overrides: {},
   stopping_rule: { kind: "fixed_horizon", max_wall_seconds: 600 },
   primary_kpi: "fill_rate",
+} satisfies Partial<Scenario>;
+
+const SCENARIO_DEFAULTS = (projectId: string, name = "Baseline"): Partial<Scenario> => ({
+  project_id: projectId,
+  name,
+  ...SCENARIO_ENGINE_DEFAULTS,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
