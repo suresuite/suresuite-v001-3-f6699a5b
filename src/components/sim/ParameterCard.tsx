@@ -34,8 +34,8 @@ const PROV: Record<Exclude<Provenance, null>, { label: string; chip: string; row
 };
 
 const TH =
-  "bg-[#f4f4f5] px-3 py-1.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#52525b] border-b border-[#e0e0e3]";
-const TD = "px-3 py-[5px] border-b border-[#ececee]";
+  "bg-[#f4f4f5] px-3 py-1.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#52525b] border-b border-[--hair-rule]";
+const TD = "px-3 py-[5px] border-b border-[--sim-divider]";
 
 function Segmented({
   value,
@@ -47,7 +47,7 @@ function Segmented({
   onChange: (v: string) => void;
 }) {
   return (
-    <span className="inline-flex rounded-sm border border-[#e0e0e3] p-[2px]">
+    <span className="inline-flex rounded-sm border border-[--hair-rule] p-[2px]">
       {options.map((o) => (
         <button
           key={o.value}
@@ -97,8 +97,8 @@ function Switch({
 
 export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: string }) {
   return (
-    <section className="flex h-full flex-col overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
-      <div className="flex items-center gap-[9px] border-b border-[#e0e0e3] px-3 py-[9px]">
+    <section className="flex h-full flex-col overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
+      <div className="flex items-center gap-[9px] border-b border-[--hair-rule] px-3 py-[9px]">
         <h3 className="whitespace-nowrap text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">
           {group.name}
         </h3>
@@ -107,7 +107,7 @@ export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: s
             {group.chip}
           </span>
         ) : null}
-        <span className="ml-auto whitespace-nowrap text-[12.5px] text-[#71717a]">
+        <span className="ml-auto whitespace-nowrap text-[12.5px] text-[--zinc-quiet]">
           {group.fields.length} parameters
         </span>
       </div>

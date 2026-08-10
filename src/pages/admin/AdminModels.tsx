@@ -111,7 +111,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
             <tr>
               <FilterTH filterKey="name" /><FilterTH filterKey="code" />
               <FilterTH filterKey="inp" align="right" /><FilterTH filterKey="out" align="right" />
-              <FilterTH filterKey="ctx" align="right" /><th className="border-b border-[#ebebeb] bg-[#fafafa]" /><th className="border-b border-[#ebebeb] bg-[#fafafa]" />
+              <FilterTH filterKey="ctx" align="right" /><th className="border-b border-[--hair-border] bg-white" /><th className="border-b border-[--hair-border] bg-white" />
             </tr></thead>
             <tbody>
               {loading ? <LoadingRow colSpan={7} /> : sorted.length === 0 ? (

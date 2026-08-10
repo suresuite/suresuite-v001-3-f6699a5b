@@ -244,7 +244,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
         <PageHeader title="Project Intelligence" />
 
         <div
-          className="grid h-[calc(100vh-150px)] min-h-[560px] overflow-hidden rounded-sm border border-[#ebebeb] bg-background"
+          className="grid h-[calc(100vh-150px)] min-h-[560px] overflow-hidden rounded-sm border border-[--hair-border] bg-background"
           style={{
             gridTemplateColumns: sidebarCollapsed ? "48px 1fr" : sidebarWidth + "px 5px 1fr",
           }}
@@ -287,8 +287,8 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
             <div
               onMouseDown={startResize}
               title="Drag to resize"
-              className="cursor-col-resize border-r border-[#ebebeb]"
-              style={{ background: resizing ? "#ebebeb" : "transparent" }}
+              className="cursor-col-resize border-r border-[--hair-border]"
+              style={{ background: resizing ? "var(--hair-border)" : "transparent" }}
             />
           )}
 

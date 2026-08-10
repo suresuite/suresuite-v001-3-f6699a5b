@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { SURFACE, KX, TH, TD, ROW_HOVER, StatusDot, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters, type DotTone } from '@/components/admin/adminUi';
+import { TableBlock } from '@/components/shared';
 import { aggregateMatrixByModel, type ModelCapabilityRow, type ModelMatrixAggregate } from '@/lib/modelMatrix';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -119,8 +120,12 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
       </div>
 
       {matrixRows.length > 0 && (
-        <div className={`${SURFACE} mt-5 overflow-hidden`}>
-          <div className={`${KX} border-b border-[#ebebeb] px-4 py-2.5`}>Model capability matrix · nightly eval (§23)</div>
+        // L1: name on the canvas above the shell.
+        <TableBlock
+          className="mt-5"
+          name="Model capability matrix · nightly eval (§23)"
+          count={matrixRows.length}
+        >
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead><tr><th className={TH}>Model</th><th className={`${TH} text-right`}>Passing</th><th className={TH}>Below target</th><th className={TH}>Measured</th><th className={TH}>Freshness</th></tr></thead>
@@ -137,12 +142,16 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
               </tbody>
             </table>
           </div>
-        </div>
+        </TableBlock>
       )}
 
       {fileRows.length > 0 && (
-        <div className={`${SURFACE} mt-5 overflow-hidden`}>
-          <div className={`${KX} border-b border-[#ebebeb] px-4 py-2.5`}>File workspace by organization (§16.2)</div>
+        // L1: name on the canvas above the shell.
+        <TableBlock
+          className="mt-5"
+          name="File workspace by organization (§16.2)"
+          count={fileRows.length}
+        >
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead><tr><th className={TH}>Organization</th><th className={`${TH} text-right`}>Files</th><th className={`${TH} text-right`}>Total size</th><th className={`${TH} text-right`}>Kept size</th><th className={`${TH} text-right`}>Expiring ≤ 7d</th></tr></thead>
@@ -159,7 +168,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
               </tbody>
             </table>
           </div>
-        </div>
+        </TableBlock>
       )}
     </AdminLayout>
   );

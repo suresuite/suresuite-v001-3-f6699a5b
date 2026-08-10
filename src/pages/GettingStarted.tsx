@@ -35,7 +35,7 @@ const featureRoutes = {
 };
 
 const StatChip = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex items-center gap-2 rounded-full border px-3 py-1 text-sm text-muted-foreground bg-background">
+  <div className="flex items-center gap-2 rounded-sm border px-3 py-1 text-sm text-muted-foreground bg-background">
     <CheckCircle2 className="h-4 w-4 text-green-600" />
     <span>{children}</span>
   </div>
@@ -176,7 +176,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
             <div className="max-w-5xl">
               <div className="mb-8">
                 <div className="inline-flex items-center gap-3 mb-6">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                  <div className="h-12 w-12 rounded-sm bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
                     <Network className="h-6 w-6 text-white" />
                   </div>
                   <div>
@@ -261,11 +261,11 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
             <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-0 bg-gradient-to-br from-blue-50/50 to-indigo-100/50 dark:from-blue-950/30 dark:to-indigo-900/30">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-indigo-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <CardContent className="p-8">
-                <div className="mb-6 h-16 w-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <div className="mb-6 h-16 w-16 mx-auto rounded-sm bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
                   <Network className="h-8 w-8 text-white" />
                 </div>
                 <div className="space-y-4 text-center">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium">
                     Interactive Network Graph
                   </div>
                   <h3 className="text-xl font-bold tracking-tight">See disruption impact fast</h3>
@@ -281,11 +281,11 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
             <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-0 bg-gradient-to-br from-purple-50/50 to-violet-100/50 dark:from-purple-950/30 dark:to-violet-900/30">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 to-violet-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <CardContent className="p-8">
-                <div className="mb-6 h-16 w-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg">
+                <div className="mb-6 h-16 w-16 mx-auto rounded-sm bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg">
                   <Crosshair className="h-8 w-8 text-white" />
                 </div>
                 <div className="space-y-4 text-center">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-sm font-medium">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-sm font-medium">
                     Hidden Critical Detection
                   </div>
                   <h3 className="text-xl font-bold tracking-tight">Surface nexus nodes automatically</h3>
@@ -301,11 +301,11 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
             <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-0 bg-gradient-to-br from-emerald-50/50 to-teal-100/50 dark:from-emerald-950/30 dark:to-teal-900/30">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/5 to-teal-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <CardContent className="p-8">
-                <div className="mb-6 h-16 w-16 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                <div className="mb-6 h-16 w-16 mx-auto rounded-sm bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
                   <Shuffle className="h-8 w-8 text-white" />
                 </div>
                 <div className="space-y-4 text-center">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
                     Strategy Simulation
                   </div>
                   <h3 className="text-xl font-bold tracking-tight">Test tactics side-by-side</h3>
@@ -329,7 +329,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
               <h3 className="text-2xl font-bold text-white mb-2">Ready to strengthen your supply chain?</h3>
               <p className="text-white/70 text-lg">Upload data → Analyze vulnerabilities → Simulate strategies</p>
             </div>
-            <Button asChild variant="outline" size="lg" className="rounded-full bg-background/10 border-white/20 text-white hover:bg-background/20 transition-all duration-200 hover:scale-105">
+            <Button asChild variant="outline" size="lg" className="rounded-sm bg-background/10 border-white/20 text-white hover:bg-background/20 transition-all duration-200 hover:scale-105">
               <Link to="/project-manager">Launch SuReSuite <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </div>
@@ -377,7 +377,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
 
             {/* Tab Navigation */}
             <div className="flex justify-center mb-8">
-              <div className="flex bg-muted rounded-xl p-1 max-w-md mx-auto">
+              <div className="flex bg-muted rounded-sm p-1 max-w-md mx-auto">
                 <button
                   onClick={() => setActiveTech('network')}
                   className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -412,13 +412,13 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
             </div>
 
             {/* Content Panel */}
-            <div className="bg-gradient-to-br from-muted to-background rounded-2xl border border-border overflow-hidden shadow-lg">
+            <div className="bg-gradient-to-br from-muted to-background rounded-sm border border-border overflow-hidden shadow-lg">
               {activeTech === 'network' && (
                 <div className="grid lg:grid-cols-3 gap-0">
                   {/* Left: Info Panel */}
                   <div className="lg:col-span-1 p-8 bg-background border-r border-border">
                     <div className="flex items-center gap-3 mb-6">
-                      <div className="p-3 rounded-xl bg-[#BF2330]/10">
+                      <div className="p-3 rounded-sm bg-[#BF2330]/10">
                         <Share2 className="h-6 w-6 text-[#BF2330]"/>
                       </div>
                       <div>
@@ -455,7 +455,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
 
               {activeTech === 'nexus' && (
                 <div className="p-12 text-center min-h-[500px] flex flex-col items-center justify-center">
-                  <div className="p-6 rounded-2xl bg-purple-50 mb-6">
+                  <div className="p-6 rounded-sm bg-purple-50 mb-6">
                     <Crosshair className="h-16 w-16 text-purple-500 mx-auto" />
                   </div>
                   <h3 className="text-2xl font-bold text-foreground mb-4">Nexus Node Detection</h3>
@@ -465,7 +465,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
 
               {activeTech === 'simulation' && (
                 <div className="p-12 text-center min-h-[500px] flex flex-col items-center justify-center">
-                  <div className="p-6 rounded-2xl bg-red-50 mb-6">
+                  <div className="p-6 rounded-sm bg-red-50 mb-6">
                     <Shuffle className="h-16 w-16 text-[#BF2330] mx-auto" />
                   </div>
                   <h3 className="text-2xl font-bold text-foreground mb-4">Monte Carlo Simulation</h3>
@@ -486,7 +486,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
               asChild
               variant="outline"
               size="lg"
-              className="rounded-full bg-background/10 border-white/20 text-white hover:bg-background/20 shrink-0 whitespace-nowrap md:self-start md:ml-auto md:-mt-2"
+              className="rounded-sm bg-background/10 border-white/20 text-white hover:bg-background/20 shrink-0 whitespace-nowrap md:self-start md:ml-auto md:-mt-2"
             >
               <Link to="/project-manager">
                 Start now <ArrowRight className="ml-2 h-4 w-4" />
@@ -510,7 +510,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
                   <div className="flex items-center justify-between">
                     <div className="text-sm"><span className="font-semibold">Enhanced Training.</span> <span className="text-muted-foreground">Broaden simulation scenarios and industry datasets to improve model robustness.</span></div>
                     <div className="flex flex-col items-end gap-0.5 text-right">
-                      <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">In progress</span>
+                      <span className="text-xs px-2 py-1 rounded-sm bg-primary/10 text-primary">In progress</span>
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /> Q4 2025</span>
                     </div>
                   </div>
@@ -526,7 +526,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
                   <div className="flex items-center justify-between">
                     <div className="text-sm"><span className="font-semibold">GIS Mapping.</span> <span className="text-muted-foreground">Geospatial visualization of suppliers/customers for location-based risk analysis.</span></div>
                     <div className="flex flex-col items-end gap-0.5 text-right">
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-700">Planned</span>
+                      <span className="text-xs px-2 py-1 rounded-sm bg-blue-500/10 text-blue-700">Planned</span>
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /> Q1 2026</span>
                     </div>
                   </div>
@@ -542,7 +542,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
                   <div className="flex items-center justify-between">
                     <div className="text-sm"><span className="font-semibold">Deep-Tier Analysis.</span> <span className="text-muted-foreground">Extend to tier-2/3 suppliers to capture cascading dependencies across the network.</span></div>
                     <div className="flex flex-col items-end gap-0.5 text-right">
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-700">Planned</span>
+                      <span className="text-xs px-2 py-1 rounded-sm bg-blue-500/10 text-blue-700">Planned</span>
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /> Q2 2026</span>
                     </div>
                   </div>

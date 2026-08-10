@@ -967,14 +967,14 @@ export function StagePolicyTable({
 
       {dataRows.length > 0 && <ProvenanceLegend imputedLines={imputedLines} />}
 
-      <div className="max-h-[614px] overflow-auto rounded-sm border border-[#ebebeb] border-t-2 border-t-foreground [scrollbar-gutter:stable]">
+      <div className="max-h-[614px] overflow-auto rounded-sm border border-[--hair-border] border-t-2 border-t-foreground [scrollbar-gutter:stable]">
         <table className="w-max min-w-full border-separate border-spacing-0">
           <thead>
             {/* Row 1 — family bands. */}
             <tr>
               <th
                 colSpan={spec.keyCols.length}
-                className="sticky left-0 top-0 z-40 h-[23px] border-b border-r border-[#ebebeb] bg-background p-0"
+                className="sticky left-0 top-0 z-40 h-[23px] border-r border-r-[rgba(255,255,255,0.22)] bg-[--brand-ink] p-0"
                 style={{ width: keyTotal, minWidth: keyTotal }}
               />
               {colGroups.map((g) => {
@@ -986,7 +986,7 @@ export function StagePolicyTable({
                   <th
                     key={g.family}
                     colSpan={isCollapsed ? 1 : g.cols.length}
-                    className="sticky top-0 z-30 h-[23px] border-b border-[#ebebeb] bg-background p-0 align-middle"
+                    className="sticky top-0 z-30 h-[23px] bg-[--brand-ink] p-0 align-middle"
                   >
                     <FamilyBand
                       family={g.family}
@@ -1003,7 +1003,7 @@ export function StagePolicyTable({
               {spec.keyCols.map((c, i) => (
                 <th
                   key={c.id}
-                  className="sticky top-[23px] z-40 border-b border-[#ebebeb] bg-[#fafafa] p-0 align-top"
+                  className="sticky top-[23px] z-40 bg-[--brand-ink] p-0 align-top"
                   style={{
                     left: keyLeft(i),
                     width: keyWidths[i],
@@ -1024,7 +1024,7 @@ export function StagePolicyTable({
                   return [
                     <th
                       key={`${g.family}-collapsed`}
-                      className="sticky top-[23px] z-30 border-b border-r border-[#ebebeb] bg-[#fafafa] px-2 py-1 text-center font-mono text-[9.5px] text-[#c4c4c4]"
+                      className="sticky top-[23px] z-30 border-r border-r-[rgba(255,255,255,0.22)] bg-[--brand-ink] px-2 py-1 text-center font-mono text-[9.5px] text-white/60"
                       style={{ width: DEFAULT_COL_WIDTH, minWidth: DEFAULT_COL_WIDTH }}
                     >
                       {g.cols.length} hidden
@@ -1036,13 +1036,13 @@ export function StagePolicyTable({
                   return (
                     <th
                       key={col.field}
-                      className="sticky top-[23px] z-30 border-b border-[#ebebeb] bg-[#fafafa] p-0 align-top"
+                      className="sticky top-[23px] z-30 bg-[--brand-ink] p-0 align-top"
                       style={{ width, minWidth: width }}
                     >
                       {col.synthetic ? (
                         // Vector cell anchor: a plain label — its params carry
                         // their own meaning inside the cell.
-                        <div className="flex h-full items-start border-r border-[#ebebeb] px-1.5 py-1 font-mono text-[10px] uppercase leading-[1.25] tracking-[0.08em] text-muted-foreground">
+                        <div className="flex h-full items-start border-r border-r-[rgba(255,255,255,0.22)] px-1.5 py-1 font-mono text-[10px] font-medium uppercase leading-[1.25] tracking-[0.08em] text-white">
                           {adaptLabel(col.label)}
                         </div>
                       ) : (
@@ -1093,8 +1093,8 @@ export function StagePolicyTable({
                       <td
                         key={c.id}
                         className={cn(
-                          "sticky z-20 border-b border-r border-[#f4f4f4] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
-                          i === spec.keyCols.length - 1 && "border-r-[#ebebeb]",
+                          "sticky z-20 border-b border-r border-[--hair-divider] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
+                          i === spec.keyCols.length - 1 && "border-r-[--hair-border]",
                         )}
                         style={{
                           left: keyLeft(i),
@@ -1115,7 +1115,7 @@ export function StagePolicyTable({
                                 autoFocus
                                 value={newSupplierId}
                                 placeholder="new supplier id"
-                                className="h-5 border-[#ebebeb] px-1.5 font-mono text-[11px]"
+                                className="h-5 border-[--zinc-border] px-1.5 font-mono text-[11px]"
                                 disabled={assigning === String(r.material_id)}
                                 onChange={(e) => setNewSupplierId(e.target.value)}
                                 onKeyDown={(e) => {
@@ -1239,7 +1239,7 @@ export function StagePolicyTable({
                         return [
                           <td
                             key={`${rowKey}-${g.family}-collapsed`}
-                            className="border-b border-r border-[#f4f4f4] bg-[#fcfcfc]"
+                            className="border-b border-r border-[--hair-divider] bg-[#fcfcfc]"
                           />,
                         ];
                       }
@@ -1258,7 +1258,7 @@ export function StagePolicyTable({
                           return (
                             <td
                               key={col.field}
-                              className="border-b border-r border-[#f4f4f4] p-0 text-center font-mono text-[10px] text-[#dcdcdc]"
+                              className="border-b border-r border-[--hair-divider] p-0 text-center font-mono text-[10px] text-[#dcdcdc]"
                               style={{ width, minWidth: width }}
                               title="Not applicable for the current policy choice"
                             >
@@ -1271,7 +1271,7 @@ export function StagePolicyTable({
                           return (
                             <td
                               key={col.field}
-                              className="border-b border-r border-[#f4f4f4] p-0 align-middle group-hover:bg-[#fafafa]"
+                              className="border-b border-r border-[--hair-divider] p-0 align-middle group-hover:bg-[#fafafa]"
                               style={{ width, minWidth: width }}
                             >
                               {renderInvParamsCell(rowKey, r as Record<string, unknown>)}
@@ -1341,7 +1341,7 @@ export function StagePolicyTable({
                           <td
                             key={col.field}
                             className={cn(
-                              "relative border-b border-r border-[#f4f4f4] px-1 py-[3px] align-middle group-hover:bg-[#fafafa]",
+                              "relative border-b border-r border-[--hair-divider] px-1 py-[3px] align-middle group-hover:bg-[#fafafa]",
                             )}
                             style={{
                               width,
@@ -1438,7 +1438,7 @@ export function StagePolicyTable({
                               <input
                                 value={String(cellValue ?? liveDefault ?? "")}
                                 onChange={(e) => commit(e.target.value)}
-                                className="h-5 w-full rounded-[3px] border border-transparent bg-transparent px-[5px] font-mono text-[11.5px] outline-none hover:bg-[#fafafa] focus:border-[#ebebeb] focus:bg-background"
+                                className="h-5 w-full rounded-sm border border-transparent bg-transparent px-[5px] font-mono text-[11.5px] outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
                               />
                             )}
                           </td>

@@ -303,7 +303,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
         />
 
         {!projectId ? (
-          <div className="rounded-sm border border-[#e0e0e3] bg-white px-3 py-[10px] text-[12.5px] text-[#71717a]">
+          <div className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
             No project selected
           </div>
         ) : (
@@ -379,7 +379,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                 )}
 
                 {!selected ? (
-                  <div className="rounded-sm border border-[#e0e0e3] bg-white px-3 py-[10px] text-[12.5px] text-[#71717a]">
+                  <div className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
                     No scenario selected
                   </div>
                 ) : pane === "setup" ? (
@@ -398,7 +398,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   <div className="flex flex-col gap-3">
                     {/* Model version + the gate, with the blocked reason as
                         visible text instead of a title attribute. */}
-                    <section className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
+                    <section className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
                       <div className="flex flex-wrap items-center gap-2 px-3 py-[9px] text-[12.5px] text-[#18181b]">
                         {policyDirty
                           ? policyVersionId

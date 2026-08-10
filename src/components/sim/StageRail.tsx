@@ -39,7 +39,7 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
         <span className="whitespace-nowrap text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#52525b]">
           Scenario run sequence
         </span>
-        <span className="h-px flex-1 bg-[#e0e0e3]" />
+        <span className="h-px flex-1 bg-[--hair-rule]" />
         <span className="flex shrink-0 items-center gap-[7px]">
           <span className="h-[7px] w-[7px] rounded-full" style={{ background: gate.dot }} />
           <span className="whitespace-nowrap text-[11.5px] text-[#3f3f46]">{gate.label}</span>
@@ -57,10 +57,10 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
                 onClick={() => onSelect(s.id)}
                 title={`${s.label} — ${s.sub}`}
                 className={cn(
-                  "flex basis-0 items-center gap-[10px] rounded-[5px] border px-[13px] py-[9px] text-left",
+                  "flex basis-0 items-center gap-[10px] rounded-sm border px-[13px] py-[9px] text-left",
                   on
                     ? "grow-[1.5] border-foreground bg-foreground text-background"
-                    : "grow border-[#e0e0e3] bg-white text-[#18181b] shadow-[0_1px_1px_rgba(24,24,27,0.04)]",
+                    : "grow border-[--hair-rule] bg-white text-[#18181b] shadow-[0_1px_1px_rgba(24,24,27,0.04)]",
                 )}
                 style={{ minWidth: on ? 224 : 168 }}
               >
@@ -71,7 +71,7 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
                       ? "bg-white text-foreground"
                       : done
                         ? "text-white"
-                        : "bg-[#f4f4f5] text-[#71717a]",
+                        : "bg-[#f4f4f5] text-[--zinc-quiet]",
                   )}
                   style={done && !on ? { background: LAYER.process } : undefined}
                 >
@@ -85,7 +85,7 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
                   <span
                     className={cn(
                       "truncate whitespace-nowrap text-[12px]",
-                      on ? "text-background/[0.66]" : "text-[#71717a]",
+                      on ? "text-background/[0.66]" : "text-[--zinc-quiet]",
                     )}
                   >
                     {s.sub}

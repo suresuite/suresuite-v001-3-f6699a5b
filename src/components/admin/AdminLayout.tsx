@@ -59,7 +59,7 @@ export function AdminLayout({
         />
 
         {/* Horizontal tab nav — same TabsList/TabsTrigger treatment as Developer API */}
-        <div className="mb-5 inline-flex h-auto items-center gap-0.5 rounded-sm border border-[#ebebeb] bg-white p-[3px]">
+        <div className="mb-5 inline-flex h-auto items-center gap-0.5 rounded-sm border border-[--hair-border] bg-white p-[3px]">
           {ADMIN_NAV.map((item) => {
             const Icon = item.icon;
             return (

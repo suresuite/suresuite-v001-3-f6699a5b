@@ -21,7 +21,7 @@ function sevStyle(severity: Severity): React.CSSProperties {
   const c = SEV_COLOR[severity];
   return c
     ? { color: c, borderColor: tint(c, 0.4), background: tint(c, 0.06) }
-    : { color: "#8a8a8a", borderColor: "#ebebeb", background: "#fafafa" };
+    : { color: "var(--ledger-quiet)", borderColor: "var(--zinc-border)", background: "#fafafa" };
 }
 
 const GROUP_LABEL: Record<Severity, string> = {
@@ -50,18 +50,18 @@ export function FindingsList({ findings, groupBySeverity, walkTo, action, classN
     : [{ severity: null, items: findings }];
 
   return (
-    <div className={cn("max-h-72 overflow-auto rounded-sm border border-[#ebebeb]", className)}>
+    <div className={cn("max-h-72 overflow-auto rounded-sm border border-[--hair-border]", className)}>
       {groups.map((g, gi) => (
         <div key={g.severity ?? gi}>
           {g.severity && (
             <div
-              className="border-b border-[#ebebeb] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
+              className="border-b border-[--hair-border] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
               style={sevStyle(g.severity)}
             >
               {GROUP_LABEL[g.severity]}
             </div>
           )}
-          <ul className="divide-y divide-[#f4f4f4] text-[12px]">
+          <ul className="divide-y divide-[--hair-divider] text-[12px]">
             {g.items.map((f) => {
               const route = walkTo?.(f) ?? null;
               const c = SEV_COLOR[f.severity];

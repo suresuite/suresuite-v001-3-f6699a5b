@@ -21,7 +21,7 @@
     --secondary-foreground: 0 0% 9%;
 
     --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 42%;
 
     --accent: 0 0% 96%;
     --accent-foreground: 0 0% 9%;
@@ -29,13 +29,18 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 92%;
+    --border: 0 0% 88%;
     --border-strong: 0 0% 85%;
-    --input: 0 0% 92%;
+    --input: 0 0% 88%;
     --surface-elevated: 0 0% 99%;
-    --surface-sunken: 0 0% 98%;
+    /* Page canvas. Both names resolve to the same 92% — PageLayout picks
+       between them per page, so both names are kept deliberately. */
+    --surface-dense: 0 0% 92%;
+    --surface-sunken: 0 0% 92%;
     --header-background: 0 0% 99%;
-    --header-border: 0 0% 92%;
+    /* The sticky page-header's bottom border is a rule directly on the canvas,
+       so it tracks --hair-rule (#d4d4d4 = 0 0% 83%), not --border. */
+    --header-border: 0 0% 83%;
     --ring: 0 0% 9%;
 
     --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
@@ -45,7 +50,32 @@
 
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
 
-    --radius: 0.5rem;
+    /* One radius, product-wide. tailwind.config.ts maps rounded-sm|md|lg all
+       to this value, so corner size never implies depth. `rounded-full`
+       survives only where the shape is a true circle. */
+    --radius: 4px;
+
+    /* ── Contrast pass ───────────────────────────────────────────────────
+       The canvas sits at 92% and cards stay #fff, so hairlines and quiet ink
+       carry all the separation. Two rule weights only:
+         --hair-*      #d4d4d4 — any 1px rule that touches the canvas, plus
+                       card outer borders and row dividers.
+         --zinc-border         — the lighter rule used *inside* a white card
+                       and on small controls (tracks --input at 88%).
+       One quiet ink (#6b6b6b) replaces the three near-identical greys the
+       ledger / hair / sim dialects each carried. Held as hex rather than HSL
+       because these are literal rule and ink values, not themeable surfaces;
+       .dark inherits them, which preserves its pre-existing appearance since
+       these were hardcoded hexes before. */
+    --brand-ink: #171717;
+    --zinc-border: #e0e0e3;
+    --hair-rule: #d4d4d4;
+    --hair-border: #d4d4d4;
+    --hair-divider: #d4d4d4;
+    --sim-divider: #d4d4d4;
+    --zinc-quiet: #6b6b6b;
+    --hair-quiet: #6b6b6b;
+    --ledger-quiet: #6b6b6b;
 
     /* Additional Vercel-style colors */
     --gray-50: 0 0% 98%;
@@ -89,6 +119,9 @@
     --border-strong: 0 0% 22%;
     --input: 0 0% 16%;
     --surface-elevated: 0 0% 6.5%;
+    /* Mirrors --surface-sunken so the new name does not leak the light canvas
+       into dark mode. Dark values are otherwise untouched by the contrast pass. */
+    --surface-dense: 0 0% 2.5%;
     --surface-sunken: 0 0% 2.5%;
     --header-background: 0 0% 5%;
     --header-border: 0 0% 14%;
@@ -125,7 +158,7 @@
     --secondary-foreground: 0 0% 9%;
 
     --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 42%;
 
     --accent: 0 0% 96%;
     --accent-foreground: 0 0% 9%;
@@ -133,13 +166,18 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 92%;
+    --border: 0 0% 88%;
     --border-strong: 0 0% 85%;
-    --input: 0 0% 92%;
+    --input: 0 0% 88%;
     --surface-elevated: 0 0% 99%;
-    --surface-sunken: 0 0% 98%;
+    /* Page canvas. Both names resolve to the same 92% — PageLayout picks
+       between them per page, so both names are kept deliberately. */
+    --surface-dense: 0 0% 92%;
+    --surface-sunken: 0 0% 92%;
     --header-background: 0 0% 99%;
-    --header-border: 0 0% 92%;
+    /* The sticky page-header's bottom border is a rule directly on the canvas,
+       so it tracks --hair-rule (#d4d4d4 = 0 0% 83%), not --border. */
+    --header-border: 0 0% 83%;
     --ring: 0 0% 9%;
 
     /* Light mode grays */
@@ -227,6 +265,7 @@
 
   .bg-surface-elevated { background-color: hsl(var(--surface-elevated)); }
   .bg-surface-sunken { background-color: hsl(var(--surface-sunken)); }
+  .bg-surface-dense { background-color: hsl(var(--surface-dense)); }
   .border-strong { border-color: hsl(var(--border-strong)); }
 
   /* Subtle grid background used in hero sections */

@@ -140,7 +140,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('name')}
                   >
                     Material Name
@@ -151,7 +151,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('connection_count')}
                   >
                     Connections
@@ -162,7 +162,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('revenue')}
                   >
                     Revenue
@@ -173,7 +173,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('degree_centrality')}
                   >
                     Degree
@@ -184,7 +184,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('weighted_degree_centrality')}
                   >
                     Wtd. Degree
@@ -195,7 +195,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('eigenvector_centrality')}
                   >
                     Eigenvector
@@ -206,7 +206,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('betweenness_centrality')}
                   >
                     Betweenness
@@ -217,7 +217,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('closeness_centrality')}
                   >
                     Closeness
@@ -228,7 +228,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 font-semibold"
+                    className="h-auto p-0 font-semibold text-white hover:bg-transparent hover:text-white"
                     onClick={() => handleSort('prominence')}
                   >
                     Prominence

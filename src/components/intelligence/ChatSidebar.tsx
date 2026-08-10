@@ -145,12 +145,12 @@ export function ChatSidebar(props: ChatSidebarProps) {
   /* ── collapsed rail ─────────────────────────────────────────────────── */
   if (collapsed) {
     return (
-      <aside className="flex flex-col items-center gap-2 overflow-hidden border-r border-[#ebebeb] bg-[#fcfcfc] py-2.5">
+      <aside className="flex flex-col items-center gap-2 overflow-hidden border-r border-[--hair-border] bg-[#fcfcfc] py-2.5">
         <button
           type="button"
           onClick={onExpand}
           title="Show chats"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-[#ebebeb] bg-background text-muted-foreground"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-[--zinc-border] bg-background text-muted-foreground"
         >
           <ChevronRight className="h-3 w-3" />
         </button>
@@ -180,7 +180,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
     const isQuick = thread.id === QUICK_THREAD_ID;
     return (
       <div
-        className={cn("relative mb-px flex items-center gap-1 rounded-sm px-0.5 py-px", active && "bg-background shadow-[0_0_0_1px_#ebebeb]")}
+        className={cn("relative mb-px flex items-center gap-1 rounded-sm px-0.5 py-px", active && "bg-background shadow-[0_0_0_1px_var(--zinc-border)]")}
       >
         {selectMode && !isQuick && (
           <input
@@ -236,7 +236,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
         {openMenu === thread.id && (
           <>
             <div className="fixed inset-0 z-[60]" onClick={() => setOpenMenu(null)} />
-            <div className="absolute right-0.5 top-[26px] z-[61] min-w-[176px] rounded-sm border border-[#ebebeb] bg-background p-1.5 shadow-[0_4px_14px_rgba(0,0,0,.10)]">
+            <div className="absolute right-0.5 top-[26px] z-[61] min-w-[176px] rounded-sm border border-[--hair-border] bg-background p-1.5 shadow-[0_4px_14px_rgba(0,0,0,.10)]">
               {!isQuick && (
                 <>
                   <button
@@ -268,7 +268,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                 <select
                   value={thread.projectId ?? ""}
                   onChange={(e) => onAttachProject(thread.id, e.target.value || null)}
-                  className="h-[26px] w-full rounded-sm border border-[#ebebeb] bg-background px-1.5 text-[11.5px] outline-none"
+                  className="h-[26px] w-full rounded-sm border border-[--hair-border] bg-background px-1.5 text-[11.5px] outline-none"
                 >
                   <option value="">No project</option>
                   {projects.map((p) => (
@@ -285,7 +285,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                   <select
                     value={thread.folderId ?? ""}
                     onChange={(e) => onMoveToFolder(thread.id, e.target.value || null)}
-                    className="h-[26px] w-full rounded-sm border border-[#ebebeb] bg-background px-1.5 text-[11.5px] outline-none"
+                    className="h-[26px] w-full rounded-sm border border-[--hair-border] bg-background px-1.5 text-[11.5px] outline-none"
                   >
                     <option value="">No folder</option>
                     {folders.map((f) => (
@@ -299,7 +299,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
 
               {!isQuick && (
                 <>
-                  <div className="my-0.5 h-px bg-[#f4f4f4]" />
+                  <div className="my-0.5 h-px bg-[--hair-divider]" />
                   <button
                     type="button"
                     onClick={() => {
@@ -350,7 +350,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
           ›
         </span>
         {label}
-        <span className="ml-1 rounded-[3px] bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal">
+        <span className="ml-1 rounded-sm bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal">
           {count}
         </span>
       </button>
@@ -360,9 +360,9 @@ export function ChatSidebar(props: ChatSidebarProps) {
 
   /* ── expanded sidebar ───────────────────────────────────────────────── */
   return (
-    <aside className="flex max-h-full min-h-0 flex-col overflow-hidden border-r border-[#ebebeb] bg-[#fcfcfc]">
+    <aside className="flex max-h-full min-h-0 flex-col overflow-hidden border-r border-[--hair-border] bg-[#fcfcfc]">
       {/* header — shrink-0 */}
-      <div className="flex shrink-0 flex-col gap-2 border-b border-[#f4f4f4] py-2.5 pl-2.5 pr-3">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-[--hair-divider] py-2.5 pl-2.5 pr-3">
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -375,7 +375,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
             type="button"
             onClick={onCollapse}
             title="Hide chat list"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[#ebebeb] bg-background text-muted-foreground"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[--zinc-border] bg-background text-muted-foreground"
           >
             <ChevronLeft className="h-3 w-3" />
           </button>
@@ -385,7 +385,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search chats"
-          className="h-[30px] rounded-sm border border-[#ebebeb] bg-background px-2.5 text-[12.5px] outline-none"
+          className="h-[30px] rounded-sm border border-[--hair-border] bg-background px-2.5 text-[12.5px] outline-none"
         />
 
         <div className="flex items-center justify-between gap-1">
@@ -495,7 +495,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
 
       {/* bulk bar — shrink-0 */}
       {selectMode && selected.length > 0 && (
-        <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-[#ebebeb] bg-background p-2">
+        <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-[--hair-border] bg-background p-2">
           <button
             type="button"
             onClick={() => {
@@ -503,7 +503,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
               setSelectMode(false);
               setSelected([]);
             }}
-            className="rounded-sm border border-[#ebebeb] bg-background px-2.5 py-1 text-[11.5px] text-foreground"
+            className="rounded-sm border border-[--hair-border] bg-background px-2.5 py-1 text-[11.5px] text-foreground"
           >
             Pin
           </button>
@@ -514,7 +514,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
               setSelectMode(false);
               setSelected([]);
             }}
-            className="rounded-sm border border-[#ebebeb] bg-background px-2.5 py-1 text-[11.5px] text-foreground"
+            className="rounded-sm border border-[--hair-border] bg-background px-2.5 py-1 text-[11.5px] text-foreground"
           >
             Archive
           </button>
@@ -536,7 +536,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
               <button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
-                className="rounded-sm border border-[#ebebeb] bg-background px-2.5 py-1 text-[11.5px] text-foreground"
+                className="rounded-sm border border-[--hair-border] bg-background px-2.5 py-1 text-[11.5px] text-foreground"
               >
                 Cancel
               </button>

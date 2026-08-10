@@ -118,14 +118,14 @@ export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardPro
   if (!proposalId) return null;
   if (loading) {
     return (
-      <div className="mt-2 flex items-center gap-2 rounded-sm border border-[#ebebeb] px-3 py-2 text-[13px] text-muted-foreground">
+      <div className="mt-2 flex items-center gap-2 rounded-sm border border-[--hair-border] px-3 py-2 text-[13px] text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading proposal…
       </div>
     );
   }
   if (!proposal) {
     return (
-      <div className="mt-2 rounded-sm border border-[#ebebeb] px-3 py-2 text-[13px] text-muted-foreground">
+      <div className="mt-2 rounded-sm border border-[--hair-border] px-3 py-2 text-[13px] text-muted-foreground">
         This proposal is no longer available.
       </div>
     );
@@ -174,7 +174,7 @@ export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardPro
         <button
           type="button"
           onClick={() => onSuggestUtterance(`Remember that we applied "${proposal.title}" because `)}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-[#ebebeb] bg-background px-2.5 py-1 text-[12px] text-muted-foreground transition hover:text-foreground"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-[--hair-border] bg-background px-2.5 py-1 text-[12px] text-muted-foreground transition hover:text-foreground"
           title="Prefills a 'Remember that…' message — you add the rationale and send"
         >
           <Lightbulb className="h-3 w-3 shrink-0" />

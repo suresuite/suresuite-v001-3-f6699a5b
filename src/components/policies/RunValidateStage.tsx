@@ -1315,7 +1315,7 @@ export function RunValidateStage({
                 "flex flex-[0_1_auto] items-center gap-[9px] rounded-sm border px-[10px] py-1.5 text-left transition-colors",
                 active
                   ? "border-foreground bg-foreground text-background"
-                  : "border-[#ebebeb] bg-background shadow-[0_1px_0_rgba(0,0,0,0.04)] hover:border-foreground hover:bg-[#fafafa]",
+                  : "border-[--hair-border] bg-background shadow-[0_1px_0_rgba(0,0,0,0.04)] hover:border-foreground hover:bg-[#fafafa]",
               )}
             >
               <span
@@ -1327,7 +1327,7 @@ export function RunValidateStage({
                       ? { background: LAYER.process, color: "#ffffff" }
                       : meta.blocked
                         ? { background: LAYER.brand, color: "#ffffff" }
-                        : { background: "#f4f4f4", color: "#8a8a8a" }
+                        : { background: "#f4f4f4", color: "var(--ledger-quiet)" }
                 }
               >
                 {done && !active ? "✓" : i + 1}
@@ -1343,7 +1343,7 @@ export function RunValidateStage({
                       ? "rgba(255,255,255,0.62)"
                       : meta.blocked
                         ? LAYER.brand
-                        : "#8a8a8a",
+                        : "var(--ledger-quiet)",
                   }}
                 >
                   {meta.text}
@@ -1605,7 +1605,7 @@ export function RunValidateStage({
                                 "rounded-sm border px-[7px] py-px font-mono text-[10px] transition-colors",
                                 selected
                                   ? "border-foreground bg-foreground text-background"
-                                  : "border-[#ebebeb] bg-background text-[#9a9a9a] hover:border-foreground hover:text-foreground",
+                                  : "border-[--hair-border] bg-background text-[--hair-quiet] hover:border-foreground hover:text-foreground",
                               )}
                             >
                               {k.label}
@@ -1642,7 +1642,7 @@ export function RunValidateStage({
                 worker writes it. This section, not the animation above, is
                 the proof the simulation actually ran. */}
             {validationScenarioId && (
-              <div className="mt-2 flex flex-col gap-2.5 border-t border-[#ebebeb] pt-3">
+              <div className="mt-2 flex flex-col gap-2.5 border-t border-[--hair-border] pt-3">
                 <span className={KX_TIGHT}>Engine run</span>
                 {/* Run-queue console (6.E): every job from history, not just
                     the latest — per-row Cancel/View/Retry, status tally, filter
@@ -1711,7 +1711,7 @@ export function RunValidateStage({
               </section>
 
               {/* (b) warm-up estimation */}
-              <section className="flex flex-col gap-2 border-t border-[#ebebeb] pt-3">
+              <section className="flex flex-col gap-2 border-t border-[--hair-border] pt-3">
                 <span className={KX_TIGHT}>b · Warm-up estimation</span>
                 <Field label="Indicators">
                   <div className="flex flex-wrap gap-1">
@@ -1730,7 +1730,7 @@ export function RunValidateStage({
                             "rounded-sm border px-[7px] py-px font-mono text-[10px] transition-colors",
                             selected
                               ? "border-foreground bg-foreground text-background"
-                              : "border-[#ebebeb] bg-background text-[#9a9a9a] hover:border-foreground hover:text-foreground",
+                              : "border-[--hair-border] bg-background text-[--hair-quiet] hover:border-foreground hover:text-foreground",
                           )}
                         >
                           {ind.label}
@@ -1754,7 +1754,7 @@ export function RunValidateStage({
                                 className="hidden"
                                 onChange={(e) => onIndicatorFile(ind.id, e.target.files?.[0] ?? null)}
                               />
-                              <div className="flex h-6 items-center gap-1.5 rounded-sm border border-dashed border-[#ebebeb] px-2 font-mono text-[11px] text-muted-foreground hover:border-foreground">
+                              <div className="flex h-6 items-center gap-1.5 rounded-sm border border-dashed border-[--zinc-border] px-2 font-mono text-[11px] text-muted-foreground hover:border-foreground">
                                 <Upload className="h-3 w-3" />
                                 {ind.fileName ? (
                                   <span className="truncate">
@@ -1882,7 +1882,7 @@ export function RunValidateStage({
                             className="hidden"
                             onChange={(e) => onEmpiricalFile(kpi, e.target.files?.[0] ?? null)}
                           />
-                          <div className="flex h-6 items-center gap-1.5 rounded-sm border border-dashed border-[#ebebeb] px-2 font-mono text-[11px] text-muted-foreground hover:border-foreground">
+                          <div className="flex h-6 items-center gap-1.5 rounded-sm border border-dashed border-[--zinc-border] px-2 font-mono text-[11px] text-muted-foreground hover:border-foreground">
                             <Upload className="h-3 w-3" />
                             {emp ? (
                               <span className="truncate">
@@ -2040,7 +2040,7 @@ function StepShell({
 }) {
   return (
     <div className={cn(SURFACE, "min-h-[340px] border-t-2 border-t-foreground")}>
-      <div className="flex flex-wrap items-center gap-[9px] border-b border-[#ebebeb] bg-[#fafafa] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-[9px] border-b border-[--hair-border] bg-[#fafafa] px-3 py-2">
         <span className={KX_TIGHT}>step {index + 1}</span>
         <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
         {sub && <span className="font-mono text-[11px] text-muted-foreground">{sub}</span>}
@@ -2227,7 +2227,7 @@ function AdoptStep({
               })}
             </tbody>
           </table>
-          <div className="border-t border-[#ebebeb] px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
+          <div className="border-t border-[--hair-border] px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
             n* = (z·s / (ε·x̄))² · card recommends {adequacy.recommended}
           </div>
         </div>
@@ -2562,7 +2562,7 @@ function MultiRunResultsPanel({
   const overall = meanCI(values, confidence);
   return (
     <div className={cn(SURFACE, "flex flex-col")}>
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-[#ebebeb] bg-[#fafafa] px-2 py-1.5">
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-[--hair-border] bg-[#fafafa] px-2 py-1.5">
         {kpis.map((id) => {
           const k = KPI_OPTIONS.find((x) => x.id === id)!;
           const active = id === activeKpi;
@@ -2575,7 +2575,7 @@ function MultiRunResultsPanel({
                 "whitespace-nowrap rounded-sm border px-[7px] py-px font-mono text-[10px] transition-colors",
                 active
                   ? "border-foreground bg-foreground text-background"
-                  : "border-transparent text-[#9a9a9a] hover:text-foreground",
+                  : "border-transparent text-[--hair-quiet] hover:text-foreground",
               )}
             >
               {k.label}
@@ -2586,7 +2586,7 @@ function MultiRunResultsPanel({
           engine data · {reps.length} rep(s)
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-2 border-b border-[#ebebeb] px-2.5 py-1.5 text-[11px]">
+      <div className="grid grid-cols-4 gap-2 border-b border-[--hair-border] px-2.5 py-1.5 text-[11px]">
         <Stat label="Mean" value={overall.mean.toFixed(3)} unit={meta.unit} />
         <Stat label="Std" value={overall.std.toFixed(3)} />
         <Stat label="CI half-width" value={overall.half.toFixed(3)} />
@@ -2789,7 +2789,7 @@ function EngineOutputSummary({
   const streaming = run.status === "running" || run.status === "queued";
   return (
     <div className={SURFACE}>
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#ebebeb] bg-[#fafafa] px-2.5 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[--hair-border] bg-[#fafafa] px-2.5 py-1.5">
         <span className={KX_TIGHT}>Engine output</span>
         <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground">
           <StatusDot ok={!streaming} pending={streaming} />
@@ -2812,7 +2812,7 @@ function EngineOutputSummary({
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-2 border-b border-[#ebebeb] px-2.5 py-1.5 text-[11px] md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 border-b border-[--hair-border] px-2.5 py-1.5 text-[11px] md:grid-cols-4">
         {SUMMARY_TILES.map((t) => (
           <div key={t.id} className="flex flex-col">
             <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
@@ -2884,7 +2884,7 @@ function FinancialStatement({ reps }: { reps: Replication[] }) {
   const lostSales = avg("lost_sales_value");
   return (
     <div className={SURFACE}>
-      <div className="flex items-center gap-2 border-b border-[#ebebeb] bg-[#fafafa] px-2.5 py-1.5">
+      <div className="flex items-center gap-2 border-b border-[--hair-border] bg-[#fafafa] px-2.5 py-1.5">
         <span className={KX_TIGHT}>Financial statement</span>
         <span className="font-mono text-[10px] text-muted-foreground">
           mean over {reps.length} rep(s)

@@ -331,7 +331,7 @@ export function ProjectCard({
                     
                     return (
                       <>
-                        <span className={`px-2.5 py-1 rounded-full font-medium ${
+                        <span className={`px-2.5 py-1 rounded-sm font-medium ${
                           project.simulation_start 
                             ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' 
                             : 'bg-gray-50 dark:bg-gray-950/30 text-gray-600 dark:text-gray-400'
@@ -339,7 +339,7 @@ export function ProjectCard({
                           Start: {fallbackDates.start.toLocaleDateString()}
                           {!project.simulation_start && <span className="text-xs opacity-75"> (default)</span>}
                         </span>
-                        <span className={`px-2.5 py-1 rounded-full font-medium ${
+                        <span className={`px-2.5 py-1 rounded-sm font-medium ${
                           project.simulation_end 
                             ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300' 
                             : 'bg-gray-50 dark:bg-gray-950/30 text-gray-600 dark:text-gray-400'

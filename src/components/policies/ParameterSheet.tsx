@@ -98,7 +98,7 @@ export function ParameterSheet({
               {meta.formula && (
                 <div className="flex flex-col gap-1">
                   <span className={KX_TIGHT}>Decision rule</span>
-                  <pre className="whitespace-pre-wrap break-words rounded-sm border border-[#ebebeb] bg-[#fafafa] px-2.5 py-2 font-mono text-[11px]">
+                  <pre className="whitespace-pre-wrap break-words rounded-sm border border-[--hair-border] bg-[#fafafa] px-2.5 py-2 font-mono text-[11px]">
                     {meta.formula}
                   </pre>
                 </div>

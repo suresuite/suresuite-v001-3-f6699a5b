@@ -65,7 +65,7 @@ export function FileCard({ file, onDownload, onKeep, compact = false }: FileCard
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={file.name}>
           {file.name}
         </span>
-        <span className={cn("rounded-full px-1.5 py-px text-[10.5px] font-medium", t.chip)}>
+        <span className={cn("rounded-sm px-1.5 py-px text-[10.5px] font-medium", t.chip)}>
           {KIND_LABEL[file.kind] ?? file.kind}
         </span>
       </div>

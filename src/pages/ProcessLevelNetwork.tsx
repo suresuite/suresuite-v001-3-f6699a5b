@@ -1446,7 +1446,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                     <button
                       key={type}
                       onClick={() => setTopFlowFilter(type)}
-                      className={`text-xs px-2 py-1 rounded-full border transition-colors capitalize ${
+                      className={`text-xs px-2 py-1 rounded-sm border transition-colors capitalize ${
                         topFlowFilter === type
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
@@ -1520,7 +1520,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                         <td className="py-2 pr-4">{l.level}</td>
                         <td className="py-2 pr-4">
                           <span
-                            className="inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize"
+                            className="inline-block px-2 py-0.5 rounded-sm text-xs font-medium capitalize"
                             style={{ background: l.color + '22', color: l.color }}
                           >
                             {l.displayType}

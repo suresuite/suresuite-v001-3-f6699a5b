@@ -9,15 +9,20 @@ import { ReactNode, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // ── Core treatment ──────────────────────────────────────────────────────────
-/** Card/table container: sharp corners, thin #ebebeb border, white surface. */
-export const SURFACE = 'rounded-sm border border-[#ebebeb] bg-white';
+/** Card/table container: 4px corners, --hair-border rule, white surface. */
+export const SURFACE = 'rounded-sm border border-[--hair-border] bg-white';
 /** JetBrains-mono kicker: 10px UPPERCASE, wide tracking, muted. */
-export const KX = "font-mono text-[10px] uppercase tracking-[0.2em] text-[#8a8a8a]";
-/** Mono UPPERCASE table header on #fafafa. Append `text-right` etc. as needed. */
+export const KX = "font-mono text-[10px] uppercase tracking-[0.2em] text-[--ledger-quiet]";
+/**
+ * L2 — the column row as an ink block. The mono/uppercase/11px/0.04em ledger
+ * treatment is unchanged; what changed is the ground (#fafafa washed out
+ * against a 92% canvas) and the label colour. No bottom border: the ink block
+ * ends where the data begins. Append `text-right` etc. as needed.
+ */
 export const TH =
-  "text-left font-mono text-[11px] uppercase tracking-[0.04em] font-medium text-[#8a8a8a] bg-[#fafafa] border-b border-[#ebebeb] px-4 py-2 whitespace-nowrap";
+  "text-left font-mono text-[11px] uppercase tracking-[0.04em] font-medium text-white bg-[--brand-ink] border-r border-r-[rgba(255,255,255,0.22)] last:border-r-0 px-4 py-2 whitespace-nowrap";
 /** Compact ~30px data cell with a hairline divider. */
-export const TD = 'px-4 py-[9px] border-b border-[#f4f4f4] align-middle';
+export const TD = 'px-4 py-[9px] border-b border-[--hair-divider] align-middle';
 /** Row hover wash. */
 export const ROW_HOVER = 'hover:bg-[#fcfcfc]';
 /** Brand-yellow accent action (starter/template downloads only). */
@@ -51,10 +56,10 @@ export function MonoChip({ children, tone = 'default' }: { children: ReactNode; 
   return (
     <span
       className={cn(
-        'rounded-[3px] px-1.5 py-px font-mono text-[10px]',
+        'rounded-sm px-1.5 py-px font-mono text-[10px]',
         tone === 'solid'
           ? 'bg-[#f0f0f0] text-[#525252]'
-          : 'border border-[#e4e4e4] text-muted-foreground',
+          : 'border border-[--zinc-border] text-muted-foreground',
       )}
     >
       {children}
@@ -102,7 +107,7 @@ export function Segmented({
   options: { value: string; label: string }[];
 }) {
   return (
-    <div className="inline-flex overflow-hidden rounded-[5px] border border-[#e4e4e4]">
+    <div className="inline-flex overflow-hidden rounded-sm border border-[--zinc-border]">
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -141,7 +146,7 @@ export function LoadingRow({ colSpan }: { colSpan: number }) {
   return (
     <tr>
       <td colSpan={colSpan} className="px-4 py-12 text-center">
-        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#e4e4e4] border-t-foreground" />
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[--zinc-border] border-t-foreground" />
       </td>
     </tr>
   );
@@ -192,12 +197,14 @@ export function useColumnFilters<T>(rows: T[], getters: Record<string, (row: T) 
 
   function FilterTH({ filterKey, align }: { filterKey: string; align?: 'right' }) {
     return (
-      <th className="border-b border-[#ebebeb] bg-[#fafafa] px-2.5 py-1">
+      // The quick-filter row is a second header row, but it stays on white —
+      // input chrome on ink reads as a defect.
+      <th className="border-b border-[--hair-border] bg-white px-2.5 py-1">
         <input
           value={filters[filterKey] || ''}
           onChange={(e) => setFilters((f) => ({ ...f, [filterKey]: e.target.value }))}
           placeholder="Filter…"
-          className={cn('h-[22px] w-full rounded-[3px] border border-[#e4e4e4] bg-white px-1.5 text-[11px]', align === 'right' && 'text-right')}
+          className={cn('h-[22px] w-full rounded-sm border border-[--zinc-border] bg-white px-1.5 text-[11px]', align === 'right' && 'text-right')}
         />
       </th>
     );

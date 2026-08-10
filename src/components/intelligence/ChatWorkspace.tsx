@@ -102,7 +102,7 @@ export function ChatWorkspace({
     <div className="flex min-h-0 min-w-0 flex-col bg-background">
       {/* agent strip */}
       {agent && (
-        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[#ebebeb] bg-[#fcfcfc] px-4 py-2">
+        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[--hair-border] bg-[#fcfcfc] px-4 py-2">
           <div className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-muted-foreground">
             <span
               className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm font-mono text-[9px] font-semibold"
@@ -150,7 +150,7 @@ export function ChatWorkspace({
                       key={a.id}
                       type="button"
                       onClick={() => onAgentChange(a.id)}
-                      className="rounded-sm border border-[#ebebeb] bg-background p-2.5 text-left hover:bg-[#fcfcfc]"
+                      className="rounded-sm border border-[--hair-border] bg-background p-2.5 text-left hover:bg-[#fcfcfc]"
                     >
                       <span
                         className="flex h-6 w-6 items-center justify-center rounded-sm font-mono text-[10px] font-semibold"
@@ -179,7 +179,7 @@ export function ChatWorkspace({
                       onInputChange(s);
                       void send(s, { model, projectId, agentId });
                     }}
-                    className="rounded-sm border border-[#ebebeb] bg-[#fcfcfc] px-2.5 py-[5px] text-[12px] text-muted-foreground"
+                    className="rounded-sm border border-[--hair-border] bg-[#fcfcfc] px-2.5 py-[5px] text-[12px] text-muted-foreground"
                   >
                     {s}
                   </button>
@@ -260,7 +260,7 @@ export function ChatWorkspace({
             </div>
           </div>
 
-          <div className="border-t border-[#ebebeb] bg-[#fcfcfc] px-4 py-3">
+          <div className="border-t border-[--hair-border] bg-[#fcfcfc] px-4 py-3">
             <div className="mx-auto max-w-[740px]">
               {suggestions.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-1.5">
@@ -269,7 +269,7 @@ export function ChatWorkspace({
                       key={s}
                       type="button"
                       onClick={() => void send(s, { model, projectId, agentId })}
-                      className="rounded-sm border border-[#ebebeb] bg-background px-2.5 py-[5px] text-[12px] text-muted-foreground"
+                      className="rounded-sm border border-[--hair-border] bg-background px-2.5 py-[5px] text-[12px] text-muted-foreground"
                     >
                       {s}
                     </button>

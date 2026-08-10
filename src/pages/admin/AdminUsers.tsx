@@ -119,7 +119,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
               <FilterTH filterKey="org" /><FilterTH filterKey="name" /><FilterTH filterKey="email" />
               <FilterTH filterKey="role" /><FilterTH filterKey="status" />
               <FilterTH filterKey="req" align="right" /><FilterTH filterKey="cost" align="right" />
-              <FilterTH filterKey="budget" align="right" /><th className="border-b border-[#ebebeb] bg-[#fafafa]" />
+              <FilterTH filterKey="budget" align="right" /><th className="border-b border-[--hair-border] bg-white" />
             </tr></thead>
             <tbody>
               {loading ? <LoadingRow colSpan={9} /> : sorted.length === 0 ? (

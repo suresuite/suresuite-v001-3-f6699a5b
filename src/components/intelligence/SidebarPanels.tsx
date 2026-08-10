@@ -326,7 +326,7 @@ export function ThreadInfoStrip({
           <button
             type="button"
             onClick={onDeleteSummary}
-            className="rounded-sm border border-[#ebebeb] bg-background px-2 py-0.5 text-[11px] text-muted-foreground"
+            className="rounded-sm border border-[--hair-border] bg-background px-2 py-0.5 text-[11px] text-muted-foreground"
           >
             Delete summary
           </button>

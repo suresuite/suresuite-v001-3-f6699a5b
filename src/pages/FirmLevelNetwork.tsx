@@ -1567,7 +1567,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                                   <td className="py-2 pr-3 max-w-[140px] truncate" title={row.name}>{row.name}</td>
                                   <td className="py-2 pr-3">
                                     <span
-                                      className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
+                                      className="inline-block px-2 py-0.5 rounded-sm text-xs font-medium"
                                       style={{ background: TIER_COLORS[row.tier] + '22', color: TIER_COLORS[row.tier] }}
                                     >
                                       {row.tier}
@@ -1577,7 +1577,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                                   <td className="py-2 pr-3 text-right">{row.incoming}</td>
                                   <td className="py-2 pr-3 text-right">{row.outgoing}</td>
                                   <td className="py-2">
-                                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${badgeStyle}`}>
+                                    <span className={`inline-block px-2 py-0.5 rounded-sm text-xs font-medium ${badgeStyle}`}>
                                       {row.risk}
                                     </span>
                                   </td>

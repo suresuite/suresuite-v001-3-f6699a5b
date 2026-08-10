@@ -75,7 +75,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
             <tr>
               <FilterTH filterKey="name" /><FilterTH filterKey="slug" />
               <FilterTH filterKey="members" align="right" /><FilterTH filterKey="projects" align="right" />
-              <FilterTH filterKey="cost" align="right" /><FilterTH filterKey="status" /><FilterTH filterKey="created" /><th className="border-b border-[#ebebeb] bg-[#fafafa]" />
+              <FilterTH filterKey="cost" align="right" /><FilterTH filterKey="status" /><FilterTH filterKey="created" /><th className="border-b border-[--hair-border] bg-white" />
             </tr></thead>
             <tbody>
               {loading ? <LoadingRow colSpan={8} /> : sorted.length === 0 ? (

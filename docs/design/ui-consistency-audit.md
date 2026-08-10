@@ -46,7 +46,9 @@ Extracted from `src/index.css`, `tailwind.config.ts`, `src/components/shared/Pag
   `ProjectPolicies.tsx:85`, `SimulationLab.tsx:263`).
 
 ### C4 — Cards & surfaces
-- Base card: shadcn `Card` = `rounded-lg border border-border bg-card` (`ui/card.tsx:12`).
+- Base card: shadcn `Card` = `rounded-sm border border-border bg-card` (`ui/card.tsx:12`) —
+  4px per C9, and **no hover lift**: with one radius product-wide the shadow change was the
+  only thing left implying depth, and this system separates by value, not depth.
   Static content cards flatten the shadow to **`shadow-xs`** (`StatCard.tsx:20`,
   `AdminUserAccess.tsx:461` — the one admin file already on-language).
 - Flat toolbar/strip variant: `rounded-md border bg-card px-3 py-2.5`
@@ -54,8 +56,9 @@ Extracted from `src/index.css`, `tailwind.config.ts`, `src/components/shared/Pag
 - KPI tiles: **`StatCard`** only — label `text-[11px] font-medium uppercase tracking-wide
   text-muted-foreground`, value `text-[26px] font-semibold tabular-nums`, `p-4`
   (`StatCard.tsx:24-40`).
-- **No gradients, no glassmorphism** (backdrop-blur exists only on the two sticky headers),
-  no `rounded-xl+`; `rounded-sm` is landing-marketing only.
+- **No gradients, no glassmorphism** (backdrop-blur exists only on the two sticky headers).
+  Corner radius is a single 4px value everywhere (C9) — there is no `rounded-xl+` and no
+  `rounded-sm`-as-exception, because `rounded-sm|md|lg` now all resolve to the same 4px.
 
 ### C5 — Typography
 - App page title = the 15 px PageHeader title; in-content section headings are
@@ -71,7 +74,27 @@ Extracted from `src/index.css`, `tailwind.config.ts`, `src/components/shared/Pag
 
 ### C6 — Color
 - **Semantic tokens only**: `border-border`, `bg-card`, `text-muted-foreground`,
-  `text-destructive`, `bg-muted`, `bg-accent`, `surface-elevated/sunken`, `header-*`.
+  `text-destructive`, `bg-muted`, `bg-accent`, `surface-elevated/sunken/dense`, `header-*`.
+- **Canvas and rule values** (`index.css` `:root`) — the canvas carries the separation, so
+  cards stay `#fff` and are never tinted:
+
+  | Token | Value | Used for |
+  |---|---|---|
+  | `--surface-sunken` / `--surface-dense` | `0 0% 92%` | the page canvas (`PageLayout`) |
+  | `--card` | `0 0% 100%` | every card; never tinted |
+  | `--border` / `--input` | `0 0% 88%` | control and in-card borders |
+  | `--zinc-border` | `#e0e0e3` | 1px rules **inside** a white card, and small controls |
+  | `--hair-rule` / `--hair-border` / `--hair-divider` / `--sim-divider` | `#d4d4d4` | any 1px rule that touches the canvas, plus card outer borders and row dividers |
+  | `--header-border` | `0 0% 83%` | the sticky page-header's bottom border — a rule on the canvas, so it tracks `--hair-rule` |
+  | `--muted-foreground` | `0 0% 42%` | quiet text |
+  | `--zinc-quiet` / `--hair-quiet` / `--ledger-quiet` | `#6b6b6b` | one quiet ink, replacing the three greys the ledger / hair / sim dialects each carried |
+  | `--brand-ink` | `#171717` | the L2 table column row |
+
+- **A 1px rule directly on the canvas must use `--hair-rule`, never `--zinc-border` or
+  `hsl(var(--border))`** — at a 92% canvas an `#e0e0e3` rule is a 4% step and vanishes.
+  Rules inside a white card keep `--zinc-border`.
+- Text that was `text-muted-foreground` on a **dark or tinted** fill keeps its old value:
+  `#6b6b6b` is darker than before and can fall under contrast there.
 - Status tints use the canonical recipe
   `bg-{emerald|amber}-500/10 text-{…}-700 dark:text-{…}-300 border-{…}-500/30`
   (`ProvenanceBadge.tsx:15-16`, `DataMapGrid.tsx:20-27`).
@@ -100,8 +123,16 @@ Extracted from `src/index.css`, `tailwind.config.ts`, `src/components/shared/Pag
   shadow-xs overflow-hidden`.
 
 ### C9 — Radii
-- `rounded-md` (6 px) for inputs/strips/small chrome, `rounded-lg` (8 px) for cards.
-  `rounded-sm` and `rounded-full` are landing-marketing exceptions. Nothing else.
+- **One radius, 4px, product-wide.** `--radius: 4px` in `index.css`, and
+  `tailwind.config.ts` maps `rounded-sm`, `rounded-md` and `rounded-lg` all to it — so
+  corner size never implies hierarchy or depth. No `rounded-xl+`, no arbitrary
+  `rounded-[3px]`/`[5px]`.
+- **`rounded-full` for true circles only**: status dots, avatars, spinners, the numbered
+  Quick Start step circles, the 2px emphasis rule, and the toggle/switch track and knob.
+  Every pill-shaped chip, badge and button is 4px.
+- The one deliberate exception is the concentric inner radius on segmented controls
+  (`rounded-[1px]`/`rounded-[2px]` on a button nested inside a 4px track with 2–3px
+  padding), where matching the outer radius would read as a defect.
 
 ---
 

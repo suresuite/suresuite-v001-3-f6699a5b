@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { ImpactTable, type ImpactRow } from "./resultTables";
+import { TableBlock } from "@/components/shared";
 import { kpiDisplay, signedDelta } from "@/lib/sim/kpiDisplay";
 import {
   scoreScenarioKpis,
@@ -70,11 +71,11 @@ export function RecoveryImpactCard({ recovery, disruptions, horizonDays }: Props
   });
 
   return (
-    <section className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
-      <div className="flex flex-wrap items-center gap-[9px] border-b border-[#e0e0e3] px-3 py-[9px]">
-        <span className="text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">
-          Recovery playbook impact
-        </span>
+    // L1: the name and its status/meta move onto the canvas above the shell.
+    <TableBlock
+      name="Recovery playbook impact"
+      meta={
+        <span className="inline-flex flex-wrap items-center gap-[9px]">
         <span className="flex items-center gap-[7px]">
           <span
             className="h-[7px] w-[7px] rounded-full"
@@ -90,10 +91,11 @@ export function RecoveryImpactCard({ recovery, disruptions, horizonDays }: Props
           {recovery.detection_lag_days}d detection lag · cap $
           {recovery.cost_cap?.toLocaleString() ?? 0}
         </span>
-      </div>
-
+        </span>
+      }
+    >
       {responses.length > 0 ? (
-        <div className="flex flex-wrap gap-[6px] border-b border-[#ececee] px-3 py-2">
+        <div className="flex flex-wrap gap-[6px] border-b border-[--sim-divider] px-3 py-2">
           {responses.map((r) => (
             <span
               key={r}
@@ -107,6 +109,6 @@ export function RecoveryImpactCard({ recovery, disruptions, horizonDays }: Props
 
       <ImpactTable head="KPI" rows={kpiRows} />
       {utilRows.length > 0 ? <ImpactTable head="Utilization by class" rows={utilRows} /> : null}
-    </section>
+    </TableBlock>
   );
 }

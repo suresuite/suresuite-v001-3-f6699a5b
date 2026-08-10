@@ -40,7 +40,7 @@ export function ExperimentLibraryBox({
       onClick={onToggle}
       title="Browse stress-test experiment presets"
       className={cn(
-        "mb-3 flex w-full items-center gap-[10px] rounded-[5px] border px-[14px] py-3 text-left hover:border-foreground",
+        "mb-3 flex w-full items-center gap-[10px] rounded-sm border px-[14px] py-3 text-left hover:border-foreground",
         open
           ? "border-[#14b8c4] bg-[#e8f7f8] shadow-[0_0_0_3px_rgba(20,184,196,0.16)]"
           : "border-[rgba(20,184,196,0.45)] bg-[rgba(20,184,196,0.07)]",
@@ -84,15 +84,15 @@ export function ScenarioList({
   onBrowseSaved: () => void;
 }) {
   return (
-    <aside className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
-      <div className="flex items-center justify-between gap-2 border-b border-[#e0e0e3] px-[14px] py-[11px]">
+    <aside className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-[--hair-rule] px-[14px] py-[11px]">
         <span className="text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">Scenarios</span>
         <span className="flex items-center gap-[6px]">
           <button
             type="button"
             onClick={onBrowseSaved}
             title="Browse the saved experiment library"
-            className="h-6 rounded-sm border border-[#e0e0e3] px-2 text-[11.5px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground"
+            className="h-6 rounded-sm border border-[--hair-rule] px-2 text-[11.5px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground"
           >
             Library
           </button>
@@ -100,7 +100,7 @@ export function ScenarioList({
             type="button"
             onClick={onCreate}
             title="New scenario"
-            className="h-6 w-6 rounded-sm border border-[#e0e0e3] text-[14px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground"
+            className="h-6 w-6 rounded-sm border border-[--hair-rule] text-[14px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground"
           >
             +
           </button>
@@ -109,10 +109,10 @@ export function ScenarioList({
 
       <div className="max-h-[420px] overflow-y-auto">
         {loading ? (
-          <div className="px-[14px] py-3 text-[12.5px] text-[#71717a]">Loading…</div>
+          <div className="px-[14px] py-3 text-[12.5px] text-[--zinc-quiet]">Loading…</div>
         ) : null}
         {!loading && scenarios.length === 0 ? (
-          <div className="px-[14px] py-3 text-[12.5px] text-[#71717a]">
+          <div className="px-[14px] py-3 text-[12.5px] text-[--zinc-quiet]">
             No scenarios yet — create one, or launch a stress test above.
           </div>
         ) : null}
@@ -125,7 +125,7 @@ export function ScenarioList({
               key={s.id}
               onClick={() => onSelect(s.id)}
               className={cn(
-                "flex cursor-pointer items-start gap-[10px] border-b border-l-2 border-b-[#ececee] px-[14px] py-3",
+                "flex cursor-pointer items-start gap-[10px] border-b border-l-2 border-b-[--sim-divider] px-[14px] py-3",
                 on ? "border-l-foreground bg-[#fafafa]" : "border-l-transparent bg-white",
               )}
             >
@@ -158,7 +158,7 @@ export function ScenarioList({
                     e.stopPropagation();
                     onDuplicate(s);
                   }}
-                  className="h-6 w-6 rounded-sm border border-transparent text-[12px] leading-none text-[#a1a1aa] hover:border-[#e0e0e3] hover:bg-white hover:text-[#18181b]"
+                  className="h-6 w-6 rounded-sm border border-transparent text-[12px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#18181b]"
                 >
                   ⧉
                 </button>
@@ -169,7 +169,7 @@ export function ScenarioList({
                     e.stopPropagation();
                     if (confirm(`Delete scenario "${s.name}"?`)) onDelete(s.id);
                   }}
-                  className="h-6 w-6 rounded-sm border border-transparent text-[13px] leading-none text-[#a1a1aa] hover:border-[#e0e0e3] hover:bg-white hover:text-[#BF2330]"
+                  className="h-6 w-6 rounded-sm border border-transparent text-[13px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#BF2330]"
                 >
                   ✕
                 </button>

@@ -225,7 +225,7 @@ function FundingStrip() {
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
                   <span className="text-[14.5px] leading-normal">{p.line}</span>
                   <span
-                    className={`whitespace-nowrap rounded-[3px] border px-[7px] py-[3px] font-mono text-[9px] uppercase tracking-[0.18em] ${p.statusClass}`}
+                    className={`whitespace-nowrap rounded-sm border px-[7px] py-[3px] font-mono text-[9px] uppercase tracking-[0.18em] ${p.statusClass}`}
                   >
                     {p.status}
                   </span>
@@ -380,7 +380,7 @@ export default function About() {
                     {p.tags.map((t) => (
                       <span
                         key={t}
-                        className="whitespace-nowrap rounded-[3px] border border-border px-2.5 py-[5px] text-xs text-foreground/70"
+                        className="whitespace-nowrap rounded-sm border border-border px-2.5 py-[5px] text-xs text-foreground/70"
                       >
                         {t}
                       </span>

@@ -1379,7 +1379,7 @@ const UploadWizard = ({
       <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b">
         <Tabs value={selectedDataset} onValueChange={setSelectedDataset} className="flex-1">
           <TabsList
-            className="inline-flex justify-start gap-1 h-9 rounded-xl bg-muted p-1"
+            className="inline-flex justify-start gap-1 h-9 rounded-sm bg-muted p-1"
             style={{ width: 'fit-content' }}
           >
             {datasetTabs.map((tab) => (

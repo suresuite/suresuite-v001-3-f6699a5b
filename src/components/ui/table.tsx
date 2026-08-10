@@ -20,7 +20,16 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+  // L2: the column row is an ink block. It ends where the data begins, so no
+  // bottom border, and the header row opts out of the L3 row hover.
+  <thead
+    ref={ref}
+    className={cn(
+      "bg-[--brand-ink] [&_tr]:border-0 [&_tr:hover]:bg-transparent",
+      className
+    )}
+    {...props}
+  />
 ))
 TableHeader.displayName = "TableHeader"
 
@@ -58,7 +67,11 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      // L3: white content, one divider weight, no zebra. The literal hover and
+      // selected values are light-mode only — dark keeps the theme-aware muted
+      // pair it had before, so dark mode is untouched by the contrast pass.
+      "border-b border-b-[--hair-border] transition-colors hover:bg-[#fcfcfc] data-[state=selected]:bg-[#f0f0f0]",
+      "dark:hover:bg-muted/50 dark:data-[state=selected]:bg-muted",
       className
     )}
     {...props}
@@ -73,7 +86,9 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      // Labels go white on the ink block; separators are a light-on-ink hairline
+      // rather than a border token, which would disappear at this value.
+      "h-12 px-4 text-left align-middle font-medium text-white border-r border-r-[rgba(255,255,255,0.22)] last:border-r-0 [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
