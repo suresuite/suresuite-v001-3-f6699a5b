@@ -470,6 +470,9 @@ export function ProjectCard({
                               : 'No project is currently active across the app',
                           });
                         }}
+                        // The default unchecked track (--input, 88%) is invisible against
+                        // the card's selected/hover tint, leaving a bare white thumb.
+                        className="data-[state=unchecked]:bg-gray-400"
                         aria-label="Set as the active project across the app"
                       />
                     </span>
