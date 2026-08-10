@@ -24,6 +24,7 @@ import ProjectIntelligence from './pages/ProjectIntelligence';
 import Profile from './pages/Profile';
 import DeveloperApi from './pages/DeveloperApi';
 import Forbidden from './pages/Forbidden';
+import NotFound from './pages/NotFound';
 import DocsLayout from '@/components/docs/DocsLayout';
 import HelpPage from './pages/help/HelpPage';
 import Landing from './pages/Landing';
@@ -189,6 +190,10 @@ function App() {
                 <Route path="/admin/models" element={<ProtectedRoute><RoleGuard><AdminModels isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/usage" element={<ProtectedRoute><RoleGuard><AdminUsage isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/audit" element={<ProtectedRoute><RoleGuard><AdminAudit isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+
+                {/* Unknown URL — the host rewrites every path to index.html so the
+                    SPA can deep-link, which means 404s land here, not on the host. */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
               </RouteErrorBoundary>
               {/* Own boundary: the bubble renders on every route, so a throw
