@@ -8,6 +8,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { StepwiseDatePicker } from '@/components/ui/stepwise-date-picker';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
 import {
   CheckCircle,
@@ -24,6 +32,7 @@ import {
   Network,
   Workflow,
   Coins,
+  MoreHorizontal,
 } from 'lucide-react';
 import { getCombineStatusStyle, getCombineStatusIcon, getCombineStatusText } from '@/utils/combineStatus';
 import { getFallbackSimulationDates } from '@/utils/dateHelpers';
@@ -74,7 +83,7 @@ interface ProjectCardProps {
   editSimulationEnd?: Date;
   editDeepTierEnabled: boolean;
   onSelect: (project: Project) => void;
-  onGlobalSelect: (projectId: string) => void;
+  onGlobalSelect: (projectId: string | null) => void;
   onDownloadNodeList: (project: Project) => void;
   onGenerateNodeList: (project: Project) => void;
   onViewData: (project: Project) => void;
@@ -443,167 +452,97 @@ export function ProjectCard({
                 </div>
               </div>
 
-            <div className="flex items-center gap-1 ml-4">
+            <div className="flex items-center gap-2 ml-4 shrink-0" onClick={(e) => e.stopPropagation()}>
               {/* Global Project Selector */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center">
+                    <span className="inline-flex">
                       <Switch
+                        size="sm"
                         checked={globalSelectedProjectId === project.id}
                         onCheckedChange={(checked) => {
-                          if (checked) {
-                            onGlobalSelect(project.id);
-                            toast({
-                              title: "Global project selected",
-                              description: `"${project.name}" is now the active project across the app`
-                            });
-                          } else {
-                            onGlobalSelect(null);
-                            toast({
-                              title: "Global project deselected",
-                              description: "No project is currently active across the app"
-                            });
-                          }
+                          onGlobalSelect(checked ? project.id : null);
+                          toast({
+                            title: checked ? 'Global project selected' : 'Global project deselected',
+                            description: checked
+                              ? `"${project.name}" is now the active project across the app`
+                              : 'No project is currently active across the app',
+                          });
                         }}
-                        className="h-4 w-8 data-[state=checked]:bg-foreground scale-75"
+                        aria-label="Set as the active project across the app"
                       />
-                    </div>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Global Project Selection</p>
+                    <p className="text-xs">Global project selection</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
 
               {canModify && (project.modeler_id === userId || role === 'admin') && (
                 <>
-                  <span className="text-muted-foreground text-sm mx-1">|</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 hover:bg-muted"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onViewData(project);
-                          }}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>View data</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Separator orientation="vertical" className="h-4" />
 
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 hover:bg-muted"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUploadData(project);
-                          }}
-                        >
-                          <Upload className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Upload data</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewData(project);
+                    }}
+                  >
+                    <Eye className="h-3.5 w-3.5" /> View data
+                  </Button>
 
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 hover:bg-muted"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditItemMaster(project);
-                          }}
-                        >
-                          <Coins className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit item master (costs &amp; capacities)</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUploadData(project);
+                    }}
+                  >
+                    <Upload className="h-3.5 w-3.5" /> Upload
+                  </Button>
 
-                  {completion && Object.values(completion).some(Boolean) && (!project.combine_status || project.combine_status === 'pending' || project.combine_status === 'failed') && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 hover:bg-muted"
-                            disabled={project.combine_status === 'running'}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCombine(project);
-                            }}
-                          >
-                            <Workflow className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {project.combine_status === 'failed' ? 'Retry combine datasets' : 'Combine datasets'}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 hover:bg-muted"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit(project);
-                          }}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit project</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 hover:bg-muted"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const isComplexProject = project.deep_tier_enabled && project.bom_level === 'multi_level';
-                            const message = isComplexProject 
-                              ? `Delete project "${project.name}"? This is a complex project that will be force-deleted (all data cleaned first).`
-                              : `Are you sure you want to delete project "${project.name}"?`;
-                              
-                            if (confirm(message)) {
-                              onDelete(project);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Delete project</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More actions" title="More actions">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuItem onClick={() => onEditItemMaster(project)}>
+                        <Coins className="mr-2 h-4 w-4" /> Edit item master
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={project.combine_status === 'running'}
+                        onClick={() => onCombine(project)}
+                      >
+                        <Workflow className="mr-2 h-4 w-4" />
+                        {project.combine_status === 'failed' ? 'Retry combine datasets' : 'Combine datasets'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onEdit(project)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Edit project
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-[#bf2330] focus:text-[#bf2330]"
+                        onClick={() => {
+                          const isComplexProject = project.deep_tier_enabled && project.bom_level === 'multi_level';
+                          const message = isComplexProject
+                            ? `Delete project "${project.name}"? This is a complex project that will be force-deleted (all data cleaned first).`
+                            : `Are you sure you want to delete project "${project.name}"?`;
+                          if (confirm(message)) onDelete(project);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete project
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               )}
             </div>
