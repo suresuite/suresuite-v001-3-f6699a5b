@@ -70,7 +70,7 @@ export function ProposalCardView({
 
   return (
     <div
-      className="mt-2 rounded-sm border border-[#ebebeb] px-3 py-2.5"
+      className="mt-2 rounded-sm border border-[--hair-border] px-3 py-2.5"
       style={{ borderLeft: "2px solid " + color, opacity: proposal.status === "rejected" ? 0.55 : 1 }}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -176,7 +176,7 @@ export function ProposalCardView({
             <button
               type="button"
               onClick={() => onReject(proposal.id)}
-              className="rounded-sm border border-[#ebebeb] bg-background px-3 py-1.5 text-[12.5px] text-foreground"
+              className="rounded-sm border border-[--hair-border] bg-background px-3 py-1.5 text-[12.5px] text-foreground"
             >
               Reject
             </button>
@@ -194,7 +194,7 @@ export function ProposalCardView({
             <button
               type="button"
               onClick={() => onReject(proposal.id)}
-              className="rounded-sm border border-[#ebebeb] bg-background px-3 py-1.5 text-[12.5px] text-foreground"
+              className="rounded-sm border border-[--hair-border] bg-background px-3 py-1.5 text-[12.5px] text-foreground"
             >
               Reject
             </button>

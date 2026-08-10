@@ -3,7 +3,7 @@
  *
  * Same shape as handoff/admin/adminUi.tsx and handoff/DeveloperApi.tsx:
  * class consts first, then the tiny primitives every panel reuses.
- * Sharp corners (rounded-sm), 1px #ebebeb borders, #f4f4f4 row dividers,
+ * Sharp corners (4px), 1px --hair-border rules, --hair-divider row dividers,
  * mono UPPERCASE kickers, black-pill active states — never grey.
  */
 import React from "react";
@@ -11,12 +11,17 @@ import { cn } from "@/lib/utils";
 
 /* ── shared class consts ─────────────────────────────────────────────── */
 
-export const SURFACE = "rounded-sm border border-[#ebebeb] bg-background";
+export const SURFACE = "rounded-sm border border-[--hair-border] bg-background";
 export const KX = "font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground";
 export const KX_TIGHT = "font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground";
+/**
+ * L2 — the column row as an ink block. The panel treatment (mono, 10px,
+ * 0.14em) is deliberately kept distinct from the Ledger TH; only the ground
+ * and the label colour move. No bottom border: the ink ends at the data.
+ */
 export const TH =
-  "bg-[#fafafa] px-2.5 py-1.5 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground border-b border-[#ebebeb]";
-export const TD = "px-2.5 py-1.5 text-[12.5px] text-foreground border-b border-[#f4f4f4]";
+  "bg-[--brand-ink] px-2.5 py-1.5 text-left font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white border-r border-r-[rgba(255,255,255,0.22)] last:border-r-0";
+export const TD = "px-2.5 py-1.5 text-[12.5px] text-foreground border-b border-[--hair-divider]";
 export const ROW_HOVER = "hover:bg-[#fcfcfc]";
 export const MONO = "font-mono";
 
@@ -82,7 +87,7 @@ export function MonoChip({
       style={
         color
           ? { background: tint(color, 0.1), color }
-          : { background: "#f4f4f4", color: "#9a9a9a" }
+          : { background: "#f4f4f4", color: "var(--hair-quiet)" }
       }
     >
       {children}
@@ -105,7 +110,7 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn("inline-flex rounded-sm border border-[#ebebeb] p-[3px]", className)}>
+    <div className={cn("inline-flex rounded-sm border border-[--zinc-border] p-[3px]", className)}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -153,7 +158,7 @@ export function Toggle({
       <span
         className={cn(
           "relative h-[14px] w-[26px] rounded-sm border transition-colors",
-          checked ? "border-foreground bg-foreground" : "border-[#ebebeb] bg-background",
+          checked ? "border-foreground bg-foreground" : "border-[--zinc-border] bg-background",
         )}
       >
         <span
@@ -184,7 +189,7 @@ export function Kicker({
     <span className={cn(KX_TIGHT, "flex items-center gap-1", className)} style={color ? { color } : undefined}>
       {children}
       {typeof count === "number" && (
-        <span className="ml-1 rounded-[3px] bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal text-muted-foreground">
+        <span className="ml-1 rounded-sm bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal text-muted-foreground">
           {count}
         </span>
       )}
@@ -218,7 +223,7 @@ export function PanelHeader({
           ›
         </span>
         {label}
-        <span className="ml-1 rounded-[3px] bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal text-muted-foreground">
+        <span className="ml-1 rounded-sm bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal text-muted-foreground">
           {count}
         </span>
       </button>

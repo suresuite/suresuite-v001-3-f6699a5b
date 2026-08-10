@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, KX, TH, TD, ROW_HOVER, useTableSort } from '@/components/admin/adminUi';
+import { TableBlock } from '@/components/shared';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface Kpis { orgs: number; projects: number; users: number; requests: number; costMtd: number; costToday: number; activeUsers7d: number; }
@@ -76,24 +77,24 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
     <AdminLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Platform Overview">
       {loading || !kpis ? (
         <div className="grid h-40 place-items-center">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#e4e4e4] border-t-foreground" />
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[--zinc-border] border-t-foreground" />
         </div>
       ) : (
         <div className="space-y-4">
           <div className={`${SURFACE} overflow-hidden`}>
-            <div className={`${KX} border-b border-[#ebebeb] px-4 py-[9px]`}>Reach</div>
+            <div className={`${KX} border-b border-[--hair-border] px-4 py-[9px]`}>Reach</div>
             <div className="grid grid-cols-4">
               {reach.map(([label, value], i) => (
-                <div key={label} className={i < 3 ? 'border-r border-[#f4f4f4] px-[18px] py-[15px]' : 'px-[18px] py-[15px]'}>
+                <div key={label} className={i < 3 ? 'border-r border-[--hair-divider] px-[18px] py-[15px]' : 'px-[18px] py-[15px]'}>
                   <div className={KX}>{label}</div>
                   <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{value}</div>
                 </div>
               ))}
             </div>
-            <div className={`${KX} border-y border-[#ebebeb] px-4 py-[9px]`}>AI spend</div>
+            <div className={`${KX} border-y border-[--hair-border] px-4 py-[9px]`}>AI spend</div>
             <div className="grid grid-cols-4">
               {spend.map(([label, value, hint, emph], i) => (
-                <div key={label as string} className={`px-[18px] py-[15px] ${i < 3 ? 'border-r border-[#f4f4f4]' : ''} ${emph ? 'bg-[#fffdf3]' : ''}`}>
+                <div key={label as string} className={`px-[18px] py-[15px] ${i < 3 ? 'border-r border-[--hair-divider]' : ''} ${emph ? 'bg-[#fffdf3]' : ''}`}>
                   <div className={KX}>{label}</div>
                   <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{value}</div>
                   {emph ? <div className="mt-2 h-[2px] w-9 rounded-full bg-[#f8d448]" /> : hint ? <div className="mt-2 font-mono text-[10px] text-[#a3a3a3]">{hint}</div> : null}
@@ -117,11 +118,14 @@ function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
     label: (r: TopRow) => r.label.toLowerCase(), requests: (r: TopRow) => r.requests, cost: (r: TopRow) => r.cost,
   });
   return (
-    <div className={`${SURFACE} overflow-hidden`}>
-      <div className="flex items-center justify-between border-b border-[#f2f2f2] px-4 py-[11px]">
-        <span className="text-[13px] font-semibold">{title}</span>
-        <span className="rounded-[3px] bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] tracking-[0.1em] text-[#8a8a8a]">MTD</span>
-      </div>
+    // L1: the table's name sits on the canvas above the shell, not in a title bar.
+    <TableBlock
+      name={title}
+      count={rows.length}
+      actions={
+        <span className="rounded-sm bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] tracking-[0.1em] text-[--ledger-quiet]">MTD</span>
+      }
+    >
       <table className="w-full border-collapse">
         <thead><tr><SortTH sortKey="label">Name</SortTH><SortTH sortKey="requests" align="right">Req</SortTH><SortTH sortKey="cost" align="right">Cost</SortTH></tr></thead>
         <tbody>
@@ -136,6 +140,6 @@ function TopTable({ title, rows }: { title: string; rows: TopRow[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableBlock>
   );
 }

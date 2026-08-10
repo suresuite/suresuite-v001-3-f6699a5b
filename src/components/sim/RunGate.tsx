@@ -45,11 +45,11 @@ export function GateBar({
   const canRun = !reason;
 
   return (
-    <div className="flex items-center gap-3 border-t border-[#e0e0e3] bg-[#fafafa] px-3 py-[9px]">
+    <div className="flex items-center gap-3 border-t border-[--hair-rule] bg-[#fafafa] px-3 py-[9px]">
       <button
         type="button"
         onClick={onShowFindings}
-        className="flex items-center gap-3 rounded-sm border border-[#e0e0e3] bg-white px-[10px] py-[5px]"
+        className="flex items-center gap-3 rounded-sm border border-[--hair-rule] bg-white px-[10px] py-[5px]"
       >
         <span className="flex items-center gap-[7px]">
           <span
@@ -91,7 +91,7 @@ export function GateBar({
           dirty ? "px-[14px]" : "px-5",
           canRun
             ? "border-foreground bg-foreground text-background"
-            : "cursor-not-allowed border-[#e0e0e3] bg-[#f4f4f5] text-[#a1a1aa]",
+            : "cursor-not-allowed border-[--hair-rule] bg-[#f4f4f5] text-[#a1a1aa]",
         )}
       >
         {dirty ? "Save version & run" : warns > 0 && acknowledged ? "Acknowledge & run" : "Run"}
@@ -121,8 +121,8 @@ export function FindingsPanel<F extends Finding>({
     .filter((g) => g.items.length > 0);
 
   return (
-    <section className="rounded-sm border border-[#e0e0e3] bg-white">
-      <div className="flex items-center gap-[9px] border-b border-[#e0e0e3] px-3 py-[9px]">
+    <section className="rounded-sm border border-[--hair-rule] bg-white">
+      <div className="flex items-center gap-[9px] border-b border-[--hair-rule] px-3 py-[9px]">
         <span className="text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">
           Required-data gate
         </span>
@@ -143,7 +143,7 @@ export function FindingsPanel<F extends Finding>({
 
       {groups.map((g) => (
         <div key={g.sev}>
-          <div className="flex items-center gap-2 border-b border-[#e0e0e3] bg-[#fafafa] px-3 py-1.5">
+          <div className="flex items-center gap-2 border-b border-[--hair-rule] bg-[#fafafa] px-3 py-1.5">
             <span className="h-[7px] w-[7px] rounded-full" style={{ background: SEV_COLOR[g.sev] }} />
             <span
               className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
@@ -159,12 +159,12 @@ export function FindingsPanel<F extends Finding>({
           {g.items.map((f) => (
             <div
               key={f.id}
-              className="flex gap-3 border-b border-l-2 border-b-[#ececee] px-3 py-[9px]"
+              className="flex gap-3 border-b border-l-2 border-b-[--sim-divider] px-3 py-[9px]"
               style={{ borderLeftColor: SEV_COLOR[g.sev] }}
             >
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] leading-[1.4] text-[#18181b]">{f.message}</div>
-                <div className="mt-[3px] text-[11.5px] text-[#71717a]">
+                <div className="mt-[3px] text-[11.5px] text-[--zinc-quiet]">
                   {[f.field, f.policy && f.policy !== "engine" ? `demanded by ${f.policy}` : f.policy]
                     .filter(Boolean)
                     .join(" · ")}
@@ -172,7 +172,7 @@ export function FindingsPanel<F extends Finding>({
                 {renderFix?.(f)}
               </div>
               {f.hint ? (
-                <span className="shrink-0 text-[11.5px] text-[#71717a]">{f.hint}</span>
+                <span className="shrink-0 text-[11.5px] text-[--zinc-quiet]">{f.hint}</span>
               ) : null}
             </div>
           ))}
@@ -183,7 +183,7 @@ export function FindingsPanel<F extends Finding>({
         <button
           type="button"
           onClick={onAcknowledge}
-          className="flex w-full items-center gap-2 border-t border-[#e0e0e3] bg-[#fafafa] px-3 py-[10px] text-left"
+          className="flex w-full items-center gap-2 border-t border-[--hair-rule] bg-[#fafafa] px-3 py-[10px] text-left"
         >
           <span
             className={cn(

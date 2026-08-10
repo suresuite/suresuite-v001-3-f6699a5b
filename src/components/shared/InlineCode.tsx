@@ -6,7 +6,7 @@ export function InlineCode({ children, className }: { children: ReactNode; class
   return (
     <code
       className={cn(
-        'rounded-md border border-border bg-muted/50 px-3 py-1.5 font-mono text-[11px]',
+        'rounded-sm border border-border bg-muted/50 px-3 py-1.5 font-mono text-[11px]',
         className,
       )}
     >

@@ -23,7 +23,7 @@ export function ApiCodeBlock({ title, code }: { title: string; code: string }) {
           <span className="ml-1.5">Copy</span>
         </Button>
       </div>
-      <pre className="rounded-md border border-border bg-muted/50 p-3 text-[11px] leading-relaxed overflow-x-auto">
+      <pre className="rounded-sm border border-border bg-muted/50 p-3 text-[11px] leading-relaxed overflow-x-auto">
         <code>{code}</code>
       </pre>
     </div>

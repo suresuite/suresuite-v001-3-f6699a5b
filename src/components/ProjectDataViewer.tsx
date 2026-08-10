@@ -53,7 +53,7 @@ interface ProjectDataViewerProps {
 }
 
 const SMALL_TXT = 'text-xs';
-const HEAD_CELL_PAD = 'h-7 px-2 py-1 font-medium text-muted-foreground text-left';
+const HEAD_CELL_PAD = 'h-7 px-2 py-1 font-medium text-white text-left';
 const CELL_PAD = 'h-6 px-2 py-1';
 
 const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewerProps) => {

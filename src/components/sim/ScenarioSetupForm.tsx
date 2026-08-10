@@ -194,20 +194,20 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <section className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
+      <section className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
         <div className="flex flex-col gap-1 px-4 py-3">
           <input
             value={local.name}
             onChange={(e) => patch({ name: e.target.value })}
             onBlur={commit}
-            className="w-full rounded-sm border border-transparent px-1 py-px text-[16px] font-semibold tracking-[-0.011em] text-[#18181b] hover:border-[#e0e0e3] focus:border-foreground focus:outline-none"
+            className="w-full rounded-sm border border-transparent px-1 py-px text-[16px] font-semibold tracking-[-0.011em] text-[#18181b] hover:border-[--hair-rule] focus:border-foreground focus:outline-none"
           />
           <input
             value={local.description}
             onChange={(e) => patch({ description: e.target.value })}
             onBlur={commit}
             placeholder="What this scenario tests"
-            className="w-full rounded-sm border border-transparent px-1 py-px text-[12.5px] text-[#52525b] hover:border-[#e0e0e3] focus:border-foreground focus:outline-none"
+            className="w-full rounded-sm border border-transparent px-1 py-px text-[12.5px] text-[#52525b] hover:border-[--hair-rule] focus:border-foreground focus:outline-none"
           />
         </div>
         <TimeUnitBar

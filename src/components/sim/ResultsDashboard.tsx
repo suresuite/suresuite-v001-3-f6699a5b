@@ -37,7 +37,7 @@ function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | 
 export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility }: Props) {
   if (!run) {
     return (
-      <div className="rounded-sm border border-[#e0e0e3] bg-white px-3 py-[10px] text-[12.5px] text-[#71717a]">
+      <div className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
         No run yet
       </div>
     );

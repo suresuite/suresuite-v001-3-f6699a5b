@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { KpiStatTable as KpiStatTableView, type KpiStat } from "./resultTables";
+import { TableBlock } from "@/components/shared";
 import type { Replication } from "@/hooks/useSimulationRun";
 import { summarize } from "@/lib/sim/stats";
 import { KPI_DISPLAY } from "@/lib/sim/kpiDisplay";
@@ -32,22 +33,15 @@ export function KpiStatTable({ reps, primaryKpi }: Props) {
   }, [reps]);
 
   return (
-    <section className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
-      <div className="flex items-center gap-[9px] border-b border-[#e0e0e3] px-3 py-[9px]">
-        <span className="text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">
-          KPI summary across replications
-        </span>
-        <span className="ml-auto text-[11.5px] tabular-nums text-[#52525b]">
-          {rows.length} {rows.length === 1 ? "KPI" : "KPIs"}
-        </span>
-      </div>
+    // L1: the table's name reads on the canvas, above the shell.
+    <TableBlock name="KPI summary across replications" count={rows.length}>
       {rows.length === 0 ? (
-        <div className="px-3 py-[10px] text-[12.5px] text-[#71717a]">
+        <div className="px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
           No completed replications yet
         </div>
       ) : (
         <KpiStatTableView rows={rows} primaryKpi={primaryKpi ?? ""} />
       )}
-    </section>
+    </TableBlock>
   );
 }

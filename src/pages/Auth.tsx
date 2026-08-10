@@ -72,7 +72,7 @@ const Auth = () => {
   return (
     <div className="flex min-h-screen items-stretch bg-white text-[#171717]">
       {/* Form column */}
-      <div className="flex shrink-0 grow-0 basis-[clamp(420px,44%,600px)] flex-col justify-start border-r border-[#ebebeb] px-[clamp(32px,5vw,76px)] pb-8 pt-9">
+      <div className="flex shrink-0 grow-0 basis-[clamp(420px,44%,600px)] flex-col justify-start border-r border-[--hair-border] px-[clamp(32px,5vw,76px)] pb-8 pt-9">
         <img
           src="/logo-lockup.png"
           alt="SuReSuite — Supply Chain Resilience Suite"
@@ -156,7 +156,7 @@ const Auth = () => {
                           type="button"
                           onClick={() => setShowPassword((v) => !v)}
                           disabled={isBusy}
-                          className="absolute right-[6px] inline-flex h-[34px] items-center rounded-[3px] px-[10px] font-mono text-[10px] uppercase tracking-[0.14em] text-[#737373] hover:bg-[#f5f5f5] hover:text-[#171717]"
+                          className="absolute right-[6px] inline-flex h-[34px] items-center rounded-sm px-[10px] font-mono text-[10px] uppercase tracking-[0.14em] text-[#737373] hover:bg-[#f5f5f5] hover:text-[#171717]"
                         >
                           {showPassword ? 'Hide' : 'Show'}
                         </button>
@@ -176,10 +176,10 @@ const Auth = () => {
                   role="checkbox"
                   aria-checked={rememberMe}
                   onClick={() => setRememberMe((v) => !v)}
-                  className="relative size-4 shrink-0 rounded-[3px] border border-[#d0d0d0] bg-white"
+                  className="relative size-4 shrink-0 rounded-sm border border-[#d0d0d0] bg-white"
                 >
                   {rememberMe && (
-                    <span className="absolute -inset-px grid place-items-center rounded-[3px] bg-[#171717]">
+                    <span className="absolute -inset-px grid place-items-center rounded-sm bg-[#171717]">
                       <Check className="size-[10px] text-white" strokeWidth={3} />
                     </span>
                   )}
@@ -206,7 +206,7 @@ const Auth = () => {
             </form>
           </Form>
 
-          <div className="flex flex-col gap-3 border-t border-[#ebebeb] pt-5">
+          <div className="flex flex-col gap-3 border-t border-[--hair-border] pt-5">
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#737373]">No account yet</span>
             <p className="m-0 text-pretty text-[13px] leading-[1.6] text-[#737373]">
               Accounts are approved by the Digital SC Lab. Email{' '}

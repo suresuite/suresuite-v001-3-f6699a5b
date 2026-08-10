@@ -91,7 +91,7 @@ export function ChatComposer({
   const modelOptions = visibleModels.length > 0 ? visibleModels : CHAT_MODELS;
 
   return (
-    <div className="rounded-sm border border-[#ebebeb] bg-background">
+    <div className="rounded-sm border border-[--hair-border] bg-background">
       <textarea
         ref={taRef}
         rows={1}
@@ -103,9 +103,9 @@ export function ChatComposer({
         style={{ minHeight: BASE, overflow: "hidden" }}
       />
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-[#f4f4f4] px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 border-t border-[--hair-divider] px-2 py-1.5">
         <Select value={projectId ?? "none"} onValueChange={(v) => onProjectChange(v === "none" ? null : v)}>
-          <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[#ebebeb] px-1.5 text-[11.5px] text-muted-foreground">
+          <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[--zinc-border] px-1.5 text-[11.5px] text-muted-foreground">
             {/* Explicit children so an unattached thread reads "+ Project"
                 instead of the "No project" item label. */}
             <SelectValue>
@@ -130,7 +130,7 @@ export function ChatComposer({
             onClick={toggleExpand}
             title={expanded ? "Collapse composer" : "Expand composer for longer input"}
             className={cn(
-              "flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-sm border border-[#ebebeb]",
+              "flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-sm border border-[--hair-border]",
               expanded ? "bg-foreground text-background" : "bg-background text-muted-foreground",
             )}
           >
@@ -138,7 +138,7 @@ export function ChatComposer({
           </button>
 
           {modesOn && (
-            <div className="inline-flex rounded-sm border border-[#ebebeb] p-[2px]">
+            <div className="inline-flex rounded-sm border border-[--hair-border] p-[2px]">
               {(["ask", "review"] as const).map((m) => (
                 <button
                   key={m}
@@ -165,7 +165,7 @@ export function ChatComposer({
           )}
 
           <Select value={model} onValueChange={onModelChange}>
-            <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[#ebebeb] px-1.5 text-[11.5px] text-muted-foreground">
+            <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[--zinc-border] px-1.5 text-[11.5px] text-muted-foreground">
               <SelectValue>{getModelLabel(model)}</SelectValue>
             </SelectTrigger>
             <SelectContent align="end" className="rounded-sm">

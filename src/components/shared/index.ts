@@ -4,7 +4,7 @@ export { ProjectSelector } from './ProjectSelector';
 export { ScenarioImpactSlider } from './ScenarioImpactSlider';
 export { YouTubeEmbed } from './YouTubeEmbed';
 export { SectionCard } from './SectionCard';
-export { TableShell } from './TableShell';
+export { TableShell, TableName, TableBlock } from './TableShell';
 export { TableLoading } from './TableLoading';
 export { TableEmpty } from './TableEmpty';
 export { ErrorBanner } from './ErrorBanner';

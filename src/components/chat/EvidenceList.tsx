@@ -62,7 +62,7 @@ export function EvidenceList({ data }: { data: unknown }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition",
+          "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[11px] font-medium transition",
           t.chip,
         )}
       >

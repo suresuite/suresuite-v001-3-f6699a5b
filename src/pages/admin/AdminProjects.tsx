@@ -99,7 +99,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
             </tr>
             <tr>
               <FilterTH filterKey="name" /><FilterTH filterKey="org" /><FilterTH filterKey="owner" />
-              <FilterTH filterKey="plant" /><FilterTH filterKey="model" /><FilterTH filterKey="status" /><FilterTH filterKey="updated" /><th className="border-b border-[#ebebeb] bg-[#fafafa]" />
+              <FilterTH filterKey="plant" /><FilterTH filterKey="model" /><FilterTH filterKey="status" /><FilterTH filterKey="updated" /><th className="border-b border-[--hair-border] bg-white" />
             </tr></thead>
             <tbody>
               {loading ? <LoadingRow colSpan={8} /> : sorted.length === 0 ? (
@@ -119,7 +119,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                     </div>
                   </td>
                   <td className={TD}>
-                    <span className={`rounded-[4px] border px-1.5 py-0.5 text-[11px] ${p.completed ? 'border-[#d4d4d4] text-foreground' : 'border-[#e4e4e4] text-muted-foreground'}`}>{p.completed ? 'completed' : 'draft'}</span>
+                    <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] ${p.completed ? 'border-[#d4d4d4] text-foreground' : 'border-[--zinc-border] text-muted-foreground'}`}>{p.completed ? 'completed' : 'draft'}</span>
                   </td>
                   <td className={`${TD} text-[12px] text-muted-foreground`}>{new Date(p.updated_at).toLocaleDateString()}</td>
                   <td className={`${TD} text-right`}>

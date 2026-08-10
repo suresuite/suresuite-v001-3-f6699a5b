@@ -10,7 +10,7 @@
 //
 // ── SuReSuite redesign (2026-07) ────────────────────────────────────────────
 // This page carries the SuReSuite visual language rather than raw shadcn
-// defaults: sharp rounded-sm corners, 1px #ebebeb borders, JetBrains-mono
+// defaults: one 4px corner radius, 1px --hair-border rules, JetBrains-mono
 // UPPERCASE table headers + kicker labels, a black-pill active tab
 // (bg-foreground text-background), teal/red status dots, a bespoke red-kicker
 // "Key hygiene" card ABOVE the table, "Create API key" living in the
@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ApiCodeBlock, InlineCode } from '@/components/shared';
+import { ApiCodeBlock, InlineCode, TableBlock } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -111,10 +111,13 @@ const NOTEBOOK_COLAB_URL =
   'https://colab.research.google.com/github/suresuite/suresuite-v001-3-f6699a5b/blob/main/public/notebooks/suresuite_api_quickstart.ipynb';
 
 // ── Shared SuReSuite treatment (sharp corners, thin borders, mono labels) ────
-const SURFACE = 'rounded-sm border border-[#ebebeb] bg-white';
+const SURFACE = 'rounded-sm border border-[--hair-border] bg-white';
 const KX = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
-const TH = 'text-left font-mono text-[11px] uppercase tracking-[0.04em] font-medium text-[#8a8a8a] bg-[#fafafa] border-b border-[#ebebeb] px-4 py-2 whitespace-nowrap';
-const TD = 'px-4 py-[11px] border-b border-[#f4f4f4] align-middle';
+// L2 — the column row as an ink block. Mono/uppercase/11px/0.04em unchanged;
+// the ground and label colour changed, and the bottom border is gone because
+// the ink block ends where the data begins.
+const TH = 'text-left font-mono text-[11px] uppercase tracking-[0.04em] font-medium text-white bg-[--brand-ink] border-r border-r-[rgba(255,255,255,0.22)] last:border-r-0 px-4 py-2 whitespace-nowrap';
+const TD = 'px-4 py-[11px] border-b border-[--hair-divider] align-middle';
 // Brand-yellow accent for the "download a template" action — flags a starter
 // artifact without competing with the black primary used elsewhere.
 const TEMPLATE_BTN =
@@ -490,7 +493,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
         <Tabs defaultValue="keys" className="space-y-4">
           {/* Black-pill active tab (bg-foreground text-background), sharp corners */}
-          <TabsList className="inline-flex h-auto items-center gap-0.5 rounded-sm border border-[#ebebeb] bg-white p-[3px]">
+          <TabsList className="inline-flex h-auto items-center gap-0.5 rounded-sm border border-[--hair-border] bg-white p-[3px]">
             <TabsTrigger
               value="keys"
               className="rounded-[2px] px-[15px] py-[7px] text-[12.5px] font-medium text-muted-foreground data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-none"
@@ -528,20 +531,17 @@ print(r["aggregate_kpis"], len(reps))`;
               </div>
             </div>
 
-            <div className={`${SURFACE} overflow-hidden`}>
-              <div className="flex items-center justify-between gap-3 border-b border-[#f2f2f2] px-[18px] py-3.5">
-                <div className="flex items-center gap-2 text-[13px] font-semibold">
-                  <KeyRound className="h-3.5 w-3.5" /> Organization keys
-                </div>
-                <div className="flex items-center gap-3.5">
-                  <span className={KX}>
-                    {keys.length} {keys.length === 1 ? 'key' : 'keys'} · {activeCount} active
-                  </span>
-                  <Button size="sm" className="rounded-sm" onClick={() => setCreateOpen(true)}>
-                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Create API key
-                  </Button>
-                </div>
-              </div>
+            {/* L1: the table's name reads on the canvas, above the shell. */}
+            <TableBlock
+              name="Organization keys"
+              count={keys.length}
+              meta={`${activeCount} active`}
+              actions={
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Create API key
+                </Button>
+              }
+            >
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -568,7 +568,7 @@ print(r["aggregate_kpis"], len(reps))`;
                       <tr>
                         <td colSpan={9} className="px-4 py-14">
                           <div className="mx-auto flex max-w-sm flex-col items-center text-center">
-                            <div className="grid h-11 w-11 place-items-center rounded-md border border-[#ebebeb] text-muted-foreground">
+                            <div className="grid h-11 w-11 place-items-center rounded-md border border-[--hair-border] text-muted-foreground">
                               <KeyRound className="h-[18px] w-[18px]" />
                             </div>
                             <div className="mt-4 text-[15px] font-semibold">No API keys yet</div>
@@ -594,11 +594,11 @@ print(r["aggregate_kpis"], len(reps))`;
                             </td>
                             <td className={TD}>
                               {k.env === 'test' ? (
-                                <span className="rounded-[3px] bg-[#f0f0f0] px-[7px] py-0.5 font-mono text-[10px] text-[#525252]">
+                                <span className="rounded-sm bg-[#f0f0f0] px-[7px] py-0.5 font-mono text-[10px] text-[#525252]">
                                   test
                                 </span>
                               ) : (
-                                <span className="rounded-[3px] border border-[#d4d4d4] px-[7px] py-0.5 font-mono text-[10px] text-foreground">
+                                <span className="rounded-sm border border-[#d4d4d4] px-[7px] py-0.5 font-mono text-[10px] text-foreground">
                                   live
                                 </span>
                               )}
@@ -608,7 +608,7 @@ print(r["aggregate_kpis"], len(reps))`;
                                 {k.scopes.map((s) => (
                                   <span
                                     key={s}
-                                    className="rounded-[3px] border border-[#e4e4e4] px-1.5 py-px font-mono text-[10px] text-muted-foreground"
+                                    className="rounded-sm border border-[--zinc-border] px-1.5 py-px font-mono text-[10px] text-muted-foreground"
                                   >
                                     {s}
                                   </span>
@@ -669,7 +669,7 @@ print(r["aggregate_kpis"], len(reps))`;
                   </tbody>
                 </table>
               </div>
-            </div>
+            </TableBlock>
           </TabsContent>
 
           {/* ── Quickstart ───────────────────────────────────────────────── */}
@@ -677,7 +677,7 @@ print(r["aggregate_kpis"], len(reps))`;
             <div>
               <div className="text-[14px] font-semibold">Base URL</div>
               <div className="mt-2 flex items-center gap-2.5">
-                <InlineCode className="flex-1 truncate rounded-sm border-[#ebebeb] text-[11.5px]">
+                <InlineCode className="flex-1 truncate rounded-sm border-[--hair-border] text-[11.5px]">
                   {API_BASE}
                 </InlineCode>
                 <CopyButton text={API_BASE} label="Copy" />
@@ -698,10 +698,8 @@ print(r["aggregate_kpis"], len(reps))`;
               <ApiCodeBlock title="Python: end-to-end (snapshot → dispatch → poll → replications)" code={pythonSnippet} />
             </div>
 
-            <div className={`${SURFACE} overflow-hidden`}>
-              <div className="border-b border-[#ebebeb] px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.04em] text-[#8a8a8a]">
-                Endpoints · v1
-              </div>
+            {/* L1: the table's name reads on the canvas, above the shell. */}
+            <TableBlock name="Endpoints · v1" count={ENDPOINTS.length}>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <tbody>
@@ -715,10 +713,10 @@ print(r["aggregate_kpis"], len(reps))`;
                   </tbody>
                 </table>
               </div>
-              <div className="border-t border-[#f2f2f2] px-4 py-2.5 text-[11px] text-muted-foreground">
+              <div className="border-t border-[--hair-border] px-4 py-2.5 text-[11px] text-muted-foreground">
                 Full reference: <span className="font-mono">docs/api/README.md</span> in the repository.
               </div>
-            </div>
+            </TableBlock>
           </TabsContent>
 
           {/* ── Notebook ─────────────────────────────────────────────────── */}
@@ -763,7 +761,7 @@ print(r["aggregate_kpis"], len(reps))`;
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground">Project ID</p>
                     <div className="flex items-center gap-2">
-                      <InlineCode className="flex-1 truncate rounded-sm border-[#ebebeb]">{nbProject.id}</InlineCode>
+                      <InlineCode className="flex-1 truncate rounded-sm border-[--hair-border]">{nbProject.id}</InlineCode>
                       <CopyButton text={nbProject.id} />
                     </div>
                   </div>
@@ -953,7 +951,7 @@ print(r["aggregate_kpis"], len(reps))`;
             </div>
             <div className="space-y-1.5">
               <Label>Scopes (least privilege: pick only what the caller needs)</Label>
-              <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto rounded-sm border border-[#ebebeb] p-3">
+              <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto rounded-sm border border-[--hair-border] p-3">
                 {SCOPES.map((s) => (
                   <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm">
                     <Checkbox
@@ -977,7 +975,7 @@ print(r["aggregate_kpis"], len(reps))`;
                 All projects in my organization
               </label>
               {!allProjects && (
-                <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-sm border border-[#ebebeb] p-3">
+                <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-sm border border-[--hair-border] p-3">
                   {projects.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No projects found.</p>
                   ) : (
@@ -1027,7 +1025,7 @@ print(r["aggregate_kpis"], len(reps))`;
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2">
-            <InlineCode className="flex-1 break-all rounded-sm border-[#ebebeb] px-3 py-2 text-xs">
+            <InlineCode className="flex-1 break-all rounded-sm border-[--hair-border] px-3 py-2 text-xs">
               {mintedKey?.plaintext}
             </InlineCode>
             <CopyButton text={mintedKey?.plaintext ?? ''} />

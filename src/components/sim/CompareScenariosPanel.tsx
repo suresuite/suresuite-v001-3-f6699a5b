@@ -8,6 +8,7 @@
 // table.
 import { useMemo, useState } from "react";
 import { CompareTable, type CompareRow } from "./resultTables";
+import { TableBlock } from "@/components/shared";
 import { kpiDisplay, signedDelta } from "@/lib/sim/kpiDisplay";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { SimulationRun } from "@/hooks/useSimulationRun";
@@ -116,12 +117,11 @@ export function CompareScenariosPanel({ scenarios, runsByScenario }: Props) {
   }, [pair, failures.length]);
 
   return (
-    <section className="overflow-hidden rounded-sm border border-[#e0e0e3] bg-white">
-      <div className="flex flex-wrap items-center gap-[9px] border-b border-[#e0e0e3] px-3 py-[9px]">
-        <span className="text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">
-          Paired comparison
-        </span>
-        <span className="ml-auto flex flex-wrap items-center gap-[7px]">
+    // L1: the name and the A/B pickers move onto the canvas above the shell.
+    <TableBlock
+      name="Paired comparison"
+      actions={
+        <span className="flex flex-wrap items-center gap-[7px]">
           <span className="text-[11.5px] text-[#52525b]">A</span>
           <select
             className={SELECT}
@@ -149,16 +149,16 @@ export function CompareScenariosPanel({ scenarios, runsByScenario }: Props) {
             ))}
           </select>
         </span>
-      </div>
-
+      }
+    >
       {withResults.length < 2 ? (
-        <div className="px-3 py-[10px] text-[12.5px] text-[#71717a]">
+        <div className="px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
           {withResults.length} of {scenarios.length}{" "}
           {scenarios.length === 1 ? "scenario has" : "scenarios have"} completed results — a
           comparison needs two
         </div>
       ) : !pair ? (
-        <div className="px-3 py-[10px] text-[12.5px] text-[#71717a]">
+        <div className="px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
           Pick two different scenarios
         </div>
       ) : failures.length > 0 ? (
@@ -175,12 +175,12 @@ export function CompareScenariosPanel({ scenarios, runsByScenario }: Props) {
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <div className="px-3 py-[10px] text-[12.5px] text-[#71717a]">
+        <div className="px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
           The two runs share no KPI in their aggregates
         </div>
       ) : (
         <CompareTable rows={rows} />
       )}
-    </section>
+    </TableBlock>
   );
 }

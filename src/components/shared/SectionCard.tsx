@@ -11,13 +11,13 @@ interface SectionCardProps {
 }
 
 /**
- * The contract card (C4): `rounded-lg border border-border bg-card p-4 shadow-xs`
+ * The contract card (C4): `rounded-sm border border-border bg-card p-4 shadow-xs`
  * with a `text-sm font-semibold` heading. Lifted from the local `Section` in
  * AdminUserAccess.tsx — the one admin file already on-language.
  */
 export function SectionCard({ title, badge, description, className, children }: SectionCardProps) {
   return (
-    <section className={cn('rounded-lg border border-border bg-card p-4 shadow-xs', className)}>
+    <section className={cn('rounded-sm border border-border bg-card p-4 shadow-xs', className)}>
       <div className={cn('flex items-center gap-2', description ? 'mb-1' : 'mb-3')}>
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         {badge && (

@@ -117,7 +117,7 @@ function ProposalStatusPill({ proposalId }: { proposalId: string }) {
   const { proposal } = useProposal(proposalId);
   if (!proposal) return null;
   return (
-    <span className={cn("rounded-full px-1.5 py-px text-[10.5px] font-medium", "bg-amber-500/10 text-amber-700 dark:text-amber-400")}>
+    <span className={cn("rounded-sm px-1.5 py-px text-[10.5px] font-medium", "bg-amber-500/10 text-amber-700 dark:text-amber-400")}>
       proposal: {proposal.status}
     </span>
   );

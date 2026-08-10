@@ -73,9 +73,12 @@ export default {
         },
       },
       borderRadius: {
+        /* One radius, product-wide (C9). The scale used to step 8/6/4 px; the
+           contrast pass collapses it so `rounded-sm|md|lg` are all --radius
+           (4px) and no component implies depth through corner size. */
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "var(--radius)",
+        sm: "var(--radius)",
       },
     },
   },

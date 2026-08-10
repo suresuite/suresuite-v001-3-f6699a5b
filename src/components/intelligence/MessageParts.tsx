@@ -4,7 +4,7 @@
  * Every card is a left-accented sharp-cornered panel so a long reply reads as
  * a stack of typed blocks rather than a wall: neutral #b8b8b8 for data
  * (table/kpi/bullets), firm #e0930b for plans, brand red for mode refusals,
- * product purple for memory. Tables use the mono UPPERCASE header on #fafafa
+ * product purple for memory. Tables use the mono UPPERCASE header on ink
  * with ~30px rows, matching adminUi's TH/TD.
  */
 import React, { useState } from "react";
@@ -13,7 +13,7 @@ import type { ChatPart, ChatToolCall } from "@/hooks/useProjectChat";
 import { LAYER, MonoChip, TD, TH, tint } from "./piUi";
 import { cn } from "@/lib/utils";
 
-const CARD = "mt-2 rounded-sm border border-[#ebebeb]";
+const CARD = "mt-2 rounded-sm border border-[--hair-border]";
 const accent = (hex: string) => ({ borderLeft: "2px solid " + hex });
 
 /* ── evidence (H1 §22.2) ─────────────────────────────────────────────── */
@@ -42,12 +42,12 @@ export function EvidencePart({ data }: { data: any }) {
       {open && (
         <div className={cn(CARD, "mt-1.5")} style={accent("#9a9a9a")}>
           {fallback && (
-            <div className="border-b border-[#ebebeb] px-2.5 py-2 text-[11.5px] text-muted-foreground">
+            <div className="border-b border-[--hair-border] px-2.5 py-2 text-[11.5px] text-muted-foreground">
               The drafted reply couldn't be traced to project data, so a grounded fallback shipped instead.
             </div>
           )}
           {citations.map((c, i) => (
-            <div key={i} className="flex gap-2 border-b border-[#f4f4f4] px-2.5 py-1.5 text-[12px] last:border-b-0">
+            <div key={i} className="flex gap-2 border-b border-[--hair-divider] px-2.5 py-1.5 text-[12px] last:border-b-0">
               <span className="font-mono text-muted-foreground">[{i + 1}]</span>
               <span className="text-muted-foreground">{c.label ?? c.kind}</span>
               <span className="font-mono text-foreground">{c.ref ?? c.reference ?? ""}</span>
@@ -91,7 +91,7 @@ export function TablePart({ data }: { data: any }) {
         </table>
       </div>
       {data?.sourceTool && (
-        <div className="border-t border-[#f4f4f4] px-2.5 py-1 text-[10.5px] text-muted-foreground">
+        <div className="border-t border-[--hair-divider] px-2.5 py-1 text-[10.5px] text-muted-foreground">
           Source: <span className="font-mono">{data.sourceTool}</span>
         </div>
       )}
@@ -103,7 +103,7 @@ export function KpiPart({ data }: { data: any }) {
   const cards: any[] = data?.cards ?? [];
   return (
     <div
-      className={cn(CARD, "grid gap-px bg-[#f4f4f4]")}
+      className={cn(CARD, "grid gap-px bg-[--hair-divider]")}
       style={{ ...accent("#b8b8b8"), gridTemplateColumns: "repeat(" + Math.min(cards.length || 1, 3) + ",1fr)" }}
     >
       {cards.map((c, i) => (
@@ -252,7 +252,7 @@ export function ActivityGroup({ toolCalls }: { toolCalls: ChatToolCall[] }) {
     (totalMs ? " · " + (totalMs / 1000).toFixed(1) + "s" : "");
 
   return (
-    <div className="mt-2.5 overflow-hidden rounded-sm border border-[#ebebeb]">
+    <div className="mt-2.5 overflow-hidden rounded-sm border border-[--hair-border]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -266,7 +266,7 @@ export function ActivityGroup({ toolCalls }: { toolCalls: ChatToolCall[] }) {
         <ChevronRight className={cn("h-3 w-3 transition-transform", open && "rotate-90")} />
       </button>
       {open && (
-        <div className="border-t border-[#ebebeb] px-2.5 py-1.5 font-mono text-[11px]">
+        <div className="border-t border-[--hair-border] px-2.5 py-1.5 font-mono text-[11px]">
           {toolCalls.map((c, i) => (
             <div key={i} className="flex items-center gap-[7px] py-0.5">
               <span
@@ -290,11 +290,11 @@ export function ActivityGroup({ toolCalls }: { toolCalls: ChatToolCall[] }) {
 export function AgentDivider({ agentName }: { agentName: string }) {
   return (
     <div className="mt-3 flex items-center gap-2">
-      <span className="h-px flex-1 bg-[#ebebeb]" />
+      <span className="h-px flex-1 bg-[--hair-border]" />
       <span className="text-[11px] text-muted-foreground">
         <strong className="text-foreground">{agentName}</strong> drafted a proposal
       </span>
-      <span className="h-px flex-1 bg-[#ebebeb]" />
+      <span className="h-px flex-1 bg-[--hair-border]" />
     </div>
   );
 }

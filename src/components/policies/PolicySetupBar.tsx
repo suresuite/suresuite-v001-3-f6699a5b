@@ -70,7 +70,7 @@ function StepCard({
       ? { background: LAYER.process, color: "#ffffff" }
       : stage.needs
         ? { background: LAYER.brand, color: "#ffffff" }
-        : { background: "#f4f4f4", color: "#8a8a8a" };
+        : { background: "#f4f4f4", color: "var(--ledger-quiet)" };
 
   return (
     <button
@@ -89,7 +89,7 @@ function StepCard({
         "relative flex flex-[0_1_auto] items-center gap-[9px] rounded-sm border px-[10px] py-1.5 pr-3 text-left transition-colors",
         active
           ? "border-foreground bg-foreground text-background"
-          : "border-[#ebebeb] bg-background shadow-[0_1px_0_rgba(0,0,0,0.04)] hover:border-foreground hover:bg-[#fafafa]",
+          : "border-[--hair-border] bg-background shadow-[0_1px_0_rgba(0,0,0,0.04)] hover:border-foreground hover:bg-[#fafafa]",
       )}
     >
       <span
@@ -106,7 +106,7 @@ function StepCard({
         <span
           className="whitespace-nowrap font-mono text-[10px]"
           style={{
-            color: active ? "rgba(255,255,255,0.62)" : stage.needs ? LAYER.brand : "#8a8a8a",
+            color: active ? "rgba(255,255,255,0.62)" : stage.needs ? LAYER.brand : "var(--ledger-quiet)",
           }}
         >
           {meta}
@@ -160,7 +160,7 @@ export function PolicySetupBar({
   return (
     <div className={cn(SURFACE, "mb-[14px]")}>
       {/* caption */}
-      <div className="flex items-center gap-2.5 border-b border-[#ebebeb] bg-[#fafafa] px-2.5 py-[5px]">
+      <div className="flex items-center gap-2.5 border-b border-[--hair-border] bg-[#fafafa] px-2.5 py-[5px]">
         <span className={cn(KX_TIGHT, "whitespace-nowrap font-medium text-foreground")}>Model setup</span>
         <span className="whitespace-nowrap font-mono text-[10.5px] text-muted-foreground">
           set A and B, then work steps 1–4
@@ -168,7 +168,7 @@ export function PolicySetupBar({
       </div>
 
       {/* A — model version */}
-      <div className="flex items-center gap-2.5 border-b border-[#ebebeb] px-2.5 py-1.5">
+      <div className="flex items-center gap-2.5 border-b border-[--hair-border] px-2.5 py-1.5">
         <span className={cn(LABEL_COL, "flex items-center gap-[7px]")}>
           <Badge tone="solid">A</Badge>
           <span className={cn(KX_TIGHT, "whitespace-nowrap")}>Model version</span>
@@ -229,7 +229,7 @@ export function PolicySetupBar({
       </div>
 
       {/* steps */}
-      <div className="flex items-stretch gap-[18px] border-t border-[#ebebeb] bg-[#f4f4f4] p-1.5">
+      <div className="flex items-stretch gap-[18px] border-t border-[--hair-border] bg-[#f4f4f4] p-1.5">
         <div className="flex w-[192px] shrink-0 flex-col justify-center gap-0.5 py-px pl-1 pr-2.5">
           <span className={cn(KX_TIGHT, "whitespace-nowrap")}>Configure SC policies</span>
           <span className="whitespace-nowrap font-mono text-[10.5px] text-muted-foreground">
@@ -263,7 +263,7 @@ export function PolicySetupBar({
                 <span
                   aria-hidden
                   className="relative grid shrink-0 place-items-center font-mono text-[15px] font-medium leading-none"
-                  style={{ width: 0, color: prevBlocked ? LAYER.brand : "#9a9a9a" }}
+                  style={{ width: 0, color: prevBlocked ? LAYER.brand : "var(--hair-quiet)" }}
                 >
                   <span className="absolute left-[-14px]">›</span>
                 </span>

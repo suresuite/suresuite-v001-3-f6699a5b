@@ -118,7 +118,7 @@ interface Props {
  */
 export function StressTestDrawer({ onLaunch }: Props) {
   return (
-    <div className="mb-3 overflow-hidden rounded-[5px] border border-[rgba(20,184,196,0.45)] bg-white">
+    <div className="mb-3 overflow-hidden rounded-sm border border-[rgba(20,184,196,0.45)] bg-white">
       {STRESS_TESTS.map((t, i) => (
         <button
           key={t.id}
@@ -127,11 +127,11 @@ export function StressTestDrawer({ onLaunch }: Props) {
           title={`Create a scenario pre-configured with: ${scheduleLine(t.scenario)}`}
           className={cn(
             "flex w-full flex-col gap-[3px] border-l-2 border-l-transparent px-[13px] py-[9px] text-left hover:border-l-[#14b8c4] hover:bg-[#fafafa]",
-            i > 0 && "border-t border-t-[#ececee]",
+            i > 0 && "border-t border-t-[--sim-divider]",
           )}
         >
           <span className="text-[12.5px] font-medium text-[#18181b]">{t.label}</span>
-          <span className="truncate text-[11.5px] tabular-nums text-[#71717a]">
+          <span className="truncate text-[11.5px] tabular-nums text-[--zinc-quiet]">
             {scheduleLine(t.scenario)}
           </span>
         </button>

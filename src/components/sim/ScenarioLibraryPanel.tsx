@@ -123,7 +123,7 @@ export function ScenarioLibraryPanel({ open, projectId, onClose, onCloned }: Pro
             <button
               key={c.key}
               onClick={() => setFilter(c.key)}
-              className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+              className={`text-[11px] px-2.5 py-1 rounded-sm border transition-colors ${
                 filter === c.key
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background hover:bg-accent border-border"

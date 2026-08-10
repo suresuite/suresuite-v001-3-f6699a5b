@@ -57,7 +57,7 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
             </tr>
             <tr>
               <FilterTH filterKey="time" /><FilterTH filterKey="actor" /><FilterTH filterKey="action" />
-              <FilterTH filterKey="target" /><th className="border-b border-[#ebebeb] bg-[#fafafa]" />
+              <FilterTH filterKey="target" /><th className="border-b border-[--hair-border] bg-white" />
             </tr></thead>
             <tbody>
               {loading ? <LoadingRow colSpan={5} /> : sorted.length === 0 ? (

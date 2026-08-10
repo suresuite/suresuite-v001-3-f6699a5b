@@ -319,7 +319,7 @@ export function FloatingChatBubble() {
       {open && (
         <div
           style={{ left: panelPos.x, top: panelPos.y, width: panelDims.w, height: panelDims.h }}
-          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-2xl border border-black bg-background shadow-2xl"
+          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-sm border border-black bg-background shadow-2xl"
           role="dialog"
           aria-label="Supply Chain assistant"
         >

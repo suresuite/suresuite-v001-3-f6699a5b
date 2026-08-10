@@ -92,7 +92,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
         <div className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-4 text-sm text-[#bf2330]">{error}</div>
       ) : (
         <div className="space-y-5">
-          <div className="inline-flex items-center gap-1.5 rounded-sm border border-[#e4e4e4] px-2.5 py-1 text-[11.5px] text-muted-foreground">
+          <div className="inline-flex items-center gap-1.5 rounded-sm border border-[--zinc-border] px-2.5 py-1 text-[11.5px] text-muted-foreground">
             <Lock className="h-3 w-3" /> Super admins & My Profile are always on
           </div>
           {renderSection('Pages', pages)}

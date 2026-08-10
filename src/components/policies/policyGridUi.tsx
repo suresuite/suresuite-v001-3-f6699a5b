@@ -101,11 +101,11 @@ export function FamilyBand({
       type="button"
       onClick={onToggle}
       style={{ flex: `0 0 ${width}px`, width, color, opacity: collapsed ? 0.45 : 1 }}
-      className="flex items-center gap-1.5 border-r border-[#ebebeb] px-2 text-left font-mono text-[10px] font-medium uppercase tracking-[0.16em]"
+      className="flex items-center gap-1.5 border-r border-r-[rgba(255,255,255,0.22)] px-2 text-left font-mono text-[10px] font-medium uppercase tracking-[0.16em]"
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
       {family}
-      <span className="text-[9px] text-[#c4c4c4]">{collapsed ? "▸" : "▾"}</span>
+      <span className="text-[9px] text-white/60">{collapsed ? "▸" : "▾"}</span>
     </button>
   );
 }
@@ -128,7 +128,7 @@ export function FamilyChip({
       className="inline-flex h-[22px] items-center gap-1.5 rounded-sm px-[7px] font-mono text-[10px] uppercase tracking-[0.08em]"
       style={
         hidden
-          ? { border: "1px solid #ebebeb", background: "#ffffff", color: "#c4c4c4" }
+          ? { border: "1px solid var(--zinc-border)", background: "#ffffff", color: "#c4c4c4" }
           : { border: "1px solid transparent", background: tint(color, 0.1), color }
       }
     >
@@ -165,23 +165,23 @@ export function SortHeader({
   onFilter?: (v: string) => void;
 }) {
   return (
-    <div className="flex h-full flex-col justify-between gap-[3px] border-r border-[#ebebeb] px-1.5 py-1">
+    <div className="flex h-full flex-col justify-between gap-[3px] border-r border-r-[rgba(255,255,255,0.22)] px-1.5 py-1">
       <div className="flex items-start gap-[3px]">
         <button
           type="button"
           onClick={onSort}
           title="Sort"
-          className="flex min-w-0 flex-1 items-start gap-1 text-left font-mono text-[10px] uppercase leading-[1.25] tracking-[0.08em] text-muted-foreground hover:text-foreground"
+          className="flex min-w-0 flex-1 items-start gap-1 text-left font-mono text-[10px] font-medium uppercase leading-[1.25] tracking-[0.08em] text-white"
         >
           <span className="min-w-0 flex-1 overflow-hidden [overflow-wrap:anywhere]">{label}</span>
-          {dir && <span className="shrink-0 font-mono text-[9px] text-foreground">{dir === "asc" ? "↑" : "↓"}</span>}
+          {dir && <span className="shrink-0 font-mono text-[9px] text-white">{dir === "asc" ? "↑" : "↓"}</span>}
         </button>
         {onInfo && (
           <button
             type="button"
             onClick={onInfo}
             title="unit · range · meaning · engine use"
-            className="grid h-3 w-3 shrink-0 place-items-center rounded-full border border-[#dcdcdc] font-mono text-[8px] leading-none text-muted-foreground hover:border-foreground hover:text-foreground"
+            className="grid h-3 w-3 shrink-0 place-items-center rounded-full border border-white/40 font-mono text-[8px] leading-none text-white hover:border-white hover:text-white"
           >
             i
           </button>
@@ -190,7 +190,7 @@ export function SortHeader({
       {pending && (
         <span
           title="Stored and versioned — not consumed by the engine yet."
-          className="self-start rounded-sm bg-[#f4f4f4] px-1 font-mono text-[9px] text-[#9a9a9a]"
+          className="self-start rounded-sm bg-white/15 px-1 font-mono text-[9px] text-white"
         >
           pending
         </span>
@@ -200,7 +200,7 @@ export function SortHeader({
           value={filter ?? ""}
           onChange={(e) => onFilter(e.target.value)}
           placeholder="filter"
-          className="h-[17px] w-full rounded-[3px] border border-[#ebebeb] bg-background px-1 text-[10.5px] outline-none placeholder:text-[#c4c4c4] focus:border-foreground"
+          className="h-[17px] w-full rounded-sm border border-[--zinc-border] bg-white px-1 text-[10.5px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground"
         />
       )}
     </div>
@@ -237,7 +237,7 @@ export function NumCell({
           const raw = e.target.value.replace("≈", "").trim();
           onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
         }}
-        className="h-5 w-full rounded-[3px] border border-transparent bg-transparent px-[5px] text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[#ebebeb] focus:bg-background"
+        className="h-5 w-full rounded-sm border border-transparent bg-transparent px-[5px] text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
       />
     </>
   );
@@ -257,7 +257,7 @@ export function CellSegmented<T extends string>({
 }) {
   const selected = options.some((o) => o.value === value) ? value : options[0]?.value;
   return (
-    <div className="inline-flex rounded-sm border border-[#ebebeb] bg-background p-[2px]">
+    <div className="inline-flex rounded-sm border border-[--zinc-border] bg-background p-[2px]">
       {options.map((o) => {
         const active = o.value === selected;
         return (
@@ -269,7 +269,7 @@ export function CellSegmented<T extends string>({
             className={cn(
               "whitespace-nowrap rounded-[2px] font-mono transition-colors",
               tiny ? "px-[4px] py-[2px] text-[9px]" : "px-1.5 py-[2px] text-[10px]",
-              active ? "bg-foreground font-medium text-background" : "text-[#9a9a9a] hover:text-foreground",
+              active ? "bg-foreground font-medium text-background" : "text-[--hair-quiet] hover:text-foreground",
             )}
           >
             {o.label}
@@ -345,7 +345,7 @@ export function ReplenishmentCell({
                 const raw = e.target.value.trim();
                 p?.onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
               }}
-              className="h-5 w-[52px] rounded-[3px] border border-transparent bg-transparent px-1 text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[#ebebeb] focus:bg-background"
+              className="h-5 w-[52px] rounded-sm border border-transparent bg-transparent px-1 text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
             />
             {p?.invalid && (
               <span title={p.invalid} className="cursor-help font-mono text-[10px] font-medium" style={{ color: LAYER.brand }}>

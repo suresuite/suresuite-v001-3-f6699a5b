@@ -131,7 +131,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
     <span className="inline-flex items-center gap-2">
       <span>{data.email}</span>
       <MonoChip>{data.role.replace('_', ' ')}</MonoChip>
-      {data.is_super_admin && <span className="inline-flex items-center gap-1 rounded-[3px] bg-[#bf2330]/10 px-1.5 py-0.5 font-mono text-[10px] text-[#bf2330]"><ShieldCheck className="h-3 w-3" /> super admin</span>}
+      {data.is_super_admin && <span className="inline-flex items-center gap-1 rounded-sm bg-[#bf2330]/10 px-1.5 py-0.5 font-mono text-[10px] text-[#bf2330]"><ShieldCheck className="h-3 w-3" /> super admin</span>}
     </span>
   ) : 'Loading…';
 
@@ -174,7 +174,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
                   </div>
                 ))}
               </div>
-              <div className="my-4 h-px bg-[#f2f2f2]" />
+              <div className="my-4 h-px bg-[--hair-border]" />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">Default model</Label>
@@ -234,7 +234,7 @@ function Section({ title, badge, children }: { title: string; badge?: string; ch
 
 function CapMatrix({ rows, isSuper, onSet }: { rows: CapRow[]; isSuper: boolean; onSet: (row: CapRow, tri: Tri) => void }) {
   return (
-    <div className="divide-y divide-[#f4f4f4]">
+    <div className="divide-y divide-[--hair-divider]">
       {rows.map((row) => {
         const locked = ALWAYS_ON.has(row.key);
         return (
@@ -260,7 +260,7 @@ function CapMatrix({ rows, isSuper, onSet }: { rows: CapRow[]; isSuper: boolean;
 
 function UsageStat({ label, value, cap, over }: { label: string; value: string; cap?: string; over?: boolean }) {
   return (
-    <div className="rounded-sm border border-[#ebebeb] px-3 py-2">
+    <div className="rounded-sm border border-[--hair-border] px-3 py-2">
       <div className={KX}>{label}</div>
       <div className={`mt-1 text-sm font-semibold ${over ? 'text-[#bf2330]' : ''}`}>{value}</div>
       {cap && <div className="text-[11px] text-muted-foreground">{cap}</div>}
@@ -286,7 +286,7 @@ function PreviewPanel({ data }: { data: AccessData }) {
         <Eye className="h-4 w-4 text-[#bf2330]" />
         <h3 className="text-[13px] font-semibold">Preview as {data.name || data.email}</h3>
       </div>
-      <p className="mb-3.5 text-[11.5px] leading-relaxed text-[#8a8a8a]">The navigation and abilities this user sees on their next login.</p>
+      <p className="mb-3.5 text-[11.5px] leading-relaxed text-[--ledger-quiet]">The navigation and abilities this user sees on their next login.</p>
       <div className={`${KX} mb-2`}>Navigation</div>
       <div className="mb-4 space-y-1">
         {pages.length === 0 ? <div className="text-xs text-muted-foreground">No pages</div> : pages.map((p) => (
