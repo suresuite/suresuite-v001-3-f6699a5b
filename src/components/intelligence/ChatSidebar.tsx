@@ -101,9 +101,12 @@ export function ChatSidebar(props: ChatSidebarProps) {
   const q = query.trim().toLowerCase();
   const matches = (t: Thread) => !q || t.title.toLowerCase().includes(q);
 
-  const { quick, pinned, projectGroups, folderList, recent, archived } = useMemo(() => {
-    const live = threads.filter((t) => !t.archived && matches(t));
-    const quickThread = live.find((t) => t.id === QUICK_THREAD_ID) ?? null;
+  // The Quick chat pseudo-thread backs the floating bubble only — it is never
+  // listed here.
+  const notQuick = (t: Thread) => t.id !== QUICK_THREAD_ID;
+
+  const { pinned, projectGroups, folderList, recent, archived } = useMemo(() => {
+    const live = threads.filter((t) => !t.archived && notQuick(t) && matches(t));
     const pinnedList = live.filter((t) => t.pinned);
     const byProject: Record<string, Thread[]> = {};
     live.forEach((t) => {
@@ -122,12 +125,11 @@ export function ChatSidebar(props: ChatSidebarProps) {
       return { id: f.id, name: f.name, rows };
     });
     return {
-      quick: quickThread,
       pinned: pinnedList,
       projectGroups: groups,
       folderList: fList,
-      recent: live.filter((t) => t.id !== QUICK_THREAD_ID && !grouped.has(t.id)),
-      archived: threads.filter((t) => t.archived && matches(t)),
+      recent: live.filter((t) => !grouped.has(t.id)),
+      archived: threads.filter((t) => t.archived && notQuick(t) && matches(t)),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threads, projects, folders, q]);
@@ -168,7 +170,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
           className={cn(KX_TIGHT, "mt-1 py-1.5")}
           style={{ writingMode: "vertical-rl", letterSpacing: "0.2em" }}
         >
-          Chats <span className="text-[#b8b8b8]">{threads.filter((t) => !t.archived).length}</span>
+          Chats <span className="text-[#b8b8b8]">{threads.filter((t) => !t.archived && notQuick(t)).length}</span>
         </button>
       </aside>
     );
@@ -177,12 +179,11 @@ export function ChatSidebar(props: ChatSidebarProps) {
   /* ── row ────────────────────────────────────────────────────────────── */
   const Row = ({ thread }: { thread: Thread }) => {
     const active = thread.id === activeThreadId;
-    const isQuick = thread.id === QUICK_THREAD_ID;
     return (
       <div
         className={cn("relative mb-px flex items-center gap-1 rounded-sm px-0.5 py-px", active && "bg-background shadow-[0_0_0_1px_var(--zinc-border)]")}
       >
-        {selectMode && !isQuick && (
+        {selectMode && (
           <input
             type="checkbox"
             checked={selected.includes(thread.id)}
@@ -237,31 +238,27 @@ export function ChatSidebar(props: ChatSidebarProps) {
           <>
             <div className="fixed inset-0 z-[60]" onClick={() => setOpenMenu(null)} />
             <div className="absolute right-0.5 top-[26px] z-[61] min-w-[176px] rounded-sm border border-[--hair-border] bg-background p-1.5 shadow-[0_4px_14px_rgba(0,0,0,.10)]">
-              {!isQuick && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRenamingId(thread.id);
-                      setRenameValue(thread.title);
-                      setOpenMenu(null);
-                    }}
-                    className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
-                  >
-                    Rename
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onTogglePin(thread.id, !thread.pinned);
-                      setOpenMenu(null);
-                    }}
-                    className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
-                  >
-                    {thread.pinned ? "Unpin" : "Pin"}
-                  </button>
-                </>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingId(thread.id);
+                  setRenameValue(thread.title);
+                  setOpenMenu(null);
+                }}
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onTogglePin(thread.id, !thread.pinned);
+                  setOpenMenu(null);
+                }}
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+              >
+                {thread.pinned ? "Unpin" : "Pin"}
+              </button>
 
               <div className="px-2 pb-1 pt-1.5">
                 <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#b0b0b0]">Project</div>
@@ -297,32 +294,28 @@ export function ChatSidebar(props: ChatSidebarProps) {
                 </div>
               )}
 
-              {!isQuick && (
-                <>
-                  <div className="my-0.5 h-px bg-[--hair-divider]" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onToggleArchive(thread.id, !thread.archived);
-                      setOpenMenu(null);
-                    }}
-                    className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
-                  >
-                    {thread.archived ? "Unarchive" : "Archive"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDeleteThread(thread.id);
-                      setOpenMenu(null);
-                    }}
-                    className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
-                    style={{ color: LAYER.brand }}
-                  >
-                    Delete
-                  </button>
-                </>
-              )}
+              <div className="my-0.5 h-px bg-[--hair-divider]" />
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleArchive(thread.id, !thread.archived);
+                  setOpenMenu(null);
+                }}
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+              >
+                {thread.archived ? "Unarchive" : "Archive"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteThread(thread.id);
+                  setOpenMenu(null);
+                }}
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+                style={{ color: LAYER.brand }}
+              >
+                Delete
+              </button>
             </div>
           </>
         )}
@@ -408,13 +401,6 @@ export function ChatSidebar(props: ChatSidebarProps) {
 
       {/* thread list — the only flexible child */}
       <div className="min-h-[200px] flex-1 overflow-y-auto overflow-x-hidden p-1.5">
-        {quick && (
-          <div className="mb-2.5">
-            <div className={cn(KX_TIGHT, "flex items-center gap-1 px-1.5 py-1")}>Quick chat</div>
-            <Row thread={quick} />
-          </div>
-        )}
-
         {pinned.length > 0 && (
           <div className="mb-2.5">
             <SectionHead label="Pinned" count={pinned.length} sectionKey="pinned" />
