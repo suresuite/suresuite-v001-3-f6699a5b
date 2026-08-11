@@ -2,14 +2,28 @@
  * Model setup bar for /policies — rows A (model version) and B (planning unit)
  * plus the 4-step guardrail track.
  *
- * Drop at: src/components/policies/PolicySetupBar.tsx
- * Renders inside <ProjectPolicies> directly under <PageHeader>, replacing the old
- * PolicyVersionBar + TimeUnitBar + StageRail trio.
+ * Renders inside <ProjectPolicies> directly under <PageHeader>.
+ *
+ * Typography, radius, state colours and the stage cards come from the shared
+ * process-rail rule set in components/sim/StageRail.tsx — this rail and the
+ * Simulation Lab rail are the same object seen twice. Nothing visual is
+ * redefined locally.
  */
 import React from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { SURFACE, KX_TIGHT, LAYER, Segmented, MonoChip } from "@/components/intelligence/piUi";
+import {
+  RAIL,
+  RAIL_EYEBROW,
+  RAIL_EYEBROW_ROW,
+  RAIL_SHELL,
+  RAIL_STAGE_ROW,
+  RailChevron,
+  RailChip,
+  RailMarker,
+  RailReadout,
+  RailStageCard,
+  type RailState,
+} from "@/components/sim/StageRail";
 
 export type StageId = "supplier" | "plant" | "customer" | "run_validate";
 export type PlanningUnit = "day" | "week" | "month";
@@ -25,94 +39,67 @@ export interface StageGuard {
   evidence?: boolean;
 }
 
+/** Fixed label column so rows A and B align. */
 const LABEL_COL = "w-[196px] shrink-0";
+const ROW = "flex items-center gap-2.5 px-3 py-1.5";
 
-function Badge({ children, tone }: { children: React.ReactNode; tone: "solid" | "muted" }) {
-  return (
-    <span
-      className={cn(
-        "grid h-4 w-4 shrink-0 place-items-center rounded-sm font-mono text-[9px] leading-none",
-        tone === "solid" ? "bg-foreground text-background" : "bg-[#f4f4f4] text-muted-foreground",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-function StepCard({
-  stage,
-  index,
-  active,
-  ready,
-  onSelect,
+/** 26px, 11.5px / 500, radius 4 — primary is ink, secondary is a white hairline. */
+function RailButton({
+  children,
+  onClick,
+  variant = "primary",
 }: {
-  stage: StageGuard;
-  index: number;
-  active: boolean;
-  ready: boolean;
-  onSelect: () => void;
+  children: React.ReactNode;
+  onClick: () => void;
+  variant?: "primary" | "secondary";
 }) {
-  const last = stage.id === "run_validate";
-  const meta = last
-    ? stage.needs
-      ? `${stage.needs} line${stage.needs === 1 ? "" : "s"} block the run`
-      : stage.evidence
-        ? "evidence complete"
-        : "5 steps"
-    : stage.needs
-      ? `${stage.total} lines · ${stage.needs} need input`
-      : `${stage.total} lines resolved`;
-
-  const badgeStyle: React.CSSProperties = active
-    ? { background: "#ffffff", color: "#111111" }
-    : ready
-      ? { background: LAYER.process, color: "#ffffff" }
-      : stage.needs
-        ? { background: LAYER.brand, color: "#ffffff" }
-        : { background: "#f4f4f4", color: "var(--ledger-quiet)" };
-
   return (
     <button
       type="button"
-      onClick={onSelect}
-      title={
-        last
-          ? stage.needs
-            ? `Resolve ${stage.needs} line(s) in steps 1–3 before the run is credible`
-            : "Verification · Run simulation · Warm-up detection · Validation · Adopt"
-          : stage.needs
-            ? `${stage.needs} line(s) still need input in this step`
-            : `All ${stage.total} lines resolved`
-      }
+      onClick={onClick}
       className={cn(
-        "relative flex flex-[0_1_auto] items-center gap-[9px] rounded-sm border px-[10px] py-1.5 pr-3 text-left transition-colors",
-        active
-          ? "border-foreground bg-foreground text-background"
-          : "border-[--hair-border] bg-background shadow-[0_1px_0_rgba(0,0,0,0.04)] hover:border-foreground hover:bg-[#fafafa]",
+        "flex h-[26px] shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-[11.5px] font-medium leading-none transition-colors",
+        variant === "primary" ? "text-white hover:opacity-90" : "border hover:bg-[#fafafa]",
       )}
+      style={
+        variant === "primary"
+          ? { background: RAIL.ink }
+          : { background: "#ffffff", borderColor: RAIL.rule, color: RAIL.ink }
+      }
     >
-      <span
-        className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full font-mono text-[10px] font-medium"
-        style={badgeStyle}
-      >
-        {ready && !active ? "✓" : index + 1}
-      </span>
-      <span className="flex min-w-0 flex-col items-start gap-px">
-        <span className="flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium tracking-[-0.01em]">
-          {stage.title}
-          {last && stage.needs > 0 && !active && <MonoChip>LOCKED</MonoChip>}
-        </span>
-        <span
-          className="whitespace-nowrap font-mono text-[10px]"
-          style={{
-            color: active ? "rgba(255,255,255,0.62)" : stage.needs ? LAYER.brand : "var(--ledger-quiet)",
-          }}
-        >
-          {meta}
-        </span>
-      </span>
+      {children}
     </button>
+  );
+}
+
+/** day / week / month — white, 1px #d4d4d4, 3px padding, mono 10.5px items. */
+function UnitSegmented({
+  value,
+  onChange,
+}: {
+  value: PlanningUnit;
+  onChange: (u: PlanningUnit) => void;
+}) {
+  return (
+    <div
+      className="inline-flex shrink-0 rounded-sm border bg-white p-[3px]"
+      style={{ borderColor: RAIL.rule }}
+    >
+      {(["day", "week", "month"] as PlanningUnit[]).map((u) => {
+        const on = u === value;
+        return (
+          <button
+            key={u}
+            type="button"
+            onClick={() => onChange(u)}
+            className="rounded-[2px] px-[7px] py-[2px] font-mono text-[10.5px] leading-normal transition-colors"
+            style={on ? { background: RAIL.ink, color: "#ffffff" } : { color: RAIL.muted }}
+          >
+            {u}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -151,133 +138,146 @@ export function PolicySetupBar({
   onStageChange: (s: StageId) => void;
 }) {
   const setupStages = stages.filter((s) => s.id !== "run_validate");
-  const runStage = stages.find((s) => s.id === "run_validate");
   const blocking = setupStages.reduce((a, s) => a + s.needs, 0);
   const readyOf = (s: StageGuard) =>
     s.id === "run_validate" ? blocking === 0 && !!s.evidence : s.needs === 0;
   const readyCount = stages.filter(readyOf).length;
+  const openStep = Math.max(
+    1,
+    stages.findIndex((s) => s.id === activeStage) + 1,
+  );
+
+  /** Same three states as the Simulation rail; only the active card is current. */
+  const stateOf = (s: StageGuard): RailState =>
+    s.id === activeStage ? "current" : readyOf(s) ? "done" : "todo";
+
+  /** `value · value · value` — lowercase, mono, never a sentence. */
+  const metaOf = (s: StageGuard) =>
+    s.id === "run_validate"
+      ? s.needs
+        ? `${s.needs} line${s.needs === 1 ? "" : "s"} blocking`
+        : s.evidence
+          ? "evidence complete"
+          : "5 steps"
+      : s.needs
+        ? `${s.total} lines · ${s.needs} need input`
+        : `${s.total} lines resolved`;
 
   return (
-    <div className={cn(SURFACE, "mb-[14px]")}>
-      {/* caption */}
-      <div className="flex items-center gap-2.5 border-b border-[--hair-border] bg-[#fafafa] px-2.5 py-[5px]">
-        <span className={cn(KX_TIGHT, "whitespace-nowrap font-medium text-foreground")}>Model setup</span>
-        <span className="whitespace-nowrap font-mono text-[10.5px] text-muted-foreground">
-          set A and B, then work steps 1–4
-        </span>
+    <div className={cn(RAIL_SHELL, "mb-[14px]")}>
+      {/* eyebrow */}
+      <div className={RAIL_EYEBROW_ROW}>
+        <span className={RAIL_EYEBROW}>Model setup</span>
+        <span className="h-px flex-1" style={{ background: RAIL.rule }} />
+        <RailReadout
+          dot={RAIL.amber}
+          label="step"
+          value={`${openStep} open`}
+          tail="— set A and B, then work steps 1–4"
+        />
       </div>
 
       {/* A — model version */}
-      <div className="flex items-center gap-2.5 border-b border-[--hair-border] px-2.5 py-1.5">
+      <div className={cn(ROW, "border-b border-[#f0f0f0]")}>
         <span className={cn(LABEL_COL, "flex items-center gap-[7px]")}>
-          <Badge tone="solid">A</Badge>
-          <span className={cn(KX_TIGHT, "whitespace-nowrap")}>Model version</span>
+          <RailMarker>A</RailMarker>
+          <span className={RAIL_EYEBROW}>Model version</span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
-          <span className="whitespace-nowrap text-[12.5px] font-medium">{versionName}</span>
-          <MonoChip>{isSnapshot ? "Snapshot" : "Live"}</MonoChip>
+          <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: RAIL.ink }}>
+            {versionName}
+          </span>
+          <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
           {versionStamp && (
-            <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">{versionStamp}</span>
+            <span className="whitespace-nowrap font-mono text-[11px]" style={{ color: RAIL.muted }}>
+              {versionStamp}
+            </span>
           )}
         </span>
         {dirty && (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.firm }} />
-            <span className="font-mono text-[11px]" style={{ color: LAYER.firm }}>
+          <span className="inline-flex shrink-0 items-center gap-1.5">
+            <span className="h-[5px] w-[5px] rounded-full" style={{ background: RAIL.amber }} />
+            <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
               unsaved changes
             </span>
           </span>
         )}
         <div className="flex-1" />
-        <Button size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={onSaveVersion}>
-          Save model version
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-[26px] px-2.5 text-[11.5px]"
-          onClick={onOpenHistory}
-        >
-          History <span className="ml-1 font-mono text-[10px] text-muted-foreground">{versionCount}</span>
-        </Button>
+        <RailButton onClick={onSaveVersion}>Save model version</RailButton>
+        <RailButton variant="secondary" onClick={onOpenHistory}>
+          History
+          <RailChip>{versionCount}</RailChip>
+        </RailButton>
       </div>
 
       {/* B — planning unit */}
-      <div className="flex items-center gap-2.5 px-2.5 py-1.5">
+      <div className={ROW}>
         <span className={cn(LABEL_COL, "flex items-center gap-[7px]")}>
-          <Badge tone="solid">B</Badge>
-          <span className={cn(KX_TIGHT, "whitespace-nowrap")}>Planning unit</span>
+          <RailMarker>B</RailMarker>
+          <span className={RAIL_EYEBROW}>Planning unit</span>
         </span>
-        <Segmented<PlanningUnit>
-          size="sm"
-          value={unit}
-          onChange={onUnitChange}
-          options={[
-            { value: "day", label: "day" },
-            { value: "week", label: "week" },
-            { value: "month", label: "month" },
-          ]}
-        />
+        <UnitSegmented value={unit} onChange={onUnitChange} />
         <div className="flex-1" />
         <span className="flex shrink-0 items-center gap-2.5">
-          <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">
-            Horizon <b className="font-medium text-foreground">{horizon}</b>
+          <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
+            Horizon{" "}
+            <b className="font-medium" style={{ color: RAIL.ink }}>
+              {horizon}
+            </b>
           </span>
-          <span className="text-[#dcdcdc]">·</span>
-          <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">{unitMap}</span>
+          <span style={{ color: RAIL.rule }}>·</span>
+          <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
+            <b className="font-medium" style={{ color: RAIL.ink }}>
+              {unitMap}
+            </b>
+          </span>
         </span>
       </div>
 
       {/* steps */}
-      <div className="flex items-stretch gap-[18px] border-t border-[--hair-border] bg-[#f4f4f4] p-1.5">
-        <div className="flex w-[192px] shrink-0 flex-col justify-center gap-0.5 py-px pl-1 pr-2.5">
-          <span className={cn(KX_TIGHT, "whitespace-nowrap")}>Configure SC policies</span>
-          <span className="whitespace-nowrap font-mono text-[10.5px] text-muted-foreground">
-            steps 1–3, then run
+      <div className={cn(RAIL_STAGE_ROW, "border-t border-[#ebebeb] gap-[18px]")}>
+        <div className="flex w-[192px] shrink-0 flex-col justify-center gap-[3px] pr-2.5">
+          <span className="flex items-center gap-[7px]">
+            <RailMarker>C</RailMarker>
+            <span className={RAIL_EYEBROW}>Configure SC policies</span>
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="font-mono text-[11px]">
-              <b className="font-medium">{readyCount}</b>
-              <span className="text-muted-foreground"> / {stages.length} ready</span>
-            </span>
-            <span className="flex gap-[3px]">
-              {stages.map((s) => (
-                <span
-                  key={s.id}
-                  className="h-[3px] w-[18px] rounded-full"
-                  style={{
-                    background: readyOf(s) ? LAYER.process : s.needs ? LAYER.brand : "#dcdcdc",
-                  }}
-                />
-              ))}
-            </span>
+          {/* indented past the marker so it aligns with the eyebrow text */}
+          <span className="font-mono text-[11px] tabular-nums" style={{ paddingLeft: 23 }}>
+            <b className="font-medium" style={{ color: RAIL.ink }}>
+              {readyCount}
+            </b>
+            <span style={{ color: RAIL.muted }}> / {stages.length} ready</span>
           </span>
         </div>
 
-        {stages.map((stage, i) => {
-          const prev = i > 0 ? stages[i - 1] : null;
-          const prevBlocked = !!prev && (prev.id === "run_validate" ? false : prev.needs > 0);
-          return (
+        <div className="flex min-w-0 flex-1 items-stretch gap-[10px]">
+          {stages.map((stage, i) => (
             <React.Fragment key={stage.id}>
-              {i > 0 && (
-                <span
-                  aria-hidden
-                  className="relative grid shrink-0 place-items-center font-mono text-[15px] font-medium leading-none"
-                  style={{ width: 0, color: prevBlocked ? LAYER.brand : "var(--hair-quiet)" }}
-                >
-                  <span className="absolute left-[-14px]">›</span>
-                </span>
-              )}
-              <StepCard
-                stage={stage}
-                index={i}
-                active={activeStage === stage.id}
-                ready={readyOf(stage)}
+              {i > 0 ? <RailChevron /> : null}
+              <RailStageCard
+                state={stateOf(stage)}
+                numeral={String(i + 1)}
+                label={stage.title}
+                sub={metaOf(stage)}
                 onSelect={() => onStageChange(stage.id)}
+                title={
+                  stage.id === "run_validate"
+                    ? stage.needs
+                      ? `Resolve ${stage.needs} line(s) in steps 1–3 before the run is credible`
+                      : "Verification · Run simulation · Warm-up detection · Validation · Adopt"
+                    : stage.needs
+                      ? `${stage.needs} line(s) still need input in this step`
+                      : `All ${stage.total} lines resolved`
+                }
+                trailing={
+                  stage.id === "run_validate" && stage.needs > 0 && stage.id !== activeStage ? (
+                    <RailChip>LOCKED</RailChip>
+                  ) : null
+                }
               />
             </React.Fragment>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </div>
   );
