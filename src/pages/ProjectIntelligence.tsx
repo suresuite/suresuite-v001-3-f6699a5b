@@ -152,16 +152,21 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     })();
   }, [user]);
 
-  // Route ↔ active thread sync.
+  // Route ↔ active thread sync. Without a ?thread=, fall back to the most
+  // recent real chat — the Quick chat pseudo-thread is no longer listed here
+  // (it backs the floating bubble only) and is never selected by default.
   useEffect(() => {
     const urlThread = searchParams.get("thread");
     if (urlThread) {
       if (urlThread !== activeThreadId) setActiveThread(urlThread);
-    } else if (!activeThreadId) {
-      setActiveThread(QUICK_THREAD_ID);
+      return;
     }
+    if (activeThreadId && activeThreadId !== QUICK_THREAD_ID) return;
+    const mostRecent = threads.find((t) => !t.archived && t.id !== QUICK_THREAD_ID);
+    if (mostRecent) setActiveThread(mostRecent.id);
+    else if (activeThreadId) setActiveThread(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, threads]);
 
   // Keep the global project selector in sync with the active thread's project.
   useEffect(() => {
