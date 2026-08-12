@@ -45,6 +45,16 @@ import {
   Toggle,
   tint,
 } from "@/components/intelligence/piUi";
+import {
+  RAIL,
+  RAIL_EYEBROW,
+  RAIL_STAGE_ROW_OPEN,
+  RAIL_STAGE_ROW_OPEN_STYLE,
+  RailChevron,
+  RailMarker,
+  RailStageCard,
+  type RailState,
+} from "@/components/sim/StageRail";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { StageRow } from "@/hooks/useStageRows";
@@ -219,7 +229,6 @@ const STEPS = [
   { id: "run", label: "Run simulation" },
   { id: "warmup", label: "Warm-up detection" },
   { id: "validate", label: "Validation" },
-  { id: "adopt", label: "Adopt" },
 ];
 
 function meanCI(values: number[], confidence: number) {
@@ -637,10 +646,8 @@ export function RunValidateStage({
     if (multiQueuedAt || hasRealData) s.add(1);
     if (warmupComputed && warmCfg.warmup_days > 0) s.add(2);
     if (validationResult) s.add(3);
-    // Adopt is complete when an active card matches the current context.
-    if (liveCredibility.state === "validated") s.add(4);
     return s;
-  }, [findings, blockCount, multiQueuedAt, hasRealData, warmupComputed, warmCfg.warmup_days, validationResult, liveCredibility.state]);
+  }, [findings, blockCount, multiQueuedAt, hasRealData, warmupComputed, warmCfg.warmup_days, validationResult]);
 
   const canContinue = (i: number): boolean => {
     if (i === 0) return findings !== null && blockCount === 0;
@@ -1290,7 +1297,7 @@ export function RunValidateStage({
     if (i === 2)
       return warmupComputed && warmCfg.warmup_days > 0
         ? { text: `${warmCfg.warmup_days} days · ${warmCfg.method}` }
-        : { text: "not detected" };
+        : { text: "not detected", blocked: hasRealData };
     if (i === 3)
       return validationResult
         ? { text: `${testsRan.filter((r) => r.pass).length}/${testsRan.length} passed` }
@@ -1298,60 +1305,49 @@ export function RunValidateStage({
     return { text: liveCredibility.state };
   };
 
+  const doneCount = completed.size;
+
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Five step cards — same treatment as the setup bar's step track. */}
-      <div className="flex flex-wrap items-stretch gap-[5px]">
-        {STEPS.map((s, i) => {
-          const meta = stepMeta(i);
-          const active = step === i;
-          const done = completed.has(i);
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setStep(i)}
-              className={cn(
-                "flex flex-[0_1_auto] items-center gap-[9px] rounded-sm border px-[10px] py-1.5 text-left transition-colors",
-                active
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-[--hair-border] bg-background shadow-[0_1px_0_rgba(0,0,0,0.04)] hover:border-foreground hover:bg-[#fafafa]",
-              )}
-            >
-              <span
-                className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full font-mono text-[10px] font-medium"
-                style={
-                  active
-                    ? { background: "#ffffff", color: "#111111" }
-                    : done
-                      ? { background: LAYER.process, color: "#ffffff" }
-                      : meta.blocked
-                        ? { background: LAYER.brand, color: "#ffffff" }
-                        : { background: "#f4f4f4", color: "var(--ledger-quiet)" }
-                }
-              >
-                {done && !active ? "✓" : i + 1}
-              </span>
-              <span className="flex min-w-0 flex-col items-start gap-px">
-                <span className="whitespace-nowrap text-[12.5px] font-medium tracking-[-0.01em]">
-                  {s.label}
-                </span>
-                <span
-                  className="whitespace-nowrap font-mono text-[10px]"
-                  style={{
-                    color: active
-                      ? "rgba(255,255,255,0.62)"
-                      : meta.blocked
-                        ? LAYER.brand
-                        : "var(--ledger-quiet)",
-                  }}
-                >
-                  {meta.text}
-                </span>
-              </span>
-            </button>
-          );
-        })}
+      {/* Section D as a band — the sim-lab surface, zinc ramp. */}
+      <div className={RAIL_STAGE_ROW_OPEN} style={RAIL_STAGE_ROW_OPEN_STYLE}>
+        <div className="flex w-[192px] shrink-0 flex-col justify-center gap-[3px] pr-2.5">
+          <span className="flex items-center gap-[7px]">
+            <RailMarker>D</RailMarker>
+            <span className={RAIL_EYEBROW} style={{ color: RAIL.zinc.body }}>
+              Run &amp; validate
+            </span>
+          </span>
+          <span className="font-mono text-[11px] tabular-nums" style={{ paddingLeft: 23 }}>
+            <b className="font-medium" style={{ color: RAIL.zinc.ink }}>
+              {doneCount}
+            </b>
+            <span style={{ color: RAIL.zinc.quiet }}> / {STEPS.length} done</span>
+          </span>
+        </div>
+
+        <div className="flex min-w-0 flex-1 items-stretch gap-[10px]">
+          {STEPS.map((s, i) => {
+            const meta = stepMeta(i);
+            const done = completed.has(i);
+            const state: RailState = step === i ? "current" : done ? "done" : "todo";
+            return (
+              <React.Fragment key={s.id}>
+                {i > 0 ? <RailChevron palette="zinc" /> : null}
+                <RailStageCard
+                  palette="zinc"
+                  state={state}
+                  needsSetup={!done && meta.blocked}
+                  numeral={String(i + 1)}
+                  label={s.label}
+                  sub={meta.text}
+                  onSelect={() => setStep(i)}
+                  title={`${s.label} — ${meta.text}`}
+                />
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
 
       <>
@@ -1952,43 +1948,42 @@ export function RunValidateStage({
                 )}
               </>
             )}
-          </StepShell>
-        )}
 
-        {/* 5 — ADOPT (§9.5 step 6, G13): persist the validated model card */}
-        {step === 4 && (
-          <StepShell
-            index={4}
-            title="Adopt"
-            action={<CredibilityBadge credibility={liveCredibility} />}
-          >
-            <AdoptStep
-              findings={findings}
-              blockCount={blockCount}
-              hasRealData={hasRealData}
-              repCount={doneReps.length}
-              engineVersion={latestRun?.code_version ?? null}
-              evidenceRunId={dbRun?.id ?? null}
-              warmupComputed={warmupComputed}
-              warmCfg={warmCfg}
-              confidence={multiCfg.confidence}
-              adequacy={adequacy}
-              validationResult={validationResult}
-              basis={adoptBasis}
-              statisticalPass={statisticalPass}
-              faceAck={faceAck}
-              onFaceAck={setFaceAck}
-              credibility={liveCredibility}
-              triple={{
-                versionId: selectedVersionId,
-                policyDirty,
-                graphHash: dataset.currentHash,
-                scenarioHash,
-              }}
-              ready={adoptReady}
-              adopting={adopting}
-              onMarkValid={onMarkValid}
-            />
+            {/* Adoption (§9.5 step 6, G13): persist the validated model card
+               from the validation result — there is no separate Adopt step. */}
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className={KX_TIGHT}>Adopt</span>
+                <CredibilityBadge credibility={liveCredibility} />
+              </div>
+              <AdoptStep
+                findings={findings}
+                blockCount={blockCount}
+                hasRealData={hasRealData}
+                repCount={doneReps.length}
+                engineVersion={latestRun?.code_version ?? null}
+                evidenceRunId={dbRun?.id ?? null}
+                warmupComputed={warmupComputed}
+                warmCfg={warmCfg}
+                confidence={multiCfg.confidence}
+                adequacy={adequacy}
+                validationResult={validationResult}
+                basis={adoptBasis}
+                statisticalPass={statisticalPass}
+                faceAck={faceAck}
+                onFaceAck={setFaceAck}
+                credibility={liveCredibility}
+                triple={{
+                  versionId: selectedVersionId,
+                  policyDirty,
+                  graphHash: dataset.currentHash,
+                  scenarioHash,
+                }}
+                ready={adoptReady}
+                adopting={adopting}
+                onMarkValid={onMarkValid}
+              />
+            </div>
           </StepShell>
         )}
       </>

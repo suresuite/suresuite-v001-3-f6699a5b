@@ -36,7 +36,26 @@ export const RAIL = {
   teal: LAYER.process,
   /** the stage-row band */
   band: "#f4f4f4",
+  /** settled eyebrow / label colour */
+  quiet: "#9a9a9a",
+  /** divider between collapsed rows */
+  hairFaint: "#f4f4f4",
+  zinc: {
+    /** --zinc-chip, the open-band fill */
+    band: "#f0f0f2",
+    /** --zinc-border */
+    border: "#e0e0e3",
+    /** --zinc-quiet */
+    quiet: "#71717a",
+    /** --zinc-body */
+    body: "#52525b",
+    /** --zinc-ink */
+    ink: "#18181b",
+  },
 } as const;
+
+/** Label column. 220px so a collapsed row's value starts on the stage-card edge. */
+export const RAIL_LABEL_COL = "w-[220px] shrink-0";
 
 /** done → behind you · current → exactly one · todo → ahead of you. */
 export type RailState = "done" | "current" | "todo";
@@ -49,6 +68,13 @@ export const RAIL_EYEBROW_ROW = "flex items-center gap-[9px] border-b border-[#e
 export const RAIL_EYEBROW = cn(KX_TIGHT, "whitespace-nowrap font-medium");
 /** Stage row: the band the cards sit in. */
 export const RAIL_STAGE_ROW = "flex items-stretch gap-[10px] bg-[#f4f4f4] px-3 py-[10px]";
+
+/** The open (sunken) band row — zinc ramp, used by the section that's active. */
+export const RAIL_STAGE_ROW_OPEN = "flex items-stretch p-3 border-t";
+export const RAIL_STAGE_ROW_OPEN_STYLE = {
+  background: RAIL.zinc.band,
+  borderColor: RAIL.zinc.border,
+} as const;
 
 /** Right-side readout — 5px dot, 11.5px text, muted label + ink value. */
 export function RailReadout({
@@ -77,14 +103,64 @@ export function RailReadout({
 }
 
 /** 16px square ink marker — the A / B / C row markers. */
-export function RailMarker({ children }: { children: React.ReactNode }) {
+export function RailMarker({
+  children,
+  settled = false,
+}: {
+  children: React.ReactNode;
+  settled?: boolean;
+}) {
   return (
     <span
       className="grid h-4 w-4 shrink-0 place-items-center rounded-sm font-mono text-[9px] leading-none text-white"
-      style={{ background: RAIL.ink }}
+      style={{ background: settled ? RAIL.muted : RAIL.ink }}
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * One settled section, one line. `summary` is a mono `value · value · value`
+ * run — never a sentence — and the `▾` is the system's band-collapse glyph.
+ */
+export function RailCollapsedRow({
+  letter,
+  label,
+  summary,
+  onExpand,
+  last = false,
+}: {
+  letter: string;
+  label: string;
+  summary: React.ReactNode;
+  onExpand: () => void;
+  /** last collapsed row before the open band — divides on the full hairline */
+  last?: boolean;
+}) {
+  return (
+    <div
+      className="flex items-center px-3 py-1.5 border-b"
+      style={{ borderColor: last ? RAIL.rule : RAIL.hairFaint }}
+    >
+      <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>
+        <RailMarker settled>{letter}</RailMarker>
+        <span className={RAIL_EYEBROW} style={{ color: RAIL.quiet }}>
+          {label}
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-1 items-center gap-2">{summary}</span>
+      <button
+        type="button"
+        onClick={onExpand}
+        aria-label={`Expand ${label}`}
+        title="Expand"
+        className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-sm border bg-white text-[11px] leading-none transition-colors hover:bg-[#fafafa]"
+        style={{ borderColor: "#e4e4e4", color: RAIL.muted }}
+      >
+        ▾
+      </button>
+    </div>
   );
 }
 
@@ -101,22 +177,31 @@ export function RailChip({ children, className }: { children: React.ReactNode; c
 }
 
 /** The separator between two stage cards. Identical in both rails. */
-export function RailChevron() {
+export function RailChevron({ palette = "grey" }: { palette?: "grey" | "zinc" }) {
   return (
     <span
       aria-hidden
       className="flex shrink-0 select-none items-center text-[18px] leading-none"
-      style={{ color: RAIL.muted }}
+      style={{ color: palette === "zinc" ? RAIL.zinc.quiet : RAIL.muted }}
     >
       ›
     </span>
   );
 }
 
+type Palette = "grey" | "zinc";
+
+const CARD = {
+  grey: { border: "#d4d4d4", bg: "#ffffff", body: "#525252", quiet: "#6b6b6b", chip: "#f0f0f0", done: RAIL.ink },
+  zinc: { border: RAIL.zinc.border, bg: "#ffffff", body: RAIL.zinc.body, quiet: RAIL.zinc.quiet, chip: RAIL.zinc.band, done: RAIL.zinc.body },
+} satisfies Record<Palette, Record<string, string>>;
+
 /**
- * One stage card. White, 1px #d4d4d4, radius 4, in every state — the state is
+ * One stage card. White, 1px border, radius 4, in every state — the state is
  * carried by the badge and by the 3px bottom track, never by inverting the card
- * and never by a second indicator dot.
+ * and never by a second indicator dot. `needsSetup` marks a required setting
+ * as missing — the only state that carries red, as a signal (ringed numeral +
+ * meta text), never a card fill.
  */
 export function RailStageCard({
   state,
@@ -126,6 +211,8 @@ export function RailStageCard({
   onSelect,
   title,
   trailing,
+  palette = "grey",
+  needsSetup = false,
 }: {
   state: RailState;
   numeral: string;
@@ -134,15 +221,24 @@ export function RailStageCard({
   onSelect: () => void;
   title?: string;
   trailing?: React.ReactNode;
+  palette?: Palette;
+  needsSetup?: boolean;
 }) {
   const done = state === "done";
   const current = state === "current";
-  const badge = done
-    ? { background: RAIL.ink, color: "#ffffff" }
-    : current
-      ? { background: RAIL.amber, color: "#ffffff" }
-      : { background: RAIL.hair, color: RAIL.muted };
-  const track = done ? RAIL.ink : current ? RAIL.amber : RAIL.rule;
+  const c = CARD[palette];
+  const badge = current
+    ? { background: RAIL.amber, color: "#ffffff" }
+    : needsSetup
+      ? {
+          background: "rgba(191,35,48,0.08)",
+          color: "#bf2330",
+          boxShadow: "inset 0 0 0 1px rgba(191,35,48,0.4)",
+        }
+      : done
+        ? { background: c.done, color: "#ffffff" }
+        : { background: c.chip, color: c.quiet };
+  const track = current ? RAIL.amber : done ? c.done : RAIL.rule;
 
   return (
     <button
@@ -150,32 +246,33 @@ export function RailStageCard({
       onClick={onSelect}
       title={title}
       aria-current={current ? "step" : undefined}
-      className="relative flex min-w-0 flex-[1_1_0] items-center gap-[10px] rounded-sm border border-[#d4d4d4] bg-white px-[10px] pb-[10px] pt-2 text-left transition-colors hover:bg-[#fafafa]"
+      className="relative flex min-w-0 flex-1 basis-0 items-center gap-[10px] rounded-sm border bg-white px-[10px] pb-[10px] pt-2 text-left transition-colors hover:bg-[#fafafa]"
+      style={{ borderColor: c.border, background: c.bg }}
     >
       <span
         className="grid h-5 w-5 shrink-0 place-items-center rounded-full font-mono text-[11px] font-medium leading-none"
         style={badge}
       >
-        {done ? "✓" : numeral}
+        {numeral}
       </span>
 
       <span className="flex min-w-0 flex-col items-start gap-[2px]">
         <span
           className="flex items-center gap-1.5 truncate whitespace-nowrap text-[13px] font-semibold tracking-[-0.011em]"
-          style={{ color: state === "todo" ? RAIL.muted : RAIL.ink }}
+          style={{ color: state === "todo" ? c.quiet : palette === "zinc" ? RAIL.zinc.ink : RAIL.ink }}
         >
           {label}
           {trailing}
         </span>
         <span
           className="truncate whitespace-nowrap font-mono text-[10.5px] font-normal tabular-nums"
-          style={{ color: current ? RAIL.amber : RAIL.muted }}
+          style={{ color: current ? "#a1650a" : needsSetup ? "#bf2330" : c.quiet }}
         >
           {sub}
         </span>
       </span>
 
-      {/* the state track — every card carries one, full width, 3px */}
+      {/* the state track — every card carries one, full width, 3px — deliberately NOT red on needsSetup */}
       <span
         aria-hidden
         className="absolute rounded-sm"
