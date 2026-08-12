@@ -15,10 +15,12 @@ import {
   RAIL,
   RAIL_EYEBROW,
   RAIL_EYEBROW_ROW,
+  RAIL_LABEL_COL,
   RAIL_SHELL,
   RAIL_STAGE_ROW,
   RailChevron,
   RailChip,
+  RailCollapsedRow,
   RailMarker,
   RailReadout,
   RailStageCard,
@@ -39,8 +41,6 @@ export interface StageGuard {
   evidence?: boolean;
 }
 
-/** Fixed label column so rows A and B align. */
-const LABEL_COL = "w-[196px] shrink-0";
 const ROW = "flex items-center gap-2.5 px-3 py-1.5";
 
 /** 26px, 11.5px / 500, radius 4 — primary is ink, secondary is a white hairline. */
@@ -137,6 +137,10 @@ export function PolicySetupBar({
   activeStage: StageId;
   onStageChange: (s: StageId) => void;
 }) {
+  /** Which lettered section is expanded. Exactly one at a time. */
+  type OpenSection = "A" | "B" | "C" | "D";
+  const openSection: OpenSection = activeStage === "run_validate" ? "D" : "C";
+
   const setupStages = stages.filter((s) => s.id !== "run_validate");
   const blocking = setupStages.reduce((a, s) => a + s.needs, 0);
   const readyOf = (s: StageGuard) =>
@@ -158,10 +162,33 @@ export function PolicySetupBar({
         ? `${s.needs} line${s.needs === 1 ? "" : "s"} blocking`
         : s.evidence
           ? "evidence complete"
-          : "5 steps"
+          : "4 steps"
       : s.needs
         ? `${s.total} lines · ${s.needs} need input`
         : `${s.total} lines resolved`;
+
+  /** Section C collapsed — built from setupStages so it never drifts from the data. */
+  const cSummary = (
+    <>
+      <span className="font-mono text-[11px] tabular-nums" style={{ color: RAIL.zinc.body }}>
+        <b className="font-medium" style={{ color: RAIL.ink }}>
+          {readyCount} / {stages.length}
+        </b>{" "}
+        ready
+      </span>
+      {setupStages.map((s) => (
+        <React.Fragment key={s.id}>
+          <span style={{ color: "#c8c8c8" }}>·</span>
+          <span
+            className="truncate font-mono text-[11px]"
+            style={{ color: s.needs ? "#bf2330" : RAIL.muted }}
+          >
+            {s.title.toLowerCase()}
+          </span>
+        </React.Fragment>
+      ))}
+    </>
+  );
 
   return (
     <div className={cn(RAIL_SHELL, "mb-[14px]")}>
@@ -178,107 +205,161 @@ export function PolicySetupBar({
       </div>
 
       {/* A — model version */}
-      <div className={cn(ROW, "border-b border-[#f0f0f0]")}>
-        <span className={cn(LABEL_COL, "flex items-center gap-[7px]")}>
-          <RailMarker>A</RailMarker>
-          <span className={RAIL_EYEBROW}>Model version</span>
-        </span>
-        <span className="flex shrink-0 items-center gap-2">
-          <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: RAIL.ink }}>
-            {versionName}
+      {openSection === "A" ? (
+        <div className={cn(ROW, "border-b border-[#f0f0f0]")}>
+          <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>
+            <RailMarker>A</RailMarker>
+            <span className={RAIL_EYEBROW}>Model version</span>
           </span>
-          <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
-          {versionStamp && (
-            <span className="whitespace-nowrap font-mono text-[11px]" style={{ color: RAIL.muted }}>
-              {versionStamp}
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: RAIL.ink }}>
+              {versionName}
+            </span>
+            <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
+            {versionStamp && (
+              <span className="whitespace-nowrap font-mono text-[11px]" style={{ color: RAIL.muted }}>
+                {versionStamp}
+              </span>
+            )}
+          </span>
+          {dirty && (
+            <span className="inline-flex shrink-0 items-center gap-1.5">
+              <span className="h-[5px] w-[5px] rounded-full" style={{ background: RAIL.amber }} />
+              <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
+                unsaved changes
+              </span>
             </span>
           )}
-        </span>
-        {dirty && (
-          <span className="inline-flex shrink-0 items-center gap-1.5">
-            <span className="h-[5px] w-[5px] rounded-full" style={{ background: RAIL.amber }} />
-            <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
-              unsaved changes
-            </span>
-          </span>
-        )}
-        <div className="flex-1" />
-        <RailButton onClick={onSaveVersion}>Save model version</RailButton>
-        <RailButton variant="secondary" onClick={onOpenHistory}>
-          History
-          <RailChip>{versionCount}</RailChip>
-        </RailButton>
-      </div>
+          <div className="flex-1" />
+          <RailButton onClick={onSaveVersion}>Save model version</RailButton>
+          <RailButton variant="secondary" onClick={onOpenHistory}>
+            History
+            <RailChip>{versionCount}</RailChip>
+          </RailButton>
+        </div>
+      ) : (
+        <RailCollapsedRow
+          letter="A"
+          label="Model version"
+          summary={
+            <>
+              <span className="whitespace-nowrap text-[11.5px]" style={{ color: RAIL.zinc.body }}>
+                {versionName}
+              </span>
+              <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
+              {dirty && (
+                <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
+                  unsaved changes
+                </span>
+              )}
+            </>
+          }
+          onExpand={onOpenHistory}
+        />
+      )}
 
       {/* B — planning unit */}
-      <div className={ROW}>
-        <span className={cn(LABEL_COL, "flex items-center gap-[7px]")}>
-          <RailMarker>B</RailMarker>
-          <span className={RAIL_EYEBROW}>Planning unit</span>
-        </span>
-        <UnitSegmented value={unit} onChange={onUnitChange} />
-        <div className="flex-1" />
-        <span className="flex shrink-0 items-center gap-2.5">
-          <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
-            Horizon{" "}
-            <b className="font-medium" style={{ color: RAIL.ink }}>
-              {horizon}
-            </b>
+      {openSection === "B" ? (
+        <div className={ROW}>
+          <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>
+            <RailMarker>B</RailMarker>
+            <span className={RAIL_EYEBROW}>Planning unit</span>
           </span>
-          <span style={{ color: RAIL.rule }}>·</span>
-          <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
-            <b className="font-medium" style={{ color: RAIL.ink }}>
-              {unitMap}
-            </b>
-          </span>
-        </span>
-      </div>
-
-      {/* steps */}
-      <div className={cn(RAIL_STAGE_ROW, "border-t border-[#ebebeb] gap-[18px]")}>
-        <div className="flex w-[192px] shrink-0 flex-col justify-center gap-[3px] pr-2.5">
-          <span className="flex items-center gap-[7px]">
-            <RailMarker>C</RailMarker>
-            <span className={RAIL_EYEBROW}>Configure SC policies</span>
-          </span>
-          {/* indented past the marker so it aligns with the eyebrow text */}
-          <span className="font-mono text-[11px] tabular-nums" style={{ paddingLeft: 23 }}>
-            <b className="font-medium" style={{ color: RAIL.ink }}>
-              {readyCount}
-            </b>
-            <span style={{ color: RAIL.muted }}> / {stages.length} ready</span>
+          <UnitSegmented value={unit} onChange={onUnitChange} />
+          <div className="flex-1" />
+          <span className="flex shrink-0 items-center gap-2.5">
+            <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
+              Horizon{" "}
+              <b className="font-medium" style={{ color: RAIL.ink }}>
+                {horizon}
+              </b>
+            </span>
+            <span style={{ color: RAIL.rule }}>·</span>
+            <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
+              <b className="font-medium" style={{ color: RAIL.ink }}>
+                {unitMap}
+              </b>
+            </span>
           </span>
         </div>
+      ) : (
+        <RailCollapsedRow
+          letter="B"
+          label="Planning unit"
+          summary={
+            <>
+              <span className="font-mono text-[11px]" style={{ color: RAIL.zinc.body }}>
+                {unit}
+              </span>
+              <span style={{ color: "#c8c8c8" }}>·</span>
+              <span className="font-mono text-[11px] tabular-nums" style={{ color: RAIL.muted }}>
+                horizon{" "}
+                <b className="font-medium" style={{ color: horizon ? RAIL.ink : "#bf2330" }}>
+                  {horizon || "not set"}
+                </b>
+              </span>
+            </>
+          }
+          onExpand={() => onStageChange(setupStages[0].id)}
+        />
+      )}
 
-        <div className="flex min-w-0 flex-1 items-stretch gap-[10px]">
-          {stages.map((stage, i) => (
-            <React.Fragment key={stage.id}>
-              {i > 0 ? <RailChevron /> : null}
-              <RailStageCard
-                state={stateOf(stage)}
-                numeral={String(i + 1)}
-                label={stage.title}
-                sub={metaOf(stage)}
-                onSelect={() => onStageChange(stage.id)}
-                title={
-                  stage.id === "run_validate"
-                    ? stage.needs
-                      ? `Resolve ${stage.needs} line(s) in steps 1–3 before the run is credible`
-                      : "Verification · Run simulation · Warm-up detection · Validation · Adopt"
-                    : stage.needs
-                      ? `${stage.needs} line(s) still need input in this step`
-                      : `All ${stage.total} lines resolved`
-                }
-                trailing={
-                  stage.id === "run_validate" && stage.needs > 0 && stage.id !== activeStage ? (
-                    <RailChip>LOCKED</RailChip>
-                  ) : null
-                }
-              />
-            </React.Fragment>
-          ))}
+      {/* C — configure SC policies */}
+      {openSection === "C" ? (
+        <div className={cn(RAIL_STAGE_ROW, "border-t border-[#ebebeb] gap-[18px]")}>
+          <div className="flex w-[192px] shrink-0 flex-col justify-center gap-[3px] pr-2.5">
+            <span className="flex items-center gap-[7px]">
+              <RailMarker>C</RailMarker>
+              <span className={RAIL_EYEBROW}>Configure SC policies</span>
+            </span>
+            {/* indented past the marker so it aligns with the eyebrow text */}
+            <span className="font-mono text-[11px] tabular-nums" style={{ paddingLeft: 23 }}>
+              <b className="font-medium" style={{ color: RAIL.ink }}>
+                {readyCount}
+              </b>
+              <span style={{ color: RAIL.muted }}> / {stages.length} ready</span>
+            </span>
+          </div>
+
+          <div className="flex min-w-0 flex-1 items-stretch gap-[10px]">
+            {stages.map((stage, i) => (
+              <React.Fragment key={stage.id}>
+                {i > 0 ? <RailChevron /> : null}
+                <RailStageCard
+                  state={stateOf(stage)}
+                  numeral={String(i + 1)}
+                  label={stage.title}
+                  sub={metaOf(stage)}
+                  onSelect={() => onStageChange(stage.id)}
+                  needsSetup={stage.id !== "run_validate" && stage.needs > 0}
+                  title={
+                    stage.id === "run_validate"
+                      ? stage.needs
+                        ? `Resolve ${stage.needs} line(s) in steps 1–3 before the run is credible`
+                        : "Verification · Run simulation · Warm-up detection · Validation"
+                      : stage.needs
+                        ? `${stage.needs} line(s) still need input in this step`
+                        : `All ${stage.total} lines resolved`
+                  }
+                  trailing={
+                    stage.id === "run_validate" && stage.needs > 0 && stage.id !== activeStage ? (
+                      <RailChip>LOCKED</RailChip>
+                    ) : null
+                  }
+                />
+              </React.Fragment>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <RailCollapsedRow
+          letter="C"
+          label="Configure SC policies"
+          summary={cSummary}
+          last
+          onExpand={() => onStageChange(setupStages[0].id)}
+        />
+      )}
     </div>
   );
 }
