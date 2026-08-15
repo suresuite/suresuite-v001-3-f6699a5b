@@ -14,7 +14,7 @@
 // §9.5.1 law for this surface: everything rendered is persisted engine output
 // (run_replications / simulation_runs) — synthetic or illustrative data is
 // banned here, even labeled. Pre-run states are empty states.
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid,
   Line,
