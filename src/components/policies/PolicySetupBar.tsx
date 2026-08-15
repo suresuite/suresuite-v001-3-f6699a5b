@@ -205,104 +205,61 @@ export function PolicySetupBar({
       </div>
 
       {/* A — model version */}
-      {openSection === "A" ? (
-        <div className={cn(ROW, "border-b border-[#f0f0f0]")}>
-          <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>
-            <RailMarker>A</RailMarker>
-            <span className={RAIL_EYEBROW}>Model version</span>
+      <div className={cn(ROW, "border-b border-[#f0f0f0]")}>
+        <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>
+          <RailMarker>A</RailMarker>
+          <span className={RAIL_EYEBROW}>Model version</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: RAIL.ink }}>
+            {versionName}
           </span>
-          <span className="flex shrink-0 items-center gap-2">
-            <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: RAIL.ink }}>
-              {versionName}
-            </span>
-            <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
-            {versionStamp && (
-              <span className="whitespace-nowrap font-mono text-[11px]" style={{ color: RAIL.muted }}>
-                {versionStamp}
-              </span>
-            )}
-          </span>
-          {dirty && (
-            <span className="inline-flex shrink-0 items-center gap-1.5">
-              <span className="h-[5px] w-[5px] rounded-full" style={{ background: RAIL.amber }} />
-              <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
-                unsaved changes
-              </span>
+          <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
+          {versionStamp && (
+            <span className="whitespace-nowrap font-mono text-[11px]" style={{ color: RAIL.muted }}>
+              {versionStamp}
             </span>
           )}
-          <div className="flex-1" />
-          <RailButton onClick={onSaveVersion}>Save model version</RailButton>
-          <RailButton variant="secondary" onClick={onOpenHistory}>
-            History
-            <RailChip>{versionCount}</RailChip>
-          </RailButton>
-        </div>
-      ) : (
-        <RailCollapsedRow
-          letter="A"
-          label="Model version"
-          summary={
-            <>
-              <span className="whitespace-nowrap text-[11.5px]" style={{ color: RAIL.zinc.body }}>
-                {versionName}
-              </span>
-              <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
-              {dirty && (
-                <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
-                  unsaved changes
-                </span>
-              )}
-            </>
-          }
-          onExpand={onOpenHistory}
-        />
-      )}
+        </span>
+        {dirty && (
+          <span className="inline-flex shrink-0 items-center gap-1.5">
+            <span className="h-[5px] w-[5px] rounded-full" style={{ background: RAIL.amber }} />
+            <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
+              unsaved changes
+            </span>
+          </span>
+        )}
+        <div className="flex-1" />
+        <RailButton onClick={onSaveVersion}>Save model version</RailButton>
+        <RailButton variant="secondary" onClick={onOpenHistory}>
+          History
+          <RailChip>{versionCount}</RailChip>
+        </RailButton>
+      </div>
 
       {/* B — planning unit */}
-      {openSection === "B" ? (
-        <div className={ROW}>
-          <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>
-            <RailMarker>B</RailMarker>
-            <span className={RAIL_EYEBROW}>Planning unit</span>
+      <div className={ROW}>
+        <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>
+          <RailMarker>B</RailMarker>
+          <span className={RAIL_EYEBROW}>Planning unit</span>
+        </span>
+        <UnitSegmented value={unit} onChange={onUnitChange} />
+        <div className="flex-1" />
+        <span className="flex shrink-0 items-center gap-2.5">
+          <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
+            Horizon{" "}
+            <b className="font-medium" style={{ color: RAIL.ink }}>
+              {horizon}
+            </b>
           </span>
-          <UnitSegmented value={unit} onChange={onUnitChange} />
-          <div className="flex-1" />
-          <span className="flex shrink-0 items-center gap-2.5">
-            <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
-              Horizon{" "}
-              <b className="font-medium" style={{ color: RAIL.ink }}>
-                {horizon}
-              </b>
-            </span>
-            <span style={{ color: RAIL.rule }}>·</span>
-            <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
-              <b className="font-medium" style={{ color: RAIL.ink }}>
-                {unitMap}
-              </b>
-            </span>
+          <span style={{ color: RAIL.rule }}>·</span>
+          <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
+            <b className="font-medium" style={{ color: RAIL.ink }}>
+              {unitMap}
+            </b>
           </span>
-        </div>
-      ) : (
-        <RailCollapsedRow
-          letter="B"
-          label="Planning unit"
-          summary={
-            <>
-              <span className="font-mono text-[11px]" style={{ color: RAIL.zinc.body }}>
-                {unit}
-              </span>
-              <span style={{ color: "#c8c8c8" }}>·</span>
-              <span className="font-mono text-[11px] tabular-nums" style={{ color: RAIL.muted }}>
-                horizon{" "}
-                <b className="font-medium" style={{ color: horizon ? RAIL.ink : "#bf2330" }}>
-                  {horizon || "not set"}
-                </b>
-              </span>
-            </>
-          }
-          onExpand={() => onStageChange(setupStages[0].id)}
-        />
-      )}
+        </span>
+      </div>
 
       {/* C — configure SC policies */}
       {openSection === "C" ? (
