@@ -19,6 +19,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import HeroLattice from '@/components/about/HeroLattice';
 
 const ACCENT = '#BF2330';
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
@@ -78,7 +79,7 @@ const PEOPLE: Person[] = [
         2025).
       </>
     ),
-    photo: '/team/phu-nguyen.jpg',
+    photo: null,
     initials: 'PN',
     monogramGlow: 'rgba(255,255,255,0.24)',
     tags: ['Simulation engine', 'Network modelling', 'Platform architecture', 'AI agents'],
@@ -98,7 +99,7 @@ const PEOPLE: Person[] = [
         policy library, and the resilience metrics it reports.
       </>
     ),
-    photo: '/team/dmitry-ivanov.jpg',
+    photo: null,
     initials: 'DI',
     monogramGlow: 'rgba(191,35,48,0.4)',
     tags: [
@@ -151,7 +152,7 @@ function FundingStrip() {
           the two columns stack instead of leaving a stray left border */}
       <div className="mx-auto grid max-w-6xl grid-cols-[repeat(auto-fit,minmax(330px,1fr))] gap-px bg-border-strong">
         {/* Home — HWR / lab identity */}
-        <div className="bg-border py-[22px] pb-6 pl-6 pr-[30px]">
+        <div className="bg-border px-6 py-8">
           <span className={KICKER}>Home</span>
           <img
             src="/funding/hwr-berlin.png"
@@ -167,7 +168,7 @@ function FundingStrip() {
         </div>
 
         {/* Funded by — programme logo + EU logo, always paired */}
-        <div className="bg-border py-[22px] pb-6 pl-[30px] pr-6">
+        <div className="bg-border px-6 py-8">
           <div className="flex items-center justify-between gap-4">
             <span className={`${KICKER} whitespace-nowrap`}>Funded by</span>
             {!single && (
@@ -243,7 +244,7 @@ function FundingStrip() {
 }
 
 function Portrait({ p }: { p: Person }) {
-  const box = 'float-left mr-[18px] mb-2.5 mt-[3px] h-[116px] w-[92px] overflow-hidden rounded';
+  const box = 'float-left mr-6 mb-3 mt-1 h-[116px] w-[92px] overflow-hidden rounded';
 
   if (!p.photo) {
     return (
@@ -301,40 +302,40 @@ export default function About() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden border-b border-border">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(560px circle at 97% -10%, rgba(191,35,48,0.10), rgba(191,35,48,0.026) 34%, transparent 66%)',
-            }}
-          />
-          <div className="relative mx-auto max-w-6xl px-6 pt-14">
+        <section className="relative overflow-hidden border-b border-border/60">
+          <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  'radial-gradient(420px circle at 92% 2%, rgba(191,35,48,0.09), rgba(191,35,48,0.022) 34%, transparent 62%)',
+              }}
+            />
+            <HeroLattice />
+          </div>
+          <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-24">
             <span className="inline-flex items-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 py-1.5">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
               <span className={KICKER}>About us</span>
             </span>
 
-            <div className="mt-[30px] pb-[60px]">
-              <h1 className="max-w-[15ch] text-[clamp(40px,6.2vw,80px)] font-semibold leading-[0.98] tracking-[-0.03em] text-balance">
-                Built inside a research lab,{' '}
-                <span className="font-serif font-medium italic">shipped as a product.</span>
-              </h1>
-              <p className="mt-[26px] max-w-[520px] text-[16.5px] leading-[1.65] text-muted-foreground text-pretty">
-                SuReSuite is built at the Digital-AI Supply Chain Lab at HWR Berlin — the group
-                behind the ripple-effect and supply chain viability research. The same small team
-                writes the science, the engine, and the interface.
-              </p>
-            </div>
+            <h1 className="mt-9 max-w-[20ch] text-[clamp(36px,5vw,60px)] font-semibold leading-[1.03] tracking-[-0.022em] text-balance">
+              Built inside a research lab,{' '}
+              <span className="font-serif font-medium italic">shipped as a product.</span>
+            </h1>
+            <p className="mt-7 max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
+              SuReSuite is built at the Digital-AI Supply Chain Lab at HWR Berlin — the group
+              behind the ripple-effect and supply chain viability research. The same small team
+              writes the science, the engine, and the interface.
+            </p>
           </div>
 
           <FundingStrip />
         </section>
 
         {/* Key people */}
-        <section id="people" className="border-b border-border">
-          <div className="mx-auto max-w-6xl px-6 pb-[52px] pt-3.5">
+        <section id="people" className="border-b border-border/60">
+          <div className="mx-auto max-w-6xl px-6 py-24">
             <div className="max-w-[600px]">
               <span
                 className="inline-flex items-center gap-[7px] whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em]"
@@ -343,16 +344,16 @@ export default function About() {
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
                 Key people
               </span>
-              <h2 className="mt-3 text-[clamp(26px,2.4vw,32px)] font-semibold leading-[1.14] tracking-[-0.026em]">
+              <h2 className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.022em]">
                 The science and the build,{' '}
                 <span className="font-serif font-medium italic">core team.</span>
               </h2>
             </div>
 
-            <div className="mt-[26px] grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] items-stretch gap-px overflow-hidden rounded-md border border-border bg-border">
+            <div className="mt-[26px] grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] items-stretch gap-px overflow-hidden rounded-sm border border-border bg-border">
               {PEOPLE.map((p) => (
-                <article key={p.slug} className="relative flex flex-col bg-card px-[34px] pb-7 pt-8">
-                  <span className="absolute right-[34px] top-8 font-mono text-[9px] tracking-[0.16em] text-muted-foreground/50">
+                <article key={p.slug} className="relative flex flex-col bg-card p-8">
+                  <span className="absolute right-8 top-8 font-mono text-[9px] tracking-[0.16em] text-muted-foreground/50">
                     {p.num}
                   </span>
 
@@ -380,7 +381,7 @@ export default function About() {
                     {p.tags.map((t) => (
                       <span
                         key={t}
-                        className="whitespace-nowrap rounded-sm border border-border px-2.5 py-[5px] text-xs text-foreground/70"
+                        className="whitespace-nowrap rounded-sm border border-border px-2 py-1 text-xs text-foreground/70"
                       >
                         {t}
                       </span>
@@ -399,20 +400,20 @@ export default function About() {
         </section>
 
         {/* Contributors */}
-        <section className="bg-secondary/30">
-          <div className="mx-auto max-w-6xl px-6 pb-16 pt-[52px]">
+        <section className="bg-secondary">
+          <div className="mx-auto max-w-6xl px-6 py-24">
             <div className="max-w-[600px]">
               <span className={`${KICKER} whitespace-nowrap`}>Contributors</span>
-              <h2 className="mt-3 text-[clamp(26px,2.4vw,32px)] font-semibold leading-[1.14] tracking-[-0.026em]">
+              <h2 className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.022em]">
                 And the people around them.
               </h2>
             </div>
 
-            <div className="mt-7 border-t border-border">
+            <div className="mt-7 border-t border-border/60">
               {CONTRIBUTORS.map((c, n) => (
                 <div
                   key={`${c.group}-${n}`}
-                  className="grid grid-cols-[minmax(104px,150px)_minmax(0,1fr)_minmax(0,max-content)] items-center gap-x-7 gap-y-5 border-b border-border py-[18px]"
+                  className="grid grid-cols-[minmax(104px,150px)_minmax(0,1fr)_minmax(0,max-content)] items-center gap-x-6 gap-y-4 border-b border-border/60 py-5"
                 >
                   <span className={`${KICKER} whitespace-nowrap`}>{c.group}</span>
                   <div>
