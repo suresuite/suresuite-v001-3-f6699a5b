@@ -9,6 +9,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { SURFACE, KX, TH, TD, ROW_HOVER, StatusDot, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters, type DotTone } from '@/components/admin/adminUi';
 import { TableBlock } from '@/components/shared';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { aggregateMatrixByModel, type ModelCapabilityRow, type ModelMatrixAggregate } from '@/lib/modelMatrix';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -27,6 +28,7 @@ const statusTone = (s: string): DotTone => (s === 'success' ? 'active' : s === '
 const db = supabase as any;
 
 export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState<LogRow[]>([]);
   const [fileRows, setFileRows] = useState<OrgFileUsageRow[]>([]);
   const [matrixRows, setMatrixRows] = useState<ModelMatrixAggregate[]>([]);
@@ -83,6 +85,41 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="AI Usage" onRefresh={load} refreshLoading={loading}
       actions={<Button variant="outline" size="sm" className="rounded-sm" onClick={exportCsv}>Export CSV</Button>}
     >
+      {isMobile ? (
+        <div className={`${SURFACE} overflow-hidden`}>
+          {loading ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
+          ) : sorted.length === 0 ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">No usage recorded yet. Trigger a chat request to see logs here.</div>
+          ) : (
+            sorted.map((r) => (
+              <div key={r.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{r.user_name || '—'}</span>
+                  <span className="shrink-0"><StatusDot tone={statusTone(r.status)} label={r.status} /></span>
+                </div>
+                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
+                  {new Date(r.created_at).toLocaleString()} · {r.model_code || '—'}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Total tok</span>
+                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{Number(r.total_tokens).toLocaleString()}</span>
+                  </span>
+                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Cost</span>
+                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">${Number(r.cost_usd).toFixed(4)}</span>
+                  </span>
+                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Latency</span>
+                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{r.latency_ms ?? '—'}</span>
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -118,6 +155,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
           </table>
         </div>
       </div>
+      )}
 
       {matrixRows.length > 0 && (
         // L1: name on the canvas above the shell.

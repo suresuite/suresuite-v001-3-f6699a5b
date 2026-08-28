@@ -20,6 +20,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { PAGE_GUTTER } from "@/components/shared/PageBody";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -244,7 +245,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         {/* No subtitle — AdminLayout header pattern. */}
         <PageHeader title="Project Intelligence" />
 

@@ -2,8 +2,8 @@
 // active item uses the SuReSuite red rail + soft-grey pill (bg-muted/80), and
 // spacing is tightened to the Ledger language. Drop-in replacement for
 // src/components/admin/AdminLayout.tsx.
-import { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { ReactNode, useEffect, useRef } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PAGE_GUTTER } from '@/components/shared/PageBody';
 import { cn } from '@/lib/utils';
 
 interface AdminLayoutProps {
@@ -48,9 +49,20 @@ export function AdminLayout({
   refreshLoading,
   children,
 }: AdminLayoutProps) {
+  const { pathname } = useLocation();
+  const activeRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    const el = activeRef.current;
+    const strip = el?.parentElement;
+    if (!el || !strip) return;
+    const target = el.offsetLeft - (strip.clientWidth - el.clientWidth) / 2;
+    strip.scrollLeft = Math.max(0, target);
+  }, [pathname]);
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title={title}
           rightContent={actions}
@@ -58,18 +70,27 @@ export function AdminLayout({
           refreshLoading={refreshLoading}
         />
 
-        {/* Horizontal tab nav — same TabsList/TabsTrigger treatment as Developer API */}
-        <div className="mb-5 inline-flex h-auto items-center gap-0.5 rounded-sm border border-[--hair-border] bg-white p-[3px]">
+        {/* Horizontal tab nav — same TabsList/TabsTrigger treatment as Developer API.
+            overflow-x-auto is the real fix: at 390px this strip is ~855px wide against
+            a ~336px container, so without it the last five tabs are unreachable. */}
+        <div
+          className="mb-5 flex h-auto max-w-full items-stretch gap-0.5 overflow-x-auto rounded-sm
+                     border border-[--hair-border] bg-white p-[3px]
+                     [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+                     md:inline-flex md:overflow-visible"
+        >
           {ADMIN_NAV.map((item) => {
             const Icon = item.icon;
+            const isActive = item.end ? pathname === item.to : pathname.startsWith(item.to);
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
+                ref={isActive ? activeRef : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-[2px] px-[15px] py-[7px] text-[12.5px] font-medium transition-colors',
+                    'inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] px-[15px] py-[7px] text-[12.5px] font-medium transition-colors md:min-h-0',
                     isActive ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
                   )
                 }

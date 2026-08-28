@@ -35,7 +35,7 @@ import {
   Map,
   Building2,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector } from '@/components/shared';
+import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import MLPrediction from '@/components/MLPrediction';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MapView from '@/components/MapView';
@@ -1073,7 +1073,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title="Firm-Level Network Intelligence"
           subtitle={`Deep-tier network of ${tierCounts['Tier 1']} Tier 1, ${tierCounts['Tier 2']} Tier 2, ${tierCounts['Tier 3']} Tier 3 suppliers, and ${tierCounts['Plant']} plant${tierCounts['Plant'] !== 1 ? 's' : ''}`}

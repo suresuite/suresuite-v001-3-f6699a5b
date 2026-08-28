@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { SURFACE, TH, TD, ROW_HOVER, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { SURFACE, TH, TD, ROW_HOVER, MonoChip, StatusDot, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +29,7 @@ const NONE = '__none__';
 const userLabel = (u: UserOption) => (u.name ? `${u.name} (${u.email})` : u.email || u.id);
 
 export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
+  const isMobile = useIsMobile();
   const { user: actor } = useAuth();
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [orgs, setOrgs] = useState<OrgOption[]>([]);
@@ -89,6 +91,51 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
       onRefresh={load} refreshLoading={loading}
       actions={<Input placeholder="Search name, org, owner, plant…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-64 rounded-sm" />}
     >
+      {isMobile ? (
+        <div className={`${SURFACE} overflow-hidden`}>
+          {loading ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
+          ) : sorted.length === 0 ? (
+            <div className="px-4 py-14 text-center">
+              <p className="mx-auto max-w-sm text-[13px] text-muted-foreground">{q ? 'No projects match these filters.' : 'No projects yet.'}</p>
+              {q && <Button variant="ghost" size="sm" className="mt-2 h-11" onClick={() => setQ('')}>Clear search</Button>}
+            </div>
+          ) : (
+            sorted.map((p) => (
+              <div key={p.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{p.name}</span>
+                  <span className="shrink-0">
+                    <StatusDot tone={p.completed ? 'active' : 'neutral'} label={p.completed ? 'Completed' : 'Draft'} />
+                  </span>
+                </div>
+                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
+                  {p.organization || '—'} · {p.owner_name || p.owner_email || '—'} · {p.plant_name || '—'}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <MonoChip>{p.supply_chain_model}</MonoChip>
+                  <MonoChip>{p.bom_level === 'multi_level' ? 'multi-level BOM' : 'single BOM'}</MonoChip>
+                  <MonoChip>{p.data_type}</MonoChip>
+                </div>
+                <div className="mt-2.5 flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-muted-foreground">Updated {new Date(p.updated_at).toLocaleDateString()}</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openDialog('transfer', p)}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer to organization…</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-[#bf2330] focus:text-[#bf2330]" onClick={() => remove(p)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -141,6 +188,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
           </table>
         </div>
       </div>
+      )}
 
       {target && dialog === 'copy' && <CopyDialog project={target} orgs={orgs} users={users} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}
       {target && dialog === 'rename' && <RenameDialog project={target} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}

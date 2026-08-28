@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { PAGE_GUTTER } from "@/components/shared/PageBody";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Segmented } from "@/components/intelligence/piUi";
@@ -146,7 +147,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 pt-6 pb-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title="Supply chain policies"
           subtitle={policyContextLine({

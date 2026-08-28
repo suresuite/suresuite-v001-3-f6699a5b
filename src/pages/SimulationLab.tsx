@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { PAGE_GUTTER } from "@/components/shared/PageBody";
 import { toast } from "sonner";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
@@ -277,7 +278,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title="Simulation Lab"
           rightContent={

@@ -34,7 +34,7 @@ import {
   AlertTriangle,
   Map as MapIcon,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector } from '@/components/shared';
+import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import MLPrediction from '@/components/MLPrediction';
 import SupplierVolumeChart, { SupplierVolumeDatum, aggregateSupplierVolumes } from '@/components/SupplierVolumeChart';
 import SupplierMaterialChart from '@/components/SupplierMaterialChart';
@@ -841,7 +841,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title="Product-level Network Intelligence"
           subtitle={`Multipartile networks of ${groupCounts.A} supplier${groupCounts.A !== 1 ? 's' : ''}, ${groupCounts.B} material${groupCounts.B !== 1 ? 's' : ''}, ${groupCounts.C} product${groupCounts.C !== 1 ? 's' : ''}, ${groupCounts.D} customer${groupCounts.D !== 1 ? 's' : ''}`}

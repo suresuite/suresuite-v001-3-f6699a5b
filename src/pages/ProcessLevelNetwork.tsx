@@ -35,7 +35,7 @@ import {
   AlertTriangle,
   Tag,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector } from '@/components/shared';
+import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import { BarChart } from 'lucide-react';
 
@@ -1109,7 +1109,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title="Process-level Network Intelligence"
           subtitle={`Shop-floor dependencies networks: ${typeSummary}${levelSummary}${filterSummary}`}

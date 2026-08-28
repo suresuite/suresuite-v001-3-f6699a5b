@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
-import { PageLayout, PageHeader, ProjectSelector } from '@/components/shared';
+import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import { Toggle } from '@/components/ui/toggle';
 import ProjectDataViewer from '@/components/ProjectDataViewer';
 import ItemMasterEditor from '@/components/ItemMasterEditor';
@@ -707,7 +707,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title="Your Projects"
           subtitle={canModify

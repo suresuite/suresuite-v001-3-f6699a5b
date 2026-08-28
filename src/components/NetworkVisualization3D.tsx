@@ -2,6 +2,20 @@ import React, { useRef, useMemo, useCallback, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Line, Text, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = React.useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  );
+  React.useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return reduced;
+}
 
 interface Node {
   id: string;
@@ -165,11 +179,13 @@ const generateNetworkData = (): NetworkData => {
 };
 
 // === R3F PARTS ===
-const NetworkNode = ({ node, isHovered, onClick }: { node: Node; isHovered: boolean; onClick: () => void; }) => {
+const NetworkNode = ({ node, isHovered, onClick, reducedMotion }: { node: Node; isHovered: boolean; onClick: () => void; reducedMotion: boolean }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   useFrame((state) => {
     if (!meshRef.current) return;
-    meshRef.current.position.y = node.position.y + Math.sin(state.clock.elapsedTime + node.position.x) * 0.05;
+    meshRef.current.position.y = reducedMotion
+      ? node.position.y
+      : node.position.y + Math.sin(state.clock.elapsedTime + node.position.x) * 0.05;
     const targetScale = isHovered ? 1.3 : 1;
     meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
   });
@@ -200,7 +216,7 @@ const NetworkEdge = ({ edge, nodes }: { edge: Edge; nodes: Node[] }) => {
   return <Line points={points} color={color} lineWidth={lineWidth} transparent opacity={opacity} />;
 };
 
-const NetworkScene = () => {
+const NetworkScene = ({ reducedMotion }: { reducedMotion: boolean }) => {
   const [hoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const networkData = useMemo(() => generateNetworkData(), []);
@@ -297,6 +313,7 @@ const NetworkScene = () => {
           node={node}
           isHovered={hoveredNode === node.id || selectedNode === node.id}
           onClick={() => handleNodeClick(node.id)}
+          reducedMotion={reducedMotion}
         />
       ))}
 
@@ -320,12 +337,22 @@ const NetworkScene = () => {
 
 // === WRAPPER ===
 const NetworkVisualization3D = () => {
+  const isMobile = useIsMobile();
+  const reducedMotion = usePrefersReducedMotion();
+  // Widen fov and pull the camera back on mobile so the stack still fits a
+  // narrow, short box; pulling the camera back (rather than rescaling the
+  // scene) keeps relative proportions and label anchors correct.
+  const fov = isMobile ? 64 : 50;
+  const cameraZ = isMobile ? 10.4 : 8.4;
+
   return (
     <div className="relative w-full h-full overflow-hidden">
       <Canvas
         className="!absolute !inset-0"
-        camera={{ position: [-5, 5.8, 8.4], fov: 50 }}
+        camera={{ position: [-5, 5.8, cameraZ], fov }}
         style={{ background: 'transparent' }}
+        dpr={[1, 2]}
+        frameloop={reducedMotion ? 'demand' : 'always'}
         gl={{
           alpha: true,
           antialias: true,
@@ -335,7 +362,7 @@ const NetworkVisualization3D = () => {
           gl.setSize(gl.domElement.clientWidth, gl.domElement.clientHeight, false);
         }}
       >
-        <NetworkScene />
+        <NetworkScene reducedMotion={reducedMotion} />
       </Canvas>
     </div>
   );

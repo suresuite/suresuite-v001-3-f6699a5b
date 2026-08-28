@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, TH, TD, ROW_HOVER, StatusDot, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,7 @@ interface OrgRow { id: string; name: string; slug: string; status: string; creat
 const db = supabase as any;
 
 export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Props) {
+  const isMobile = useIsMobile();
   const { user: actor } = useAuth();
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +66,54 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
       onRefresh={load} refreshLoading={loading}
       actions={<AddOrgDialog actorArgs={actorArgs} onCreated={load} />}
     >
+      {isMobile ? (
+        <div className={`${SURFACE} overflow-hidden`}>
+          {loading ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
+          ) : sorted.length === 0 ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">No organizations yet.</div>
+          ) : (
+            sorted.map((o) => (
+              <div key={o.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{o.name}</span>
+                  <span className="shrink-0"><StatusDot tone={o.status === 'active' ? 'active' : 'error'} label={o.status} /></span>
+                </div>
+                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
+                  {o.slug} · {new Date(o.created_at).toLocaleDateString()}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Members</span>
+                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{o.members}</span>
+                  </span>
+                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Projects</span>
+                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{o.projects}</span>
+                  </span>
+                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Cost MTD</span>
+                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">${o.cost_mtd.toFixed(2)}</span>
+                  </span>
+                </div>
+                <div className="mt-2.5 flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setRenameOrg(o)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setAccessOrg(o)}><ShieldCheck className="mr-2 h-4 w-4" /> Access defaults…</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => toggleStatus(o)}>
+                        {o.status === 'active' ? <><Ban className="mr-2 h-4 w-4" /> Suspend</> : <><Undo2 className="mr-2 h-4 w-4" /> Reactivate</>}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -108,6 +158,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
           </table>
         </div>
       </div>
+      )}
 
       {accessOrg && <OrgAccessDrawer orgId={accessOrg.id} orgName={accessOrg.name} open={!!accessOrg} onClose={() => setAccessOrg(null)} />}
       {renameOrg && <RenameOrgDialog org={renameOrg} actorArgs={actorArgs} onClose={() => setRenameOrg(null)} onDone={load} />}

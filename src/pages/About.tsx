@@ -303,7 +303,14 @@ export default function About() {
       <main className="flex-1">
         {/* Hero */}
         <section className="relative overflow-hidden border-b border-border/60">
-          <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          {/* Desktop's 60px headline leaves the right half of the hero clear, so the
+              lattice sits beside the copy; a 390px frame puts the copy over the whole
+              figure, so it recedes (opacity-50) and tucks into the top-right corner
+              (-top-[2%]) below md. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -top-[2%] overflow-hidden opacity-50 md:top-0 md:opacity-100"
+          >
             <div
               className="absolute inset-0"
               style={{
@@ -313,17 +320,19 @@ export default function About() {
             />
             <HeroLattice />
           </div>
-          <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-24">
+          <div className="relative mx-auto max-w-6xl px-5 pt-12 pb-9 md:px-6 md:pt-20 md:pb-24">
             <span className="inline-flex items-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 py-1.5">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
               <span className={KICKER}>About us</span>
             </span>
 
-            <h1 className="mt-9 max-w-[20ch] text-[clamp(36px,5vw,60px)] font-semibold leading-[1.03] tracking-[-0.022em] text-balance">
+            <h1 className="mt-9 max-w-[20ch] text-[31px] leading-[1.08] tracking-[-0.024em] text-balance font-semibold
+                           md:text-[clamp(36px,5vw,60px)] md:leading-[1.03] md:tracking-[-0.022em]">
               Built inside a research lab,{' '}
               <span className="font-serif font-medium italic">shipped as a product.</span>
             </h1>
-            <p className="mt-7 max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
+            <p className="mt-5 max-w-xl text-[16px] leading-[1.62] text-muted-foreground text-pretty
+                          md:mt-7 md:text-lg md:leading-relaxed">
               SuReSuite is built at the Digital-AI Supply Chain Lab at HWR Berlin — the group
               behind the ripple-effect and supply chain viability research. The same small team
               writes the science, the engine, and the interface.
