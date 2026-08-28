@@ -40,7 +40,11 @@ export default function HeroLattice() {
       const ux = Math.min(Math.max(18, (W - W * 0.64 - 24) / 7.35), (W - pad) / 5.6);
       const uy = ux * 0.5, gap = ux * 1.97;
       const cx = W - pad - ux * 4.35 + W * 0.05;
-      const cy = H * 0.33 - gap + uy;
+      // Clamp the top so the topmost node square (NODE_HALF = 2.2) cannot clip out
+      // of the canvas — a bled edge reads as a hard cut on a filled plane.
+      const NODE_HALF = 2.2;
+      const cyTop = 1.5 + NODE_HALF + ux * 2;
+      const cy = Math.max(cyTop, H * 0.33 - gap + uy);
       const stackR = Math.max(ux * 4, uy * 3 + gap);
       const sway = Math.sin(t / 31) * R * 0.018;
 
