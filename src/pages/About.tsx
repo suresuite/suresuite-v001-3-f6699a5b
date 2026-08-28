@@ -349,7 +349,7 @@ export default function About() {
 
         {/* Key people */}
         <section id="people" className="border-b border-border/60">
-          <div className="mx-auto max-w-6xl px-6 py-24">
+          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
             <div className="max-w-[600px]">
               <span
                 className="inline-flex items-center gap-[7px] whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em]"
@@ -415,7 +415,7 @@ export default function About() {
 
         {/* Contributors */}
         <section className="bg-secondary">
-          <div className="mx-auto max-w-6xl px-6 py-24">
+          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
             <div className="max-w-[600px]">
               <span className={`${KICKER} whitespace-nowrap`}>Contributors</span>
               <h2 className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.022em]">
@@ -427,7 +427,9 @@ export default function About() {
               {CONTRIBUTORS.map((c, n) => (
                 <div
                   key={`${c.group}-${n}`}
-                  className="grid grid-cols-[minmax(104px,150px)_minmax(0,1fr)_minmax(0,max-content)] items-center gap-x-6 gap-y-4 border-b border-border/60 py-5"
+                  className="grid grid-cols-1 gap-x-6 gap-y-1.5 border-b border-border/60 py-5
+                             md:grid-cols-[minmax(104px,150px)_minmax(0,1fr)_minmax(0,max-content)]
+                             md:items-center md:gap-y-4"
                 >
                   <span className={`${KICKER} whitespace-nowrap`}>{c.group}</span>
                   <div>
@@ -438,7 +440,7 @@ export default function About() {
                       {c.body}
                     </span>
                   </div>
-                  <span className="justify-self-end whitespace-nowrap text-[12.5px] text-muted-foreground">
+                  <span className="text-[12.5px] text-muted-foreground md:justify-self-end md:whitespace-nowrap">
                     {c.org}
                   </span>
                 </div>
