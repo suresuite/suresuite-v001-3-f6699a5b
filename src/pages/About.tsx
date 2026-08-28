@@ -272,7 +272,7 @@ export default function About() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top bar — same as Landing */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:h-16 md:px-6">
           <Link to="/" className="flex items-center">
             <img
               src="/logo-mark.png"
@@ -285,20 +285,20 @@ export default function About() {
               className="hidden h-[58px] object-contain md:block"
             />
           </Link>
-          <nav className="flex items-center gap-1 whitespace-nowrap">
-            <Button asChild variant="secondary" size="sm">
+          <nav className="flex items-center gap-1 whitespace-nowrap md:gap-2">
+            <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex">
               <Link to="/about">About</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/#video">Demo</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/help">Docs</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/auth">Log in</Link>
             </Button>
-            <Button asChild size="sm" className="ml-1">
+            <Button asChild size="sm" className="h-11 whitespace-nowrap md:ml-1 md:h-8">
               <Link to="/auth">Get started</Link>
             </Button>
           </nav>
@@ -349,7 +349,7 @@ export default function About() {
 
         {/* Key people */}
         <section id="people" className="border-b border-border/60">
-          <div className="mx-auto max-w-6xl px-6 py-24">
+          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
             <div className="max-w-[600px]">
               <span
                 className="inline-flex items-center gap-[7px] whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em]"
@@ -415,7 +415,7 @@ export default function About() {
 
         {/* Contributors */}
         <section className="bg-secondary">
-          <div className="mx-auto max-w-6xl px-6 py-24">
+          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
             <div className="max-w-[600px]">
               <span className={`${KICKER} whitespace-nowrap`}>Contributors</span>
               <h2 className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.022em]">
@@ -427,7 +427,9 @@ export default function About() {
               {CONTRIBUTORS.map((c, n) => (
                 <div
                   key={`${c.group}-${n}`}
-                  className="grid grid-cols-[minmax(104px,150px)_minmax(0,1fr)_minmax(0,max-content)] items-center gap-x-6 gap-y-4 border-b border-border/60 py-5"
+                  className="grid grid-cols-1 gap-x-6 gap-y-1.5 border-b border-border/60 py-5
+                             md:grid-cols-[minmax(104px,150px)_minmax(0,1fr)_minmax(0,max-content)]
+                             md:items-center md:gap-y-4"
                 >
                   <span className={`${KICKER} whitespace-nowrap`}>{c.group}</span>
                   <div>
@@ -438,7 +440,7 @@ export default function About() {
                       {c.body}
                     </span>
                   </div>
-                  <span className="justify-self-end whitespace-nowrap text-[12.5px] text-muted-foreground">
+                  <span className="text-[12.5px] text-muted-foreground md:justify-self-end md:whitespace-nowrap">
                     {c.org}
                   </span>
                 </div>
@@ -452,7 +454,10 @@ export default function About() {
       <footer className="border-t border-border/60">
         <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} SuReSuite</span>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link to="/#video" className="hover:text-foreground md:hidden">
+              Demo
+            </Link>
             <Link to="/help" className="hover:text-foreground">
               Docs
             </Link>
