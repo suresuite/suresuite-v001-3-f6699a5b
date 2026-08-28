@@ -272,7 +272,7 @@ export default function About() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top bar — same as Landing */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:h-16 md:px-6">
           <Link to="/" className="flex items-center">
             <img
               src="/logo-mark.png"
@@ -285,20 +285,20 @@ export default function About() {
               className="hidden h-[58px] object-contain md:block"
             />
           </Link>
-          <nav className="flex items-center gap-1 whitespace-nowrap">
-            <Button asChild variant="secondary" size="sm">
+          <nav className="flex items-center gap-1 whitespace-nowrap md:gap-2">
+            <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex">
               <Link to="/about">About</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/#video">Demo</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/help">Docs</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/auth">Log in</Link>
             </Button>
-            <Button asChild size="sm" className="ml-1">
+            <Button asChild size="sm" className="h-11 whitespace-nowrap md:ml-1 md:h-8">
               <Link to="/auth">Get started</Link>
             </Button>
           </nav>
@@ -452,7 +452,10 @@ export default function About() {
       <footer className="border-t border-border/60">
         <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} SuReSuite</span>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link to="/#video" className="hover:text-foreground md:hidden">
+              Demo
+            </Link>
             <Link to="/help" className="hover:text-foreground">
               Docs
             </Link>
