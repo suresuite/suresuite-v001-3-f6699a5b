@@ -4,6 +4,8 @@
 
 @layer base {
   :root {
+    color-scheme: only light; /* not just "light" — "only" blocks UA force-darkening */
+
     /* Vercel-inspired color palette */
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
