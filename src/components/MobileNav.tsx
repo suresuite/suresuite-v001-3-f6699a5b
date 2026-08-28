@@ -99,7 +99,7 @@ export function MobileNavDrawer({
     <div className="fixed inset-0 z-[60] flex md:hidden" role="dialog" aria-modal="true">
       <div className="flex w-[300px] flex-col border-r border-border bg-background">
         <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border pl-4 pr-2">
-          <img src="/logo-lockup.png" alt="SuReSuite" className="h-[17px] w-auto object-contain" />
+          <img src="/logo-mark.png" alt="SuReSuite" className="h-[17px] w-auto object-contain" />
           <span className="flex-1" />
           <button
             type="button"

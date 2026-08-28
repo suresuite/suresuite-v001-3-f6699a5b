@@ -275,9 +275,14 @@ export default function About() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link to="/" className="flex items-center">
             <img
+              src="/logo-mark.png"
+              alt="SuReSuite — Supply Chain Resilience Suite"
+              className="h-[19px] w-auto object-contain md:hidden"
+            />
+            <img
               src="/logo-lockup.png"
               alt="SuReSuite — Supply Chain Resilience Suite"
-              className="h-[58px] object-contain"
+              className="hidden h-[58px] object-contain md:block"
             />
           </Link>
           <nav className="flex items-center gap-1 whitespace-nowrap">
