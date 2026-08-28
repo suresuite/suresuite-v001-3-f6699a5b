@@ -10,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, TH, TD, ROW_HOVER, StatusDot, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,7 @@ const db = supabase as any;
 const ROLES = ['user', 'modeler', 'admin', 'super_admin'];
 
 export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { user: actor } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
@@ -106,6 +109,81 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
         </div>
       }
     >
+      {isMobile ? (
+        <div className={cn(SURFACE, 'overflow-hidden')}>
+          {loading ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
+          ) : sorted.length === 0 ? (
+            <div className="px-4 py-14 text-center">
+              <p className="mx-auto max-w-sm text-[13px] text-muted-foreground">
+                {q ? 'No users match these filters.' : 'No users yet.'}
+              </p>
+              {q && (
+                <Button variant="ghost" size="sm" className="mt-2 h-11 md:h-8" onClick={() => setQ('')}>
+                  Clear search
+                </Button>
+              )}
+            </div>
+          ) : (
+            sorted.map((r) => {
+              const active = r.is_active !== false;
+              const budget = r.monthly_budget_usd ?? null;
+              const remaining = budget != null ? budget - Number(r.mtd_cost_usd) : null;
+              return (
+                <div key={r.user_id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/admin/users/${r.user_id}`)}
+                      className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-[#bf2330] underline-offset-2 hover:underline"
+                    >
+                      {r.name || '—'}
+                    </button>
+                    <span className="shrink-0">
+                      <StatusDot tone={active ? 'active' : 'error'} label={active ? 'Active' : 'Suspended'} />
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
+                    {r.email || '—'} · {r.organization || '—'}
+                  </div>
+
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Req MTD</span>
+                      <span className="font-mono text-[11.5px] tabular-nums text-foreground">{Number(r.mtd_requests).toLocaleString()}</span>
+                    </span>
+                    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Cost MTD</span>
+                      <span className="font-mono text-[11.5px] tabular-nums text-foreground">${Number(r.mtd_cost_usd).toFixed(2)}</span>
+                    </span>
+                    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Budget</span>
+                      <span className={cn('font-mono text-[11.5px] tabular-nums', remaining != null && remaining < 0 ? 'text-[#bf2330]' : 'text-foreground')}>
+                        {budget != null ? `$${budget.toFixed(2)}` : '—'}
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <Select value={r.role} onValueChange={(v) => changeRole(r, v)}>
+                      <SelectTrigger className="h-9 w-32 rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <span className="inline-flex items-center gap-1 text-[#a3a3a3]">
+                      <button title="Manage access" className="grid h-11 w-11 place-items-center hover:text-foreground" onClick={() => navigate(`/admin/users/${r.user_id}`)}>
+                        <SlidersHorizontal className="h-[15px] w-[15px]" />
+                      </button>
+                      <button title={active ? 'Suspend' : 'Enable'} className={cn('grid h-11 w-11 place-items-center', active ? 'hover:text-[#bf2330]' : 'hover:text-foreground')} onClick={() => toggleActive(r)}>
+                        {active ? <Ban className="h-[15px] w-[15px]" /> : <Undo2 className="h-[15px] w-[15px]" />}
+                      </button>
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -170,6 +248,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
           </table>
         </div>
       </div>
+      )}
     </AdminLayout>
   );
 }
