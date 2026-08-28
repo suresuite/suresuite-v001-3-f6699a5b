@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, TH, TD, ROW_HOVER, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface AuditRow {
@@ -15,6 +16,7 @@ interface AuditRow {
 const db = supabase as any;
 
 export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,6 +50,31 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
     <AdminLayout
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Audit Log" onRefresh={load} refreshLoading={loading}
     >
+      {isMobile ? (
+        <div className={`${SURFACE} overflow-hidden`}>
+          {loading ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
+          ) : sorted.length === 0 ? (
+            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">No audit entries yet.</div>
+          ) : (
+            sorted.map((r) => (
+              <div key={r.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{r.actor_name || '—'}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{r.action}</span>
+                </div>
+                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
+                  {new Date(r.created_at).toLocaleString()} · {r.target_type}{r.target_id ? `:${r.target_id.slice(0, 8)}` : ''}
+                </div>
+                <div className="mt-2 break-words font-mono text-[10.5px] leading-relaxed text-[#737373]">
+                  <span className="text-[#a3a3a3]">before</span> {r.before ? JSON.stringify(r.before) : '—'}<br />
+                  <span className="text-[#a3a3a3]">after</span> {r.after ? JSON.stringify(r.after) : '—'}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -80,6 +107,7 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
           </table>
         </div>
       </div>
+      )}
     </AdminLayout>
   );
 }

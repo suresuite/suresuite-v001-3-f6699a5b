@@ -238,13 +238,13 @@ function CapMatrix({ rows, isSuper, onSet }: { rows: CapRow[]; isSuper: boolean;
       {rows.map((row) => {
         const locked = ALWAYS_ON.has(row.key);
         return (
-          <div key={row.key} className="flex items-center gap-3 py-2.5">
+          <div key={row.key} className="flex flex-wrap items-center gap-3 py-2.5">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-[13px] font-medium">{row.label}{locked && <Lock className="h-3 w-3 text-muted-foreground" />}</div>
             </div>
             <span className="hidden shrink-0 font-mono text-[10px] text-[#a3a3a3] sm:inline">default {row.role_default ? 'allow' : 'deny'}</span>
             {locked || isSuper ? (
-              <span className="w-[210px] text-right text-[11px] text-muted-foreground">{locked ? 'Always available' : 'Full access'}</span>
+              <span className="w-full text-right text-[11px] text-muted-foreground sm:w-[210px]">{locked ? 'Always available' : 'Full access'}</span>
             ) : (
               <Segmented value={triOf(row.user_override)} options={TRI_OPTS} onChange={(v) => onSet(row, v as Tri)} />
             )}

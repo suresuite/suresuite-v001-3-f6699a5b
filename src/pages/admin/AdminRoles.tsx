@@ -50,7 +50,8 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
     <div>
       <h2 className="mb-2 text-[13px] font-semibold">{title}</h2>
       <div className={`${SURFACE} overflow-hidden`}>
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[480px] border-collapse">
           <thead><tr>
             <th className={`${TH} w-[46%]`}>Capability</th>
             {ROLE_ORDER.map((r) => <th key={r} className={`${TH} text-center`}>{r.replace('_', ' ')}</th>)}
@@ -77,6 +78,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
