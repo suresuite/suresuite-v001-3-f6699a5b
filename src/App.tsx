@@ -48,7 +48,15 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      {/* Light-locked: the product has no dark design. forcedTheme pins the class
+          regardless of the OS setting or a stale localStorage value. The .dark block
+          in index.css is legacy and inert once this is set — do not delete it. */}
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="light"
+        enableSystem={false}
+        forcedTheme="light"
+      >
         <AuthProvider>
           <CapabilitiesProvider>
           <GlobalProjectProvider>
@@ -205,8 +213,8 @@ function App() {
           </GlobalProjectProvider>
           </CapabilitiesProvider>
         </AuthProvider>
+        <Toaster />
       </ThemeProvider>
-      <Toaster />
     </QueryClientProvider>
   );
 }

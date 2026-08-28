@@ -5,12 +5,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Search, Moon, Sun, ChevronRight, ArrowLeft, ArrowRight, X,
+  Search, ChevronRight, ArrowLeft, ArrowRight, X,
   PanelLeftClose, PanelLeftOpen, BookText,
 } from "lucide-react";
 import {
@@ -71,25 +70,6 @@ function useHeadings(ref: React.RefObject<HTMLElement>, dep: string) {
   }, [ref, dep]);
 
   return { headings, activeId };
-}
-
-function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const isDark = mounted && resolvedTheme === "dark";
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8"
-      aria-label="Toggle theme"
-      title="Toggle light / dark"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-    >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </Button>
-  );
 }
 
 function FontSizeControl({
@@ -310,7 +290,6 @@ export default function DocsLayout() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <FontSizeControl step={fontStep} setStep={changeFont} />
-          <ThemeToggle />
         </div>
       </header>
 

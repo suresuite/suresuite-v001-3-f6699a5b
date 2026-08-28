@@ -274,7 +274,7 @@ export default function Landing() {
             />
           </Link>
           <nav className="flex items-center gap-1 md:gap-2">
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="h-11 md:h-8">
               <Link to="/about">About</Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
@@ -733,7 +733,6 @@ export default function Landing() {
         <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 md:px-6 md:py-0 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Link to="/about" className="hover:text-foreground md:hidden">About</Link>
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>
             <Link to="/help" className="hover:text-foreground">Docs</Link>
             <Link to="/auth" className="hover:text-foreground">Sign in</Link>

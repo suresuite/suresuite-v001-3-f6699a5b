@@ -119,8 +119,14 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       {
-        to: "/help",
+        to: "/about",
         icon: Info,
+        label: "About",
+        tooltip: "About",
+      },
+      {
+        to: "/help",
+        icon: HelpCircle,
         label: "About & Help",
         tooltip: "About & Help",
       },
