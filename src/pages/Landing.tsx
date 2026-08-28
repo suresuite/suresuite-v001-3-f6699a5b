@@ -262,12 +262,15 @@ export default function Landing() {
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:px-6">
           <Link to="/" className="flex items-center">
-            {/* logo-mark.png (wordmark crop) doesn't exist yet in public/ — fall back to
-                the full lockup sized where the tagline stays legible. */}
+            <img
+              src="/logo-mark.png"
+              alt="SuReSuite — Supply Chain Resilience Suite"
+              className="h-[19px] w-auto object-contain md:hidden"
+            />
             <img
               src="/logo-lockup.png"
               alt="SuReSuite — Supply Chain Resilience Suite"
-              className="h-9 object-contain md:h-[58px]"
+              className="hidden h-[58px] object-contain md:block"
             />
           </Link>
           <nav className="flex items-center gap-1 md:gap-2">

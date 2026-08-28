@@ -1,5 +1,6 @@
 import React from "react";
 import { X } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 interface FooterProps {
   isCollapsed?: boolean;
@@ -7,6 +8,7 @@ interface FooterProps {
 }
 
 const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }) => {
+  const isMobile = useIsMobile();
   const [dismissed, setDismissed] = React.useState(() => {
     try {
       return localStorage.getItem("ss.footerCredit") === "dismissed";
@@ -26,9 +28,14 @@ const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }
 
   return (
     <footer
-      className={`fixed left-0 right-0 z-30 bottom-14 md:bottom-0 ${
+      className={`fixed left-0 right-0 z-30 md:bottom-0 ${
         dismissed ? "hidden md:block" : ""
       }`}
+      style={
+        isMobile
+          ? { bottom: "calc(3.5rem + env(safe-area-inset-bottom, 0px))" }
+          : undefined
+      }
     >
       <div
         className={`relative text-white pl-3 pr-10 py-2 text-xs text-center transition-all duration-500 md:pr-3
