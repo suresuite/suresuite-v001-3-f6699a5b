@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ApiCodeBlock, InlineCode, TableBlock } from '@/components/shared';
+import { ApiCodeBlock, InlineCode, TableBlock, PAGE_GUTTER } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -483,7 +483,7 @@ print(r["aggregate_kpis"], len(reps))`;
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader
           title="Developer API"
           subtitle="Drive SureSuite programmatically — API keys, scopes, and quickstarts for the /v1 gateway"

@@ -38,7 +38,9 @@ interface NavbarProps {
 }
 
 
-const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
+export type NavSection = { title?: string; items: NavItemConfig[] };
+
+export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { to: "/app", icon: Home, label: "Getting Started", tooltip: "Getting Started" },
@@ -126,18 +128,25 @@ const NAV_SECTIONS: { title?: string; items: NavItemConfig[] }[] = [
   },
 ];
 
+export function filterVisibleSections(
+  sections: NavSection[],
+  canAccessPage: (to: string) => boolean
+): NavSection[] {
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccessPage(item.to)),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
 const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
   const { user, logout } = useAuth();
   const { canAccessPage } = useCapabilities();
 
   const handleLogout = () => logout();
 
-  const visibleSections = NAV_SECTIONS
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => canAccessPage(item.to)),
-    }))
-    .filter((section) => section.items.length > 0);
+  const visibleSections = filterVisibleSections(NAV_SECTIONS, canAccessPage);
 
   const sizes = {
     collapsedW: "w-14",

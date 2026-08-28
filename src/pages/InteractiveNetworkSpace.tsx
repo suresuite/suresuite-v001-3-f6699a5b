@@ -36,7 +36,7 @@ import {
   HelpCircle,
   Target,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector } from '@/components/shared';
+import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 
 const NODE_TYPE_COLORS: Record<string, string> = {
   supplier: '#2563eb',   // Blue - suppliers (leftmost)
@@ -825,7 +825,7 @@ Result: We return the induced subgraph (nodes + edges) matching your filters, la
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader 
           title="Interactive Network Space" 
           subtitle="Advanced network exploration with intelligent search and subgraph extraction"

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PAGE_GUTTER } from '@/components/shared/PageBody';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -136,7 +137,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="px-12 py-6">
+      <div className={PAGE_GUTTER}>
         <PageHeader title="My Profile" subtitle="Manage your account, contact info, and password." />
 
 
