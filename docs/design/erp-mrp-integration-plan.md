@@ -1,0 +1,93 @@
+# SureSuite ↔ External MRP/ERP Integration — Plan
+
+| | |
+|---|---|
+| **Status** | Draft v0.1 — proposal, not yet adopted |
+| **Date** | 2026-08-29 |
+| **Altitude** | Data ingestion architecture: replacing manual Excel upload with a governed, credentialed pull/push connection to an external MRP/ERP system |
+| **Authority** | Governed by `docs/design/next-gen-platform-design.md`. Proposes a **new gap (G18)** — see §7 for the blueprint edit to apply on adoption. Builds on `docs/design/public-api-and-access-control.md` (G15) for the credential/authz machinery, and on `docs/data-simulation-mapping.md` for the data contract the import must fill. |
+| **Non-goals** | Naming a specific vendor/product to integrate with, finished code, SQL DDL, dated schedule |
+
+---
+
+## 1. Problem
+
+Today, `materials` / `products` / `suppliers` / `inbound_logistics` / `outbound_logistics` / `bom_*` are populated by uploading spreadsheets through `/project-manager` (`src/pages/DataManager.tsx`). That path is manual, has no source-system identity, and cannot refresh on a schedule. The request is to replace (or supplement) the spreadsheet path with a **direct connection to an external MRP/ERP system** (SAP, Oracle, NetSuite, Odoo, Fishbowl, an in-house system, etc.) so item masters, BOM/routing, and logistics data flow in automatically.
+
+This is a data-governance problem before it is a data-plumbing problem: the moment SureSuite pulls from a live ERP, it inherits that system's trust boundary — wrong scope, a leaked credential, or a bad field mapping can corrupt planning data or leak the customer's production data.
+
+## 2. Design principles (extends the blueprint, doesn't replace it)
+
+1. **The import is a new *source*, not a new *pipeline*.** It must land in the same tables, through the same `ensure_item_masters()` reconciliation and the same `MappingWarning` mechanism that spreadsheet upload already uses (`docs/data-simulation-mapping.md` §1–§2). Two ingestion paths writing divergent shapes into `ProjectData` is exactly the "two code paths disagreed" failure the mapping doc was written to kill — do not reintroduce it.
+2. **Every field that lands must be attributable**: which external system, which external record ID, when fetched, by which credential. Add `source_system`, `external_id`, `synced_at` provenance columns (or a side `external_source_links` table) rather than overwriting masters silently — mirrors the `dataset_version` provenance pattern already adopted in G15 §8.4.
+3. **Read-only first.** SureSuite should default to *pulling* from the ERP (items, BOM, routings, supplier terms, lead times). Writing simulation-derived decisions *back* to the ERP (e.g., recommended reorder points) is a separate, later, explicitly-scoped capability — don't couple the two in v1.
+4. **Credentials never live in application code or the frontend.** Use the same secret-storage discipline the platform already applies to its own API keys (G15 §5–§6: hashed/opaque tokens, scoped, rotatable, revocable, audit-logged) — extended to *outbound* credentials (the ERP's API key/OAuth token), stored server-side (Supabase Edge Function secrets / Vault), never exposed to the browser.
+5. **Least privilege on both sides.** Request read-only, item-master-scoped API access from the ERP (not a full admin/integration user). On the SureSuite side, gate which projects/orgs a given ERP connection may write into — identical tenancy model to `organizations`/`organization_members`.
+6. **Human-in-the-loop for the first sync.** The first import from any newly connected ERP should land in a staging/preview state (diff against current masters) before it overwrites live project data — same "trust but verify" posture this session's own operating rules apply to external content.
+
+## 3. Target architecture
+
+```
+External MRP/ERP  ──(read-only API/OAuth, scoped credential)──►  connector (Supabase Edge Function)
+                                                                        │
+                                                                        ├─► staging tables (raw external shape + provenance)
+                                                                        │
+                                                                        ├─► field-mapping layer (per-ERP adapter → ProjectData shape,
+                                                                        │     reusing datamap.py's normalization: units→weeks, price
+                                                                        │     fallback rules from docs/data-simulation-mapping.md)
+                                                                        │
+                                                                        └─► materials / products / suppliers / inbound_logistics /
+                                                                              outbound_logistics / bom_* (same tables Excel upload writes)
+```
+
+- **Connector** = one Edge Function per ERP family (or one generic function + per-vendor adapter config), following the existing `supabase/functions/*` pattern — not a new runtime.
+- **Adapter** = a small, pure mapping module (vendor field names → SureSuite's canonical schema), analogous to `sim-worker/sim_worker/datamap.py` but for *inbound* ERP data instead of the simulation `ProjectData`.
+- **Scheduling** = a periodic sync (cron-triggered Edge Function invocation) or webhook-driven, per ERP capability; either way every sync run is logged (what changed, from which credential, at what time) using the same audit pattern as `admin_audit_logs`.
+- **Conflict/diff surface** = reuse the review pattern of `/project-manager`'s existing upload preview, extended to show "changed since last sync" rather than "new upload."
+
+## 4. Data governance & access-control checklist
+
+Before connecting to any real external system, confirm:
+
+- [ ] **Legal/contractual basis** — does the org have the right to extract this data from the ERP (contract terms, data-processing agreement, IP ownership of BOM/pricing data)?
+- [ ] **Least-privilege credential** — a scoped, read-only, revocable API key/OAuth client created specifically for this integration (not a shared admin login).
+- [ ] **Data classification** — item cost/pricing and supplier terms are commercially sensitive; treat at the same sensitivity tier as the platform's own pricing data; restrict which SureSuite roles can view raw synced values vs. derived simulation outputs.
+- [ ] **PII check** — MRP/ERP exports occasionally carry named contacts (supplier reps, planner names) in free-text fields; strip or mask fields not needed for simulation.
+- [ ] **Storage location & residency** — confirm the target Supabase project's region satisfies any data-residency terms the ERP's data owner requires.
+- [ ] **Retention & deletion** — define how long staged/raw external records are kept, and an on-request purge path (org offboarding, credential revocation).
+- [ ] **Credential lifecycle** — rotation schedule, revocation on offboarding, no credential embedded in exported notebooks or client bundles (same rule G15 §10 sets for SureSuite's own API keys).
+- [ ] **Audit trail** — every sync logged with source, credential id, record counts, and diff summary; surfaced to org admins.
+- [ ] **Rate/quota respect** — the connector must respect the ERP's own rate limits (avoid being throttled/banned by the source system) — mirrors the quota discipline G15 already built for SureSuite's *own* API.
+- [ ] **Fallback safety** — if a sync fails partway, never leave `materials`/`products` in a half-written state; stage-then-swap, matching the "worker = sole writer, idempotent by run_id" discipline already used for simulation results.
+
+## 5. Phased rollout
+
+| Phase | Scope | Exit criteria |
+|---|---|---|
+| **0 — Discovery** | Identify the target ERP/MRP product(s), confirm what API/export surface it actually offers (REST API, OData, flat-file SFTP drop, or none), and what access the organization can legally/technically obtain. Use the Claude Code prompt in §6 to research the target system's own repository/API docs if it is open-source or has a public SDK/GitHub. | A one-page findings doc: available integration surface, auth method, rate limits, data shape for items/BOM/logistics |
+| **1 — Read-only single-connector pilot** | Build one adapter for the confirmed target system; land data in staging tables; manual review-and-approve before it reaches `materials`/`products`/etc. | A design partner org can review a diff and approve a sync into a real project |
+| **2 — Scheduled sync + audit** | Cron/webhook-triggered syncs, audit log, alerting on failures or large diffs | Syncs run unattended; anomalous diffs (e.g. >X% of items changed) block auto-apply and require review |
+| **3 — Multi-ERP adapters** | Generalize the adapter interface once ≥2 real ERPs are connected | Adding a third ERP = one adapter file, no changes to staging/governance layer (same "one plugin file" property the policy registry already guarantees — §1 pillar 1 of the blueprint) |
+| **4 (later, separate approval)** | Write-back of simulation-derived recommendations into the ERP | Explicit scope, explicit approval — not assumed by this plan |
+
+## 6. Next step: research prompt for the target ERP/MRP system
+
+Use this prompt (with a Claude session that has GitHub access, via `add_repo` or the GitHub MCP tools) once the target system is identified and its repository is known or discoverable. It is written to be pasted as-is, with the bracketed placeholders filled in.
+
+> I want to integrate SureSuite (a supply-chain simulation platform) with **[ERP/MRP system name]** so item master, BOM, and logistics data can be imported automatically instead of via Excel upload. Please investigate that system's GitHub repository — **[owner/repo, or "search for it if not given"]** — and its public docs, and report back on:
+>
+> 1. **Integration surface**: does it expose a REST/GraphQL API, an OData feed, a webhook system, a file-drop/SFTP export, or none of the above? Link the specific docs/source files that define it.
+> 2. **Authentication**: what auth methods does it support for external API clients (API key, OAuth2 client-credentials, per-user token)? Can a read-only, least-privilege scope be created, or is access all-or-nothing?
+> 3. **Rate limits and quotas**: any documented or code-visible rate limiting on its API.
+> 4. **Data shapes relevant to us**: how does it model items/materials, bill of materials (BOM), suppliers, purchase/sales orders, and lead times? Note field names and units (this will map to SureSuite's canonical schema described in `docs/data-simulation-mapping.md`).
+> 5. **Change/delta detection**: does it support incremental sync (updated-since timestamps, webhooks, change-data-capture) or only full exports?
+> 6. **Licensing/ToS constraints**: is programmatic API access permitted under its license/terms for a third-party integration like this? Flag anything requiring a paid partner agreement.
+> 7. **Known integration examples**: does the repo or its ecosystem already have connectors/SDKs (Python/JS/Node) we could reuse instead of writing a raw HTTP client?
+>
+> Do not write integration code yet — this is a research and feasibility pass. Summarize findings and flag any blockers (auth model that can't be scoped read-only, no incremental sync, restrictive licensing) before we design the SureSuite-side connector.
+
+## 7. Blueprint edit on adoption
+
+If this plan is adopted, add to `docs/design/next-gen-platform-design.md` §2.3 Gap catalog:
+
+> **G18** | **No inbound ERP/MRP data connector.** Item masters, BOM, and logistics data can only be entered via manual Excel upload (`/project-manager`); no path exists for a live external ERP to feed `materials`/`products`/`inbound_logistics`/`outbound_logistics` directly, and no governance layer exists for external-system credentials. | `src/pages/DataManager.tsx` (upload-only), no `external_source_links`/staging tables | Organizations with an existing ERP must re-key data by hand and cannot keep SureSuite's masters in sync; `docs/design/erp-mrp-integration-plan.md` defines the fix (staged connector, provenance columns, credential governance modeled on G15) |
