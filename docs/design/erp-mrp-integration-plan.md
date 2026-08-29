@@ -189,6 +189,29 @@ Nothing downstream changes shape — that's the point of §2 principle 1. Synced
 - **Freshness becomes a first-class run input**: because synced data carries `synced_at` provenance, the Run & Validate stage can show *"Item masters last synced from orbit-mrp: 3 days ago"* next to the existing validation-status surface (G13/G14a's trust-surface work) — turning "is this data current" into a visible, not assumed, fact before a decision run.
 - **Recurring syncs turn one-off simulations into a monitored baseline**: with a scheduled sync (§5 Phase 2), a planner can compare this month's MRP-driven `materials`/`products` snapshot against last month's simulation results without re-uploading anything — the natural next question ("did the ERP's actual lead times drift from what we simulated?") becomes answerable from data already in the same tables, not a separate export/import cycle.
 
+### 6c.1 Connection & mapping health — a status the user can actually check
+
+"Is it connected" and "did the data map correctly" are two different questions and both need a visible, unambiguous answer — not an inference from silence. Two status surfaces, both reusing components that already exist in the codebase rather than inventing a new status language:
+
+**A. Connection status — on the link card itself (§6c step 1).** Every `project_erp_links` card shows a live status, not just "linked at creation":
+
+| State | Shown as | Meaning |
+|---|---|---|
+| 🟢 Connected | green dot + "Connected · verified 2 min ago" | last live re-check (§6b rule 3) succeeded on both sides |
+| 🟡 Needs attention | amber dot + "Token expiring soon" / "Re-authorize" | token nearing expiry, or a scope changed upstream |
+| 🔴 Disconnected | red dot + "Access revoked in orbit-mrp — reconnect" | the §6b live re-check failed (membership pulled, token revoked); sync is paused, no silent retry loop |
+
+This is the same active/revoked status-dot pattern `DeveloperApi.tsx` already renders for API keys (`k.status === 'revoked'` → red dot + label) — reused here for connector links instead of keys, so it costs a new data source, not a new component.
+
+**B. Mapping status — a "Sync mapping report" on every sync, modeled directly on the engine's existing `MappingWarningsCard`.** That component already answers exactly this question for simulation runs: it shows a green "fully specified — no fallbacks" badge when a run's `mapping_warnings` array is empty, or amber/gray badges counting `defaulted` vs. `derived` values, expandable into a per-field list. A **Sync Mapping Report** card on each sync's result reuses the identical shape:
+
+- 🟢 **"All fields mapped"** — every field the connector expected from orbit-mrp's schema (product type, MOQ, lead time, unit cost, BOM lines, …) was present and landed in its target column; zero fallbacks.
+- 🟡 **"N fields defaulted"** — expandable list, one row per field: *"`safety_stock_days` — not provided by orbit-mrp for 12 materials — defaulted to project default"* — the same sentence shape `MappingWarning`s already use in the simulation report, so a user who has seen that card once already knows how to read this one.
+- 🔴 **"N fields failed to map"** — a hard mismatch (e.g. orbit-mrp returned a `unit_of_measure` SureSuite's schema can't normalize) that blocked that field from landing at all; these must be resolved (schema fix or manual override) before the row is trusted, and are called out separately from "defaulted" because a default is a known, intentional fallback while a failure is a data-quality bug in the connector or the mapping.
+- Per-sync **row counts**: "1,007 products synced · 25 BOM versions · 1,014 BOM lines · 0 failed to map · 12 defaulted" — the same "row counts match" verification `docs/self-hosting.md`'s own migration procedure already uses as its ground truth, surfaced in-product instead of a manual `psql` count.
+
+**Where both appear together**: the connections list (§6c step 5) shows the connection-status dot per row; clicking a row opens that link's sync history, each entry carrying its own Sync Mapping Report — so "is it connected" and "did the last sync map cleanly" are always answerable within two clicks, and a 🟡/🔴 on either surface is exactly the trigger for the human review step in §5 Phase 1/2, not something a user has to notice by comparing row counts themselves.
+
 ### One consequence worth flagging in the UI copy itself
 
 Because both **upload** and **sync** write the same tables, whichever ran *last* wins on a shared field — the UI must say so plainly (e.g. "Applying this sync will overwrite `moq` for 40 materials last edited by manual upload on <date>") rather than let a planner discover it only in a diff after the fact. This is a direct consequence of §2's "coexist, don't replace" decision and needs its own confirmation step in the wizard, not just a silent overwrite.
