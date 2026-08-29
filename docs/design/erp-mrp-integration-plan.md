@@ -89,6 +89,29 @@ Use this prompt (with a Claude session that has GitHub access, via `add_repo` or
 >
 > Do not write integration code yet — this is a research and feasibility pass. Summarize findings and flag any blockers (auth model that can't be scoped read-only, no incremental sync, restrictive licensing) before we design the SureSuite-side connector.
 
+## 6a. Phase 0 findings — `suresuite/orbit-mrp` ("virtual-mrp")
+
+Investigated directly (repo cloned read-only, same `suresuite` GitHub org). This is a Lovable-built React/Vite app ("virtual-mrp") on its own Supabase project — an MRP tool, not a third-party vendor product — which makes this integration materially easier than a generic external ERP.
+
+1. **Integration surface — MCP over HTTP, plus plain REST fallback.** The app *is* an MCP server (`docs/agent-access.md`): one endpoint at `https://<app>/mcp`. It also exposes the same tools as plain HTTP routes (`/.mcp/list-tools`, `/.mcp/invoke-tool/<tool>`) for scripting — no separate API to design against.
+2. **Authentication — OAuth 2.1, no static API keys.** Its own Supabase project acts as the OAuth 2.1 authorization server (dynamic client registration; discovery via `/.well-known/oauth-protected-resource`). A connecting client authenticates as a real app user and inherits that user's company scope and role — **RLS applies to agent calls exactly as it does to the UI**, so read-only, least-privilege access is achieved by connecting as a user whose role is read-only, not by a separate credential tier.
+3. **Rate limits** — none documented in the repo; whatever Supabase-project-level limits apply.
+4. **Data shapes relevant to us** — confirmed against `migration/00*.sql` and `docs/agent-access.md`:
+   - `products` (id, company_id, name, sku, **type**: `finished_good`/`subassembly`/`raw_material`, unit_of_measure, lead_time_days, moq, unit_cost, supplier_name/number/country, cycle_time_seconds) — maps directly to SureSuite's `materials`/`products`/`suppliers`.
+   - `bom_versions` + `bom_lines` (component_product_id, quantity_per_unit, scrap_factor) — a versioned, active-flagged BOM, multi-level via component chaining — maps to `bom_single_level`/`bom_multi_level`.
+   - `machines`, `processes`, `production_paths`, `operations` — routing/capacity detail SureSuite's schema doesn't yet fully consume (relevant to `inbound_logistics`/plant capacity policies, not a 1:1 field match — needs its own mapping work in Phase 1).
+   - `demand_plan`, `mps_plan`, `mrp_plan`, `purchase_orders`, `production_orders`, `inventory_transactions` — MRP *outputs*, useful context but not inputs SureSuite's simulation needs; out of scope for a v1 read.
+5. **Change/delta detection** — no explicit updated-since filter documented on `list_products`/`get_bom`; `list_snapshots` exposes monthly rolling snapshots with status, which is the natural cursor for "what changed" at the planning-run level. Full-list-and-diff is the safe default until confirmed otherwise.
+6. **Licensing/ToS** — none; this is a sibling `suresuite`-org repo, not a third-party product, so there is no external ToS constraint. Access is an internal authorization decision (who gets a read-only role in that Supabase project), not a legal one.
+7. **Existing SDKs** — `@lovable.dev/mcp-js` is already a dependency; any generic MCP client (including Claude Code itself, via `claude mcp add --transport http`) works without a bespoke HTTP client.
+
+**Blockers/flags found, not architecture — must be resolved before any live connection:**
+- **`.env` is committed to the repository** with the Supabase project ref, URL, and publishable key. The publishable/anon key is designed to be public (client-side), but a committed `.env` is still bad practice (rotates awkwardly, encourages committing the service-role key by habit later) — flag to the orbit-mrp maintainers to `.gitignore` it and rely on `.env.example`.
+- **`migration/*.sql` contains what looks like a real customer data dump** ("Imported from TRONICO" — real supplier names, part numbers, unit costs). That data must **not** be pulled into a SureSuite dev/staging project as sample data without confirming it's authorized test data or already anonymized — treat it as production-sensitive per §4's data-classification checkbox.
+- No `LICENSE` file — expected for an internal sibling repo, but confirms there's no external redistribution question to resolve.
+
+**Net read:** connecting to `orbit-mrp` is a same-org OAuth/MCP integration, not a generic third-party ERP integration — Phase 1 (single read-only connector pilot) can likely skip building a bespoke adapter and instead have the SureSuite-side connector (Edge Function) act as an **MCP client** calling `list_products`/`get_bom`/`get_purchase_orders`, authenticated as a dedicated read-only orbit-mrp user created for this integration.
+
 ## 7. Blueprint edit on adoption
 
 If this plan is adopted, add to `docs/design/next-gen-platform-design.md` §2.3 Gap catalog:
