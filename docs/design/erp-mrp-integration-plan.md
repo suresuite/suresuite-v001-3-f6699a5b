@@ -112,6 +112,56 @@ Investigated directly (repo cloned read-only, same `suresuite` GitHub org). This
 
 **Net read:** connecting to `orbit-mrp` is a same-org OAuth/MCP integration, not a generic third-party ERP integration — Phase 1 (single read-only connector pilot) can likely skip building a bespoke adapter and instead have the SureSuite-side connector (Edge Function) act as an **MCP client** calling `list_products`/`get_bom`/`get_purchase_orders`, authenticated as a dedicated read-only orbit-mrp user created for this integration.
 
+## 6b. Cross-platform identity and project-scoping — how a dual-access user is prevented from causing a leak
+
+This is the sharpest risk in the whole plan: once one person holds an account on **both** SureSuite and orbit-mrp, the connector must not become a bridge that gives them (or, via a bug, someone else) more than the *intersection* of what each platform already lets them see. Both systems' actual RLS models are relevant here:
+
+- **SureSuite**: `projects` are org-scoped and RLS-gated by `owner`/`admin`/`plant access` (`supabase/migrations/20250820145017_*.sql` — "Projects: selectable by owner, admin, or plant access"); a project's `organization` is stamped server-side at creation (G16).
+- **orbit-mrp**: every table is gated by `is_member(company_id)` / `has_company_role(company_id, roles)` off a `memberships(user_id, company_id, role)` table (`migration/01_schema.sql`). There is no cross-company visibility at all — a user only ever sees companies they're a member of.
+
+Neither platform knows the other's authorization model exists. The connector is the only place that can accidentally union them. Four rules close that:
+
+**1. Delegated auth only — never a shared/admin credential.** The connector must authenticate to orbit-mrp as the *individual user* performing the link (via the OAuth 2.1 flow orbit-mrp's `docs/agent-access.md` already implements), not as one shared service account. This means the actual boundary enforced is **orbit-mrp's own RLS**, evaluated as that user — the connector inherits it rather than re-implementing it. A shared service-role credential would see every company in orbit-mrp regardless of who's driving the sync; that is the single mistake that turns this into a leak vector, so it must be architecturally impossible, not just discouraged.
+
+**2. A link is a two-sided, explicit grant — never an inference from "same email."** Add a `project_erp_links` table (SureSuite side):
+
+```
+project_erp_links(
+  project_id        -> projects.id,
+  external_system    text,               -- 'orbit-mrp'
+  external_company_id text,              -- orbit-mrp company_id
+  linked_by_user_id  -> auth.users.id,   -- the human who authorized this
+  external_oauth_token_ref text,         -- pointer into Vault/secrets, never the raw token in a table
+  created_at, revoked_at
+)
+```
+
+Creating a row requires, checked live at link time (not cached):
+- the acting user has **owner/admin on the target SureSuite project** (same check `projects` RLS already applies), **and**
+- the OAuth consent screen the user just completed on orbit-mrp proves they are a **member of that specific `external_company_id`** — orbit-mrp's own `list_companies` tool returning that company *is* the proof; the connector never accepts a company id the user's token can't itself list.
+
+A user who is an admin on SureSuite Project A but only a member of orbit-mrp Company Z can link A↔Z. They cannot link A to any company their token doesn't return from `list_companies` — there is no path to specify an arbitrary `external_company_id` by hand.
+
+**3. Every sync re-checks both sides, live, not just at link time.** Membership on either side can be revoked after a link exists (someone leaves the company, loses plant access, is offboarded). Before each sync runs:
+- re-verify the linking user still has project access on SureSuite (or the connector falls back to any other current linker with valid access — never "keep syncing on stale grant"),
+- re-verify the stored OAuth token still authorizes that `external_company_id` (a 403/empty `list_companies` result revokes the link automatically and logs it).
+
+Fail closed: a sync that can't re-verify both sides skips and flags, it never runs with the old assumption.
+
+**4. One link, one token, one project — no token reuse across projects or orgs.** If the same person links orbit-mrp Company Z into two different SureSuite projects (even in two different orgs they belong to), each `project_erp_links` row gets its **own** token reference and is revocable independently. This bounds the blast radius of a compromised project (revoking its link cannot be bypassed by a sibling project silently sharing the same stored credential) and makes the audit trail per-project rather than per-user.
+
+**Data classification adds one more constraint**: staged rows carry `external_company_id` provenance (§2 principle 2); the merge step into `materials`/`products`/etc. must assert the target project's `project_erp_links` row for that exact company still exists and is unrevoked immediately before writing — not just at the start of the sync job — closing the window where a mid-sync revocation could still land data.
+
+**Worked failure cases this design must pass:**
+
+| Scenario | Required outcome |
+|---|---|
+| User is SureSuite admin on Project A, but not a member of orbit-mrp Company Z | Cannot create the A↔Z link — orbit-mrp's own OAuth consent never lets them prove membership they don't have |
+| User was the linker for A↔Z, later removed from Company Z in orbit-mrp | Next sync's live re-check fails; link auto-revoked; project A gets no further data, existing rows keep their old provenance, admins are notified |
+| User loses admin/owner on Project A in SureSuite, but is still an orbit-mrp Company Z member | Next sync's SureSuite-side re-check fails the same way — losing rights on either side breaks the sync |
+| Two different orgs' projects are both linked (by two different, legitimately-authorized users) to the same orbit-mrp company | Each link has its own token and audit trail; neither project's sync can see the other project's link or its data, only its own staged rows |
+| The Edge Function itself is compromised or misconfigured | Worst case is bounded to the tokens it holds, each already scoped to one company by orbit-mrp's own RLS — never a platform-wide credential that turns a connector bug into a cross-tenant leak |
+
 ## 7. Blueprint edit on adoption
 
 If this plan is adopted, add to `docs/design/next-gen-platform-design.md` §2.3 Gap catalog:
