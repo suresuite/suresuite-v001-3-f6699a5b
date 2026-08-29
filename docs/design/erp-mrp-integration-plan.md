@@ -162,6 +162,37 @@ Fail closed: a sync that can't re-verify both sides skips and flags, it never ru
 | Two different orgs' projects are both linked (by two different, legitimately-authorized users) to the same orbit-mrp company | Each link has its own token and audit trail; neither project's sync can see the other project's link or its data, only its own staged rows |
 | The Edge Function itself is compromised or misconfigured | Worst case is bounded to the tokens it holds, each already scoped to one company by orbit-mrp's own RLS — never a platform-wide credential that turns a connector bug into a cross-tenant leak |
 
+## 6c. UX/UI across both systems, and how the synced data reaches analysis
+
+Three surfaces, one per side plus one for the merged result. Each reuses an existing pattern rather than inventing a new one, per §2 principle 1.
+
+### orbit-mrp side — nothing new to build
+
+The connection is authorized entirely from orbit-mrp's existing **Settings → Agent access** page (`docs/agent-access.md`), which already shows the `/mcp` URL and drives the OAuth consent screen. From a user's point of view: they start the "Connect to SureSuite" action from the *SureSuite* side (below); orbit-mrp just shows them its normal sign-in + consent screen ("SureSuite is requesting access to `<company name>` as `<role>`. Approve / Deny"), scoped to the one company they picked. Nothing changes in orbit-mrp's UI beyond what OAuth-authorizing any MCP client already does — no orbit-mrp-side settings screen has to be built for this.
+
+### SureSuite side — a per-project panel, next to the existing Upload Wizard
+
+`/project-manager` (`src/pages/DataManager.tsx`) already expands each `ProjectCard` into an upload/data-review area driven by `UploadWizard`. Add one more entry point in the same expanded-card region: a **"Connect a data source"** action sitting beside "Upload spreadsheet" — same visual weight, not a replacement (§2.0). Flow:
+
+1. **Connect** — click "Connect a data source" → pick orbit-mrp (only option today, others as G18's Phase 3 generalizes) → redirected through the OAuth consent screen above → back in SureSuite, the company they approved appears as a card: *"Linked to orbit-mrp · TRONICO Electronics · linked by you, 2 min ago"*, with a **Revoke** button. This is the UI for creating one `project_erp_links` row (§6b); the "which companies can I even pick" list is never typed by hand, it's populated from what the OAuth flow just proved the user can see.
+2. **Preview/diff before anything touches live data** — reuses `UploadWizard`'s existing preview-before-commit pattern (it already renders a preview table before an Excel upload is applied). A synced pull renders the same shape of table, plus a **change column**: new / changed / unchanged / removed-upstream, computed against current `materials`/`products`/`bom_*`. First sync ever for a link: everything shows as "new," full manual review required (§2.6). Later syncs: only the diff needs a look.
+3. **Approve → merge**, or **schedule** — a human clicks "Apply sync" the same way they click "Import" at the end of the upload wizard today; or toggles "Auto-apply small changes" (a diff under an admin-configured threshold, e.g. <2% of rows) once trust is established, matching §5 Phase 2's anomaly-gating rule.
+4. **Provenance surfaces wherever the data is used** — `ItemMasterEditor` (already the per-field editor for materials/products/suppliers) gets a small badge per synced field: *"from orbit-mrp · synced 3h ago"* vs. blank for manually entered/uploaded fields — the same visual signal `dataset_version` provenance already uses elsewhere in the app (G15 §8.4 pattern), just applied per-source instead of per-version.
+5. **A connections list, org-wide** — mirrors the existing `/developer` page (`DeveloperApi.tsx`, built for API keys under G15): a tab or sibling page listing every active `project_erp_links` row across the org's projects, who linked each one, last sync time/result, and a Revoke action — the same "keys" table pattern (`status: active/revoked`, a colored status dot) that page already renders for API keys, reused for connector links instead of keys.
+
+### How the data is actually used for analysis once it lands
+
+Nothing downstream changes shape — that's the point of §2 principle 1. Synced rows land in the exact same tables Excel upload writes (`materials`, `products`, `suppliers`, `inbound_logistics`, `outbound_logistics`, `bom_single_level`/`bom_multi_level`), so every existing consumer picks them up with zero new code:
+
+- **`/policies`** reads the same item masters to populate policy forms (MOQ, lead time, safety-stock inputs) — a synced `moq`/`lead_time_days` from orbit-mrp shows up exactly where an uploaded one would.
+- **`/simulation-lab`**'s Run & Validate stage runs scsim against `ProjectData` built from these tables via `datamap.py` — unchanged; a run doesn't know or care whether an item's cost came from a spreadsheet or a sync, only that `MappingWarning`s are recorded the same way (§2.1).
+- **Freshness becomes a first-class run input**: because synced data carries `synced_at` provenance, the Run & Validate stage can show *"Item masters last synced from orbit-mrp: 3 days ago"* next to the existing validation-status surface (G13/G14a's trust-surface work) — turning "is this data current" into a visible, not assumed, fact before a decision run.
+- **Recurring syncs turn one-off simulations into a monitored baseline**: with a scheduled sync (§5 Phase 2), a planner can compare this month's MRP-driven `materials`/`products` snapshot against last month's simulation results without re-uploading anything — the natural next question ("did the ERP's actual lead times drift from what we simulated?") becomes answerable from data already in the same tables, not a separate export/import cycle.
+
+### One consequence worth flagging in the UI copy itself
+
+Because both **upload** and **sync** write the same tables, whichever ran *last* wins on a shared field — the UI must say so plainly (e.g. "Applying this sync will overwrite `moq` for 40 materials last edited by manual upload on <date>") rather than let a planner discover it only in a diff after the fact. This is a direct consequence of §2's "coexist, don't replace" decision and needs its own confirmation step in the wizard, not just a silent overwrite.
+
 ## 7. Blueprint edit on adoption
 
 If this plan is adopted, add to `docs/design/next-gen-platform-design.md` §2.3 Gap catalog:
