@@ -12,6 +12,7 @@ import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 
 // Import pages
 import Auth from './pages/Auth';
+import OrbitMrpCallback from './pages/OrbitMrpCallback';
 import DataManager from './pages/DataManager';
 import ProductLevelNetwork from './pages/ProductLevelNetwork';
 import ProcessLevelNetwork from './pages/ProcessLevelNetwork';
@@ -64,6 +65,7 @@ function App() {
               <RouteErrorBoundary>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/integrations/orbit-mrp/callback" element={<ProtectedRoute><OrbitMrpCallback /></ProtectedRoute>} />
               <Route path="/forbidden" element={<Forbidden />} />
                 <Route path="/" element={<Landing />} />
                 <Route

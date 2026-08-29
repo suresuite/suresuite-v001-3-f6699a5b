@@ -24,6 +24,7 @@ import ItemMasterEditor from '@/components/ItemMasterEditor';
 import { getDefaultSimulationDateRange, formatDateForDatabase } from '@/utils/dateHelpers';
 import UploadWizard from '@/components/UploadWizard';
 import { ProjectCard } from '@/components/ProjectCard';
+import { ErpConnectionsPanel } from '@/components/erp/ErpConnectionsPanel';
 
 interface Project {
   id: string;
@@ -949,7 +950,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                   />
 
                   {expandedProjectId === project.id && (
-                    <div className="mt-4 ml-4 pl-4 border-l-2 border-border">
+                    <div className="mt-4 ml-4 pl-4 border-l-2 border-border space-y-4">
                        <ProjectDataViewer
                          project={project}
                          onClose={() => setExpandedProjectId(null)}
@@ -959,6 +960,9 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                            });
                          }}
                        />
+                       {/* Complementary to the Upload Wizard above, never a replacement —
+                           docs/design/erp-mrp-integration-plan.md §2.0, §6c. */}
+                       <ErpConnectionsPanel projectId={project.id} />
                     </div>
                   )}
                   {itemMasterProjectId === project.id && (
