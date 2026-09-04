@@ -722,8 +722,15 @@ print(r["aggregate_kpis"], len(reps))`;
           {/* ── Notebook ─────────────────────────────────────────────────── */}
           <TabsContent value="notebook" className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="flex items-center gap-2 text-[14px] font-semibold">
-                <NotebookText className="h-3.5 w-3.5" /> Ready-to-run quickstart
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 text-[14px] font-semibold">
+                  <NotebookText className="h-3.5 w-3.5" /> Ready-to-run quickstart
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  §1–12 cover the full API surface; §13 is a worked material-shortage
+                  deep dive — pick your project above, then edit its `SHORTAGE_TARGET`
+                  to a real material or supplier key.
+                </p>
               </div>
               <div className="flex flex-none gap-2">
                 <Button size="sm" variant="outline" className="rounded-sm" asChild>
