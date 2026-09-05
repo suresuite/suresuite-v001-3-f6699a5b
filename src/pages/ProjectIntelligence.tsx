@@ -1,4 +1,3 @@
-// @ts-nocheck — mirrors src/pages/ProjectIntelligence.tsx: the underlying
 // supply-chain schema tables aren't in the generated DB types yet.
 /**
  * Project Intelligence (SureSuite visual language).
@@ -21,7 +20,7 @@ import { useSearchParams } from "react-router-dom";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { PAGE_GUTTER } from "@/components/shared/PageBody";
-import { useGlobalProject } from "@/hooks/useGlobalProject";
+import { useGlobalProject, type Project } from "@/hooks/useGlobalProject";
 import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +37,16 @@ interface ProjectIntelligenceProps {
   setIsCollapsed: (value: boolean) => void;
 }
 
+/** list_projects returns the same shape the global project selection stores,
+ * which is why `match` can be handed straight to setSelectedProject. The RPC
+ * postdates the generated Supabase types — that mismatch is what the
+ * file-wide `@ts-nocheck` used to paper over, along with every real type
+ * error in the file. Loosen only the one call that needs it. */
+type ProjectRow = Project;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
+
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 460;
 const SIDEBAR_DEFAULT = 264;
@@ -48,7 +57,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
   const { user } = useAuth();
   const { can } = useCapabilities();
   const { setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState(() => getStoredModel());
   const [searchParams, setSearchParams] = useSearchParams();
@@ -85,6 +94,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     bulkSetThreadFlags,
     bulkMoveToFolder,
     bulkDeleteThreads,
+    getServerThreadId,
   } = useChatThreads();
 
   const memoryProjectId = activeThread?.projectId ?? null;
@@ -140,12 +150,12 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     if (!user) return;
     (async () => {
       try {
-        const { data, error } = await supabase.rpc("list_projects", {
+        const { data, error } = await db.rpc("list_projects", {
           p_user_id: user.id,
           p_user_email: user.email,
         });
         if (error) throw error;
-        setProjects(data || []);
+        setProjects((data as ProjectRow[]) ?? []);
       } catch (e) {
         console.error(e);
         toast.error("Failed to load projects");
@@ -241,7 +251,9 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     updateThread(activeThreadId, { projectId });
   };
 
-  const firstName = (user?.user_metadata?.full_name ?? user?.email ?? "").split(/[ @]/)[0];
+  // full_name is Supabase auth user_metadata, absent from the generated User type.
+  const fullName = (user as { user_metadata?: { full_name?: string } } | null)?.user_metadata?.full_name;
+  const firstName = (fullName ?? user?.email ?? "").split(/[ @]/)[0];
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
@@ -312,6 +324,7 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
             onModelChange={handleModelChange}
             threadMode={activeThread?.mode ?? "review"}
             onModeChange={(m) => activeThreadId && setThreadMode(activeThreadId, m)}
+            serverThreadId={activeThreadId ? getServerThreadId(activeThreadId) : null}
             threadSummary={activeThread?.summary ?? null}
             onDeleteSummary={() => activeThreadId && clearThreadSummary(activeThreadId)}
           />

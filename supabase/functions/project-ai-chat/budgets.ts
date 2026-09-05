@@ -14,9 +14,18 @@
 // ({llm_calls, tool_calls, wall_ms, budget_hit} — §7.7-4 tests them).
 
 /** Provider calls per request: 1 router + ≤ 2 step turns + ≤ 1 persona
- * wrap-up. Summary/judge calls are excluded (separately capped
- * fire-and-forget — they never receive the budget). */
-export const MAX_LLM_CALLS_PER_REQUEST = 4;
+ * wrap-up + ≤ 1 verifier corrective retry, plus headroom. Summary/judge calls
+ * are excluded (separately capped fire-and-forget — they never receive the
+ * budget).
+ *
+ * This was 4, which is exactly the cost of the worst legal request
+ * (router + agent + wrap-up + verifier retry). At 4 the meter had zero slack:
+ * any additional call — the failure-path persona turn, a second corrective
+ * retry — exhausted the budget and returned the canned exhaustion line
+ * instead of an answer, and the exhaustion was reached most often on exactly
+ * the multi-step asks the agents exist to serve. 6 keeps the meter a real
+ * cost guard while leaving the normal path two calls of headroom. */
+export const MAX_LLM_CALLS_PER_REQUEST = 6;
 /** Executed tool calls per request (consumed by executeTool via ToolContext). */
 export const MAX_TOOL_CALLS_PER_REQUEST = 15;
 /** Summed completion chars per request (checked after each LLM call). */

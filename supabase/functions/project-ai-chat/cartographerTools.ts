@@ -68,6 +68,8 @@ import {
 import { canonicalJson, sha256Hex } from "./telemetry.ts";
 import { deploymentEnabledAgents } from "./router.ts";
 import { resolveModel } from "./providers.ts";
+import { cleanEnv } from "../_shared/env.ts";
+import { fetchWithTimeout } from "../_shared/fetchTimeout.ts";
 import { loadGateDataset } from "../_shared/validationGate.ts";
 import { loadPolicyDefaults } from "../_shared/itemMasterCandidates.ts";
 import { normalizeBomRows } from "../_shared/grading.ts";
@@ -442,12 +444,12 @@ export type ExtractorCall = (prompt: string) => Promise<string>;
 export function makeExtractor(modelCode: string | null | undefined): ExtractorCall | null {
   const model = resolveModel(modelCode ?? undefined);
   if (model.provider === "gemini") {
-    const key = Deno.env.get("GEMINI_API_KEY");
+    const key = cleanEnv("GEMINI_API_KEY");
     if (!key) return null;
     return async (prompt) => {
       const endpoint =
         `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`;
-      const res = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
+      const res = await fetchWithTimeout(`${endpoint}?key=${encodeURIComponent(key)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -467,7 +469,7 @@ export function makeExtractor(modelCode: string | null | undefined): ExtractorCa
     };
   }
   const isOpenAI = model.provider === "openai";
-  const key = Deno.env.get(isOpenAI ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY");
+  const key = cleanEnv(isOpenAI ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY");
   if (!key) return null;
   const baseUrl = isOpenAI ? "https://api.openai.com/v1" : "https://api.deepseek.com/v1";
   return async (prompt) => {
@@ -484,7 +486,7 @@ export function makeExtractor(modelCode: string | null | undefined): ExtractorCa
       body.temperature = 0;
       body.max_tokens = 2048;
     }
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -501,7 +503,7 @@ async function gleifLiveCandidates(name: string): Promise<LeiRecord[]> {
   try {
     const url = "https://api.gleif.org/api/v1/lei-records?page[size]=5&filter[fulltext]=" +
       encodeURIComponent(name);
-    const res = await fetch(url, { headers: { Accept: "application/vnd.api+json" } });
+    const res = await fetchWithTimeout(url, { headers: { Accept: "application/vnd.api+json" } });
     if (!res.ok) return [];
     const data = await res.json();
     const records: LeiRecord[] = [];
@@ -686,7 +688,7 @@ async function ingestNetworkEvidence(
     const screenUrl = applyScreeningRule(entry, { url });
     if (!screenUrl.ok) return failure(tool, "invalid_params", screenUrl.reason ?? "screening failed");
     try {
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url);
       if (!res.ok) {
         return failure(tool, "dependency_missing", `Fetching the url failed (${res.status}).`);
       }

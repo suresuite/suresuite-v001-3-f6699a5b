@@ -14,6 +14,9 @@
 //
 // Flag: CHAT_SUMMARY_ENABLED (server, default off ⇒ M0 behavior exactly).
 
+import { cleanEnv } from "../_shared/env.ts";
+import { fetchWithTimeout } from "../_shared/fetchTimeout.ts";
+
 /** §14.3 trigger threshold (DEFAULT): refresh when this many messages have
  * accumulated past the summarized prefix. */
 export const SUMMARY_TRIGGER_GAP = 24;
@@ -75,11 +78,11 @@ interface SummaryModel {
  * provider errors — callers are fire-and-forget and log-only. */
 export async function runSummaryModel(model: SummaryModel, prompt: string): Promise<string> {
   if (model.provider === "gemini") {
-    const key = Deno.env.get("GEMINI_API_KEY");
+    const key = cleanEnv("GEMINI_API_KEY");
     if (!key) throw new Error("GEMINI_API_KEY is not configured.");
     const endpoint =
       `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`;
-    const res = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
+    const res = await fetchWithTimeout(`${endpoint}?key=${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -97,7 +100,7 @@ export async function runSummaryModel(model: SummaryModel, prompt: string): Prom
     return parts.map((p) => p.text ?? "").join("").trim();
   }
   const isOpenAI = model.provider === "openai";
-  const key = Deno.env.get(isOpenAI ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY");
+  const key = cleanEnv(isOpenAI ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY");
   if (!key) throw new Error(`${isOpenAI ? "OPENAI" : "DEEPSEEK"}_API_KEY is not configured.`);
   const baseUrl = isOpenAI ? "https://api.openai.com/v1" : "https://api.deepseek.com/v1";
   // deno-lint-ignore no-explicit-any
@@ -112,7 +115,7 @@ export async function runSummaryModel(model: SummaryModel, prompt: string): Prom
     body.temperature = 0;
     body.max_tokens = SUMMARY_MAX_OUTPUT_TOKENS;
   }
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+  const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),

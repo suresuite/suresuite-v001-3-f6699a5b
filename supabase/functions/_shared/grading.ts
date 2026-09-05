@@ -35,6 +35,12 @@ export interface GradingDataset {
   /** bom_single_level OR bom_multi_level rows — gradeManifest normalizes the
    * shape itself (normalizeBomRows); powers the unsourced-BOM hard block. */
   bom: Row[];
+  /** Names of the tables that came back at the row ceiling, i.e. the loader
+   * may not have seen every row. Optional and unset for every in-memory
+   * dataset; loadGateDataset populates it. Grading itself ignores it — it
+   * exists so a caller can say "this was graded on a partial dataset"
+   * instead of reporting a partial grade as complete. */
+  truncated?: string[];
 }
 
 export interface FallbackStep {

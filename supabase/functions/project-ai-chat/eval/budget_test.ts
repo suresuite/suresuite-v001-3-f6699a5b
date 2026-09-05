@@ -52,21 +52,25 @@ const toolCallResponse = (name: string, args: Record<string, unknown> = {}): Scr
 
 // ── the normative DEFAULTs (§21.5 table) ─────────────────────────────────────
 
-Deno.test("§21.5 DEFAULTs are the normative table: 4 LLM calls, 15 tool calls, 48,000 chars, 60 s wall", () => {
-  assertEquals(MAX_LLM_CALLS_PER_REQUEST, 4, "1 router + ≤ 2 step turns + ≤ 1 persona wrap-up");
+Deno.test("§21.5 DEFAULTs are the normative table: 6 LLM calls, 15 tool calls, 48,000 chars, 60 s wall", () => {
+  assertEquals(MAX_LLM_CALLS_PER_REQUEST, 6, "1 router + ≤ 2 step turns + ≤ 1 persona wrap-up + ≤ 1 verifier retry, + headroom");
   assertEquals(MAX_TOOL_CALLS_PER_REQUEST, 15);
   assertEquals(MAX_COMPLETION_CHARS_PER_REQUEST, 48_000);
   assertEquals(WALL_BUDGET_MS, 60_000);
   const b = makeRequestBudget();
   assertEquals(
     [b.maxLlmCalls, b.maxToolCalls, b.maxCompletionChars, b.wallBudgetMs],
-    [4, 15, 48_000, 60_000],
+    [6, 15, 48_000, 60_000],
   );
-  // Generosity proof for the pre-H3 shapes: the worst legal pre-H3 request
-  // (router + agent + persona + one verifier retry = 4 turn-level calls)
-  // fits exactly — the 4th consume succeeds, only a 5th would deny.
-  for (let i = 0; i < 4; i++) assert(tryConsumeLlmCall(b), `call ${i + 1} within budget`);
-  assert(!tryConsumeLlmCall(b), "the 5th call is the first denial");
+  // Headroom proof: the worst legal request shape (router + agent + persona +
+  // one verifier retry = 4 turn-level calls) now leaves 2 calls of slack. At
+  // the old cap of 4 it fit EXACTLY, so any additional call — the failure-path
+  // persona turn, a second corrective retry — exhausted the meter and returned
+  // the canned exhaustion line instead of an answer.
+  for (let i = 0; i < 4; i++) assert(tryConsumeLlmCall(b), `worst-shape call ${i + 1} within budget`);
+  assert(tryConsumeLlmCall(b), "the 5th call still has headroom");
+  assert(tryConsumeLlmCall(b), "the 6th call is the last within budget");
+  assert(!tryConsumeLlmCall(b), "the 7th call is the first denial");
 });
 
 // ── llm_calls: the cap denies the call, never truncates a reply ──────────────
@@ -209,12 +213,42 @@ Deno.test("the §20.5 provider retry burns real wall time the wall check sees (t
 
 // ── hops: the existing reply, now recorded as a hit ──────────────────────────
 
-Deno.test("MAX_HOPS exhaustion keeps the existing 'ran out of steps' reply and records budget_hit 'hops'", async () => {
+Deno.test("MAX_HOPS exhaustion spends one closing completion so the final hop's tool results are answered from, not discarded", async () => {
   const budget = makeRequestBudget();
   const { ctx } = makeCtx(budget);
-  const mock = installFetchMock(
-    Array.from({ length: 5 }, () => toolCallResponse("list_project_entities", { entity_type: "all" })),
-  );
+  // 6 hops of tool calls, then the closing (tool-free) completion.
+  const mock = installFetchMock([
+    ...Array.from({ length: 6 }, () => toolCallResponse("list_project_entities", { entity_type: "all" })),
+    textResponse("Here is what I could establish from the reads I did make."),
+  ]);
+  try {
+    const result = await runChat("gemini-2.5-flash", "loop forever", [], ctx, null, { budget });
+    assertEquals(result.reply, "Here is what I could establish from the reads I did make.");
+    assertEquals(budget.budgetHit, "hops", "the hit is still recorded for the chat.reply spend");
+    assertEquals(mock.calls.length, 7, "6 tool hops + 1 closing completion");
+    // The closing call withdraws the tool surface — the model cannot keep looping.
+    const closing = mock.calls[6].body as { tools?: unknown; contents: { parts: { text?: string }[] }[] };
+    assertEquals(closing.tools, undefined, "the closing completion declares no tools");
+    const lastTurn = closing.contents[closing.contents.length - 1];
+    assertEquals(
+      lastTurn.parts[0].text?.startsWith("You have used all the tool steps available"),
+      true,
+      "the wrap-up instruction is the final turn",
+    );
+  } finally {
+    mock.restore();
+  }
+});
+
+Deno.test("MAX_HOPS exhaustion falls back to the verbatim 'ran out of steps' reply when the closing completion fails", async () => {
+  const budget = makeRequestBudget();
+  const { ctx } = makeCtx(budget);
+  const mock = installFetchMock([
+    ...Array.from({ length: 6 }, () => toolCallResponse("list_project_entities", { entity_type: "all" })),
+    // 400 is non-retryable (§20.5), so this exercises the fallback without
+    // burning the retry wait.
+    { status: 400, json: { error: "bad request" } },
+  ]);
   try {
     const result = await runChat("gemini-2.5-flash", "loop forever", [], ctx, null, { budget });
     assertEquals(result.reply, "I ran out of steps on that one. Try narrowing the question.");

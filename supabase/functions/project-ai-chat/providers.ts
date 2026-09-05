@@ -12,6 +12,9 @@ import {
   type RequestBudget,
 } from "./budgets.ts";
 
+import { cleanEnv } from "../_shared/env.ts";
+import { fetchWithTimeout } from "../_shared/fetchTimeout.ts";
+
 export type ProviderId = "gemini" | "openai" | "deepseek";
 
 export interface ModelSpec {
@@ -31,6 +34,19 @@ export const MODEL_REGISTRY: Record<string, ModelSpec> = {
 export function resolveModel(id: string | undefined | null): ModelSpec {
   if (id && MODEL_REGISTRY[id]) return MODEL_REGISTRY[id];
   return MODEL_REGISTRY["gemini-2.5-flash"];
+}
+
+/** Whether a caller-supplied model id is one this deployment can actually run.
+ *
+ * resolveModel() silently falls back to gemini-2.5-flash for anything it does
+ * not recognise, which is right for an ABSENT id and wrong for a WRONG one:
+ * ai_models seeds several grantable codes with no MODEL_REGISTRY entry
+ * (gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite, gpt-5-nano,
+ * gpt-5.5), so an admin could grant one and the user would be served Gemini
+ * Flash while the UI said otherwise — a silent downgrade, which §23.4 forbids.
+ * Callers that receive a model id from a client check this first and refuse. */
+export function isKnownModelId(id: string | undefined | null): boolean {
+  return !id || Object.prototype.hasOwnProperty.call(MODEL_REGISTRY, id);
 }
 
 export interface ChatTurn { role: "user" | "assistant"; content: string }
@@ -73,7 +89,7 @@ async function providerFetch(
   init: RequestInit,
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, init);
+    const res = await fetchWithTimeout(url, init);
     const retryable = res.status === 429 || res.status >= 500;
     if (!retryable) return res;
     if (attempt >= PROVIDER_RETRY_MAX) {
@@ -136,7 +152,19 @@ export interface ChatRunResult {
   model?: string;
 }
 
-const MAX_HOPS = 5;
+const MAX_HOPS = 6;
+
+/** Appended to the conversation when the hop budget runs out, so the closing
+ * completion below is answering from evidence rather than reaching for a tool
+ * it can no longer call. */
+const HOP_WRAP_UP_INSTRUCTION =
+  "You have used all the tool steps available for this turn. Do not call any more tools. " +
+  "Answer now using only the tool results you already received. If they are not enough for a " +
+  "grounded answer, say exactly what is missing and what you would look up next — never guess.";
+
+/** The pre-existing exhaustion reply, kept verbatim as the fallback for when
+ * the closing completion itself fails or comes back empty. */
+const HOPS_EXHAUSTED_REPLY = "I ran out of steps on that one. Try narrowing the question.";
 
 // Friendly stand-in when a provider returns no visible text. If a tool already
 // produced data, the UI renders it — so just introduce it instead of orphaning it
@@ -355,10 +383,36 @@ async function runGemini(
       contents.push({ role: "function", parts: [{ functionResponse: { name, response: result as unknown as Record<string, unknown> } }] });
     }
   }
-  // MAX_HOPS exhaustion — the existing "ran out of steps" reply; when a
-  // budget rides the request the hit is recorded for the chat.reply spend.
+  // MAX_HOPS exhaustion. The loop above has just executed the final hop's tool
+  // calls — they hit the database and consumed the tool meter — so returning
+  // here outright would throw those results away unseen. Spend one closing
+  // completion with the tool surface withdrawn instead, so the model answers
+  // from what it already has. When a budget rides the request the hit is still
+  // recorded for the chat.reply spend, and an exhausted wall skips the call.
   if (budget && budget.budgetHit === null) budget.budgetHit = "hops";
-  return { reply: "I ran out of steps on that one. Try narrowing the question.", parts: collectedParts, toolCalls, model: model.label };
+  if (!budget || !wallExceeded(budget)) {
+    try {
+      contents.push({ role: "user", parts: [{ text: HOP_WRAP_UP_INSTRUCTION }] });
+      const closing = await providerFetch("gemini", `${endpoint}?key=${encodeURIComponent(apiKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { role: "system", parts: [{ text: system }] },
+          contents,
+          generationConfig: { temperature: 0.4, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
+        }),
+      });
+      if (closing.ok) {
+        const cData = await closing.json();
+        const cText = (cData?.candidates?.[0]?.content?.parts ?? [])
+          .filter((p: GeminiPart) => p.text).map((p: GeminiPart) => p.text).join("").trim();
+        if (cText) return { reply: cText, parts: collectedParts, toolCalls, model: model.label };
+      }
+    } catch (e) {
+      console.warn("[hop-wrapup] gemini closing completion failed:", e instanceof Error ? e.message : e);
+    }
+  }
+  return { reply: HOPS_EXHAUSTED_REPLY, parts: collectedParts, toolCalls, model: model.label };
 }
 
 // ---------------- OpenAI-compatible (OpenAI + DeepSeek) ----------------
@@ -445,8 +499,36 @@ async function runOpenAICompatible(
       });
     }
   }
+  // MAX_HOPS exhaustion — see runGemini: one closing completion with the tool
+  // surface withdrawn, so the final hop's results are answered from rather
+  // than discarded.
   if (budget && budget.budgetHit === null) budget.budgetHit = "hops";
-  return { reply: "I ran out of steps on that one. Try narrowing the question.", parts: collectedParts, toolCalls, model: model.label };
+  if (!budget || !wallExceeded(budget)) {
+    try {
+      messages.push({ role: "user", content: HOP_WRAP_UP_INSTRUCTION });
+      const closingBody: any = { model: model.apiModel, messages };
+      if (model.provider === "openai" && model.apiModel.startsWith("gpt-5")) {
+        closingBody.max_completion_tokens = 4096;
+        closingBody.reasoning_effort = "low";
+      } else {
+        closingBody.temperature = 0.4;
+        closingBody.max_tokens = 2048;
+      }
+      const closing = await providerFetch(model.provider, `${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(closingBody),
+      });
+      if (closing.ok) {
+        const cData = await closing.json();
+        const cText = (cData?.choices?.[0]?.message?.content ?? "").trim();
+        if (cText) return { reply: cText, parts: collectedParts, toolCalls, model: model.label };
+      }
+    } catch (e) {
+      console.warn("[hop-wrapup] closing completion failed:", e instanceof Error ? e.message : e);
+    }
+  }
+  return { reply: HOPS_EXHAUSTED_REPLY, parts: collectedParts, toolCalls, model: model.label };
 }
 
 // ---------------- Dispatcher ----------------
@@ -488,17 +570,17 @@ export async function runChat(
   };
 
   if (model.provider === "gemini") {
-    const key = Deno.env.get("GEMINI_API_KEY");
+    const key = cleanEnv("GEMINI_API_KEY");
     if (!key) throw new Error("GEMINI_API_KEY is not configured.");
     return metered(runGemini(key, model, system, userMessage, history, ctx, tools, opts?.onToolResult, opts?.budget));
   }
   if (model.provider === "openai") {
-    const key = Deno.env.get("OPENAI_API_KEY");
+    const key = cleanEnv("OPENAI_API_KEY");
     if (!key) throw new Error("OPENAI_API_KEY is not configured.");
     return metered(runOpenAICompatible("https://api.openai.com/v1", key, model, system, userMessage, history, ctx, tools, opts?.onToolResult, opts?.budget));
   }
   if (model.provider === "deepseek") {
-    const key = Deno.env.get("DEEPSEEK_API_KEY");
+    const key = cleanEnv("DEEPSEEK_API_KEY");
     if (!key) throw new Error("DEEPSEEK_API_KEY is not configured.");
     return metered(runOpenAICompatible("https://api.deepseek.com/v1", key, model, system, userMessage, history, ctx, tools, opts?.onToolResult, opts?.budget));
   }

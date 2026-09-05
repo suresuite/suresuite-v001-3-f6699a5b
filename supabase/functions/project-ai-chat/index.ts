@@ -9,7 +9,9 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { runChat, resolveModel, type ChatRunResult, type ChatTurn } from "./providers.ts";
+import { runChat, resolveModel, type ChatRunResult, type ChatTurn,
+  isKnownModelId,
+} from "./providers.ts";
 import { makeToolContext, type ToolContext, type ToolDeclaration, type ToolEnvelope } from "./tools.ts";
 // H2 (§6.6 rule 1): the cache reads that join the persona surface when the
 // router marks an ask cache_checkable. Pure reads — no approval involved.
@@ -32,6 +34,7 @@ import {
   deploymentEnabledAgents,
   makeClassifier,
   OFFER_CHIP_TEXT,
+  AGENT_NOT_ENABLED_TEXT,
   resolveRoutedUtterance,
 } from "./router.ts";
 // Importing agentTurn.ts registers the staged draft tools (draftTools.ts,
@@ -261,6 +264,7 @@ serve(async (req) => {
         }
 
         await supabaseAdmin.from('ai_usage_logs').insert({
+          request_id: requestId,
           user_id: userId ?? null,
           org_id: orgId,
           project_id: projectId ?? null,
@@ -301,7 +305,22 @@ serve(async (req) => {
     // Mirrors the client gates in src/lib/capabilities.ts word for word. The
     // posture also mirrors the client fallback: a transient resolver failure
     // never wrongly blocks a legitimate call (fail open, log, proceed).
+    // §23.4 no-silent-degradation: an explicitly requested model this
+    // deployment cannot run is refused, not quietly swapped for the default.
+    if (!isKnownModelId(typeof model === 'string' ? model : null)) {
+      return jsonResponse({
+        error: `The model "${String(model)}" isn't available in this deployment. Pick another from the model menu.`,
+        type: 'BAD_REQUEST',
+      });
+    }
     const resolvedModel = resolveModel(model);
+    // ai_models.code is provider-prefixed ('google/gemini-2.5-flash'); the
+    // client sends the bare id ('gemini-2.5-flash'). CHAT_MODEL_CODES already
+    // bridges the two for the capability re-check below — but every
+    // logAiUsage call passed the raw request-body value, so the ai_models
+    // lookup never matched: cost_usd was 0 on every row and the monthly/daily
+    // USD budget gates could never trip.
+    const usageModelCode = CHAT_MODEL_CODES[resolvedModel.id] ?? resolvedModel.id;
     let capFeatures: Record<string, boolean> = {};
     let capIsSuper = false;
     try {
@@ -376,6 +395,13 @@ serve(async (req) => {
     if (ctx) ctx.budget = budget;
 
     // --- Telemetry (ai-agents.md §7; AGENT_TELEMETRY_ENABLED, default off) ---
+    // Also stamped on every ai_usage_logs row this request writes (§8 T5:
+    // "records all three (distinct request_id)"). ai_usage_logs.request_id has
+    // existed since the table was created and was never populated, so an
+    // agent-routed request — which legitimately writes an agent-turn row AND a
+    // request row — counted twice against the per-day REQUEST limit. Declared
+    // here rather than at the top of the handler because telemetry owns it;
+    // every logAiUsage CALL happens below this line.
     const requestId = crypto.randomUUID();
     let orgId: string | null = null;
     if (telemetryEnabled()) {
@@ -561,7 +587,8 @@ serve(async (req) => {
         });
         logAiUsage({
           status: agent.ok ? 'success' : 'error',
-          modelCode: model,
+          modelCode: usageModelCode,
+          providerCode: resolvedModel.provider,
           promptChars: outcome.utterance.length,
           completionChars: agent.reply.length,
           latencyMs: Date.now() - agentT0,
@@ -862,7 +889,8 @@ serve(async (req) => {
           });
           logAiUsage({
             status: 'blocked',
-            modelCode: model,
+            modelCode: usageModelCode,
+            providerCode: resolvedModel.provider,
             promptChars: promptText.length,
             latencyMs: Date.now() - _t0,
             errorCode: 'model_below_target',
@@ -945,7 +973,8 @@ serve(async (req) => {
         });
         logAiUsage({
           status: agent.ok ? 'success' : 'error',
-          modelCode: model,
+          modelCode: usageModelCode,
+          providerCode: resolvedModel.provider,
           promptChars: agentUtterance.length,
           completionChars: agent.reply.length,
           latencyMs: Date.now() - agentT0,
@@ -1195,6 +1224,10 @@ serve(async (req) => {
           // §6.2 step 3: below-threshold artifact asks stay advisory with one
           // plain-text offer chip.
           result = { ...result, reply: `${result.reply}\n\n${OFFER_CHIP_TEXT}` };
+        } else if (routeDecision.short_circuit === 'agent_not_enabled') {
+          // The classifier positively wanted an agent this caller cannot
+          // route to. That drop used to be silent — say it instead.
+          result = { ...result, reply: `${result.reply}\n\n${AGENT_NOT_ENABLED_TEXT}` };
         }
       }
 
@@ -1294,12 +1327,21 @@ serve(async (req) => {
       }
 
       const latencyMs = Date.now() - _t0;
+      // A blocked reply or a budget-exhausted turn is not a success. Logging
+      // it as one made the usage table read clean while the user got a refusal
+      // or the canned exhaustion line.
       logAiUsage({
-        status: 'success',
-        modelCode: model,
+        status: result?.blocked ? 'blocked' : budget.budgetHit ? 'error' : 'success',
+        modelCode: usageModelCode,
+        providerCode: resolvedModel.provider,
         promptChars: promptText.length,
         completionChars: (result?.reply ?? '').length,
         latencyMs,
+        ...(result?.blocked
+          ? { errorCode: 'blocked' }
+          : budget.budgetHit
+          ? { errorCode: `budget:${budget.budgetHit}` }
+          : {}),
       });
       for (const call of telemetryToolCalls) {
         sha256Hex(canonicalJson(call.args ?? {})).then((argsSha) =>
@@ -1364,7 +1406,8 @@ serve(async (req) => {
     } catch (innerErr) {
       logAiUsage({
         status: 'error',
-        modelCode: model,
+        modelCode: usageModelCode,
+        providerCode: resolvedModel.provider,
         promptChars: promptText.length,
         latencyMs: Date.now() - _t0,
         errorCode: innerErr instanceof Error ? innerErr.message.slice(0, 200) : 'unknown',

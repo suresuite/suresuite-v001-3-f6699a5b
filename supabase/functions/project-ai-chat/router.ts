@@ -6,6 +6,9 @@
 // (§3.3). All fallbacks/tie-breaks below are deterministic and unit-tested in
 // eval/ (§6.5 tier 1).
 
+import { cleanEnv } from "../_shared/env.ts";
+import { fetchWithTimeout } from "../_shared/fetchTimeout.ts";
+
 export type Route = "advisory" | "artifact" | "mixed";
 
 export interface RouteDecision {
@@ -319,6 +322,21 @@ export async function classifyIntent(
 export const OFFER_CHIP_TEXT =
   `I can draft this for you — say "do it" to get a reviewable proposal.`;
 
+/** Said when the classifier POSITIVELY identified an artifact intent for an
+ * agent this caller cannot route to (§6.2 `agent_not_enabled`). That is the
+ * one short-circuit where the user's drafting intent is genuinely dropped —
+ * and it used to be dropped silently, leaving them with an advisory answer and
+ * no idea the proposal half of their ask went nowhere.
+ *
+ * Deliberately NOT applied to `router_disabled`, `no_enabled_agents`,
+ * `no_project`, `classifier_unavailable`, `parse_failure` or
+ * `classifier_error`: those fire before (or independently of) a positive
+ * artifact classification, i.e. on ordinary questions too, so a note there
+ * would append itself to every reply in the deployment. */
+export const AGENT_NOT_ENABLED_TEXT =
+  `(Answered as a question — the agent that would draft this isn't enabled for your account, ` +
+  `so I can't file a reviewable proposal. An administrator can grant it.)`;
+
 /** The "do it" follow-up (§6.2 step 3): re-routes with the prior utterance as
  * the artifact part. Deliberately narrow — anything else re-classifies fresh. */
 export const CONFIRMATION_RE =
@@ -400,12 +418,12 @@ export function openaiRouteSchema(): Record<string, unknown> {
  * decideRoute then falls back to advisory (`classifier_unavailable`). */
 export function makeClassifier(model: ClassifierModel): ClassifierCall | null {
   if (model.provider === "gemini") {
-    const key = Deno.env.get("GEMINI_API_KEY");
+    const key = cleanEnv("GEMINI_API_KEY");
     if (!key) return null;
     return async (prompt) => {
       const endpoint =
         `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`;
-      const res = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
+      const res = await fetchWithTimeout(`${endpoint}?key=${encodeURIComponent(key)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -427,7 +445,7 @@ export function makeClassifier(model: ClassifierModel): ClassifierCall | null {
   }
 
   const isOpenAI = model.provider === "openai";
-  const key = Deno.env.get(isOpenAI ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY");
+  const key = cleanEnv(isOpenAI ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY");
   if (!key) return null;
   const baseUrl = isOpenAI ? "https://api.openai.com/v1" : "https://api.deepseek.com/v1";
   return async (prompt) => {
@@ -448,7 +466,7 @@ export function makeClassifier(model: ClassifierModel): ClassifierCall | null {
       body.temperature = 0;
       body.max_tokens = 300;
     }
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),

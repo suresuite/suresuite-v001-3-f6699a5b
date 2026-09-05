@@ -100,6 +100,11 @@ jobs:
       #   CHAT_MODES_ENABLED        §15 Ask/Review mode control
       #   SUGGESTED_ACTIONS_ENABLED §17.3 suggestion engine
       #   FILE_WORKSPACE_ENABLED    §16.2 file workspace + report-render
+      #   COVERAGE_TOOLS_ENABLED    §19.3 grounded relation/detail read tools
+      #   VERIFIER_ENABLED          §22.3 pre-send verifier + the §22.2 v2
+      #                             system prompt (providers.ts selects v2 on
+      #                             this flag — off ⇒ the v1 prompt, which
+      #                             lacks the count-is-not-a-list rules)
       - name: Set AI-agent GA flags (ai-agents.md §9 GA flip)
         run: |
           supabase secrets set --project-ref wckdrutwkytwcomrlpib \
@@ -112,7 +117,9 @@ jobs:
             PROJECT_MEMORY_ENABLED=true \
             CHAT_MODES_ENABLED=true \
             SUGGESTED_ACTIONS_ENABLED=true \
-            FILE_WORKSPACE_ENABLED=true
+            FILE_WORKSPACE_ENABLED=true \
+            COVERAGE_TOOLS_ENABLED=true \
+            VERIFIER_ENABLED=true
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
