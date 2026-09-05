@@ -32,12 +32,14 @@ import {
 import {
   specFor,
   familiesForStage,
-  headerColsUnion,
+  fitColsForStage,
   vectorParamCols,
   flattenBundle,
   type ColSpec,
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
+import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
+import { groupByKeyA, summarise } from "@/lib/policies/groupRows";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
@@ -85,25 +87,22 @@ const FAMILY_ORDER: PolicyFamily[] = [
   "demand",
 ];
 
-/** Frozen key-column widths per stage (the ids carry the row's identity). */
-const KEY_WIDTHS: Record<StageKey, number[]> = {
-  supplier: [216, 152],
-  plant: [152, 216],
-  customer: [216, 216],
-  run_validate: [],
-};
+/**
+ * Frozen key-column widths, by viewport breakpoint (the ids carry the row's
+ * identity). Both the `<col>` and the sticky `left` offset read the same
+ * constant — never hard-code one and derive the other (columnFit.ts §0.2).
+ */
+const KEY_W = {
+  wide: { a: 168, b: 132 }, // ≥1280
+  mid: { a: 148, b: 116 }, // ≥1024
+  narrow: { a: 132, b: 104 }, // <1024
+} as const;
 
-/** Value-column widths; everything else takes the default. */
-const COL_WIDTH: Record<string, number> = {
-  __inv_params: 216,
-  fg_safety_stock: 196,
-  type: 136,
-  mode: 176,
-  sourcing_firm: 152,
-  primary_source: 86,
-};
-const DEFAULT_COL_WIDTH = 118;
-const widthOf = (col: ColSpec) => COL_WIDTH[col.field] ?? DEFAULT_COL_WIDTH;
+function keyWidthsFor(winWidth: number): { a: number; b: number } {
+  if (winWidth >= 1280) return KEY_W.wide;
+  if (winWidth >= 1024) return KEY_W.mid;
+  return KEY_W.narrow;
+}
 
 /** Short segmented labels for the inventory Policy Type (titles stay the
  *  registry library's own labels — "Min-max (s, S)", "(R, Q)", …). */
@@ -313,23 +312,17 @@ export function StagePolicyTable({
     [dataRows, drafts, fulfillmentStrategy, rowEffective],
   );
 
-  const allCols = useMemo(
-    () => headerColsUnion(stageKey, rowCtxs),
-    [stageKey, rowCtxs],
-  );
+  // Fit/render metadata for the header union (columnFit.ts, joined by field).
+  const fitCols = useMemo(() => fitColsForStage(stageKey, rowCtxs), [stageKey, rowCtxs]);
 
-  // Group columns by family in canonical order so bands are contiguous.
-  const colGroups = useMemo(() => {
-    const buckets = new Map<PolicyFamily, ColSpec[]>();
-    for (const c of allCols) {
-      const arr = buckets.get(c.family) ?? [];
-      arr.push(c);
-      buckets.set(c.family, arr);
-    }
-    return FAMILY_ORDER
-      .filter((f) => buckets.has(f))
-      .map((f) => ({ family: f, cols: buckets.get(f)! }));
-  }, [allCols]);
+  // Every family that has at least one column at this stage, in canonical
+  // order — independent of fold/collapse state, so the toolbar always offers
+  // every family a chip.
+  const familiesPresent = useMemo(() => {
+    const set = new Set<PolicyFamily>();
+    for (const c of fitCols) set.add(c.family);
+    return FAMILY_ORDER.filter((f) => set.has(f));
+  }, [fitCols]);
 
   // Per-stage collapsed family set persisted in localStorage.
   const collapseKey = `policy.table.collapsed.${stageKey}`;
@@ -360,23 +353,94 @@ export function StagePolicyTable({
       return next;
     });
   };
-
-  // Flattened visible cols (respecting collapse) — used for rendering rows.
-  const cols = useMemo(
-    () => colGroups.filter((g) => !collapsed.has(g.family)).flatMap((g) => g.cols),
-    [colGroups, collapsed],
+  const collapsedFamilies = useMemo(
+    () => Object.fromEntries([...collapsed].map((f) => [f, true])),
+    [collapsed],
   );
 
-  // Frozen key columns: cumulative left offsets from the per-stage widths.
-  const keyWidths = KEY_WIDTHS[stageKey] ?? [];
-  const keyLeft = (i: number) => keyWidths.slice(0, i).reduce((a, b) => a + b, 0);
-  const keyTotal = keyWidths.reduce((a, b) => a + b, 0);
+  // Row-group collapse (§5) — a material's suppliers, a plant's products, a
+  // customer's product lanes. State resets per stage on purpose (§5 note).
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (id: string) => {
+    setCollapsedGroups((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
-  // Reset drafts + filters/sort when stage / project changes.
+  // Responsive chrome: the frozen key-column breakpoint and the family
+  // summary column's narrow variant both key off the viewport, not the grid
+  // container (columnFit.ts §3.1 / §1 narrow flag).
+  const [winWidth, setWinWidth] = useState(() =>
+    typeof window === "undefined" ? 1280 : window.innerWidth,
+  );
+  useEffect(() => {
+    const onResize = () => setWinWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const keyW = keyWidthsFor(winWidth);
+  const narrowFamily = winWidth < 860;
+
+  // Fit-fold: `enabled=false` means "show all columns", scrolling
+  // horizontally instead of folding. Observe the scroll container's
+  // offsetWidth (not clientWidth — that shrinks when a vertical scrollbar
+  // appears, which the fold itself can cause, oscillating).
+  const [fitEnabled, setFitEnabled] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [containerW, setContainerW] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setContainerW(el.offsetWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const avail = Math.max(0, containerW - 2 - 24 - keyW.a - keyW.b);
+  const fit = useMemo(
+    () =>
+      fitColumns({
+        cols: fitCols,
+        avail,
+        collapsedFamilies,
+        enabled: fitEnabled,
+        narrow: narrowFamily,
+      }),
+    [fitCols, avail, collapsedFamilies, fitEnabled, narrowFamily],
+  );
+  const { visible, folded, fills } = fit;
+  const totalCols = visible.length + folded.length;
+
+  // Band groups: contiguous same-family runs of the currently visible
+  // columns (declaration order already groups by family, so a partial fold
+  // never interleaves two families).
+  const bandGroups = useMemo(() => {
+    const out: { family: PolicyFamily; cols: FitCol[] }[] = [];
+    for (const c of visible) {
+      const last = out[out.length - 1];
+      if (last && last.family === c.family) last.cols.push(c);
+      else out.push({ family: c.family, cols: [c] });
+    }
+    return out;
+  }, [visible]);
+
+  // Frozen key columns: cumulative left offsets from the breakpoint widths.
+  const keyWidths = [keyW.a, keyW.b];
+  const keyLeft = (i: number) => (i === 0 ? 0 : keyW.a);
+  const keyTotal = keyW.a + keyW.b;
+  const tableMinWidth = keyTotal + fit.valueWidth;
+
+  // Reset drafts + filters/sort/group-collapse when stage / project changes.
   useEffect(() => {
     setDrafts({});
     setColFilters({});
     setSort(null);
+    setCollapsedGroups(new Set());
   }, [stageKey, projectId]);
 
   /** Effective value lookup: data prefill → override → default.
@@ -456,13 +520,14 @@ export function StagePolicyTable({
    * Basis control is hidden while the line uses the default basis — it repeated
    * identically on every line.
    */
-  const renderInvParamsCell = (rowKey: string, r: Record<string, unknown>) => {
+  const renderInvParamsCell = (rowKey: string, r: Record<string, unknown>, paramW?: number) => {
     const type = String(getEffective(rowKey, r, "type", "inventory") ?? "min_max");
     const regParams = inventoryParamsForType(type).filter((p) => p.field !== "basis");
     const basis = String(getEffective(rowKey, r, "basis", "inventory") ?? "days_of_supply");
     return (
       <ReplenishmentCell
         policyType={type}
+        paramW={paramW}
         params={regParams.map((p) => {
           const value = getEffective(rowKey, r, p.field, "inventory");
           const n = typeof value === "number" ? value : value == null ? undefined : Number(value);
@@ -537,6 +602,32 @@ export function StagePolicyTable({
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataRows, colFilters, sort, drafts, overrides, spec.keyCols]);
+
+  // Row-group collapse (§5): consecutive runs sharing key A — a material's
+  // suppliers, a plant's products, a customer's product lanes. An active sort
+  // that scrambles key-A order degrades gracefully to singleton "groups",
+  // which simply offer nothing to collapse.
+  const rowGroups = useMemo(
+    () => groupByKeyA(filtered as Record<string, unknown>[], spec.keyCols[0]?.id ?? ""),
+    [filtered, spec.keyCols],
+  );
+  const collapsibleGroups = useMemo(() => rowGroups.filter((g) => g.members.length > 1), [rowGroups]);
+  const anyGroupExpanded = collapsibleGroups.some((g) => !collapsedGroups.has(`${stageKey}::${g.id}`));
+  const toggleAllGroups = () => {
+    if (anyGroupExpanded) {
+      setCollapsedGroups((cur) => {
+        const next = new Set(cur);
+        for (const g of collapsibleGroups) next.add(`${stageKey}::${g.id}`);
+        return next;
+      });
+    } else {
+      setCollapsedGroups((cur) => {
+        const next = new Set(cur);
+        for (const g of collapsibleGroups) next.delete(`${stageKey}::${g.id}`);
+        return next;
+      });
+    }
+  };
 
   const dirtyKeys = Object.keys(drafts).filter((k) => Object.keys(drafts[k] ?? {}).length > 0);
 
@@ -864,7 +955,388 @@ export function StagePolicyTable({
     return "text";
   };
 
-  const colCount = spec.keyCols.length + cols.length + collapsed.size;
+  const colCount = spec.keyCols.length + visible.length;
+
+  /** The outermost column carries no right rule (§0.4) — it would otherwise
+   *  spring a permanent 2px horizontal scrollbar. */
+  const cellDivider = (isLastCol: boolean): React.CSSProperties => ({
+    borderRight: isLastCol ? "none" : "1px solid var(--hair-divider)",
+  });
+
+  /** One data row (§5.1 — plain or a group's expanded member). */
+  const renderRow = (
+    r: Record<string, unknown>,
+    groupMeta?: { isFirstOfGroup: boolean; isContinuation: boolean; groupId: string },
+  ) => {
+    const rowKey = String(r.key);
+    const isDirty = (drafts[rowKey] && Object.keys(drafts[rowKey]).length > 0) ?? false;
+    const overrode = hasOverride(rowKey);
+    const attention = rowNeedsAttention(r);
+    // Multi-source pairs stay marked permanently for review, even
+    // once a primary is chosen.
+    const isMultiSource = Number(r.__lane_count ?? 0) > 1;
+    const accent = rowAccent({ edited: isDirty, attention, multiSource: isMultiSource });
+    return (
+      <tr key={rowKey} className="group">
+        {spec.keyCols.map((c, i) => (
+          <td
+            key={c.id}
+            className={cn(
+              "sticky z-20 border-b border-r border-[--hair-divider] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
+              i === spec.keyCols.length - 1 && "border-r-[--hair-border]",
+            )}
+            style={{
+              left: keyLeft(i),
+              width: keyWidths[i],
+              minWidth: keyWidths[i],
+              maxWidth: keyWidths[i],
+              ...(i === 0 && accent ? { borderLeft: `2px solid ${accent}` } : {}),
+            }}
+          >
+            <span className="flex items-center gap-1.5">
+              {i === 0 && groupMeta?.isFirstOfGroup && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleGroup(groupMeta.groupId);
+                  }}
+                  className="grid h-[15px] w-[15px] shrink-0 place-items-center font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                  title="Collapse this group"
+                >
+                  ▾
+                </button>
+              )}
+              {i === 0 && groupMeta && !groupMeta.isFirstOfGroup ? (
+                // Continuation member of an expanded group: key A repeats the
+                // same id as the first member — show ↳ instead of restating it.
+                <span
+                  className="w-[15px] shrink-0 text-center font-mono text-[10px] text-[#c4c4c4]"
+                  title={String(r[c.id] ?? "")}
+                >
+                  ↳
+                </span>
+              ) : c.id === "supplier_id" && r.__needs_supplier ? (
+                newSupplierFor === rowKey ? (
+                  // Typing a brand-new supplier id: Enter confirms,
+                  // Escape cancels.
+                  <Input
+                    autoFocus
+                    value={newSupplierId}
+                    placeholder="new supplier id"
+                    className="h-5 border-[--zinc-border] px-1.5 font-mono text-[11px]"
+                    disabled={assigning === String(r.material_id)}
+                    onChange={(e) => setNewSupplierId(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setNewSupplierFor(null);
+                        setNewSupplierId("");
+                      }
+                      if (e.key === "Enter") {
+                        const id = newSupplierId.trim();
+                        if (!id || id.startsWith("(")) {
+                          toast.warning("Enter a valid supplier id.", TOAST);
+                          return;
+                        }
+                        setNewSupplierFor(null);
+                        setNewSupplierId("");
+                        void assignSupplier(String(r.material_id), id);
+                      }
+                    }}
+                    onBlur={() => {
+                      setNewSupplierFor(null);
+                      setNewSupplierId("");
+                    }}
+                  />
+                ) : (
+                  // Unassigned material: pick (or create) a supplier —
+                  // creates the sourcing lane.
+                  <Select
+                    disabled={assigning === String(r.material_id)}
+                    onValueChange={(v) => {
+                      if (v === "__new__") {
+                        setNewSupplierFor(rowKey);
+                        setNewSupplierId("");
+                        return;
+                      }
+                      void assignSupplier(String(r.material_id), v);
+                    }}
+                  >
+                    <SelectTrigger
+                      className="h-5 w-full px-1.5 font-mono text-[10.5px]"
+                      style={{ borderColor: LAYER.brand, color: LAYER.brand }}
+                    >
+                      <SelectValue
+                        placeholder={assigning === String(r.material_id) ? "assigning…" : "assign supplier"}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__new__" className="text-xs font-medium">
+                        + new supplier
+                      </SelectItem>
+                      {knownSuppliers.map((s) => (
+                        <SelectItem key={s} value={s} className="text-xs">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )
+              ) : (
+                <span className="min-w-[62px] flex-1 truncate" title={String(r[c.id] ?? "")}>
+                  {String(r[c.id] ?? "")}
+                </span>
+              )}
+
+              {/* material-level required actions */}
+              {i === 0 && r.__needs_supplier && (
+                <RowFlag title="This material has no supplier in the project data — assign one in the Supplier column.">
+                  needs supplier
+                </RowFlag>
+              )}
+              {i === 0 &&
+                !r.__needs_supplier &&
+                Number(r.__lane_count ?? 0) > 1 &&
+                !groupHasPrimary(r) && (
+                  <RowFlag title="Multiple sources — pick exactly one primary.">pick primary</RowFlag>
+                )}
+              {c.id === "product_id" && r.__unknown_product && (
+                <span
+                  title="Not found in BOM"
+                  className="shrink-0 rounded-sm px-1 font-mono text-[9px]"
+                  style={{ background: tint(LAYER.firm, 0.12), color: LAYER.firm }}
+                >
+                  !
+                </span>
+              )}
+              {/* "set firm" only when the customer product has no known firms in data. */}
+              {i === spec.keyCols.length - 1 &&
+                stageKey === "customer" &&
+                (!r.__firms_available || (r.__firms_available as string[]).length === 0) &&
+                !getEffective(rowKey, r, "sourcing_firm") && (
+                  <RowFlag title="No firms detected for this product — type a sourcing firm">set firm</RowFlag>
+                )}
+              {/* Per-row reset (drafts + saved overrides) */}
+              {i === 0 && deleteOverride && (overrode || isDirty) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    resetRow(rowKey);
+                  }}
+                  className="shrink-0 font-mono text-[9.5px] text-[#c4c4c4] opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                  title="Revert this line to project data"
+                >
+                  ↺
+                </button>
+              )}
+            </span>
+          </td>
+        ))}
+
+        {visible.map((fc, fi) => {
+          const isLastCol = fi === visible.length - 1;
+          const width = fills && isLastCol ? undefined : fc.w;
+          if (fc.foldedFamily) {
+            return (
+              <td
+                key={fc.key}
+                className="border-b bg-[#fcfcfc]"
+                style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
+              />
+            );
+          }
+          const col = specColByField.get(fc.key);
+          if (!col) return null;
+          const rowDraft = drafts[rowKey] ?? {};
+          const eff = rowEffective.get(rowKey);
+          // per-row gating: hide cells whose policy choice doesn't apply
+          const isVisibleForRow =
+            !col.visibleWhen ||
+            col.visibleWhen({ fulfillmentStrategy, row: r, draft: rowDraft, effective: eff });
+          if (!isVisibleForRow) {
+            return (
+              <td
+                key={col.field}
+                className="border-b p-0 text-center font-mono text-[10px] text-[#dcdcdc]"
+                style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
+                title="Not applicable for the current policy choice"
+              >
+                —
+              </td>
+            );
+          }
+          // The dynamic "Replenishment parameters" vector cell.
+          if (col.synthetic && col.field === "__inv_params") {
+            return (
+              <td
+                key={col.field}
+                className="border-b p-0 align-middle group-hover:bg-[#fafafa]"
+                style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
+              >
+                {renderInvParamsCell(rowKey, r, fc.paramW)}
+              </td>
+            );
+          }
+          const cellValue = getEffective(rowKey, r, col.field, col.family);
+          // Master-backed columns: value from the item master, with
+          // the engine's derived fallback (≈) shown when unset.
+          const masterSet = col.master ? masterValueFor(col, r) !== undefined : false;
+          const derivedVal = col.master && !masterSet ? derivedValueFor(col, r) : undefined;
+          // live default = bundle value > spec.defaultWhenMissing > family raw default.
+          // Read from the column's own family (not the flattened first-wins
+          // map) so a name shared across families resolves to this header's value.
+          const bundleVal = (
+            effectivePolicy(defaults, overrides, spec.scope, rowKey)[col.family] as
+              | Record<string, unknown>
+              | undefined
+          )?.[col.field];
+          const liveDefault = col.master
+            ? derivedVal ?? 0
+            : bundleVal !== undefined
+              ? bundleVal
+              : col.defaultWhenMissing !== undefined
+                ? col.defaultWhenMissing
+                : getDefault(col.field, col.family);
+          const edited = rowDraft[col.field] !== undefined;
+          // Provenance maps emitted by useStageRows for project-backed fields.
+          const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
+          const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
+          const tracked = col.field in fromDataMap || col.field in imputedMap;
+          const imputed = !edited && !col.master && imputedMap[col.field] === true;
+          const fromData =
+            !edited &&
+            !imputed &&
+            (col.master
+              ? masterSet
+              : tracked
+                ? fromDataMap[col.field] === true
+                : r[col.field] !== undefined && r[col.field] !== null);
+          const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
+          const fromOverride =
+            !edited &&
+            !imputed &&
+            !fromData &&
+            !col.master &&
+            overrides.some(
+              (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
+            );
+          const prov: Provenance = edited
+            ? "edited"
+            : imputed
+              ? "imputed"
+              : fromData
+                ? col.master
+                  ? "master"
+                  : "data"
+                : derivedFallback
+                  ? "derived"
+                  : fromOverride
+                    ? "override"
+                    : "default";
+
+          const firms = r.__firms_available as string[] | undefined;
+          const opts = enumOptionsFor(col);
+          const kind = kindOf(col, opts, firms, cellValue, liveDefault);
+          const commit = (v: unknown) => onCellChange(rowKey, col.field, v);
+
+          return (
+            <td
+              key={col.field}
+              className="relative overflow-hidden border-b px-1 py-[3px] align-middle group-hover:bg-[#fafafa]"
+              style={{
+                width,
+                minWidth: width,
+                ...cellDivider(isLastCol),
+                ...(edited ? { background: "rgba(17,17,17,0.04)" } : {}),
+              }}
+            >
+              {kind !== "number" && <ProvenanceDot p={prov} />}
+
+              {kind === "readonly" && (
+                <span
+                  title={col.engineStatus ? `Activates with ${col.engineStatus.milestone}` : undefined}
+                  className="block w-full px-[5px] text-right font-mono text-[11px] tabular-nums text-[#c4c4c4]"
+                >
+                  {(() => {
+                    const raw = cellValue ?? liveDefault;
+                    const n = typeof raw === "number" ? raw : null;
+                    if (n != null && Number.isFinite(n)) return col.format ? col.format(n) : String(n);
+                    return typeof raw === "string" && raw !== "" ? raw : "—";
+                  })()}
+                </span>
+              )}
+
+              {kind === "segmented" && (
+                <CellSegmented
+                  value={String(
+                    cellValue ?? liveDefault ?? (col.field === "sourcing_firm" ? firms?.[0] : opts?.[0]?.value) ?? "",
+                  )}
+                  options={
+                    col.field === "sourcing_firm" && firms
+                      ? firms.map((f) => ({ value: f, label: f }))
+                      : opts!
+                  }
+                  onChange={commit}
+                />
+              )}
+
+              {kind === "select" && (
+                <Select value={String(cellValue ?? liveDefault ?? "")} onValueChange={commit}>
+                  <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(col.field === "sourcing_firm" && firms
+                      ? firms.map((f) => ({ value: f, label: f, title: undefined }))
+                      : opts ?? []
+                    ).map((o) => (
+                      <SelectItem key={o.value} value={o.value} className="text-xs">
+                        {o.title ?? o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {kind === "toggle" && (
+                <span className="flex justify-center">
+                  <Toggle
+                    checked={typeof cellValue === "boolean" ? cellValue : Boolean(liveDefault)}
+                    onChange={commit}
+                  />
+                </span>
+              )}
+
+              {kind === "number" && (
+                <NumCell
+                  value={(() => {
+                    const n = typeof cellValue === "number" ? cellValue : Number(cellValue);
+                    return cellValue == null || !Number.isFinite(n) ? undefined : n;
+                  })()}
+                  provenance={prov}
+                  decimals={fc.kind === "num" ? (fc.dec ?? 2) : prov === "derived" ? 2 : undefined}
+                  integer={fc.kind === "int"}
+                  unit={fc.unit}
+                  onCommit={commit}
+                />
+              )}
+
+              {kind === "text" && (
+                <input
+                  value={String(cellValue ?? liveDefault ?? "")}
+                  onChange={(e) => commit(e.target.value)}
+                  className="h-5 w-full min-w-0 rounded-sm border border-transparent bg-transparent px-[5px] font-mono text-[11.5px] outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
+                  style={{ boxSizing: "border-box" }}
+                  size={1}
+                />
+              )}
+            </td>
+          );
+        })}
+      </tr>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -902,15 +1374,44 @@ export function StagePolicyTable({
           </span>
         )}
         <div className="flex items-center gap-1">
-          {colGroups.map((g) => (
+          {familiesPresent.map((f) => (
             <FamilyChip
-              key={g.family}
-              family={g.family}
-              hidden={collapsed.has(g.family)}
-              onToggle={() => toggleFamily(g.family)}
+              key={f}
+              family={f}
+              hidden={collapsed.has(f)}
+              onToggle={() => toggleFamily(f)}
             />
           ))}
         </div>
+        {collapsibleGroups.length > 0 && (
+          <button
+            type="button"
+            onClick={toggleAllGroups}
+            className="inline-flex h-[22px] items-center gap-1 rounded-sm border border-[--zinc-border] bg-white px-[7px] font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            title={anyGroupExpanded ? "Collapse every group to one summary row" : "Expand every group"}
+          >
+            {anyGroupExpanded ? "⇕" : "⇔"}{" "}
+            {anyGroupExpanded ? `collapse ${collapsibleGroups.length} groups` : `expand ${collapsibleGroups.length} groups`}
+          </button>
+        )}
+        {totalCols > 0 && (
+          <button
+            type="button"
+            onClick={() => setFitEnabled((v) => !v)}
+            className="inline-flex h-[22px] items-center gap-1 rounded-sm border border-[--zinc-border] bg-white px-[7px] font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            title={
+              fitEnabled
+                ? "Show every column and scroll horizontally instead of folding"
+                : "Fold low-priority columns to fit the box"
+            }
+          >
+            {!fitEnabled
+              ? `all ${totalCols} columns · scrolls`
+              : folded.length > 0
+                ? `${folded.length} folded · ${visible.length}/${totalCols}`
+                : `all ${totalCols} columns fit`}
+          </button>
+        )}
         {dataBannerState === "pending" && (
           <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px]" style={{ color: LAYER.firm }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.firm }} />
@@ -967,38 +1468,62 @@ export function StagePolicyTable({
 
       {dataRows.length > 0 && <ProvenanceLegend imputedLines={imputedLines} />}
 
-      <div className="max-h-[614px] overflow-auto rounded-sm border border-[--hair-border] border-t-2 border-t-foreground [scrollbar-gutter:stable]">
-        <table className="w-max min-w-full border-separate border-spacing-0">
+      {/* Nothing folded is hidden silently (§0.5) — name it and say how to get it back. */}
+      {fitEnabled && folded.length > 0 && (
+        <div className="font-mono text-[10px] text-muted-foreground">
+          folded: {folded.slice(0, 4).map((c) => c.label).join(", ")} · {foldNote(folded)}
+        </div>
+      )}
+
+      <div
+        ref={scrollRef}
+        className="max-h-[614px] overflow-auto rounded-sm border border-[--hair-border] border-t-2 border-t-foreground [scrollbar-gutter:stable]"
+      >
+        <table
+          className="border-separate border-spacing-0"
+          style={{ width: "100%", minWidth: tableMinWidth, tableLayout: "fixed" }}
+        >
+          <colgroup>
+            <col style={{ width: keyW.a }} />
+            <col style={{ width: keyW.b }} />
+            {visible.map((c, i) => (
+              <col
+                key={c.key}
+                style={{ width: fills && i === visible.length - 1 ? "auto" : c.w }}
+              />
+            ))}
+          </colgroup>
           <thead>
-            {/* Row 1 — family bands. */}
+            {/* Row 1 — family bands. Widths come from the fit, never a fresh
+                measurement — the <colgroup> above is the only source (§0.1). */}
             <tr>
               <th
                 colSpan={spec.keyCols.length}
                 className="sticky left-0 top-0 z-40 h-[23px] border-r border-r-[rgba(255,255,255,0.22)] bg-[--brand-ink] p-0"
                 style={{ width: keyTotal, minWidth: keyTotal }}
               />
-              {colGroups.map((g) => {
+              {bandGroups.map((g, gi) => {
                 const isCollapsed = collapsed.has(g.family);
-                const width = isCollapsed
-                  ? DEFAULT_COL_WIDTH
-                  : g.cols.reduce((a, c) => a + widthOf(c), 0);
+                const width = g.cols.reduce((a, c) => a + c.w, 0);
                 return (
                   <th
-                    key={g.family}
-                    colSpan={isCollapsed ? 1 : g.cols.length}
+                    key={`${g.family}-${gi}`}
+                    colSpan={g.cols.length}
                     className="sticky top-0 z-30 h-[23px] bg-[--brand-ink] p-0 align-middle"
                   >
                     <FamilyBand
                       family={g.family}
+                      label={isCollapsed ? `${g.family} (folded)` : undefined}
                       width={width}
                       collapsed={isCollapsed}
+                      last={gi === bandGroups.length - 1}
                       onToggle={() => toggleFamily(g.family)}
                     />
                   </th>
                 );
               })}
             </tr>
-            {/* Row 2 — column heads. */}
+            {/* Row 2 — column heads, two lines (label + sub) on one baseline. */}
             <tr>
               {spec.keyCols.map((c, i) => (
                 <th
@@ -1019,46 +1544,68 @@ export function StagePolicyTable({
                   />
                 </th>
               ))}
-              {colGroups.flatMap((g) => {
-                if (collapsed.has(g.family)) {
-                  return [
-                    <th
-                      key={`${g.family}-collapsed`}
-                      className="sticky top-[23px] z-30 border-r border-r-[rgba(255,255,255,0.22)] bg-[--brand-ink] px-2 py-1 text-center font-mono text-[9.5px] text-white/60"
-                      style={{ width: DEFAULT_COL_WIDTH, minWidth: DEFAULT_COL_WIDTH }}
-                    >
-                      {g.cols.length} hidden
-                    </th>,
-                  ];
-                }
-                return g.cols.map((col) => {
-                  const width = widthOf(col);
+              {visible.map((fc, i) => {
+                const isLast = i === visible.length - 1;
+                const width = fills && isLast ? undefined : fc.w;
+                if (fc.foldedFamily) {
                   return (
                     <th
-                      key={col.field}
+                      key={fc.key}
+                      className="sticky top-[23px] z-30 bg-[--brand-ink] px-2 py-1 text-left font-mono text-[9.5px] text-white/60"
+                      style={{ width, minWidth: width, borderRight: isLast ? "none" : "1px solid rgba(255,255,255,0.22)" }}
+                    >
+                      {fc.foldedFamily} field{fc.foldedFamily === 1 ? "" : "s"} folded
+                    </th>
+                  );
+                }
+                const col = specColByField.get(fc.key);
+                if (!col) return null;
+                if (col.synthetic) {
+                  return (
+                    <th
+                      key={fc.key}
                       className="sticky top-[23px] z-30 bg-[--brand-ink] p-0 align-top"
                       style={{ width, minWidth: width }}
                     >
-                      {col.synthetic ? (
-                        // Vector cell anchor: a plain label — its params carry
-                        // their own meaning inside the cell.
-                        <div className="flex h-full items-start border-r border-r-[rgba(255,255,255,0.22)] px-1.5 py-1 font-mono text-[10px] font-medium uppercase leading-[1.25] tracking-[0.08em] text-white">
-                          {adaptLabel(col.label)}
-                        </div>
-                      ) : (
-                        <SortHeader
-                          label={adaptLabel(col.label)}
-                          dir={sort?.col === col.field ? sort.dir : null}
-                          onSort={() => toggleSort(col.field)}
-                          onInfo={() => setParamSheetCol(col)}
-                          pending={!!col.engineStatus}
-                          filter={colFilters[col.field] ?? ""}
-                          onFilter={(v) => setColFilter(col.field, v)}
-                        />
-                      )}
+                      {/* Vector cell anchor: a plain label — its params carry
+                          their own meaning inside the cell. */}
+                      <div
+                        className="flex h-full flex-col items-start justify-center gap-px overflow-hidden px-1.5 py-1 font-mono font-medium uppercase text-white"
+                        style={{ borderRight: isLast ? "none" : "1px solid rgba(255,255,255,0.22)" }}
+                        title={adaptLabel(fc.label)}
+                      >
+                        <span className="w-full truncate text-[10px] leading-[1.2] tracking-[0.08em]">
+                          {adaptLabel(fc.label)}
+                        </span>
+                        {fc.sub && (
+                          <span className="w-full truncate text-[9px] font-normal normal-case tracking-normal text-white/55">
+                            {fc.sub}
+                          </span>
+                        )}
+                      </div>
                     </th>
                   );
-                });
+                }
+                return (
+                  <th
+                    key={fc.key}
+                    className="sticky top-[23px] z-30 bg-[--brand-ink] p-0 align-top"
+                    style={{ width, minWidth: width }}
+                  >
+                    <SortHeader
+                      label={adaptLabel(fc.label)}
+                      sub={fc.sub}
+                      dir={sort?.col === col.field ? sort.dir : null}
+                      onSort={() => toggleSort(col.field)}
+                      onInfo={() => setParamSheetCol(col)}
+                      pending={!!col.engineStatus}
+                      quiet={fc.quiet}
+                      last={isLast}
+                      filter={fc.filterable === false ? undefined : (colFilters[col.field] ?? "")}
+                      onFilter={fc.filterable === false ? undefined : (v) => setColFilter(col.field, v)}
+                    />
+                  </th>
+                );
               })}
             </tr>
           </thead>
@@ -1078,372 +1625,108 @@ export function StagePolicyTable({
               </tr>
             )}
             {!loading &&
-              filtered.map((r) => {
-                const rowKey = r.key;
-                const isDirty = (drafts[rowKey] && Object.keys(drafts[rowKey]).length > 0) ?? false;
-                const overrode = hasOverride(rowKey);
-                const attention = rowNeedsAttention(r as Record<string, unknown>);
-                // Multi-source pairs stay marked permanently for review, even
-                // once a primary is chosen.
-                const isMultiSource = Number((r as Record<string, unknown>).__lane_count ?? 0) > 1;
-                const accent = rowAccent({ edited: isDirty, attention, multiSource: isMultiSource });
+              rowGroups.flatMap((group) => {
+                const isCollapsible = group.members.length > 1;
+                const groupId = `${stageKey}::${group.id}`;
+                const isGroupCollapsed = isCollapsible && collapsedGroups.has(groupId);
+
+                if (!isGroupCollapsed) {
+                  return group.members.map((m, mi) =>
+                    renderRow(m.row as Record<string, unknown>, {
+                      isFirstOfGroup: isCollapsible && mi === 0,
+                      isContinuation: isCollapsible && mi > 0,
+                      groupId,
+                    }),
+                  );
+                }
+
+                // §5.2 — collapsed group: one summary row, Σ / ø / distinct
+                // aggregates per column kind. No provenance dots — they would
+                // claim a provenance the aggregate does not have.
+                const rows = group.members.map((m) => m.row as Record<string, unknown>);
+                const anyFlagged = rows.some((rr) => rowNeedsAttention(rr));
+                const flaggedCount = rows.filter((rr) => rowNeedsAttention(rr)).length;
+                const accent = anyFlagged ? "#BF2330" : "#171717";
+                const keyBLabel =
+                  stageKey === "supplier"
+                    ? `${rows.length} suppliers`
+                    : stageKey === "plant"
+                      ? `${rows.length} products`
+                      : `${rows.length} lines`;
                 return (
-                  <tr key={rowKey} className="group">
-                    {spec.keyCols.map((c, i) => (
-                      <td
-                        key={c.id}
-                        className={cn(
-                          "sticky z-20 border-b border-r border-[--hair-divider] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
-                          i === spec.keyCols.length - 1 && "border-r-[--hair-border]",
-                        )}
-                        style={{
-                          left: keyLeft(i),
-                          width: keyWidths[i],
-                          minWidth: keyWidths[i],
-                          maxWidth: keyWidths[i],
-                          ...(i === 0 && accent
-                            ? { borderLeft: `2px solid ${accent}` }
-                            : {}),
-                        }}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {c.id === "supplier_id" && r.__needs_supplier ? (
-                            newSupplierFor === rowKey ? (
-                              // Typing a brand-new supplier id: Enter confirms,
-                              // Escape cancels.
-                              <Input
-                                autoFocus
-                                value={newSupplierId}
-                                placeholder="new supplier id"
-                                className="h-5 border-[--zinc-border] px-1.5 font-mono text-[11px]"
-                                disabled={assigning === String(r.material_id)}
-                                onChange={(e) => setNewSupplierId(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Escape") {
-                                    setNewSupplierFor(null);
-                                    setNewSupplierId("");
-                                  }
-                                  if (e.key === "Enter") {
-                                    const id = newSupplierId.trim();
-                                    if (!id || id.startsWith("(")) {
-                                      toast.warning("Enter a valid supplier id.", TOAST);
-                                      return;
-                                    }
-                                    setNewSupplierFor(null);
-                                    setNewSupplierId("");
-                                    void assignSupplier(String(r.material_id), id);
-                                  }
-                                }}
-                                onBlur={() => {
-                                  setNewSupplierFor(null);
-                                  setNewSupplierId("");
-                                }}
-                              />
-                            ) : (
-                              // Unassigned material: pick (or create) a supplier —
-                              // creates the sourcing lane.
-                              <Select
-                                disabled={assigning === String(r.material_id)}
-                                onValueChange={(v) => {
-                                  if (v === "__new__") {
-                                    setNewSupplierFor(rowKey);
-                                    setNewSupplierId("");
-                                    return;
-                                  }
-                                  void assignSupplier(String(r.material_id), v);
-                                }}
-                              >
-                                <SelectTrigger
-                                  className="h-5 w-full px-1.5 font-mono text-[10.5px]"
-                                  style={{ borderColor: LAYER.brand, color: LAYER.brand }}
-                                >
-                                  <SelectValue
-                                    placeholder={
-                                      assigning === String(r.material_id) ? "assigning…" : "assign supplier"
-                                    }
-                                  />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__new__" className="text-xs font-medium">
-                                    + new supplier
-                                  </SelectItem>
-                                  {knownSuppliers.map((s) => (
-                                    <SelectItem key={s} value={s} className="text-xs">
-                                      {s}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )
-                          ) : (
-                            <span
-                              className="min-w-[62px] flex-1 truncate"
-                              title={String(r[c.id] ?? "")}
-                            >
-                              {String(r[c.id] ?? "")}
-                            </span>
-                          )}
-
-                          {/* material-level required actions */}
-                          {i === 0 && r.__needs_supplier && (
-                            <RowFlag title="This material has no supplier in the project data — assign one in the Supplier column.">
-                              needs supplier
-                            </RowFlag>
-                          )}
-                          {i === 0 &&
-                            !r.__needs_supplier &&
-                            Number(r.__lane_count ?? 0) > 1 &&
-                            !groupHasPrimary(r as Record<string, unknown>) && (
-                              <RowFlag title="Multiple sources — pick exactly one primary.">
-                                pick primary
-                              </RowFlag>
-                            )}
-                          {c.id === "product_id" && r.__unknown_product && (
-                            <span
-                              title="Not found in BOM"
-                              className="shrink-0 rounded-sm px-1 font-mono text-[9px]"
-                              style={{ background: tint(LAYER.firm, 0.12), color: LAYER.firm }}
-                            >
-                              !
-                            </span>
-                          )}
-                          {/* "set firm" only when the customer product has no known firms in data. */}
-                          {i === spec.keyCols.length - 1 &&
-                            stageKey === "customer" &&
-                            (!r.__firms_available || (r.__firms_available as string[]).length === 0) &&
-                            !getEffective(rowKey, r, "sourcing_firm") && (
-                              <RowFlag title="No firms detected for this product — type a sourcing firm">
-                                set firm
-                              </RowFlag>
-                            )}
-                          {/* Per-row reset (drafts + saved overrides) */}
-                          {i === 0 && deleteOverride && (overrode || isDirty) && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                resetRow(rowKey);
-                              }}
-                              className="shrink-0 font-mono text-[9.5px] text-[#c4c4c4] opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                              title="Revert this line to project data"
-                            >
-                              ↺
-                            </button>
-                          )}
+                  <tr key={groupId} className="group">
+                    <td
+                      className="sticky z-20 border-b border-r border-[--hair-divider] bg-[#f7f7f7] px-2 py-[3px] font-mono text-[11px]"
+                      style={{
+                        left: keyLeft(0),
+                        width: keyWidths[0],
+                        minWidth: keyWidths[0],
+                        maxWidth: keyWidths[0],
+                        borderLeft: `2px solid ${accent}`,
+                      }}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(groupId)}
+                          className="grid h-[15px] w-[15px] shrink-0 place-items-center font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                          title="Expand this group"
+                        >
+                          ▸
+                        </button>
+                        <span className="min-w-0 flex-1 truncate font-medium" title={group.id}>
+                          {group.id}
                         </span>
-                      </td>
-                    ))}
-
-                    {colGroups.flatMap((g) => {
-                      if (collapsed.has(g.family)) {
-                        return [
-                          <td
-                            key={`${rowKey}-${g.family}-collapsed`}
-                            className="border-b border-r border-[--hair-divider] bg-[#fcfcfc]"
-                          />,
-                        ];
-                      }
-                      return g.cols.map((col) => {
-                        const rowDraft = drafts[rowKey] ?? {};
-                        const eff = rowEffective.get(rowKey);
-                        const width = widthOf(col);
-                        // per-row gating: hide cells whose policy choice doesn't apply
-                        const isVisibleForRow = !col.visibleWhen || col.visibleWhen({
-                          fulfillmentStrategy,
-                          row: r,
-                          draft: rowDraft,
-                          effective: eff,
-                        });
-                        if (!isVisibleForRow) {
-                          return (
-                            <td
-                              key={col.field}
-                              className="border-b border-r border-[--hair-divider] p-0 text-center font-mono text-[10px] text-[#dcdcdc]"
-                              style={{ width, minWidth: width }}
-                              title="Not applicable for the current policy choice"
-                            >
-                              —
-                            </td>
-                          );
-                        }
-                        // The dynamic "Replenishment parameters" vector cell.
-                        if (col.synthetic && col.field === "__inv_params") {
-                          return (
-                            <td
-                              key={col.field}
-                              className="border-b border-r border-[--hair-divider] p-0 align-middle group-hover:bg-[#fafafa]"
-                              style={{ width, minWidth: width }}
-                            >
-                              {renderInvParamsCell(rowKey, r as Record<string, unknown>)}
-                            </td>
-                          );
-                        }
-                        const cellValue = getEffective(rowKey, r, col.field, col.family);
-                        // Master-backed columns: value from the item master, with
-                        // the engine's derived fallback (≈) shown when unset.
-                        const masterSet = col.master ? masterValueFor(col, r) !== undefined : false;
-                        const derivedVal = col.master && !masterSet ? derivedValueFor(col, r) : undefined;
-                        // live default = bundle value > spec.defaultWhenMissing > family raw default.
-                        // Read from the column's own family (not the flattened first-wins
-                        // map) so a name shared across families resolves to this header's value.
-                        const bundleVal = (
-                          effectivePolicy(defaults, overrides, spec.scope, rowKey)[col.family] as
-                            | Record<string, unknown>
-                            | undefined
-                        )?.[col.field];
-                        const liveDefault = col.master
-                          ? derivedVal ?? 0
-                          : bundleVal !== undefined
-                            ? bundleVal
-                            : col.defaultWhenMissing !== undefined
-                            ? col.defaultWhenMissing
-                            : getDefault(col.field, col.family);
-                        const edited = rowDraft[col.field] !== undefined;
-                        // Provenance maps emitted by useStageRows for project-backed fields.
-                        const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
-                        const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
-                        const tracked = col.field in fromDataMap || col.field in imputedMap;
-                        const imputed = !edited && !col.master && imputedMap[col.field] === true;
-                        const fromData =
-                          !edited &&
-                          !imputed &&
-                          (col.master
-                            ? masterSet
-                            : tracked
-                            ? fromDataMap[col.field] === true
-                            : r[col.field] !== undefined && r[col.field] !== null);
-                        const derivedFallback =
-                          !edited && !!col.master && !masterSet && derivedVal !== undefined;
-                        const fromOverride =
-                          !edited && !imputed && !fromData && !col.master && overrides.some(
-                            (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
-                          );
-                        const prov: Provenance = edited
-                          ? "edited"
-                          : imputed
-                          ? "imputed"
-                          : fromData
-                          ? col.master
-                            ? "master"
-                            : "data"
-                          : derivedFallback
-                          ? "derived"
-                          : fromOverride
-                          ? "override"
-                          : "default";
-
-                        const firms = r.__firms_available as string[] | undefined;
-                        const opts = enumOptionsFor(col);
-                        const kind = kindOf(col, opts, firms, cellValue, liveDefault);
-                        const commit = (v: unknown) => onCellChange(rowKey, col.field, v);
-
+                        {anyFlagged && (
+                          <RowFlag title="One or more lines in this group need input">
+                            {flaggedCount} open
+                          </RowFlag>
+                        )}
+                      </span>
+                    </td>
+                    <td
+                      className="sticky z-20 border-b border-r border-r-[--hair-border] bg-[#f7f7f7] px-2 py-[3px] font-mono text-[11px] text-muted-foreground"
+                      style={{ left: keyLeft(1), width: keyWidths[1], minWidth: keyWidths[1], maxWidth: keyWidths[1] }}
+                    >
+                      {keyBLabel}
+                    </td>
+                    {visible.map((fc, fi) => {
+                      const isLastCol = fi === visible.length - 1;
+                      const width = fills && isLastCol ? undefined : fc.w;
+                      if (fc.foldedFamily) {
                         return (
                           <td
-                            key={col.field}
-                            className={cn(
-                              "relative border-b border-r border-[--hair-divider] px-1 py-[3px] align-middle group-hover:bg-[#fafafa]",
-                            )}
-                            style={{
-                              width,
-                              minWidth: width,
-                              ...(edited ? { background: "rgba(17,17,17,0.04)" } : {}),
-                            }}
+                            key={fc.key}
+                            className="border-b bg-[#f7f7f7]"
+                            style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
+                          />
+                        );
+                      }
+                      const col = specColByField.get(fc.key);
+                      if (!col) return null;
+                      if (col.synthetic) {
+                        return (
+                          <td
+                            key={fc.key}
+                            className="border-b bg-[#f7f7f7] px-1.5 py-[3px] font-mono text-[10.5px] text-muted-foreground"
+                            style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
                           >
-                            {kind !== "number" && <ProvenanceDot p={prov} />}
-
-                            {kind === "readonly" && (
-                              <span
-                                title={
-                                  col.engineStatus
-                                    ? `Activates with ${col.engineStatus.milestone}`
-                                    : undefined
-                                }
-                                className="block w-full px-[5px] text-right font-mono text-[11px] tabular-nums text-[#c4c4c4]"
-                              >
-                                {(() => {
-                                  const raw = cellValue ?? liveDefault;
-                                  const n = typeof raw === "number" ? raw : null;
-                                  if (n != null && Number.isFinite(n))
-                                    return col.format ? col.format(n) : String(n);
-                                  return typeof raw === "string" && raw !== "" ? raw : "—";
-                                })()}
-                              </span>
-                            )}
-
-                            {kind === "segmented" && (
-                              <CellSegmented
-                                value={String(
-                                  cellValue ??
-                                    liveDefault ??
-                                    (col.field === "sourcing_firm" ? firms?.[0] : opts?.[0]?.value) ??
-                                    "",
-                                )}
-                                options={
-                                  col.field === "sourcing_firm" && firms
-                                    ? firms.map((f) => ({ value: f, label: f }))
-                                    : opts!
-                                }
-                                onChange={commit}
-                              />
-                            )}
-
-                            {kind === "select" && (
-                              <Select
-                                value={String(cellValue ?? liveDefault ?? "")}
-                                onValueChange={commit}
-                              >
-                                <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
-                                  <SelectValue placeholder="—" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {(col.field === "sourcing_firm" && firms
-                                    ? firms.map((f) => ({ value: f, label: f, title: undefined }))
-                                    : opts ?? []
-                                  ).map((o) => (
-                                    <SelectItem key={o.value} value={o.value} className="text-xs">
-                                      {o.title ?? o.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-
-                            {kind === "toggle" && (
-                              <span className="flex justify-center">
-                                <Toggle
-                                  checked={
-                                    typeof cellValue === "boolean"
-                                      ? cellValue
-                                      : Boolean(liveDefault)
-                                  }
-                                  onChange={commit}
-                                />
-                              </span>
-                            )}
-
-                            {kind === "number" && (
-                              <NumCell
-                                value={(() => {
-                                  const n =
-                                    typeof cellValue === "number" ? cellValue : Number(cellValue);
-                                  return cellValue == null || !Number.isFinite(n) ? undefined : n;
-                                })()}
-                                provenance={prov}
-                                decimals={prov === "derived" ? 2 : undefined}
-                                onCommit={commit}
-                              />
-                            )}
-
-                            {kind === "text" && (
-                              <input
-                                value={String(cellValue ?? liveDefault ?? "")}
-                                onChange={(e) => commit(e.target.value)}
-                                className="h-5 w-full rounded-sm border border-transparent bg-transparent px-[5px] font-mono text-[11.5px] outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
-                              />
-                            )}
+                            per line
                           </td>
                         );
-                      });
+                      }
+                      const values = rows.map((rr) => cellValueFor(rr, col.field));
+                      const summary = summarise({ kind: fc.kind, dec: fc.dec }, values);
+                      const align = fc.align === "left" ? "left" : fc.align === "center" ? "center" : "right";
+                      return (
+                        <td
+                          key={fc.key}
+                          className="border-b bg-[#f7f7f7] px-1.5 py-[3px] font-mono text-[10.5px] text-muted-foreground"
+                          style={{ width, minWidth: width, textAlign: align, ...cellDivider(isLastCol) }}
+                        >
+                          {summary}
+                        </td>
+                      );
                     })}
                   </tr>
                 );
@@ -1452,22 +1735,6 @@ export function StagePolicyTable({
         </table>
       </div>
 
-      {/* The edited/Revert/Save cluster follows the cursor: the toolbar copy is
-          at the top of a 614px-tall grid, this one is always in reach. */}
-      {dirtyKeys.length > 0 && (
-        <div className="fixed bottom-[18px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-[9px] rounded-sm border border-foreground bg-background px-2.5 py-[7px] shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
-            <span className="h-[5px] w-[5px] rounded-full bg-foreground" />
-            {dirtyKeys.length} edited
-          </span>
-          <Button variant="ghost" size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={revertAll}>
-            Revert
-          </Button>
-          <Button size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={saveAll}>
-            Save changes
-          </Button>
-        </div>
-      )}
 
       <AlertDialog open={confirmPrefill} onOpenChange={setConfirmPrefill}>
         <AlertDialogContent>

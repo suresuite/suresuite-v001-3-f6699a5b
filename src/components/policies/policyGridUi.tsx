@@ -86,13 +86,19 @@ export const FAMILY_COLOR: Record<string, string> = {
 
 export function FamilyBand({
   family,
+  label,
   width,
   collapsed,
+  last,
   onToggle,
 }: {
   family: string;
+  /** Display text override (e.g. "sourcing (folded)") — `family` still drives the color. */
+  label?: string;
   width: number;
   collapsed: boolean;
+  /** The outermost column carries no right rule — otherwise it springs a scrollbar. */
+  last?: boolean;
   onToggle: () => void;
 }) {
   const color = FAMILY_COLOR[family] ?? "#9a9a9a";
@@ -100,12 +106,19 @@ export function FamilyBand({
     <button
       type="button"
       onClick={onToggle}
-      style={{ flex: `0 0 ${width}px`, width, color, opacity: collapsed ? 0.45 : 1 }}
-      className="flex items-center gap-1.5 border-r border-r-[rgba(255,255,255,0.22)] px-2 text-left font-mono text-[10px] font-medium uppercase tracking-[0.16em]"
+      title={`${collapsed ? "Expand" : "Collapse"} the ${family} family`}
+      style={{
+        flex: `0 0 ${width}px`,
+        width,
+        color,
+        opacity: collapsed ? 0.45 : 1,
+        borderRight: last ? "none" : "2px solid #ffffff",
+      }}
+      className="flex h-full w-full items-center gap-1.5 overflow-hidden px-2 text-left font-mono text-[10px] font-medium uppercase tracking-[0.16em]"
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
-      {family}
-      <span className="text-[9px] text-white/60">{collapsed ? "▸" : "▾"}</span>
+      <span className="min-w-0 flex-1 truncate">{label ?? family}</span>
+      <span className="shrink-0 text-[9px] text-white/60">{collapsed ? "▸" : "▾"}</span>
     </button>
   );
 }
@@ -149,32 +162,56 @@ export function FamilyChip({
  */
 export function SortHeader({
   label,
+  sub,
   dir,
   onSort,
   onInfo,
   pending,
+  quiet,
   filter,
   onFilter,
+  last,
 }: {
   label: string;
+  /** Second header line: unit, range, provenance note — never part of `label`. */
+  sub?: string;
   dir: "asc" | "desc" | null;
   onSort: () => void;
   onInfo?: () => void;
   pending?: boolean;
+  /** Engine-pending column: dims the sub line further. */
+  quiet?: boolean;
   filter?: string;
   onFilter?: (v: string) => void;
+  /** The outermost column carries no right rule — it would spring a scrollbar. */
+  last?: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col justify-between gap-[3px] border-r border-r-[rgba(255,255,255,0.22)] px-1.5 py-1">
-      <div className="flex items-start gap-[3px]">
+    <div
+      className="flex h-full flex-col justify-between gap-[3px] px-1.5 py-1"
+      style={{ borderRight: last ? "none" : "1px solid rgba(255,255,255,0.22)" }}
+    >
+      <div className="flex min-w-0 items-start gap-[3px]">
         <button
           type="button"
           onClick={onSort}
-          title="Sort"
-          className="flex min-w-0 flex-1 items-start gap-1 text-left font-mono text-[10px] font-medium uppercase leading-[1.25] tracking-[0.08em] text-white"
+          title={sub ? `${label} — ${sub}` : label}
+          className="flex min-w-0 flex-1 flex-col items-start text-left font-mono text-white"
         >
-          <span className="min-w-0 flex-1 overflow-hidden [overflow-wrap:anywhere]">{label}</span>
-          {dir && <span className="shrink-0 font-mono text-[9px] text-white">{dir === "asc" ? "↑" : "↓"}</span>}
+          <span className="flex w-full min-w-0 items-center gap-1">
+            <span className="min-w-0 flex-1 truncate text-[10px] font-medium uppercase leading-[1.2] tracking-[0.08em]">
+              {label}
+            </span>
+            {dir && <span className="shrink-0 font-mono text-[9px] text-white">{dir === "asc" ? "↑" : "↓"}</span>}
+          </span>
+          {sub && (
+            <span
+              className="w-full truncate text-[9px] leading-[1.2] normal-case tracking-normal"
+              style={{ color: quiet ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.55)" }}
+            >
+              {sub}
+            </span>
+          )}
         </button>
         {onInfo && (
           <button
@@ -200,7 +237,9 @@ export function SortHeader({
           value={filter ?? ""}
           onChange={(e) => onFilter(e.target.value)}
           placeholder="filter"
-          className="h-[17px] w-full rounded-sm border border-[--zinc-border] bg-white px-1 text-[10.5px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground"
+          size={1}
+          style={{ boxSizing: "border-box", minWidth: 0 }}
+          className="h-[18px] w-full rounded border border-[--zinc-border] bg-white px-[5px] text-[10px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground"
         />
       )}
     </div>
@@ -214,31 +253,45 @@ export function NumCell({
   provenance,
   onCommit,
   decimals,
+  integer,
+  unit,
 }: {
   value: number | undefined;
   provenance: Provenance;
   onCommit: (v: number | undefined) => void;
+  /** Fixed decimal count — what puts every row's decimal point on one axis. */
   decimals?: number;
+  /** Thousands-separated, no decimals (columnFit `kind: "int"`). */
+  integer?: boolean;
+  /** Unit glyph rendered in its own fixed gutter, never inside the value text. */
+  unit?: string;
 }) {
   const derived = provenance === "derived";
-  const text =
-    value === undefined || value === null
-      ? ""
-      : (derived ? "≈ " : "") + (decimals ? value.toFixed(decimals) : String(value));
+  const formatted = (v: number) =>
+    integer ? v.toLocaleString("en-US") : decimals != null ? v.toFixed(decimals) : String(v);
+  const text = value === undefined || value === null ? "" : (derived ? "≈ " : "") + formatted(value);
   return (
     <>
       <ProvenanceDot p={provenance} />
-      <input
-        defaultValue={text}
-        key={text}
-        placeholder="—"
-        title={PROVENANCE[provenance].title}
-        onBlur={(e) => {
-          const raw = e.target.value.replace("≈", "").trim();
-          onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
-        }}
-        className="h-5 w-full rounded-sm border border-transparent bg-transparent px-[5px] text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
-      />
+      <span
+        className="grid h-5 items-center"
+        style={{ gridTemplateColumns: `1fr ${unit ? 14 : 0}px`, columnGap: unit ? 3 : 0 }}
+      >
+        <input
+          defaultValue={text}
+          key={text}
+          placeholder="—"
+          title={PROVENANCE[provenance].title}
+          size={1}
+          onBlur={(e) => {
+            const raw = e.target.value.replace("≈", "").trim();
+            onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
+          }}
+          style={{ boxSizing: "border-box", minWidth: 0 }}
+          className="h-5 w-full rounded-sm border border-transparent bg-transparent px-[5px] text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
+        />
+        {unit && <span className="text-[9px] text-[#a3a3a3]">{unit}</span>}
+      </span>
     </>
   );
 }
@@ -318,6 +371,7 @@ export function ReplenishmentCell({
   basis,
   onBasisChange,
   showBasis,
+  paramW,
 }: {
   policyType: string;
   params: Array<{ field: string; value: number | undefined; onCommit: (v: number | undefined) => void; invalid?: string }>;
@@ -325,15 +379,19 @@ export function ReplenishmentCell({
   basis: "days_of_supply" | "forward_visible";
   onBasisChange: (b: "days_of_supply" | "forward_visible") => void;
   showBasis?: boolean;
+  /** Value input width — the fit shrinks this (columnFit §1.2) when the cell
+   *  itself has been compacted, so the cell's contents keep fitting its box. */
+  paramW?: number;
 }) {
   const spec = POLICY_PARAMS[policyType] ?? POLICY_PARAMS.min_max;
   const visibleBasis = showBasis || basis !== "days_of_supply";
+  const w = paramW ?? 52;
   return (
-    <div className="flex w-full items-center gap-[7px] px-1">
+    <div className="flex w-full items-center gap-[7px] overflow-hidden px-1">
       {spec.map(({ field, symbol }) => {
         const p = params.find((x) => x.field === field);
         return (
-          <div key={field} className="flex items-center gap-[3px]">
+          <div key={field} className="flex shrink-0 items-center gap-[3px]">
             <span title={labelFor(field)} className="cursor-help font-mono text-[10px] font-medium text-muted-foreground">
               {symbol}
             </span>
@@ -341,11 +399,13 @@ export function ReplenishmentCell({
               key={String(p?.value)}
               defaultValue={p?.value ?? ""}
               placeholder="—"
+              size={1}
               onBlur={(e) => {
                 const raw = e.target.value.trim();
                 p?.onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
               }}
-              className="h-5 w-[52px] rounded-sm border border-transparent bg-transparent px-1 text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
+              style={{ width: w, boxSizing: "border-box" }}
+              className="h-5 rounded-sm border border-transparent bg-transparent px-1 text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
             />
             {p?.invalid && (
               <span title={p.invalid} className="cursor-help font-mono text-[10px] font-medium" style={{ color: LAYER.brand }}>
