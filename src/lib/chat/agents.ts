@@ -1,5 +1,20 @@
 import { ShieldAlert, FlaskConical, Package, Truck, MessageSquare, type LucideIcon } from "lucide-react";
 
+/**
+ * Chat PERSONAS — the five entries in the picker.
+ *
+ * These are not the routed agents. A persona is a system-prompt preamble and
+ * nothing else: all five share one tool surface, one model and one prompt
+ * body, and the only behavioural difference is a sentence like "Prefer the
+ * risk and criticality tools first" (see the server mirror,
+ * supabase/functions/project-ai-chat/agents.ts).
+ *
+ * The specialist agents — data-steward, policy-configurator, vv-analyst,
+ * experiment-designer, report-builder, cost-estimator, network-cartographer,
+ * disruption-sentinel — each have their own prompt, least-privilege tool
+ * subset and proposal artifact, and are selected by the §6 router from what
+ * the user asks, never from this picker. Nothing here maps onto them.
+ */
 export interface AgentSpec {
   id: string;
   name: string;

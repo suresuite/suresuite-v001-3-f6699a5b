@@ -12,6 +12,7 @@ import { ChevronRight } from "lucide-react";
 import type { ChatPart, ChatToolCall } from "@/hooks/useProjectChat";
 import { LAYER, MonoChip, TD, TH, tint } from "./piUi";
 import { cn } from "@/lib/utils";
+import { PlanCard, type PlanPartData } from "@/components/chat/PlanCard";
 
 const CARD = "mt-2 rounded-sm border border-[--hair-border]";
 const accent = (hex: string) => ({ borderLeft: "2px solid " + hex });
@@ -131,39 +132,16 @@ export function BulletsPart({ data }: { data: any }) {
 
 /* ── plan checklist (H3 §21.2) ───────────────────────────────────────── */
 
-const STEP_DOT: Record<string, string> = {
-  pending: "#d9d9d9",
-  active: LAYER.firm,
-  done: LAYER.process,
-  failed: LAYER.brand,
-  refused: "#d9d9d9",
-  awaiting_approval: LAYER.accent,
-  awaiting_run: LAYER.firm,
-};
-
-export function PlanPart({ data }: { data: any }) {
-  const steps: any[] = data?.steps ?? [];
-  return (
-    <div className={cn(CARD, "px-3 py-2.5")} style={accent(LAYER.firm)}>
-      <div className="flex items-center gap-1.5">
-        <span className="text-[13px] font-semibold text-foreground">{data?.title ?? "Task plan"}</span>
-        <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-          {data?.status}
-        </span>
-      </div>
-      {steps.map((s, i) => (
-        <div key={s.id ?? i} className="mt-[7px] flex items-center gap-[7px] text-[12.5px]">
-          <span
-            className="inline-block h-2 w-2 shrink-0 rounded-full"
-            style={{ background: STEP_DOT[s.status] ?? "#d9d9d9" }}
-          />
-          <span className="text-foreground">{s.label}</span>
-          <span className="text-[11px] text-muted-foreground">{String(s.status ?? "").replace(/_/g, " ")}</span>
-          {s.note && <span className="text-[11px] text-muted-foreground">— {s.note}</span>}
-        </div>
-      ))}
-    </div>
-  );
+/**
+ * Plans are SERVER state (§21.2): the {kind:"plan"} part carries a render
+ * snapshot, and the live checklist comes from subscribing to the chat_plans
+ * row. This surface used to draw the snapshot directly, so a plan advancing in
+ * the background stayed frozen here while the same plan animated correctly in
+ * the floating chat bubble, which renders the real PlanCard. Delegate to it —
+ * one plan renderer, live on every surface.
+ */
+export function PlanPart({ data }: { data: unknown }) {
+  return <PlanCard data={data as PlanPartData} />;
 }
 
 /* ── mode notice (§15) ───────────────────────────────────────────────── */

@@ -6,6 +6,13 @@ export interface ServerAgent {
   requiresProject: boolean;
 }
 
+// These are PERSONAS, not the routed agents. A persona is a system-prompt
+// preamble and nothing else: all five share one tool surface, one model and
+// one prompt body — the only behavioural difference is the sentence below.
+// The specialist agents (router.ts AGENT_PRECEDENCE / agentTurn.ts
+// AGENT_TURNS) each carry their own prompt, least-privilege tool subset and
+// proposal artifact, and are chosen by the §6 router from the utterance —
+// never from the picker that selects one of these.
 export const SERVER_AGENTS: Record<string, ServerAgent> = {
   "risk-analyst": {
     id: "risk-analyst",

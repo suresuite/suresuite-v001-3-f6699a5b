@@ -16,6 +16,14 @@ on:
       - 'supabase/functions/_shared/**'
       - 'supabase/migrations/**'
       - 'src/lib/chat/**'
+      # The chat UI was outside this gate, so the visual-language port
+      # (0c5d5ba) landed with no agent-eval run at all — it orphaned six
+      # components, replaced the server-backed §17.3 suggestion chips with two
+      # hardcoded strings, and downgraded the live PlanCard to a frozen
+      # snapshot on the main surface.
+      - 'src/components/intelligence/**'
+      - 'src/components/chat/**'
+      - 'src/hooks/useProjectChat.ts'
       - '.github/workflows/ai-agent-eval.yml'
   pull_request:
     paths:
@@ -25,6 +33,14 @@ on:
       - 'supabase/functions/_shared/**'
       - 'supabase/migrations/**'
       - 'src/lib/chat/**'
+      # The chat UI was outside this gate, so the visual-language port
+      # (0c5d5ba) landed with no agent-eval run at all — it orphaned six
+      # components, replaced the server-backed §17.3 suggestion chips with two
+      # hardcoded strings, and downgraded the live PlanCard to a frozen
+      # snapshot on the main surface.
+      - 'src/components/intelligence/**'
+      - 'src/components/chat/**'
+      - 'src/hooks/useProjectChat.ts'
       - '.github/workflows/ai-agent-eval.yml'
   workflow_dispatch:
 

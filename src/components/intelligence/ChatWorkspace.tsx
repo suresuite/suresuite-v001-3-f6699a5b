@@ -16,6 +16,7 @@ import { ChatComposer } from "./ChatComposer";
 import { ActivityGroup, AgentDivider, MessagePart } from "./MessageParts";
 import { ThreadInfoStrip } from "./SidebarPanels";
 import { ProposalCard } from "@/components/chat/ProposalCard";
+import { SuggestedActions } from "./SuggestedActions";
 import { cn } from "@/lib/utils";
 
 interface ChatWorkspaceProps {
@@ -32,6 +33,9 @@ interface ChatWorkspaceProps {
   onModelChange: (id: string) => void;
   threadMode: "ask" | "review";
   onModeChange: (m: "ask" | "review") => void;
+  /** The chat_threads row id, when this thread has synced. §17.3 resolves the
+   * thread's mode from that row, so the LOCAL thread id would never match. */
+  serverThreadId?: string | null;
   threadSummary?: string | null;
   onDeleteSummary?: () => void;
 }
@@ -56,6 +60,7 @@ export function ChatWorkspace({
   onModelChange,
   threadMode,
   onModeChange,
+  serverThreadId = null,
   threadSummary = null,
   onDeleteSummary = () => {},
 }: ChatWorkspaceProps) {
@@ -77,9 +82,18 @@ export function ChatWorkspace({
     void send(text, { model, projectId, agentId });
   };
 
-  const suggestions = projectId
-    ? ["Summarize this project's key risks", "What changed in my network this week?"]
-    : [];
+  // §17.3 suggestion chips are SERVER-computed, deterministic and
+  // capability-filtered — SuggestedActions calls mode:"suggest" and records
+  // suggestion.clicked. This used to be two hardcoded strings, which shadowed
+  // that entire surface even though the server's SUGGESTED_ACTIONS_ENABLED and
+  // the client's VITE_SUGGESTED_ACTIONS_ENABLED are both true in the
+  // deployment. SuggestedActions renders nothing when the flag is off or the
+  // server returns no chips, so an empty state stays empty rather than
+  // inventing prompts.
+  const pickSuggestion = (utterance: string) => {
+    onInputChange("");
+    void send(utterance, { model, projectId, agentId });
+  };
 
   const composer = (
     <ChatComposer
@@ -169,21 +183,15 @@ export function ChatWorkspace({
               </div>
             )}
 
-            {agent && suggestions.length > 0 && (
-              <div className="mb-2.5 flex flex-wrap gap-1.5">
-                {suggestions.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => {
-                      onInputChange(s);
-                      void send(s, { model, projectId, agentId });
-                    }}
-                    className="rounded-sm border border-[--hair-border] bg-[#fcfcfc] px-2.5 py-[5px] text-[12px] text-muted-foreground"
-                  >
-                    {s}
-                  </button>
-                ))}
+            {agent && (
+              <div className="mb-2.5">
+                <SuggestedActions
+                  projectId={projectId}
+                  threadId={serverThreadId}
+                  threadMode={threadMode}
+                  onPick={pickSuggestion}
+                  disabled={loading}
+                />
               </div>
             )}
 
@@ -262,20 +270,13 @@ export function ChatWorkspace({
 
           <div className="border-t border-[--hair-border] bg-[#fcfcfc] px-4 py-3">
             <div className="mx-auto max-w-[740px]">
-              {suggestions.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => void send(s, { model, projectId, agentId })}
-                      className="rounded-sm border border-[--hair-border] bg-background px-2.5 py-[5px] text-[12px] text-muted-foreground"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <SuggestedActions
+                projectId={projectId}
+                threadId={serverThreadId}
+                threadMode={threadMode}
+                onPick={pickSuggestion}
+                disabled={loading}
+              />
               {composer}
             </div>
           </div>

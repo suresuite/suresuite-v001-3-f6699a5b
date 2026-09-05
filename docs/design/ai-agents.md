@@ -1375,6 +1375,18 @@ Two tiers, both under `supabase/functions/project-ai-chat/eval/`:
 
 A roster change (new agent, prompt-template change, tool-surface change) requires: deterministic tier green + a model-scored run green + the §7.2 guardrail-health review — the agent-layer analogue of "no engine change without golden traces."
 
+**Tier 2 has never run. Read this before treating any flag flip as "gated on the eval."**
+Across every nightly run published to the `eval-results` branch, tier 2 has failed or been skipped — it has never once scored an answer. The current failure is `no provider keys configured`: `GEMINI_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` exist as Supabase **function secrets** but not as **GitHub Actions secrets**, and the Management API returns sha256 digests rather than plaintext, so CI cannot recover them from the deployment (`ai-agent-model-eval.yml` documents this). The single run that ever produced a report scored **0.000 recall on every agent and every model** because the key it did have was rejected as `API_KEY_INVALID`.
+
+Two consequences, both load-bearing:
+
+- **None of the targets above has ever been measured** — not router precision/recall, not schema validity, not the fabrication rate. Deterministic tier green means the machinery is correct, not that any model uses it well.
+- **"Gated on the §7.4 model-scored eval" has meant "gated on a check that cannot run."** That is why `VERIFIER_ENABLED` and `COVERAGE_TOOLS_ENABLED` — the §22.3 verifier and the §19.3 grounding tools, both written specifically to close the fabrication incident in `ai-agent-accuracy-audit.md` — sat off in production long after they shipped and passed the deterministic tier.
+
+Unblocking this is a repository-settings action, not a code change: add the three provider keys as GitHub Actions secrets. Until then, say plainly that a flag is unmeasured rather than describing it as eval-gated.
+
+Note also that `golden_transcript_test.ts` runs with **every flag deleted** and asserts byte-equality — it is a regression lock proving the kill switches work, not evidence about answer quality. Nothing in tier 1 can catch a provider-contract error, because the providers are fetch-mocked.
+
 ### 7.5 Privacy boundaries — never logged
 
 `ai_chat_events` (and any log line in the agent path) must never contain: user message text or LLM reply text (lengths + `args_sha256` only — tool *arguments* are hashed, not stored, because they can embed entity names and free text); user emails (ids only — `ai_usage_logs` already follows this); API keys or `Authorization` material (existing redaction rule, public-api doc §10); raw provider responses. Proposals themselves *do* contain project data — that is their job — and live under the project's read posture, not in telemetry. Provider-side handling remains governed by the org's model allowlist (§8 row I2). Retention: `ai_chat_events` 180 days (DEFAULT), enforced by a scheduled delete; `proposals` retained with the project (they are audit artifacts).

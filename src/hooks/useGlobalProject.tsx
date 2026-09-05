@@ -1,6 +1,10 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-interface Project {
+/** The project shape the global selection stores — and what list_projects
+ * returns. Exported so callers that feed setSelectedProject can type their
+ * rows as this rather than `any` (ProjectIntelligence did the latter under a
+ * file-wide @ts-nocheck). */
+export interface Project {
   id: string;
   name: string;
   plant_name: string;
