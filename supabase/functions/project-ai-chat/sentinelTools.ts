@@ -88,6 +88,7 @@ import {
   type DraftErrorCode,
 } from "./draftTools.ts";
 import { canonicalJson, sha256Hex } from "./telemetry.ts";
+import { fetchWithTimeout } from "../_shared/fetchTimeout.ts";
 import { deploymentEnabledAgents } from "./router.ts";
 import {
   buildDisambiguationPrompt,
@@ -411,7 +412,7 @@ async function assessEvent(
     const screenUrl = applyScreeningRule(entry, { url });
     if (!screenUrl.ok) return failure(tool, "invalid_params", screenUrl.reason ?? "screening failed");
     try {
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url);
       if (!res.ok) {
         return failure(tool, "dependency_missing", `Fetching the url failed (${res.status}).`);
       }

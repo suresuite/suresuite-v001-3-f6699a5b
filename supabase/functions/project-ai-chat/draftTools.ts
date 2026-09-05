@@ -15,13 +15,14 @@
 // executeTool).
 
 import {
+  clamp,
   registerToolHandler,
   toolDeclarations,
   type ToolContext,
   type ToolDeclaration,
   type ToolEnvelope,
 } from "./tools.ts";
-import { loadGateDataset } from "../_shared/validationGate.ts";
+import { gradedResultNote, loadGateDataset } from "../_shared/validationGate.ts";
 import {
   completenessRows,
   DRAFT_FIELDS,
@@ -114,6 +115,11 @@ export const getDataCompletenessDeclaration: ToolDeclaration = {
         type: "string",
         enum: ["materials", "products", "suppliers", "all"],
         description: "Restrict findings to one item-master table. Default 'all'.",
+      },
+      top_n: {
+        type: "number",
+        description:
+          "Maximum findings to return (default 100, max 200), most severe first. meta.note carries the TRUE total when the list is truncated.",
       },
     },
   },
@@ -275,15 +281,27 @@ async function getDataCompleteness(
   const tableArg = ["materials", "products", "suppliers", "all"].includes(String(args.table))
     ? String(args.table)
     : "all";
+  const topN = clamp(args.top_n, 100, 1, 200);
   try {
     const [dataset, defaults] = await Promise.all([
       loadGateDataset(ctx.supabase, ctx.projectId),
       loadPolicyDefaults(ctx.supabase, ctx.projectId),
     ]);
-    const rows = completenessRows(gradeDataset(dataset, defaults)).filter(
+    const all = completenessRows(gradeDataset(dataset, defaults)).filter(
       (r) => tableArg === "all" || r.field.startsWith(`${tableArg}.`),
     );
-    if (rows.length === 0) {
+    // completenessRows emits one row per (graded field × entity) with a prose
+    // message each, so a mid-size project produces thousands of rows — and the
+    // whole envelope is JSON.stringify'd verbatim into the model's context
+    // (providers.ts). Cap it the way the §19.3 reads do: most severe first,
+    // truncate, and carry the TRUE total in meta.note. The grounding-context
+    // builder for this same data already enforces a 32 KB budget
+    // (serializeFindings below); this path had no bound at all.
+    const SEVERITY_RANK: Record<string, number> = { block: 0, blocker: 0, error: 1, warn: 2, warning: 2, info: 3 };
+    const rank = (sev: unknown) => SEVERITY_RANK[String(sev).toLowerCase()] ?? 4;
+    const sorted = [...all].sort((a, b) => rank(a.severity) - rank(b.severity));
+    const rows = sorted.slice(0, topN);
+    if (all.length === 0) {
       return {
         kind: "text",
         data: "No data-completeness findings — the required-data manifest grades green.",
@@ -304,7 +322,11 @@ async function getDataCompleteness(
           r.message,
         ]),
       },
-      meta: { tool, row_count: rows.length },
+      meta: {
+        tool,
+        row_count: rows.length,
+        ...(gradedResultNote(dataset, all.length, rows.length, "findings")),
+      },
     };
   } catch (e) {
     console.warn("get_data_completeness failed:", (e as Error).message);

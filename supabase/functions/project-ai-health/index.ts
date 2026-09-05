@@ -5,6 +5,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { MODEL_REGISTRY, type ProviderId } from "../project-ai-chat/providers.ts";
+import { cleanEnv } from "../_shared/env.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,7 +57,7 @@ serve(async (req) => {
     const providerIds = [...new Set(Object.values(MODEL_REGISTRY).map((m) => m.provider))];
     const entries = await Promise.all(providerIds.map(async (provider) => {
       const { envKey, probe } = PROVIDER_PROBES[provider];
-      const key = Deno.env.get(envKey);
+      const key = cleanEnv(envKey);
       const configured = Boolean(key);
       const reachable = configured ? await probe(key as string) : false;
       const models = Object.values(MODEL_REGISTRY)

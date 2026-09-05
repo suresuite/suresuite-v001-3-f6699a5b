@@ -13,13 +13,14 @@
 //     idempotency key. Provenance is always `deterministic`.
 
 import {
+  clamp,
   registerToolHandler,
   toolDeclarations,
   type ToolContext,
   type ToolDeclaration,
   type ToolEnvelope,
 } from "./tools.ts";
-import { loadGateDataset } from "../_shared/validationGate.ts";
+import { gradedResultNote, loadGateDataset } from "../_shared/validationGate.ts";
 import {
   completenessRows,
   DRAFT_FIELDS,
@@ -85,6 +86,11 @@ export const getParameterEstimatesDeclaration: ToolDeclaration = {
         type: "boolean",
         description:
           "Also return the firm-level resilience fixed-cost estimates (P-S.1 coordination, P-P.5 capacity). These are report-only — never draftable.",
+      },
+      top_n: {
+        type: "number",
+        description:
+          "Maximum candidate rows to return (default 100, max 200). meta.note carries the TRUE total when the list is truncated.",
       },
     },
   },
@@ -261,6 +267,7 @@ async function getParameterEstimates(
   const tableArg = ["materials", "products", "suppliers", "all"].includes(String(args.table))
     ? String(args.table)
     : "all";
+  const topN = clamp(args.top_n, 100, 1, 200);
   try {
     const [dataset, defaults] = await Promise.all([
       loadGateDataset(ctx.supabase, ctx.projectId),
@@ -272,6 +279,11 @@ async function getParameterEstimates(
     );
     const firm = args.include_resilience === true ? firmLevelEstimates(inputs) : [];
     const all = [...candidates, ...firm];
+    // estimateCandidates is a cross-product of (missing value × applicable
+    // method) with an assumptions string per row, and the envelope is
+    // stringified verbatim into the model's context (providers.ts). Cap it the
+    // way the §19.3 reads do; the firm-level rows are few and always kept.
+    const rows = [...firm, ...candidates].slice(0, topN);
     if (all.length === 0) {
       return {
         kind: "text",
@@ -283,7 +295,7 @@ async function getParameterEstimates(
       kind: "table",
       data: {
         columns: ["field", "entity_id", "method", "value", "low", "high", "basis", "dataset", "vintage", "status", "assumptions"],
-        rows: all.map((c) => {
+        rows: rows.map((c) => {
           const src = candidateSourceLabel(c);
           const field = c.entity_id === "firm" ? c.field : `${c.table}.${c.field}`;
           return [
@@ -301,7 +313,11 @@ async function getParameterEstimates(
           ];
         }),
       },
-      meta: { tool, row_count: all.length },
+      meta: {
+        tool,
+        row_count: rows.length,
+        ...(gradedResultNote(dataset, all.length, rows.length, "candidates")),
+      },
     };
   } catch (e) {
     console.warn("get_parameter_estimates failed:", (e as Error).message);

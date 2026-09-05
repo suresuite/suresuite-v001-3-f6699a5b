@@ -47,21 +47,28 @@ export type { GradingDataset as GateDataset };
  * RLS context never reaches a pooled edge connection (the same reason the
  * project-existence check in sim-command uses the service role).
  */
+/** Explicit row ceiling for every gate read. Without a `.limit()` PostgREST
+ * applies its own `db-max-rows` (commonly 1000) and truncates SILENTLY, so a
+ * large project was graded on a slice while reporting a complete grade. An
+ * explicit, generous ceiling makes the bound ours, and a table that comes back
+ * at exactly the ceiling is reported through `dataset.truncated`. */
+export const GATE_ROW_CEILING = 50_000;
+
 // deno-lint-ignore no-explicit-any
 export async function loadGateDataset(sb: any, projectId: string): Promise<GradingDataset> {
   const [materials, products, suppliers, inbound, outbound, bomSingle, bomMulti] = await Promise.all([
     // `name` rides along for the B8 v2 IO-coefficient sector match
     // (estimators.ts::matchIoCoefficient) — the grader itself ignores it.
-    sb.from("materials").select("material_id,name,cost,moq,holding_cost_pct").eq("project_id", projectId),
-    sb.from("products").select("product_id,sell_price,demand_mean,production_capacity,demand_cv").eq("project_id", projectId),
-    sb.from("suppliers").select("supplier_id,capacity_per_week,reliability_score").eq("project_id", projectId),
-    sb.from("inbound_logistics").select("supplier_id,material_id,unit_price,lead_time,volume,time_unit").eq("project_id", projectId),
-    sb.from("outbound_logistics").select("product_id,customer_id,unit_price,volume,time_unit").eq("project_id", projectId),
+    sb.from("materials").select("material_id,name,cost,moq,holding_cost_pct").eq("project_id", projectId).limit(GATE_ROW_CEILING),
+    sb.from("products").select("product_id,sell_price,demand_mean,production_capacity,demand_cv").eq("project_id", projectId).limit(GATE_ROW_CEILING),
+    sb.from("suppliers").select("supplier_id,capacity_per_week,reliability_score").eq("project_id", projectId).limit(GATE_ROW_CEILING),
+    sb.from("inbound_logistics").select("supplier_id,material_id,unit_price,lead_time,volume,time_unit").eq("project_id", projectId).limit(GATE_ROW_CEILING),
+    sb.from("outbound_logistics").select("product_id,customer_id,unit_price,volume,time_unit").eq("project_id", projectId).limit(GATE_ROW_CEILING),
     // consumption_rate rides along for the B8 v2 rate back-test and the
     // mass-balance validator (estimators.ts) — the flatten already read it,
     // defaulting absent rates to 1.0 exactly as the engine does.
-    sb.from("bom_single_level").select("product_id,material_id,consumption_rate").eq("project_id", projectId),
-    sb.from("bom_multi_level").select("material_id,higher_level_component_id,consumption_rate").eq("project_id", projectId),
+    sb.from("bom_single_level").select("product_id,material_id,consumption_rate").eq("project_id", projectId).limit(GATE_ROW_CEILING),
+    sb.from("bom_multi_level").select("material_id,higher_level_component_id,consumption_rate").eq("project_id", projectId).limit(GATE_ROW_CEILING),
   ]);
   // Multi-level rows win when they exist — the same rule the engine's
   // datamap and the frontend lanes apply. Rows pass through RAW: shape
@@ -72,6 +79,16 @@ export async function loadGateDataset(sb: any, projectId: string): Promise<Gradi
   // with "bom too_short".
   const multiRows = bomMulti.data ?? [];
   const bom = multiRows.length > 0 ? multiRows : bomSingle.data ?? [];
+  // A table that came back at exactly the ceiling was probably cut short.
+  // Report it rather than grading a slice as if it were the whole project.
+  const truncated = ([
+    ["materials", materials], ["products", products], ["suppliers", suppliers],
+    ["inbound_logistics", inbound], ["outbound_logistics", outbound],
+    ["bom_single_level", bomSingle], ["bom_multi_level", bomMulti],
+    // deno-lint-ignore no-explicit-any
+  ] as Array<[string, any]>)
+    .filter(([, r]) => (r?.data?.length ?? 0) >= GATE_ROW_CEILING)
+    .map(([name]) => name);
   return {
     materials: materials.data ?? [],
     products: products.data ?? [],
@@ -79,7 +96,35 @@ export async function loadGateDataset(sb: any, projectId: string): Promise<Gradi
     inbound: inbound.data ?? [],
     outbound: outbound.data ?? [],
     bom,
+    ...(truncated.length > 0 ? { truncated } : {}),
   };
+}
+
+/** The `meta.note` for a tool envelope built from a graded dataset.
+ *
+ * Two things can make such a result partial, and both must reach the model:
+ * the loader hit the row ceiling (`dataset.truncated`), or the tool capped its
+ * own output. Silence on either produces a confident "your project has N gaps"
+ * from a slice. Returns a spreadable object so the caller can inline it. */
+export function gradedResultNote(
+  dataset: GradingDataset,
+  total: number,
+  shown: number,
+  unit: string,
+): { note?: string } {
+  const parts: string[] = [];
+  if (dataset.truncated?.length) {
+    parts.push(
+      `PARTIAL DATASET — ${dataset.truncated.join(", ")} hit the ${GATE_ROW_CEILING}-row read ceiling, ` +
+        `so this grade was computed on a slice of the project. Say so; do not report it as complete.`,
+    );
+  }
+  if (total > shown) {
+    parts.push(
+      `${total} ${unit} in total; showing ${shown}. Do not describe this as the complete list.`,
+    );
+  }
+  return parts.length > 0 ? { note: parts.join(" ") } : {};
 }
 
 export function runValidationGate(args: {

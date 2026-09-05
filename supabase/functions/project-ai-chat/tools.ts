@@ -81,6 +81,25 @@ function empty(tool: string, note = "No data available for this project."): Tool
   return envelope(tool, "text", note, 0, "empty");
 }
 
+/** A read that FAILED, as distinct from a read that came back empty.
+ *
+ * These two used to collapse: every catch below returned empty(), so a
+ * database error reached the model as "No data available for this project"
+ * and the model would tell the user, in good faith, that their project has no
+ * suppliers. note:"error" is the Layer B posture already used by
+ * draftTools.ts::get_data_completeness and its siblings — the model can see
+ * the read failed and say so instead of reporting an empty project. */
+function errored(tool: string, what: string): ToolEnvelope {
+  return envelope(
+    tool,
+    "text",
+    `Could not read ${what} for this project — the query failed. This is a lookup failure, ` +
+      `NOT a finding that the project has no data. Say the read failed; do not report an empty result.`,
+    0,
+    "error",
+  );
+}
+
 // ---------- Gemini function declarations (server-side only) ----------
 
 // Shape of one function declaration as the providers send it. Layer B agent
@@ -175,7 +194,9 @@ export const toolDeclarations = [
 
 type Handler = (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolEnvelope>;
 
-const clamp = (n: unknown, fallback: number, min = 1, max = 100): number => {
+/** Numeric arg coercion + bounds for tool parameters. Exported so the Layer B
+ * tool modules clamp their own top_n the same way rather than re-deriving it. */
+export const clamp = (n: unknown, fallback: number, min = 1, max = 100): number => {
   const v = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(v)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(v)));
@@ -231,7 +252,10 @@ async function listProjectEntities(args: Record<string, unknown>, ctx: ToolConte
       if (want("plant")) for (const id of await distinctCol(ctx, "node_list", "plant_name").catch(() => [])) out.push({ type: "plant", id, label: id });
     }
   } catch (e) {
+    // A failed read is not an empty project — see errored(). Returning here
+    // keeps the two apart; falling through would have reported "no entities".
     console.warn("list_project_entities query failed:", (e as Error).message);
+    return errored("list_project_entities", "this project's entity list");
   }
 
   if (out.length === 0) return empty("list_project_entities");
@@ -274,7 +298,11 @@ async function criticalityMap(ctx: ToolContext, nodeType: string): Promise<Map<s
     for (const n of (data ?? []) as any[]) {
       map.set(String(n.node_id), { critical: Boolean(n.is_critical_node), score: n.critical_node_score == null ? null : Number(n.critical_node_score) });
     }
-  } catch { /* enrichment is best-effort */ }
+  } catch (e) {
+    // Enrichment is best-effort, but stay loud: a silent failure here makes
+    // every supplier render as non-critical, which reads as a finding.
+    console.warn("criticalityMap enrichment failed:", (e as Error).message);
+  }
   return map;
 }
 
@@ -339,7 +367,7 @@ async function getSupplierRisk(args: Record<string, unknown>, ctx: ToolContext):
     }, rows.length);
   } catch (e) {
     console.warn("get_supplier_risk failed:", (e as Error).message);
-    return empty("get_supplier_risk");
+    return errored("get_supplier_risk", "inbound logistics and supplier criticality");
   }
 }
 
@@ -386,7 +414,7 @@ async function getProcurementSpend(args: Record<string, unknown>, ctx: ToolConte
     }, sorted.length, `Total procurement spend across project: ${Math.round(totalSpend)}`);
   } catch (e) {
     console.warn("get_procurement_spend failed:", (e as Error).message);
-    return empty("get_procurement_spend");
+    return errored("get_procurement_spend", "procurement spend");
   }
 }
 
@@ -444,7 +472,7 @@ async function getMaterialRisk(args: Record<string, unknown>, ctx: ToolContext):
     }, rows.length);
   } catch (e) {
     console.warn("get_material_risk failed:", (e as Error).message);
-    return empty("get_material_risk");
+    return errored("get_material_risk", "material risk");
   }
 }
 
@@ -483,10 +511,13 @@ async function recommendDisruptionStrategy(args: Record<string, unknown>, ctx: T
     rows = rows.slice(0, 8);
 
     if (rows.length === 0) {
-      // Fall back to generic playbooks so the AI still has something to reason about.
+      // Fall back to generic playbooks so the AI still has something to reason
+      // about — but note:"generic" so the model must present them as canonical
+      // patterns, never as this project's playbooks. The numbers in them are
+      // derived from the caller's magnitude argument, not from project data.
       const generic = genericPlaybooks(disruptionType, magnitude, target);
       return envelope("recommend_disruption_strategy", "bullets", generic, generic.length,
-        "No project-specific playbooks found; returning canonical recovery patterns.");
+        "generic");
     }
 
     return envelope("recommend_disruption_strategy", "table", {
@@ -500,48 +531,61 @@ async function recommendDisruptionStrategy(args: Record<string, unknown>, ctx: T
       ]),
     }, rows.length, `Ranked by fastest target recovery for a ${disruptionType || "disruption"}.`);
   } catch (e) {
+    // Previously this returned genericPlaybooks() as a row_count > 0 envelope,
+    // so a database error produced invented numbers ("increase safety stock by
+    // N%") that the model relayed as grounded project advice. A failed read is
+    // a failed read.
     console.warn("recommend_disruption_strategy failed:", (e as Error).message);
-    const generic = genericPlaybooks(disruptionType, magnitude, target);
-    return envelope("recommend_disruption_strategy", "bullets", generic, generic.length,
-      "No project playbooks available; returning canonical patterns.");
+    return errored("recommend_disruption_strategy", "the recovery playbook catalog");
   }
 }
 
+/** Canonical, NON-project-specific recovery patterns. Every number in these
+ * is derived from the caller's magnitude argument, not from project data, so
+ * they are only ever returned under note:"generic" and the leading line says
+ * so — the model must not present them as this project's playbooks. */
 function genericPlaybooks(disruption: string, magnitude: number, target: string | null): string[] {
   const t = target ? ` for ${target}` : "";
   const sev = magnitude >= 70 ? "high-severity" : magnitude >= 30 ? "moderate" : "low-severity";
+  // Leads every list: the model reads tool results as evidence, so the
+  // provenance has to travel with the content, not just in meta.note.
+  const preface =
+    "These are CANONICAL industry recovery patterns, not this project's playbooks — " +
+    "no project data was read. Present them as general options and say so; any figure " +
+    "below is scaled from the requested magnitude, not measured.";
+  const generic = (items: string[]) => [preface, ...items];
   switch (disruption) {
     case "supplier_outage":
-      return [
+      return generic([
         `Activate qualified backup suppliers${t} — prioritize those already approved in the AVL.`,
         `Increase safety stock by ${Math.round(magnitude / 2)}% for the affected SKUs during the recovery window.`,
         `Engage logistics to expedite in-transit inventory; consider air freight for ${sev} disruption.`,
         `Open dual-sourcing RFQ within 5 business days to prevent recurrence.`,
-      ];
+      ]);
     case "material_shortage":
-      return [
+      return generic([
         `Substitute with approved alternate materials${t}; verify BOM compatibility first.`,
         `Reallocate constrained material to highest-margin or strategic-customer orders.`,
         `Negotiate long-term contract with secondary source to de-risk the category.`,
-      ];
+      ]);
     case "lead_time_shock":
-      return [
+      return generic([
         `Shift to closer-shore suppliers${t} for the affected category.`,
         `Pre-position inventory at distribution centers near top-demand regions.`,
         `Communicate revised promise dates to customers within 24 hours.`,
-      ];
+      ]);
     case "demand_surge":
-      return [
+      return generic([
         `Activate overtime / second-shift capacity at the focal plant.`,
         `Pull-in open POs and request expedites from top tier-1 suppliers.`,
         `Temporarily lift order limits on strategic SKUs; throttle non-strategic SKUs.`,
-      ];
+      ]);
     case "nexus_attack":
-      return [
+      return generic([
         `Isolate impacted hub${t}; re-route flows through redundant nexus nodes.`,
         `Stand up a temporary cross-dock at the next-best logistics node.`,
         `Increase monitoring cadence to daily for upstream suppliers feeding the nexus.`,
-      ];
+      ]);
     default:
       return [`No predefined playbook for disruption type "${disruption}". Run a scenario in the Simulation Lab to evaluate options.`];
   }
@@ -575,7 +619,11 @@ async function masterNames(ctx: ToolContext, table: string, idCol: string): Prom
       const id = r[idCol];
       if (id != null && r.name != null && String(r.name).trim() !== "") map.set(String(id), String(r.name));
     }
-  } catch { /* names are enrichment; ids alone are still grounded */ }
+  } catch (e) {
+    // Names are enrichment; ids alone are still grounded — but log it, or a
+    // broken master table silently degrades every reply to bare ids.
+    console.warn("masterNames enrichment failed:", (e as Error).message);
+  }
   return map;
 }
 
@@ -689,7 +737,7 @@ async function getSupplierMaterials(args: Record<string, unknown>, ctx: ToolCont
     }, rows.length, note);
   } catch (e) {
     console.warn("get_supplier_materials failed:", (e as Error).message);
-    return empty(tool);
+    return errored(tool, "this supplier's materials");
   }
 }
 
@@ -749,7 +797,7 @@ async function getMaterialSuppliers(args: Record<string, unknown>, ctx: ToolCont
     }, rows.length, note);
   } catch (e) {
     console.warn("get_material_suppliers failed:", (e as Error).message);
-    return empty(tool);
+    return errored(tool, "this material's suppliers");
   }
 }
 
@@ -952,7 +1000,7 @@ async function getBomRelations(args: Record<string, unknown>, ctx: ToolContext):
     }, rows.length, note);
   } catch (e) {
     console.warn("get_bom_relations failed:", (e as Error).message);
-    return empty(tool);
+    return errored(tool, "BOM relations");
   }
 }
 
@@ -1067,7 +1115,7 @@ async function getEntityDetail(args: Record<string, unknown>, ctx: ToolContext):
     return envelope(tool, "kpi", { cards }, cards.length, note);
   } catch (e) {
     console.warn("get_entity_detail failed:", (e as Error).message);
-    return empty(tool);
+    return errored(tool, "this entity's master record");
   }
 }
 
