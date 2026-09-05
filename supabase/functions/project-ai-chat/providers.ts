@@ -192,6 +192,7 @@ export function buildSystemPrompt(
   hasProject = true,
   summary?: string | null,
   cacheFirst = false,
+  projectId?: string | null,
 ): string {
   const agent = resolveAgent(agentId);
   // §6.6 rule 1 (H2): one appended DATA RULES line, only when the router
@@ -204,8 +205,9 @@ export function buildSystemPrompt(
   const summaryBlock = summary && summary.trim()
     ? `\n\nCONVERSATION SUMMARY (older context): ${summary.trim()}`
     : "";
+  const projectLabel = projectId ? `project ${projectId}` : "a project";
   const projectBlock = hasProject
-    ? "- A project is attached. Use the provided tools to retrieve any operational fact. Never invent or estimate numbers, names, or scores."
+    ? `- ${projectLabel} is attached. Call a tool FIRST before writing any entity-specific sentence — never invent names, ids, numbers, or scores. If unsure which tool to call, start with list_project_entities.`
     : "- No project is attached. Answer conceptually and offer to attach a project (the + button in the composer) for data-backed answers. Do NOT claim numeric facts.";
   // §22.4 (Phase H1): the hardened v2 prompt — the §19.4 faithfulness/refusal
   // grammar folded in verbatim plus the RESULTS rule, the [n] marker
@@ -269,6 +271,11 @@ ${projectBlock}
   important insight.
 - Never generate SQL. You are read-only.${cacheBlock}
 
+TOOL-USE MANDATE
+- When the user asks "what project is this?", "who are our suppliers?", "what materials do we have?", or any entity-specific question: call list_project_entities or a relevant read tool IMMEDIATELY, then answer from its result. Never answer from memory or training data.
+- Never say "I don't have a tool to see X" if a tool could return X. Available reads include: list_project_entities, get_material_suppliers, get_supplier_materials, get_bom_relations, get_entity_detail, get_supplier_risk, get_material_risk, get_procurement_spend, get_data_completeness, find_completed_run, get_run_results, and more.
+- Call tools in parallel where possible. Don't ask the user for clarification when a tool call can settle the question.
+
 STYLE
 - Format large numbers with thousands separators when it helps readability.
 
@@ -299,6 +306,11 @@ ${projectBlock}
 - Resolve ambiguous entity references by calling list_project_entities first.
 - When a tool returns kind "table"/"kpi"/"bullets", don't restate the payload — give 1-3 sentences of interpretation and call out the most important insight.
 - Never generate SQL. You are read-only.${cacheBlock}
+
+TOOL-USE MANDATE
+- When the user asks "what project is this?", "who are our suppliers?", "what materials do we have?", or any entity-specific question: call list_project_entities or a relevant read tool IMMEDIATELY, then answer from its result. Never answer from memory or training data.
+- Never say "I don't have a tool to see X" if a tool could return X. Available reads include: list_project_entities, get_material_suppliers, get_supplier_materials, get_bom_relations, get_entity_detail, get_supplier_risk, get_material_risk, get_procurement_spend, get_data_completeness, find_completed_run, get_run_results, and more.
+- Call tools in parallel where possible. Don't ask the user for clarification when a tool call can settle the question.
 
 STYLE
 - Format large numbers with thousands separators when it helps readability.
@@ -555,7 +567,7 @@ export async function runChat(
     };
   }
   const builtSystem = opts?.system ??
-    buildSystemPrompt(model.label, agentId, !!ctx, opts?.summary, opts?.cacheFirst === true);
+    buildSystemPrompt(model.label, agentId, !!ctx, opts?.summary, opts?.cacheFirst === true, ctx?.projectId ?? null);
   // §22.3: the corrective-retry addendum joins the system prompt; absent ⇒
   // byte-identical to the pre-H1 path.
   const system = opts?.systemAddendum ? `${builtSystem}\n\n${opts.systemAddendum}` : builtSystem;
