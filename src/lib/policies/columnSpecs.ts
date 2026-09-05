@@ -1,6 +1,7 @@
 import { FIELD_LABELS, type PolicyBundle, type PolicyFamily } from "./schemas";
 import { fieldEngineStatus } from "./fieldStatus";
 import type { StageKey } from "./stages";
+import type { FitCol } from "./columnFit";
 
 export interface ColSpecCtx {
   fulfillmentStrategy?: string;
@@ -332,4 +333,104 @@ export function headerColsUnion(
   return dedupeByField(
     STAGE_TABLE_SPEC[stage].cols.filter((c) => !c.vectorGroup && want.has(c.field)),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Presentation layer for the column-fit grid (columnFit.ts). Joined to
+// STAGE_TABLE_SPEC by `field` — never a parallel schema. STAGE_TABLE_SPEC
+// keeps carrying engine truth (visibleWhen, master, vectorGroup, engineStatus);
+// this only adds render/fit metadata: width, priority, alignment, decimals.
+// ---------------------------------------------------------------------------
+
+/** Presentation metadata per field. Join to ColSpec by `field`. */
+export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">> = {
+  // ---- supplier · sourcing
+  primary_source: { sub: "one per mat.", w: 64, kind: "toggle", keep: true, filterable: false, align: "center" },
+  supply_share: { sub: "0–1", w: 74, kind: "num", dec: 2, keep: true },
+  material_price: { sub: "€ / unit", w: 84, kind: "num", dec: 2, unit: "€", keep: true },
+  material_cost: { sub: "€ / unit · master", w: 96, kind: "num", dec: 2, unit: "€", prio: 8 },
+  material_moq: { sub: "units · master", w: 84, kind: "int", prio: 5 },
+  capacity_per_week: { sub: "units / wk · master", w: 96, kind: "int", prio: 4 },
+  reliability_score: { sub: "0–1 · master", w: 84, kind: "num", dec: 2, prio: 3 },
+  // ---- inventory (shared by supplier + plant)
+  type: { sub: "s,S · S · R,Q · T,S", w: 152, kind: "type", keep: true, filterable: false, align: "left" },
+  __inv_params: { sub: "levels & lot sizes", w: 184, kind: "vector", keep: true, filterable: false, align: "left" },
+  initial_on_hand: { sub: "units", w: 88, kind: "int", prio: 6 },
+  safety_stock_days: { sub: "days · 0–84", w: 76, kind: "int", unit: "d", keep: true },
+  holding_cost_pct: { sub: "frac / yr", w: 72, kind: "num", dec: 2, prio: 7 },
+  service_level_target: { sub: "0–1", w: 84, kind: "num", dec: 2, prio: 7 },
+  // ---- supplier · transport (engine-pending)
+  mode: { sub: "pending", w: 76, kind: "text", quiet: true, prio: 2 },
+  cost_per_km: { sub: "pending", w: 72, kind: "num", dec: 2, quiet: true, prio: 1 },
+  // ---- plant · production
+  sell_price: { sub: "€ / unit · master", w: 92, kind: "num", dec: 2, unit: "€", keep: true },
+  production_capacity: { sub: "units / wk · master", w: 100, kind: "int", prio: 5 },
+  demand_mean: { sub: "units / wk · master", w: 100, kind: "int", prio: 4 },
+  capacity_units_per_day: { sub: "units / day", w: 96, kind: "int", keep: true },
+  allocation_priority_weight: { sub: "weight", w: 76, kind: "num", dec: 2, prio: 9 },
+  // ---- plant · finished goods
+  fg_safety_stock: { sub: "sizing · P-P.4", w: 132, kind: "chip", keep: true, filterable: false, align: "left" },
+  fg_service_level_target: { sub: "0–1 · when sized", w: 88, kind: "num", dec: 2, prio: 2 },
+  fg_safety_stock_days: { sub: "days · when sized", w: 78, kind: "int", unit: "d", prio: 1 },
+  // ---- customer · fulfillment
+  sourcing_firm: { sub: "serving node", w: 168, kind: "text", keep: true, align: "left" },
+};
+
+/** Fallback so a new engine field renders sanely before it gets metadata. */
+const FIT_FALLBACK: Omit<FitCol, "key" | "family" | "label"> = { sub: "", w: 96, kind: "text", prio: 50 };
+
+/**
+ * `FIELD_LABELS` values are sentences ("Supplier capacity (units/wk)",
+ * "Safety stock (days, 0–84)") — fine for a form, but wrapped the grid header
+ * into three ragged lines. The noun stays on line one here; everything
+ * parenthetical already lives in `COLUMN_FIT[field].sub` above. This is a
+ * display-only map — `FIELD_LABELS` is untouched (still used by Excel export).
+ */
+export const SHORT_LABEL: Record<string, string> = {
+  supply_share: "Share",
+  material_price: "Price",
+  material_cost: "Cost",
+  material_moq: "MOQ",
+  capacity_per_week: "Capacity",
+  reliability_score: "Reliability",
+  type: "Policy type",
+  __inv_params: "Replenishment",
+  initial_on_hand: "Initial stock",
+  safety_stock_days: "Safety stock",
+  holding_cost_pct: "Holding",
+  service_level_target: "Service level",
+  cost_per_km: "Cost / km",
+  sell_price: "Sell price",
+  production_capacity: "Prod. capacity",
+  demand_mean: "Demand mean",
+  capacity_units_per_day: "Line capacity",
+  allocation_priority_weight: "Allocation wt.",
+  fg_safety_stock: "FG safety stock",
+  fg_service_level_target: "FG service",
+  fg_safety_stock_days: "FG days",
+  sourcing_firm: "Sourcing firm",
+};
+
+/** Per-stage label overrides — same field, different meaning by context. */
+const STAGE_LABEL_OVERRIDE: Partial<Record<StageKey, Record<string, string>>> = {
+  plant: { initial_on_hand: "Initial FG" },
+};
+
+function shortLabelFor(stage: StageKey, field: string, fallback: string): string {
+  return STAGE_LABEL_OVERRIDE[stage]?.[field] ?? SHORT_LABEL[field] ?? fallback;
+}
+
+/**
+ * Header columns (§ headerColsUnion) with fit/render metadata joined on.
+ * `key` is the ColSpec field verbatim (including "__inv_params") so it maps
+ * 1:1 back to the spec used by StagePolicyTable's save/prefill/gating logic.
+ */
+export function fitColsForStage(stage: StageKey, rowsCtx: ColSpecCtx[]): FitCol[] {
+  return headerColsUnion(stage, rowsCtx).map((c) => ({
+    key: c.field,
+    family: c.family,
+    label: shortLabelFor(stage, c.field, c.label),
+    ...FIT_FALLBACK,
+    ...(COLUMN_FIT[c.field] ?? {}),
+  }));
 }
