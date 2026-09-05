@@ -480,6 +480,51 @@ while True:
     time.sleep(5)
 reps = requests.get(f"{BASE}/runs/{run['run_id']}/replications", headers=HEADERS).json()["data"]
 print(r["aggregate_kpis"], len(reps))`;
+  const shortageSnippet = `import os, time, requests
+
+BASE = "${API_BASE}"
+HEADERS = {"Authorization": f"Bearer {os.environ['SURESUITE_API_KEY']}"}
+
+def run_and_wait(project_id, scenario_id, policy_version_id, idem):
+    submitted = requests.post(
+        f"{BASE}/projects/{project_id}/runs", headers={**HEADERS, "Idempotency-Key": idem},
+        json={"scenario_id": scenario_id, "policy_version_id": policy_version_id},
+    ).json()
+    run_id = submitted["run_id"]
+    while True:
+        run = requests.get(f"{BASE}/runs/{run_id}", headers=HEADERS).json()
+        if run["status"] in ("succeeded", "failed", "cancelled"):
+            return run
+        time.sleep(5)
+
+# 1. resolve "Project AA" and its "Version 3" policy snapshot by name
+projects = requests.get(f"{BASE}/projects", headers=HEADERS).json()["data"]
+project = next(p for p in projects if p["name"].strip().lower() == "project aa")
+versions = requests.get(f"{BASE}/projects/{project['id']}/policy-versions", headers=HEADERS).json()["data"]
+version_3 = next(v for v in versions if (v.get("label") or "").strip().lower() == "version 3")
+
+# 2. baseline scenario (no disruption)
+baseline = requests.post(
+    f"{BASE}/projects/{project['id']}/scenarios", headers=HEADERS,
+    json={"name": "Material shortage — baseline", "horizon_days": 120, "warmup_days": 14,
+          "replications": 20, "seed": 42, "crn": True, "primary_kpi": "fill_rate"},
+).json()
+run_baseline = run_and_wait(project["id"], baseline["id"], version_3["id"], "shortage-baseline")
+
+# 3. shortage scenario — cut a material/supplier's capacity for 3 weeks
+shortage = requests.post(
+    f"{BASE}/projects/{project['id']}/scenarios", headers=HEADERS,
+    json={"name": "Material shortage — RM-2201 cut", "horizon_days": 120, "warmup_days": 14,
+          "replications": 20, "seed": 42, "crn": True, "primary_kpi": "fill_rate",
+          "disruption_schedule": [{"target": "RM-2201", "target_type": "material",
+                                   "start_day": 30, "duration_days": 21, "magnitude_pct": 60}]},
+).json()
+run_shortage = run_and_wait(project["id"], shortage["id"], version_3["id"], "shortage-cut")
+
+# 4. shortage evidence — driven by policy P-C.1 unmet_demand_handling
+for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area", "ttr_weeks"):
+    a, b = run_baseline["aggregate_kpis"].get(kpi), run_shortage["aggregate_kpis"].get(kpi)
+    print(f"{kpi:20s} baseline={a}  shortage={b}")`;
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
@@ -698,6 +743,32 @@ print(r["aggregate_kpis"], len(reps))`;
               <ApiCodeBlock title="Python: end-to-end (snapshot → dispatch → poll → replications)" code={pythonSnippet} />
             </div>
 
+            <div>
+              <div className="text-[14px] font-semibold">Example: material shortage on Project AA (Version 3)</div>
+              <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
+                Resolves a real project and policy snapshot by name, runs a baseline and a
+                supplier/material capacity-cut scenario, then compares the shortage KPIs
+                (<span className="font-mono">fill_rate</span>,{' '}
+                <span className="font-mono">lost_sales_value</span>,{' '}
+                <span className="font-mono">max_backlog</span>) driven by policy{' '}
+                <span className="font-mono">P-C.1 unmet_demand_handling</span>. The full
+                version — with baseline vs. shortage charts and a weekly fill-rate
+                trajectory plot — is §13 of the{' '}
+                <button
+                  type="button"
+                  className="underline underline-offset-2 hover:text-foreground"
+                  onClick={() => {
+                    const tab = document.querySelector<HTMLButtonElement>('[value="notebook"]');
+                    tab?.click();
+                  }}
+                >
+                  Notebook tab
+                </button>{' '}
+                quickstart.
+              </p>
+            </div>
+            <ApiCodeBlock title="Python: material shortage — Project AA, Version 3" code={shortageSnippet} />
+
             {/* L1: the table's name reads on the canvas, above the shell. */}
             <TableBlock name="Endpoints · v1" count={ENDPOINTS.length}>
               <div className="overflow-x-auto">
@@ -722,8 +793,15 @@ print(r["aggregate_kpis"], len(reps))`;
           {/* ── Notebook ─────────────────────────────────────────────────── */}
           <TabsContent value="notebook" className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="flex items-center gap-2 text-[14px] font-semibold">
-                <NotebookText className="h-3.5 w-3.5" /> Ready-to-run quickstart
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 text-[14px] font-semibold">
+                  <NotebookText className="h-3.5 w-3.5" /> Ready-to-run quickstart
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  §1–12 cover the full API surface; §13 is a worked material-shortage
+                  deep dive — pick your project above, then edit its `SHORTAGE_TARGET`
+                  to a real material or supplier key.
+                </p>
               </div>
               <div className="flex flex-none gap-2">
                 <Button size="sm" variant="outline" className="rounded-sm" asChild>
