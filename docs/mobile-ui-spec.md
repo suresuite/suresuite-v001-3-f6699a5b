@@ -455,7 +455,7 @@ and common answer for desktop — but it must be stated.
 
 | Don't | Because |
 |---|---|
-| A second breakpoint (`sm:` for layout, `lg:`, `xl:`) | The product has one: 768. `sm:` is permitted **only** for the §3.2 label swap. |
+| A second breakpoint (`sm:` for layout, `lg:`, `xl:`) | The product has one: 768. `sm:` is permitted **only** for the §3.2 label swap; `lg:` **only** for a multi-pane shell that measurably cannot hold its panes at 768 (§6.1). |
 | Bare `1fr` in a grid | `min-width:auto` floor → sideways scroll. |
 | `shrink-0` on text | Forces the parent past the viewport. |
 | Missing `min-w-0` on a flex text child | Same. |
@@ -469,6 +469,45 @@ and common answer for desktop — but it must be stated.
 | A filled `default` badge | `secondary` neutral/active · `outline` meta · `destructive` bad. |
 | `#F8D448` outside its four uses | Template button · Quick Start markers · the admin emphasis rule · `LAYER.accent`. |
 | Copy that changes meaning between platforms | Same product, same words. |
+
+---
+
+### 6.1 The one sanctioned `lg:` — multi-pane shells
+
+**Amendment, added after measuring the code this spec governs.** The
+one-breakpoint rule above was written for the mobile/desktop split and it holds
+everywhere a pane is a *column of content*. It does not survive a **multi-pane
+shell** — a layout where two or three panes must each hold a usable minimum at
+once — because 768px minus the collapsed sidebar (56) minus the app gutter (96)
+leaves **616px of content**, and a 3:1 or sidebar-plus-panel split of 616 gives
+one pane a width nothing can be read in.
+
+Measured in Chromium against the real grid templates:
+
+| Shell | at 768 (616px of content) | today at 1024 (872px) |
+|---|---|---|
+| Network lens (`grid-cols-4`, 3 + 1) | graph 444, **sidebar 148** | graph 636, sidebar 212 |
+| Docs shell (`16rem / 1fr / 15rem`) | nav 256, **prose 272**, toc 240 | nav 256, prose 528, toc 240 |
+| `AdminUserAccess` (matrix + preview) | **matrix 276**, preview 320 | matrix 532, preview 320 |
+| `RunValidateStage` (setup + content) | setup 320, **content 286** | setup 320, content 542 |
+
+A 148px lens sidebar, 272px of prose between two chrome panes, or a five-column
+capability matrix in 276px are all worse than what `lg:` does today, which is to
+**stack until 1024**. So:
+
+> `lg:` is permitted for a multi-pane shell, and only there. The layout
+> breakpoint for everything else stays 768. A new `lg:` must come with the
+> measurement that justifies it — the pane width it produces at 616px — in the
+> PR body.
+
+The shells this sanctions today are `DocsLayout`, the three network lens pages,
+`AdminUserAccess` and `RunValidateStage`; `scripts/audit-adaptive-ui.mjs` holds
+the same list, so adding one is a deliberate edit in both places.
+
+This is **not** a general licence. `GettingStarted`'s nine `lg:` uses are legacy
+page-padding steps awaiting that page's own redesign, and `DeveloperApi`'s two
+are ordinary two-up card grids that would sit at ~300px per pane at 768 — those
+stay recorded as debt, not blessed.
 
 ---
 

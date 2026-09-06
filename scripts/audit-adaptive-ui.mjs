@@ -50,6 +50,19 @@ const UPDATE_BASELINE = ARGV.has('--update-baseline');
 // bands, gradients and marketing-scale type (audit C6, guide §3.2).
 const MARKETING = /src[\\/](pages[\\/](Landing|Auth|About)|components[\\/](AuthHeroStrip|Footer|NetworkVisualization3D))/;
 
+// The one sanctioned `lg:` (spec §6.1). A multi-pane shell has to hold two or
+// three panes at once, and 768px leaves 616px of content after the collapsed
+// sidebar (56) and the app gutter (96). Measured, converting these to `md:`
+// gives: lens sidebar 148px, docs prose 272px between two chrome panes,
+// capability matrix 276px for five role columns, validation content 286px.
+// Each is worse than what `lg:` does today, which is to stack until 1024.
+//
+// This list is the spec's list. Adding to it is a deliberate edit in both
+// places, and a new entry needs its pane width at 616px in the PR body. It is
+// not a general licence: GettingStarted's `lg:` padding steps are legacy and
+// DeveloperApi's two-up grids are ordinary, so both stay reported.
+const MULTIPANE = /src[\\/](components[\\/](docs[\\/]DocsLayout|policies[\\/]RunValidateStage)|pages[\\/]((Product|Process|Firm)LevelNetwork|admin[\\/]AdminUserAccess))/;
+
 /**
  * Blank out comments, preserving every byte offset and line break so reported
  * line numbers stay true. String-aware: a `//` inside a quoted string or after
@@ -206,7 +219,7 @@ for (const file of files) {
     // and from shadcn's size map key `lg: "h-12 …"`, neither of which is a
     // breakpoint at all.
     const bp = !isCss && /(?:^|[\s"'`({[])(lg|xl|2xl):(?=[a-z[-])/.exec(text);
-    if (bp && !isMarketing) {
+    if (bp && !isMarketing && !(bp[1] === 'lg' && MULTIPANE.test(file))) {
       report(file, ln, `Second breakpoint "${bp[1]}:" — the product has one (md)`, '6', text.trim().slice(0, 60));
     }
 
