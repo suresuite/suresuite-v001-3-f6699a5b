@@ -17,15 +17,38 @@ interface PageLayoutProps {
   setIsCollapsed: (value: boolean) => void;
 }
 
-// Bottom chrome on mobile, measured rather than guessed: tab bar + its border +
-// the credit bar, then 16px of breathing room, then the device inset. Derived so
-// a height change in either component cannot leave content underneath.
-const MOBILE_CHROME_PX =
-  MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER + MOBILE_FOOTER_H + 16;
+// Bottom chrome on mobile: tab bar + its border + the credit bar, then 16px of
+// breathing room, then the device inset.
+//
+// The tab bar is a fixed height, but the credit bar WRAPS — measured, it is
+// three lines (64px) at 320-390, two (48px) at 414-600, and the single line
+// MOBILE_FOOTER_H describes only above ~700. So its height is read off the live
+// element rather than assumed: a constant here leaves the last 16px of content
+// underneath the bar at every common iPhone width, which is precisely what this
+// reservation exists to prevent. MOBILE_FOOTER_H stays the first-paint floor.
+const MOBILE_BREATHING_PX = 16;
+const MOBILE_CHROME_BASE_PX =
+  MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER + MOBILE_BREATHING_PX;
 
 export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayoutProps) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const isMobile = useIsMobile();
+
+  // Purely visual: the measured height of the credit bar, which changes with
+  // wrapping and drops to 0 once the bar is dismissed.
+  const [footerH, setFooterH] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (!isMobile || typeof ResizeObserver === 'undefined') return;
+    const el = document.querySelector('footer');
+    if (!el) return;
+    const measure = () => setFooterH(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobile]);
+
+  const chromePx = MOBILE_CHROME_BASE_PX + (footerH ?? MOBILE_FOOTER_H);
 
   return (
     <div className="min-h-screen bg-background">
@@ -43,7 +66,7 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
           isMobile
             ? {
                 paddingBottom:
-                  `calc(${MOBILE_CHROME_PX}px + env(safe-area-inset-bottom, 0px))`,
+                  `calc(${chromePx}px + env(safe-area-inset-bottom, 0px))`,
               }
             : undefined
         }

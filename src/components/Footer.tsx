@@ -3,8 +3,10 @@ import { X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { MOBILE_TABBAR_H, MOBILE_TABBAR_BORDER } from "@/components/MobileNav";
 
-/** Single-line credit bar height, in px (px-3 py-2 text-xs). PageLayout reserves
- *  space from this. */
+/** Single-LINE credit bar height, in px (px-3 py-2 text-xs) — the first-paint
+ *  floor only. The bar wraps on narrow screens (three lines at 320-390, two at
+ *  414-600), so PageLayout measures the live element and falls back to this
+ *  until the first measurement lands. Do not treat it as the bar's height. */
 export const MOBILE_FOOTER_H = 32;
 
 interface FooterProps {
