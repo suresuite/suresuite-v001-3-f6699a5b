@@ -1,0 +1,43 @@
+name: adaptive UI audit
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "scripts/audit-adaptive-ui.mjs"
+      - "scripts/adaptive-ui-baseline.json"
+      - ".github/workflows/ui-audit.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "scripts/audit-adaptive-ui.mjs"
+      - "scripts/adaptive-ui-baseline.json"
+  workflow_dispatch:
+
+# The mechanical half of docs/mobile-ui-spec.md — emoji in product copy, bare
+# `1fr` tracks, `shrink-0` on unbounded text, sub-44px touch targets, a second
+# breakpoint, and the rest of §2/§3/§6.
+#
+# It lands on a codebase with a known backlog, so the gate is a RATCHET: it
+# fails on anything above scripts/adaptive-ui-baseline.json and passes on the
+# backlog itself. That makes it green on arrival and one-directional — the
+# backlog can shrink and can never grow. Fix a file, re-run with
+# --update-baseline to record the smaller number, and commit that.
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # No dependencies: the audit is a single Node script over the source.
+      - name: Adaptive-UI audit (fails on any violation above the baseline)
+        run: node scripts/audit-adaptive-ui.mjs
+
+      - name: Backlog, for the record
+        if: always()
+        run: node scripts/audit-adaptive-ui.mjs --all || true
