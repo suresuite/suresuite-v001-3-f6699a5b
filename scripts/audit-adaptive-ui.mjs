@@ -119,11 +119,17 @@ for (const file of files) {
     // ── §3.5 Emoji. The product's own audit files an emoji in an alert body
     // as a defect. Functional Unicode marks are fine and are allowlisted.
     // Debug logging is not product copy, so `console.*` is out of subject.
-    const ALLOWED_MARKS = /[▲▼›▸▾≈⚠→←·—✕↑↓]/g;
+    // Monochrome functional marks, not emoji — §6 permits these by kind, and
+    // its list is illustrative. A tick and a cross in a completeness column
+    // are the same family as the arrows; a coloured ✅ is not. The ceiling and
+    // floor brackets are mathematical notation in the policy formulas.
+    const ALLOWED_MARKS = /[▲▼›▸▾≈⚠→←·—✕↑↓✓✗○●◦⌈⌉⌊⌋]/g;
     if (!/\bconsole\s*\./.test(text)) {
       const stripped = text.replace(ALLOWED_MARKS, '');
       const emoji = stripped.match(
-        /[\u{1F300}-\u{1FAFF}\u{1F900}-\u{1F9FF}\u{2700}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu,
+        // 2300-23FF and 2600-26FF are in the net because the product had a
+        // clock and a scales glyph the narrower ranges walked straight past.
+        /[\u{1F300}-\u{1FAFF}\u{1F900}-\u{1F9FF}\u{2300}-\u{23FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu,
       );
       if (emoji) report(file, ln, 'Emoji', '3.5', [...new Set(emoji)].join(' '));
     }
@@ -141,7 +147,19 @@ for (const file of files) {
     // ── §2.5 shrink-0 on text. Only flagged when the same element carries a
     // JSX interpolation, which is the unbounded case: a project name, a user
     // query, a filename. Static button labels are legitimately shrink-0.
-    if (/\bshrink-0\b/.test(text) && /\{[a-zA-Z_$][\w$.?[\]']*\}/.test(text)) {
+    //
+    // Two things are not that. An interpolation that is a PROP is not content:
+    // `${SMALL_TXT}` inside a className template is a class fragment, and
+    // key/ref/value are attributes — the element may hold nothing but an icon.
+    // (Template literals go first, so a nested ${...} cannot end the prop
+    // match early.) And §2.5 permits shrink-0 on "fixed-width chrome" in as
+    // many words, so an explicit w-* on the same element is the rule being
+    // followed, not broken.
+    const withoutProps = text
+      .replace(/`[^`]*`/g, '')
+      .replace(/\b(?:key|ref|value)=\{[^}]*\}/g, '');
+    const fixedWidth = /\bw-(?:\d|\[)/.test(text);
+    if (/\bshrink-0\b/.test(text) && /\{[a-zA-Z_$][\w$.?[\]']*\}/.test(withoutProps) && !fixedWidth) {
       const looksLikeIcon = /className="[^"]*\bh-\d|<[A-Z]\w+\s|Icon|Chevron|aria-hidden/.test(text);
       if (!looksLikeIcon) {
         report(file, ln, 'shrink-0 on interpolated (unbounded) text', '2.5', text.trim().slice(0, 70));
@@ -160,7 +178,7 @@ for (const file of files) {
     }
 
     // ── §3.3 Numbers must never be shortened to fit.
-    if (/\.slice\(0,\s*\d+\)/.test(text) && /value|count|total|cost|rate|qty|amount/i.test(text)) {
+    if (/\b\w*(?:value|count|total|cost|rate|qty|amount)\w*\s*\.slice\(0,\s*\d+\)/i.test(text)) {
       report(file, ln, 'Possible truncated numeric value', '3.3', text.trim().slice(0, 70));
     }
     if (/toFixed\(0\)|Math\.round/.test(text) && /display|label|render/i.test(text)) {

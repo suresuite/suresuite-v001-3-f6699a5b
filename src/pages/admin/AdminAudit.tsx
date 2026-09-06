@@ -61,7 +61,7 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
               <div key={r.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{r.actor_name || '—'}</span>
-                  <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{r.action}</span>
+                  <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground" title={r.action}>{r.action}</span>
                 </div>
                 <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
                   {new Date(r.created_at).toLocaleString()} · {r.target_type}{r.target_id ? `:${r.target_id.slice(0, 8)}` : ''}

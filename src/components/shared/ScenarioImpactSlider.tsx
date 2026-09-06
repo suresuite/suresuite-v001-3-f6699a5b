@@ -30,14 +30,6 @@ const getEffectTypeDisplay = (effectType: string): string => {
   }
 };
 
-const getEffectIcon = (effectType: string) => {
-  switch (effectType) {
-    case 'time_delay': return '⏰';
-    case 'capacity_reduction': return '📉';
-    default: return '⚠️';
-  }
-};
-
 interface ScenarioImpactSliderProps {
   scenario: DisruptionScenario;
   isSelected: boolean;

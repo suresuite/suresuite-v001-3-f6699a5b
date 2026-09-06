@@ -290,12 +290,12 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
         
         <div className="mt-4 text-sm text-muted-foreground">
           <div className="flex flex-wrap gap-4">
-            <span>📊 <strong>Degree:</strong> Connection ratio to max possible</span>
-            <span>⚖️ <strong>Weighted:</strong> Revenue-weighted connections</span>
-            <span>🎯 <strong>Eigenvector:</strong> Connected to important nodes</span>
-            <span>🌉 <strong>Betweenness:</strong> Bridge between network clusters</span>
-            <span>📍 <strong>Closeness:</strong> Average distance to all nodes</span>
-            <span>⭐ <strong>Prominence:</strong> Overall network importance</span>
+            <span><strong>Degree:</strong> Connection ratio to max possible</span>
+            <span><strong>Weighted:</strong> Revenue-weighted connections</span>
+            <span><strong>Eigenvector:</strong> Connected to important nodes</span>
+            <span><strong>Betweenness:</strong> Bridge between network clusters</span>
+            <span><strong>Closeness:</strong> Average distance to all nodes</span>
+            <span><strong>Prominence:</strong> Overall network importance</span>
           </div>
         </div>
       </CardContent>

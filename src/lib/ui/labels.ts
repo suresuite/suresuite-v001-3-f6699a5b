@@ -22,6 +22,26 @@
 // NEVER put a number, a unit, a status word or an error in here. Those are
 // forbidden from the ladder entirely (spec §3.1) — if a numeric row does not
 // fit, the TABLE scrolls (§2.7); the number does not change.
+//
+// WHAT WAS MEASURED, AND WHAT DID NOT NEED A VARIANT
+// Every label below was measured at 320px in Chromium with the product's own
+// webfonts, against the width its container actually gives it:
+//
+//   drawer nav (13.5px, 239px of room)  widest is "Project Intelligence" at
+//                                       127px — every NAV_LABEL fits, twice over
+//   bottom tab bar (10.5px, 64px cell)  widest is "Policies" at 45px — all fit
+//   data-viewer tabs (12px, ~200px)     seven tabs measure 569px. This is the
+//                                       one that overflows, and the only place
+//                                       a variant is wired up today.
+//
+// So NAV_LABELS, LAB_LABELS, ADMIN_LABELS and ACCESS_LABELS are declared
+// vocabulary, not pending work — do not wire one up without measuring its
+// container first. A variant that saves width nothing needed is churn, and it
+// costs a hidden text node per label.
+//
+// Note also what a variant cannot fix: shortening all seven data-viewer tabs
+// takes the strip from 569px to 459px, still more than twice the room. The
+// strip has to scroll (§2.7); the shorter labels only make the swipe shorter.
 
 export interface Label {
   /** The canonical label. Used at >=sm, and always in `title`/aria. */

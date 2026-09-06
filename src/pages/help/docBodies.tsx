@@ -881,7 +881,7 @@ const SIM_PARAM_GROUPS: ParamGroup[] = [
   },
   {
     entity: "lane",
-    title: "§3.6 · Transport edges 🧩",
+    title: "§3.6 · Transport edges (planned)",
     blurb: "Transport edge. Defaults are behavior-neutral (folded into T_s).",
     rows: [
       ["id", "id", "E", "required", "—", ""],
@@ -898,9 +898,9 @@ const SIM_PARAM_GROUPS: ParamGroup[] = [
     title: "§3.7 · Disruption event model",
     blurb: "What fails, when, and for how long — the stress applied to the twin.",
     rows: [
-      ["target_type", "enum", "event", "node:supplier", "{node:supplier, node:plant, edge:lane}", "node:supplier ✅; node:plant ✅; edge:lane 🧩."],
+      ["target_type", "enum", "event", "node:supplier", "{node:supplier, node:plant, edge:lane}", "node:supplier ✓; node:plant ✓; edge:lane planned."],
       ["target_id", "id", "event", "required", "—", ""],
-      ["effect_type", "enum", "event", "lead_time_extension", "{lead_time_extension, capacity_reduction}", "LT extension ✅ (Eqs. 11–12) vs capacity throttle."],
+      ["effect_type", "enum", "event", "lead_time_extension", "{lead_time_extension, capacity_reduction}", "LT extension ✓ (Eqs. 11–12) vs capacity throttle."],
       ["capacity_factor", "—", "event", "0.0", "[0.0, 1.0]", "φ — 0 = full outage. capacity_reduction only."],
       ["overflow_rule", "enum", "event", "queue", "{queue, reject}", "reject logs lost_inbound_units."],
       ["onset_profile", "enum", "event", "step", "{step, ramp_linear}", "ramp_linear applies to capacity_reduction only."],
@@ -939,7 +939,7 @@ type Policy = {
   stage: "customer" | "plant" | "supplier" | "transport" | "cross";
   cls: "built_in" | "strategic" | "anticipation" | "improvisation" | "meta";
   constraint: string;
-  status: "✅" | "🧩";
+  status: "implemented" | "planned";
   milestone?: string;
   logic: string;
   /** Decision rule / formula block (implemented policies). Plain text, rendered monospace. */
@@ -967,12 +967,12 @@ const POLICY_STAGES: { key: Policy["stage"]; label: string }[] = [
 const POLICY_CATALOG: Policy[] = [
   {
     ref: "P-C.1", id: "unmet_demand_handling", stage: "customer", cls: "built_in",
-    constraint: "demand_side", status: "✅",
+    constraint: "demand_side", status: "implemented",
     logic: "What happens to an unservable order: it dies (lost_sales — competitive markets), waits (backorder — contractual B2B), or splits (partial_backorder). Backorders convert lost revenue into delay cost, changing the economics of every strategy.",
     math: "FIFO: clear existing backlog first, then serve this week's demand. unmet = D_p − served_new. lost_sales ⇒ lost = unmet, no backlog. backorder ⇒ all unmet waits; partial_backorder ⇒ unmet·partial_accept_prob waits, the rest is lost. Waiting units age in FIFO buckets; a bucket older than backorder_horizon expires to lost; backorder_penalty (€/unit/wk) charged on aged backlog.",
     hooks: [["PH-60", "50", "demand, fg_fulfillment, production_output", "fulfillment, state.backlog, state.cost_ledger, state.lost_sales", "—"]],
     params: [
-      ["rule", "enum", "P", "lost_sales", "{lost_sales, backorder, partial_backorder}", "lost_sales ✅ (manuscript)."],
+      ["rule", "enum", "P", "lost_sales", "{lost_sales, backorder, partial_backorder}", "lost_sales ✓ (manuscript)."],
       ["backorder_horizon", "weeks", "P", "4", "[0, 26]", "Aged-out backlog becomes lost."],
       ["backorder_penalty", "€/unit/wk", "P", "0.0", "[0, ∞]", ""],
       ["partial_accept_prob", "—", "P", "0.5", "[0.0, 1.0]", "Share of unmet demand that waits."],
@@ -980,7 +980,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-C.2", id: "customer_allocation", stage: "customer", cls: "improvisation",
-    constraint: "demand_side", status: "✅",
+    constraint: "demand_side", status: "implemented",
     logic: "Under scarcity, 'who do we disappoint first' is deliberate — distributes each product's weekly fulfillment across customers (protect strategic accounts / SLA floors / spread pain) and reports per-segment fill-rate KPIs. Product-level physics untouched. Inert for single-customer MTO. Hook: PH-60.",
     params: [
       ["rule", "enum", "C", "fcfs", "{fcfs, proportional, fair_share, priority, sla_tier}", "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata)."],
@@ -990,7 +990,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-C.3", id: "demand_shaping", stage: "customer", cls: "improvisation",
-    constraint: "demand_side", status: "🧩", milestone: "M8",
+    constraint: "demand_side", status: "planned", milestone: "M8",
     logic: "Move demand instead of fighting supply — substitution offers, delay incentives; cheap when customers accept. Hook: PH-60.",
     params: [
       ["substitution_offer", "product → substitute", "P", "—", "—", ""],
@@ -1002,7 +1002,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.1", id: "inventory_control", stage: "plant", cls: "built_in",
-    constraint: "material_availability", status: "✅",
+    constraint: "material_availability", status: "implemented",
     logic: "Everyday replenishment rule (min-max / base-stock / (R,Q) / periodic). The baseline shock absorber every chain already has; quantifying it prevents over-buying dedicated resilience.",
     math: "Levels (Eqs. 2–3): s_m = E[D_m]·T_s,  S_m = E[D_m]·(T_s + κ).  position = on_hand + in_transit + supplier queue. Release (each ≥ MOQ): min_max → if position < s_m, order S_m − position every review_cadence_weeks; base_stock → order S_m − position whenever short; rop_q → fixed rop_q_quantity when position < s_m; periodic → order S_m − position every periodic_review_weeks.",
     hooks: [
@@ -1010,7 +1010,7 @@ const POLICY_CATALOG: Policy[] = [
       ["PH-80", "50", "inventory_levels, state.on_hand, state.pipeline, state.queue", "purchase_orders", "—"],
     ],
     params: [
-      ["policy_type", "enum", "M", "min_max", "{min_max, base_stock, rop_q, periodic}", "min_max ✅ (manuscript)."],
+      ["policy_type", "enum", "M", "min_max", "{min_max, base_stock, rop_q, periodic}", "min_max ✓ (manuscript)."],
       ["coverage_weeks", "weeks", "G/M", "—", "[0, 26]", "κ — order-up-to cover beyond lead time. Strip 8/10/12."],
       ["review_cadence_weeks", "weeks", "G", "1", "{1, 2, 4}", ""],
       ["rop_q_quantity", "units", "M", "—", "see schema", "Fixed (R,Q) lot; ≥ MOQ enforced."],
@@ -1019,7 +1019,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.2", id: "lot_sizing", stage: "plant", cls: "built_in",
-    constraint: "material_availability", status: "🧩", milestone: "M8",
+    constraint: "material_availability", status: "planned", milestone: "M8",
     logic: "Batching exists for setup economics but can amplify shocks (bullwhip) — test whether your lots worsen propagation. Hook: PH-80.",
     params: [
       ["rule", "enum", "M", "lot_for_lot", "{lot_for_lot, fixed_qty, epq}", ""],
@@ -1029,12 +1029,12 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.3", id: "safety_stock_materials", stage: "plant", cls: "strategic",
-    constraint: "material_availability", status: "✅",
+    constraint: "material_availability", status: "implemented",
     logic: "ABC-XYZ-differentiated material safety stock (Eqs. 20–21). Dominates short disruptions; depletes — beyond ~7–9 weeks expediting wins (run the crossover sweep). Requires pre-deployment.",
     math: "Eqs. 20–21: ss_s = z_m·σ_{D_m}·√T_s ,  ss_S = z_m·σ_{D_m}·√(T_s + κ), added on top of P-P.1's base levels. z_m = Φ⁻¹(SL_m/100) (normal quantile) from the ABC-XYZ z-matrix: AX 99.5% … CZ 80%. ABC by cumulative value share (80/95), XYZ by demand CV (0.13/0.25). king variant: z·σ_D·√T + z·μ_D·σ_LT. Weekly holding cost h_m·c_m·ss.",
     hooks: [["PH-70", "60", "inventory_levels, material_demand", "inventory_levels, state.cost_ledger", "Adds the safety-stock buffer on top of inventory_control's levels (priority 50) — Eqs. 20–21."]],
     params: [
-      ["classification", "enum", "G", "abc_xyz", "{abc_xyz, uniform, fixed_days, king}", "abc_xyz ✅."],
+      ["classification", "enum", "G", "abc_xyz", "{abc_xyz, uniform, fixed_days, king}", "abc_xyz ✓."],
       ["z_matrix", "% service level", "G", "—", "[80, 99.9]", "Nine ABC×XYZ cells."],
       ["abc_breakpoints", "cumulative value share", "G", "[0.8, 0.95]", "—", "A up to 80%, B up to 95%, C the rest (80/15/5)."],
       ["xyz_cv_breakpoints", "demand CV", "G", "[0.13, 0.25]", "—", "X ≤ 0.13, Y ≤ 0.25, Z above."],
@@ -1044,7 +1044,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.4", id: "fg_safety_stock", stage: "plant", cls: "strategic",
-    constraint: "demand_side", status: "✅",
+    constraint: "demand_side", status: "implemented",
     logic: "The only buffer DOWNSTREAM of production (MTS only): keeps serving customers while production is blocked, and the only feasible buffer when suppliers are single-sourced. Costs full COGS per unit held. Requires pre-deployment.",
     math: "MTS only. service_level: SS^FG_p = z^FG_p·σ_{D_p} (one-week production cycle); fixed_days: forecast_p·days/7; fixed_units: constant. z^FG = Φ⁻¹(SL/100); abc_by_revenue trims B −2pp, C −5pp (floor 80). Added on the cycle-stock base FG target. Holding cost (h^FG/52)·COGS_p·SS.",
     hooks: [["PH-70", "55", "forecast, state.fg_target", "state.cost_ledger, state.fg_target", "Adds FG safety stock on top of the cycle-stock base target (priority 45) — ADR 0001."]],
@@ -1059,19 +1059,19 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.5", id: "short_term_capacity", stage: "plant", cls: "anticipation",
-    constraint: "production_capacity", status: "✅",
+    constraint: "production_capacity", status: "implemented",
     logic: "Overtime: pay-per-use plant headroom (Eq. 22). Bites only when production capacity binds — in material-constrained networks that is rare; check utilization first.",
     math: "Eq. 22: feasible output is computed at base capacity O_p and at O_p·max_overtime_factor; extra = Q^o − Q^base. revenue_positive ⇒ activate only if (Q^o − Q^base)·u_p > C^o, where C^o = extra·u_p·(premium/100). Premium charged on units produced above O_p.",
     hooks: [["PH-40", "40", "demand, firm_knowledge, state.backlog, state.on_hand", "overtime_capacity", "—"]],
     params: [
       ["overtime_premium_pct_of_price", "% of u_p / OT unit", "P", "5.0", "[1.0, 25.0]", "C^o."],
       ["max_overtime_factor", "× O_p", "P", "1.5", "[1.0, 2.0]", ""],
-      ["activation", "enum", "G", "revenue_positive", "{revenue_positive, always_during_disruption}", "revenue_positive ✅ (Eq. 22)."],
+      ["activation", "enum", "G", "revenue_positive", "{revenue_positive, always_during_disruption}", "revenue_positive ✓ (Eq. 22)."],
     ],
   },
   {
     ref: "P-P.6", id: "standing_capacity_reserve", stage: "plant", cls: "strategic",
-    constraint: "production_capacity", status: "🧩", milestone: "M8",
+    constraint: "production_capacity", status: "planned", milestone: "M8",
     logic: "Permanently maintained plant headroom — option premium vs P-P.5's pay-per-use. Requires pre-deployment. Hook: PH-40.",
     params: [
       ["reserve_factor", "× O_p", "P", "0.2", "[0.0, 0.5]", ""],
@@ -1080,7 +1080,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.7", id: "process_flexibility", stage: "plant", cls: "anticipation",
-    constraint: "production_capacity", status: "🧩", milestone: "M8",
+    constraint: "production_capacity", status: "planned", milestone: "M8",
     logic: "Which lines make which products; Jordan–Graves chaining — a little flexibility buys most of the value. Requires pre-deployment. Hook: PH-40.",
     params: [
       ["flexibility_matrix", "line → products", "P", "required", "—", ""],
@@ -1090,7 +1090,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.8", id: "alternative_bom", stage: "plant", cls: "anticipation",
-    constraint: "material_availability", status: "🧩", milestone: "M8",
+    constraint: "material_availability", status: "planned", milestone: "M8",
     logic: "Pre-qualified substitutes (Tesla chip-redesign pattern) — the only material-side answer to single-sourced bottlenecks; qualification must precede the crisis. Hooks: PH-40 / PH-50.",
     params: [
       ["substitute_map", "material → substitutes", "M", "required", "—", ""],
@@ -1101,13 +1101,13 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.9", id: "material_allocation", stage: "plant", cls: "improvisation",
-    constraint: "allocation_efficiency", status: "✅",
+    constraint: "allocation_efficiency", status: "implemented",
     logic: "The weekly war-room as a rolling LP (Eqs. 13–17): reassign shared materials across products to protect revenue during scarcity. Costs planner time only; value scales with the shared-material index.",
     math: "Eqs. 13–17: rolling LP over W = window_weeks. max Σ_p w_p·x[p,τ] subject to cumulative shared-material balance Σ_p r_{p,m}·Σ_{τ'≤τ} x[p,τ'] ≤ I_m + arrivals(≤τ), plus per-week capacity and demand caps. objective sets w_p (max_revenue ⇒ w_p = u_p). Solved with HiGHS; weeks with no binding shared material skip the solve; on solver failure it falls back to a revenue-ranked greedy plan (counted in lp_fallbacks).",
     hooks: [["PH-40", "60", "demand, firm_knowledge, overtime_capacity, state.backlog, state.on_hand, state.pipeline", "production_plan, state.cost_ledger", "Replaces the default greedy plan (priority 50) with the rolling-LP allocation when active."]],
     params: [
       ["window_weeks", "weeks", "G", "4", "[1, 13]", "W — rolling horizon."],
-      ["objective", "enum", "G", "max_revenue", "{max_revenue, max_fill_rate, priority_weighted, fg_replenish}", "max_revenue ✅; fg_replenish is MTS-only (M7)."],
+      ["objective", "enum", "G", "max_revenue", "{max_revenue, max_fill_rate, priority_weighted, fg_replenish}", "max_revenue ✓; fg_replenish is MTS-only (M7)."],
       ["priority_weights", "weight per product", "P", "—", "—", "objective=priority_weighted; missing products weigh 1."],
       ["annual_cost", "€/yr", "G", "6240.0", "[0, ∞]", "C^alc — planner labor."],
       ["activation", "enum", "G", "during_disruption", "{during_disruption, always}", ""],
@@ -1116,7 +1116,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-P.10", id: "repurposing", stage: "plant", cls: "improvisation",
-    constraint: "production_capacity", status: "🧩", milestone: "M8",
+    constraint: "production_capacity", status: "planned", milestone: "M8",
     logic: "Convert lines to new capability mid-crisis (Intel substrate) — high cost, delay, true bounce-forward. Hook: PH-40.",
     params: [
       ["conversion_map", "line → capability", "P", "required", "—", ""],
@@ -1127,7 +1127,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-S.1", id: "backup_supplier", stage: "supplier", cls: "strategic",
-    constraint: "material_availability", status: "✅",
+    constraint: "material_availability", status: "implemented",
     logic: "Contingent rerouting to a qualified backup source — premium paid only on rerouted orders. Slower than warm dual-sourcing, and useless when a BoM peer is single-sourced: one missing material still blocks the product. Requires pre-deployment.",
     math: "While the firm SEES a disruption on a material's primary source, this week's released order reroutes to a backup s′ chosen by selection_rule (min_cost | min_leadtime | reliability). Premium (c_{m,s′} − c_{m,s})·qty → backup_premium. activation_trigger=coverage_threshold skips rerouting while position covers ≥ threshold weeks; rerouting persists cooldown_weeks after the event clears (anti-flap). Single-sourced materials are skipped.",
     hooks: [["PH-80", "60", "firm_knowledge, purchase_orders, state.on_hand, state.pipeline, state.queue", "purchase_orders, state.cost_ledger", "Reroutes orders released by inventory_control (priority 50) away from firm-visibly disrupted primary suppliers."]],
@@ -1142,7 +1142,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-S.2", id: "proactive_multi_sourcing", stage: "supplier", cls: "strategic",
-    constraint: "material_availability", status: "✅",
+    constraint: "material_availability", status: "implemented",
     logic: "Split orders across warm sources in NORMAL operations — no activation delay, permanent premium; the structural answer to capacity-cut events. Pay-always vs P-S.1's pay-on-activation; each slice carries its own source's lead time, so a disruption hits only its slice. Requires pre-deployment.",
     math: "Always-on split of each released order across qualified links by shares w_{m,s} (sum 100; default = equal over the cheapest k where 100/k ≥ min_share_pct). Premium on non-primary slices = Σ (c_{m,s} − c_{m,primary} + secondary_premium)·slice. rebalance_trigger=disruption renormalizes shares onto healthy sources. Each slice carries its own source's lead time, so a disruption hits only its slice.",
     hooks: [["PH-80", "55", "firm_knowledge, purchase_orders", "purchase_orders, state.cost_ledger", "Splits orders released by inventory_control (priority 50) across qualified links; P-S.1 (priority 60) may still reroute a disrupted slice afterwards."]],
@@ -1155,7 +1155,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-S.3", id: "capacity_reservation", stage: "supplier", cls: "strategic",
-    constraint: "material_availability", status: "🧩", milestone: "M8",
+    constraint: "material_availability", status: "planned", milestone: "M8",
     logic: "Real-options contract (semiconductor-style): standing fee for callable capacity; reserved units bypass capacity cuts. Cheaper than stock for slow, expensive materials. Requires pre-deployment. Hook: PH-80.",
     params: [
       ["reserved_capacity", "units/wk", "SM", "required", "[0, ∞]", ""],
@@ -1165,7 +1165,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-S.4", id: "early_warning_failover", stage: "supplier", cls: "anticipation",
-    constraint: "response_time", status: "✅",
+    constraint: "response_time", status: "implemented",
     logic: "Visibility investments compress disruption-start → firm-knows: effective lag = min(monitored, scenario). Reactive policies (P-S.1/P-T.2/P-P.5) simply engage earlier; rerouting itself stays P-S.1's job. Makes 'what is a week of warning worth?' a first-class experiment. Requires pre-deployment. Hook: PH-20.",
     params: [
       ["detection_lag_weeks", "weeks", "G/S", "1", "[0, 4]", "Monitored lag; effective lag = min(this, settings). Applies to ALL reactive strategies (PH-20)."],
@@ -1174,7 +1174,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-T.1", id: "multimodal_lane_portfolio", stage: "transport", cls: "strategic",
-    constraint: "transport_capacity", status: "🧩", milestone: "M7",
+    constraint: "transport_capacity", status: "planned", milestone: "M7",
     logic: "Qualified alternative lanes / modes per supplier — edge-risk redundancy; prerequisite for P-T.3 mode_shift. Requires pre-deployment. Hook: PH-90.",
     params: [
       ["lanes", "lanes per supplier link", "SM", "—", "—", "≤3 per SM."],
@@ -1183,19 +1183,19 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-T.2", id: "expedited_shipments", stage: "transport", cls: "improvisation",
-    constraint: "response_time", status: "✅",
+    constraint: "response_time", status: "implemented",
     logic: "Premium freight pulls existing in-transit forward (Eqs. 18–19) — repeatable every week, hence the strongest long-disruption strategy. Cannot conjure units a capacity cut never shipped (the supplier queue is out of reach).",
     math: "Eqs. 18–19: coverage gap need_m = E[D_m] + backlog_m − on_hand_m − arrivals[t+1,t+2). revenue_positive ⇒ expedite only if marginal value max_p(u_p / r_{p,m}) > premium_unit = c_m·premium/100. Pull up to the gap forward from the earliest future pipeline slots into next week's landing; cost = pulled·c_m·premium/100. Touches in-transit only — never the supplier queue.",
     hooks: [["PH-90", "40", "firm_knowledge, material_demand, state.backlog, state.on_hand, state.pipeline", "state.cost_ledger, state.pipeline", "Runs after the deferral mechanic (priority 10) and before landing (priority 90): expedited quantities land this week at a premium."]],
     params: [
       ["premium_pct_of_cost", "% of c_m / unit", "M", "3.0", "[1.0, 50.0]", "C^exp_m."],
-      ["decision", "enum", "G", "revenue_positive", "{revenue_positive, always_during_disruption}", "revenue_positive ✅."],
-      ["scope", "enum", "G", "disrupted_materials", "{disrupted_materials, all}", "disrupted_materials ✅."],
+      ["decision", "enum", "G", "revenue_positive", "{revenue_positive, always_during_disruption}", "revenue_positive ✓."],
+      ["scope", "enum", "G", "disrupted_materials", "{disrupted_materials, all}", "disrupted_materials ✓."],
     ],
   },
   {
     ref: "P-T.3", id: "mode_shift", stage: "transport", cls: "improvisation",
-    constraint: "response_time", status: "🧩", milestone: "M7",
+    constraint: "response_time", status: "planned", milestone: "M7",
     logic: "Switch NEW orders to a faster lane (sea→air) — composable with P-T.2, which moves the EXISTING flow. Requires P-T.1. Hooks: PH-80 / PH-90.",
     params: [
       ["upgrade_lane", "lane id", "E", "required", "—", "Requires P-T.1."],
@@ -1206,7 +1206,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-T.4", id: "leadtime_hedging", stage: "transport", cls: "anticipation",
-    constraint: "response_time", status: "🧩", milestone: "M8",
+    constraint: "response_time", status: "planned", milestone: "M8",
     logic: "Order earlier than policy dictates for long-lead / critical materials — a time buffer instead of a unit buffer. Hook: PH-70.",
     params: [
       ["hedge_weeks", "weeks", "M", "2", "[0, 8]", ""],
@@ -1216,7 +1216,7 @@ const POLICY_CATALOG: Policy[] = [
   },
   {
     ref: "P-X.1", id: "recovery_playbook", stage: "cross", cls: "meta",
-    constraint: "—", status: "🧩", milestone: "M8",
+    constraint: "—", status: "planned", milestone: "M8",
     logic: "Firms execute SEQUENCED responses — detect → expedite → backup → overtime — gated by triggers and budget. Composes enabled policies; replaces flat recovery lists. Hook: PH-20 (evaluation) + delegated.",
     params: [
       ["steps", "ordered steps", "G", "required", "—", ""],
@@ -1239,8 +1239,8 @@ function PolicyCard({ p }: { p: Policy }) {
             <span className={cn("text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5", POLICY_CLASS_STYLE[p.cls])}>
               {p.cls}
             </span>
-            <Badge variant={p.status === "✅" ? "secondary" : "outline"} className="text-[10px]">
-              {p.status === "✅" ? "implemented" : p.milestone ? `planned · ${p.milestone}` : "planned"}
+            <Badge variant={p.status === "implemented" ? "secondary" : "outline"} className="text-[10px]">
+              {p.status === "implemented" ? "implemented" : p.milestone ? `planned · ${p.milestone}` : "planned"}
             </Badge>
           </div>
         </div>
@@ -1400,7 +1400,7 @@ const MECHANICS: [string, string][] = [
 type DistRow = { name: string; form: string; notes: string };
 
 const DEMAND_DISTS: DistRow[] = [
-  { name: "triangular ✅", form: "Tri(a, b, c) — inverse-CDF", notes: "Manuscript core. E=(a+b+c)/3; Var=(a²+b²+c²−ab−ac−bc)/18. Default a=max{0,(1−ν)·b}, c=(1+ν)·b." },
+  { name: "triangular ✓", form: "Tri(a, b, c) — inverse-CDF", notes: "Manuscript core. E=(a+b+c)/3; Var=(a²+b²+c²−ab−ac−bc)/18. Default a=max{0,(1−ν)·b}, c=(1+ν)·b." },
   { name: "triangularAV", form: "triangular(avg·(1−v), avg, avg·(1+v))", notes: "'Average & Variability' form: mode = avg, symmetric ±v range (a floored at 0). In scsim: demand_mode = avg, demand_floor_factor (ν) = v. e.g. avg 100, v 0.30 → Tri(70, 100, 130). Use Product.with_triangular_av(average, variability)." },
   { name: "deterministic", form: "D = b", notes: "No randomness; Var = 0." },
   { name: "poisson", form: "Pois(λ), λ = b", notes: "Counts; E = Var = b." },
@@ -1409,7 +1409,7 @@ const DEMAND_DISTS: DistRow[] = [
 ];
 
 const LEADTIME_DISTS: DistRow[] = [
-  { name: "deterministic ✅", form: "T = lead_time_weeks", notes: "No randomness (manuscript)." },
+  { name: "deterministic ✓", form: "T = lead_time_weeks", notes: "No randomness (manuscript)." },
   { name: "lognormal", form: "σ²=ln(1+CV²), μ=ln(T)−σ²/2; round", notes: "E[X] = T, Var = T²·CV²." },
   { name: "gamma", form: "α=1/CV², β=T·CV²; round", notes: "E[X] = T, Var = T²·CV²." },
   { name: "empirical", form: "— (M7)", notes: "Lands with the data-import path; compiling one today raises a clear error." },
@@ -1422,18 +1422,18 @@ const DISRUPTION_DRAWS: [string, string][] = [
 ];
 
 const ENUM_GROUPS: [string, string][] = [
-  ["DemandModel", "deterministic · triangular ✅ · poisson · negbin · bootstrap"],
-  ["LeadTimeDist", "deterministic ✅ · lognormal · gamma · empirical (M7)"],
-  ["FulfillmentMode (CODP)", "mto ✅ · mts (M7) · ato (reserved)"],
-  ["ForecastModel", "naive · ma ✅ · exp_smoothing · perfect"],
-  ["EffectType", "lead_time_extension ✅ · capacity_reduction"],
-  ["TargetType", "node:supplier ✅ · node:plant ✅ · edge:lane (behavior-neutral)"],
+  ["DemandModel", "deterministic · triangular ✓ · poisson · negbin · bootstrap"],
+  ["LeadTimeDist", "deterministic ✓ · lognormal · gamma · empirical (M7)"],
+  ["FulfillmentMode (CODP)", "mto ✓ · mts (M7) · ato (reserved)"],
+  ["ForecastModel", "naive · ma ✓ · exp_smoothing · perfect"],
+  ["EffectType", "lead_time_extension ✓ · capacity_reduction"],
+  ["TargetType", "node:supplier ✓ · node:plant ✓ · edge:lane (behavior-neutral)"],
   ["OverflowRule", "queue · reject (→ lost_inbound_units)"],
   ["Onset / RecoveryProfile", "step · ramp_linear"],
   ["TransportMode", "default · sea · air · road · rail"],
-  ["WarmupMethod", "conway · mser5 · manual · most_conservative ✅"],
-  ["RunMode", "full ✅ · fast_scan"],
-  ["ReplicationStopping", "fixed ✅ · sequential_ci"],
+  ["WarmupMethod", "conway · mser5 · manual · most_conservative ✓"],
+  ["RunMode", "full ✓ · fast_scan"],
+  ["ReplicationStopping", "fixed ✓ · sequential_ci"],
 ];
 
 function DistTable({ caption, rows }: { caption: string; rows: DistRow[] }) {
@@ -1514,13 +1514,13 @@ function ResilienceIndexTable() {
 // ── Experiments: synergy · stress tests · performance · roadmap ───────────────
 
 const STRESS_TESTS: { id: string; status: string; desc: string }[] = [
-  { id: "ST-1", status: "✅", desc: "Supplier outage sweep — each supplier × lead-time extension × Δt {5, 8, 10} weeks (manuscript)." },
-  { id: "ST-2", status: "✅", desc: "Supplier capacity-cut sweep — supplier × φ {0.75, 0.5, 0.25, 0} × {4, 8} weeks; cells without finite capacity are skipped with a reason." },
-  { id: "ST-3", status: "🧩 M7", desc: "Material shortage sweep." },
-  { id: "ST-4", status: "🧩 M7", desc: "Edge / lane shock (needs the edge split)." },
-  { id: "ST-5", status: "🧩 M7", desc: "Demand surge." },
-  { id: "ST-6", status: "🧩 M7", desc: "Compound shock (ST-1 ∩ ST-5)." },
-  { id: "ST-7", status: "🧩 M7", desc: "Nexus-node attack — top-k ML-critical nodes (ml-service integration)." },
+  { id: "ST-1", status: "implemented", desc: "Supplier outage sweep — each supplier × lead-time extension × Δt {5, 8, 10} weeks (manuscript)." },
+  { id: "ST-2", status: "implemented", desc: "Supplier capacity-cut sweep — supplier × φ {0.75, 0.5, 0.25, 0} × {4, 8} weeks; cells without finite capacity are skipped with a reason." },
+  { id: "ST-3", status: "planned · M7", desc: "Material shortage sweep." },
+  { id: "ST-4", status: "planned · M7", desc: "Edge / lane shock (needs the edge split)." },
+  { id: "ST-5", status: "planned · M7", desc: "Demand surge." },
+  { id: "ST-6", status: "planned · M7", desc: "Compound shock (ST-1 ∩ ST-5)." },
+  { id: "ST-7", status: "planned · M7", desc: "Nexus-node attack — top-k ML-critical nodes (ml-service integration)." },
 ];
 
 const PERF_TARGETS: { workload: string; target: string; measured: string }[] = [
@@ -1539,14 +1539,14 @@ const PERF_TECHNIQUES: string[] = [
 ];
 
 const ROADMAP: { m: string; deliverable: string; status: string }[] = [
-  { m: "M1", deliverable: "Entities + Part III dictionary; registry; phase-pipeline skeleton.", status: "✅" },
-  { m: "M2", deliverable: "MTO core loop (PH-10..99); LT-extension injector; warm-up detection; ring-buffer pipeline.", status: "✅" },
-  { m: "M3", deliverable: "Policies as plugins; keyed policy RNG; warm-state snapshots.", status: "✅" },
-  { m: "M4", deliverable: "ST-1 end-to-end + scorecard + Resilience Index; fast_scan.", status: "✅ engine" },
-  { m: "M5", deliverable: "Portfolio study + synergy decomposition (CRN, bootstrap stars, breadth ladder).", status: "✅ engine" },
-  { m: "M6", deliverable: "Docs auto-generation + docs CI gate; validation suite.", status: "✅" },
-  { m: "M7", deliverable: "capacity_reduction ✅, ST-2 ✅, MTS + P-P.4 ✅, P-S.2 ✅, plant targets ✅, P-S.4 ✅, P-C.2 ✅, edge split ✅; ST-3/4/5.", status: "🔜 most shipped" },
-  { m: "M8", deliverable: "Remaining policies; P-X.1 recovery playbook; LLM diff proposer.", status: "🧩" },
+  { m: "M1", deliverable: "Entities + Part III dictionary; registry; phase-pipeline skeleton.", status: "implemented" },
+  { m: "M2", deliverable: "MTO core loop (PH-10..99); LT-extension injector; warm-up detection; ring-buffer pipeline.", status: "implemented" },
+  { m: "M3", deliverable: "Policies as plugins; keyed policy RNG; warm-state snapshots.", status: "implemented" },
+  { m: "M4", deliverable: "ST-1 end-to-end + scorecard + Resilience Index; fast_scan.", status: "implemented (engine)" },
+  { m: "M5", deliverable: "Portfolio study + synergy decomposition (CRN, bootstrap stars, breadth ladder).", status: "implemented (engine)" },
+  { m: "M6", deliverable: "Docs auto-generation + docs CI gate; validation suite.", status: "implemented" },
+  { m: "M7", deliverable: "capacity_reduction ✓, ST-2 ✓, MTS + P-P.4 ✓, P-S.2 ✓, plant targets ✓, P-S.4 ✓, P-C.2 ✓, edge split ✓; ST-3/4/5.", status: "mostly implemented" },
+  { m: "M8", deliverable: "Remaining policies; P-X.1 recovery playbook; LLM diff proposer.", status: "planned" },
 ];
 
 function Experiments() {
@@ -1968,8 +1968,8 @@ export const DOC_BODIES: Record<string, () => JSX.Element> = {
                   simulator of a <strong>three-echelon network</strong> (suppliers → plant → customers)
                   advancing on weekly ticks. The default product mode is <strong>make-to-order
                   (MTO)</strong>; make-to-stock (MTS) and assemble-to-order (ATO) are supported per
-                  product. Manuscript constructs are the validated core (✅); everything else is a
-                  governed extension (🧩) that lands at the listed milestone — compiling a planned
+                  product. Manuscript constructs are the validated core (✓); everything else is a
+                  governed extension (planned) that lands at the listed milestone — compiling a planned
                   policy raises a clear error, never a silent no-op.
                 </p>
                 <p>
@@ -2077,7 +2077,7 @@ I^T,disr_{m*}[t + τ]   = I^T_{m*}[t]  for τ ∈ [1, Δt - 1]`}
               </pre>
               <Prose>
                 <p>
-                  This is the <code>lead_time_extension</code> effect (✅ Eqs. 11–12): units are{" "}
+                  This is the <code>lead_time_extension</code> effect (✓ Eqs. 11–12): units are{" "}
                   <em>delayed, never destroyed</em>. The second effect, <code>capacity_reduction</code>,
                   throttles a supplier's weekly outbound flow to <code>φ · capacity_per_week</code> (φ = 0
                   is a full outage). Under <code>overflow_rule = queue</code> nothing is lost — the cut
@@ -2159,7 +2159,7 @@ In scsim:  demand_mode = average,  demand_floor_factor (ν) = variability
                 </p>
                 <h3 className="text-base font-semibold pt-2">Allowed values (enums)</h3>
                 <p className="text-sm text-muted-foreground">
-                  The full set of accepted values for the categorical parameters above (✅ = validated /
+                  The full set of accepted values for the categorical parameters above (✓ = validated /
                   default-selected today).
                 </p>
               </Prose>
@@ -2193,8 +2193,8 @@ In scsim:  demand_mode = average,  demand_floor_factor (ν) = variability
                   <li><strong>meta</strong> — orchestration that sequences other policies (recovery playbook).</li>
                 </ul>
                 <p className="text-sm text-muted-foreground">
-                  Status: <strong>✅ implemented</strong> = validated manuscript core, runnable today;{" "}
-                  <strong>🧩 planned</strong> = full parameter schema lives in the registry, with the
+                  Status: <strong>✓ implemented</strong> = validated manuscript core, runnable today;{" "}
+                  <strong>planned</strong> = full parameter schema lives in the registry, with the
                   engine landing at the listed milestone (compiling one raises a clear error, never a
                   silent no-op). Cards are grouped by network stage; each lists the policy logic, its
                   formula / decision rule (implemented policies), the engine hook(s) it fires in (phase,
@@ -2719,7 +2719,7 @@ scenario      ┘    role read)     pure)          defaults · warnings)
                     average disruption magnitude). The policy bundles are loaded and cached but the
                     per-policy decision rules are not yet wired into this realtime worker. Phase 2
                     replaces <code>compute_kpis()</code> with the <strong>scsim</strong> engine (engine
-                    0.2.0) documented in the Modelers section — the nine ✅ policies (inventory control,
+                    0.2.0) documented in the Modelers section — the nine implemented policies (inventory control,
                     material &amp; FG safety stock, overtime, allocation, backup, multi-sourcing,
                     expediting, unmet-demand handling) are implemented there today.
                   </li>

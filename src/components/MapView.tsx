@@ -7,6 +7,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { MapPin, Zap, Route, Factory } from 'lucide-react';
+
+// The map hands Mapbox raw HTML in two places (the plant marker and its popup),
+// where a React component cannot go. This is lucide's `Factory` as a string —
+// paths copied verbatim from lucide-react/icons/factory.js — so the marker, the
+// popup and the <Factory /> in the legend are all the same glyph (C7: lucide
+// only). Keep it in sync if the icon set is upgraded.
+const FACTORY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/></svg>`;
+
 import { Button } from '@/components/ui/button';
 
 interface NodeData extends Record<string, unknown> {
@@ -228,7 +236,7 @@ const createMarkerElement = useCallback((node: Node<NodeData>, isSelected: boole
     
     // Add content based on type
     if (isPlant) {
-      el.innerHTML = '<div style="display: flex; align-items: center; justify-content: center;">🏭</div>';
+      el.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; width: 14px; height: 14px;">${FACTORY_SVG}</div>`;
     } else if (nodeCount && nodeCount > 1) {
       el.textContent = nodeCount.toString();
       el.style.fontSize = '12px';
@@ -548,7 +556,7 @@ const createMarkerElement = useCallback((node: Node<NodeData>, isSelected: boole
             }).setHTML(`
               <div class="p-3 min-w-[140px]">
                 <div class="flex items-center gap-2 mb-2">
-                  <span class="text-lg">🏭</span>
+                  <span class="inline-flex h-4 w-4 items-center justify-center">${FACTORY_SVG}</span>
                   <h3 class="font-semibold text-sm">Manufacturing Plant</h3>
                 </div>
                 <p class="text-xs text-muted-foreground mb-1">${proj.plant_name || 'Plant'}</p>
@@ -686,10 +694,10 @@ const createMarkerElement = useCallback((node: Node<NodeData>, isSelected: boole
           {/* Main legend items in compact grid */}
           <div className="grid grid-cols-2 gap-3 mb-3">
             {[
-              { key: 'A', label: 'Suppliers', color: GROUP_COLORS.A, icon: '🏢' },
-              { key: 'D', label: 'Customers', color: GROUP_COLORS.D, icon: '🏪' },
-              { key: 'PLANT', label: 'Plant', color: GROUP_COLORS.PLANT, icon: '🏭', special: true },
-            ].map(({ key, label, color, icon, special }) => (
+              { key: 'A', label: 'Suppliers', color: GROUP_COLORS.A },
+              { key: 'D', label: 'Customers', color: GROUP_COLORS.D },
+              { key: 'PLANT', label: 'Plant', color: GROUP_COLORS.PLANT, special: true },
+            ].map(({ key, label, color, special }) => (
               <div key={key} className="flex items-center gap-2">
                 <div 
                   className={`rounded-full border-2 border-background shadow-sm flex items-center justify-center text-xs font-medium ${special ? 'w-6 h-6' : 'w-4 h-4'}`}
@@ -698,7 +706,7 @@ const createMarkerElement = useCallback((node: Node<NodeData>, isSelected: boole
                     color: '#ffffff'
                   }}
                 >
-                  {special && icon}
+                  {special && <Factory className="h-3.5 w-3.5" aria-hidden="true" />}
                 </div>
                 <span className="text-xs font-medium text-foreground">{label}</span>
               </div>
