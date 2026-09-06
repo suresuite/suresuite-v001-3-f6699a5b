@@ -20,7 +20,7 @@ export function YouTubeEmbed({ videoId, title, className }: YouTubeEmbedProps) {
   return (
     <div
       className={cn(
-        "w-full overflow-hidden rounded-sm border border-border bg-black shadow-sm",
+        "w-full overflow-hidden rounded-sm border border-border bg-muted shadow-sm",
         className
       )}
     >

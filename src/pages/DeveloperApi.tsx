@@ -737,7 +737,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
               </p>
             </div>
 
-            <div className="grid gap-3.5 lg:grid-cols-2">
+            <div className="grid gap-3.5 md:grid-cols-2">
               <ApiCodeBlock title="List your projects" code={curlList} />
               <ApiCodeBlock title="Dispatch a run (202 → run_id; a retried submit with the same Idempotency-Key returns the same run)" code={curlRun} />
               <ApiCodeBlock title="Poll a run until it finishes" code={curlPoll} />
@@ -819,7 +819,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+            <div className="grid gap-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-start">
               {/* Project + CONFIG cell */}
               <div className="space-y-3">
                 <div className="space-y-1.5">
