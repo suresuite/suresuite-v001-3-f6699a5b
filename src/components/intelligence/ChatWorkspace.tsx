@@ -127,7 +127,7 @@ export function ChatWorkspace({
             >
               {AGENT_MONO[agent.id] ?? "GA"}
             </span>
-            <span className="shrink-0 font-semibold text-foreground">{agent.name}</span>
+            <span className="min-w-0 truncate font-semibold text-foreground" title={agent.name}>{agent.name}</span>
             <span className="shrink-0 text-[#c4c4c4]">·</span>
             <span className="min-w-0 flex-1 truncate">{agent.blurb}</span>
           </div>

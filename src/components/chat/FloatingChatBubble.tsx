@@ -393,7 +393,7 @@ export function FloatingChatBubble() {
             {!projectId && (
               <div className="space-y-3">
                 <div className="rounded-lg border border-border bg-card/60 p-3 text-sm text-muted-foreground">
-                  👋 I'm your Supply Chain assistant. Which project should we dig into?
+                  I'm your Supply Chain assistant. Which project should we dig into?
                 </div>
                 {projectsLoading ? (
                   <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">

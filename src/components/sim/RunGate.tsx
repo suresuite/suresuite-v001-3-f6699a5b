@@ -172,7 +172,7 @@ export function FindingsPanel<F extends Finding>({
                 {renderFix?.(f)}
               </div>
               {f.hint ? (
-                <span className="shrink-0 text-[11.5px] text-[--zinc-quiet]">{f.hint}</span>
+                <span className="min-w-0 text-[11.5px] leading-[1.4] text-[--zinc-quiet] [text-wrap:pretty]">{f.hint}</span>
               ) : null}
             </div>
           ))}

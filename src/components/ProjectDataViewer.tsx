@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdaptiveLabel } from '@/components/shared/AdaptiveText';
+import { DATASET_LABELS } from '@/lib/ui/labels';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
@@ -378,19 +380,25 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
     <Card className="relative">
       {/* Compact header bar */}
       <div className="flex items-center gap-2 px-3 pt-2 pb-1">
-        {/* Tabs: width auto (just fits the buttons) */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="flex-1">
+        {/* Tabs. With the deep tier on, all seven measure 569px against roughly
+            200px of room at 320px — so the strip scrolls below `md` (the same
+            treatment as the admin sub-nav, which had the same problem) and the
+            labels take their short form below `sm`, which trims 110px off the
+            swipe. Neither is enough alone; `overflow-visible` at `md` keeps the
+            desktop strip exactly as it was. */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="min-w-0 flex-1">
           <TabsList
-            className="inline-flex justify-start gap-1 px-1 py-1 h-8 rounded-md"
+            className="inline-flex max-w-full justify-start gap-1 overflow-x-auto px-1 py-1 h-8 rounded-md
+                       [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:overflow-visible"
             style={{ width: 'fit-content' }}
           >
             {visibleTabs.map(t => (
               <TabsTrigger
                 key={t.key}
                 value={t.key}
-                className={`${SMALL_TXT} py-1 px-2`}
+                className={`${SMALL_TXT} shrink-0 py-1 px-2`}
               >
-                {t.label}
+                <AdaptiveLabel label={DATASET_LABELS[t.key]} />
               </TabsTrigger>
             ))}
           </TabsList>
