@@ -336,7 +336,7 @@ export function FloatingChatBubble() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
+                className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-white/90 hover:bg-white/10 hover:text-white md:min-h-0 md:min-w-0"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={clear}
                 aria-label="Clear chat"
@@ -348,7 +348,7 @@ export function FloatingChatBubble() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
+              className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-white/90 hover:bg-white/10 hover:text-white md:min-h-0 md:min-w-0"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => {
                 setOpen(false);
@@ -362,7 +362,7 @@ export function FloatingChatBubble() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 text-white/90 hover:bg-white/10 hover:text-white"
+              className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-white/90 hover:bg-white/10 hover:text-white md:min-h-0 md:min-w-0"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setOpen(false)}
               aria-label="Close"
@@ -479,7 +479,7 @@ export function FloatingChatBubble() {
               className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               style={{ minHeight: 40, maxHeight: 120 }}
             />
-            <Button type="submit" size="icon" className="h-9 w-9 rounded-lg" disabled={!projectId || !input.trim() || loading} aria-label="Send">
+            <Button type="submit" size="icon" className="h-9 w-9 min-h-11 min-w-11 rounded-lg md:min-h-0 md:min-w-0" disabled={!projectId || !input.trim() || loading} aria-label="Send">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>

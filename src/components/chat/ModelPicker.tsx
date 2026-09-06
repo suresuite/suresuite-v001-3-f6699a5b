@@ -76,7 +76,7 @@ export function ModelPicker({ value, onChange, className }: Props) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
-        className={`h-8 w-auto gap-1 rounded-md border-border bg-transparent px-2 text-[12px] font-medium text-muted-foreground shadow-none hover:bg-muted hover:text-foreground focus:ring-0 ${className ?? ""}`}
+        className={`h-8 min-h-11 w-auto gap-1 md:min-h-0 rounded-md border-border bg-transparent px-2 text-[12px] font-medium text-muted-foreground shadow-none hover:bg-muted hover:text-foreground focus:ring-0 ${className ?? ""}`}
       >
         {/* Explicit children so the trigger shows the label only — the item
             rows below may carry a second hint line (§23.3). */}

@@ -490,7 +490,7 @@ export function ProjectCard({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5"
+                    className="h-8 min-h-11 gap-1.5 md:min-h-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewData(project);
@@ -502,7 +502,7 @@ export function ProjectCard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 gap-1.5"
+                    className="h-8 min-h-11 gap-1.5 md:min-h-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       onUploadData(project);
@@ -513,7 +513,7 @@ export function ProjectCard({
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More actions" title="More actions">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 min-h-11 min-w-11 md:min-h-0 md:min-w-0" aria-label="More actions" title="More actions">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

@@ -1099,7 +1099,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   <input
                     autoFocus
                     type="text"
-                    className="h-9 pl-9 pr-3 border border-border rounded-md text-sm bg-background focus:outline-none w-full"
+                    className="h-9 min-h-11 md:min-h-0 pl-9 pr-3 border border-border rounded-md text-sm bg-background focus:outline-none w-full"
                     placeholder="find a firm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}

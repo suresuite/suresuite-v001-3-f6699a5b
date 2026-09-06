@@ -89,7 +89,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
     <AdminLayout
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Projects"
       onRefresh={load} refreshLoading={loading}
-      actions={<Input placeholder="Search name, org, owner, plant…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-64 rounded-sm" />}
+      actions={<Input placeholder="Search name, org, owner, plant…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-64 rounded-sm md:min-h-0" />}
     >
       {isMobile ? (
         <div className={`${SURFACE} overflow-hidden`}>

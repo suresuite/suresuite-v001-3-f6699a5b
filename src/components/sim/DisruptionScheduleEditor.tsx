@@ -37,7 +37,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           <div className="col-span-3 flex flex-col gap-1">
             <Label className="text-[10px]">Target</Label>
             <Input
-              className="h-8"
+              className="h-8 min-h-11 md:min-h-0"
               value={d.target}
               placeholder="node/edge id"
               onChange={(e) => update(i, { target: e.target.value })}
@@ -46,7 +46,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           <div className="col-span-2 flex flex-col gap-1">
             <Label className="text-[10px]">Type</Label>
             <select
-              className="h-8 bg-background border border-input rounded-sm px-2 text-sm"
+              className="h-8 min-h-11 md:min-h-0 bg-background border border-input rounded-sm px-2 text-sm"
               value={d.target_type}
               onChange={(e) => update(i, { target_type: e.target.value as "node" | "edge" })}
             >
@@ -57,7 +57,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           <div className="col-span-2 flex flex-col gap-1">
             <Label className="text-[10px]">Start ({unitPlural})</Label>
             <Input
-              className="h-8"
+              className="h-8 min-h-11 md:min-h-0"
               type="number"
               value={Math.round(fromDays(d.start_day))}
               onChange={(e) => update(i, { start_day: Math.round(toDays(+e.target.value)) })}
@@ -66,7 +66,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           <div className="col-span-2 flex flex-col gap-1">
             <Label className="text-[10px]">Duration ({unitPlural})</Label>
             <Input
-              className="h-8"
+              className="h-8 min-h-11 md:min-h-0"
               type="number"
               value={Math.round(fromDays(d.duration_days))}
               onChange={(e) => update(i, { duration_days: Math.round(toDays(+e.target.value)) })}
@@ -75,7 +75,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           <div className="col-span-2 flex flex-col gap-1">
             <Label className="text-[10px]">Magnitude %</Label>
             <Input
-              className="h-8"
+              className="h-8 min-h-11 md:min-h-0"
               type="number"
               value={d.magnitude_pct}
               onChange={(e) => update(i, { magnitude_pct: +e.target.value })}
@@ -84,7 +84,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           <Button
             size="icon"
             variant="ghost"
-            className="h-8 w-8 col-span-1 text-destructive"
+            className="h-8 w-8 min-h-11 min-w-11 col-span-1 text-destructive md:min-h-0 md:min-w-0"
             onClick={() => remove(i)}
           >
             <Trash2 className="h-4 w-4" />

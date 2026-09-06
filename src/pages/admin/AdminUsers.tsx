@@ -104,7 +104,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       refreshLoading={loading}
       actions={
         <div className="flex items-center gap-2">
-          <Input placeholder="Search name, email, org…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-60 rounded-sm" />
+          <Input placeholder="Search name, email, org…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-60 rounded-sm md:min-h-0" />
           <AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />
         </div>
       }

@@ -168,10 +168,24 @@ for (const file of files) {
 
     // ── §2.4 Touch targets. h-8/h-9 is CORRECT at md+ (audit C3), so only
     // flag a small height that is not released or paired with a md: override.
+    //
+    // A TARGET, though — the rule is about what a thumb has to hit. A 32px
+    // spinner, a lucide icon, an avatar, a table-header height and a spacer
+    // div are all `h-8`/`h-9`/`h-10` and none of them is tappable; flagging
+    // them buries the 40 that are real. So the element has to look interactive
+    // (JSX spans lines, hence the small window) and must not be an icon or a
+    // spinner, which are sized by C7 and are never the hit area themselves.
     const small = /\b(?:min-)?h-(?:8|9|10)\b/.exec(text);
     if (small && !isMarketing) {
       const hasMobileFloor = /\b(?:min-)?h-11\b|min-h-\[44|md:h-(?:8|9|10)\b/.test(text);
-      if (!hasMobileFloor) {
+      const window = lines.slice(Math.max(0, i - 3), i + 2).join('\n');
+      const interactive =
+        /<button|<Button|onClick|role="button"|<a\s|<Link|<[A-Z]\w*(?:Input|Select|Trigger|Toggle)|<input|<select|cursor-pointer/i
+          .test(window);
+      const isIconOrSpinner =
+        /animate-spin/.test(text) ||
+        /<[A-Z]\w*\s+className=(?:"|\{`)[^"`]*\b(?:min-)?h-(?:8|9|10)\b/.test(text);
+      if (!hasMobileFloor && interactive && !isIconOrSpinner) {
         report(file, ln, `${small[0]} with no 44px mobile floor`, '2.4',
           'add h-11 md:' + small[0] + ', or min-h-11 md:min-h-0');
       }

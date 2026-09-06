@@ -212,7 +212,7 @@ export function StepwiseDatePicker({
         <Button
           variant="outline"
           className={cn(
-            "w-full justify-start text-left font-normal text-xs h-8",
+            "w-full justify-start text-left font-normal text-xs h-8 min-h-11 md:min-h-0",
             !date && "text-muted-foreground",
             className
           )}
