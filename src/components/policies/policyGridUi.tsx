@@ -275,7 +275,7 @@ export function NumCell({
       <ProvenanceDot p={provenance} />
       <span
         className="grid h-5 items-center"
-        style={{ gridTemplateColumns: `1fr ${unit ? 14 : 0}px`, columnGap: unit ? 3 : 0 }}
+        style={{ gridTemplateColumns: `minmax(0,1fr) ${unit ? 14 : 0}px`, columnGap: unit ? 3 : 0 }}
       >
         <input
           defaultValue={text}

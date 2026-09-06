@@ -377,7 +377,7 @@ export default function Landing() {
         {/* Deep network AI — the 3D model, three lenses */}
         <section className="border-b border-border/60 bg-black text-white">
           <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
-            <div className="grid items-stretch gap-10 md:gap-14 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="grid items-stretch gap-10 md:gap-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
               {/* Left: copy + lenses */}
               <div className="max-w-md">
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#BF2330]">

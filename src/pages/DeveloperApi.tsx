@@ -722,7 +722,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
             <div>
               <div className="text-[14px] font-semibold">Base URL</div>
               <div className="mt-2 flex items-center gap-2.5">
-                <InlineCode className="flex-1 truncate rounded-sm border-[--hair-border] text-[11.5px]">
+                <InlineCode className="min-w-0 flex-1 truncate rounded-sm border-[--hair-border] text-[11.5px]">
                   {API_BASE}
                 </InlineCode>
                 <CopyButton text={API_BASE} label="Copy" />
@@ -818,7 +818,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
               {/* Project + CONFIG cell */}
               <div className="space-y-3">
                 <div className="space-y-1.5">
@@ -839,7 +839,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground">Project ID</p>
                     <div className="flex items-center gap-2">
-                      <InlineCode className="flex-1 truncate rounded-sm border-[--hair-border]">{nbProject.id}</InlineCode>
+                      <InlineCode className="min-w-0 flex-1 truncate rounded-sm border-[--hair-border]">{nbProject.id}</InlineCode>
                       <CopyButton text={nbProject.id} />
                     </div>
                   </div>

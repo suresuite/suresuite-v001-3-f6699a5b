@@ -152,7 +152,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
       ) : error ? (
         <div className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-4 text-sm text-[#bf2330]">{error}</div>
       ) : !data ? null : (
-        <div className={`grid gap-5 ${preview ? 'lg:grid-cols-[1fr_320px]' : ''}`}>
+        <div className={`grid gap-5 ${preview ? 'lg:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
           <div className="space-y-4">
             <Section title="Pages"><CapMatrix rows={pages} isSuper={isSuper} onSet={setOverride} /></Section>
             <Section title="Features"><CapMatrix rows={features} isSuper={isSuper} onSet={setOverride} /></Section>

@@ -293,7 +293,7 @@ export default function DocsLayout() {
         </div>
       </header>
 
-      <div className="flex-1 mx-auto w-full max-w-[1400px] grid grid-cols-1 lg:grid-cols-[16rem_1fr_15rem]">
+      <div className="flex-1 mx-auto w-full max-w-[1400px] grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_15rem]">
         {/* Left nav */}
         <aside
           className={cn(

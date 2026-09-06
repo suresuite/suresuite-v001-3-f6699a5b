@@ -256,7 +256,7 @@ export function ExperimentDesigner() {
                     checked={selectedPlaybooks.has(p.id)}
                     onCheckedChange={() => togglePlaybook(p.id)}
                   />
-                  <span className="flex-1 truncate">{p.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
                   {p.is_system && (
                     <Badge variant="outline" className="text-[9px] px-1 py-0">sys</Badge>
                   )}

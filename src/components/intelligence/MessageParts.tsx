@@ -105,7 +105,7 @@ export function KpiPart({ data }: { data: any }) {
   return (
     <div
       className={cn(CARD, "grid gap-px bg-[--hair-divider]")}
-      style={{ ...accent("#b8b8b8"), gridTemplateColumns: "repeat(" + Math.min(cards.length || 1, 3) + ",1fr)" }}
+      style={{ ...accent("#b8b8b8"), gridTemplateColumns: "repeat(" + Math.min(cards.length || 1, 3) + ",minmax(0,1fr))" }}
     >
       {cards.map((c, i) => (
         <div key={i} className="bg-background p-2.5">

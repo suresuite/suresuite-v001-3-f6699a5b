@@ -258,7 +258,7 @@ export function RailStageCard({
 
       <span className="flex min-w-0 flex-col items-start gap-[2px]">
         <span
-          className="flex items-center gap-1.5 truncate whitespace-nowrap text-[13px] font-semibold tracking-[-0.011em]"
+          className="flex min-w-0 items-center gap-1.5 truncate whitespace-nowrap text-[13px] font-semibold tracking-[-0.011em]"
           style={{ color: state === "todo" ? c.quiet : palette === "zinc" ? RAIL.zinc.ink : RAIL.ink }}
         >
           {label}
