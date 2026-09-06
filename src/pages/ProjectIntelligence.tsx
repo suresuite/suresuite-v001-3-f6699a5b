@@ -264,7 +264,9 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
         <div
           className="grid h-[calc(100vh-150px)] min-h-[560px] overflow-hidden rounded-sm border border-[--hair-border] bg-background"
           style={{
-            gridTemplateColumns: sidebarCollapsed ? "48px 1fr" : sidebarWidth + "px 5px 1fr",
+            gridTemplateColumns: sidebarCollapsed
+              ? "48px minmax(0,1fr)"
+              : sidebarWidth + "px 5px minmax(0,1fr)",
           }}
         >
           <ChatSidebar

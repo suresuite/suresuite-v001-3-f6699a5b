@@ -135,7 +135,7 @@ export function ApplyPresetDialog({ open, onOpenChange, preset, ctx, currentBund
                       {familyDiffs.map((d) => (
                         <div
                           key={`${d.family}.${d.field}`}
-                          className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 text-xs"
+                          className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2 text-xs"
                         >
                           <span className="text-muted-foreground truncate">
                             {FIELD_LABELS[d.field] ?? d.field}

@@ -1529,7 +1529,7 @@ export function RunValidateStage({
               </TabsContent>
 
               <TabsContent value="multi" className="mt-2.5 flex flex-col gap-2.5">
-                <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[320px_1fr]">
+                <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[320px_minmax(0,1fr)]">
                   {/* Setup card (compact, fixed width on desktop) */}
                   <div className={cn(SURFACE, "flex flex-col gap-2.5 p-2.5")}>
                     <span className={KX_TIGHT}>Setup</span>

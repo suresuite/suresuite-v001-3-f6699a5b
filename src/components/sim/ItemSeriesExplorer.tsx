@@ -184,7 +184,7 @@ export function ItemSeriesExplorer({ runId, warmupWeeks = null }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-0">
+      <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] gap-0">
         <div className="border-b md:border-b-0 md:border-r p-2 flex flex-col gap-2">
           <Input
             placeholder={`Search ${counts[kind]} ${kind}s…`}

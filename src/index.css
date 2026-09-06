@@ -79,6 +79,26 @@
     --hair-quiet: #6b6b6b;
     --ledger-quiet: #6b6b6b;
 
+    /* ── Fluid type scale (mobile UI spec §2.2) ──────────────────────────
+       Three sizes plus mobile body copy. The vw term only bites below `md`;
+       at 768px and up every token is pinned to its upper bound. Never take a
+       value below the design system's floors: micro-labels stay 10-11px,
+       dense table cells stay 12-12.5px, and mobile body copy is 15px, not 13.
+       Marketing headlines keep their own clamp; these are app-page tokens.
+
+       --fs-stat's ceiling is StatCard's existing 26px (audit C4), so it can be
+       dropped in as-is. --fs-page-title's ceiling is 17px, which is NOT the
+       audit's 15px page title (C3) — any rule using it must pin the desktop
+       side back with `md:text-[15px]`, as PageHeader does.
+
+       Tailwind needs the `length:` hint on an arbitrary value that is a bare
+       var(), or it guesses `color` and silently drops the font size:
+       `text-[length:var(--fs-page-title)]`, never `text-[var(...)]`. */
+    --fs-page-title: clamp(15px, 4.2vw, 17px);  /* the app H1 */
+    --fs-section: clamp(13px, 3.6vw, 14px);     /* in-content headings */
+    --fs-stat: clamp(18px, 5.4vw, 26px);        /* StatCard value */
+    --fs-body: clamp(13px, 3.6vw, 15px);        /* mobile body copy */
+
     /* Additional Vercel-style colors */
     --gray-50: 0 0% 98%;
     --gray-100: 0 0% 96%;

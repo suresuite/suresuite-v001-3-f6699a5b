@@ -68,7 +68,7 @@ export function ActivityGroup({ calls }: { calls: ChatToolCall[] }) {
                   c.ok ? "bg-emerald-500" : "bg-destructive",
                 )}
               />
-              <span className="text-foreground">{c.name}</span>
+              <span className="min-w-0 truncate text-foreground">{c.name}</span>
               <span className="text-muted-foreground tabular-nums">
                 · {c.row_count} {c.row_count === 1 ? "row" : "rows"}
               </span>
