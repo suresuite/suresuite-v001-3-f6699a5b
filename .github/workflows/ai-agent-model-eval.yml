@@ -30,6 +30,9 @@ on:
       agents:
         description: "Comma list of agents to score (§7.4: every enabled agent)"
         default: "data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder"
+      models:
+        description: "Comma list of models to score. Empty = the scored default (gpt-5)."
+        default: "gpt-5"
       mode:
         description: "full = eval + state; state-only = skip the eval tiers"
         type: choice
@@ -60,19 +63,30 @@ jobs:
         id: params
         run: |
           DEFAULT_AGENTS="data-steward,policy-configurator,vv-analyst,experiment-designer,report-builder"
+          # Scored roster (§7.4). The tier is a GATE, so it scores the models
+          # this deployment actually serves: gpt-5 is the DEFAULT_MODEL_ID every
+          # model-less turn resolves to. Gemini and DeepSeek stay in
+          # MODEL_REGISTRY and remain user-selectable, but scoring a provider
+          # whose account is out of quota/balance only ever reports that
+          # account's 429/402 as an agent-quality failure and buries the real
+          # signal. Add them back here once their billing is live.
+          DEFAULT_MODELS="gpt-5"
           if [ "${{ github.event_name }}" = "push" ]; then
             AGENTS=$(grep -oP '^agents=\K.+' .github/model-eval-request | tail -1 || true)
+            MODELS=$(grep -oP '^models=\K.+' .github/model-eval-request | tail -1 || true)
             MODE=$(grep -oP '^mode=\K.+' .github/model-eval-request | tail -1 || true)
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             AGENTS="${{ inputs.agents }}"
+            MODELS="${{ inputs.models }}"
             MODE="${{ inputs.mode }}"
           else
             # nightly (§7.4): always the full suite on the full enabled roster
-            AGENTS=""; MODE=""
+            AGENTS=""; MODELS=""; MODE=""
           fi
           echo "agents=${AGENTS:-$DEFAULT_AGENTS}" >> "$GITHUB_OUTPUT"
+          echo "models=${MODELS:-$DEFAULT_MODELS}" >> "$GITHUB_OUTPUT"
           echo "mode=${MODE:-full}" >> "$GITHUB_OUTPUT"
-          echo "resolved: agents=${AGENTS:-$DEFAULT_AGENTS} mode=${MODE:-full}"
+          echo "resolved: agents=${AGENTS:-$DEFAULT_AGENTS} models=${MODELS:-$DEFAULT_MODELS} mode=${MODE:-full}"
 
       - uses: denoland/setup-deno@v2
         if: steps.params.outputs.mode != 'state-only'
@@ -178,6 +192,7 @@ jobs:
           if [ -n "$GH_DEEPSEEK_API_KEY" ]; then export DEEPSEEK_API_KEY="$GH_DEEPSEEK_API_KEY"; fi
           deno run --allow-env --allow-read --allow-write --allow-net run_model_eval.ts \
             --agents="${{ steps.params.outputs.agents }}" \
+            --models="${{ steps.params.outputs.models }}" \
             --out=/tmp/model-eval-report.json 2>&1 | tee /tmp/tier2.log
 
       # ── Live deployment state (always captured, even when the eval fails,

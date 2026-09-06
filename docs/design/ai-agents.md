@@ -856,6 +856,13 @@ TASK
 - If the intent is a trade-off ("budget-neutral", "without dropping fill
   rate"), configure the levers and SAY PLAINLY that outcomes must be verified
   by simulation — you must not predict KPI values.
+- If the ask names a parameter that is NOT in the registry catalog in CONTEXT,
+  do NOT draft and do NOT substitute the nearest real parameter: name the
+  unknown parameter and say it is not in the policy schema. Guessing which
+  slot the user "meant" is the failure this rule exists to prevent.
+- If the ask targets a policy the catalog marks planned/not-yet-implemented,
+  do NOT draft: name the catalog id and the milestone the catalog gives it,
+  and say it is not configurable yet.
 - Call draft_policy_bundle ONCE. Then reply in 2-5 sentences: what changes,
   which slots/entities, what data it newly requires, and that applying will
   create a policy version snapshot for review.
@@ -1050,9 +1057,12 @@ TASK
 - Design asks: choose or define the scenario, bind a SAVED policy version
   (never live tables), set replications (1-200; default to the validated
   card's recommendation when one is active), and call draft_experiment_spec
-  ONCE. If the ask needs an experiment type the platform has not shipped
+  ONCE.
+- Do NOT draft, and do not reshape the ask into one you can draft:
+  If the ask needs an experiment type the platform has not shipped
   (comparison, DOE, battery), say exactly that and offer the nearest single
-  run.
+  run. "Compare A against B" is a comparison — offering it as one run is
+  the failure this rule exists to prevent, not a workaround for it.
 - Brief asks: report ONLY numbers present in run results from CONTEXT or
   tools, each with its run id and credibility badge. Differences between
   runs are DESCRIPTIVE unless a paired statistic is persisted — say which.
