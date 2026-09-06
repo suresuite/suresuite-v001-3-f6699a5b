@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Replication } from "@/hooks/useSimulationRun";
+import { FROZEN_CELL } from '@/components/shared';
 
 /** The weekly series keys the worker persists on run_replications.time_series. */
 export const REPLICATION_SERIES = [
@@ -258,7 +259,7 @@ export function ReplicationSeedExplorer({
           <table className="w-full text-[11px]">
             <thead>
               <tr className="text-muted-foreground">
-                <th className="text-left font-normal pr-3 py-0.5">KPI</th>
+                <th className={`text-left font-normal pr-3 py-0.5 ${FROZEN_CELL}`}>KPI</th>
                 {SEED_KPI_ROW.map((k) => (
                   <th key={k.key} className="text-right font-normal px-2 py-0.5">
                     {k.label}
@@ -268,7 +269,7 @@ export function ReplicationSeedExplorer({
             </thead>
             <tbody>
               <tr>
-                <td className="pr-3 py-0.5 font-medium whitespace-nowrap">
+                <td className={`pr-3 py-0.5 font-medium whitespace-nowrap ${FROZEN_CELL}`}>
                   seed {selectedRep.seed_used} · rep {selectedRep.rep_index}
                 </td>
                 {SEED_KPI_ROW.map((k) => (
@@ -278,7 +279,7 @@ export function ReplicationSeedExplorer({
                 ))}
               </tr>
               <tr className="text-muted-foreground">
-                <td className="pr-3 py-0.5 whitespace-nowrap">mean over {reps.length} rep(s)</td>
+                <td className={`pr-3 py-0.5 whitespace-nowrap ${FROZEN_CELL}`}>mean over {reps.length} rep(s)</td>
                 {SEED_KPI_ROW.map((k) => {
                   const vals = reps
                     .map((r) => Number(r.kpis[k.key]))

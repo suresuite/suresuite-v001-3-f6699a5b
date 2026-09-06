@@ -236,10 +236,21 @@ for (const file of files) {
   });
 
   // ── §2.7 A horizontally scrollable table should freeze its first column,
-  // otherwise the row loses its identity as soon as you scroll.
-  if (/overflow-x-auto/.test(src) && /<table/.test(src) && !/sticky\s+left-0/.test(src)) {
+  // otherwise the row loses its identity as soon as you scroll. FROZEN_CELL /
+  // FROZEN_CELL_ON_TINT (shared/index.ts) are that pattern named, so they count.
+  //
+  // Two limits worth knowing before trusting this one. It is FILE-scoped: it
+  // cannot pair a scroll container with the table inside it, so a file with a
+  // scrollable diagram and a table anywhere else reads as a hit, and one frozen
+  // table clears a file that holds three. And §2.7's own exception — a mobile
+  // card list, which the spec sanctions and prefers — is honoured by skipping
+  // files with a `useIsMobile` branch; whether that card list actually carries
+  // every column is a question for eyes, not for a regex.
+  const hasCardBranch = /useIsMobile/.test(src);
+  const hasFrozenCol = /sticky\s+left-0/.test(src) || /\bFROZEN_CELL(?:_ON_TINT)?\b/.test(src);
+  if (/overflow-x-auto/.test(src) && /<table/.test(src) && !hasFrozenCol && !hasCardBranch) {
     report(file, 0, 'Scrollable table with no frozen identifying column', '2.7',
-      'add `sticky left-0 z-[1] bg-…` to the first th/td');
+      'freeze the first th/td with FROZEN_CELL, or switch to a mobile card list');
   }
 }
 

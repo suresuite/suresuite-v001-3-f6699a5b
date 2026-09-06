@@ -17,6 +17,7 @@
 import React from "react";
 import { AGENT_COLOR, AGENT_MONO, LAYER, TD, TH, tint } from "../intelligence/piUi";
 import { cn } from "@/lib/utils";
+import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 
 export interface ProposalRow {
   table?: string;
@@ -98,8 +99,8 @@ export function ProposalCardView({
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {!isParam && <th className={TH}>Table</th>}
-              <th className={TH}>Entity</th>
+              {!isParam && <th className={cn(TH, FROZEN_CELL_ON_TINT)}>Table</th>}
+              <th className={cn(TH, isParam && FROZEN_CELL_ON_TINT)}>Entity</th>
               <th className={TH}>Field</th>
               <th className={TH}>Value</th>
               {isParam && <th className={TH}>[low, high]</th>}
@@ -110,8 +111,8 @@ export function ProposalCardView({
           <tbody>
             {proposal.rows.map((r, i) => (
               <tr key={i} className="hover:bg-[#fcfcfc]">
-                {!isParam && <td className={cn(TD, "font-mono")}>{r.table}</td>}
-                <td className={cn(TD, "font-mono")}>{r.entity}</td>
+                {!isParam && <td className={cn(TD, "font-mono", FROZEN_CELL)}>{r.table}</td>}
+                <td className={cn(TD, "font-mono", isParam && FROZEN_CELL)}>{r.entity}</td>
                 <td className={TD}>{r.field}</td>
                 <td className={cn(TD, "font-mono")}>{r.value}</td>
                 {isParam && (

@@ -8,6 +8,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, TH, TD, ROW_HOVER, Toggle } from '@/components/admin/adminUi';
 import { Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface Cap { key: string; kind: 'page' | 'feature'; label: string; description?: string | null; sort_order: number; }
@@ -53,7 +54,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
         <div className="overflow-x-auto">
         <table className="w-full min-w-[480px] border-collapse">
           <thead><tr>
-            <th className={`${TH} w-[46%]`}>Capability</th>
+            <th className={`${TH} ${FROZEN_CELL_ON_TINT} w-[46%]`}>Capability</th>
             {ROLE_ORDER.map((r) => <th key={r} className={`${TH} text-center`}>{r.replace('_', ' ')}</th>)}
           </tr></thead>
           <tbody>
@@ -61,7 +62,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
               const locked = ALWAYS_ON.has(cap.key);
               return (
                 <tr key={cap.key} className={ROW_HOVER}>
-                  <td className={TD}>
+                  <td className={`${TD} ${FROZEN_CELL}`}>
                     <div className="flex items-center gap-1.5 text-[13px] font-medium">{cap.label}{locked && <Lock className="h-3 w-3 text-muted-foreground" />}</div>
                   </td>
                   {ROLE_ORDER.map((role) => {
