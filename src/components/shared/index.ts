@@ -13,6 +13,13 @@ export { TableEmpty } from './TableEmpty';
 export { ErrorBanner } from './ErrorBanner';
 export { ApiCodeBlock } from './ApiCodeBlock';
 export { InlineCode } from './InlineCode';
+export {
+  AdaptiveLabel,
+  TruncatedText,
+  ProseText,
+  Disclosure,
+  NumericValue,
+} from './AdaptiveText';
 
 /** Dense uppercase micro-header for data tables (C8). Append alignment classes as needed. */
 export const TH_DENSE = 'h-9 text-[11px] uppercase tracking-wide text-muted-foreground';
