@@ -815,9 +815,14 @@ const COVERAGE_BATTERY = [
   "cov-09-no-data-honesty",
 ];
 
-// The §7.7 nightly-judge prompt (verbatim). Executed with the deployment's
-// DEFAULT model at temperature 0, structured output; malformed output is
+// The §7.7 nightly-judge prompt (verbatim). Executed with the pinned
+// JUDGE_MODEL_ID at temperature 0, structured output; malformed output is
 // recorded judge_error and never counted as faithful.
+/** The §7.7 faithfulness judge's own model. Pinned, not derived from
+ * DEFAULT_MODEL_ID: the call below is Gemini-shaped, and an independent judge
+ * beats self-judging. Needs a funded GEMINI_API_KEY to report anything. */
+const JUDGE_MODEL_ID = "gemini-2.5-flash";
+
 const JUDGE_PROMPT = `You are a verification judge for a supply-chain assistant. You will be given
 TOOL RESULTS (the only facts available) and a REPLY. Judge ONLY whether the
 reply is faithful to the tool results. Rules:
@@ -849,7 +854,15 @@ async function judgeReply(
   toolResultsJson: string,
   replyText: string,
 ): Promise<JudgeVerdict | "judge_error" | "judge_unavailable"> {
-  const judge = resolveModel(null); // the deployment default model
+  // The judge names its OWN model rather than following the deployment
+  // default. The request below is Gemini-shaped (generativelanguage endpoint,
+  // thinkingConfig), so the provider check is a hard requirement, not a
+  // preference — deriving the model from resolveModel(null) meant that moving
+  // DEFAULT_MODEL_ID to gpt-5 silently turned the judge off everywhere
+  // (run 34017719076: "judge=unavailable" where the prior run judged 1.000).
+  // Judging a model with itself is also weak evidence, so an independent judge
+  // is the right default even once gpt-5 serves production traffic.
+  const judge = resolveModel(JUDGE_MODEL_ID);
   const key = Deno.env.get(keyFor(judge.provider));
   if (!key || judge.provider !== "gemini") return "judge_unavailable";
   const prompt = JUDGE_PROMPT
