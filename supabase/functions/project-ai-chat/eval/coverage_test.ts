@@ -470,6 +470,36 @@ Deno.test("persona surface: flag off ⇒ the UNCHANGED five declarations (golden
   }
 });
 
+// ── multiplier notation is a quantity, never a fabricated entity ────────────
+
+Deno.test("cov-03: BOM quantities written as 'x2' are not reported as fabricated entities", async () => {
+  const fx = await loadCov("cov-03-bom-both-directions");
+  const { ctx, db } = makeCtx(structuredClone(fx.project_snapshot));
+  const args = { direction: "product_to_materials", target: "XP1" };
+  const env = await executeTool("get_bom_relations", args, ctx);
+  const calls = [call("get_bom_relations", args, env)];
+  const { citations, toolCallRefs } = await assembleCitations(calls);
+
+  // The natural way to render this BOM. signatureOf("x2") is "A9" — the same
+  // shape as the real ids M1/M2/M3/XP1 — so before the isIdShapedCandidate
+  // guard every one of these quantities was flagged as an ungrounded entity
+  // and the zero-tolerance §19.7 fabrication gate failed the whole run.
+  const result = await verifyReply({
+    reply: "XP1 uses Frame M1 x2 and Assembly M2 x1, and M2 itself uses Screw M3 x8.",
+    calls,
+    citations,
+    userMessage: fx.utterance,
+    projectId: PROJECT,
+    db,
+    toolCallRefs,
+  });
+
+  const flagged = result.violations.filter((v) => v.class === "entity").map((v) => v.token);
+  for (const q of ["x2", "x1", "x8"]) {
+    assert(!flagged.includes(q), `quantity ${q} reported as a fabricated entity`);
+  }
+});
+
 // ── read-only law: the four new tools never write ───────────────────────────
 
 Deno.test("the four coverage tools are read-only: stub tables byte-identical after every call", async () => {

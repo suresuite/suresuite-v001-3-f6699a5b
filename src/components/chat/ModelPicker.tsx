@@ -15,7 +15,8 @@ export const CHAT_MODELS = [
   { id: "deepseek-chat", label: "DeepSeek" },
 ] as const;
 
-export const DEFAULT_MODEL_ID = "gemini-2.5-flash";
+// Mirrors providers.ts DEFAULT_MODEL_ID — keep the two in sync.
+export const DEFAULT_MODEL_ID = "gpt-5";
 
 export function getStoredModel(): string {
   if (typeof window === "undefined") return DEFAULT_MODEL_ID;

@@ -255,9 +255,12 @@ TASK
 - Design asks: choose or define the scenario, bind a SAVED policy version
   (never live tables), set replications (1-200; default to the validated
   card's recommendation when one is active), and call draft_experiment_spec
-  ONCE. If the ask needs an experiment type the platform has not shipped
+  ONCE.
+- Do NOT draft, and do not reshape the ask into one you can draft:
+  If the ask needs an experiment type the platform has not shipped
   (comparison, DOE, battery), say exactly that and offer the nearest single
-  run.
+  run. "Compare A against B" is a comparison — offering it as one run is
+  the failure this rule exists to prevent, not a workaround for it.
 - Brief asks: report ONLY numbers present in run results from CONTEXT or
   tools, each with its run id and credibility badge. Differences between
   runs are DESCRIPTIVE unless a paired statistic is persisted — say which.

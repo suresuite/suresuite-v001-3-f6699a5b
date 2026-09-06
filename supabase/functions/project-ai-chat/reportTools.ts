@@ -195,6 +195,14 @@ TASK
   render time by the platform.
 - If the template needs a completed run that does not exist, do NOT draft:
   ${refusalTail}
+- If the ask names a report the template catalog does not contain, do NOT
+  draft and do NOT fall back to the closest template: say which report was
+  asked for, that it is not a template this platform ships, and list the
+  template names that ARE available.
+- If the template is citation-mandatory, every run id you cite must come
+  from CONTEXT or a tool result this turn. If you cannot cite a real run,
+  do NOT draft and do NOT invent or guess a run id: say which citation is
+  missing.
 - After the tool returns, reply in 2-4 sentences: which template, what the
   document will contain, and that approving the card renders the files into
   the user's workspace.

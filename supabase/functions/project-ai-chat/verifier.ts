@@ -97,6 +97,13 @@ function isIdShapedCandidate(token: string): boolean {
   // English ordinals are prose, not ids ("18th" would otherwise collide with
   // learned digit+letter signatures like 001409784A's).
   if (/^\d+(st|nd|rd|th)$/i.test(token)) return false;
+  // Multiplier notation is a QUANTITY, not an id: a BOM reply naturally reads
+  // "Frame x2, Assembly x1", and signatureOf("x2") is "A9" — the very shape
+  // learned from ids like M1/XP1/C1, so every such quantity was reported as a
+  // fabricated entity (cov-03). Excluding it can only ever suppress a token
+  // that is ABSENT from the grounded vocabulary, so a project that really does
+  // own an entity "X2" still resolves it by membership and is unaffected.
+  if (/^x\d+$/i.test(token)) return false;
   return /[A-Za-z]/.test(token) || /[-_./]/.test(token);
 }
 

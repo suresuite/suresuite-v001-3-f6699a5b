@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { useChatThreads } from "@/hooks/useChatThreads";
 import { chatModesUiEnabled } from "@/components/chat/ModeSwitch";
+import { DEFAULT_MODEL_ID } from "@/components/chat/ModelPicker";
 import { registerPlanResumePoster } from "@/lib/chat/planResume";
 
 /** The history window the SERVER applies (providers.ts): the last 8 turns,
@@ -114,7 +115,7 @@ export function useProjectChat(threadId: string | null) {
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   const loadingRef = useRef(false);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
-  const lastModelRef = useRef<string>("gemini-2.5-flash");
+  const lastModelRef = useRef<string>(DEFAULT_MODEL_ID);
   const resumesInFlight = useRef<Set<string>>(new Set());
 
   // Hydrate when thread changes.
@@ -159,7 +160,7 @@ export function useProjectChat(threadId: string | null) {
 
       // Access control: block disallowed features/models and over-budget calls
       // before we ever reach the LLM, with a clear, actionable reason.
-      const modelId = opts.model ?? "gemini-2.5-flash";
+      const modelId = opts.model ?? DEFAULT_MODEL_ID;
       lastModelRef.current = modelId;
       if (!caps.can("ai_chat")) {
         setError("The AI assistant isn't enabled for your account. Contact an administrator.");
@@ -197,7 +198,7 @@ export function useProjectChat(threadId: string | null) {
           conversationHistory: history,
           userId: user.id,
           userEmail: user.email,
-          model: opts.model ?? "gemini-2.5-flash",
+          model: opts.model ?? DEFAULT_MODEL_ID,
           ...(serverThreadId ? { threadId: serverThreadId } : {}),
           // §15: unsynced/localStorage threads carry the mode in the request
           // body — the server still enforces it (synced threads resolve from

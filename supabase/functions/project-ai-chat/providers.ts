@@ -31,19 +31,25 @@ export const MODEL_REGISTRY: Record<string, ModelSpec> = {
   "deepseek-chat":    { id: "deepseek-chat",    label: "DeepSeek",         provider: "deepseek", apiModel: "deepseek-chat" },
 };
 
+/** The model served when a caller names none. Must stay a provider this
+ * deployment actually has quota for: an unfunded default fails EVERY
+ * model-less turn (chat, the §7.7 coverage judge, cartographer estimates)
+ * with the provider's own rate-limit error, not a SureSuite one. */
+export const DEFAULT_MODEL_ID = "gpt-5";
+
 export function resolveModel(id: string | undefined | null): ModelSpec {
   if (id && MODEL_REGISTRY[id]) return MODEL_REGISTRY[id];
-  return MODEL_REGISTRY["gemini-2.5-flash"];
+  return MODEL_REGISTRY[DEFAULT_MODEL_ID];
 }
 
 /** Whether a caller-supplied model id is one this deployment can actually run.
  *
- * resolveModel() silently falls back to gemini-2.5-flash for anything it does
+ * resolveModel() silently falls back to DEFAULT_MODEL_ID for anything it does
  * not recognise, which is right for an ABSENT id and wrong for a WRONG one:
  * ai_models seeds several grantable codes with no MODEL_REGISTRY entry
  * (gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite, gpt-5-nano,
- * gpt-5.5), so an admin could grant one and the user would be served Gemini
- * Flash while the UI said otherwise — a silent downgrade, which §23.4 forbids.
+ * gpt-5.5), so an admin could grant one and the user would be served the
+ * default while the UI said otherwise — a silent swap, which §23.4 forbids.
  * Callers that receive a model id from a client check this first and refuse. */
 export function isKnownModelId(id: string | undefined | null): boolean {
   return !id || Object.prototype.hasOwnProperty.call(MODEL_REGISTRY, id);
@@ -247,6 +253,9 @@ ${projectBlock}
   to try.
 - Resolve ambiguous entity references by calling list_project_entities
   first. If more than one entity matches, ask which one — never guess.
+  Use this wording verbatim (§22.5), then list the candidates the tool
+  returned, one per line as "- id (label)":
+  "<fragment>" matches more than one entity — which did you mean?
 - Relationships are FACTS, not guesses. Never state that a supplier
   supplies a material, that a material is used by a product, or that a
   customer buys a product, unless a tool result on THIS project shows that
@@ -274,7 +283,7 @@ ${projectBlock}
 TOOL-USE MANDATE
 - When the user asks "what project is this?", "who are our suppliers?", "what materials do we have?", or any entity-specific question: call list_project_entities or a relevant read tool IMMEDIATELY, then answer from its result. Never answer from memory or training data.
 - Never say "I don't have a tool to see X" if a tool could return X. Available reads include: list_project_entities, get_material_suppliers, get_supplier_materials, get_bom_relations, get_entity_detail, get_supplier_risk, get_material_risk, get_procurement_spend, get_data_completeness, find_completed_run, get_run_results, and more.
-- Call tools in parallel where possible. Don't ask the user for clarification when a tool call can settle the question.
+- Call tools in parallel where possible. Don't ask the user for something a tool can fetch — call the tool instead. This never overrides the DATA RULES above: when a tool reports that a name matches more than one entity, you must still ask which one and never guess.
 
 STYLE
 - Format large numbers with thousands separators when it helps readability.
@@ -310,7 +319,7 @@ ${projectBlock}
 TOOL-USE MANDATE
 - When the user asks "what project is this?", "who are our suppliers?", "what materials do we have?", or any entity-specific question: call list_project_entities or a relevant read tool IMMEDIATELY, then answer from its result. Never answer from memory or training data.
 - Never say "I don't have a tool to see X" if a tool could return X. Available reads include: list_project_entities, get_material_suppliers, get_supplier_materials, get_bom_relations, get_entity_detail, get_supplier_risk, get_material_risk, get_procurement_spend, get_data_completeness, find_completed_run, get_run_results, and more.
-- Call tools in parallel where possible. Don't ask the user for clarification when a tool call can settle the question.
+- Call tools in parallel where possible. Don't ask the user for something a tool can fetch — call the tool instead. This never overrides the DATA RULES above: when a tool reports that a name matches more than one entity, you must still ask which one and never guess.
 
 STYLE
 - Format large numbers with thousands separators when it helps readability.
