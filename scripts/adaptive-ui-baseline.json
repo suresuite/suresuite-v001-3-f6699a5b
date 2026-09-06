@@ -1,7 +1,7 @@
 {
   "note": "Known adaptive-UI backlog. The audit fails only ABOVE these counts. Ratchet down by fixing a file and re-running with --update-baseline; never re-record to admit a new violation.",
   "generated": "2026-09-06",
-  "total": 117,
+  "total": 116,
   "counts": {
     "src/components/MapView.tsx::C6": 1,
     "src/components/NetworkMetricsTable.tsx::C6": 9,
@@ -28,7 +28,6 @@
     "src/components/ui/alert-dialog.tsx::C6": 1,
     "src/components/ui/dialog.tsx::C6": 1,
     "src/components/ui/drawer.tsx::C6": 1,
-    "src/components/ui/drawer.tsx::2.6": 1,
     "src/components/ui/sheet.tsx::C6": 1,
     "src/components/ui/table.tsx::C6": 1,
     "src/pages/DeveloperApi.tsx::C6": 1,
