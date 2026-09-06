@@ -315,7 +315,7 @@ export function ProjectCard({
                 )}
                 
                 {project.combine_status && (
-                  <Badge className={`text-xs ${getCombineStatusStyle(project.combine_status)}`}>
+                  <Badge variant="outline" className={`text-xs ${getCombineStatusStyle(project.combine_status)}`}>
                     {(() => {
                       const StatusIcon = getCombineStatusIcon(project.combine_status);
                       return (

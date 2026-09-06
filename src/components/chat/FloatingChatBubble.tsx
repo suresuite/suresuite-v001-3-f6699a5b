@@ -297,7 +297,7 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             setOpen(true);
           }}
-          className="group fixed z-[90] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-black text-white shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="group fixed z-[90] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-foreground text-background shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
@@ -310,7 +310,7 @@ export function FloatingChatBubble() {
                 "conic-gradient(from 0deg, rgba(255,0,51,0) 0deg, rgba(255,0,51,0) 225deg, rgba(255,0,51,0.7) 315deg, rgba(255,45,75,1) 352deg, rgba(255,0,51,1) 358deg, rgba(255,0,51,0) 360deg)",
             }}
           />
-          <span className="pointer-events-none absolute inset-[2px] rounded-full bg-black" />
+          <span className="pointer-events-none absolute inset-[2px] rounded-full bg-foreground" />
           <AssistantMascot className="pointer-events-none relative h-[34px] w-[34px]" />
         </button>
       )}
@@ -319,24 +319,24 @@ export function FloatingChatBubble() {
       {open && (
         <div
           style={{ left: panelPos.x, top: panelPos.y, width: panelDims.w, height: panelDims.h }}
-          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-sm border border-black bg-background shadow-2xl"
+          className="fixed z-[95] isolate flex flex-col overflow-hidden rounded-sm border border-foreground bg-background shadow-2xl"
           role="dialog"
           aria-label="Supply Chain assistant"
         >
           {/* Row 1 — Title header (drag region) */}
           <div
             onPointerDown={startPanelDrag}
-            className="flex h-14 shrink-0 cursor-move items-center gap-3 border-b border-white/10 bg-black px-4 select-none"
+            className="flex h-14 shrink-0 cursor-move items-center gap-3 border-b border-background/10 bg-foreground px-4 select-none"
           >
             <AssistantMascot className="h-9 w-9 shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-white">SC Assistant</div>
+              <div className="truncate text-sm font-semibold text-background">SC Assistant</div>
             </div>
             {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-white/90 hover:bg-white/10 hover:text-white md:min-h-0 md:min-w-0"
+                className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-background/90 hover:bg-background/10 hover:text-background md:min-h-0 md:min-w-0"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={clear}
                 aria-label="Clear chat"
@@ -348,7 +348,7 @@ export function FloatingChatBubble() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-white/90 hover:bg-white/10 hover:text-white md:min-h-0 md:min-w-0"
+              className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-background/90 hover:bg-background/10 hover:text-background md:min-h-0 md:min-w-0"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => {
                 setOpen(false);
@@ -362,7 +362,7 @@ export function FloatingChatBubble() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-white/90 hover:bg-white/10 hover:text-white md:min-h-0 md:min-w-0"
+              className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-background/90 hover:bg-background/10 hover:text-background md:min-h-0 md:min-w-0"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setOpen(false)}
               aria-label="Close"

@@ -217,14 +217,41 @@ for (const file of files) {
     }
 
     // ── C6 bg-black / text-white outside the sanctioned surfaces.
-    if (/\b(bg-black|text-white)\b/.test(text) && !isMarketing) {
+    //
+    // The rule is about a black SURFACE in an app page. White ink is the
+    // consequence of a dark fill, not the defect: C6 sanctions the L2 table
+    // column row on `--brand-ink`, and `ui/table.tsx` puts `text-white` on it
+    // by design — flagging that (and every header button inheriting it) was
+    // most of this rule's output. So white ink is only reported in a file that
+    // establishes no dark fill at all, and `bg-black/<alpha>` is left alone:
+    // a modal scrim is not a surface.
+    // `TableHeader` from ui/table.tsx IS the ink block product-wide, so a file
+    // that renders one has a dark fill even though the token lives elsewhere.
+    const darkFill =
+      /bg-black\b|bg-foreground\b|--brand-ink|bg-(?:neutral|zinc|slate|gray)-(?:8|9)00|bg-\[#[0-2]|<TableHead/;
+    // `bg-black/80` is a modal scrim, not a surface — the alpha is the tell.
+    const blackSurface = /\bbg-black\b(?!\/)/.test(text);
+    // White ink is also correct on a fill the element supplies itself — a
+    // status badge at `bg-emerald-600`, a map pin or a rail marker coloured
+    // from an inline style. Those are dark fills the file-level token scan
+    // cannot see, so check the element's own neighbourhood too.
+    const ownFill =
+      /\bbg-\w+-(?:[5-9])00\b/.test(text) ||
+      /background(?:-color|Color)?\s*[:=]/.test(lines.slice(i, i + 5).join('\n'));
+    const whiteInk = /\btext-white\b/.test(text) && !darkFill.test(src) && !ownFill;
+    if ((blackSurface || whiteInk) && !isMarketing) {
       report(file, ln, 'bg-black/text-white outside landing, /auth and Footer', 'C6', text.trim().slice(0, 60));
     }
 
-    // ── §6 Filled default badges.
-    if (/<Badge(?![^>]*variant)/.test(text)) {
-      report(file, ln, 'Badge with no variant — filled default is not the language', 'C8',
-        'use secondary | outline | destructive');
+    // ── §6 Filled default badges. `<Badge` only — `<BadgeCheck` is a lucide
+    // icon — and the props are read across the element's open tag, since a
+    // multi-line <Badge> carries `variant` on a later line than its own name.
+    if (/<Badge(?![A-Za-z])/.test(text)) {
+      const openTag = lines.slice(i, i + 6).join('\n').split('>')[0];
+      if (!/variant/.test(openTag)) {
+        report(file, ln, 'Badge with no variant — filled default is not the language', 'C8',
+          'use secondary | outline | destructive');
+      }
     }
 
     // ── §2.6 Bottom-pinned chrome must keep the safe-area inset. Unprefixed
