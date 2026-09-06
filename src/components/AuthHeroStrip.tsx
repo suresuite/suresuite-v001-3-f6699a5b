@@ -99,7 +99,7 @@ const AuthHeroStrip = () => {
     <div
       onMouseEnter={stop}
       onMouseLeave={start}
-      className="relative flex min-w-[340px] flex-1 flex-col justify-between overflow-hidden bg-black px-[clamp(32px,4.2vw,60px)] pb-9 pt-10 text-white"
+      className="relative hidden min-w-[340px] flex-1 flex-col justify-between overflow-hidden bg-black px-[clamp(32px,4.2vw,60px)] pb-9 pt-10 text-white md:flex"
     >
       <div
         aria-hidden

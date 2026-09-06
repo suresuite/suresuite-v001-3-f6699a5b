@@ -168,10 +168,24 @@ for (const file of files) {
 
     // ── §2.4 Touch targets. h-8/h-9 is CORRECT at md+ (audit C3), so only
     // flag a small height that is not released or paired with a md: override.
+    //
+    // A TARGET, though — the rule is about what a thumb has to hit. A 32px
+    // spinner, a lucide icon, an avatar, a table-header height and a spacer
+    // div are all `h-8`/`h-9`/`h-10` and none of them is tappable; flagging
+    // them buries the 40 that are real. So the element has to look interactive
+    // (JSX spans lines, hence the small window) and must not be an icon or a
+    // spinner, which are sized by C7 and are never the hit area themselves.
     const small = /\b(?:min-)?h-(?:8|9|10)\b/.exec(text);
     if (small && !isMarketing) {
       const hasMobileFloor = /\b(?:min-)?h-11\b|min-h-\[44|md:h-(?:8|9|10)\b/.test(text);
-      if (!hasMobileFloor) {
+      const window = lines.slice(Math.max(0, i - 3), i + 2).join('\n');
+      const interactive =
+        /<button|<Button|onClick|role="button"|<a\s|<Link|<[A-Z]\w*(?:Input|Select|Trigger|Toggle)|<input|<select|cursor-pointer/i
+          .test(window);
+      const isIconOrSpinner =
+        /animate-spin/.test(text) ||
+        /<[A-Z]\w*\s+className=(?:"|\{`)[^"`]*\b(?:min-)?h-(?:8|9|10)\b/.test(text);
+      if (!hasMobileFloor && interactive && !isIconOrSpinner) {
         report(file, ln, `${small[0]} with no 44px mobile floor`, '2.4',
           'add h-11 md:' + small[0] + ', or min-h-11 md:min-h-0');
       }
@@ -203,14 +217,41 @@ for (const file of files) {
     }
 
     // ── C6 bg-black / text-white outside the sanctioned surfaces.
-    if (/\b(bg-black|text-white)\b/.test(text) && !isMarketing) {
+    //
+    // The rule is about a black SURFACE in an app page. White ink is the
+    // consequence of a dark fill, not the defect: C6 sanctions the L2 table
+    // column row on `--brand-ink`, and `ui/table.tsx` puts `text-white` on it
+    // by design — flagging that (and every header button inheriting it) was
+    // most of this rule's output. So white ink is only reported in a file that
+    // establishes no dark fill at all, and `bg-black/<alpha>` is left alone:
+    // a modal scrim is not a surface.
+    // `TableHeader` from ui/table.tsx IS the ink block product-wide, so a file
+    // that renders one has a dark fill even though the token lives elsewhere.
+    const darkFill =
+      /bg-black\b|bg-foreground\b|--brand-ink|bg-(?:neutral|zinc|slate|gray)-(?:8|9)00|bg-\[#[0-2]|<TableHead/;
+    // `bg-black/80` is a modal scrim, not a surface — the alpha is the tell.
+    const blackSurface = /\bbg-black\b(?!\/)/.test(text);
+    // White ink is also correct on a fill the element supplies itself — a
+    // status badge at `bg-emerald-600`, a map pin or a rail marker coloured
+    // from an inline style. Those are dark fills the file-level token scan
+    // cannot see, so check the element's own neighbourhood too.
+    const ownFill =
+      /\bbg-\w+-(?:[5-9])00\b/.test(text) ||
+      /background(?:-color|Color)?\s*[:=]/.test(lines.slice(i, i + 5).join('\n'));
+    const whiteInk = /\btext-white\b/.test(text) && !darkFill.test(src) && !ownFill;
+    if ((blackSurface || whiteInk) && !isMarketing) {
       report(file, ln, 'bg-black/text-white outside landing, /auth and Footer', 'C6', text.trim().slice(0, 60));
     }
 
-    // ── §6 Filled default badges.
-    if (/<Badge(?![^>]*variant)/.test(text)) {
-      report(file, ln, 'Badge with no variant — filled default is not the language', 'C8',
-        'use secondary | outline | destructive');
+    // ── §6 Filled default badges. `<Badge` only — `<BadgeCheck` is a lucide
+    // icon — and the props are read across the element's open tag, since a
+    // multi-line <Badge> carries `variant` on a later line than its own name.
+    if (/<Badge(?![A-Za-z])/.test(text)) {
+      const openTag = lines.slice(i, i + 6).join('\n').split('>')[0];
+      if (!/variant/.test(openTag)) {
+        report(file, ln, 'Badge with no variant — filled default is not the language', 'C8',
+          'use secondary | outline | destructive');
+      }
     }
 
     // ── §2.6 Bottom-pinned chrome must keep the safe-area inset. Unprefixed
@@ -222,10 +263,21 @@ for (const file of files) {
   });
 
   // ── §2.7 A horizontally scrollable table should freeze its first column,
-  // otherwise the row loses its identity as soon as you scroll.
-  if (/overflow-x-auto/.test(src) && /<table/.test(src) && !/sticky\s+left-0/.test(src)) {
+  // otherwise the row loses its identity as soon as you scroll. FROZEN_CELL /
+  // FROZEN_CELL_ON_TINT (shared/index.ts) are that pattern named, so they count.
+  //
+  // Two limits worth knowing before trusting this one. It is FILE-scoped: it
+  // cannot pair a scroll container with the table inside it, so a file with a
+  // scrollable diagram and a table anywhere else reads as a hit, and one frozen
+  // table clears a file that holds three. And §2.7's own exception — a mobile
+  // card list, which the spec sanctions and prefers — is honoured by skipping
+  // files with a `useIsMobile` branch; whether that card list actually carries
+  // every column is a question for eyes, not for a regex.
+  const hasCardBranch = /useIsMobile/.test(src);
+  const hasFrozenCol = /sticky\s+left-0/.test(src) || /\bFROZEN_CELL(?:_ON_TINT)?\b/.test(src);
+  if (/overflow-x-auto/.test(src) && /<table/.test(src) && !hasFrozenCol && !hasCardBranch) {
     report(file, 0, 'Scrollable table with no frozen identifying column', '2.7',
-      'add `sticky left-0 z-[1] bg-…` to the first th/td');
+      'freeze the first th/td with FROZEN_CELL, or switch to a mobile card list');
   }
 }
 

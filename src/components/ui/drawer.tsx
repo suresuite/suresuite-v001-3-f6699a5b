@@ -41,7 +41,12 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
+        // Bottom-pinned, so it keeps the safe-area inset (§2.6) — without it
+        // the last row of content sits under the home indicator. Nothing
+        // imports this primitive yet; the inset is here so the first thing
+        // that does is not the place the bug is found.
         "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+        "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         className
       )}
       {...props}

@@ -360,7 +360,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
           <button
             type="button"
             onClick={onNewThread}
-            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-sm bg-foreground text-[12.5px] font-medium text-background"
+            className="flex h-8 min-h-11 flex-1 items-center justify-center gap-1.5 md:min-h-0 rounded-sm bg-foreground text-[12.5px] font-medium text-background"
           >
             <Plus className="h-3.5 w-3.5" /> New chat
           </button>
@@ -368,7 +368,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
             type="button"
             onClick={onCollapse}
             title="Hide chat list"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[--zinc-border] bg-background text-muted-foreground"
+            className="flex h-8 w-8 min-h-11 min-w-11 shrink-0 items-center justify-center md:min-h-0 md:min-w-0 rounded-sm border border-[--zinc-border] bg-background text-muted-foreground"
           >
             <ChevronLeft className="h-3 w-3" />
           </button>

@@ -39,6 +39,7 @@ import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/componen
 import MLPrediction from '@/components/MLPrediction';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MapView from '@/components/MapView';
+import { FROZEN_CELL } from '@/components/shared';
 
 
 const TIER_ORDER = ['Tier 1', 'Tier 2', 'Tier 3', 'Plant'] as const;
@@ -1099,7 +1100,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   <input
                     autoFocus
                     type="text"
-                    className="h-9 pl-9 pr-3 border border-border rounded-md text-sm bg-background focus:outline-none w-full"
+                    className="h-9 min-h-11 md:min-h-0 pl-9 pr-3 border border-border rounded-md text-sm bg-background focus:outline-none w-full"
                     placeholder="find a firm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -1549,7 +1550,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b">
-                              <th className="text-left font-medium text-muted-foreground pb-2 pr-3">Firm</th>
+                              <th className={`text-left font-medium text-muted-foreground pb-2 pr-3 ${FROZEN_CELL}`}>Firm</th>
                               <th className="text-left font-medium text-muted-foreground pb-2 pr-3">Tier</th>
                               <th className="text-left font-medium text-muted-foreground pb-2 pr-3">Country</th>
                               <th className="text-right font-medium text-muted-foreground pb-2 pr-3">In</th>
@@ -1564,7 +1565,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                               
                               return (
                                 <tr key={row.name} className="border-b last:border-0">
-                                  <td className="py-2 pr-3 max-w-[140px] truncate" title={row.name}>{row.name}</td>
+                                  <td className={`py-2 pr-3 max-w-[140px] truncate ${FROZEN_CELL}`} title={row.name}>{row.name}</td>
                                   <td className="py-2 pr-3">
                                     <span
                                       className="inline-block px-2 py-0.5 rounded-sm text-xs font-medium"

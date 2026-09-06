@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { PART_TREATMENTS, TABLE_COLLAPSE_ROWS } from "@/lib/chat/partStyles";
 import { SourceNote } from "./SourceNote";
+import { FROZEN_CELL } from '@/components/shared';
 
 interface TablePayload {
   columns?: string[];
@@ -26,7 +27,13 @@ export function DataTable({ data, sourceTool }: { data: unknown; sourceTool?: st
           <thead className="bg-muted/50">
             <tr>
               {columns.map((c, i) => (
-                <th key={i} className="px-2 py-1.5 text-left font-medium text-muted-foreground">
+                <th
+                  key={i}
+                  className={cn(
+                    'px-2 py-1.5 text-left font-medium text-muted-foreground',
+                    i === 0 && `${FROZEN_CELL} bg-[hsl(var(--muted))] md:bg-transparent`,
+                  )}
+                >
                   {c}
                 </th>
               ))}
@@ -36,7 +43,7 @@ export function DataTable({ data, sourceTool }: { data: unknown; sourceTool?: st
             {visible.map((row, r) => (
               <tr key={r} className="border-t border-border">
                 {row.map((cell, c) => (
-                  <td key={c} className="px-2 py-1.5 text-foreground">
+                  <td key={c} className={cn('px-2 py-1.5 text-foreground', c === 0 && FROZEN_CELL)}>
                     {cell ?? "-"}
                   </td>
                 ))}

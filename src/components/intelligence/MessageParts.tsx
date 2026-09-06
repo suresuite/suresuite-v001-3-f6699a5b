@@ -13,6 +13,7 @@ import type { ChatPart, ChatToolCall } from "@/hooks/useProjectChat";
 import { LAYER, MonoChip, TD, TH, tint } from "./piUi";
 import { cn } from "@/lib/utils";
 import { PlanCard, type PlanPartData } from "@/components/chat/PlanCard";
+import { FROZEN_CELL } from '@/components/shared';
 
 const CARD = "mt-2 rounded-sm border border-[--hair-border]";
 const accent = (hex: string) => ({ borderLeft: "2px solid " + hex });
@@ -71,8 +72,8 @@ export function TablePart({ data }: { data: any }) {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {columns.map((c) => (
-                <th key={c} className={TH}>
+              {columns.map((c, i) => (
+                <th key={c} className={cn(TH, i === 0 && FROZEN_CELL)}>
                   {c}
                 </th>
               ))}
@@ -82,7 +83,7 @@ export function TablePart({ data }: { data: any }) {
             {rows.map((r, i) => (
               <tr key={i} className="hover:bg-[#fcfcfc]">
                 {r.map((cell, j) => (
-                  <td key={j} className={TD}>
+                  <td key={j} className={cn(TD, j === 0 && FROZEN_CELL)}>
                     {String(cell ?? "")}
                   </td>
                 ))}

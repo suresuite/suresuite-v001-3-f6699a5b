@@ -93,6 +93,7 @@ import type { PolicyBundle, FulfillmentStrategy } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import { MappingWarningsCard } from "@/components/sim/RunProgressPanel";
 import { RunQueueConsole } from "@/components/sim/RunQueueConsole";
+import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 
 // Runs launched from the policies stage all reuse this single auto-managed
 // scenario so the Lab's scenario list doesn't fill up with validation runs.
@@ -1898,7 +1899,7 @@ export function RunValidateStage({
                     <table className="w-full">
                       <thead>
                         <tr>
-                          <th className={TH}>KPI</th>
+                          <th className={cn(TH, FROZEN_CELL_ON_TINT)}>KPI</th>
                           <th className={cn(TH, "text-right")}>KS D</th>
                           <th className={cn(TH, "text-right")}>KS p</th>
                           <th className={cn(TH, "text-right")}>t</th>
@@ -1915,7 +1916,7 @@ export function RunValidateStage({
                             Number.isNaN(v) ? "—" : String(v);
                           return (
                             <tr key={r.kpi}>
-                              <td className={TD}>{meta.label}</td>
+                              <td className={cn(TD, FROZEN_CELL)}>{meta.label}</td>
                               <td className={cn(TD, "text-right font-mono tabular-nums")}>{num(r.ks)}</td>
                               <td className={cn(TD, "text-right font-mono tabular-nums")}>{num(r.ksP)}</td>
                               <td className={cn(TD, "text-right font-mono tabular-nums")}>{num(r.t)}</td>
@@ -2464,7 +2465,7 @@ function ReplicationAdequacy({
         <table className="w-full">
           <thead>
             <tr>
-              <th className={TH}>KPI</th>
+              <th className={cn(TH, FROZEN_CELL_ON_TINT)}>KPI</th>
               <th className={cn(TH, "text-right")}>Mean</th>
               <th className={cn(TH, "text-right")}>Std</th>
               <th className={cn(TH, "text-right")}>n</th>
@@ -2478,7 +2479,7 @@ function ReplicationAdequacy({
               const meta = KPI_OPTIONS.find((x) => x.id === r.kpi)!;
               return (
                 <tr key={r.kpi} className={r.focal ? undefined : "text-muted-foreground"}>
-                  <td className={TD}>
+                  <td className={cn(TD, FROZEN_CELL)}>
                     {meta.label}
                     {!r.focal && <MonoChip className="ml-1.5">cost</MonoChip>}
                   </td>

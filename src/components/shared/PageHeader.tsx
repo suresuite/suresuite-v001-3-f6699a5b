@@ -68,12 +68,14 @@ export function PageHeader({
         {/* Right slot: 44px touch floor below `md` (spec §0.3 amendment 2),
             the audit's h-8 buttons / h-9 selects from `md` up (C3). The floor
             is min-height/min-width so it can never shrink a control that is
-            already larger, and it is released at `md` rather than overridden. */}
+            already larger, and it is released at `md` rather than overridden.
+            Inputs and selects are covered too — the admin search fields live
+            here and a thumb has to hit them like anything else. */}
         <div
           className={cn(
             'flex items-center gap-1.5 shrink-0 md:gap-2',
-            '[&_button]:min-h-11 [&_button]:min-w-11',
-            'md:[&_button]:min-h-0 md:[&_button]:min-w-0',
+            '[&_button]:min-h-11 [&_button]:min-w-11 [&_input]:min-h-11 [&_select]:min-h-11',
+            'md:[&_button]:min-h-0 md:[&_button]:min-w-0 md:[&_input]:min-h-0 md:[&_select]:min-h-0',
           )}
         >
           {onRefresh && (

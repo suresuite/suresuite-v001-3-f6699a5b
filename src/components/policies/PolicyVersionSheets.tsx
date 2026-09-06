@@ -66,7 +66,7 @@ export function SaveVersionDialog({
           <span className={KX_TIGHT}>Label</span>
           <Input
             autoFocus
-            className="h-8 text-[12.5px]"
+            className="h-8 min-h-11 text-[12.5px] md:min-h-0"
             placeholder="Pre-Q4 freeze"
             value={label}
             onChange={(e) => setLabel(e.target.value)}

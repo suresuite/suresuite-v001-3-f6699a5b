@@ -275,7 +275,7 @@ export default function DocsLayout() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 lg:hidden"
+          className="h-8 w-8 min-h-11 min-w-11 md:min-h-0 md:min-w-0 lg:hidden"
           aria-label="Toggle navigation"
           onClick={() => setNavOpen((o) => !o)}
         >

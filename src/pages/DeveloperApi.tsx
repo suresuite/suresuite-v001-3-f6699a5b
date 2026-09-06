@@ -41,6 +41,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 
 interface Props {
   isCollapsed: boolean;
@@ -591,7 +592,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className={TH}>Name</th>
+                      <th className={`${TH} ${FROZEN_CELL_ON_TINT}`}>Name</th>
                       <th className={TH}>Key</th>
                       <th className={TH}>Env</th>
                       <th className={TH}>Scopes</th>
@@ -888,7 +889,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                               <tbody>
                                 {nbScenarios.map((s) => (
                                   <tr key={s.id} className="hover:bg-[#fcfcfc]">
-                                    <td className={`${TD} text-xs font-medium`}>{s.name}</td>
+                                    <td className={`${TD} ${FROZEN_CELL} text-xs font-medium`}>{s.name}</td>
                                     <td className={TD}><IdCell value={s.id} /></td>
                                     <td className={`${TD} text-xs`}>{s.horizon_days} d (+{s.warmup_days})</td>
                                     <td className={`${TD} text-xs`}>{s.replications}</td>

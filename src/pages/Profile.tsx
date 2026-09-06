@@ -321,7 +321,7 @@ function MyAccessTab() {
                   >
                     <span className={on ? '' : 'text-muted-foreground'}>{f.label}</span>
                     {on ? (
-                      <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400">
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
                         <Check className="mr-0.5 h-3 w-3" /> On
                       </Badge>
                     ) : (

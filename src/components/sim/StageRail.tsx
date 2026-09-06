@@ -63,11 +63,22 @@ export type RailState = "done" | "current" | "todo";
 /** Rail container: white card, 1px #a3a3a3, radius 4, clipped. */
 export const RAIL_SHELL = "overflow-hidden rounded-sm border border-[#a3a3a3] bg-white";
 /** Eyebrow row: 7px 12px, closed by a 1px #ebebeb rule. */
-export const RAIL_EYEBROW_ROW = "flex items-center gap-[9px] border-b border-[#ebebeb] px-3 py-[7px]";
+export const RAIL_EYEBROW_ROW =
+  // The kicker and the gate readout measure 160px + 274px against 270px of room
+  // at 320px, so below `md` the readout wraps to its own line rather than
+  // pushing the row sideways. `md:flex-nowrap` restores the desktop row exactly.
+  "flex flex-wrap items-center gap-[9px] border-b border-[#ebebeb] px-3 py-[7px] md:flex-nowrap";
 /** Section eyebrow type: mono 10 / 500, uppercase, .16em, muted. */
 export const RAIL_EYEBROW = cn(KX_TIGHT, "whitespace-nowrap font-medium");
 /** Stage row: the band the cards sit in. */
-export const RAIL_STAGE_ROW = "flex items-stretch gap-[10px] bg-[#f4f4f4] px-3 py-[10px]";
+export const RAIL_STAGE_ROW =
+  // Five equal-width cards need 50px of chrome each before any text; at 320px
+  // the row has 270px for all five, so `flex-1 basis-0` leaves them negative
+  // room and the labels vanish. The sequence is the information, so it scrolls
+  // rather than reflowing (§2.7) — the same treatment the admin sub-nav carries.
+  // `md:overflow-visible` means the desktop row is untouched.
+  "flex items-stretch gap-[10px] overflow-x-auto bg-[#f4f4f4] px-3 py-[10px] " +
+  "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:overflow-visible";
 
 /** The open (sunken) band row — zinc ramp, used by the section that's active. */
 export const RAIL_STAGE_ROW_OPEN = "flex items-stretch p-3 border-t";
@@ -246,7 +257,7 @@ export function RailStageCard({
       onClick={onSelect}
       title={title}
       aria-current={current ? "step" : undefined}
-      className="relative flex min-w-0 flex-1 basis-0 items-center gap-[10px] rounded-sm border bg-white px-[10px] pb-[10px] pt-2 text-left transition-colors hover:bg-[#fafafa]"
+      className="relative flex w-[180px] shrink-0 min-w-0 items-center gap-[10px] rounded-sm border bg-white px-[10px] pb-[10px] pt-2 text-left md:w-auto md:flex-1 md:shrink md:basis-0 transition-colors hover:bg-[#fafafa]"
       style={{ borderColor: c.border, background: c.bg }}
     >
       <span
@@ -314,6 +325,18 @@ export interface StageRailProps {
 
 /** Equal-width cards (flex 1 1 0), 10px gap, a chevron between each pair. */
 export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
+  // With the row scrolling below `md`, the current stage can sit off-screen.
+  // Centre it, the way the admin sub-nav centres its active tab.
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const strip = rowRef.current;
+    const el = strip?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!strip || !el) return;
+    const offset =
+      el.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft;
+    strip.scrollLeft = Math.max(0, offset - (strip.clientWidth - el.clientWidth) / 2);
+  }, [active]);
+
   return (
     <section className={RAIL_SHELL}>
       <div className={RAIL_EYEBROW_ROW}>
@@ -322,7 +345,7 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
         <RailReadout dot={gate.dot} label={gate.label} value={gate.value} tail={gate.tail} />
       </div>
 
-      <div className={RAIL_STAGE_ROW}>
+      <div ref={rowRef} className={RAIL_STAGE_ROW}>
         {stages.map((s, i) => (
           <React.Fragment key={s.id}>
             {i > 0 ? <RailChevron /> : null}
