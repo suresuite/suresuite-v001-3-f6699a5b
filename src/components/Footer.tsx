@@ -1,6 +1,11 @@
 import React from "react";
 import { X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { MOBILE_TABBAR_H, MOBILE_TABBAR_BORDER } from "@/components/MobileNav";
+
+/** Single-line credit bar height, in px (px-3 py-2 text-xs). PageLayout reserves
+ *  space from this. */
+export const MOBILE_FOOTER_H = 32;
 
 interface FooterProps {
   isCollapsed?: boolean;
@@ -33,7 +38,13 @@ const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }
       }`}
       style={
         isMobile
-          ? { bottom: "calc(3.5rem + env(safe-area-inset-bottom, 0px))" }
+          ? {
+              // sits ABOVE the tab bar: its height, its border, then the inset.
+              // The border term is what gives the visible gap.
+              bottom:
+                `calc(${MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER}px` +
+                ` + env(safe-area-inset-bottom, 0px))`,
+            }
           : undefined
       }
     >

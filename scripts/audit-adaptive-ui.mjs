@@ -294,6 +294,31 @@ for (const file of files) {
   }
 }
 
+// ── §2.6 — a safe-area guard is inert on iOS unless the viewport opts in. The
+// guards live in .tsx; the cause lives in index.html, which no other rule reads.
+{
+  // Read the viewport meta TAG, not the file: index.html's own explanatory
+  // comment says "viewport-fit=cover", and a whole-file test would be satisfied
+  // by that comment forever — a guard that can never fire.
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+  const viewport = /<meta[^>]*\bname\s*=\s*["']viewport["'][^>]*>/i.exec(html)?.[0] ?? '';
+  if (!/viewport-fit\s*=\s*cover/.test(viewport)) {
+    for (const file of files) {
+      const src = readFileSync(file, 'utf8');
+      const i = src.indexOf('env(safe-area-inset-');
+      if (i >= 0) {
+        report(
+          file,
+          src.slice(0, i).split('\n').length,
+          'safe-area-inert',
+          '2.6',
+          'env(safe-area-inset-*) resolves to 0 on iOS: index.html lacks viewport-fit=cover',
+        );
+      }
+    }
+  }
+}
+
 // ── Baseline ──────────────────────────────────────────────────────────────
 // Keyed by file + section, counted. Line numbers are deliberately NOT part of
 // the key: editing a file above a known hit must not fail the build.

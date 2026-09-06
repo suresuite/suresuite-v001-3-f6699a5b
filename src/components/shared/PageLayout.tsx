@@ -1,8 +1,13 @@
 import React from 'react';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import Footer, { MOBILE_FOOTER_H } from '@/components/Footer';
 import PasswordExpiryBanner from '@/components/PasswordExpiryBanner';
-import { MobileTabBar, MobileNavDrawer } from '@/components/MobileNav';
+import {
+  MobileTabBar,
+  MobileNavDrawer,
+  MOBILE_TABBAR_H,
+  MOBILE_TABBAR_BORDER,
+} from '@/components/MobileNav';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +16,12 @@ interface PageLayoutProps {
   isCollapsed: boolean;
   setIsCollapsed: (value: boolean) => void;
 }
+
+// Bottom chrome on mobile, measured rather than guessed: tab bar + its border +
+// the credit bar, then 16px of breathing room, then the device inset. Derived so
+// a height change in either component cannot leave content underneath.
+const MOBILE_CHROME_PX =
+  MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER + MOBILE_FOOTER_H + 16;
 
 export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayoutProps) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -30,7 +41,10 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
         )}
         style={
           isMobile
-            ? { paddingBottom: 'calc(8.5rem + env(safe-area-inset-bottom, 0px))' }
+            ? {
+                paddingBottom:
+                  `calc(${MOBILE_CHROME_PX}px + env(safe-area-inset-bottom, 0px))`,
+              }
             : undefined
         }
       >
