@@ -1,14 +1,11 @@
 {
   "note": "Known adaptive-UI backlog. The audit fails only ABOVE these counts. Ratchet down by fixing a file and re-running with --update-baseline; never re-record to admit a new violation.",
   "generated": "2026-09-06",
-  "total": 16,
+  "total": 7,
   "counts": {
-    "src/components/shared/YouTubeEmbed.tsx::C6": 1,
-    "src/pages/DeveloperApi.tsx::6": 2,
-    "src/pages/GettingStarted.tsx::6": 9,
     "src/pages/GettingStarted.tsx::C6": 1,
+    "src/pages/GettingStarted.tsx::6": 4,
     "src/pages/InteractiveNetworkSpace.tsx::3.3": 1,
-    "src/pages/ProcessLevelNetwork.tsx::3.3": 1,
-    "src/pages/help/docBodies.tsx::2.7": 1
+    "src/pages/ProcessLevelNetwork.tsx::3.3": 1
   }
 }

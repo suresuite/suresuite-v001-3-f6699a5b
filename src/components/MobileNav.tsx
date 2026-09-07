@@ -13,6 +13,12 @@ import { NAV_SECTIONS, filterVisibleSections } from '@/components/Navbar';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
 
+/** Bottom-chrome geometry, in px, published so PageLayout reserves space FROM
+ *  these rather than from a hand-summed literal. Change a height here and the
+ *  reservation follows; it cannot drift. */
+export const MOBILE_TABBAR_H = 56;      // min-h-[56px] on each tab
+export const MOBILE_TABBAR_BORDER = 1;  // border-t
+
 const TABS = [
   { to: '/app', label: 'Home', icon: Home },
   { to: '/policies', label: 'Policies', icon: SlidersHorizontal },

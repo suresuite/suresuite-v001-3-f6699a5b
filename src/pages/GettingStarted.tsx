@@ -50,7 +50,7 @@ const Section = ({
   subtitle?: React.ReactNode;
   children: React.ReactNode;
 }) => (
-  <section className="px-6 sm:px-8 lg:px-12 py-12 border-t bg-background">
+  <section className="px-6 md:px-12 py-12 border-t bg-background">
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
         <h2 className="text-3xl font-bold tracking-tight mb-2">{title}</h2>
@@ -76,7 +76,7 @@ const DarkSection = ({
   compact?: boolean;
   noBorder?: boolean;
 }) => (
-  <section className={`px-6 sm:px-8 lg:px-12 ${compact ? 'py-2' : 'py-16'} ${noBorder ? '' : 'border-t'} bg-black text-white`}>
+  <section className={`px-6 md:px-12 ${compact ? 'py-2' : 'py-16'} ${noBorder ? '' : 'border-t'} bg-black text-white`}>
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
         {title ? (
@@ -164,7 +164,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
     <div className="min-h-screen bg-background flex relative">
       <Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       <main
-        className="flex-1 transition-all duration-300 px-6 sm:px-8 lg:px-12" // side margins
+        className="flex-1 transition-all duration-300 px-6 md:px-12" // side margins
         style={{ marginLeft: isCollapsed ? 50 : 192 }}
       >
         {/* Intro */}
@@ -172,7 +172,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
           {/* background grid + soft gradient */}
           <div className="absolute inset-0 opacity-10 [background-image:linear-gradient(to_right,rgba(0,0,0,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.08)_1px,transparent_1px)] [background-size:64px_64px]" />
           <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-[420px] w-[900px] bg-gradient-to-r from-orange-400/30 via-pink-400/30 to-teal-400/30 blur-3xl rounded-full" />
-          <div className="relative px-6 sm:px-8 lg:px-12 py-16 sm:py-20">
+          <div className="relative px-6 md:px-12 py-16 sm:py-20">
             <div className="max-w-5xl">
               <div className="mb-8">
                 <div className="inline-flex items-center gap-3 mb-6">
@@ -368,7 +368,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
         </DarkSection>
 
         {/* Technical Overview */}
-        <section className="px-6 sm:px-8 lg:px-12 py-16 border-t bg-background">
+        <section className="px-6 md:px-12 py-16 border-t bg-background">
           <div className="max-w-7xl mx-auto">
             <div className="mb-12 text-center">
               <h2 className="text-3xl font-bold tracking-tight mb-4 text-foreground">SuReSuite Technical Architecture</h2>

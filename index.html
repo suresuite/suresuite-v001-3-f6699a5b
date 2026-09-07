@@ -3,13 +3,17 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover is load-bearing: without it iOS Safari resolves every
+       env(safe-area-inset-*) to 0, and the bottom tab bar, the credit footer and
+       PageLayout's bottom reservation all silently lose their clearance. It
+       reproduces on hardware only. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="color-scheme" content="light" />
   <title>SuReSuite-v001</title>
   <link rel="icon" href="/favicon.ico" type="image/x-icon" />
   <meta name="description" content="SC Analytics Dashboard" />
   <meta property="og:image" content="/og-image.svg" />
-  
+
 </head>
 
 <body>

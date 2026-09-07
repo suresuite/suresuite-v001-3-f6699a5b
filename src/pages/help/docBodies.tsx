@@ -3,7 +3,7 @@
 // No auth required, no business logic, purely presentational.
 
 import { Link } from "react-router-dom";
-import { PageLayout, PageHeader, YouTubeEmbed } from "@/components/shared";
+import { PageLayout, PageHeader, YouTubeEmbed, FROZEN_CELL } from "@/components/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -701,8 +701,8 @@ function Row6Table({ head, rows }: { head: typeof PARAM_HEAD; rows: Row6[] }) {
       <table className="w-full text-xs border rounded-md">
         <thead className="bg-muted/40 text-left">
           <tr>
-            {head.map((h) => (
-              <th key={h} className="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap">
+            {head.map((h, i) => (
+              <th key={h} className={cn("px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>
                 {h}
               </th>
             ))}
@@ -711,7 +711,7 @@ function Row6Table({ head, rows }: { head: typeof PARAM_HEAD; rows: Row6[] }) {
         <tbody className="[&_td]:px-2.5 [&_td]:py-2 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
           {rows.map((r, i) => (
             <tr key={i}>
-              <td className="font-mono text-[11px] font-medium whitespace-nowrap">{r[0]}</td>
+              <td className={cn("font-mono text-[11px] font-medium whitespace-nowrap", FROZEN_CELL)}>{r[0]}</td>
               <td className="text-muted-foreground whitespace-nowrap">{r[1]}</td>
               <td className="font-mono text-[10px]">{r[2]}</td>
               <td className="font-mono text-[10px] whitespace-nowrap">{r[3]}</td>
@@ -747,15 +747,15 @@ function PhasePipeline() {
       <table className="w-full text-sm border rounded-md">
         <thead className="bg-muted/40 text-left">
           <tr>
-            {["Phase", "Name", "What happens in the weekly tick"].map((h) => (
-              <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+            {["Phase", "Name", "What happens in the weekly tick"].map((h, i) => (
+              <th key={h} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
           {PHASES.map((p) => (
             <tr key={p[0]}>
-              <td className="font-mono text-xs whitespace-nowrap">{p[0]}</td>
+              <td className={cn("font-mono text-xs whitespace-nowrap", FROZEN_CELL)}>{p[0]}</td>
               <td className="font-mono text-xs whitespace-nowrap">{p[1]}</td>
               <td className="text-muted-foreground text-[13px]">{p[2]}</td>
             </tr>
@@ -1263,15 +1263,15 @@ function PolicyCard({ p }: { p: Policy }) {
               <table className="w-full text-xs border rounded-md">
                 <thead className="bg-muted/40 text-left">
                   <tr>
-                    {["Phase", "Prio", "Reads", "Writes", "Resolution"].map((h) => (
-                      <th key={h} className="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    {["Phase", "Prio", "Reads", "Writes", "Resolution"].map((h, i) => (
+                      <th key={h} className={cn("px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="[&_td]:px-2.5 [&_td]:py-2 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
                   {p.hooks.map((h, i) => (
                     <tr key={i}>
-                      <td className="font-mono text-[10px] whitespace-nowrap">{h[0]}</td>
+                      <td className={cn("font-mono text-[10px] whitespace-nowrap", FROZEN_CELL)}>{h[0]}</td>
                       <td className="font-mono text-[10px]">{h[1]}</td>
                       <td className="text-muted-foreground text-[11px]">{h[2]}</td>
                       <td className="text-muted-foreground text-[11px]">{h[3]}</td>
@@ -1335,15 +1335,15 @@ function KpiDictionary() {
       <table className="w-full text-sm border rounded-md">
         <thead className="bg-muted/40 text-left">
           <tr>
-            {["KPI", "Symbol", "Definition", "Unit"].map((h) => (
-              <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+            {["KPI", "Symbol", "Definition", "Unit"].map((h, i) => (
+              <th key={h} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
           {KPI_ROWS.map((k) => (
             <tr key={k.kpi}>
-              <td className="font-mono text-xs font-medium whitespace-nowrap">{k.kpi}</td>
+              <td className={cn("font-mono text-xs font-medium whitespace-nowrap", FROZEN_CELL)}>{k.kpi}</td>
               <td className="font-mono text-xs whitespace-nowrap">{k.symbol}</td>
               <td className="text-muted-foreground text-[13px]">{k.def}</td>
               <td className="text-muted-foreground whitespace-nowrap text-xs">{k.unit}</td>
@@ -1363,15 +1363,15 @@ function TwoColTable({ head, rows }: { head: [string, string]; rows: [string, st
       <table className="w-full text-sm border rounded-md">
         <thead className="bg-muted/40 text-left">
           <tr>
-            {head.map((h) => (
-              <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+            {head.map((h, i) => (
+              <th key={h} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
           {rows.map((r) => (
             <tr key={r[0]}>
-              <td className="font-mono text-[12px] whitespace-nowrap">{r[0]}</td>
+              <td className={cn("font-mono text-[12px] whitespace-nowrap", FROZEN_CELL)}>{r[0]}</td>
               <td className="text-muted-foreground text-[13px]">{r[1]}</td>
             </tr>
           ))}
@@ -1444,15 +1444,15 @@ function DistTable({ caption, rows }: { caption: string; rows: DistRow[] }) {
         <table className="w-full text-xs border rounded-md">
           <thead className="bg-muted/40 text-left">
             <tr>
-              {["Distribution", "Form / sampling", "Moments & notes"].map((h) => (
-                <th key={h} className="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+              {["Distribution", "Form / sampling", "Moments & notes"].map((h, i) => (
+                <th key={h} className={cn("px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="[&_td]:px-2.5 [&_td]:py-2 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
             {rows.map((r) => (
               <tr key={r.name}>
-                <td className="font-mono text-[11px] font-medium whitespace-nowrap">{r.name}</td>
+                <td className={cn("font-mono text-[11px] font-medium whitespace-nowrap", FROZEN_CELL)}>{r.name}</td>
                 <td className="font-mono text-[11px]">{r.form}</td>
                 <td className="text-muted-foreground text-[12px]">{r.notes}</td>
               </tr>
@@ -1491,15 +1491,15 @@ function ResilienceIndexTable() {
       <table className="w-full text-sm border rounded-md">
         <thead className="bg-muted/40 text-left">
           <tr>
-            {["Component", "Weight", "Normalization", "Rationale"].map((h) => (
-              <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+            {["Component", "Weight", "Normalization", "Rationale"].map((h, i) => (
+              <th key={h} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
           {RI_COMPONENTS.map((r) => (
             <tr key={r.comp}>
-              <td className="font-medium text-[13px] whitespace-nowrap">{r.comp}</td>
+              <td className={cn("font-medium text-[13px] whitespace-nowrap", FROZEN_CELL)}>{r.comp}</td>
               <td className="font-mono text-xs whitespace-nowrap">{r.weight}</td>
               <td className="font-mono text-[11px] whitespace-nowrap">{r.norm}</td>
               <td className="text-muted-foreground text-[12px]">{r.note}</td>
@@ -1584,15 +1584,15 @@ function Experiments() {
           <table className="w-full text-sm border rounded-md">
             <thead className="bg-muted/40 text-left">
               <tr>
-                {["Test", "Status", "What it sweeps"].map((h) => (
-                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                {["Test", "Status", "What it sweeps"].map((h, i) => (
+                  <th key={h} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
               {STRESS_TESTS.map((s) => (
                 <tr key={s.id}>
-                  <td className="font-mono text-xs whitespace-nowrap">{s.id}</td>
+                  <td className={cn("font-mono text-xs whitespace-nowrap", FROZEN_CELL)}>{s.id}</td>
                   <td className="text-xs whitespace-nowrap">{s.status}</td>
                   <td className="text-muted-foreground text-[13px]">{s.desc}</td>
                 </tr>
@@ -1616,15 +1616,15 @@ function Experiments() {
           <table className="w-full text-sm border rounded-md">
             <thead className="bg-muted/40 text-left">
               <tr>
-                {["Workload", "Target", "Measured"].map((h) => (
-                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                {["Workload", "Target", "Measured"].map((h, i) => (
+                  <th key={h} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
               {PERF_TARGETS.map((p) => (
                 <tr key={p.workload}>
-                  <td className="text-[13px]">{p.workload}</td>
+                  <td className={cn("text-[13px]", FROZEN_CELL)}>{p.workload}</td>
                   <td className="font-mono text-xs whitespace-nowrap">{p.target}</td>
                   <td className="font-mono text-xs whitespace-nowrap">{p.measured}</td>
                 </tr>
@@ -1643,15 +1643,15 @@ function Experiments() {
           <table className="w-full text-sm border rounded-md">
             <thead className="bg-muted/40 text-left">
               <tr>
-                {["Milestone", "Deliverable", "Status"].map((h) => (
-                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                {["Milestone", "Deliverable", "Status"].map((h, i) => (
+                  <th key={h} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
               {ROADMAP.map((r) => (
                 <tr key={r.m}>
-                  <td className="font-mono text-xs whitespace-nowrap">{r.m}</td>
+                  <td className={cn("font-mono text-xs whitespace-nowrap", FROZEN_CELL)}>{r.m}</td>
                   <td className="text-muted-foreground text-[13px]">{r.deliverable}</td>
                   <td className="text-xs whitespace-nowrap">{r.status}</td>
                 </tr>
@@ -1802,7 +1802,7 @@ export const DOC_BODIES: Record<string, () => JSX.Element> = {
                 <table className="w-full text-sm border rounded-md">
                   <thead className="bg-muted/40 text-left">
                     <tr>
-                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Mode</th>
+                      <th className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide", FROZEN_CELL)}>Mode</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Trigger</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Engine path</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Persists?</th>
@@ -1810,13 +1810,13 @@ export const DOC_BODIES: Record<string, () => JSX.Element> = {
                   </thead>
                   <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t text-sm [&_tr:nth-child(even)]:bg-muted/20">
                     <tr>
-                      <td className="font-medium">Preview</td>
+                      <td className={cn("font-medium", FROZEN_CELL)}>Preview</td>
                       <td>Slider / strategy toggle</td>
                       <td>Single-rep incremental DES on warm graph</td>
                       <td>No — broadcast only</td>
                     </tr>
                     <tr>
-                      <td className="font-medium">Experiment</td>
+                      <td className={cn("font-medium", FROZEN_CELL)}>Experiment</td>
                       <td>"Run scenario" button</td>
                       <td>Full Monte Carlo (N replications, warmup, CIs)</td>
                       <td>Yes — <code>simulation_runs</code> + <code>run_replications</code></td>
@@ -2259,29 +2259,29 @@ In scsim:  demand_mode = average,  demand_floor_factor (ν) = variability
                 <table className="w-full text-sm border rounded-md">
                   <thead className="bg-muted/40 text-left">
                     <tr>
-                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Metric</th>
+                      <th className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide", FROZEN_CELL)}>Metric</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Measures</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Supply chain interpretation</th>
                     </tr>
                   </thead>
                   <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t text-sm [&_tr:nth-child(even)]:bg-muted/20">
                     <tr>
-                      <td className="font-medium">Degree centrality</td>
+                      <td className={cn("font-medium", FROZEN_CELL)}>Degree centrality</td>
                       <td>Direct connections</td>
                       <td>How many products depend on this supplier or material</td>
                     </tr>
                     <tr>
-                      <td className="font-medium">Betweenness centrality</td>
+                      <td className={cn("font-medium", FROZEN_CELL)}>Betweenness centrality</td>
                       <td>Control over flow paths</td>
                       <td>How often this node sits on the critical path between suppliers and products</td>
                     </tr>
                     <tr>
-                      <td className="font-medium">Eigenvector centrality</td>
+                      <td className={cn("font-medium", FROZEN_CELL)}>Eigenvector centrality</td>
                       <td>Influence via neighbours</td>
                       <td>Whether this node connects to other structurally important nodes</td>
                     </tr>
                     <tr>
-                      <td className="font-medium">Closeness centrality</td>
+                      <td className={cn("font-medium", FROZEN_CELL)}>Closeness centrality</td>
                       <td>Proximity to all other nodes</td>
                       <td>How quickly a disruption at this node propagates through the network</td>
                     </tr>
@@ -2535,17 +2535,17 @@ scenario      ┘    role read)     pure)          defaults · warnings)
                 <table className="w-full text-sm border rounded-md">
                   <thead className="bg-muted/40 text-left">
                     <tr>
-                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Aspect</th>
+                      <th className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide", FROZEN_CELL)}>Aspect</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Realtime system</th>
                     </tr>
                   </thead>
                   <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20">
-                    <tr><td>Entry</td><td><code>sim-command</code></td></tr>
-                    <tr><td>Compute</td><td>Fly.io <code>sim-worker</code></td></tr>
-                    <tr><td>Transport</td><td>Upstash Redis stream</td></tr>
-                    <tr><td>Latency target</td><td>Sub-second, interactive</td></tr>
-                    <tr><td>Result table</td><td><code>simulation_runs</code>, <code>run_replications</code></td></tr>
-                    <tr><td>Used by</td><td>Product/Process UI, Policies preview, Sim Lab</td></tr>
+                    <tr><td className={FROZEN_CELL}>Entry</td><td><code>sim-command</code></td></tr>
+                    <tr><td className={FROZEN_CELL}>Compute</td><td>Fly.io <code>sim-worker</code></td></tr>
+                    <tr><td className={FROZEN_CELL}>Transport</td><td>Upstash Redis stream</td></tr>
+                    <tr><td className={FROZEN_CELL}>Latency target</td><td>Sub-second, interactive</td></tr>
+                    <tr><td className={FROZEN_CELL}>Result table</td><td><code>simulation_runs</code>, <code>run_replications</code></td></tr>
+                    <tr><td className={FROZEN_CELL}>Used by</td><td>Product/Process UI, Policies preview, Sim Lab</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -2590,21 +2590,21 @@ scenario      ┘    role read)     pure)          defaults · warnings)
                 <table className="w-full text-sm border rounded-md">
                   <thead className="bg-muted/40 text-left">
                     <tr>
-                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Kind</th>
+                      <th className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide", FROZEN_CELL)}>Kind</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Emitter</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Persists?</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Worker action</th>
                     </tr>
                   </thead>
                   <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t font-mono text-xs [&_tr:nth-child(even)]:bg-muted/20">
-                    <tr><td>scenario.changed</td><td>Product / Process UI</td><td>No (preview)</td><td>Incremental DES on dirty sub-graph</td></tr>
-                    <tr><td>scenario.reset</td><td>Scenario rail</td><td>No</td><td>Clear deltas</td></tr>
-                    <tr><td>simulation.snapshot</td><td>Sim Lab</td><td>Yes</td><td>Write <code>simulation_runs</code> row</td></tr>
-                    <tr><td>simulation.fork</td><td>Sim Lab</td><td>Yes</td><td>Branch a scenario</td></tr>
-                    <tr><td>policy.changed</td><td>/policies</td><td>No (preview)</td><td>Apply policy delta only</td></tr>
-                    <tr><td>experiment.run</td><td>Sim Lab</td><td>Yes</td><td>N replications, aggregate KPIs</td></tr>
-                    <tr><td>experiment.cancel</td><td>Sim Lab</td><td>Yes</td><td>Stop, mark cancelled</td></tr>
-                    <tr><td>experiment.add_reps</td><td>Sim Lab</td><td>Yes</td><td>Extend in-flight run</td></tr>
+                    <tr><td className={FROZEN_CELL}>scenario.changed</td><td>Product / Process UI</td><td>No (preview)</td><td>Incremental DES on dirty sub-graph</td></tr>
+                    <tr><td className={FROZEN_CELL}>scenario.reset</td><td>Scenario rail</td><td>No</td><td>Clear deltas</td></tr>
+                    <tr><td className={FROZEN_CELL}>simulation.snapshot</td><td>Sim Lab</td><td>Yes</td><td>Write <code>simulation_runs</code> row</td></tr>
+                    <tr><td className={FROZEN_CELL}>simulation.fork</td><td>Sim Lab</td><td>Yes</td><td>Branch a scenario</td></tr>
+                    <tr><td className={FROZEN_CELL}>policy.changed</td><td>/policies</td><td>No (preview)</td><td>Apply policy delta only</td></tr>
+                    <tr><td className={FROZEN_CELL}>experiment.run</td><td>Sim Lab</td><td>Yes</td><td>N replications, aggregate KPIs</td></tr>
+                    <tr><td className={FROZEN_CELL}>experiment.cancel</td><td>Sim Lab</td><td>Yes</td><td>Stop, mark cancelled</td></tr>
+                    <tr><td className={FROZEN_CELL}>experiment.add_reps</td><td>Sim Lab</td><td>Yes</td><td>Extend in-flight run</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -2622,20 +2622,20 @@ scenario      ┘    role read)     pure)          defaults · warnings)
                 <table className="w-full text-sm border rounded-md">
                   <thead className="bg-muted/40 text-left">
                     <tr>
-                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Data</th>
+                      <th className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide", FROZEN_CELL)}>Data</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Owner</th>
                       <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide">Why</th>
                     </tr>
                   </thead>
                   <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_tr]:border-t text-sm [&_tr:nth-child(even)]:bg-muted/20">
-                    <tr><td>Projects, nodes, edges, BOM, demand</td><td>Supabase</td><td>Baseline twin; RLS-scoped per user/project</td></tr>
-                    <tr><td>policy_defaults, policy_overrides</td><td>Supabase</td><td>Auditable rules; realtime-subscribed by UI</td></tr>
-                    <tr><td>scenarios (disruptions, horizon, reps)</td><td>Supabase</td><td>The "what-if" definition</td></tr>
-                    <tr><td>simulation_runs, run_replications</td><td>Supabase</td><td>Committed experiment results</td></tr>
-                    <tr><td>Effective-policy map (merged defaults + overrides)</td><td>Fly.io RAM</td><td>Rebuilt from Supabase; cached in GraphCache</td></tr>
-                    <tr><td>SimPy graph, RNG state, dirty sub-graph</td><td>Fly.io RAM</td><td>Per-tick compute; cheap to rebuild</td></tr>
-                    <tr><td>Command stream sim.cmd.&#123;project_id&#125;</td><td>Upstash</td><td>Transient transport; MAXLEN ~1000</td></tr>
-                    <tr><td>KPI deltas (preview mode)</td><td>Realtime</td><td>Broadcast only — not persisted</td></tr>
+                    <tr><td className={FROZEN_CELL}>Projects, nodes, edges, BOM, demand</td><td>Supabase</td><td>Baseline twin; RLS-scoped per user/project</td></tr>
+                    <tr><td className={FROZEN_CELL}>policy_defaults, policy_overrides</td><td>Supabase</td><td>Auditable rules; realtime-subscribed by UI</td></tr>
+                    <tr><td className={FROZEN_CELL}>scenarios (disruptions, horizon, reps)</td><td>Supabase</td><td>The "what-if" definition</td></tr>
+                    <tr><td className={FROZEN_CELL}>simulation_runs, run_replications</td><td>Supabase</td><td>Committed experiment results</td></tr>
+                    <tr><td className={FROZEN_CELL}>Effective-policy map (merged defaults + overrides)</td><td>Fly.io RAM</td><td>Rebuilt from Supabase; cached in GraphCache</td></tr>
+                    <tr><td className={FROZEN_CELL}>SimPy graph, RNG state, dirty sub-graph</td><td>Fly.io RAM</td><td>Per-tick compute; cheap to rebuild</td></tr>
+                    <tr><td className={FROZEN_CELL}>Command stream sim.cmd.&#123;project_id&#125;</td><td>Upstash</td><td>Transient transport; MAXLEN ~1000</td></tr>
+                    <tr><td className={FROZEN_CELL}>KPI deltas (preview mode)</td><td>Realtime</td><td>Broadcast only — not persisted</td></tr>
                   </tbody>
                 </table>
               </div>
