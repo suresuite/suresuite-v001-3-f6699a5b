@@ -134,7 +134,7 @@ shot: handoff/shots/02-auth.png
 route: Sign in
 repo: src/pages/Auth.tsx, src/components/AuthHeroStrip.tsx
 status: landed
-accept: verify src/pages/Auth.tsx,src/components/AuthHeroStrip.tsx
+accept: built  src/pages/Auth.tsx,src/components/AuthHeroStrip.tsx
 
 ### What it is
 Desktop is a split screen: form column plus an always-black rotating brand
@@ -350,9 +350,9 @@ nothing is described only in summary:
 ## 05 · Project Manager
 shot: handoff/shots/04-projects.png
 route: Project Manager
-repo: src/pages/DataManager.tsx, src/components/UploadWizard.tsx
+repo: src/pages/DataManager.tsx, src/components/UploadWizard.tsx, src/components/erp/ErpConnectionsPanel.tsx
 status: landed
-accept: verify src/pages/DataManager.tsx,src/components/UploadWizard.tsx
+accept: verify src/pages/DataManager.tsx,src/components/UploadWizard.tsx,src/components/erp/ErpConnectionsPanel.tsx
 
 ### What it is
 Data import and item masters. Four sections in the demo's stacked shell: add
@@ -475,9 +475,9 @@ nothing is described only in summary:
 ## 07 · Connect a data source (OrbitMRP / ERP)
 shot: handoff/shots/06-erp.png
 route: Project Manager → "orbit-mrp" row
-repo: src/components/ErpConnectionsPanel.tsx, src/lib/orbitMrpOAuth.ts, src/pages/OrbitMrpCallback.tsx, MappingWarningsCard
+repo: src/components/erp/ErpConnectionsPanel.tsx, src/lib/erp/orbitMrpOAuth.ts, src/pages/OrbitMrpCallback.tsx, MappingWarningsCard (exported from src/components/sim/RunProgressPanel.tsx)
 status: landed
-accept: verify src/components/ErpConnectionsPanel.tsx,src/components/MappingWarningsCard.tsx
+accept: verify src/components/erp/ErpConnectionsPanel.tsx,src/components/sim/RunProgressPanel.tsx
 
 ### What it is
 An OAuth link to an external MRP, and the one flow where a phone genuinely
@@ -1147,9 +1147,9 @@ nothing is described only in summary:
 ## 17 · Chats, files and memory sheets
 shot: handoff/shots/25-ai-agents.png
 route: AI → header ⋯ menu, or the thread title
-repo: src/components/chat/ChatSidebar.tsx, src/components/intelligence/MyFilesPanel.tsx, ThreadInfoPanel.tsx, ProjectMemoryPanel.tsx, ModelPicker.tsx, SuggestedActions.tsx
+repo: src/components/intelligence/ChatSidebar.tsx, src/components/intelligence/SidebarPanels.tsx (MyFilesPanel, ProjectMemoryPanel, ThreadInfoStrip), ModelPicker.tsx, SuggestedActions.tsx
 status: landed
-accept: verify src/components/chat/ChatSidebar.tsx,src/components/intelligence/MyFilesPanel.tsx,src/components/intelligence/ProjectMemoryPanel.tsx
+accept: verify src/components/intelligence/ChatSidebar.tsx,src/components/intelligence/SidebarPanels.tsx
 
 ### What it is
 Five sheets sharing the drag-dismissable shell: agents, model, chats, my files,
@@ -1199,7 +1199,7 @@ shot: handoff/shots/26-more.png
 route: More (tab bar)
 repo: src/components/MobileNav.tsx, src/components/Navbar.tsx, src/components/shared/PageLayout.tsx, PageHeader.tsx, Footer.tsx
 status: landed · **one live defect (IPHONE-FIX.md)**
-accept: verify src/components/MobileNav.tsx,src/components/shared/PageLayout.tsx,src/components/shared/PageHeader.tsx,src/components/Footer.tsx
+accept: built  src/components/MobileNav.tsx,src/components/shared/PageLayout.tsx,src/components/shared/PageHeader.tsx,src/components/Footer.tsx
 
 ### What it is
 The mobile shell. The 192px sidebar is `hidden md:block`; below `md` a five-item
@@ -1257,7 +1257,7 @@ shots: handoff/shots/27-admin-hub.png, handoff/shots/28-admin-people.png, handof
 route: More → Super Admin
 repo: src/components/admin/AdminLayout.tsx, AdminDashboard.tsx, AdminUsers.tsx, AdminRoles.tsx, AdminAudit.tsx, AdminOrganizations.tsx, AdminProjects.tsx, AdminModels.tsx, AdminUsage.tsx, adminUi.tsx
 status: landed
-accept: verify src/components/admin/AdminLayout.tsx,src/pages/admin/AdminDashboard.tsx,src/pages/admin/AdminUsers.tsx,src/pages/admin/AdminAudit.tsx
+accept: verify src/components/admin/AdminLayout.tsx,src/pages/admin/AdminDashboard.tsx,src/pages/admin/AdminUsers.tsx,src/pages/admin/AdminAudit.tsx,src/pages/admin/AdminUserAccess.tsx,src/components/admin/OrgAccessDrawer.tsx
 
 ### What it is
 Desktop is an eight-tab scrolling strip over eight tables. On a phone that is
@@ -1440,7 +1440,7 @@ shots: handoff/shots/33-docs.png, handoff/shots/34-docs-body.png
 route: About & Help → "Open the docs"
 repo: src/components/docs/registry.ts, DocsLayout.tsx, src/pages/help/docBodies.tsx
 status: landed · remaining (FINAL §2 — 1 table violation in docBodies.tsx)
-accept: verify src/components/docs/registry.ts,src/components/docs/DocsLayout.tsx,src/pages/help/docBodies.tsx
+accept: built  src/components/docs/registry.ts,src/components/docs/DocsLayout.tsx,src/pages/help/docBodies.tsx
 
 ### What it is
 All 21 real doc pages in their five real groups, with verbatim slugs, titles,
@@ -1547,7 +1547,7 @@ shot: handoff/shots/36-forbidden.png
 route: any denied destination (More → a page you cannot open)
 repo: src/pages/Forbidden.tsx
 status: landed
-accept: verify src/pages/Forbidden.tsx
+accept: built  src/pages/Forbidden.tsx
 
 ### What it is
 The `RoleGuard` denial. Small, but it is the screen a wrongly-provisioned user
