@@ -66,7 +66,7 @@ function App() {
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/integrations/orbit-mrp/callback" element={<ProtectedRoute><OrbitMrpCallback /></ProtectedRoute>} />
-              <Route path="/forbidden" element={<Forbidden />} />
+              <Route path="/forbidden" element={<Forbidden isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />} />
                 <Route path="/" element={<Landing />} />
                 <Route
                   path="/app"
@@ -203,7 +203,7 @@ function App() {
 
                 {/* Unknown URL — the host rewrites every path to index.html so the
                     SPA can deep-link, which means 404s land here, not on the host. */}
-                <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<NotFound isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />} />
               </Routes>
               </RouteErrorBoundary>
               {/* Own boundary: the bubble renders on every route, so a throw

@@ -299,6 +299,83 @@ gate('G', 'per-surface acceptance (agreed copy is in the code)', () => {
   };
 });
 
+// ── H · every app page is mounted in the mobile shell ───────────────────────
+// The failure this exists to prevent: GettingStarted.tsx rendered <Navbar>
+// directly instead of going through PageLayout, so the /app home route had the
+// desktop sidebar at every width and NO bottom tab bar, drawer or safe-area
+// reservation. The shell was correct and simply not mounted on the first screen
+// a user sees. No copy check or class check can see this — only "is this page
+// wrapped in the layout that owns the mobile chrome".
+//
+// PUBLIC_PAGES render deliberately without app chrome. Everything else under
+// src/pages must be shelled — either by importing PageLayout/AdminLayout
+// itself, or by being mounted inside a <PageLayout> route in App.tsx (which is
+// how the /help subtree works). The route case is VERIFIED against App.tsx, not
+// trusted to a list, and a page that is shelled by its route must NOT also wrap
+// itself — that would nest two shells.
+const PUBLIC_PAGES = [
+  'src/pages/Landing.tsx',          // marketing, no sidebar by design
+  'src/pages/Auth.tsx',             // sign-in
+  'src/pages/OrbitMrpCallback.tsx', // OAuth redirect target, no chrome
+  // About is public: it is linked from Landing for signed-out visitors and
+  // carries Landing's own top bar (logo -> "/", Log in, Get started) at every
+  // width, so a phone user reaching it from the drawer is not stranded. Move it
+  // OUT of this list if it ever loses that header.
+  'src/pages/About.tsx',
+];
+gate('H', 'every app page is mounted in the mobile shell', () => {
+  const norm = (p) => p.split(/[\\/]/).join('/');
+  const pages = SRC.filter((f) => /^src[\\/]pages[\\/].*\.tsx$/.test(f));
+  if (!pages.length) {
+    return { pass: true, warnOnly: true, detail: ['no src/pages/*.tsx found — is this the repo root?'], count: 'skipped' };
+  }
+
+  // Components a PARENT route shells for its children — the /help subtree:
+  //
+  //   <Route path="/help" element={<PageLayout …><DocsLayout/></PageLayout>}>
+  //     <Route index element={<HelpPage slug="overview"/>} />   <- shelled
+  //   </Route>
+  //
+  // so the children are exactly what sits between the element's </PageLayout>
+  // and that route's </Route>. A PageLayout route with no nested children
+  // contributes nothing, which is what we want.
+  const app = body('src/App.tsx');
+  const routeShelled = new Set();
+  for (const m of app.matchAll(/<\/PageLayout>/g)) {
+    const rest = app.slice(m.index + m[0].length);
+    const end = rest.indexOf('</Route>');
+    if (end < 0) continue;
+    for (const c of rest.slice(0, end).matchAll(/<([A-Z][A-Za-z0-9_]*)[\s/>]/g)) routeShelled.add(c[1]);
+  }
+
+  const bad = [], ok = [];
+  for (const f of pages) {
+    const src = body(f);
+    const rel = norm(f);
+    const isPublic = PUBLIC_PAGES.includes(rel);
+    const component = rel.split('/').pop().replace(/\.tsx$/, '');
+    // A page that renders the desktop sidebar itself is wrong even if it also
+    // imports PageLayout — the sidebar must come from the layout, behind md:.
+    if (/<Navbar[\s/>]/.test(src)) {
+      bad.push(`${rel} — renders <Navbar> directly. The sidebar must come from PageLayout (which hides it below md); a page that mounts it itself shows the desktop sidebar on every phone.`);
+      continue;
+    }
+    const hasLayout = /\b(PageLayout|AdminLayout)\b/.test(src);
+    const byRoute = routeShelled.has(component) && !isPublic;
+    if (byRoute && hasLayout) {
+      bad.push(`${rel} — App.tsx already mounts <${component}> inside a <PageLayout> route AND the page wraps itself. Two shells nest two tab bars and two credit bars; drop one.`);
+      continue;
+    }
+    if (isPublic || hasLayout || byRoute) { ok.push(rel); continue; }
+    bad.push(`${rel} — imports neither PageLayout nor AdminLayout and is not mounted inside a <PageLayout> route, so it renders with no tab bar, no drawer and no safe-area reservation. A user who lands here on a phone has no navigation at all.`);
+  }
+  return {
+    pass: bad.length === 0,
+    detail: bad,
+    count: `${ok.length}/${pages.length} pages shelled`,
+  };
+});
+
 // ── report ───────────────────────────────────────────────────────────────────
 const W = 74;
 console.log('');
@@ -320,7 +397,8 @@ for (const g of gates) {
 console.log('─'.repeat(W));
 console.log(`${gates.length - failed - warned} ok · ${warned} to review · ${failed} failing`);
 console.log('');
-console.log('Gates A-F are the code contract. Gate G is the design contract.');
+console.log('Gates A-F are the code contract. G is the design contract. H is the');
+console.log('shell contract: an unshelled page has no navigation at all on a phone.');
 console.log('');
 console.log('Gate G in triage: each "triage" line is a worklist for one surface.');
 console.log('Work it down, then flip that entry\'s accept: verify -> built in PAGES.md.');
