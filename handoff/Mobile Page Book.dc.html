@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="ds-tokens.css">
+<style>
+  :root { color-scheme: only light; }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: #f1f1f2; color: #171717; font-family: Inter, system-ui, sans-serif; letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; }
+  a { color: #171717; }
+  a:hover { color: #525252; }
+  img { display: block; }
+</style>
+</helmet>
+
+<div style="max-width:1180px;margin:0 auto;padding:clamp(18px,3.4vw,44px) clamp(14px,3vw,34px) 80px;display:flex;flex-direction:column;gap:22px;">
+
+  <header style="display:flex;flex-direction:column;gap:11px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b6b6b;">SuReSuite mobile · design record</div>
+    <h1 style="margin:0;font-size:clamp(25px,3.6vw,36px);font-weight:600;letter-spacing:-0.024em;text-wrap:balance;">The page book</h1>
+    <p style="margin:0;max-width:72ch;font-size:15px;line-height:1.65;color:#525252;text-wrap:pretty;">Every mobile surface in the prototype, one entry each: what it is, what the phone layout does differently and why, how to build it in the repo, and how to open it in the demo. The text lives in <span style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#f0f0f0;border-radius:3px;padding:1px 5px;">handoff/PAGES.md</span> — this page renders it, one entry at a time.</p>
+  </header>
+
+  <div style="display:flex;flex-wrap:wrap;gap:5px;">
+    <sc-for list="{{ index }}" as="ix" hint-placeholder-count="25">
+      <button type="button" onClick="{{ ix.onClick }}" style="{{ ix.style }}">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;opacity:0.6;">{{ ix.num }}</span>
+        <span>{{ ix.title }}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ loadError }}" hint-placeholder-val="{{ false }}">
+    <div style="border:1px solid rgba(191,35,48,0.3);background:rgba(191,35,48,0.06);border-radius:4px;padding:14px 16px;font-size:14px;line-height:1.6;color:#8f1a24;">{{ loadError }}</div>
+  </sc-if>
+
+  <article style="border:1px solid #d4d4d4;border-radius:4px;background:#fff;overflow:hidden;">
+
+    <div style="display:flex;align-items:baseline;gap:11px;padding:15px clamp(14px,2.4vw,22px);border-bottom:1px solid #ebebeb;background:#fafafa;">
+      <span style="flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.08em;color:#8a8a8a;">{{ pageNum }}</span>
+      <h2 style="margin:0;min-width:0;flex:1;font-size:clamp(18px,2.4vw,22px);font-weight:600;letter-spacing:-0.019em;">{{ pageTitle }}</h2>
+      <span style="{{ statusStyle }}">{{ pageStatus }}</span>
+    </div>
+
+    <div style="{{ bodyGridStyle }}">
+
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-content:flex-start;">
+        <sc-if value="{{ hasShots }}" hint-placeholder-val="{{ false }}">
+          <sc-for list="{{ shots }}" as="sh" hint-placeholder-count="0">
+            <div role="img" aria-label="{{ sh.alt }}" style="{{ sh.style }}"></div>
+          </sc-for>
+        </sc-if>
+      </div>
+
+      <div style="min-width:0;display:flex;flex-direction:column;gap:16px;">
+
+        <div style="display:flex;flex-direction:column;gap:1px;background:#ebebeb;border:1px solid #ebebeb;border-radius:4px;overflow:hidden;">
+          <sc-for list="{{ meta }}" as="m" hint-placeholder-count="3">
+            <div style="display:flex;gap:10px;background:#fff;padding:8px 11px;">
+              <span style="flex-shrink:0;width:58px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8a8a8a;padding-top:2px;">{{ m.k }}</span>
+              <span style="min-width:0;flex:1;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.55;color:#525252;overflow-wrap:anywhere;">{{ m.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-for list="{{ sections }}" as="s" hint-placeholder-count="4">
+          <section style="display:flex;flex-direction:column;gap:9px;">
+            <h3 style="margin:0;font-size:13.5px;font-weight:600;letter-spacing:-0.01em;">{{ s.head }}</h3>
+            <sc-for list="{{ s.blocks }}" as="b" hint-placeholder-count="2">
+
+              <sc-if value="{{ b.isText }}" hint-placeholder-val="{{ true }}">
+                <p style="margin:0;max-width:74ch;font-size:14px;line-height:1.68;color:#3f3f3f;text-wrap:pretty;">
+                  <sc-for list="{{ b.runs }}" as="r" hint-placeholder-count="2">
+                    <span style="{{ r.style }}">{{ r.text }}</span>
+                  </sc-for>
+                </p>
+              </sc-if>
+
+              <sc-if value="{{ b.isList }}" hint-placeholder-val="{{ false }}">
+                <ul style="margin:0;padding-left:17px;display:flex;flex-direction:column;gap:7px;max-width:74ch;">
+                  <sc-for list="{{ b.items }}" as="it" hint-placeholder-count="3">
+                    <li style="font-size:14px;line-height:1.62;color:#3f3f3f;text-wrap:pretty;">
+                      <sc-for list="{{ it.runs }}" as="r" hint-placeholder-count="2">
+                        <span style="{{ r.style }}">{{ r.text }}</span>
+                      </sc-for>
+                    </li>
+                  </sc-for>
+                </ul>
+              </sc-if>
+
+              <sc-if value="{{ b.isTable }}" hint-placeholder-val="{{ false }}">
+                <div style="overflow-x:auto;border:1px solid #ebebeb;border-radius:4px;">
+                  <table style="border-collapse:collapse;width:100%;font-size:13px;">
+                    <thead>
+                      <tr style="background:#fafafa;">
+                        <sc-for list="{{ b.head }}" as="th" hint-placeholder-count="2">
+                          <th style="text-align:left;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;font-weight:500;color:#8a8a8a;padding:8px 12px;border-bottom:1px solid #ebebeb;white-space:nowrap;">{{ th.text }}</th>
+                        </sc-for>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ b.rows }}" as="tr" hint-placeholder-count="3">
+                        <tr>
+                          <sc-for list="{{ tr.cells }}" as="td" hint-placeholder-count="2">
+                            <td style="padding:9px 12px;border-bottom:1px solid #f4f4f4;font-size:13px;line-height:1.55;color:#3f3f3f;vertical-align:top;">
+                              <sc-for list="{{ td.runs }}" as="r" hint-placeholder-count="1">
+                                <span style="{{ r.style }}">{{ r.text }}</span>
+                              </sc-for>
+                            </td>
+                          </sc-for>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+              </sc-if>
+
+            </sc-for>
+          </section>
+        </sc-for>
+
+        <div style="display:flex;gap:8px;padding-top:6px;border-top:1px solid #ebebeb;">
+          <button type="button" onClick="{{ goPrev }}" style="{{ prevStyle }}">← {{ prevLabel }}</button>
+          <span style="flex:1;"></span>
+          <button type="button" onClick="{{ goNext }}" style="{{ nextStyle }}">{{ nextLabel }} →</button>
+        </div>
+
+      </div>
+    </div>
+  </article>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180}}">
+class Component extends DCLogic {
+  state = { md: null, err: null, sel: 0 };
+
+  componentDidMount() { this.load(); }
+
+  // The book must work both at the project root (PAGES.md is under handoff/) and
+  // from inside handoff/ itself, so a zipped handoff/ folder is self-contained.
+  // Resolve by trying both, and remember which won so the shot paths match.
+  async load(attempt) {
+    const n = attempt || 1;
+    const candidates = ['handoff/PAGES.md', 'PAGES.md', './PAGES.md'];
+    try {
+      let res = null, used = null;
+      for (const c of candidates) {
+        try {
+          const r = await fetch(c, { cache: 'no-store' });
+          if (r.ok) { res = r; used = c; break; }
+        } catch (_) { /* try the next candidate */ }
+      }
+      if (!res) throw new Error('PAGES.md not found at ' + candidates.join(' or '));
+      // Shot paths in PAGES.md are written as handoff/shots/... . If we loaded
+      // PAGES.md from the current directory, we are inside handoff/ and the
+      // prefix has to come off.
+      this._stripPrefix = used !== 'handoff/PAGES.md';
+      this.setState({ md: await res.text(), err: null });
+    } catch (e) {
+      // A cold reload can lose the fetch once; retry twice before reporting,
+      // so a transient miss doesn't leave the book blank.
+      if (n < 3) {
+        setTimeout(() => this.load(n + 1), 400 * n);
+        return;
+      }
+      this.setState({ err: 'Could not load handoff/PAGES.md — ' + e.message + ' (3 attempts)' });
+    }
+  }
+
+  runs(text) {
+    const out = [];
+    // Order matters: ** must be tried before * or bold splits into two italics.
+    const re = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*)/g;
+    let last = 0, m;
+    const STYLE = {
+      code: "font-family:'JetBrains Mono',monospace;font-size:0.88em;background:#f0f0f0;border-radius:3px;padding:1px 4px;color:#171717;overflow-wrap:anywhere;",
+      bold: 'font-weight:600;color:#171717;',
+      // §2: the serif italic accent is the product's one typographic flourish —
+      // the book quotes those accents, so it has to render them.
+      italic: "font-family:ui-serif,Georgia,'Times New Roman',serif;font-style:italic;font-size:1.04em;color:#171717;",
+    };
+    const push = (t, kind) => { if (t) out.push({ text: t, style: kind ? STYLE[kind] : '' }); };
+    while ((m = re.exec(text))) {
+      push(text.slice(last, m.index));
+      const tok = m[0];
+      if (tok.startsWith('`')) push(tok.slice(1, -1), 'code');
+      else if (tok.startsWith('**')) push(tok.slice(2, -2), 'bold');
+      else push(tok.slice(1, -1), 'italic');
+      last = m.index + tok.length;
+    }
+    push(text.slice(last));
+    return out.length ? out : [{ text, style: '' }];
+  }
+
+  parse(md) {
+    const lines = md.split('\n');
+    const pages = [];
+    let page = null, section = null, para = [], list = null, table = null;
+
+    // Before the first `##`, the preamble belongs to the intro entry — so the
+    // fallback is the intro's lead, never null. Returning null here was what
+    // silently discarded the whole "How to read this" entry.
+    const target = () => {
+      if (section) return section.blocks;
+      if (page) { page.lead = page.lead || []; return page.lead; }
+      intro.lead = intro.lead || [];
+      return intro.lead;
+    };
+    const flushPara = () => {
+      const text = para.join(' ').trim();
+      para = [];
+      const t = target();
+      if (!text || !t) return;
+      t.push({ isText: true, isList: false, isTable: false, runs: this.runs(text) });
+    };
+    const flushList = () => {
+      if (!list) return;
+      const items = list.map((s) => ({ runs: this.runs(s) }));
+      list = null;
+      const t = target();
+      if (t) t.push({ isText: false, isList: true, isTable: false, items });
+    };
+    const flushTable = () => {
+      if (!table) return;
+      const rows = table.filter((r) => !/^[\s|:-]+$/.test(r));
+      table = null;
+      // Table cells carry inline markdown too — **bold** and `code` — so they
+      // go through the same run splitter as prose, not out as raw text.
+      const cells = (r) => r.replace(/^\||\|$/g, '').split('|')
+        .map((c) => ({ text: c.trim(), runs: this.runs(c.trim()) }));
+      const t = target();
+      if (t) {
+        t.push({
+          isText: false, isList: false, isTable: true,
+          head: rows.length ? cells(rows[0]) : [],
+          rows: rows.slice(1).map((r) => ({ cells: cells(r) })),
+        });
+      }
+    };
+    const flushAll = () => { flushPara(); flushList(); flushTable(); };
+
+    const intro = { num: '00', title: 'How to read this', shots: [], meta: [], sections: [], lead: null, status: 'start here' };
+
+    lines.forEach((raw) => {
+      const line = raw.replace(/\s+$/, '');
+      if (/^#\s/.test(line)) return;
+      if (/^---+$/.test(line)) { flushAll(); return; }
+
+      if (/^##\s/.test(line)) {
+        flushAll();
+        const heading = line.replace(/^##\s+/, '');
+        const parts = heading.split(/\s+·\s+/);
+        const isNum = /^\d+$/.test(parts[0]);
+        page = {
+          num: isNum ? parts[0] : '—',
+          title: parts.length > 1 ? parts.slice(1).join(' · ') : heading,
+          shots: [], meta: [], sections: [], lead: null, status: '',
+        };
+        pages.push(page);
+        section = null;
+        return;
+      }
+
+      if (/^###\s/.test(line)) {
+        flushAll();
+        section = { head: line.replace(/^###\s+/, ''), blocks: [] };
+        (page || intro).sections.push(section);
+        return;
+      }
+
+      const meta = page && !section && line.match(/^(shot|shots|route|repo|status):\s*(.+)$/);
+      if (meta) {
+        flushAll();
+        const k = meta[1], v = meta[2];
+        if (k === 'shot' || k === 'shots') {
+          v.split(',').map((s) => s.trim()).filter(Boolean).forEach((src) => {
+            // The screenshot rides in a background-image style hole rather than
+            // an <img src>: a literal src in the template is parsed out of the
+            // stream before values exist and fires a 404 for "{{ sh.src }}".
+            // role="img" + aria-label keeps the accessible name.
+            const url = this._stripPrefix ? src.replace(/^handoff\//, '') : src;
+            page.shots.push({
+              src: url,
+              alt: page.title + ' — ' + src.split('/').pop(),
+              // Every shot is 472×926 (verified across all 39), so cover fits
+              // exactly — no letterbox, no crop.
+              style: 'flex:0 0 auto;width:236px;aspect-ratio:472/926;border:1px solid #e0e0e3;'
+                + 'border-radius:6px;background-color:#f1f1f2;background-repeat:no-repeat;'
+                + 'background-position:top center;background-size:cover;'
+                + "background-image:url('" + url.replace(/'/g, "\\'") + "');",
+            });
+          });
+        } else {
+          page.meta.push({ k, v });
+          if (k === 'status') page.status = v.replace(/\*\*/g, '').replace(/`/g, '');
+        }
+        return;
+      }
+
+      if (/^\|/.test(line)) { flushPara(); flushList(); (table = table || []).push(line); return; }
+      if (/^[-*]\s/.test(line)) { flushPara(); flushTable(); (list = list || []).push(line.replace(/^[-*]\s+/, '')); return; }
+      if (!line.trim()) { flushAll(); return; }
+      if (list) { list[list.length - 1] += ' ' + line.trim(); return; }
+      flushTable();
+      para.push(line.trim());
+    });
+    flushAll();
+
+    const all = [intro].concat(pages);
+    all.forEach((pg) => {
+      if (pg.lead && pg.lead.length) pg.sections.unshift({ head: pg === intro ? '' : 'Summary', blocks: pg.lead });
+      pg.status = pg.status || 'see entry';
+    });
+    return all;
+  }
+
+  statusStyleFor(v) {
+    const base = "flex-shrink:0;max-width:min(46%,340px);text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.5;letter-spacing:0.06em;text-transform:uppercase;border-radius:3px;padding:3px 7px;";
+    if (/remaining|defect|mixed/i.test(v)) return base + 'border:1px solid rgba(224,147,11,0.35);background:rgba(224,147,11,0.09);color:#92400e;';
+    if (/^n\/a/i.test(v)) return base + 'border:1px solid #e0e0e3;background:#f4f4f5;color:#6b6b6b;';
+    if (/landed/i.test(v)) return base + 'border:1px solid rgba(20,184,196,0.3);background:rgba(20,184,196,0.08);color:#0f8f99;';
+    return base + 'border:1px solid #e0e0e3;background:#fafafa;color:#6b6b6b;';
+  }
+
+  renderVals() {
+    const md = this.state.md;
+    // The cache key carries a version because a hot-reloaded logic class keeps
+    // its instance state: without this, editing parse()/runs() leaves the old
+    // parse in place and the edit looks like it did nothing. Bump on any change
+    // to parse() or runs().
+    const key = 'v4::' + md;
+    if (md && this._md !== key) { this._md = key; this._pages = this.parse(md); }
+    const pages = md ? this._pages : [];
+    const sel = Math.max(0, Math.min(this.state.sel, pages.length - 1));
+    const page = pages[sel] || { num: '', title: '', shots: [], meta: [], sections: [], status: '' };
+    const prev = pages[sel - 1], next = pages[sel + 1];
+    const btn = (on) => 'display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 10px;border-radius:4px;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;'
+      + (on ? 'border:1px solid #171717;background:#171717;color:#fff;' : 'border:1px solid #e0e0e3;background:#fff;color:#171717;');
+    const navBtn = (enabled) => 'min-height:40px;padding:0 13px;border-radius:4px;font:inherit;font-size:13.5px;font-weight:500;'
+      + (enabled ? 'border:1px solid #d4d4d4;background:#fff;color:#171717;cursor:pointer;' : 'border:1px solid #ebebeb;background:#fafafa;color:#c4c4c4;cursor:default;');
+
+    return {
+      loadError: this.state.err,
+      index: pages.map((p, i) => ({
+        num: p.num, title: p.title, style: btn(i === sel),
+        onClick: () => { this.setState({ sel: i }); if (typeof window !== 'undefined') window.scrollTo(0, 0); },
+      })),
+      pageNum: page.num,
+      pageTitle: page.title,
+      pageStatus: page.status,
+      statusStyle: this.statusStyleFor(page.status || ''),
+      hasShots: page.shots.length > 0,
+      shots: page.shots,
+      meta: page.meta,
+      sections: page.sections,
+      bodyGridStyle: page.shots.length
+        ? 'display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(16px,2.4vw,26px);padding:clamp(14px,2.4vw,22px);align-items:start;'
+          + (page.shots.length === 1 ? '' : '')
+        : 'display:block;padding:clamp(14px,2.4vw,22px);',
+      prevLabel: prev ? prev.title : 'Start',
+      nextLabel: next ? next.title : 'End',
+      prevStyle: navBtn(!!prev),
+      nextStyle: navBtn(!!next),
+      goPrev: () => { if (prev) { this.setState({ sel: sel - 1 }); window.scrollTo(0, 0); } },
+      goNext: () => { if (next) { this.setState({ sel: sel + 1 }); window.scrollTo(0, 0); } },
+    };
+  }
+}
+
+</script>
+</body>
+</html>
