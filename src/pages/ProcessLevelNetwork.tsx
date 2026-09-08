@@ -34,9 +34,12 @@ import {
   Search,
   AlertTriangle,
   Tag,
+  ChevronRight,
+  Info,
 } from 'lucide-react';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
+import MLPrediction from '@/components/MLPrediction';
 import { BarChart } from 'lucide-react';
 
 // Colors for integrated process network - left to right flow (Level 6 Suppliers → Customer)
@@ -1041,6 +1044,32 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
   }, []);
   const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
 
+  const mobileProcessMetrics = useMemo(() => {
+    const totalNodes = allNodes.length;
+    const networkDepth = Object.keys(levelCounts).length;
+    // Bottlenecks: level-1 nodes in the top flow list (manufacturing / assembly steps)
+    const bottlenecks = topFlowNodes.filter(n => n.level === 1).length;
+    // Path concentration: HHI of flow volumes across top-flow nodes
+    const flows = topFlowNodes.map(n => n.flow);
+    const totalFlow = flows.reduce((s, f) => s + f, 0);
+    let pathConc = 0;
+    if (totalFlow > 0) flows.forEach(f => { const s = f / totalFlow; pathConc += s * s; });
+    // Top bottleneck node
+    const topL1 = [...topFlowNodes].filter(n => n.level === 1).sort((a, b) => b.flow - a.flow)[0];
+    const topL1Node = topL1 ? allNodes.find(n => n.id === topL1.id) : null;
+    // Resilience: use path concentration as HHI proxy, no SPOF heuristic from flow
+    const resilience = 0.4 + 0.3 * (1 - pathConc) + 0.3 * (1 - Math.min(pathConc, 1));
+    return {
+      totalNodes,
+      networkDepth,
+      bottlenecks,
+      pathConcentration: totalFlow > 0 ? pathConc.toFixed(3) : '—',
+      resilience: totalFlow > 0 ? resilience.toFixed(3) : '—',
+      resilienceRed: totalFlow > 0 && resilience < 0.4,
+      topBottleneckName: topL1Node?.data?.label ?? null,
+    };
+  }, [allNodes, levelCounts, topFlowNodes]);
+
   // Create summary for subtitle  
   const nodeTypeCounts = Object.entries(nodes.reduce((acc, node) => {
     const type = node.data?.nodeType || 'unknown';
@@ -1216,7 +1245,138 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           }
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* ── Mobile composition (md:hidden) ── */}
+        <div className="md:hidden space-y-6 mt-4">
+
+          {/* Lens chip */}
+          <span className="inline-flex items-center gap-1 rounded-sm bg-teal-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+            Process level
+          </span>
+
+          {/* How to read this */}
+          <details className="group border-b border-border pb-3">
+            <summary className="flex cursor-pointer items-center justify-between text-sm font-medium select-none">
+              How to read this
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+            </summary>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Nodes represent process steps, materials, and products flowing left to right. Level 1 nodes are manufacturing or assembly steps. High flow volume through a single node indicates a potential bottleneck that constrains the critical path.
+            </p>
+          </details>
+
+          {/* Desktop-only notice */}
+          <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <Info className="inline-block h-3.5 w-3.5 mr-1 shrink-0 align-text-bottom" />
+            The 3D network space is desktop-only. Open on a larger screen to explore the interactive graph.
+          </p>
+
+          {/* Network structure */}
+          <section>
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Network structure</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Nodes', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.totalNodes) : '—' },
+                { label: 'Network depth', value: mobileProcessMetrics.networkDepth > 0 ? String(mobileProcessMetrics.networkDepth) : '—' },
+                { label: 'Critical path', value: '—' },
+                {
+                  label: 'Resilience',
+                  value: mobileProcessMetrics.resilience,
+                  red: mobileProcessMetrics.resilienceRed,
+                },
+              ].map(({ label, value, red }) => (
+                <div key={label} className="rounded-sm border border-border p-3">
+                  <p className={`text-xl font-semibold tabular-nums ${red ? 'text-destructive' : ''}`}>{value}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Structural risk */}
+          <section>
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Structural risk</p>
+            <div className="divide-y divide-border rounded-sm border border-border">
+              {[
+                { label: 'Critical path', value: '—' },
+                { label: 'Bottlenecks', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.bottlenecks) : '—' },
+                { label: 'Utilisation headroom', value: '—' },
+                { label: 'Path concentration', value: mobileProcessMetrics.pathConcentration },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between px-3 py-2">
+                  <span className="text-sm text-muted-foreground">{label}</span>
+                  <span className="text-sm font-semibold tabular-nums">{value}</span>
+                </div>
+              ))}
+            </div>
+            {mobileProcessMetrics.bottlenecks > 0 && mobileProcessMetrics.topBottleneckName && (
+              <div className="mt-2 flex items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                <p className="text-xs text-destructive">
+                  {mobileProcessMetrics.topBottleneckName} is the highest-flow assembly step and may constrain the critical path.
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Centrality table */}
+          <section>
+            <div className="mb-2 flex items-baseline justify-between">
+              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Centrality</p>
+              <span className="text-[10px] text-muted-foreground">swipe →</span>
+            </div>
+            <div className="overflow-x-auto rounded-sm border border-border">
+              <table className="w-full min-w-[400px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="sticky left-0 z-[1] bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Node</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Type</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Flow</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">In</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Out</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {topFlowNodes.length === 0 ? (
+                    <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">No data — select a project</td></tr>
+                  ) : (
+                    topFlowNodes.slice(0, 20).map(n => {
+                      const node = allNodes.find(an => an.id === n.id);
+                      const label = node?.data?.label ?? n.id;
+                      const displayType = getDisplayNodeType(n.level);
+                      const inCount = (node?.data?.incoming as number) ?? 0;
+                      const outCount = (node?.data?.outgoing as number) ?? 0;
+                      return (
+                        <tr key={n.id}>
+                          <td className="sticky left-0 z-[1] bg-background px-3 py-2 font-medium max-w-[120px] truncate" title={String(label)}>{String(label)}</td>
+                          <td className="px-3 py-2 text-muted-foreground capitalize text-xs">{displayType}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{n.flow.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{inCount}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{outCount}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Nexus Node Prediction */}
+          <section
+            aria-label="Nexus Node Prediction — Processing predictions… This may take a few minutes for large datasets."
+          >
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Nexus Node Prediction</p>
+            <MLPrediction selectedPlant={
+              globalSelectedProjectId
+                ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
+                : null
+            } />
+          </section>
+
+        </div>
+        {/* ── End mobile composition ── */}
+
+        <div className="hidden md:grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main network view */}
           <div className="lg:col-span-3">
             <Card className="h-[800px]">
@@ -1411,6 +1571,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           </div>
         </div>
 
+        <div className="hidden md:block">
         {showAnalytics && (
           <div className="mt-6 space-y-6">
 
@@ -1539,6 +1700,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
           </div>
         )}
+        </div>
 
         <DisruptionDialog
           open={disruptionDialogOpen}
