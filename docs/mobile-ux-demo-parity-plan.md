@@ -131,7 +131,7 @@ The repo already has the landed precedent —
 
 | File : line | Literal to preserve |
 |---|---|
-| `SimulationLab.tsx:290` | `200px` |
+| `SimulationLab.tsx:290` | `200px` · ✅ done (G10) |
 | `ProcessLevelNetwork.tsx:1153` | `160px` |
 | `ProcessLevelNetwork.tsx:1233` | `180px` |
 | `FirmLevelNetwork.tsx:1193` | `180px` |
@@ -146,7 +146,8 @@ floor to its slot, and a second one double-pads the header.
 
 `sim/ExperimentDesigner.tsx:279` (160px) · `:337` (260px) ·
 `sim/PlaybookPicker.tsx:55` (220px) · `sim/ReplicationSeedExplorer.tsx:80`
-(210px, inside `cn()`).
+(210px, inside `cn()`). **Both ✅ done (G10);** `ExperimentDesigner.tsx` is
+imported by nothing and was left alone.
 
 Where a Case B select sits in a flex row beside a label, that row also needs
 `flex-col items-stretch md:flex-row md:items-center`.
@@ -290,6 +291,65 @@ and follows it when the bar is dismissed. Nothing else reads the variable.
 sub-44px control on any of the mobile surfaces, no console or page errors, `tsc`
 clean, `audit-adaptive-ui --all` unchanged at 7.
 
+
+### G10 — Simulation Lab was never taken past its rail · ✅ **done, mobile only**
+
+`PAGES.md` entry 14 records this screen as *"shell landed · rail remaining"*,
+and the rail did land — `StageRail` scrolls its five stage cards below `md` and
+centres the active one. Everything **behind** those five cards did not. Measured
+in Chromium against the real components, at 320px:
+
+| # | Defect | Measured |
+|---|---|---|
+| G10.1 | Tables clipped, not scrolled — `TableShell` and `ParameterCard` are `overflow-hidden` | KPI summary 576px in 292px · comparison 595px in 292px · recovery impact 360px in 292px · Run window 409px in a **131px** card · Precision 472px in **152px** · Objective 517px in 294px |
+| G10.2 | `RunProgressPanel`'s header pushed the document sideways | `scrollWidth` 471 at 320, 474 at 414, **778 at 768** |
+| G10.3 | `ScenarioLibraryPanel` is a fixed 420px sheet | renders at `left:-93` — 93px permanently off-screen |
+| G10.4 | `DisruptionScheduleEditor`'s six fields share 12 columns | 31px per input |
+| G10.5 | `GateBar` truncates the blocked-run reason | §3.1 never-truncate list |
+| G10.6 | 60+ controls under the 44px floor across all five panes | now 0 |
+
+**What shipped.** Reflows only — no recomposition, no new component tree. Every
+change is a mobile value with `md:` restoring the existing literal. The clipped
+tables scroll with the identifying column frozen (`FROZEN_CELL_ON_TINT`) and
+carry the swipe affordance; the two parameter cards stack; the run header and
+the gate bar wrap; the library sheet clamps to the viewport; the playbook save
+dialog uses `DIALOG_AS_SHEET`; the schedule editor is two columns below `md`.
+G3's three Lab selects (`SimulationLab.tsx:290`, `PlaybookPicker.tsx:55`,
+`ReplicationSeedExplorer.tsx:80`) closed with it.
+
+**Two desktop regressions were introduced and caught only by measuring at 1280**,
+both worth knowing:
+
+1. A scroll wrapper around a table that held `flex-1` **takes** that `flex-1`,
+   so the card's surplus height stopped being shared across its rows.
+   `md:contents` removes the wrapper from desktop layout entirely.
+2. `FROZEN_CELL` carries `md:bg-transparent`, which stripped the parameter
+   grid's provenance rows of their `#fffdf7` tint above `md` — the same class
+   of defect G9 recorded on the ledger `TH`. A cell that already carries an
+   opaque fill wants `FROZEN_CELL_ON_TINT`.
+
+**Verified.** 320 / 360 / 375 / 390 / 414 / 768 / 1280 plus landscape 874x402,
+across five panes and the empty, loading, no-project, no-scenario, no-run,
+queued, running, failed, blocked-gate, warn-only, clear-gate, dirty-policy and
+long-text states, and behind every control: the library sheet, the stress-test
+drawer, the save dialog, the mapping report and all five Select popovers. No
+horizontal overflow and no sub-44px control anywhere below `md`. **Desktop
+proved rather than asserted: 21 full-page screenshots at 1280 are byte-identical
+by SHA-256 to `main`.** `audit-adaptive-ui` clean with the baseline unchanged at
+7; `tsc` unchanged at 7 pre-existing errors; `eslint` on the changed file set
+identical to `main`; every rendered number identical at 320 and 1280.
+
+**Not done, and why.** The `Dialog`/`Sheet` primitive's close button is 16x16 —
+a global control on ~40 surfaces, so raising it is a cross-page change that
+cannot be verified inside one page. The scenario row is a `div` with an
+`onClick` and so is not keyboard reachable; making it a real control is a
+behaviour change. `CredibilityBadge` and the per-replication cells explain
+themselves only through hover (`title` / tooltip), which is inert on touch —
+also behaviour. The demo's Lab copy ("No disruption schedule yet — this project
+has no network to disrupt", "swipe →", "Ask the AI about this run") was **not**
+ported: changing product strings is not a reflow, and §6 forbids copy that
+differs between platforms, so it needs one decision covering both.
+
 ---
 
 ## 4. Sequence
@@ -304,6 +364,7 @@ riskiest visual change lands last and alone.
 | **3** | **Bulk edit sheet** — G4 | `BulkEditDialog.tsx` | Low. Shell swap, logic untouched |
 | **4** | **More panel** — G6 | `MobileNav.tsx` | Medium. Re-layout; keep the tab bar visible |
 | **5** | **Getting Started** — G5 | `GettingStarted.tsx`, `home/MobileGettingStarted.tsx` | ✅ **done** — see §5 |
+| **7** | **Simulation Lab** — G10 | `resultTables.tsx`, `ParameterCard.tsx`, `ScenarioSetupForm.tsx`, `RunGate.tsx`, `RunProgressPanel.tsx`, `PreRunValidationPanel.tsx`, `DisruptionScheduleEditor.tsx`, `DisruptionRecoveryPane.tsx`, `PlaybookPicker.tsx`, `PlaybookSaveDialog.tsx`, `ScenarioLibraryPanel.tsx`, `ScenarioRail.tsx`, `CompareScenariosPanel.tsx`, `ReplicationSeedExplorer.tsx`, `ItemSeriesExplorer.tsx`, `ResultsDashboard.tsx`, `UtilizationHeatmap.tsx`, `SimulationLab.tsx` | ✅ **done** — see G10. Low: reflow only, all `md:`-released |
 | **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
