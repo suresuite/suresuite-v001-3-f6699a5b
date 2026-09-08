@@ -24,6 +24,8 @@ import {
   MapPin,
   Layers3,
   Share2,
+  Menu,
+  X,
 } from 'lucide-react';
 
 // Canonical micro-label style — the only uppercase label treatment on this page.
@@ -252,6 +254,7 @@ export default function Landing() {
   const { user, loading } = useAuth();
   const { homePath } = useCapabilities();
   const [activeTech, setActiveTech] = useState<TechKey>('network');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   if (loading) {
     return (
@@ -281,24 +284,66 @@ export default function Landing() {
             />
           </Link>
           <nav className="flex items-center gap-1 md:gap-2">
-            <Button asChild variant="ghost" size="sm" className="h-11 md:h-8">
+            {/* Desktop-only links */}
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/about">About</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <a href="#video">Demo</a>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/help">Docs</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/auth">Log in</Link>
             </Button>
-            <Button asChild size="sm" className="h-11 whitespace-nowrap md:h-8">
+            <Button asChild size="sm" className="hidden whitespace-nowrap md:inline-flex md:h-8">
               <Link to="/auth">Get started</Link>
             </Button>
+            {/* Mobile: Log in + hamburger */}
+            <Button asChild variant="outline" size="sm" className="h-11 whitespace-nowrap md:hidden">
+              <Link to="/auth">Log in</Link>
+            </Button>
+            <button
+              aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              title={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              onClick={() => setMobileNavOpen((o) => !o)}
+              className="grid h-11 w-11 place-items-center rounded-sm border border-border bg-card md:hidden"
+            >
+              {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </nav>
         </div>
       </header>
+
+      {/* Mobile nav drawer */}
+      {mobileNavOpen && (
+        <div className="sticky top-14 z-30 border-b border-border bg-background/95 backdrop-blur md:hidden">
+          <div className="mx-auto flex max-w-6xl flex-col px-5">
+            <Link
+              to="/about"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex min-h-11 items-center border-b border-border/60 text-sm font-medium"
+            >
+              About
+            </Link>
+            <a
+              href="#video"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex min-h-11 items-center border-b border-border/60 text-sm font-medium"
+            >
+              Demo
+            </a>
+            <Link
+              to="/help"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex min-h-11 items-center text-sm font-medium"
+            >
+              Docs
+            </Link>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1">
         {/* Hero */}
@@ -309,7 +354,7 @@ export default function Landing() {
             <span className="inline-flex items-center rounded-sm border border-border bg-card px-3 py-1.5">
               <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#BF2330]" />
               <span className={KICKER}>
-                <span className="sm:hidden">Supply chain resilience</span>
+                <span className="sm:hidden">Resilience-grade simulator</span>
                 <span className="hidden sm:inline">Resilience-grade supply chain simulator</span>
               </span>
             </span>
@@ -324,8 +369,9 @@ export default function Landing() {
               <p className="mt-5 max-w-xl text-[16px] leading-[1.62] text-muted-foreground text-pretty
                             md:mt-7 md:text-lg md:leading-relaxed">
                 Build a digital twin of your network, run rigorous experiments, and pick
-                the strategy that holds up under pressure — from data import to
-                side-by-side comparison, in one workspace.
+                the strategy that holds up under pressure
+                <span className="hidden md:inline"> — from data import to
+                side-by-side comparison, in one workspace</span>.
               </p>
               <div className="mt-6 flex flex-col gap-2.5 md:mt-8 md:flex-row md:flex-wrap md:items-center md:gap-3">
                 <Button asChild size="lg" className="group h-12 w-full rounded-sm md:w-auto">
