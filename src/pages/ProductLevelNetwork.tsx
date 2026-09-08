@@ -1,5 +1,5 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -33,6 +33,8 @@ import {
   RotateCcw,
   AlertTriangle,
   Map as MapIcon,
+  ChevronRight,
+  Info,
 } from 'lucide-react';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import MLPrediction from '@/components/MLPrediction';
@@ -839,6 +841,29 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
   }, []);
   const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
 
+  const mobileProductMetrics = useMemo(() => {
+    const totalNodes = (groupCounts.A || 0) + (groupCounts.B || 0) + (groupCounts.C || 0) + (groupCounts.D || 0);
+    const networkDepth = ['A', 'B', 'C', 'D'].filter(k => (groupCounts[k as GroupKey] || 0) > 0).length;
+    const totalVolume = supplierVolumes.reduce((s, v) => s + v.volume, 0);
+    let hhi = 0;
+    if (totalVolume > 0) supplierVolumes.forEach(v => { const s = v.volume / totalVolume; hhi += s * s; });
+    const peakBetweenness = networkMetrics.reduce((m, n) => Math.max(m, n.prominence ?? 0), 0);
+    const nexusMaterials = networkMetrics.filter(n => (n.prominence ?? 0) >= 0.8).length;
+    const hasSPOF = nexusMaterials > 0;
+    const resilience = (hasSPOF ? 0 : 0.4) + 0.3 * (1 - hhi) + 0.3 * (1 - peakBetweenness);
+    const topNexus = [...networkMetrics].sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))[0];
+    return {
+      totalNodes,
+      networkDepth,
+      hhi: hhi.toFixed(3),
+      resilience: resilience.toFixed(3),
+      resilienceRed: resilience < 0.4,
+      nexusMaterials,
+      hasSPOF,
+      topNexusName: topNexus?.name ?? null,
+    };
+  }, [groupCounts, supplierVolumes, networkMetrics]);
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
@@ -927,7 +952,138 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
           }
         />
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* ── Mobile composition (md:hidden) ── */}
+        <div className="md:hidden space-y-6 mt-4">
+
+          {/* Lens chip */}
+          <span className="inline-flex items-center gap-1 rounded-sm bg-violet-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
+            Product level
+          </span>
+
+          {/* How to read this */}
+          <details className="group border-b border-border pb-3">
+            <summary className="flex cursor-pointer items-center justify-between text-sm font-medium select-none">
+              How to read this
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+            </summary>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Nodes represent suppliers, materials, products, and customers. Edges show sourcing and flow relationships. Prominence (betweenness centrality) identifies materials that are critical bottlenecks — high scores signal single points of failure.
+            </p>
+          </details>
+
+          {/* Desktop-only notice */}
+          <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <Info className="inline-block h-3.5 w-3.5 mr-1 shrink-0 align-text-bottom" />
+            The 3D network space is desktop-only. Open on a larger screen to explore the interactive graph.
+          </p>
+
+          {/* Network structure */}
+          <section>
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Network structure</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Nodes', value: mobileProductMetrics.totalNodes > 0 ? String(mobileProductMetrics.totalNodes) : '—' },
+                { label: 'Network depth', value: mobileProductMetrics.networkDepth > 0 ? String(mobileProductMetrics.networkDepth) : '—' },
+                { label: 'Critical path', value: '—' },
+                {
+                  label: 'Resilience',
+                  value: mobileProductMetrics.totalNodes > 0 ? mobileProductMetrics.resilience : '—',
+                  red: mobileProductMetrics.resilienceRed && mobileProductMetrics.totalNodes > 0,
+                },
+              ].map(({ label, value, red }) => (
+                <div key={label} className="rounded-sm border border-border p-3">
+                  <p className={`text-xl font-semibold tabular-nums ${red ? 'text-destructive' : ''}`}>{value}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Structural risk */}
+          <section>
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Structural risk</p>
+            <div className="divide-y divide-border rounded-sm border border-border">
+              {[
+                { label: 'Single-source risk', value: supplierMetrics.supplierDiversity > 0 ? supplierMetrics.singleSourceRisk : '—' },
+                { label: 'Concentration risk', value: materialMetrics.materialDiversity > 0 ? materialMetrics.materialConcentrationRisk : '—' },
+                { label: 'Mean HHI', value: mobileProductMetrics.totalNodes > 0 ? mobileProductMetrics.hhi : '—' },
+                { label: 'Nexus materials', value: networkMetrics.length > 0 ? String(mobileProductMetrics.nexusMaterials) : '—' },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between px-3 py-2">
+                  <span className="text-sm text-muted-foreground">{label}</span>
+                  <span className="text-sm font-semibold tabular-nums">{value}</span>
+                </div>
+              ))}
+            </div>
+            {mobileProductMetrics.hasSPOF && mobileProductMetrics.topNexusName && (
+              <div className="mt-2 flex items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                <p className="text-xs text-destructive">
+                  {mobileProductMetrics.topNexusName} is a nexus material — a single source of failure in the supply network.
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Centrality table */}
+          <section>
+            <div className="mb-2 flex items-baseline justify-between">
+              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Centrality</p>
+              <span className="text-[10px] text-muted-foreground">swipe →</span>
+            </div>
+            <div className="overflow-x-auto rounded-sm border border-border">
+              <table className="w-full min-w-[480px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="sticky left-0 z-[1] bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Node</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Prominence</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Betweenness</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Degree</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Connections</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {networkMetrics.length === 0 ? (
+                    <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">Run centrality analysis to see metrics</td></tr>
+                  ) : (
+                    [...networkMetrics]
+                      .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
+                      .slice(0, 20)
+                      .map(n => {
+                        const p = n.prominence ?? 0;
+                        const colorClass = p >= 0.8 ? 'text-destructive font-semibold' : p >= 0.6 ? 'text-warning font-medium' : p >= 0.4 ? 'text-primary' : 'text-muted-foreground';
+                        return (
+                          <tr key={n.id}>
+                            <td className="sticky left-0 z-[1] bg-background px-3 py-2 font-medium max-w-[120px] truncate" title={n.name}>{n.name}</td>
+                            <td className={`px-3 py-2 text-right tabular-nums ${colorClass}`}>{n.prominence != null ? n.prominence.toFixed(3) : '—'}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{n.betweenness_centrality != null ? n.betweenness_centrality.toFixed(3) : '—'}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{n.degree_centrality != null ? n.degree_centrality.toFixed(3) : '—'}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{n.connection_count}</td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Nexus Node Prediction */}
+          <section
+            aria-label="Nexus Node Prediction — Processing predictions… This may take a few minutes for large datasets."
+          >
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Nexus Node Prediction</p>
+            <MLPrediction selectedPlant={
+              globalSelectedProjectId
+                ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
+                : null
+            } />
+          </section>
+
+        </div>
+        {/* ── End mobile composition ── */}
+
+          <div className="hidden md:grid grid-cols-1 lg:grid-cols-4 gap-6">
 
             {/* Graph Canvas or Map View */}
             <div className="lg:col-span-3">
@@ -1045,6 +1201,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             </div>
           </div>
 
+          <div className="hidden md:block">
           {showAnalytics && (
             <div className="grid grid-cols-1 gap-6 mt-6">
               <SupplierVolumeChart
@@ -1080,6 +1237,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
               )}
             </div>
           )}
+          </div>
 
         </div>
 
@@ -1089,7 +1247,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
         nodeId={selectedNode?.id || null}
         projectId={globalSelectedProjectId}
         plantName={projects.find(p => p.id === globalSelectedProjectId)?.plant_name || 'Unknown Plant'}
-        connectedEdges={selectedNode ? allEdges.filter(edge => 
+        connectedEdges={selectedNode ? allEdges.filter(edge =>
           edge.source === selectedNode.id || edge.target === selectedNode.id
         ) : []}
         onSuccess={fetchData}

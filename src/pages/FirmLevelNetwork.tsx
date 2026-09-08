@@ -1,5 +1,5 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -34,6 +34,8 @@ import {
   AlertTriangle,
   Map,
   Building2,
+  ChevronRight,
+  Info,
 } from 'lucide-react';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import MLPrediction from '@/components/MLPrediction';
@@ -1072,6 +1074,51 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
   }, []);
   const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
 
+  const mobileFirmMetrics = useMemo(() => {
+    const totalNodes = networkNodes.length;
+    const maxDepth = networkNodes.reduce((m, n) => Math.max(m, n.depth ?? 0), 0);
+    const supplierDiversity = (tierCounts['Tier 1'] ?? 0) + (tierCounts['Tier 2'] ?? 0) + (tierCounts['Tier 3'] ?? 0);
+    const tier1Exposure = totalNodes > 0
+      ? ((tierCounts['Tier 1'] / totalNodes) * 100).toFixed(1) + '%'
+      : '—';
+    const dstSources = new Map<string, Set<string>>();
+    networkEdges.forEach(e => {
+      if (!dstSources.has(e.dst_uid)) dstSources.set(e.dst_uid, new Set());
+      dstSources.get(e.dst_uid)!.add(e.src_uid);
+    });
+    const soleSourceSet = new Set<string>();
+    dstSources.forEach(sources => { if (sources.size === 1) sources.forEach(s => soleSourceSet.add(s)); });
+    const hubBetweenness = prominenceStats?.max ?? null;
+    const hubNode = hubBetweenness !== null
+      ? networkNodes.find(n => Math.abs((n.prominence ?? 0) - hubBetweenness) < 0.001)
+      : null;
+    const revMap = new Map<string, number>();
+    let revTotal = 0;
+    networkEdges.forEach(e => {
+      if (e.relative_revenue_percentage != null) {
+        revMap.set(e.src_uid, (revMap.get(e.src_uid) || 0) + e.relative_revenue_percentage);
+        revTotal += e.relative_revenue_percentage;
+      }
+    });
+    let hhi = 0;
+    if (revTotal > 0) revMap.forEach(v => { const s = v / revTotal; hhi += s * s; });
+    const peak = hubBetweenness ?? 0;
+    const hasSPOF = peak >= 0.999;
+    const resilience = (hasSPOF ? 0 : 0.4) + 0.3 * (1 - hhi) + 0.3 * (1 - peak);
+    return {
+      totalNodes,
+      networkDepth: maxDepth,
+      supplierDiversity,
+      tier1Exposure,
+      soleSources: soleSourceSet.size,
+      hubDependence: hubBetweenness !== null ? hubBetweenness.toFixed(3) : '—',
+      hubNodeName: hubNode?.name ?? null,
+      resilience: resilience.toFixed(3),
+      resilienceRed: resilience < 0.4,
+      hasSPOF,
+    };
+  }, [networkNodes, networkEdges, tierCounts, prominenceStats]);
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
@@ -1158,7 +1205,141 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
           }
         />
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* ── Mobile composition (md:hidden) ── */}
+        <div className="md:hidden space-y-6 mt-4">
+
+          {/* Lens chip */}
+          <span className="inline-flex items-center gap-1 rounded-sm bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+            Firm level
+          </span>
+
+          {/* How to read this */}
+          <details className="group border-b border-border pb-3">
+            <summary className="flex cursor-pointer items-center justify-between text-sm font-medium select-none">
+              How to read this
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+            </summary>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Each node is a firm. Edges show direct supply relationships. Depth indicates tiers from your plant. Prominence measures how many shortest paths pass through a firm — high-prominence firms are single points of failure.
+            </p>
+          </details>
+
+          {/* Desktop-only notice */}
+          <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <Info className="inline-block h-3.5 w-3.5 mr-1 shrink-0 align-text-bottom" />
+            The 3D network space is desktop-only. Open on a larger screen to explore the interactive graph.
+          </p>
+
+          {/* Network structure */}
+          <section>
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Network structure</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Nodes', value: String(mobileFirmMetrics.totalNodes || '—') },
+                { label: 'Network depth', value: mobileFirmMetrics.networkDepth > 0 ? String(mobileFirmMetrics.networkDepth) : '—' },
+                { label: 'Critical path', value: '—' },
+                {
+                  label: 'Resilience',
+                  value: mobileFirmMetrics.totalNodes > 0 ? mobileFirmMetrics.resilience : '—',
+                  red: mobileFirmMetrics.resilienceRed && mobileFirmMetrics.totalNodes > 0,
+                },
+              ].map(({ label, value, red }) => (
+                <div key={label} className="rounded-sm border border-border p-3">
+                  <p className={`text-xl font-semibold tabular-nums ${red ? 'text-destructive' : ''}`}>{value}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Structural risk */}
+          <section>
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Structural risk</p>
+            <div className="divide-y divide-border rounded-sm border border-border">
+              {[
+                { label: 'Supplier diversity', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.supplierDiversity) : '—' },
+                { label: 'Tier-1 exposure', value: mobileFirmMetrics.totalNodes > 0 ? mobileFirmMetrics.tier1Exposure : '—' },
+                { label: 'Sole-source firms', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.soleSources) : '—' },
+                { label: 'Hub dependence', value: mobileFirmMetrics.hubDependence },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between px-3 py-2">
+                  <span className="text-sm text-muted-foreground">{label}</span>
+                  <span className="text-sm font-semibold tabular-nums">{value}</span>
+                </div>
+              ))}
+            </div>
+            {mobileFirmMetrics.hasSPOF && mobileFirmMetrics.hubNodeName && (
+              <div className="mt-2 flex items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                <p className="text-xs text-destructive">
+                  {mobileFirmMetrics.hubNodeName} is a single hub — every path runs through it.
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Centrality table */}
+          <section>
+            <div className="mb-2 flex items-baseline justify-between">
+              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Centrality</p>
+              <span className="text-[10px] text-muted-foreground">swipe →</span>
+            </div>
+            <div className="overflow-x-auto rounded-sm border border-border">
+              <table className="w-full min-w-[480px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="sticky left-0 z-[1] bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Firm</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Tier</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Prominence</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">In</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Out</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {networkNodes.length === 0 ? (
+                    <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">No data — select a project</td></tr>
+                  ) : (
+                    [...networkNodes]
+                      .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
+                      .slice(0, 20)
+                      .map(node => {
+                        const p = node.prominence ?? 0;
+                        const colorClass = p >= 0.8 ? 'text-destructive font-semibold' : p >= 0.6 ? 'text-warning font-medium' : p >= 0.4 ? 'text-primary' : 'text-muted-foreground';
+                        const tier = getTierFromDepth(node.depth, node.is_seed ?? false);
+                        const inCount = networkEdges.filter(e => e.dst_uid === node.uid).length;
+                        const outCount = networkEdges.filter(e => e.src_uid === node.uid).length;
+                        return (
+                          <tr key={node.id}>
+                            <td className="sticky left-0 z-[1] bg-background px-3 py-2 font-medium max-w-[120px] truncate" title={node.name ?? ''}>{node.name ?? node.uid}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{tier}</td>
+                            <td className={`px-3 py-2 text-right tabular-nums ${colorClass}`}>{node.prominence != null ? node.prominence.toFixed(3) : '—'}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{inCount}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{outCount}</td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Nexus Node Prediction */}
+          <section
+            aria-label="Nexus Node Prediction — Processing predictions… This may take a few minutes for large datasets."
+          >
+            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Nexus Node Prediction</p>
+            <MLPrediction selectedPlant={
+              globalSelectedProjectId
+                ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
+                : null
+            } />
+          </section>
+
+        </div>
+        {/* ── End mobile composition ── */}
+
+          <div className="hidden md:grid grid-cols-1 lg:grid-cols-4 gap-6">
 
             {/* Graph Canvas or Map View */}
             <div className="lg:col-span-3">
@@ -1290,6 +1471,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             </div>
           </div>
 
+          <div className="hidden md:block">
           {showAnalytics && (
             <div className="grid grid-cols-1 gap-6 mt-6">
               {prominenceStats && (
@@ -1643,6 +1825,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
             </div>
           )}
+          </div>
 
         </div>
 
