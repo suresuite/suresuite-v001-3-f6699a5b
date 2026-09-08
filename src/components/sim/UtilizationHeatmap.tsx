@@ -86,6 +86,9 @@ export function UtilizationHeatmap({ reps }: Props) {
             ))}
           </div>
         </div>
+        <div className="pt-1.5 text-[11px] text-muted-foreground md:hidden">
+          swipe the heatmap sideways for the remaining weeks
+        </div>
         <div className="flex items-center gap-2 mt-2 text-[10px] text-muted-foreground">
           <span>0%</span>
           <div className="h-2 flex-1 bg-gradient-to-r from-primary/10 to-primary" />

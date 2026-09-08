@@ -20,7 +20,7 @@ interface Props {
 }
 
 const SELECT =
-  "h-7 rounded-sm border border-[#d4d4d8] bg-white px-2 text-[12.5px] text-[#18181b] focus:border-foreground focus:outline-none";
+  "h-7 min-h-11 min-w-0 max-w-full rounded-sm border border-[#d4d4d8] bg-white px-2 text-[12.5px] text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0";
 
 /** §9.3: CRN pairing plus a single-component RunKey difference. */
 function comparabilityFailures(

@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { FROZEN_CELL_ON_TINT } from "@/components/shared";
 
 /**
  * Tables of numbers stay tables of numbers. What changed is legibility: each
@@ -10,6 +12,25 @@ import { cn } from "@/lib/utils";
  * L3 carries no zebra: the row divider does the separating, and the objective
  * row is marked the way a selected row is.
  */
+
+/**
+ * Spec §2.7. These tables are 4 to 7 columns of numbers and they sit inside
+ * `TableShell`, which is `overflow-hidden` — so at 320px the KPI summary was
+ * painting 576px of table into 292px of card and silently swallowing four
+ * columns. The column set IS the information, so below `md` the table scrolls
+ * sideways and the identifying column freezes; `md:overflow-visible` hands the
+ * desktop table straight back to the shell, where it has always fitted.
+ */
+function ScrollTable({ children, hint }: { children: ReactNode; hint: string }) {
+  return (
+    <>
+      <div className="overflow-x-auto md:overflow-visible">{children}</div>
+      <div className="border-t border-[--sim-divider] px-3 py-1.5 text-[11px] text-[--zinc-quiet] md:hidden">
+        {hint}
+      </div>
+    </>
+  );
+}
 
 const TH =
   "bg-[--brand-ink] px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white border-r border-r-[rgba(255,255,255,0.22)] last:border-r-0";
@@ -30,10 +51,11 @@ export interface KpiStat {
 
 export function KpiStatTable({ rows, primaryKpi }: { rows: KpiStat[]; primaryKpi: string }) {
   return (
+    <ScrollTable hint="swipe the table sideways for the remaining columns">
     <table className="w-full border-collapse">
       <thead>
         <tr>
-          <th className={cn(TH, "text-left")}>KPI</th>
+          <th className={cn(TH, "text-left", FROZEN_CELL_ON_TINT)}>KPI</th>
           <th className={cn(TH, "text-right")}>Mean</th>
           <th className={cn(TH, "text-left pl-1")}>± 95% CI</th>
           <th className={cn(TH, "text-right")}>σ</th>
@@ -48,7 +70,7 @@ export function KpiStatTable({ rows, primaryKpi }: { rows: KpiStat[]; primaryKpi
           const bg = primary ? SELECTED : "#ffffff";
           return (
             <tr key={r.key}>
-              <td className={TD} style={{ background: bg }}>
+              <td className={cn(TD, FROZEN_CELL_ON_TINT)} style={{ background: bg }}>
                 <span
                   className="inline-block whitespace-nowrap border-l-2 pl-2 text-[12.5px] text-[#18181b]"
                   style={{ borderLeftColor: primary ? "#18181b" : "transparent" }}
@@ -79,6 +101,7 @@ export function KpiStatTable({ rows, primaryKpi }: { rows: KpiStat[]; primaryKpi
         })}
       </tbody>
     </table>
+    </ScrollTable>
   );
 }
 
@@ -97,10 +120,11 @@ export interface CompareRow {
 
 export function CompareTable({ rows }: { rows: CompareRow[] }) {
   return (
+    <ScrollTable hint="swipe the table sideways for the remaining columns">
     <table className="w-full border-collapse">
       <thead>
         <tr>
-          <th className={cn(TH, "text-left")}>KPI</th>
+          <th className={cn(TH, "text-left", FROZEN_CELL_ON_TINT)}>KPI</th>
           <th className={cn(TH, "text-right")}>A mean</th>
           <th className={cn(TH, "text-left pl-1")}>± 95% CI</th>
           <th className={cn(TH, "text-right")}>B mean</th>
@@ -115,7 +139,10 @@ export function CompareTable({ rows }: { rows: CompareRow[] }) {
           const deltaColor = r.better === null ? "var(--zinc-quiet)" : r.better ? "#14b8c4" : "#BF2330";
           return (
             <tr key={r.key}>
-              <td className={cn(TD, "whitespace-nowrap text-[12.5px] text-[#18181b]")} style={{ background: bg }}>
+              <td
+                className={cn(TD, "whitespace-nowrap text-[12.5px] text-[#18181b]", FROZEN_CELL_ON_TINT)}
+                style={{ background: bg }}
+              >
                 {r.label}
               </td>
               <td
@@ -161,6 +188,7 @@ export function CompareTable({ rows }: { rows: CompareRow[] }) {
         })}
       </tbody>
     </table>
+    </ScrollTable>
   );
 }
 
@@ -174,10 +202,11 @@ export interface ImpactRow {
 
 export function ImpactTable({ head, rows }: { head: string; rows: ImpactRow[] }) {
   return (
+    <ScrollTable hint="swipe the table sideways for the Δ column">
     <table className="w-full border-collapse">
       <thead>
         <tr>
-          <th className={cn(TH, "text-left")}>{head}</th>
+          <th className={cn(TH, "text-left", FROZEN_CELL_ON_TINT)}>{head}</th>
           <th className={cn(TH, "text-right")}>Without</th>
           <th className={cn(TH, "text-right")}>With</th>
           <th className={cn(TH, "text-right")}>Δ</th>
@@ -189,7 +218,10 @@ export function ImpactTable({ head, rows }: { head: string; rows: ImpactRow[] })
           const color = r.better === null ? "var(--zinc-quiet)" : r.better ? "#14b8c4" : "#BF2330";
           return (
             <tr key={r.label}>
-              <td className={cn(TD, "whitespace-nowrap text-[12.5px] text-[#18181b]")} style={{ background: bg }}>
+              <td
+                className={cn(TD, "whitespace-nowrap text-[12.5px] text-[#18181b]", FROZEN_CELL_ON_TINT)}
+                style={{ background: bg }}
+              >
                 {r.label}
               </td>
               <td className={cn(TD, "text-right text-[12.5px] tabular-nums text-[#52525b]")} style={{ background: bg }}>
@@ -209,5 +241,6 @@ export function ImpactTable({ head, rows }: { head: string; rows: ImpactRow[] })
         })}
       </tbody>
     </table>
+    </ScrollTable>
   );
 }

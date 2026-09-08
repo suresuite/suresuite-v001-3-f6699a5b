@@ -52,16 +52,19 @@ export function PlaybookPicker({
           else onSelect(playbooks.find((p) => p.id === v) ?? null);
         }}
       >
-        <SelectTrigger className="h-8 text-xs w-[220px]">
+        {/* §2.4/G3 Case B: full width below `md`, the 220px literal at `md`. */}
+        <SelectTrigger className="h-8 min-h-11 w-full min-w-0 text-xs md:min-h-0 md:w-[220px]">
           <SelectValue placeholder="Choose a playbook…" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none">— Custom (no playbook) —</SelectItem>
+          <SelectItem value="__none" className="min-h-11 md:min-h-0">
+            — Custom (no playbook) —
+          </SelectItem>
           {system.length > 0 && (
             <SelectGroup>
               <SelectLabel className="text-[10px] uppercase tracking-wider">System</SelectLabel>
               {system.map((p) => (
-                <SelectItem key={p.id} value={p.id} className="text-xs">
+                <SelectItem key={p.id} value={p.id} className="min-h-11 text-xs md:min-h-0">
                   {p.name}
                 </SelectItem>
               ))}
@@ -71,7 +74,7 @@ export function PlaybookPicker({
             <SelectGroup>
               <SelectLabel className="text-[10px] uppercase tracking-wider">Project</SelectLabel>
               {project.map((p) => (
-                <SelectItem key={p.id} value={p.id} className="text-xs">
+                <SelectItem key={p.id} value={p.id} className="min-h-11 text-xs md:min-h-0">
                   {p.name}
                 </SelectItem>
               ))}
@@ -87,13 +90,13 @@ export function PlaybookPicker({
       )}
 
       {selected && modified && onResetToPlaybook && (
-        <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={onResetToPlaybook}>
+        <Button size="sm" variant="ghost" className="h-7 min-h-11 gap-1 text-xs md:min-h-0" onClick={onResetToPlaybook}>
           <RotateCcw className="h-3 w-3" /> Reset
         </Button>
       )}
 
       {selected && modified && canEditSelected && onSaveChanges && (
-        <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => void onSaveChanges()}>
+        <Button size="sm" variant="outline" className="h-7 min-h-11 gap-1 text-xs md:min-h-0" onClick={() => void onSaveChanges()}>
           <Save className="h-3 w-3" /> Save changes
         </Button>
       )}
@@ -101,7 +104,7 @@ export function PlaybookPicker({
       <Button
         size="sm"
         variant="outline"
-        className="h-7 gap-1 text-xs"
+        className="h-7 min-h-11 gap-1 text-xs md:min-h-0"
         onClick={() => setSaveOpen(true)}
       >
         <Bookmark className="h-3 w-3" /> Save as new
@@ -111,7 +114,7 @@ export function PlaybookPicker({
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 gap-1 text-xs text-destructive hover:text-destructive"
+          className="h-7 min-h-11 min-w-11 gap-1 text-xs text-destructive hover:text-destructive md:min-h-0 md:min-w-0"
           onClick={() => void onDelete(selected.id)}
         >
           <Trash2 className="h-3 w-3" />

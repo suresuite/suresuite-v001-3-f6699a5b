@@ -83,8 +83,8 @@ function SupplierLinkFix({
   return (
     <div className="flex flex-col gap-1 mt-1.5">
       {materialIds.map((mat) => (
-        <div key={mat} className="flex items-center gap-1.5">
-          <span className="font-mono text-[10px] w-32 truncate" title={mat}>{mat}</span>
+        <div key={mat} className="flex flex-col items-stretch gap-1.5 md:flex-row md:items-center">
+          <span className="font-mono text-[10px] w-full truncate md:w-32" title={mat}>{mat}</span>
           {fixed.has(mat) ? (
             <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="h-3 w-3" /> supplier assigned
@@ -95,19 +95,19 @@ function SupplierLinkFix({
                 value={chosen[mat] ?? ""}
                 onValueChange={(v) => setChosen((c) => ({ ...c, [mat]: v }))}
               >
-                <SelectTrigger className="h-6 w-40 text-[10px]">
+                <SelectTrigger className="h-6 min-h-11 w-full min-w-0 text-[10px] md:min-h-0 md:w-40">
                   <SelectValue placeholder="Pick supplier…" />
                 </SelectTrigger>
                 <SelectContent>
                   {supplierIds.map((s) => (
-                    <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+                    <SelectItem key={s} value={s} className="min-h-11 text-xs md:min-h-0">{s}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 gap-1 px-2 text-[10px]"
+                className="h-6 min-h-11 gap-1 px-2 text-[10px] md:min-h-0"
                 disabled={!chosen[mat] || applying === mat}
                 onClick={() => void apply(mat)}
               >
@@ -167,7 +167,8 @@ export function PreRunValidationPanel({
             {route && (
               <Link
                 to={route}
-                className="mt-[3px] inline-block text-[11.5px] text-[#52525b] underline-offset-2 hover:text-foreground hover:underline"
+                // §2.4: pad the hit area, negate the layout cost.
+                className="-my-[13px] mt-[3px] inline-flex min-h-11 items-center py-[13px] text-[11.5px] text-[#52525b] underline-offset-2 hover:text-foreground hover:underline md:my-0 md:mt-[3px] md:inline-block md:min-h-0 md:py-0"
                 title="Open the editor for this field in the Project Manager"
               >
                 fix data ↗

@@ -45,11 +45,12 @@ export function GateBar({
   const canRun = !reason;
 
   return (
-    <div className="flex items-center gap-3 border-t border-[--hair-rule] bg-[#fafafa] px-3 py-[9px]">
+    // Three children on one non-wrapping row squeeze to nothing at 320px.
+    <div className="flex flex-wrap items-center gap-3 border-t border-[--hair-rule] bg-[#fafafa] px-3 py-[9px] md:flex-nowrap">
       <button
         type="button"
         onClick={onShowFindings}
-        className="flex items-center gap-3 rounded-sm border border-[--hair-rule] bg-white px-[10px] py-[5px]"
+        className="flex min-h-11 items-center gap-3 rounded-sm border border-[--hair-rule] bg-white px-[10px] py-[5px] md:min-h-0"
       >
         <span className="flex items-center gap-[7px]">
           <span
@@ -74,8 +75,10 @@ export function GateBar({
       </button>
 
       {/* the Run control always says why it can't fire */}
+      {/* §3.1: the reason a control is disabled is on the never-truncate
+          list. It wraps below `md`; `md:truncate` is the desktop literal. */}
       <span
-        className="min-w-0 flex-1 truncate text-[12.5px]"
+        className="min-w-0 flex-1 basis-full text-[12.5px] [text-wrap:pretty] md:basis-auto md:truncate"
         style={{ color: blocks > 0 ? LAYER.brand : reason ? LAYER.firm : "#a1a1aa" }}
         title={reason ?? undefined}
       >
@@ -87,7 +90,7 @@ export function GateBar({
         disabled={!canRun}
         onClick={dirty ? onSaveVersionAndRun : onRun}
         className={cn(
-          "h-[30px] rounded-sm border text-[13px] font-medium",
+          "h-[30px] min-h-11 rounded-sm border text-[13px] font-medium md:min-h-0",
           dirty ? "px-[14px]" : "px-5",
           canRun
             ? "border-foreground bg-foreground text-background"
@@ -159,7 +162,7 @@ export function FindingsPanel<F extends Finding>({
           {g.items.map((f) => (
             <div
               key={f.id}
-              className="flex gap-3 border-b border-l-2 border-b-[--sim-divider] px-3 py-[9px]"
+              className="flex flex-col gap-1.5 border-b border-l-2 border-b-[--sim-divider] px-3 py-[9px] md:flex-row md:gap-3"
               style={{ borderLeftColor: SEV_COLOR[g.sev] }}
             >
               <div className="min-w-0 flex-1">
@@ -183,7 +186,7 @@ export function FindingsPanel<F extends Finding>({
         <button
           type="button"
           onClick={onAcknowledge}
-          className="flex w-full items-center gap-2 border-t border-[--hair-rule] bg-[#fafafa] px-3 py-[10px] text-left"
+          className="flex min-h-11 w-full items-center gap-2 border-t border-[--hair-rule] bg-[#fafafa] px-3 py-[10px] text-left md:min-h-0"
         >
           <span
             className={cn(

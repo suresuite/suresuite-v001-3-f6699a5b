@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { FROZEN_CELL_ON_TINT } from "@/components/shared";
 import { DAYS_PER_UNIT, UNIT_LABEL_PLURAL, type TimeUnit } from "@/hooks/useTimeUnit";
 
 /**
@@ -54,7 +55,8 @@ function Segmented({
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            "whitespace-nowrap rounded-[2px] px-[10px] py-[3px] text-[12.5px]",
+            // §2.4 touch floor; `md:` hands the row back its 3px padding.
+            "min-h-11 min-w-11 whitespace-nowrap rounded-[2px] px-[10px] py-[3px] text-[12.5px] md:min-h-0 md:min-w-0",
             // every segmented control shows its selection: black on white, never grey on grey
             o.value === value ? "bg-foreground text-background" : "text-[#52525b]",
           )}
@@ -78,7 +80,13 @@ function Switch({
   offLabel?: string;
 }) {
   return (
-    <button type="button" onClick={() => onChange(!value)} className="flex items-center gap-2">
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      // §2.4: the visual switch stays 16px; `box-content` + the negated margin
+      // grow the hit box to 44px without moving anything.
+      className="-my-[14px] box-content flex min-h-11 items-center gap-2 py-[14px] md:my-0 md:min-h-0 md:py-0"
+    >
       <span
         className={cn(
           "relative h-4 w-7 rounded-sm border",
@@ -113,11 +121,16 @@ export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: s
       </div>
 
       {/* flex-1 so surplus height is shared across rows instead of collapsing
-          into one dead band when two cards sit side by side */}
+          into one dead band when two cards sit side by side.
+          §2.7: the card is `overflow-hidden`, so below `md` a 400px+ parameter
+          table was losing its Value and Unit columns entirely inside a 131px
+          card. It scrolls instead, with the Parameter column frozen;
+          `md:overflow-visible` restores the desktop table exactly. */}
+      <div className="min-w-0 flex-1 overflow-x-auto md:contents">
       <table className="w-full flex-1 border-collapse">
         <thead>
           <tr>
-            <th className={TH}>Parameter</th>
+            <th className={cn(TH, FROZEN_CELL_ON_TINT)}>Parameter</th>
             <th className={TH}>Value</th>
             <th className={cn(TH, "w-[34%]")}>Unit</th>
           </tr>
@@ -127,7 +140,11 @@ export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: s
             const prov = f.provenance ? PROV[f.provenance] : null;
             return (
               <tr key={f.label}>
-                <td className={cn(TD, prov?.row)}>
+                {/* FROZEN_CELL carries `md:bg-transparent`, which would strip a
+                    provenance row of its tint above `md`. The tint is already
+                    opaque, so it IS the sticky cell's background; a plain row
+                    gets white below `md` and desktop's transparent back. */}
+                <td className={cn(TD, FROZEN_CELL_ON_TINT, prov?.row ?? "bg-white md:bg-transparent")}>
                   <span className="flex items-center gap-[7px]">
                     <span className="whitespace-nowrap text-[12.5px] text-[#18181b]">{f.label}</span>
                     {prov ? (
@@ -154,7 +171,7 @@ export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: s
                         if (Number.isFinite(v)) (f.control as { onChange: (n: number) => void }).onChange(v);
                       }}
                       onBlur={f.control.onCommit}
-                      className="h-7 rounded-sm border border-[#d4d4d8] px-[9px] text-[13px] tabular-nums text-[#18181b] focus:border-foreground focus:outline-none"
+                      className="h-7 min-h-11 rounded-sm border border-[#d4d4d8] px-[9px] text-[13px] tabular-nums text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0"
                       style={{ width: f.control.width ?? 76 }}
                     />
                   ) : f.control.kind === "segmented" ? (
@@ -180,6 +197,10 @@ export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: s
           })}
         </tbody>
       </table>
+      </div>
+      <div className="border-t border-[--sim-divider] px-3 py-1.5 text-[11px] text-[--zinc-quiet] md:hidden">
+        swipe the table sideways for the value and unit columns
+      </div>
 
       {footer ? (
         <div className="bg-[#fafafa] px-3 py-[7px] text-[11.5px] tabular-nums text-[#52525b]">{footer}</div>
@@ -204,7 +225,7 @@ export function TimeUnitBar({
 }) {
   const factor = DAYS_PER_UNIT[unit];
   return (
-    <div className="flex items-center gap-3 bg-[#fcfcfc] px-4 py-[10px]">
+    <div className="flex flex-wrap items-center gap-3 bg-[#fcfcfc] px-4 py-[10px] md:flex-nowrap">
       <span className="whitespace-nowrap text-[12.5px] text-[#3f3f46]">Show time in</span>
       <Segmented
         value={unit}

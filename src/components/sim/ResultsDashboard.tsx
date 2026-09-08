@@ -57,7 +57,7 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility 
       : [];
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {isStub ? (
           <Badge variant="outline" className="text-[11px] gap-1 border-yellow-400 text-yellow-700 bg-yellow-50">
             Preliminary estimate — Monte Carlo engine computing…
@@ -72,7 +72,7 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility 
 
       {meta?.scsim_notes && meta.scsim_notes.length > 0 && (
         <details className="text-xs text-muted-foreground border border-border rounded-md px-3 py-2">
-          <summary className="cursor-pointer select-none">
+          <summary className="flex min-h-11 cursor-pointer select-none items-center md:min-h-0 md:list-item">
             Engine conversion notes ({meta.scsim_notes.length})
           </summary>
           <ul className="list-disc pl-4 pt-1 space-y-0.5">

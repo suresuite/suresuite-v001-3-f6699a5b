@@ -33,8 +33,11 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
         <p className="text-xs text-muted-foreground">No disruptions scheduled.</p>
       )}
       {value.map((d, i) => (
-        <div key={i} className="grid grid-cols-12 gap-2 items-end border border-border p-2 rounded-sm">
-          <div className="col-span-3 flex flex-col gap-1">
+        // Six fields across 12 columns leave 31px per field at 320px — below
+        // the width of the values they hold. Two columns below `md`, the
+        // desktop 12-column row restored literally at `md`.
+        <div key={i} className="grid grid-cols-2 gap-2 items-end border border-border p-2 rounded-sm md:grid-cols-12">
+          <div className="col-span-2 flex flex-col gap-1 md:col-span-3">
             <Label className="text-[10px]">Target</Label>
             <Input
               className="h-8 min-h-11 md:min-h-0"
@@ -43,7 +46,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
               onChange={(e) => update(i, { target: e.target.value })}
             />
           </div>
-          <div className="col-span-2 flex flex-col gap-1">
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
             <Label className="text-[10px]">Type</Label>
             <select
               className="h-8 min-h-11 md:min-h-0 bg-background border border-input rounded-sm px-2 text-sm"
@@ -54,7 +57,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
               <option value="edge">edge</option>
             </select>
           </div>
-          <div className="col-span-2 flex flex-col gap-1">
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
             <Label className="text-[10px]">Start ({unitPlural})</Label>
             <Input
               className="h-8 min-h-11 md:min-h-0"
@@ -63,7 +66,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
               onChange={(e) => update(i, { start_day: Math.round(toDays(+e.target.value)) })}
             />
           </div>
-          <div className="col-span-2 flex flex-col gap-1">
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
             <Label className="text-[10px]">Duration ({unitPlural})</Label>
             <Input
               className="h-8 min-h-11 md:min-h-0"
@@ -72,7 +75,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
               onChange={(e) => update(i, { duration_days: Math.round(toDays(+e.target.value)) })}
             />
           </div>
-          <div className="col-span-2 flex flex-col gap-1">
+          <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
             <Label className="text-[10px]">Magnitude %</Label>
             <Input
               className="h-8 min-h-11 md:min-h-0"
@@ -84,7 +87,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           <Button
             size="icon"
             variant="ghost"
-            className="h-8 w-8 min-h-11 min-w-11 col-span-1 text-destructive md:min-h-0 md:min-w-0"
+            className="h-8 w-8 min-h-11 min-w-11 col-span-2 justify-self-end text-destructive md:col-span-1 md:min-h-0 md:min-w-0 md:justify-self-auto"
             onClick={() => remove(i)}
           >
             <Trash2 className="h-4 w-4" />

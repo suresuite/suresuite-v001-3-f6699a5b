@@ -77,15 +77,16 @@ export function SeedSelector({ reps, value, onChange, className }: SeedSelectorP
       value={value == null ? "__all__" : String(value)}
       onValueChange={(v) => onChange(v === "__all__" ? null : Number(v))}
     >
-      <SelectTrigger className={cn("h-7 w-[210px] text-[11px]", className)}>
+      {/* §2.4/G3 Case B: full width below `md`, the 210px literal at `md`. */}
+      <SelectTrigger className={cn("h-7 min-h-11 w-full min-w-0 text-[11px] md:min-h-0 md:w-[210px]", className)}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="__all__" className="text-xs">
+        <SelectItem value="__all__" className="min-h-11 text-xs md:min-h-0">
           All replications (mean + CI)
         </SelectItem>
         {reps.map((r) => (
-          <SelectItem key={r.seed_used} value={String(r.seed_used)} className="text-xs">
+          <SelectItem key={r.seed_used} value={String(r.seed_used)} className="min-h-11 text-xs md:min-h-0">
             seed {r.seed_used} · rep {r.rep_index}
           </SelectItem>
         ))}
@@ -171,7 +172,7 @@ export function ReplicationSeedExplorer({
                 type="button"
                 onClick={() => setSeriesKey(s.key)}
                 className={cn(
-                  "h-6 px-2 rounded-md text-[10px] border transition-colors whitespace-nowrap",
+                  "h-6 min-h-11 px-2 rounded-md text-[10px] border transition-colors whitespace-nowrap md:min-h-0",
                   s.key === seriesKey
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-transparent hover:bg-muted/50 border-transparent",
@@ -187,7 +188,7 @@ export function ReplicationSeedExplorer({
           <button
             type="button"
             onClick={() => setIsolate((v) => !v)}
-            className="h-6 px-2 rounded-md text-[10px] border bg-card hover:bg-muted/50"
+            className="h-6 min-h-11 px-2 rounded-md text-[10px] border bg-card hover:bg-muted/50 md:min-h-0"
             title="Overlay keeps the mean ± CI band and the other traces dimmed; Isolate shows only the selected replication"
           >
             {isolate ? "Isolated" : "Overlaid"}

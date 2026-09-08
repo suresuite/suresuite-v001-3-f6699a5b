@@ -131,7 +131,7 @@ The repo already has the landed precedent —
 
 | File : line | Literal to preserve |
 |---|---|
-| `SimulationLab.tsx:290` | `200px` |
+| `SimulationLab.tsx:290` | `200px` · ✅ done (G10) |
 | `ProcessLevelNetwork.tsx:1153` | `160px` |
 | `ProcessLevelNetwork.tsx:1233` | `180px` |
 | `FirmLevelNetwork.tsx:1193` | `180px` |
@@ -146,7 +146,8 @@ floor to its slot, and a second one double-pads the header.
 
 `sim/ExperimentDesigner.tsx:279` (160px) · `:337` (260px) ·
 `sim/PlaybookPicker.tsx:55` (220px) · `sim/ReplicationSeedExplorer.tsx:80`
-(210px, inside `cn()`).
+(210px, inside `cn()`). **Both ✅ done (G10);** `ExperimentDesigner.tsx` is
+imported by nothing and was left alone.
 
 Where a Case B select sits in a flex row beside a label, that row also needs
 `flex-col items-stretch md:flex-row md:items-center`.
@@ -349,6 +350,7 @@ riskiest visual change lands last and alone.
 | **3** | **Bulk edit sheet** — G4 | `BulkEditDialog.tsx` | Low. Shell swap, logic untouched |
 | **4** | **More panel** — G6 | `MobileNav.tsx` | Medium. Re-layout; keep the tab bar visible |
 | **5** | **Getting Started** — G5 | `GettingStarted.tsx`, `home/MobileGettingStarted.tsx` | ✅ **done** — see §5 |
+| **7** | **Simulation Lab** — G10 | `resultTables.tsx`, `ParameterCard.tsx`, `ScenarioSetupForm.tsx`, `RunGate.tsx`, `RunProgressPanel.tsx`, `PreRunValidationPanel.tsx`, `DisruptionScheduleEditor.tsx`, `DisruptionRecoveryPane.tsx`, `PlaybookPicker.tsx`, `PlaybookSaveDialog.tsx`, `ScenarioLibraryPanel.tsx`, `ScenarioRail.tsx`, `CompareScenariosPanel.tsx`, `ReplicationSeedExplorer.tsx`, `ItemSeriesExplorer.tsx`, `ResultsDashboard.tsx`, `UtilizationHeatmap.tsx`, `SimulationLab.tsx` | ✅ **done** — see G10. Low: reflow only, all `md:`-released |
 | **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
