@@ -69,8 +69,11 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
     <div className="flex flex-col gap-3">
       <Card className={statusChrome.card}>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm flex items-center gap-2">
+          {/* Five badges beside an action group on one non-wrapping row took
+              the document to 471px at 320 and 778px at 768. It stacks below
+              `md` and the badges wrap; `md:` restores the desktop row. */}
+          <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="text-sm flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">
               Latest run
               <Badge variant={statusColor} className={cn("text-[10px] uppercase gap-1", statusChrome.badge)}>
                 {statusChrome.Icon && <statusChrome.Icon className="h-3 w-3" />}
@@ -86,7 +89,7 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
               </Badge>
               {credibility && <CredibilityBadge credibility={credibility} />}
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-2">
               {(run.status === "running" || run.status === "queued") && (
                 <Button size="sm" variant="outline" className="gap-1" onClick={onCancel}>
                   <Square className="h-3.5 w-3.5" /> Cancel
@@ -188,7 +191,7 @@ export function MappingWarningsCard({
       <CardHeader className="pb-2">
         <button
           type="button"
-          className="flex items-center gap-2 w-full text-left"
+          className="flex min-h-11 flex-wrap items-center gap-2 w-full text-left md:min-h-0 md:flex-nowrap"
           onClick={() => setOpen((o) => !o)}
         >
           {list.length > 0 ? (
