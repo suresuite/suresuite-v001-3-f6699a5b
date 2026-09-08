@@ -4,18 +4,22 @@
  * Every card is a left-accented sharp-cornered panel so a long reply reads as
  * a stack of typed blocks rather than a wall: neutral #b8b8b8 for data
  * (table/kpi/bullets), firm #e0930b for plans, brand red for mode refusals,
- * product purple for memory. Tables use the mono UPPERCASE header on ink
- * with ~30px rows, matching adminUi's TH/TD.
+ * product purple for memory. Tables use TH_MESSAGE/TD_MESSAGE — the demo's
+ * light #fafafa header with grey mono labels and mono cells, which is the
+ * in-reply table, not the page ledger (piUi explains the split). Above md
+ * both restore the ledger literal, so desktop is unchanged.
  */
 import React, { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { ChatPart, ChatToolCall } from "@/hooks/useProjectChat";
-import { LAYER, MonoChip, TD, TH, tint } from "./piUi";
+import { LAYER, MonoChip, TD_MESSAGE, TH_MESSAGE, tint } from "./piUi";
 import { cn } from "@/lib/utils";
 import { PlanCard, type PlanPartData } from "@/components/chat/PlanCard";
 import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 
-const CARD = "mt-2 rounded-sm border border-[--hair-border]";
+// The demo's card hairline is #ebebeb — lighter than the --hair-border token,
+// which reads too heavy at three cards stacked in a reply. md: restores it.
+const CARD = "mt-2 rounded-sm border border-[#ebebeb] md:border-[--hair-border]";
 const accent = (hex: string) => ({ borderLeft: "2px solid " + hex });
 
 /* ── evidence (H1 §22.2) ─────────────────────────────────────────────── */
@@ -33,7 +37,7 @@ export function EvidencePart({ data }: { data: any }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="min-h-11 rounded-sm px-2.5 py-1 text-[11px] md:min-h-0"
+        className="min-h-11 rounded-sm px-3 text-[11.5px] md:min-h-0 md:px-2.5 md:py-1 md:text-[11px]"
         style={{
           background: tint(fallback ? LAYER.brand : "#6b6b6b", 0.1),
           color: fallback ? LAYER.brand : "#5a5a5a",
@@ -44,12 +48,12 @@ export function EvidencePart({ data }: { data: any }) {
       {open && (
         <div className={cn(CARD, "mt-1.5")} style={accent("#9a9a9a")}>
           {fallback && (
-            <div className="border-b border-[--hair-border] px-2.5 py-2 text-[11.5px] text-muted-foreground">
+            <div className="border-b border-b-[#ebebeb] px-2.5 py-2 text-[11.5px] text-muted-foreground md:border-b-[--hair-border]">
               The drafted reply couldn't be traced to project data, so a grounded fallback shipped instead.
             </div>
           )}
           {citations.map((c, i) => (
-            <div key={i} className="flex gap-2 border-b border-[--hair-divider] px-2.5 py-1.5 text-[12px] last:border-b-0">
+            <div key={i} className="flex gap-2 border-b border-b-[#f4f4f4] px-[11px] py-2 text-[12px] last:border-b-0 md:border-b-[--hair-divider] md:px-2.5 md:py-1.5">
               <span className="font-mono text-muted-foreground">[{i + 1}]</span>
               <span className="text-muted-foreground">{c.label ?? c.kind}</span>
               <span className="font-mono text-foreground">{c.ref ?? c.reference ?? ""}</span>
@@ -73,10 +77,10 @@ export function TablePart({ data }: { data: any }) {
           <thead>
             <tr>
               {columns.map((c, i) => (
-                // FROZEN_CELL_ON_TINT, not FROZEN_CELL (§2.7): the TH already
-                // paints an opaque ink fill, and FROZEN_CELL's bg-background
-                // repainted it white — a white label on a white ground, which
-                // is what the first column header looked like on a phone.
+                // FROZEN_CELL_ON_TINT, not FROZEN_CELL (§2.7): TH_MESSAGE
+                // already paints its own opaque header fill, and FROZEN_CELL's
+                // bg-background would repaint it — which is what turned the
+                // first column header into white-on-white on a phone.
                 //
                 // md:bg-transparent is kept deliberately. FROZEN_CELL carried
                 // it, so above md this cell has always rendered transparent
@@ -84,7 +88,7 @@ export function TablePart({ data }: { data: any }) {
                 // but fixing it is a desktop change and this work is mobile-only
                 // — so the desktop rendering is preserved exactly and the defect
                 // is reported rather than folded in here.
-                <th key={c} className={cn(TH, i === 0 && FROZEN_CELL_ON_TINT, i === 0 && "md:bg-transparent")}>
+                <th key={c} className={cn(TH_MESSAGE, i === 0 && FROZEN_CELL_ON_TINT, i === 0 && "md:bg-transparent")}>
                   {c}
                 </th>
               ))}
@@ -94,7 +98,7 @@ export function TablePart({ data }: { data: any }) {
             {rows.map((r, i) => (
               <tr key={i} className="hover:bg-[#fcfcfc]">
                 {r.map((cell, j) => (
-                  <td key={j} className={cn(TD, j === 0 && FROZEN_CELL)}>
+                  <td key={j} className={cn(TD_MESSAGE, j === 0 && FROZEN_CELL)}>
                     {String(cell ?? "")}
                   </td>
                 ))}
@@ -104,7 +108,7 @@ export function TablePart({ data }: { data: any }) {
         </table>
       </div>
       {data?.sourceTool && (
-        <div className="border-t border-[--hair-divider] px-2.5 py-1 text-[10.5px] text-muted-foreground">
+        <div className="border-t border-t-[#f4f4f4] px-2.5 py-1.5 text-[10.5px] text-[#8a8a8a] md:border-t-[--hair-divider] md:py-1 md:text-muted-foreground">
           Source: <span className="font-mono">{data.sourceTool}</span>
         </div>
       )}
@@ -121,15 +125,17 @@ export function KpiPart({ data }: { data: any }) {
     <div
       className={cn(
         CARD,
-        "grid grid-cols-[repeat(auto-fit,minmax(min(140px,100%),1fr))] gap-px bg-[--hair-divider]",
+        "grid grid-cols-[repeat(auto-fit,minmax(min(140px,100%),1fr))] gap-px bg-[#f4f4f4] md:bg-[--hair-divider]",
         "md:[grid-template-columns:repeat(var(--kpi-cols),minmax(0,1fr))]",
       )}
       style={{ ...accent("#b8b8b8"), "--kpi-cols": Math.min(cards.length || 1, 3) } as React.CSSProperties}
     >
       {cards.map((c, i) => (
-        <div key={i} className="bg-background p-2.5">
-          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{c.label}</div>
-          <div className="mt-0.5 text-[16px] font-semibold text-foreground">{c.value}</div>
+        <div key={i} className="bg-background px-[11px] py-2.5 md:p-2.5">
+          <div className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#8a8a8a] md:text-[10px] md:text-muted-foreground">
+            {c.label}
+          </div>
+          <div className="mt-[3px] text-[16px] font-semibold tabular-nums text-foreground md:mt-0.5">{c.value}</div>
         </div>
       ))}
     </div>
@@ -249,11 +255,11 @@ export function ActivityGroup({ toolCalls }: { toolCalls: ChatToolCall[] }) {
     (totalMs ? " · " + (totalMs / 1000).toFixed(1) + "s" : "");
 
   return (
-    <div className="mt-2.5 overflow-hidden rounded-sm border border-[--hair-border]">
+    <div className="mt-2.5 overflow-hidden rounded-sm border border-[#ebebeb] md:border-[--hair-border]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center gap-[7px] bg-[#fcfcfc] px-2.5 py-1.5 text-left text-[12px] text-muted-foreground md:min-h-0"
+        className="flex min-h-11 w-full items-center gap-[7px] bg-[#fcfcfc] p-2.5 text-left text-[12px] text-muted-foreground md:min-h-0 md:px-2.5 md:py-1.5"
       >
         <span
           className="inline-block h-1.5 w-1.5 rounded-full"
@@ -263,7 +269,7 @@ export function ActivityGroup({ toolCalls }: { toolCalls: ChatToolCall[] }) {
         <ChevronRight className={cn("h-3 w-3 transition-transform", open && "rotate-90")} />
       </button>
       {open && (
-        <div className="border-t border-[--hair-border] px-2.5 py-1.5 font-mono text-[11px]">
+        <div className="border-t border-t-[#ebebeb] px-2.5 py-2 font-mono text-[11px] md:border-t-[--hair-border] md:py-1.5">
           {toolCalls.map((c, i) => (
             <div key={i} className="flex items-center gap-[7px] py-0.5">
               <span
