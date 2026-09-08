@@ -290,6 +290,51 @@ and follows it when the bar is dismissed. Nothing else reads the variable.
 sub-44px control on any of the mobile surfaces, no console or page errors, `tsc`
 clean, `audit-adaptive-ui --all` unchanged at 7.
 
+#### G9.1 — second pass: measured against the demo, not remembered
+
+The first pass got the composition right (header, sheets, composer chip) but was
+built from reading the demo's markup. It was then **rendered**: the standalone
+bundle unpacks and runs, so the demo's own AI screen was driven in a browser and
+its computed styles diffed against the shipped page element by element. Two
+things that reading had missed:
+
+1. **The surface was inset in the page gutter.** `PAGE_GUTTER` plus a card
+   border put ~31px of padding and a rounded frame around a conversation that
+   the demo runs edge to edge. It also cost the in-reply cards ~17px of line
+   length, which is what made KPI labels wrap that fit in the demo. The mobile
+   branch now renders `MobileIntelligence` with no gutter, and `--pi-chrome`
+   dropped its `+2rem` allowance to match.
+2. **The in-message table was the page ledger.** `TablePart` used piUi's `TH`/`TD`
+   — the ink header with sans cells. The demo's in-reply table is a different
+   object: `#fafafa` header, `#8a8a8a` mono labels, `#ebebeb` / `#f4f4f4`
+   hairlines, and **every cell in mono** so figures line up column to column.
+   That is now `TH_MESSAGE` / `TD_MESSAGE` in `piUi.tsx`, mobile value with
+   `md:` restoring the ledger literal.
+
+Also brought to the demo's numbers: card hairline `#ebebeb`, KPI label 9.5px
+`#8a8a8a` with tabular-nums values on an `#f4f4f4` grid rule, source note, the
+evidence chip and its citation rows, the activity disclosure, the composer's
+inner `#f4f4f4` rule, and the composer's two-row resting height (the demo's
+collapsed textarea is ~61px, not one line — `height:auto` lets `rows` set the
+floor so auto-grow still measures from there).
+
+**Two demo behaviours deliberately not ported:**
+
+- The demo colours any table cell whose **text** matches `/source|unset/` brand
+  red. That is a prototype shortcut, not a semantic: it would paint a supplier
+  legitimately named "Source Ltd" as a risk. Cell emphasis needs a real field on
+  the server's table part before it can ship.
+- The demo's header reads "New thread" on an empty chat. `PAGES.md` 16 is
+  explicit that "chat" is the user-visible word and "thread" is the data term,
+  so the shipped header says **New chat** — the demo contradicts its own spec
+  here.
+
+**Flag-dependent, worth knowing before a demo:** the composer's mode segment and
+the suggestions lightbulb only appear when `VITE_CHAT_MODES_ENABLED` and
+`VITE_SUGGESTED_ACTIONS_ENABLED` are on; the memory and files rows in the ⋯ menu
+need the `project_memory` / `reports` capabilities and an attached project. With
+those off the screen is correct but thinner than the demo's screenshots.
+
 ---
 
 ## 4. Sequence
