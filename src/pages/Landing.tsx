@@ -123,6 +123,13 @@ const ROADMAP = [
 
 type TechKey = 'network' | 'nexus' | 'simulation';
 
+const NETWORK_STATS = [
+  { label: 'Network levels', value: '3' },
+  { label: 'Topology', value: 'Multi-layer' },
+  { label: 'Metric', value: 'Betweenness & closeness' },
+  { label: 'Output', value: 'Critical nodes' },
+];
+
 const NEXUS_STATS = [
   { label: 'Training runs', value: '5,000+' },
   { label: 'Detection target', value: 'Nexus nodes' },
@@ -300,8 +307,11 @@ export default function Landing() {
           <div className="relative mx-auto max-w-6xl px-5 pt-12 pb-9 md:px-6 md:pt-20 md:pb-24">
             {/* Eyebrow */}
             <span className="inline-flex items-center rounded-sm border border-border bg-card px-3 py-1.5">
-              <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#BF2330]" />
-              <span className={KICKER}>Resilience-grade supply chain simulator</span>
+              <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#BF2330]" />
+              <span className={KICKER}>
+                <span className="sm:hidden">Supply chain resilience</span>
+                <span className="hidden sm:inline">Resilience-grade supply chain simulator</span>
+              </span>
             </span>
 
             {/* Headline block */}
@@ -427,7 +437,7 @@ export default function Landing() {
                         'radial-gradient(ellipse 54% 26% at 46% 72%, rgba(214,168,20,0.16), transparent 70%)',
                     }}
                   />
-                  <div className="relative h-[240px] md:h-[460px] lg:h-[560px]">
+                  <div className="relative h-[300px] md:h-[460px] lg:h-[560px]">
                     <NetworkVisualization3D />
                   </div>
                 </div>
@@ -549,10 +559,17 @@ export default function Landing() {
                         </div>
                       </div>
                     </div>
-                    <div className="lg:col-span-2 h-[220px] md:h-[500px] relative bg-black">
-                      <div className="absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-                      <div className="relative h-full">
-                        <NetworkVisualization3D />
+                    <div className="lg:col-span-2">
+                      {/* Mobile: stat viewport (3D viz is invisible at 220px on black bg) */}
+                      <div className="md:hidden">
+                        <StatViewport stats={NETWORK_STATS} />
+                      </div>
+                      {/* md+: 3D visualization */}
+                      <div className="hidden md:block md:h-[500px] relative bg-black">
+                        <div className="absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+                        <div className="relative h-full">
+                          <NetworkVisualization3D />
+                        </div>
                       </div>
                     </div>
                   </div>
