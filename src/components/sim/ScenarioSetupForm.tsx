@@ -200,14 +200,14 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
             value={local.name}
             onChange={(e) => patch({ name: e.target.value })}
             onBlur={commit}
-            className="w-full rounded-sm border border-transparent px-1 py-px text-[16px] font-semibold tracking-[-0.011em] text-[#18181b] hover:border-[--hair-rule] focus:border-foreground focus:outline-none"
+            className="min-h-11 w-full rounded-sm border border-transparent px-1 py-px text-[16px] font-semibold tracking-[-0.011em] text-[#18181b] hover:border-[--hair-rule] focus:border-foreground focus:outline-none md:min-h-0"
           />
           <input
             value={local.description}
             onChange={(e) => patch({ description: e.target.value })}
             onBlur={commit}
             placeholder="What this scenario tests"
-            className="w-full rounded-sm border border-transparent px-1 py-px text-[12.5px] text-[#52525b] hover:border-[--hair-rule] focus:border-foreground focus:outline-none"
+            className="min-h-11 w-full rounded-sm border border-transparent px-1 py-px text-[12.5px] text-[#52525b] hover:border-[--hair-rule] focus:border-foreground focus:outline-none md:min-h-0"
           />
         </div>
         <TimeUnitBar
@@ -217,7 +217,10 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
         />
       </section>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.16fr)] items-stretch gap-3">
+      {/* Two cards side by side leave 131px and 152px at 320px — narrower than
+          either card's own header. They stack below `md`; `md:` restores the
+          desktop template literally. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.16fr)]">
         <ParameterCard
           group={runWindow}
           footer={`${local.horizon_days} d horizon · ${local.warmup_days} d warm-up · ${measured} d measured`}
