@@ -301,7 +301,7 @@ export default function Landing() {
               <Link to="/auth">Get started</Link>
             </Button>
             {/* Mobile: Log in + hamburger */}
-            <Button asChild variant="outline" size="sm" className="h-11 whitespace-nowrap md:hidden">
+            <Button asChild variant="ghost" size="sm" className="h-11 whitespace-nowrap border border-border text-foreground md:hidden">
               <Link to="/auth">Log in</Link>
             </Button>
             <button
