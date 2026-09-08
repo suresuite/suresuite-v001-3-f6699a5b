@@ -159,7 +159,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
     if (!el) return;
     const max = expanded ? EXPANDED_MAX : COLLAPSED_MAX;
     const min = expanded ? EXPANDED_MIN : COLLAPSED_MIN;
-    el.style.height = COLLAPSED_MIN + "px";
+    el.style.height = "auto";
     el.style.height = Math.max(min, Math.min(el.scrollHeight, max)) + "px";
     el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
   }, [expanded]);
@@ -295,14 +295,14 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
       <div className="rounded-sm border border-[--hair-border] bg-background">
         <textarea
           ref={taRef}
-          rows={1}
+          rows={2}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           placeholder={agent ? "Ask the " + agent.name + "…" : "How can I help you today?"}
           className="block w-full resize-none rounded-t-sm border-none bg-transparent px-[11px] pb-[9px] pt-[11px] text-[14px] leading-[1.45] text-foreground outline-none placeholder:text-[#a8a8a8]"
           style={{ minHeight: COLLAPSED_MIN, overflow: "hidden" }}
         />
-        <div className="flex items-center gap-1.5 border-t border-[--hair-divider] px-[7px] py-1.5">
+        <div className="flex items-center gap-1.5 border-t border-t-[#f4f4f4] px-[7px] py-1.5">
           {/* The one control row: project · model · mode as a single chip. */}
           <button
             type="button"
@@ -682,7 +682,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
     // --pi-chrome is published by PageLayout: the measured bottom reservation
     // plus this page's gutter. The fallback only covers the first paint before
     // the credit bar is measured.
-    <div className="relative flex h-[calc(100svh-var(--pi-chrome,210px))] min-h-[420px] flex-col overflow-hidden rounded-sm border border-[--hair-border] bg-background">
+    <div className="relative flex h-[calc(100svh-var(--pi-chrome,170px))] min-h-[420px] flex-col overflow-hidden bg-background">
       {header}
 
       {messages.length === 0 ? (

@@ -23,6 +23,28 @@ export const TH =
   "bg-[--brand-ink] px-2.5 py-1.5 text-left font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white border-r border-r-[rgba(255,255,255,0.22)] last:border-r-0";
 export const TD = "px-2.5 py-1.5 text-[12.5px] text-foreground border-b border-[--hair-divider]";
 export const ROW_HOVER = "hover:bg-[#fcfcfc]";
+
+/**
+ * The in-MESSAGE table (MessageParts.TablePart) — NOT the ledger above.
+ *
+ * A table inside an assistant reply is a quiet block in a card, not a Ledger:
+ * the demo gives it a light #fafafa header with grey mono labels and hairline
+ * #ebebeb / #f4f4f4 rules, and sets every cell in mono so figures line up
+ * column to column. The ink TH is right for a full-page ledger and far too
+ * loud for three rows inside a chat bubble.
+ *
+ * Mobile value first, `md:` restoring the ledger literal — desktop renders
+ * exactly what it rendered before (spec §2.5C).
+ */
+export const TH_MESSAGE =
+  "px-2.5 text-left font-mono text-[10px] font-medium uppercase tracking-[0.14em] whitespace-nowrap " +
+  "bg-[#fafafa] py-[7px] text-[#8a8a8a] border-b border-b-[#ebebeb] " +
+  "md:border-b-0 md:bg-[--brand-ink] md:py-1.5 md:text-white md:border-r md:border-r-[rgba(255,255,255,0.22)] md:last:border-r-0";
+
+export const TD_MESSAGE =
+  "px-2.5 text-[12.5px] text-foreground border-b " +
+  "py-[7px] font-mono whitespace-nowrap border-b-[#f4f4f4] " +
+  "md:py-1.5 md:font-sans md:whitespace-normal md:border-b-[--hair-divider]";
 export const MONO = "font-mono";
 
 /** Layer colors (design system): firm/focal, product, process/material. */

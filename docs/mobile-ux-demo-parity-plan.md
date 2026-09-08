@@ -291,64 +291,50 @@ and follows it when the bar is dismissed. Nothing else reads the variable.
 sub-44px control on any of the mobile surfaces, no console or page errors, `tsc`
 clean, `audit-adaptive-ui --all` unchanged at 7.
 
+#### G9.1 — second pass: measured against the demo, not remembered
 
-### G10 — Simulation Lab was never taken past its rail · ✅ **done, mobile only**
+The first pass got the composition right (header, sheets, composer chip) but was
+built from reading the demo's markup. It was then **rendered**: the standalone
+bundle unpacks and runs, so the demo's own AI screen was driven in a browser and
+its computed styles diffed against the shipped page element by element. Two
+things that reading had missed:
 
-`PAGES.md` entry 14 records this screen as *"shell landed · rail remaining"*,
-and the rail did land — `StageRail` scrolls its five stage cards below `md` and
-centres the active one. Everything **behind** those five cards did not. Measured
-in Chromium against the real components, at 320px:
+1. **The surface was inset in the page gutter.** `PAGE_GUTTER` plus a card
+   border put ~31px of padding and a rounded frame around a conversation that
+   the demo runs edge to edge. It also cost the in-reply cards ~17px of line
+   length, which is what made KPI labels wrap that fit in the demo. The mobile
+   branch now renders `MobileIntelligence` with no gutter, and `--pi-chrome`
+   dropped its `+2rem` allowance to match.
+2. **The in-message table was the page ledger.** `TablePart` used piUi's `TH`/`TD`
+   — the ink header with sans cells. The demo's in-reply table is a different
+   object: `#fafafa` header, `#8a8a8a` mono labels, `#ebebeb` / `#f4f4f4`
+   hairlines, and **every cell in mono** so figures line up column to column.
+   That is now `TH_MESSAGE` / `TD_MESSAGE` in `piUi.tsx`, mobile value with
+   `md:` restoring the ledger literal.
 
-| # | Defect | Measured |
-|---|---|---|
-| G10.1 | Tables clipped, not scrolled — `TableShell` and `ParameterCard` are `overflow-hidden` | KPI summary 576px in 292px · comparison 595px in 292px · recovery impact 360px in 292px · Run window 409px in a **131px** card · Precision 472px in **152px** · Objective 517px in 294px |
-| G10.2 | `RunProgressPanel`'s header pushed the document sideways | `scrollWidth` 471 at 320, 474 at 414, **778 at 768** |
-| G10.3 | `ScenarioLibraryPanel` is a fixed 420px sheet | renders at `left:-93` — 93px permanently off-screen |
-| G10.4 | `DisruptionScheduleEditor`'s six fields share 12 columns | 31px per input |
-| G10.5 | `GateBar` truncates the blocked-run reason | §3.1 never-truncate list |
-| G10.6 | 60+ controls under the 44px floor across all five panes | now 0 |
+Also brought to the demo's numbers: card hairline `#ebebeb`, KPI label 9.5px
+`#8a8a8a` with tabular-nums values on an `#f4f4f4` grid rule, source note, the
+evidence chip and its citation rows, the activity disclosure, the composer's
+inner `#f4f4f4` rule, and the composer's two-row resting height (the demo's
+collapsed textarea is ~61px, not one line — `height:auto` lets `rows` set the
+floor so auto-grow still measures from there).
 
-**What shipped.** Reflows only — no recomposition, no new component tree. Every
-change is a mobile value with `md:` restoring the existing literal. The clipped
-tables scroll with the identifying column frozen (`FROZEN_CELL_ON_TINT`) and
-carry the swipe affordance; the two parameter cards stack; the run header and
-the gate bar wrap; the library sheet clamps to the viewport; the playbook save
-dialog uses `DIALOG_AS_SHEET`; the schedule editor is two columns below `md`.
-G3's three Lab selects (`SimulationLab.tsx:290`, `PlaybookPicker.tsx:55`,
-`ReplicationSeedExplorer.tsx:80`) closed with it.
+**Two demo behaviours deliberately not ported:**
 
-**Two desktop regressions were introduced and caught only by measuring at 1280**,
-both worth knowing:
+- The demo colours any table cell whose **text** matches `/source|unset/` brand
+  red. That is a prototype shortcut, not a semantic: it would paint a supplier
+  legitimately named "Source Ltd" as a risk. Cell emphasis needs a real field on
+  the server's table part before it can ship.
+- The demo's header reads "New thread" on an empty chat. `PAGES.md` 16 is
+  explicit that "chat" is the user-visible word and "thread" is the data term,
+  so the shipped header says **New chat** — the demo contradicts its own spec
+  here.
 
-1. A scroll wrapper around a table that held `flex-1` **takes** that `flex-1`,
-   so the card's surplus height stopped being shared across its rows.
-   `md:contents` removes the wrapper from desktop layout entirely.
-2. `FROZEN_CELL` carries `md:bg-transparent`, which stripped the parameter
-   grid's provenance rows of their `#fffdf7` tint above `md` — the same class
-   of defect G9 recorded on the ledger `TH`. A cell that already carries an
-   opaque fill wants `FROZEN_CELL_ON_TINT`.
-
-**Verified.** 320 / 360 / 375 / 390 / 414 / 768 / 1280 plus landscape 874x402,
-across five panes and the empty, loading, no-project, no-scenario, no-run,
-queued, running, failed, blocked-gate, warn-only, clear-gate, dirty-policy and
-long-text states, and behind every control: the library sheet, the stress-test
-drawer, the save dialog, the mapping report and all five Select popovers. No
-horizontal overflow and no sub-44px control anywhere below `md`. **Desktop
-proved rather than asserted: 21 full-page screenshots at 1280 are byte-identical
-by SHA-256 to `main`.** `audit-adaptive-ui` clean with the baseline unchanged at
-7; `tsc` unchanged at 7 pre-existing errors; `eslint` on the changed file set
-identical to `main`; every rendered number identical at 320 and 1280.
-
-**Not done, and why.** The `Dialog`/`Sheet` primitive's close button is 16x16 —
-a global control on ~40 surfaces, so raising it is a cross-page change that
-cannot be verified inside one page. The scenario row is a `div` with an
-`onClick` and so is not keyboard reachable; making it a real control is a
-behaviour change. `CredibilityBadge` and the per-replication cells explain
-themselves only through hover (`title` / tooltip), which is inert on touch —
-also behaviour. The demo's Lab copy ("No disruption schedule yet — this project
-has no network to disrupt", "swipe →", "Ask the AI about this run") was **not**
-ported: changing product strings is not a reflow, and §6 forbids copy that
-differs between platforms, so it needs one decision covering both.
+**Flag-dependent, worth knowing before a demo:** the composer's mode segment and
+the suggestions lightbulb only appear when `VITE_CHAT_MODES_ENABLED` and
+`VITE_SUGGESTED_ACTIONS_ENABLED` are on; the memory and files rows in the ⋯ menu
+need the `project_memory` / `reports` capabilities and an attached project. With
+those off the screen is correct but thinner than the demo's screenshots.
 
 ---
 
