@@ -287,13 +287,17 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                 value={projectId || ""}
                 onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
               >
-                <SelectTrigger className="w-[200px] h-9">
+                {/* §2.4/G3 Case A: the right slot is `shrink-0` beside a
+                    truncating title, so a fixed 200px starves the title at
+                    320px. 42vw exceeds 200px from 477px up, which pins the
+                    desktop literal without a second breakpoint. */}
+                <SelectTrigger className="w-[clamp(130px,42vw,200px)] h-9">
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {projects.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
+                    <SelectItem key={p.id} value={p.id} className="min-h-11 md:min-h-0">
                       {p.name}
                     </SelectItem>
                   ))}

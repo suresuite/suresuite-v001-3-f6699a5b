@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { DIALOG_AS_SHEET } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +28,10 @@ export function PlaybookSaveDialog({ open, onOpenChange, defaultName = "", onSav
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      {/* §2.6/§4.4 — a centred dialog is the wrong container on a phone.
+          DIALOG_AS_SHEET gates its own height cap and scroll behind `md:` so
+          the desktop dialog keeps the primitive's geometry exactly. */}
+      <DialogContent className={cn(DIALOG_AS_SHEET, "sm:max-w-md md:max-w-md")}>
         <DialogHeader>
           <DialogTitle className="text-base">Save recovery playbook</DialogTitle>
           <DialogDescription>
@@ -40,7 +45,7 @@ export function PlaybookSaveDialog({ open, onOpenChange, defaultName = "", onSav
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Hurricane response v2"
-              className="h-9"
+              className="h-9 min-h-11 md:min-h-0"
             />
           </div>
           <div className="space-y-1">

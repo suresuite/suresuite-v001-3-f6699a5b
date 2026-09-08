@@ -74,7 +74,7 @@ function TemplateCard({
       )}
       <Button
         size="sm"
-        className="h-7 text-xs w-full mt-1"
+        className="h-7 min-h-11 text-xs w-full mt-1 md:min-h-0"
         onClick={onUse}
         disabled={cloning}
       >
@@ -109,7 +109,11 @@ export function ScenarioLibraryPanel({ open, projectId, onClose, onCloned }: Pro
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent side="right" className="w-[420px] sm:w-[480px] flex flex-col p-0">
+      {/* A fixed 420px panel on a 320px screen renders at left:-93 — 93px of
+          it is permanently off-screen. The clamp keeps the 420px literal
+          wherever it fits and leaves a 24px scrim to tap out on below that;
+          the same idiom as FocusedStage. */}
+      <SheetContent side="right" className="w-[min(420px,calc(100vw-1.5rem))] sm:w-[480px] flex flex-col p-0">
         <SheetHeader className="px-5 pt-5 pb-3 border-b">
           <SheetTitle className="text-base">Scenario library</SheetTitle>
           <p className="text-xs text-muted-foreground">
@@ -123,7 +127,7 @@ export function ScenarioLibraryPanel({ open, projectId, onClose, onCloned }: Pro
             <button
               key={c.key}
               onClick={() => setFilter(c.key)}
-              className={`text-[11px] px-2.5 py-1 rounded-sm border transition-colors ${
+              className={`min-h-11 min-w-11 text-[11px] px-2.5 py-1 rounded-sm border transition-colors md:min-h-0 md:min-w-0 ${
                 filter === c.key
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background hover:bg-accent border-border"

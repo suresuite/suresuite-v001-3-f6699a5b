@@ -306,9 +306,12 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
             title="When off, disruptions hit raw — no mitigation runs."
           >
             <div className="text-xs font-medium">Recovery enabled</div>
+            {/* §2.4: the track stays 24px; `box-content` plus the negated
+                margin grow the hit box to 44px without moving anything. */}
             <Switch
               checked={effective.enabled}
               onCheckedChange={(v) => patchOverride("enabled", v)}
+              className="-my-[10px] box-content py-[10px] md:my-0 md:box-border md:py-0"
             />
           </div>
 
@@ -331,7 +334,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
                     {/* Strategy header — clickable to toggle */}
                     <button
                       type="button"
-                      className="w-full flex items-start gap-3 px-3 py-2.5 text-left"
+                      className="w-full flex min-h-11 items-start gap-3 px-3 py-2.5 text-left md:min-h-0"
                       title={STRATEGY_DESCRIPTIONS[opt]}
                       onClick={() => toggleResponse(opt)}
                     >
@@ -350,7 +353,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
 
                     {/* Strategy params — only when active and params exist */}
                     {active && params.length > 0 && (
-                      <div className="border-t border-border/60 px-3 py-3 grid grid-cols-2 gap-3">
+                      <div className="border-t border-border/60 px-3 py-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                         {params.map((f) => {
                           const stored = overrides[f.key as string];
                           const displayVal = stored !== undefined && stored !== null
@@ -369,7 +372,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
                                 onChange={(e) =>
                                   patchOverride(f.key, parseFloat(e.target.value) || f.default)
                                 }
-                                className="h-8 text-xs"
+                                className="h-8 min-h-11 text-xs md:min-h-0"
                               />
                             </div>
                           );

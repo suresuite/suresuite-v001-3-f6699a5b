@@ -92,7 +92,7 @@ export function ScenarioList({
             type="button"
             onClick={onBrowseSaved}
             title="Browse the saved experiment library"
-            className="h-6 rounded-sm border border-[--hair-rule] px-2 text-[11.5px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground"
+            className="h-6 min-h-11 rounded-sm border border-[--hair-rule] px-2 text-[11.5px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground md:min-h-0"
           >
             Library
           </button>
@@ -100,14 +100,15 @@ export function ScenarioList({
             type="button"
             onClick={onCreate}
             title="New scenario"
-            className="h-6 w-6 rounded-sm border border-[--hair-rule] text-[14px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground"
+            className="h-6 min-h-11 w-6 min-w-11 rounded-sm border border-[--hair-rule] text-[14px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground md:min-h-0 md:min-w-0"
           >
             +
           </button>
         </span>
       </div>
 
-      <div className="max-h-[420px] overflow-y-auto">
+      {/* 420px is taller than a landscape phone's whole viewport (§2.6). */}
+      <div className="max-h-[min(420px,60svh)] overflow-y-auto md:max-h-[420px]">
         {loading ? (
           <div className="px-[14px] py-3 text-[12.5px] text-[--zinc-quiet]">Loading…</div>
         ) : null}
@@ -158,7 +159,7 @@ export function ScenarioList({
                     e.stopPropagation();
                     onDuplicate(s);
                   }}
-                  className="h-6 w-6 rounded-sm border border-transparent text-[12px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#18181b]"
+                  className="h-6 min-h-11 w-6 min-w-11 rounded-sm border border-transparent text-[12px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#18181b] md:min-h-0 md:min-w-0"
                 >
                   ⧉
                 </button>
@@ -169,7 +170,7 @@ export function ScenarioList({
                     e.stopPropagation();
                     if (confirm(`Delete scenario "${s.name}"?`)) onDelete(s.id);
                   }}
-                  className="h-6 w-6 rounded-sm border border-transparent text-[13px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#BF2330]"
+                  className="h-6 min-h-11 w-6 min-w-11 rounded-sm border border-transparent text-[13px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#BF2330] md:min-h-0 md:min-w-0"
                 >
                   ✕
                 </button>

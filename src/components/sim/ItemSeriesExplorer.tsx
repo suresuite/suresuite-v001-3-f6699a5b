@@ -172,7 +172,7 @@ export function ItemSeriesExplorer({ runId, warmupWeeks = null }: Props) {
                 setQuery("");
               }}
               className={cn(
-                "h-6 px-2 rounded-md text-[10px] border transition-colors capitalize",
+                "h-6 min-h-11 px-2 rounded-md text-[10px] border transition-colors capitalize md:min-h-0",
                 k === kind
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-card hover:bg-muted/50 border-border",
@@ -188,7 +188,7 @@ export function ItemSeriesExplorer({ runId, warmupWeeks = null }: Props) {
         <div className="border-b md:border-b-0 md:border-r p-2 flex flex-col gap-2">
           <Input
             placeholder={`Search ${counts[kind]} ${kind}s…`}
-            className="h-7 text-xs"
+            className="h-7 min-h-11 text-xs md:min-h-0"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -199,7 +199,7 @@ export function ItemSeriesExplorer({ runId, warmupWeeks = null }: Props) {
                 type="button"
                 onClick={() => setSelectedId(i.item_id)}
                 className={cn(
-                  "text-left px-2 py-1 rounded text-[11px] font-mono truncate transition-colors",
+                  "text-left px-2 py-1 min-h-11 flex items-center rounded text-[11px] font-mono truncate transition-colors md:min-h-0 md:block",
                   i.item_id === selectedId
                     ? "bg-primary text-primary-foreground"
                     : "hover:bg-muted/50",
