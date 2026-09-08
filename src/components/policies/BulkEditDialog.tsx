@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { DIALOG_AS_SHEET } from "@/components/shared";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -47,7 +49,7 @@ export function BulkEditDialog({ open, onOpenChange, family, defaults, targetKey
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={cn(DIALOG_AS_SHEET, "md:max-w-lg")}>
         <DialogHeader>
           <DialogTitle>Bulk edit · {family}</DialogTitle>
           <DialogDescription>
