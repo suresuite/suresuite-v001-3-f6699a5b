@@ -55,9 +55,9 @@ export function ErpConnectionsPanel({ projectId }: { projectId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-col items-start gap-2 pb-2 md:flex-row md:items-center md:justify-between">
         <CardTitle className="text-sm">Connect a data source</CardTitle>
-        <Button size="sm" variant="outline" onClick={handleConnect}>
+        <Button size="sm" variant="outline" className="min-h-11 w-full md:min-h-0 md:w-auto" onClick={handleConnect}>
           <Plug className="h-3.5 w-3.5 mr-1.5" /> Connect orbit-mrp
         </Button>
       </CardHeader>
@@ -74,18 +74,18 @@ export function ErpConnectionsPanel({ projectId }: { projectId: string }) {
           const latestRun = runsByLink[link.id]?.[0];
           return (
             <div key={link.id} className="rounded-md border p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-                  <span className="text-sm font-medium">{link.external_company_name ?? link.external_company_id}</span>
+                  <span className="min-w-0 truncate text-sm font-medium" title={link.external_company_name ?? link.external_company_id}>{link.external_company_name ?? link.external_company_id}</span>
                   <Badge variant="outline" className="text-[10px]">{link.external_system}</Badge>
                   <span className="text-xs text-muted-foreground">{meta.label}</span>
                 </div>
                 <div className="flex gap-1.5">
-                  <Button size="sm" variant="ghost" disabled={link.status === "revoked" || syncing === link.id} onClick={() => handleSync(link.id)}>
+                  <Button size="sm" variant="ghost" className="min-h-11 md:min-h-0" disabled={link.status === "revoked" || syncing === link.id} onClick={() => handleSync(link.id)}>
                     <RefreshCw className={`h-3.5 w-3.5 mr-1 ${syncing === link.id ? "animate-spin" : ""}`} /> Sync now
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => revokeLink(link.id)}>
+                  <Button size="sm" variant="ghost" className="min-h-11 md:min-h-0" onClick={() => revokeLink(link.id)}>
                     <Unplug className="h-3.5 w-3.5 mr-1" /> Revoke
                   </Button>
                 </div>
@@ -99,7 +99,7 @@ export function ErpConnectionsPanel({ projectId }: { projectId: string }) {
                   </p>
                   <MappingWarningsCard warnings={latestRun.mapping_warnings} status={latestRun.status === "staged" ? "done" : "running"} />
                   {latestRun.status === "staged" && (
-                    <Button size="sm" onClick={() => handleApply(latestRun.id)}>
+                    <Button size="sm" className="min-h-11 w-full md:min-h-0 md:w-auto" onClick={() => handleApply(latestRun.id)}>
                       Apply sync to this project
                     </Button>
                   )}
