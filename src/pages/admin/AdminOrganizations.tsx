@@ -17,6 +17,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { OrgAccessDrawer } from '@/components/admin/OrgAccessDrawer';
+import { DIALOG_AS_SHEET } from '@/components/shared';
+import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface OrgRow { id: string; name: string; slug: string; status: string; created_at: string; members: number; projects: number; cost_mtd: number; }
@@ -100,10 +102,10 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setRenameOrg(o)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setAccessOrg(o)}><ShieldCheck className="mr-2 h-4 w-4" /> Access defaults…</DropdownMenuItem>
+                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => setRenameOrg(o)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
+                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => setAccessOrg(o)}><ShieldCheck className="mr-2 h-4 w-4" /> Access defaults…</DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => toggleStatus(o)}>
+                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => toggleStatus(o)}>
                         {o.status === 'active' ? <><Ban className="mr-2 h-4 w-4" /> Suspend</> : <><Undo2 className="mr-2 h-4 w-4" /> Reactivate</>}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -143,10 +145,10 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setRenameOrg(o)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAccessOrg(o)}><ShieldCheck className="mr-2 h-4 w-4" /> Access defaults…</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => setRenameOrg(o)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => setAccessOrg(o)}><ShieldCheck className="mr-2 h-4 w-4" /> Access defaults…</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => toggleStatus(o)}>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => toggleStatus(o)}>
                           {o.status === 'active' ? <><Ban className="mr-2 h-4 w-4" /> Suspend</> : <><Undo2 className="mr-2 h-4 w-4" /> Reactivate</>}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -179,7 +181,7 @@ function RenameOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
   };
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="rounded-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Rename “{org.name}”</DialogTitle></DialogHeader>
         <div><Label className="text-xs">New name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" autoFocus /></div>
         <DialogFooter>
@@ -207,7 +209,7 @@ function AddOrgDialog({ actorArgs, onCreated }: { actorArgs: () => any; onCreate
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setName(''); setSlug(''); } }}>
       <DialogTrigger asChild><Button size="sm" className="rounded-sm"><Plus className="mr-1.5 h-3.5 w-3.5" /> Add organization</Button></DialogTrigger>
-      <DialogContent className="rounded-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Add organization</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" placeholder="Acme Robotics" /></div>

@@ -83,27 +83,33 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
         <div className="space-y-4">
           <div className={`${SURFACE} overflow-hidden`}>
             <div className={`${KX} border-b border-[--hair-border] px-4 py-[9px]`}>Reach</div>
-            <div className="grid grid-cols-4">
+            {/* Spec 2.3/4.5: four 27px figures do not fit 320px. Below md this is a
+                2-up whose cell rules come from a 1px grid gap over the divider
+                colour, so no cell needs to know its index; md: restores the
+                literal grid-cols-4 and the index-driven border-r. */}
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-px bg-[--hair-divider] md:grid-cols-4 md:gap-0 md:bg-transparent">
               {reach.map(([label, value], i) => (
-                <div key={label} className={i < 3 ? 'border-r border-[--hair-divider] px-[18px] py-[15px]' : 'px-[18px] py-[15px]'}>
+                <div key={label} className={`min-w-0 bg-white px-[18px] py-[15px] md:bg-transparent ${i < 3 ? 'md:border-r md:border-[--hair-divider]' : ''}`}>
                   <div className={KX}>{label}</div>
-                  <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{value}</div>
+                  <div className="mt-2 text-[length:var(--fs-stat)] font-semibold leading-none tracking-[-0.02em] tabular-nums md:text-[27px]">{value}</div>
                 </div>
               ))}
             </div>
             <div className={`${KX} border-y border-[--hair-border] px-4 py-[9px]`}>AI spend</div>
-            <div className="grid grid-cols-4">
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-px bg-[--hair-divider] md:grid-cols-4 md:gap-0 md:bg-transparent">
               {spend.map(([label, value, hint, emph], i) => (
-                <div key={label as string} className={`px-[18px] py-[15px] ${i < 3 ? 'border-r border-[--hair-divider]' : ''} ${emph ? 'bg-[#fffdf3]' : ''}`}>
+                <div key={label as string} className={`min-w-0 px-[18px] py-[15px] ${i < 3 ? 'md:border-r md:border-[--hair-divider]' : ''} ${emph ? 'bg-[#fffdf3]' : 'bg-white md:bg-transparent'}`}>
                   <div className={KX}>{label}</div>
-                  <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{value}</div>
+                  <div className="mt-2 text-[length:var(--fs-stat)] font-semibold leading-none tracking-[-0.02em] tabular-nums md:text-[27px]">{value}</div>
                   {emph ? <div className="mt-2 h-[2px] w-9 rounded-full bg-[#f8d448]" /> : hint ? <div className="mt-2 font-mono text-[10px] text-[#a3a3a3]">{hint}</div> : null}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5">
+          {/* Spec 2.3: two ledgers side by side is ~150px each at 320. Stack below
+              md; md: restores the literal 2-up. */}
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[repeat(2,minmax(0,1fr))]">
             <TopTable title="Top users" rows={topUsers} />
             <TopTable title="Top organizations" rows={topOrgs} />
           </div>
