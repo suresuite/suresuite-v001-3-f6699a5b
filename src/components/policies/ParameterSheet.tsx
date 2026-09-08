@@ -52,7 +52,7 @@ export function ParameterSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[392px] overflow-y-auto sm:max-w-[392px]">
+      <SheetContent className="w-full overflow-y-auto sm:w-[392px] sm:max-w-[392px]">
         {meta && (
           <>
             <SheetHeader>

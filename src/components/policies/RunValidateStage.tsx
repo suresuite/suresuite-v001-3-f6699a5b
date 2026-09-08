@@ -1311,8 +1311,8 @@ export function RunValidateStage({
   return (
     <div className="flex flex-col gap-2.5">
       {/* Section D as a band — the sim-lab surface, zinc ramp. */}
-      <div className={RAIL_STAGE_ROW_OPEN} style={RAIL_STAGE_ROW_OPEN_STYLE}>
-        <div className="flex w-[192px] shrink-0 flex-col justify-center gap-[3px] pr-2.5">
+      <div className={cn(RAIL_STAGE_ROW_OPEN, "flex-col md:flex-row")} style={RAIL_STAGE_ROW_OPEN_STYLE}>
+        <div className="flex w-full min-w-0 flex-col justify-center gap-[3px] pb-2 md:w-[192px] md:shrink-0 md:pb-0 md:pr-2.5">
           <span className="flex items-center gap-[7px]">
             <RailMarker>D</RailMarker>
             <span className={RAIL_EYEBROW} style={{ color: RAIL.zinc.body }}>
