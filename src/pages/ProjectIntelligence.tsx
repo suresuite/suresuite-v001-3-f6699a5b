@@ -20,6 +20,8 @@ import { useSearchParams } from "react-router-dom";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { PAGE_GUTTER } from "@/components/shared/PageBody";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { PanelLeft, X } from "lucide-react";
 import { useGlobalProject, type Project } from "@/hooks/useGlobalProject";
 import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -72,6 +74,12 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     () => (typeof window !== "undefined" ? window.localStorage.getItem(KEY_SIDEBAR_COLLAPSED) === "1" : false),
   );
   const [resizing, setResizing] = useState(false);
+
+  // Below md the three-column grid cannot work: at 390px a 264px sidebar plus
+  // the 5px handle leaves the workspace ~120px, and the handle is mouse-only so
+  // it can never be collapsed by touch. One column, sidebar as an overlay.
+  const isMobile = useIsMobile();
+  const [chatListOpen, setChatListOpen] = useState(false);
 
   const {
     threads,
@@ -229,11 +237,14 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
   const handleSelectThread = (id: string) => {
     setActiveThread(id);
     setSearchParams({ thread: id }, { replace: true });
+    // No-op above md, where the overlay never opens.
+    setChatListOpen(false);
   };
 
   const handleNewThread = () => {
     const id = newThread();
     if (id) setSearchParams({ thread: id }, { replace: true });
+    setChatListOpen(false);
   };
 
   const handleModelChange = (id: string) => {
@@ -251,6 +262,40 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     updateThread(activeThreadId, { projectId });
   };
 
+  // The single ChatSidebar prop set. Both the desktop grid child and the mobile
+  // overlay spread this, so the two instances can never drift apart; only the
+  // collapse trio below differs, because only the desktop instance collapses.
+  const sidebarProps = {
+    projects,
+    threads,
+    activeThreadId,
+    onSelectThread: handleSelectThread,
+    onNewThread: handleNewThread,
+    onDeleteThread: deleteThread,
+    onRenameThread: (id: string, title: string) => updateThread(id, { title }),
+    onAttachProject: (id: string, projectId: string | null) => updateThread(id, { projectId }),
+    syncEnabled,
+    folders,
+    onCreateFolder: createFolder,
+    onDeleteFolder: deleteFolder,
+    onMoveToFolder: moveThreadToFolder,
+    onTogglePin: setPinned,
+    onToggleArchive: setArchived,
+    onSearchMessages: searchMessages,
+    memoryEnabled: can("project_memory"),
+    memoryProjectId,
+    filesEnabled: fileWorkspaceUiEnabled() && can("reports"),
+    onBulkSetFlags: bulkSetThreadFlags,
+    onBulkMoveToFolder: bulkMoveToFolder,
+    onBulkDelete: bulkDeleteThreads,
+    files: sidebarFiles,
+    memoryEntries: sidebarMemory,
+    onDownloadFile: handleDownloadFile,
+    onKeepFile: handleKeepFile,
+    onAddMemory: handleAddMemory,
+    onArchiveMemory: handleArchiveMemory,
+  };
+
   // full_name is Supabase auth user_metadata, absent from the generated User type.
   const fullName = (user as { user_metadata?: { full_name?: string } } | null)?.user_metadata?.full_name;
   const firstName = (fullName ?? user?.email ?? "").split(/[ @]/)[0];
@@ -259,51 +304,87 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
         {/* No subtitle — AdminLayout header pattern. */}
-        <PageHeader title="Project Intelligence" />
+        <PageHeader
+          title="Project Intelligence"
+          rightContent={
+            isMobile ? (
+              <button
+                type="button"
+                onClick={() => setChatListOpen(true)}
+                aria-label="Chats, files and memory"
+                title="Chats, files and memory"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-card text-foreground"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </button>
+            ) : undefined
+          }
+        />
 
         <div
-          className="grid h-[calc(100vh-150px)] min-h-[560px] overflow-hidden rounded-sm border border-[--hair-border] bg-background"
+          className="grid overflow-hidden rounded-sm border border-[--hair-border] bg-background
+                     h-[calc(100svh-var(--pi-chrome,210px))] min-h-[420px]
+                     md:h-[calc(100vh-150px)] md:min-h-[560px]"
           style={{
-            gridTemplateColumns: sidebarCollapsed
-              ? "48px minmax(0,1fr)"
-              : sidebarWidth + "px 5px minmax(0,1fr)",
+            gridTemplateColumns: isMobile
+              ? "minmax(0,1fr)"
+              : sidebarCollapsed
+                ? "48px minmax(0,1fr)"
+                : sidebarWidth + "px 5px minmax(0,1fr)",
           }}
         >
-          <ChatSidebar
-            collapsed={sidebarCollapsed}
-            onCollapse={() => setCollapsed(true)}
-            onExpand={() => setCollapsed(false)}
-            projects={projects}
-            threads={threads}
-            activeThreadId={activeThreadId}
-            onSelectThread={handleSelectThread}
-            onNewThread={handleNewThread}
-            onDeleteThread={deleteThread}
-            onRenameThread={(id, title) => updateThread(id, { title })}
-            onAttachProject={(id, projectId) => updateThread(id, { projectId })}
-            syncEnabled={syncEnabled}
-            folders={folders}
-            onCreateFolder={createFolder}
-            onDeleteFolder={deleteFolder}
-            onMoveToFolder={moveThreadToFolder}
-            onTogglePin={setPinned}
-            onToggleArchive={setArchived}
-            onSearchMessages={searchMessages}
-            memoryEnabled={can("project_memory")}
-            memoryProjectId={memoryProjectId}
-            filesEnabled={fileWorkspaceUiEnabled() && can("reports")}
-            onBulkSetFlags={bulkSetThreadFlags}
-            onBulkMoveToFolder={bulkMoveToFolder}
-            onBulkDelete={bulkDeleteThreads}
-            files={sidebarFiles}
-            memoryEntries={sidebarMemory}
-            onDownloadFile={handleDownloadFile}
-            onKeepFile={handleKeepFile}
-            onAddMemory={handleAddMemory}
-            onArchiveMemory={handleArchiveMemory}
-          />
+          {/* Below md the sidebar is off-canvas. It is the SAME component with the
+              same sidebarProps; only the collapse trio differs, and the overlay
+              never collapses — its close button dismisses the drawer instead. */}
+          {isMobile && chatListOpen && (
+            <div className="fixed inset-0 z-[60] flex md:hidden" role="dialog" aria-modal="true">
+              <div className="flex w-[86vw] max-w-[330px] flex-col bg-background shadow-xl">
+                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border pl-3 pr-2">
+                  <span className="flex-1 text-[13px] font-semibold">Chats</span>
+                  <button
+                    type="button"
+                    onClick={() => setChatListOpen(false)}
+                    aria-label="Close"
+                    className="grid h-11 w-11 place-items-center rounded-md hover:bg-accent"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <ChatSidebar
+                    collapsed={false}
+                    onCollapse={() => setChatListOpen(false)}
+                    onExpand={() => setChatListOpen(true)}
+                    {...sidebarProps}
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setChatListOpen(false)}
+                className="flex-1 bg-foreground/30"
+              />
+            </div>
+          )}
 
-          {!sidebarCollapsed && (
+          {/* Exactly one ChatSidebar is mounted at any width — this branch above
+              md, the overlay below it. display:contents keeps this one a DIRECT
+              grid child; a plain wrapper would collapse the three tracks into
+              one cell and squeeze the workspace into the sidebar column. */}
+          {!isMobile && (
+            <div className="contents">
+              <ChatSidebar
+                collapsed={sidebarCollapsed}
+                onCollapse={() => setCollapsed(true)}
+                onExpand={() => setCollapsed(false)}
+                {...sidebarProps}
+              />
+            </div>
+          )}
+
+          {/* 6 · the handle is onMouseDown-only, so it never mounts below md. */}
+          {!isMobile && !sidebarCollapsed && (
             <div
               onMouseDown={startResize}
               title="Drag to resize"
