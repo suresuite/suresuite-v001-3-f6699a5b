@@ -152,7 +152,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
       ) : error ? (
         <div className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-4 text-sm text-[#bf2330]">{error}</div>
       ) : !data ? null : (
-        <div className={`grid gap-5 ${preview ? 'lg:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
+        <div className={`grid gap-5 ${preview ? 'md:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
           <div className="space-y-4">
             <Section title="Pages"><CapMatrix rows={pages} isSuper={isSuper} onSet={setOverride} /></Section>
             <Section title="Features"><CapMatrix rows={features} isSuper={isSuper} onSet={setOverride} /></Section>
@@ -164,7 +164,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
                     <div className={`${KX} mb-1.5`}>{provider}</div>
                     <div className="space-y-1">
                       {models.map((m) => (
-                        <label key={m.id} className="flex items-center gap-2.5 rounded-sm px-1 py-1 text-sm hover:bg-[#fafafa]">
+                        <label key={m.id} className="flex min-h-11 items-center gap-2.5 rounded-sm px-1 py-1 text-sm hover:bg-[#fafafa] md:min-h-0">
                           <Checkbox checked={data.models.allowed_ids.includes(m.id)} disabled={isSuper} onCheckedChange={(v) => toggleModel(m.id, !!v)} />
                           <span>{m.display_name}</span>
                           <span className="ml-auto font-mono text-[11px] text-muted-foreground">{m.code}</span>
@@ -175,7 +175,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
                 ))}
               </div>
               <div className="my-4 h-px bg-[--hair-border]" />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="text-xs">Default model</Label>
                   <Select value={data.models.default_id ?? 'none'} onValueChange={(v) => saveModels({ default_id: v === 'none' ? null : v })}>
@@ -242,7 +242,7 @@ function CapMatrix({ rows, isSuper, onSet }: { rows: CapRow[]; isSuper: boolean;
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-[13px] font-medium">{row.label}{locked && <Lock className="h-3 w-3 text-muted-foreground" />}</div>
             </div>
-            <span className="hidden shrink-0 font-mono text-[10px] text-[#a3a3a3] sm:inline">default {row.role_default ? 'allow' : 'deny'}</span>
+            <span className="shrink-0 font-mono text-[10px] text-[#a3a3a3]">default {row.role_default ? 'allow' : 'deny'}</span>
             {locked || isSuper ? (
               <span className="w-full text-right text-[11px] text-muted-foreground sm:w-[210px]">{locked ? 'Always available' : 'Full access'}</span>
             ) : (
@@ -272,7 +272,7 @@ function Field({ label, value, set, placeholder }: { label: string; value: strin
   return (
     <div>
       <Label className="text-xs">{label}</Label>
-      <Input type="number" inputMode="decimal" value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="mt-1 rounded-sm font-mono" />
+      <Input type="number" inputMode="decimal" value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="mt-1 min-h-11 rounded-sm font-mono md:min-h-0" />
     </div>
   );
 }
@@ -281,7 +281,7 @@ function PreviewPanel({ data }: { data: AccessData }) {
   const pages = data.capabilities.filter((c) => c.kind === 'page' && c.effective);
   const features = data.capabilities.filter((c) => c.kind === 'feature' && c.effective);
   return (
-    <aside className={`${SURFACE} sticky top-16 h-fit p-4`}>
+    <aside className={`${SURFACE} h-fit p-4 md:sticky md:top-16`}>
       <div className="mb-2.5 flex items-center gap-2">
         <Eye className="h-4 w-4 text-[#bf2330]" />
         <h3 className="text-[13px] font-semibold">Preview as {data.name || data.email}</h3>

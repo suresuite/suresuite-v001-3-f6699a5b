@@ -167,20 +167,26 @@ export default function MLPrediction({ selectedPlant }: MLPredictionProps) {
               </Button>
 
               {/* Stats grid below button with extra breathing room */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-3">
+              <div className="grid grid-cols-3 gap-2 pt-3 md:gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold">{stats.total}</div>
                   <div className="text-xs text-muted-foreground">Total Nodes</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">{stats.critical}</div>
+                  <div className="text-2xl font-bold text-[#bf2330]">{stats.critical}</div>
                   <div className="text-xs text-muted-foreground">Nexus</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{stats.non_critical}</div>
+                  <div className="text-2xl font-bold text-[#14b8c4]">{stats.non_critical}</div>
                   <div className="text-xs text-muted-foreground">Non-Nexus</div>
                 </div>
               </div>
+
+              <p className="pt-1 text-[11.5px] leading-relaxed text-muted-foreground">
+                Nexus nodes are a prediction about cascading failure. The
+                single-source material count on the lens pages is a structural
+                fact about sourcing — the two answer different questions.
+              </p>
             </div>
           )}
         </CardContent>
