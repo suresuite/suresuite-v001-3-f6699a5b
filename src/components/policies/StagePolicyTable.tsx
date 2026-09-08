@@ -1373,7 +1373,7 @@ export function StagePolicyTable({
             {dirtyKeys.length} edited
           </span>
         )}
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
           {familiesPresent.map((f) => (
             <FamilyChip
               key={f}
