@@ -1,4 +1,6 @@
 import { PageLayout } from "@/components/shared/PageLayout";
+import { MobileGettingStarted } from "@/components/home/MobileGettingStarted";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { Link } from "react-router-dom";
 import { YouTubeEmbed } from "@/components/shared";
 import { useState, useEffect, useRef } from "react";
@@ -91,6 +93,14 @@ const DarkSection = ({
 );
 
 const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) => {
+  // Structural branch, not a `md:` reflow: below 768px this route renders the
+  // current-dialect home (components/home/MobileGettingStarted.tsx) instead of
+  // the legacy marketing page. Rendering both trees would mount the 3D canvas
+  // on phones, which the mobile decision rules out - hence the hook rather than
+  // `hidden md:block`. The branch itself sits below every hook in this
+  // component so the hook order is identical on both platforms.
+  const isMobile = useIsMobile();
+
   // Default selected sub-block
   const [activeTech, setActiveTech] = useState<TechKey>('network');
 
@@ -158,6 +168,14 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
       clearTimeout(t3);
     };
   }, []);
+
+  if (isMobile) {
+    return (
+      <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+        <MobileGettingStarted />
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>

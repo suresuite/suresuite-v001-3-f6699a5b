@@ -159,7 +159,7 @@ dialog is the wrong container on mobile; the demo uses a bottom sheet.
 **Shell only.** Its logic, its `targetKeys` contract and its copy ("Empty fields
 are skipped so the override stays sparse") stay verbatim.
 
-### G5 — `GettingStarted.tsx` never got the redesign · **largest visual gap**
+### G5 — `GettingStarted.tsx` never got the redesign · ✅ **done, mobile only**
 
 This is the app's **Home tab**, and it is the one page still in the old
 marketing dialect: gradients, `hover:shadow-xl hover:-translate-y-1`, centred
@@ -234,7 +234,7 @@ riskiest visual change lands last and alone.
 | **2** | **Selects** — G3 (all 10) | 5 pages + 4 sim components | Low. One-line each |
 | **3** | **Bulk edit sheet** — G4 | `BulkEditDialog.tsx` | Low. Shell swap, logic untouched |
 | **4** | **More panel** — G6 | `MobileNav.tsx` | Medium. Re-layout; keep the tab bar visible |
-| **5** | **Getting Started** — G5 | `GettingStarted.tsx` | **High, and gated on §5** |
+| **5** | **Getting Started** — G5 | `GettingStarted.tsx`, `home/MobileGettingStarted.tsx` | ✅ **done** — see §5 |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
 
@@ -247,25 +247,63 @@ e.g. `fix(mobile): freeze the policy-grid identifying column (spec §2.5C/§2.7)
 
 ---
 
-## 5. The one decision needed — Getting Started (G5)
+## 5. Getting Started (G5) — decided, and the divergence recorded
 
-Everything else is mechanical. This is not, so it is stated as a choice:
+**Decision (owner's call, taken): port the demo composition, mobile only.**
 
-- **(a) Port the demo.** Replace the marketing stack with the resume card +
-  quick-start rows. Matches the demo exactly, clears 5 of 7 audit violations,
-  and makes Home useful to a returning user. Biggest change; the marketing copy
-  moves to `/about` or is dropped.
-- **(b) Conformance only.** Keep the page as-is, fix just the `lg:` breakpoints
-  and the `bg-black` band. Clears the audit, leaves the demo divergence open.
-  Low risk, low reward.
-- **(c) Defer.** Ship commits 1–4, leave the audit baseline as-is, and take the
-  page in its own redesign with the marketing copy resolved first.
+`PAGES.md` entry 04 required this to be settled explicitly — *"either the repo
+page is modernised too, or this divergence is accepted deliberately and written
+down. It is not a thing to discover in review."* This section is that record.
 
-**Recommendation: (c) now, (a) next.** Commits 1–4 are unambiguous wins that
-need no product input and shouldn't be held hostage to a page-identity question.
-(a) is the right end state, but "what does Home say to a returning user" is a
-product call, not a UI cleanup — and `PAGES.md` already flags it as an open
-question rather than a defect.
+**What now ships on this route:**
+
+| | Below 768px | 768px and up |
+|---|---|---|
+| Tree | `components/home/MobileGettingStarted.tsx` | The existing legacy page, untouched |
+| Dialect | Current/sharp — 4px radius, 1px `--hair-border`, mono kickers, no gradients | Legacy — gradients, icon tiles, `rounded-2xl` |
+| 3D | Not mounted | `NetworkVisualization3D` as before |
+
+**The divergence is accepted deliberately.** Desktop and mobile speak different
+visual dialects on this one route. That is a knowing exception to "every change
+ships desktop and mobile", taken because the desktop page is *documented legacy*
+(design system §3.10 names it as the one surface that "predates [the system] and
+looks nothing like it") and because the brief for this work was explicitly
+mobile-only. Modernising desktop remains open, and would close the divergence.
+
+**Why a `useIsMobile` branch and not `md:` classes.** This is a different
+component tree, which is exactly what `use-is-mobile.ts` reserves the hook for.
+Rendering both trees behind `hidden md:block` would mount the 3D canvas on
+phones, against the standing no-3D-on-mobile decision. The branch sits below
+every hook in the component, so hook order is identical on both platforms.
+
+### What was deliberately not built, and why
+
+The demo's resume card also carries a relative timestamp ("12 min ago"), node
+and echelon counts, and a three-row readiness checklist (data imported /
+policies configured / validated run). **None of it shipped**, because every one
+of those values needs a query this route does not make — `useDataMap`,
+`usePolicies`, `useScenarioRuns`. Mounting them would fire three new requests on
+every home load: a behaviour change, not a UI change, and so outside gate 1.
+
+What shipped instead is built strictly from `useGlobalProject()` — app-wide
+context that is already mounted and costs no request. Nothing is invented: a
+field the context does not hold is not rendered at all, and the meta line drops
+empty entries rather than showing a hole.
+
+**Consequence worth knowing:** a cold load restores the project *id* from
+`localStorage` but not the project row, so the card's "No project open" state is
+common rather than exceptional. It is built as a real destination
+("Choose a project" → Project Manager), not an apology.
+
+**Follow-up, if the full demo card is wanted:** add the three readiness rows and
+the timestamp. That is a small, well-scoped change — but it is a *data* change,
+so it needs its own non-UI-only PR and its own review.
+
+### What this did not clear
+
+The 4 `lg:` violations and the `bg-black` band are all in the **desktop** tree,
+which this work does not touch. The audit therefore still reports 7 — unchanged,
+not worsened. They clear only if desktop is modernised too.
 
 ---
 
