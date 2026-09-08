@@ -114,10 +114,18 @@ export default function MLPrediction({ selectedPlant }: MLPredictionProps) {
         <CardHeader className="flex items-center justify-between pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             Nexus Node Prediction
+            {/* Spec 2.4: 44px hit area below `md`, with the negative margin
+                giving the space straight back so nothing moves visually, and
+                `md:` restoring the bare 16px icon the desktop card has always
+                had. Every icon-only control carries aria-label AND title. */}
             <a
               href="/docs/nexus-node.md"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="What a nexus node is"
+              title="What a nexus node is"
+              className="-my-3.5 -mr-3.5 grid h-11 w-11 shrink-0 place-items-center
+                         md:m-0 md:h-4 md:w-4"
             >
               <Info className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
             </a>

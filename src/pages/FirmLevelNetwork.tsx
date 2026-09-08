@@ -34,14 +34,23 @@ import {
   AlertTriangle,
   Map,
   Building2,
-  ChevronRight,
-  Info,
 } from 'lucide-react';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import MLPrediction from '@/components/MLPrediction';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MapView from '@/components/MapView';
 import { FROZEN_CELL } from '@/components/shared';
+import {
+  LensChip,
+  LensRule,
+  LensHowToRead,
+  LensDesktopOnlyNote,
+  LensStructure,
+  LensRisk,
+  LensTable,
+  LensAction,
+  LENS_SWIPE_HINT,
+} from '@/components/network/MobileLens';
 
 
 const TIER_ORDER = ['Tier 1', 'Tier 2', 'Tier 3', 'Plant'] as const;
@@ -1081,7 +1090,10 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
     const tier1Exposure = totalNodes > 0
       ? ((tierCounts['Tier 1'] / totalNodes) * 100).toFixed(1) + '%'
       : '—';
-    const dstSources = new Map<string, Set<string>>();
+    // `Map` is shadowed in this module by the lucide icon of the same name
+    // (line 35), so the global constructor is reached through globalThis -
+    // the pattern ProductLevelNetwork.tsx already uses for the same reason.
+    const dstSources = new globalThis.Map<string, Set<string>>();
     networkEdges.forEach(e => {
       if (!dstSources.has(e.dst_uid)) dstSources.set(e.dst_uid, new Set());
       dstSources.get(e.dst_uid)!.add(e.src_uid);
@@ -1092,7 +1104,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
     const hubNode = hubBetweenness !== null
       ? networkNodes.find(n => Math.abs((n.prominence ?? 0) - hubBetweenness) < 0.001)
       : null;
-    const revMap = new Map<string, number>();
+    const revMap = new globalThis.Map<string, number>();
     let revTotal = 0;
     networkEdges.forEach(e => {
       if (e.relative_revenue_percentage != null) {
@@ -1128,7 +1140,21 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
           onRefresh={fetchData}
           refreshLoading={loading}
           rightContent={
-            <div className="flex items-center space-x-2">
+            /* `gap-2` rather than `space-x-2`: `space-x-*` puts its margin on
+               the DOM children, so it would land on the `md:contents` wrapper
+               below instead of on the controls inside it and collapse the
+               desktop spacing. `gap` is inherited correctly through
+               `display:contents`, and for this single-line row the two
+               produce the same 8px. */
+            <div className="flex items-center gap-2">
+              {/* Spec 4.1 caps the mobile right slot at three controls. Search,
+                  the map toggle and the analytics panel all drive surfaces that
+                  are `hidden md:` on this page, and "recalculate prominence"
+                  moves next to the centrality table it changes. Below `md` the
+                  header therefore holds refresh + the project select only;
+                  `md:contents` hands every control straight back to the same
+                  flex row on desktop, unchanged. */}
+              <span className="hidden md:contents">
               {selectedNode && (
                 <Button
                   onClick={() => setDisruptionDialogOpen(true)}
@@ -1189,8 +1215,13 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                 {viewMode === 'network' ? <Map className="h-4 w-4" /> : <Network className="h-4 w-4" />}
               </Button>
 
+              </span>
+
               <Select value={globalSelectedProjectId || ''} onValueChange={setGlobalSelectedProjectId}>
-                <SelectTrigger className="w-[180px] h-9">
+                {/* Case A select (spec 2.1 / parity plan G3): the vw term
+                    exceeds 180px at every width from 768 up, so the clamp
+                    resolves to the desktop literal without an `md:`. */}
+                <SelectTrigger className="w-[clamp(120px,38vw,180px)] h-9">
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1205,37 +1236,40 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
           }
         />
 
-        {/* ── Mobile composition (md:hidden) ── */}
-        <div className="md:hidden space-y-6 mt-4">
+        {/* ── Mobile composition (md:hidden) ──────────────────────────
+             Spec 5 row 7 / demo entry 08. See ProductLevelNetwork for the
+             shape; the pieces come from components/network/MobileLens so the
+             three lenses stay identical in composition and differ only in
+             what each lens measures. */}
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-5">
 
-          {/* Lens chip */}
-          <span className="inline-flex items-center gap-1 rounded-sm bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-            Firm level
-          </span>
+          <div>
+            <LensChip tone="amber">Firm level</LensChip>
+          </div>
 
-          {/* How to read this */}
-          <details className="group border-b border-border pb-3">
-            <summary className="flex cursor-pointer items-center justify-between text-sm font-medium select-none">
-              How to read this
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Each node is a firm. Edges show direct supply relationships. Depth indicates tiers from your plant. Prominence measures how many shortest paths pass through a firm — high-prominence firms are single points of failure.
-            </p>
-          </details>
+          <LensHowToRead
+            scope="Every firm in this project's deep-tier graph, with your plant as the seed and tiers counted outward from it."
+            findings="A firm is reported as a single hub once it carries the graph's peak prominence: every shortest path runs through it and nothing routes around it. Prominence is coloured from 0.400 up, so a row is worth reading before it becomes a finding."
+            columns={[
+              { term: 'Firm', def: 'The firm this row measures.' },
+              { term: 'Tier', def: 'Distance from your plant, counted outward.' },
+              { term: 'Prominence', def: 'Overall network importance.' },
+              { term: 'In', def: 'Firms supplying this one.' },
+              { term: 'Out', def: 'Firms this one supplies.' },
+            ]}
+          />
 
-          {/* Desktop-only notice */}
-          <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <Info className="inline-block h-3.5 w-3.5 mr-1 shrink-0 align-text-bottom" />
-            The 3D network space is desktop-only. Open on a larger screen to explore the interactive graph.
-          </p>
+          <LensDesktopOnlyNote>
+            The firm graph, the map view and the tier analytics are desktop
+            surfaces. Open this lens on a larger screen to explore them; the
+            findings below are the same on both.
+          </LensDesktopOnlyNote>
 
-          {/* Network structure */}
           <section>
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Network structure</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Nodes', value: String(mobileFirmMetrics.totalNodes || '—') },
+            <LensRule>Network structure</LensRule>
+            <LensStructure
+              items={[
+                { label: 'Nodes', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.totalNodes) : '—' },
                 { label: 'Network depth', value: mobileFirmMetrics.networkDepth > 0 ? String(mobileFirmMetrics.networkDepth) : '—' },
                 { label: 'Critical path', value: '—' },
                 {
@@ -1243,92 +1277,79 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   value: mobileFirmMetrics.totalNodes > 0 ? mobileFirmMetrics.resilience : '—',
                   red: mobileFirmMetrics.resilienceRed && mobileFirmMetrics.totalNodes > 0,
                 },
-              ].map(({ label, value, red }) => (
-                <div key={label} className="rounded-sm border border-border p-3">
-                  <p className={`text-xl font-semibold tabular-nums ${red ? 'text-destructive' : ''}`}>{value}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p>
-                </div>
-              ))}
-            </div>
+              ]}
+            />
           </section>
 
-          {/* Structural risk */}
           <section>
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Structural risk</p>
-            <div className="divide-y divide-border rounded-sm border border-border">
-              {[
+            <LensRule>Structural risk</LensRule>
+            <LensRisk
+              rows={[
                 { label: 'Supplier diversity', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.supplierDiversity) : '—' },
                 { label: 'Tier-1 exposure', value: mobileFirmMetrics.totalNodes > 0 ? mobileFirmMetrics.tier1Exposure : '—' },
                 { label: 'Sole-source firms', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.soleSources) : '—' },
                 { label: 'Hub dependence', value: mobileFirmMetrics.hubDependence },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between px-3 py-2">
-                  <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className="text-sm font-semibold tabular-nums">{value}</span>
-                </div>
-              ))}
-            </div>
-            {mobileFirmMetrics.hasSPOF && mobileFirmMetrics.hubNodeName && (
-              <div className="mt-2 flex items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
-                <p className="text-xs text-destructive">
-                  {mobileFirmMetrics.hubNodeName} is a single hub — every path runs through it.
-                </p>
-              </div>
-            )}
+              ]}
+              alert={
+                mobileFirmMetrics.hasSPOF && mobileFirmMetrics.hubNodeName
+                  ? `${mobileFirmMetrics.hubNodeName} is a single hub — every path runs through it.`
+                  : undefined
+              }
+            />
           </section>
 
-          {/* Centrality table */}
           <section>
-            <div className="mb-2 flex items-baseline justify-between">
-              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Centrality</p>
-              <span className="text-[10px] text-muted-foreground">swipe →</span>
-            </div>
-            <div className="overflow-x-auto rounded-sm border border-border">
-              <table className="w-full min-w-[480px] text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="sticky left-0 z-[1] bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Firm</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Tier</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Prominence</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">In</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Out</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {networkNodes.length === 0 ? (
-                    <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">No data — select a project</td></tr>
-                  ) : (
-                    [...networkNodes]
-                      .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
-                      .slice(0, 20)
-                      .map(node => {
-                        const p = node.prominence ?? 0;
-                        const colorClass = p >= 0.8 ? 'text-destructive font-semibold' : p >= 0.6 ? 'text-warning font-medium' : p >= 0.4 ? 'text-primary' : 'text-muted-foreground';
-                        const tier = getTierFromDepth(node.depth, node.is_seed ?? false);
-                        const inCount = networkEdges.filter(e => e.dst_uid === node.uid).length;
-                        const outCount = networkEdges.filter(e => e.src_uid === node.uid).length;
-                        return (
-                          <tr key={node.id}>
-                            <td className="sticky left-0 z-[1] bg-background px-3 py-2 font-medium max-w-[120px] truncate" title={node.name ?? ''}>{node.name ?? node.uid}</td>
-                            <td className="px-3 py-2 text-muted-foreground">{tier}</td>
-                            <td className={`px-3 py-2 text-right tabular-nums ${colorClass}`}>{node.prominence != null ? node.prominence.toFixed(3) : '—'}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{inCount}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{outCount}</td>
-                          </tr>
-                        );
-                      })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <LensRule trailing={networkNodes.length > 0 ? 'swipe →' : undefined}>Centrality</LensRule>
+            <LensTable
+              minWidth={440}
+              loading={loading}
+              columns={[
+                { key: 'firm', label: 'Firm' },
+                { key: 'tier', label: 'Tier' },
+                { key: 'prominence', label: 'Prominence', align: 'right' },
+                { key: 'in', label: 'In', align: 'right' },
+                { key: 'out', label: 'Out', align: 'right' },
+              ]}
+              rows={[...networkNodes]
+                .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
+                .slice(0, 20)
+                .map(node => {
+                  const p = node.prominence ?? 0;
+                  const tone = p >= 0.8
+                    ? 'text-destructive font-semibold'
+                    : p >= 0.6
+                      ? 'text-warning font-medium'
+                      : p >= 0.4
+                        ? 'text-primary'
+                        : 'text-muted-foreground';
+                  return {
+                    key: node.id,
+                    id: node.name ?? node.uid,
+                    cells: [
+                      { text: getTierFromDepth(node.depth, node.is_seed ?? false), className: 'text-muted-foreground' },
+                      { text: node.prominence != null ? node.prominence.toFixed(3) : '—', className: tone },
+                      { text: String(networkEdges.filter(e => e.dst_uid === node.uid).length) },
+                      { text: String(networkEdges.filter(e => e.src_uid === node.uid).length) },
+                    ],
+                  };
+                })}
+              empty="No deep-tier network data. Select a project with deep-tier sourcing enabled."
+              caption={networkNodes.length > 0 ? LENS_SWIPE_HINT : undefined}
+              action={
+                <LensAction
+                  onClick={recalculateProminence}
+                  disabled={loading || recalculatingProminence || !globalSelectedProjectId}
+                  disabledReason={!globalSelectedProjectId ? 'Select a project first' : 'Already recalculating'}
+                >
+                  <RotateCcw className={`h-3.5 w-3.5 ${recalculatingProminence ? 'animate-spin' : ''}`} />
+                  Recalculate
+                </LensAction>
+              }
+            />
           </section>
 
-          {/* Nexus Node Prediction */}
-          <section
-            aria-label="Nexus Node Prediction — Processing predictions… This may take a few minutes for large datasets."
-          >
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Nexus Node Prediction</p>
+          <section>
+            <LensRule>Prediction</LensRule>
             <MLPrediction selectedPlant={
               globalSelectedProjectId
                 ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
