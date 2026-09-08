@@ -85,12 +85,26 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onCheckedChange?.(!checked)}
       className={cn(
-        'inline-flex h-[18px] w-[34px] items-center rounded-full p-[2px] transition-colors',
-        checked ? 'justify-end bg-foreground' : 'justify-start bg-[#e4e4e4]',
+        // Spec 2.4. The pill is 34x18, below the 44px touch floor. Below md the
+        // button itself becomes a 60x44 target and hands the space straight back
+        // with a negative margin; the pill is redrawn at its exact size as a
+        // ::before, and the knob is offset to the end it belongs to. The element
+        // count is unchanged, so at md every class below is the literal this
+        // replaced and the desktop box tree is identical.
+        'relative grid -m-[13px] h-11 w-[60px] place-items-center rounded-none bg-transparent p-0',
+        "before:absolute before:h-[18px] before:w-[34px] before:rounded-full before:content-['']",
+        checked ? 'before:bg-foreground' : 'before:bg-[#e4e4e4]',
+        'md:static md:m-0 md:inline-flex md:h-[18px] md:w-[34px] md:items-center md:rounded-full md:p-[2px] md:transition-colors md:before:hidden',
+        checked ? 'md:justify-end md:bg-foreground' : 'md:justify-start md:bg-[#e4e4e4]',
         disabled && 'opacity-55',
       )}
     >
-      <span className="block h-[14px] w-[14px] rounded-full bg-white" />
+      <span
+        className={cn(
+          'relative z-[1] block h-[14px] w-[14px] rounded-full bg-white md:static md:z-auto md:transform-none',
+          checked ? 'translate-x-[8px]' : '-translate-x-[8px]',
+        )}
+      />
     </button>
   );
 }
@@ -116,7 +130,8 @@ export function Segmented({
             type="button"
             onClick={() => onChange?.(o.value)}
             className={cn(
-              'px-2.5 py-1 text-[11px] transition-colors',
+              // Spec 2.4 touch floor below md; md: restores the audit's py-1.
+              'min-h-11 px-2.5 py-1 text-[11px] transition-colors md:min-h-0',
               on ? 'bg-foreground text-background' : 'bg-white text-muted-foreground hover:text-foreground',
             )}
           >
@@ -174,7 +189,13 @@ export function useTableSort<T>(rows: T[], getters: Record<string, (row: T) => s
     return (
       <th
         onClick={() => setSort((s) => (s?.key === sortKey ? (s.dir === 1 ? { key: sortKey, dir: -1 } : null) : { key: sortKey, dir: 1 }))}
-        className={cn(TH, align === 'right' && 'text-right', 'cursor-pointer select-none')}
+        className={cn(
+          TH,
+          align === 'right' && 'text-right',
+          // Spec 2.4: this th is a control. TH's own py-2 is ~28px, so pad to the
+          // touch floor below md and hand the literal back at md:.
+          'cursor-pointer select-none py-[15px] md:py-2',
+        )}
       >
         {children}{active ? (sort!.dir === 1 ? ' \u25b2' : ' \u25bc') : ''}
       </th>

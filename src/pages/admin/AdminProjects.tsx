@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ArrowRightLeft, Copy, Loader2, MoreHorizontal, Pencil, Settings2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { DIALOG_AS_SHEET } from '@/components/shared';
+import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface ProjectRow { id: string; name: string; organization_id: string | null; organization: string | null; modeler_id: string; owner_name: string | null; owner_email: string | null; plant_name: string; supply_chain_model: string; bom_level: string; data_type: string; completed: boolean; simulation_start: string | null; simulation_end: string | null; created_at: string; updated_at: string; }
@@ -122,12 +124,12 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openDialog('transfer', p)}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer to organization…</DropdownMenuItem>
+                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
+                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
+                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
+                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('transfer', p)}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer to organization…</DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-[#bf2330] focus:text-[#bf2330]" onClick={() => remove(p)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                      <DropdownMenuItem className="min-h-11 text-[#bf2330] focus:text-[#bf2330] md:min-h-0" onClick={() => remove(p)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -173,12 +175,12 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openDialog('transfer', p)}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer to organization…</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('transfer', p)}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer to organization…</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-[#bf2330] focus:text-[#bf2330]" onClick={() => remove(p)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 text-[#bf2330] focus:text-[#bf2330] md:min-h-0" onClick={() => remove(p)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -215,7 +217,7 @@ function CopyDialog({ project, orgs, users, actorArgs, onClose, onDone }: { proj
   };
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="rounded-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Copy “{project.name}”</DialogTitle><DialogDescription>Copies the project and its model data (item master, logistics, BOM, network, policies). Simulation runs and version history are not copied.</DialogDescription></DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">New name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" /></div>
@@ -248,7 +250,7 @@ function RenameDialog({ project, actorArgs, onClose, onDone }: { project: Projec
   };
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="rounded-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Rename “{project.name}”</DialogTitle></DialogHeader>
         <div><Label className="text-xs">New name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" autoFocus /></div>
         <DialogFooter>
@@ -278,22 +280,23 @@ function MetaDialog({ project, actorArgs, onClose, onDone }: { project: ProjectR
   };
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="rounded-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Edit metadata — “{project.name}”</DialogTitle><DialogDescription>Model settings of the project itself.</DialogDescription></DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Plant</Label><Input value={plant} onChange={(e) => setPlant(e.target.value)} className="mt-1 rounded-sm" /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
             <div><Label className="text-xs">Supply chain model</Label>
               <Select value={model} onValueChange={setModel}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Make-To-Order">Make-To-Order</SelectItem><SelectItem value="Make-To-Stock">Make-To-Stock</SelectItem></SelectContent></Select></div>
             <div><Label className="text-xs">BOM level</Label>
               <Select value={bomLevel} onValueChange={setBomLevel}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="single">Single level</SelectItem><SelectItem value="multi_level">Multi level</SelectItem></SelectContent></Select></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
             <div><Label className="text-xs">Data type</Label>
               <Select value={dataType} onValueChange={setDataType}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="curated">Curated</SelectItem><SelectItem value="uncurated">Uncurated</SelectItem></SelectContent></Select></div>
-            <div className="flex items-end gap-2 pb-1"><Switch checked={completed} onCheckedChange={setCompleted} id="proj-completed" /><Label htmlFor="proj-completed" className="text-xs">Completed</Label></div>
+            <div className="flex items-end gap-2 pb-1"><Switch checked={completed} onCheckedChange={setCompleted} id="proj-completed"
+                className="-my-[10px] box-content border-y-[10px] border-transparent bg-clip-content md:my-0 md:border-y-0 md:bg-clip-border" /><Label htmlFor="proj-completed" className="text-xs">Completed</Label></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
             <div><Label className="text-xs">Simulation start</Label><Input type="date" value={simStart} onChange={(e) => setSimStart(e.target.value)} className="mt-1 rounded-sm" /></div>
             <div><Label className="text-xs">Simulation end</Label><Input type="date" value={simEnd} onChange={(e) => setSimEnd(e.target.value)} className="mt-1 rounded-sm" /></div>
           </div>
@@ -322,7 +325,7 @@ function TransferDialog({ project, orgs, users, actorArgs, onClose, onDone }: { 
   };
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="rounded-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Transfer “{project.name}”</DialogTitle><DialogDescription>Moves the project (and all its data) from <span className="font-medium">{project.organization || 'no organization'}</span> to another organization. Optionally hand ownership to a user there.</DialogDescription></DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Target organization</Label>

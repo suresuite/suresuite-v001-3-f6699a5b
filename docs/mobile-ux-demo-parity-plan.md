@@ -338,6 +338,46 @@ those off the screen is correct but thinner than the demo's screenshots.
 
 ---
 
+### G11 — Super Admin was desktop-only below the card lists · ✅ **done, mobile only**
+
+`PAGES.md` entry 19 records this surface as *landed*. The eight `useIsMobile`
+card branches had landed; nothing behind them had. Re-derived against the tree
+and measured in Chromium, the gaps were:
+
+| Gap | Where | Fix |
+|---|---|---|
+| KPI ledger is `grid-cols-4` — 80px cells with 27px figures at 320 | `AdminDashboard.tsx` | 2-up over a 1px divider grid below md; `md:grid-cols-4` and the index-driven `border-r` restore the literal. Figures use `--fs-stat`, `md:text-[27px]` |
+| Two Top ledgers side by side (~150px each at 320) | `AdminDashboard.tsx` | `grid-cols-1 md:grid-cols-[repeat(2,minmax(0,1fr))]` |
+| `Toggle` is 34×18 · `Segmented` 55×25 · `SortTH` 28px · `Checkbox` 16×16 · `Switch` 44×24 · close ✕ 16×16 · every `SelectItem`/`DropdownMenuItem` 32px | `adminUi.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, 6 pages | Spec §2.4. Pad-and-negate where the control carries its own visual (the pill and the checkbox box are redrawn as `::before` so nothing moves), `min-h-11 md:min-h-0` everywhere else |
+| Eight centred dialogs on a phone | Users, Orgs ×2, Projects ×4, Models | `DIALOG_AS_SHEET` + `md:max-w-lg md:rounded-sm`; inner 2-ups stack below md |
+| Role matrix and the two AI-Usage sub-tables scroll with no frozen column or affordance | `AdminRoles.tsx`, `AdminUsage.tsx` | `FROZEN_CELL`/`FROZEN_CELL_ON_TINT` + the §2.7 affordance line, `md:hidden` |
+| Three `sm:` layout grids — a second breakpoint (§6) | `AdminUserAccess.tsx` | Moved to `md:`; changes only 640–767px, which is mobile territory |
+
+**Two defects found by measuring, both pre-existing.** The model-allowlist row's
+44px `<label>` is inert — it wraps a Radix *button*, not an input, so tapping the
+row text toggled nothing; the control is now the 44px target itself. And
+`place-items-center` on a `<button>` is **not** inert: it feeds the button's
+anonymous inner box and silently widened the Radix check indicator from 14px to
+16px. Both were caught only by a computed-geometry diff against `main`.
+
+**Not built: the demo's phone hub.** `shots/27-admin-hub.png` replaces the
+eight-tab strip with search → "Needs attention" → today 2×2 → People → Recent
+changes → Reference. Every block needs data this route does not fetch —
+cross-entity search, per-user budget-vs-spend, and the audit tail all live on
+*other* routes' queries. Mounting them is a behaviour change, so it is outside
+gate 1 and deliberately left out.
+
+**Verified.** 320 · 360 · 375 · 390 · 414 · 768 · 1280 and landscape 874×402
+across all nine routes, plus every dialog, sheet, menu and select popover, and
+the empty / loading / error states: no horizontal overflow, no sub-44px control
+below md. Desktop proved by computed-geometry diff against `main` served from a
+separate worktree — **every element rect identical** on all nine routes and all
+eight open dialogs; the only computed deltas are inert (`min-height`/`min-width`
+`auto`→`0`, grid `gap: normal`→`0px`, `z-index` on `position: static` cells).
+Screenshot hashes were tried first and abandoned: they are not deterministic
+here (`main` differs from itself). `audit-adaptive-ui --all` unchanged at 7,
+`tsc` unchanged at 7, eslint unchanged.
+
 ## 4. Sequence
 
 Five commits, each independently shippable and revertable, ordered so the
@@ -352,6 +392,7 @@ riskiest visual change lands last and alone.
 | **5** | **Getting Started** — G5 | `GettingStarted.tsx`, `home/MobileGettingStarted.tsx` | ✅ **done** — see §5 |
 | **7** | **Simulation Lab** — G10 | `resultTables.tsx`, `ParameterCard.tsx`, `ScenarioSetupForm.tsx`, `RunGate.tsx`, `RunProgressPanel.tsx`, `PreRunValidationPanel.tsx`, `DisruptionScheduleEditor.tsx`, `DisruptionRecoveryPane.tsx`, `PlaybookPicker.tsx`, `PlaybookSaveDialog.tsx`, `ScenarioLibraryPanel.tsx`, `ScenarioRail.tsx`, `CompareScenariosPanel.tsx`, `ReplicationSeedExplorer.tsx`, `ItemSeriesExplorer.tsx`, `ResultsDashboard.tsx`, `UtilizationHeatmap.tsx`, `SimulationLab.tsx` | ✅ **done** — see G10. Low: reflow only, all `md:`-released |
 | **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |
+| **8** | **Super Admin** — G11 | `adminUi.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, `OrgAccessDrawer.tsx`, 8 admin pages | ✅ **done** — see G11 |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
 

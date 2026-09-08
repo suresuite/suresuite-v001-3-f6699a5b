@@ -88,16 +88,16 @@ export function OrgAccessDrawer({ orgId, orgName, open, onClose }: Props) {
   const renderRows = (rows: Cap[]) => (
     <div className="divide-y divide-border">
       {rows.map((cap) => (
-        <div key={cap.key} className="flex items-center gap-3 py-2">
+        <div key={cap.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2 md:gap-y-3">
           <div className="min-w-0 flex-1 text-sm font-medium text-foreground">{cap.label}</div>
           <ToggleGroup
             type="single"
             value={triOf(cap.org_override)}
             onValueChange={(v) => v && setOverride(cap, v as Tri)}
           >
-            <ToggleGroupItem value="inherit" className="h-7 px-2 text-xs">Inherit</ToggleGroupItem>
-            <ToggleGroupItem value="allow" className="h-7 px-2 text-xs">Allow</ToggleGroupItem>
-            <ToggleGroupItem value="deny" className="h-7 px-2 text-xs">Deny</ToggleGroupItem>
+            <ToggleGroupItem value="inherit" className="h-7 min-h-11 px-2 text-xs md:min-h-0">Inherit</ToggleGroupItem>
+            <ToggleGroupItem value="allow" className="h-7 min-h-11 px-2 text-xs md:min-h-0">Allow</ToggleGroupItem>
+            <ToggleGroupItem value="deny" className="h-7 min-h-11 px-2 text-xs md:min-h-0">Deny</ToggleGroupItem>
           </ToggleGroup>
         </div>
       ))}
@@ -106,7 +106,7 @@ export function OrgAccessDrawer({ orgId, orgName, open, onClose }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent side="right" className="w-full overflow-y-auto md:max-w-lg">
         <SheetHeader>
           <SheetTitle>Organization access defaults</SheetTitle>
           <SheetDescription>

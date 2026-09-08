@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { SURFACE, KX, TH, TD, ROW_HOVER, StatusDot, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters, type DotTone } from '@/components/admin/adminUi';
-import { TableBlock } from '@/components/shared';
+import { TableBlock, FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { aggregateMatrixByModel, type ModelCapabilityRow, type ModelMatrixAggregate } from '@/lib/modelMatrix';
 
@@ -166,11 +166,11 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
         >
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
-              <thead><tr><th className={TH}>Model</th><th className={`${TH} text-right`}>Passing</th><th className={TH}>Below target</th><th className={TH}>Measured</th><th className={TH}>Freshness</th></tr></thead>
+              <thead><tr><th className={`${TH} ${FROZEN_CELL_ON_TINT}`}>Model</th><th className={`${TH} text-right`}>Passing</th><th className={TH}>Below target</th><th className={TH}>Measured</th><th className={TH}>Freshness</th></tr></thead>
               <tbody>
                 {matrixRows.map((r) => (
                   <tr key={r.model_code} className={ROW_HOVER}>
-                    <td className={`${TD} font-mono text-[11.5px]`}>{r.model_code}</td>
+                    <td className={`${TD} ${FROZEN_CELL} font-mono text-[11.5px]`}>{r.model_code}</td>
                     <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{r.passing}/{r.total}</td>
                     <td className={`${TD} max-w-[360px] text-[11.5px] text-muted-foreground`}>{r.belowTarget.length > 0 ? r.belowTarget.join(', ') : '—'}</td>
                     <td className={`${TD} text-[11.5px] text-muted-foreground`}>{r.measuredAt ? new Date(r.measuredAt).toLocaleString() : '—'}</td>
@@ -180,6 +180,9 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
               </tbody>
             </table>
           </div>
+          <p className="px-4 pb-2 pt-1.5 text-[11.5px] text-muted-foreground md:hidden">
+            swipe the table sideways for the remaining columns
+          </p>
         </TableBlock>
       )}
 
@@ -192,11 +195,11 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
         >
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
-              <thead><tr><th className={TH}>Organization</th><th className={`${TH} text-right`}>Files</th><th className={`${TH} text-right`}>Total size</th><th className={`${TH} text-right`}>Kept size</th><th className={`${TH} text-right`}>Expiring ≤ 7d</th></tr></thead>
+              <thead><tr><th className={`${TH} ${FROZEN_CELL_ON_TINT}`}>Organization</th><th className={`${TH} text-right`}>Files</th><th className={`${TH} text-right`}>Total size</th><th className={`${TH} text-right`}>Kept size</th><th className={`${TH} text-right`}>Expiring ≤ 7d</th></tr></thead>
               <tbody>
                 {fileRows.map((r) => (
                   <tr key={r.org_id ?? 'none'} className={ROW_HOVER}>
-                    <td className={`${TD} text-[13px]`}>{r.org_name || (r.org_id ? r.org_id.slice(0, 8) : 'No organization')}</td>
+                    <td className={`${TD} ${FROZEN_CELL} text-[13px]`}>{r.org_name || (r.org_id ? r.org_id.slice(0, 8) : 'No organization')}</td>
                     <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{r.file_count}</td>
                     <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{humanBytes(Number(r.total_bytes))}</td>
                     <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{humanBytes(Number(r.retained_bytes))}</td>
@@ -206,6 +209,9 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
               </tbody>
             </table>
           </div>
+          <p className="px-4 pb-2 pt-1.5 text-[11.5px] text-muted-foreground md:hidden">
+            swipe the table sideways for the remaining columns
+          </p>
         </TableBlock>
       )}
     </AdminLayout>

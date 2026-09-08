@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { DIALOG_AS_SHEET } from '@/components/shared';
 import { Ban, Loader2, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -134,7 +135,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => navigate(`/admin/users/${r.user_id}`)}
-                      className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-[#bf2330] underline-offset-2 hover:underline"
+                      className="-my-[12px] min-h-11 min-w-0 flex-1 truncate py-[12px] text-left text-[13px] font-medium text-[#bf2330] underline-offset-2 hover:underline"
                     >
                       {r.name || '—'}
                     </button>
@@ -166,8 +167,8 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
 
                   <div className="mt-2.5 flex items-center justify-between gap-2">
                     <Select value={r.role} onValueChange={(v) => changeRole(r, v)}>
-                      <SelectTrigger className="h-9 w-32 rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="h-11 w-32 rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="min-h-11 md:min-h-0">{role}</SelectItem>)}</SelectContent>
                     </Select>
                     <span className="inline-flex items-center gap-1 text-[#a3a3a3]">
                       <button title="Manage access" className="grid h-11 w-11 place-items-center hover:text-foreground" onClick={() => navigate(`/admin/users/${r.user_id}`)}>
@@ -220,7 +221,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     <td className={TD}>
                       <Select value={r.role} onValueChange={(v) => changeRole(r, v)}>
                         <SelectTrigger className="h-7 w-32 rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                        <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="min-h-11 md:min-h-0">{role}</SelectItem>)}</SelectContent>
                       </Select>
                     </td>
                     <td className={TD}><StatusDot tone={active ? 'active' : 'error'} label={active ? 'Active' : 'Suspended'} /></td>
@@ -285,7 +286,7 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
       <DialogTrigger asChild>
         <Button size="sm" className="rounded-sm"><Plus className="mr-1.5 h-3.5 w-3.5" /> Add user</Button>
       </DialogTrigger>
-      <DialogContent className="rounded-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Add user</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Full name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" placeholder="Jane Doe" /></div>
@@ -295,21 +296,21 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
             <Input type="text" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 rounded-sm" placeholder="at least 8 characters" />
             <p className="mt-1 text-xs text-muted-foreground">The user must change this on first login.</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))]">
+            <div className="min-w-0">
               <Label className="text-xs">Role</Label>
               <Select value={role} onValueChange={setRole}>
                 <SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="min-h-11 md:min-h-0">{r}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="min-w-0">
               <Label className="text-xs">Organization</Label>
               <Select value={orgId} onValueChange={setOrgId}>
                 <SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">— None —</SelectItem>
-                  {orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                  <SelectItem value="none" className="min-h-11 md:min-h-0">— None —</SelectItem>
+                  {orgs.map((o) => <SelectItem key={o.id} value={o.id} className="min-h-11 md:min-h-0">{o.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
