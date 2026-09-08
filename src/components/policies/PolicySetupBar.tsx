@@ -60,7 +60,7 @@ function RailButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex h-[26px] shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-[11.5px] font-medium leading-none transition-colors",
+        "flex h-[26px] min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-sm px-2.5 text-[11.5px] font-medium leading-none transition-colors md:min-h-0 md:justify-start",
         variant === "primary" ? "text-white hover:opacity-90" : "border hover:bg-[#fafafa]",
       )}
       style={
@@ -84,7 +84,7 @@ function UnitSegmented({
 }) {
   return (
     <div
-      className="inline-flex shrink-0 rounded-sm border bg-white p-[3px]"
+      className="flex w-full rounded-sm border bg-white p-[3px] md:inline-flex md:w-auto md:shrink-0"
       style={{ borderColor: RAIL.rule }}
     >
       {(["day", "week", "month"] as PlanningUnit[]).map((u) => {
@@ -94,7 +94,7 @@ function UnitSegmented({
             key={u}
             type="button"
             onClick={() => onChange(u)}
-            className="rounded-[2px] px-[7px] py-[2px] font-mono text-[10.5px] leading-normal transition-colors"
+            className="min-h-11 flex-1 rounded-[2px] px-[7px] py-[2px] font-mono text-[10.5px] leading-normal transition-colors md:min-h-0 md:flex-none"
             style={on ? { background: RAIL.ink, color: "#ffffff" } : { color: RAIL.muted }}
           >
             {u}
@@ -212,7 +212,7 @@ export function PolicySetupBar({
           <RailMarker>A</RailMarker>
           <span className={RAIL_EYEBROW}>Model version</span>
         </span>
-        <span className="flex shrink-0 items-center gap-2">
+        <span className="flex min-w-0 flex-wrap items-center gap-2 md:shrink-0 md:flex-nowrap">
           <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: RAIL.ink }}>
             {versionName}
           </span>
@@ -224,19 +224,21 @@ export function PolicySetupBar({
           )}
         </span>
         {dirty && (
-          <span className="inline-flex shrink-0 items-center gap-1.5">
+          <span className="inline-flex min-w-0 items-center gap-1.5 md:shrink-0">
             <span className="h-[5px] w-[5px] rounded-full" style={{ background: RAIL.amber }} />
             <span className="font-mono text-[11px]" style={{ color: RAIL.amber }}>
               unsaved changes
             </span>
           </span>
         )}
-        <div className="flex-1" />
-        <RailButton onClick={onSaveVersion}>Save model version</RailButton>
-        <RailButton variant="secondary" onClick={onOpenHistory}>
-          History
-          <RailChip>{versionCount}</RailChip>
-        </RailButton>
+        <div className="hidden flex-1 md:block" />
+        <span className="flex w-full items-stretch gap-2 md:contents">
+          <RailButton onClick={onSaveVersion}>Save model version</RailButton>
+          <RailButton variant="secondary" onClick={onOpenHistory}>
+            History
+            <RailChip>{versionCount}</RailChip>
+          </RailButton>
+        </span>
       </div>
 
       {/* B — planning unit */}
@@ -246,8 +248,8 @@ export function PolicySetupBar({
           <span className={RAIL_EYEBROW}>Planning unit</span>
         </span>
         <UnitSegmented value={unit} onChange={onUnitChange} />
-        <div className="flex-1" />
-        <span className="flex shrink-0 items-center gap-2.5">
+        <div className="hidden flex-1 md:block" />
+        <span className="flex min-w-0 flex-wrap items-center gap-2.5 md:shrink-0 md:flex-nowrap">
           <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
             Horizon{" "}
             <b className="font-medium" style={{ color: RAIL.ink }}>
