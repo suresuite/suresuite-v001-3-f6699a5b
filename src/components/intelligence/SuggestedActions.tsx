@@ -38,7 +38,13 @@ interface Props {
   disabled?: boolean;
 }
 
-export function SuggestedActions({ projectId, threadId, threadMode, onPick, disabled }: Props) {
+/**
+ * The fetch + click-record half, split out so a second surface can render the
+ * same server chips in its own shape. The mobile tree lists them as sheet rows
+ * (the chip row does not fit a phone composer); both go through this hook, so
+ * neither can quietly stop recording `suggestion.clicked`.
+ */
+export function useSuggestedActions({ projectId, threadId, threadMode }: Omit<Props, "onPick" | "disabled">) {
   const { user } = useAuth();
   const [suggestions, setSuggestions] = useState<SuggestedAction[]>([]);
 
@@ -68,9 +74,7 @@ export function SuggestedActions({ projectId, threadId, threadMode, onPick, disa
     return () => { cancelled = true; };
   }, [projectId, threadMode, threadId, user]);
 
-  if (suggestions.length === 0) return null;
-
-  const pick = (s: SuggestedAction) => {
+  const recordClick = (s: SuggestedAction) => {
     db.rpc("record_chat_ui_event", {
       p_kind: "suggestion.clicked",
       p_user_id: user?.id ?? null,
@@ -80,6 +84,18 @@ export function SuggestedActions({ projectId, threadId, threadMode, onPick, disa
     }).then(({ error }: { error: { message: string } | null }) => {
       if (error) console.warn("[suggestions] click event failed:", error.message);
     });
+  };
+
+  return { suggestions, recordClick };
+}
+
+export function SuggestedActions({ projectId, threadId, threadMode, onPick, disabled }: Props) {
+  const { suggestions, recordClick } = useSuggestedActions({ projectId, threadId, threadMode });
+
+  if (suggestions.length === 0) return null;
+
+  const pick = (s: SuggestedAction) => {
+    recordClick(s);
     onPick(s.utterance);
   };
 

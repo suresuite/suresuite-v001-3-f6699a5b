@@ -221,6 +221,75 @@ silently differs from its source.
 **Not UI-only.** Changing a rendered number is exactly what gate 1 forbids, and
 these are equally wrong on desktop. Track separately; do not fold into this work.
 
+### G9 — Project Intelligence never got the demo's phone composition · ✅ **done, mobile only**
+
+`PAGES.md` entry 16 records this screen as *landed*. It was not: what shipped below
+`md` was the desktop workspace in one column with the sidebar as a left drawer —
+the page title, the agent strip, the memory strip, the suggestion chips and the
+composer's four separate controls all still on screen. The demo's whole point on
+this surface is the opposite: **on a phone the conversation is the product**, and
+~150px of chrome folds away to make room for it.
+
+| | Demo (`shots/24-ai.png`, `25-ai-agents.png`) | Shipped before this change |
+|---|---|---|
+| Header | Chats · chat title + agent chip · ⋯ | `PageHeader` "Project Intelligence" + a panel toggle |
+| Agent | Two-letter badge in the header, opens a sheet | Full-width strip under the header |
+| Memory | Rows in the ⋯ menu | Purple strip above the stream |
+| Suggestions | Composer lightbulb → sheet | Chip row above the composer |
+| Composer | One chip — `Tronico EMS · GPT-5 · Review` — plus lightbulb, expand, send | Project select + expand + Ask/Review/Auto + model select |
+| Chats / files / memory | Bottom sheets | Left drawer (chats), disclosures (files, memory) |
+
+**What shipped.** A separate phone tree, `components/intelligence/MobileIntelligence.tsx`,
+mounted from `ProjectIntelligence.tsx` behind `useIsMobile()` — the same
+`use-is-mobile.ts` case §5 established for `GettingStarted`: a different
+composition, not a reflow. Desktop renders exactly what it rendered before.
+
+- **One data flow.** The phone tree takes the page's existing props and hooks; it
+  adds no query, no RPC and no state shape. Files, memory and suggestions are the
+  ones the page already loads.
+- **One message stream.** The turn list moved out of `ChatWorkspace` into
+  `MessageStream`, which both platforms render — all nine part kinds stay identical
+  on both, and the desktop wrapper passes the classes it used inline.
+- **One sheet shell.** `components/shared/MobileSheet.tsx` implements §4.4 (drag the
+  header down past 90px to dismiss, 76% portrait / full-height landscape) and backs
+  all eleven sheets — agents, this chat → project / model / mode, chats, suggested
+  actions, ⋯ → summary / how memory works / project memory / my files / rename. It
+  stops **above** the tab bar, per G6's rule.
+- **One thread list.** The Chats sheet mounts the real `ChatSidebar` with the page's
+  own prop set, so search, folders and per-row actions cannot drift from desktop.
+- **One panel body.** `MyFilesPanel` / `ProjectMemoryPanel` gained a
+  `variant="sheet"` — same copy, same handlers, no disclosure, 44px actions.
+  `variant` defaults to `"panel"`, so the sidebar is untouched.
+
+Copy is the demo's, verbatim: "needs project", "Grounds every answer in that
+project's data.", the Auto lock, the memory-consent line.
+
+**Two defects found while doing it**, both pre-existing:
+
+1. `MessageParts.TablePart` put `FROZEN_CELL` on the ledger `<th>`. Its
+   `bg-background` repaints the ink header white — on a phone the first column
+   header was **white text on white**. Fixed with `FROZEN_CELL_ON_TINT`, which is
+   what §2.7 says to use on a cell that already carries an opaque fill.
+   `FROZEN_CELL` also carries `md:bg-transparent`, so **above** `md` that cell has
+   always rendered transparent beside its ink neighbours. That is a desktop defect;
+   it is deliberately **not** fixed here (this work is mobile-only) and the class is
+   kept explicitly so desktop is byte-identical. Worth its own one-line PR.
+2. `ChatSidebar` was only partly at the §2.4 touch floor — section headers, the
+   thread row, the per-row ⋯, the folder `+`, Select, the row-menu items, both
+   selects and the select-mode checkbox were all under 44px. All now carry the
+   mobile value with `md:` restoring the literal. `EvidencePart` and `ActivityGroup`
+   had the same gap, and the KPI strip's three fixed columns do not fit a 320px
+   phone — it is the §2.3 auto-fit 2-up below `md`, desktop count restored from
+   `--kpi-cols` at `md`.
+
+`PageLayout` now publishes `--pi-chrome` (its measured bottom reservation plus the
+gutter) so the chat column ends exactly on the credit bar however that bar wraps,
+and follows it when the bar is dismissed. Nothing else reads the variable.
+
+**Verified** at 320 / 390 / 767 / 1280 and landscape: no horizontal overflow and no
+sub-44px control on any of the mobile surfaces, no console or page errors, `tsc`
+clean, `audit-adaptive-ui --all` unchanged at 7.
+
 ---
 
 ## 4. Sequence
@@ -235,6 +304,7 @@ riskiest visual change lands last and alone.
 | **3** | **Bulk edit sheet** — G4 | `BulkEditDialog.tsx` | Low. Shell swap, logic untouched |
 | **4** | **More panel** — G6 | `MobileNav.tsx` | Medium. Re-layout; keep the tab bar visible |
 | **5** | **Getting Started** — G5 | `GettingStarted.tsx`, `home/MobileGettingStarted.tsx` | ✅ **done** — see §5 |
+| **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
 

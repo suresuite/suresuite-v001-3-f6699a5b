@@ -22,8 +22,10 @@ export function chatModesUiEnabled(): boolean {
   return import.meta.env.VITE_CHAT_MODES_ENABLED === "true";
 }
 
-/** §10 Q6 revisit trigger, verbatim — the only path to a live Auto. */
-const AUTO_TOOLTIP =
+/** §10 Q6 revisit trigger, verbatim — the only path to a live Auto.
+ * Exported so the mobile Mode sheet states the same unlock conditions rather
+ * than paraphrasing them. */
+export const AUTO_TOOLTIP =
   "Auto isn't available. It unlocks only after: ≥ 3 consecutive months of per-agent " +
   "accepted-proposal rate ≥ 0.9 AND an org explicitly requesting it AND resolved principals " +
   "(server-verified identity) — and then as a per-org opt-in designed as a new decision, " +

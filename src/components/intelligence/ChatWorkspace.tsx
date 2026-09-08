@@ -8,14 +8,13 @@
  * The min-w-0 on the column and the agent strip matters — without it a long
  * agent blurb widens the grid track and pushes the composer off-screen.
  */
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { AGENTS, getAgent } from "@/lib/chat/agents";
 import { useProjectChat } from "@/hooks/useProjectChat";
 import { AGENT_COLOR, AGENT_MONO, KX_TIGHT, LAYER, tint } from "./piUi";
 import { ChatComposer } from "./ChatComposer";
-import { ActivityGroup, AgentDivider, MessagePart } from "./MessageParts";
+import { MessageStream } from "./MessageStream";
 import { ThreadInfoStrip } from "./SidebarPanels";
-import { ProposalCard } from "@/components/chat/ProposalCard";
 import { SuggestedActions } from "./SuggestedActions";
 import { cn } from "@/lib/utils";
 
@@ -66,15 +65,6 @@ export function ChatWorkspace({
 }: ChatWorkspaceProps) {
   const { messages, loading, error, send } = useProjectChat(threadId);
   const agent = agentId ? getAgent(agentId) : null;
-  const streamRef = useRef<HTMLDivElement | null>(null);
-  const [savedMemory, setSavedMemory] = useState<Record<string, boolean>>({});
-
-  // Keep the newest turn in view without scrollIntoView.
-  useEffect(() => {
-    const el = streamRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, loading]);
-
   const submit = () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -206,67 +196,14 @@ export function ChatWorkspace({
       ) : (
         /* ── populated thread ────────────────────────────────────────── */
         <>
-          <div ref={streamRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="mx-auto flex max-w-[740px] flex-col gap-4 px-5 pb-7 pt-5">
-              {messages.map((m) => {
-                if (m.role === "user") {
-                  return (
-                    <div key={m.id} className="flex justify-end">
-                      <div className="max-w-[78%] whitespace-pre-wrap rounded-sm bg-foreground px-3 py-2 text-[14px] leading-[1.55] text-background">
-                        {m.content}
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={m.id}>
-                    {m.content && (
-                      <div className="whitespace-pre-wrap text-[14px] leading-[1.65] text-foreground">
-                        {m.content}
-                      </div>
-                    )}
-                    {(m.parts ?? []).map((part, i) => {
-                      // Proposals render via ProposalCard in the app (they need
-                      // the proposals hook for approve/apply state).
-                      if (part.kind === "proposal") {
-                        const d = part.data as any;
-                        return (
-                          <React.Fragment key={i}>
-                            {d?.agent && <AgentDivider agentName={d.agent} />}
-                            {/* The container resolves the proposal (approve/
-                                apply state) and renders ProposalCardView. */}
-                            <ProposalCard proposalId={d.proposal_id} />
-                          </React.Fragment>
-                        );
-                      }
-                      const key = m.id + ":" + i;
-                      return (
-                        <MessagePart
-                          key={key}
-                          part={part}
-                          onSwitchToReview={threadMode === "ask" ? () => onModeChange("review") : undefined}
-                          onSaveMemory={() => setSavedMemory((s) => ({ ...s, [key]: true }))}
-                          onDismissMemory={() => setSavedMemory((s) => ({ ...s, [key]: false }))}
-                        />
-                      );
-                    })}
-                    {m.toolCalls && m.toolCalls.length > 0 && <ActivityGroup toolCalls={m.toolCalls} />}
-                  </div>
-                );
-              })}
-
-              {loading && (
-                <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground" /> Thinking…
-                </div>
-              )}
-              {error && (
-                <div className="rounded-sm border border-[#f0c7cb] bg-[#fdf2f3] px-3 py-2 text-[12.5px] text-[#8a2a30]">
-                  {error}
-                </div>
-              )}
-            </div>
-          </div>
+          <MessageStream
+            messages={messages}
+            loading={loading}
+            error={error}
+            threadMode={threadMode}
+            onModeChange={onModeChange}
+            containerClassName="mx-auto max-w-[740px] px-5 pb-7 pt-5"
+          />
 
           <div className="border-t border-[--hair-border] bg-[#fcfcfc] px-4 py-3">
             <div className="mx-auto max-w-[740px]">

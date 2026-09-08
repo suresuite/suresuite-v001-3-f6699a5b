@@ -64,10 +64,18 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
         )}
         style={
           isMobile
-            ? {
+            ? ({
                 paddingBottom:
                   `calc(${chromePx}px + env(safe-area-inset-bottom, 0px))`,
-              }
+                // Published for the one mobile surface that must fill exactly
+                // the space this reservation leaves — Project Intelligence's
+                // full-height chat column. It is the reservation plus the
+                // gutter's 1rem top and bottom, so the composer lands on the
+                // credit bar however the bar wraps, and follows it when the
+                // bar is dismissed. Every other page just scrolls.
+                '--pi-chrome':
+                  `calc(${chromePx}px + env(safe-area-inset-bottom, 0px) + 2rem)`,
+              } as React.CSSProperties)
             : undefined
         }
       >
