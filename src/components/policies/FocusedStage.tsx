@@ -185,7 +185,7 @@ export function FocusedStage({
             Apply preset ▾
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[340px]">
+        <DropdownMenuContent align="end" className="w-[min(340px,calc(100vw-1.5rem))]">
           {presets.map((p) => (
             <DropdownMenuItem
               key={p.slug}

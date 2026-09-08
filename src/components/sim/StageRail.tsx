@@ -55,7 +55,7 @@ export const RAIL = {
 } as const;
 
 /** Label column. 220px so a collapsed row's value starts on the stage-card edge. */
-export const RAIL_LABEL_COL = "w-[220px] shrink-0";
+export const RAIL_LABEL_COL = "w-full min-w-0 md:w-[220px] md:shrink-0";
 
 /** done → behind you · current → exactly one · todo → ahead of you. */
 export type RailState = "done" | "current" | "todo";

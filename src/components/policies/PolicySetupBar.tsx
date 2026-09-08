@@ -263,8 +263,8 @@ export function PolicySetupBar({
 
       {/* C — configure SC policies */}
       {openSection === "C" ? (
-        <div className={cn(RAIL_STAGE_ROW, "border-t border-[#ebebeb] gap-[18px]")}>
-          <div className="flex w-[192px] shrink-0 flex-col justify-center gap-[3px] pr-2.5">
+        <div className={cn(RAIL_STAGE_ROW, "flex-col border-t border-[#ebebeb] gap-[18px] md:flex-row")}>
+          <div className="flex w-full min-w-0 flex-col justify-center gap-[3px] pb-2 md:w-[192px] md:shrink-0 md:pb-0 md:pr-2.5">
             <span className="flex items-center gap-[7px]">
               <RailMarker>C</RailMarker>
               <span className={RAIL_EYEBROW}>Configure SC policies</span>

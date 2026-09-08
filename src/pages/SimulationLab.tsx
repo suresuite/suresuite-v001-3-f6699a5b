@@ -313,8 +313,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
               <StageRail stages={stages} active={pane} onSelect={setPane} gate={gateReadout} />
             ) : null}
 
-            <div className="flex gap-4 items-start">
-              <aside className="w-64 shrink-0">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start">
+              <aside className="w-full min-w-0 md:w-64 md:shrink-0">
                 <ExperimentLibraryBox
                   count={STRESS_TESTS.length}
                   open={stressOpen}
