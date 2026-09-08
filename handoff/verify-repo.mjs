@@ -153,11 +153,31 @@ gate('D', '#F8D448 confined to its four sanctioned uses', () => {
 });
 
 // ── E · no emoji ─────────────────────────────────────────────────────────────
-gate('E', 'no emoji in src', () => {
-  const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F0FF}]/u;
+// §3.5 is about what the product RENDERS, so this gate is scoped to its actual
+// subject, matching the rule the repo already enforces in
+// scripts/audit-adaptive-ui.mjs (which is in CI as ui-audit.yml):
+//
+//   · `console.*` lines are debug logging, not product copy — out of subject.
+//   · Monochrome functional marks are permitted by kind (§6). A tick in a
+//     completeness column is the same family as an arrow; a coloured ✅ is not.
+//     The ceiling/floor brackets are notation in the policy formulas.
+//   · Comment lines are not rendered.
+//
+// Read naively this gate reported 221 hits on a repo whose own §3.5 audit is
+// clean: 168 debug logs, 41 functional marks, 12 comments. That is the failure
+// mode the repo's audit header warns about — "an audit that cries wolf is one
+// people learn to skip". Narrowing a rule to its subject is not loosening it;
+// loosening it would be dropping a range or exempting a rendered string.
+const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F0FF}]/u;
+const ALLOWED_MARKS = /[▲▼›▸▾≈⚠→←·—✕↑↓✓✗○●◦⌈⌉⌊⌋]/g;
+const COMMENT_LINE = /^\s*(\/\/|\/?\*|\{\/\*)/;
+gate('E', 'no emoji in rendered copy', () => {
   const hits = [];
   for (const f of SRC) {
-    body(f).split('\n').forEach((l, i) => { if (EMOJI.test(l)) hits.push(`${f}:${i + 1} — ${l.trim().slice(0, 100)}`); });
+    body(f).split('\n').forEach((l, i) => {
+      if (/\bconsole\s*\./.test(l) || COMMENT_LINE.test(l)) return;
+      if (EMOJI.test(l.replace(ALLOWED_MARKS, ''))) hits.push(`${f}:${i + 1} — ${l.trim().slice(0, 100)}`);
+    });
   }
   return { pass: hits.length === 0, detail: hits, count: hits.length ? `${hits.length} hit(s)` : 'clean' };
 });

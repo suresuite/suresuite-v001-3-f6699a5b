@@ -1,0 +1,46 @@
+name: mobile handoff conformance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "index.html"
+      - "handoff/**"
+      - "scripts/adaptive-ui-baseline.json"
+      - ".github/workflows/mobile-verify.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "index.html"
+      - "handoff/**"
+      - "scripts/adaptive-ui-baseline.json"
+      - ".github/workflows/mobile-verify.yml"
+  workflow_dispatch:
+
+# The design half of the mobile handoff, where ui-audit.yml is the mechanical
+# half. handoff/PAGES.md carries a copy deck per surface; gate G fails the build
+# when a surface marked `accept: built` loses one of its agreed strings, so the
+# detail we agreed cannot be quietly dropped in a later refactor.
+#
+# A surface enters enforcement only by someone editing its `accept:` line from
+# `verify` to `built` — a deliberate act that shows up in review. Gates C, F and
+# G-in-triage warn without failing; only a hard gate breaks the build.
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # No dependencies: the checker is a single Node script over the source.
+      - name: Mobile conformance gates (A-G)
+        run: node handoff/verify-repo.mjs --book handoff
+
+      - name: Full triage list, for the record
+        if: always()
+        run: node handoff/verify-repo.mjs --book handoff --all || true
