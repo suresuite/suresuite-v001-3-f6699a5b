@@ -24,6 +24,8 @@ import {
   MapPin,
   Layers3,
   Share2,
+  Menu,
+  X,
 } from 'lucide-react';
 
 // Canonical micro-label style — the only uppercase label treatment on this page.
@@ -122,6 +124,13 @@ const ROADMAP = [
 ];
 
 type TechKey = 'network' | 'nexus' | 'simulation';
+
+const NETWORK_STATS = [
+  { label: 'Network levels', value: '3' },
+  { label: 'Topology', value: 'Multi-layer' },
+  { label: 'Metric', value: 'Betweenness & closeness' },
+  { label: 'Output', value: 'Critical nodes' },
+];
 
 const NEXUS_STATS = [
   { label: 'Training runs', value: '5,000+' },
@@ -245,6 +254,7 @@ export default function Landing() {
   const { user, loading } = useAuth();
   const { homePath } = useCapabilities();
   const [activeTech, setActiveTech] = useState<TechKey>('network');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   if (loading) {
     return (
@@ -274,24 +284,66 @@ export default function Landing() {
             />
           </Link>
           <nav className="flex items-center gap-1 md:gap-2">
-            <Button asChild variant="ghost" size="sm" className="h-11 md:h-8">
+            {/* Desktop-only links */}
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/about">About</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <a href="#video">Demo</a>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/help">Docs</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/auth">Log in</Link>
             </Button>
-            <Button asChild size="sm" className="h-11 whitespace-nowrap md:h-8">
+            <Button asChild size="sm" className="hidden whitespace-nowrap md:inline-flex md:h-8">
               <Link to="/auth">Get started</Link>
             </Button>
+            {/* Mobile: Log in + hamburger */}
+            <Button asChild variant="ghost" size="sm" className="h-11 whitespace-nowrap border border-border text-foreground md:hidden">
+              <Link to="/auth">Log in</Link>
+            </Button>
+            <button
+              aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              title={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              onClick={() => setMobileNavOpen((o) => !o)}
+              className="grid h-11 w-11 place-items-center rounded-sm border border-border bg-card md:hidden"
+            >
+              {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </nav>
         </div>
       </header>
+
+      {/* Mobile nav drawer */}
+      {mobileNavOpen && (
+        <div className="sticky top-14 z-30 border-b border-border bg-background/95 backdrop-blur md:hidden">
+          <div className="mx-auto flex max-w-6xl flex-col px-5">
+            <Link
+              to="/about"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex min-h-11 items-center border-b border-border/60 text-sm font-medium"
+            >
+              About
+            </Link>
+            <a
+              href="#video"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex min-h-11 items-center border-b border-border/60 text-sm font-medium"
+            >
+              Demo
+            </a>
+            <Link
+              to="/help"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex min-h-11 items-center text-sm font-medium"
+            >
+              Docs
+            </Link>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1">
         {/* Hero */}
@@ -300,8 +352,11 @@ export default function Landing() {
           <div className="relative mx-auto max-w-6xl px-5 pt-12 pb-9 md:px-6 md:pt-20 md:pb-24">
             {/* Eyebrow */}
             <span className="inline-flex items-center rounded-sm border border-border bg-card px-3 py-1.5">
-              <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#BF2330]" />
-              <span className={KICKER}>Resilience-grade supply chain simulator</span>
+              <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#BF2330]" />
+              <span className={KICKER}>
+                <span className="sm:hidden">Resilience-grade simulator</span>
+                <span className="hidden sm:inline">Resilience-grade supply chain simulator</span>
+              </span>
             </span>
 
             {/* Headline block */}
@@ -314,8 +369,9 @@ export default function Landing() {
               <p className="mt-5 max-w-xl text-[16px] leading-[1.62] text-muted-foreground text-pretty
                             md:mt-7 md:text-lg md:leading-relaxed">
                 Build a digital twin of your network, run rigorous experiments, and pick
-                the strategy that holds up under pressure — from data import to
-                side-by-side comparison, in one workspace.
+                the strategy that holds up under pressure
+                <span className="hidden md:inline"> — from data import to
+                side-by-side comparison, in one workspace</span>.
               </p>
               <div className="mt-6 flex flex-col gap-2.5 md:mt-8 md:flex-row md:flex-wrap md:items-center md:gap-3">
                 <Button asChild size="lg" className="group h-12 w-full rounded-sm md:w-auto">
@@ -427,7 +483,7 @@ export default function Landing() {
                         'radial-gradient(ellipse 54% 26% at 46% 72%, rgba(214,168,20,0.16), transparent 70%)',
                     }}
                   />
-                  <div className="relative h-[240px] md:h-[460px] lg:h-[560px]">
+                  <div className="relative h-[300px] md:h-[460px] lg:h-[560px]">
                     <NetworkVisualization3D />
                   </div>
                 </div>
@@ -549,10 +605,17 @@ export default function Landing() {
                         </div>
                       </div>
                     </div>
-                    <div className="lg:col-span-2 h-[220px] md:h-[500px] relative bg-black">
-                      <div className="absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-                      <div className="relative h-full">
-                        <NetworkVisualization3D />
+                    <div className="lg:col-span-2">
+                      {/* Mobile: stat viewport (3D viz is invisible at 220px on black bg) */}
+                      <div className="md:hidden">
+                        <StatViewport stats={NETWORK_STATS} />
+                      </div>
+                      {/* md+: 3D visualization */}
+                      <div className="hidden md:block md:h-[500px] relative bg-black">
+                        <div className="absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+                        <div className="relative h-full">
+                          <NetworkVisualization3D />
+                        </div>
                       </div>
                     </div>
                   </div>
