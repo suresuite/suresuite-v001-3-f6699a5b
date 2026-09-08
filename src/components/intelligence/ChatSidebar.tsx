@@ -22,6 +22,9 @@ interface ChatSidebarProps {
   collapsed: boolean;
   onCollapse: () => void;
   onExpand: () => void;
+  /** False inside the mobile Chats sheet: the sheet has its own close control
+   * and there is no rail to collapse into, so the chevron would be a dead end. */
+  collapsible?: boolean;
   projects: Array<{ id: string; name: string }>;
   threads: Thread[];
   activeThreadId: string | null;
@@ -58,6 +61,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
     collapsed,
     onCollapse,
     onExpand,
+    collapsible = true,
     projects,
     threads,
     activeThreadId,
@@ -190,7 +194,9 @@ export function ChatSidebar(props: ChatSidebarProps) {
             onChange={() =>
               setSelected((s) => (s.includes(thread.id) ? s.filter((x) => x !== thread.id) : [...s, thread.id]))
             }
-            className="ml-1 h-3 w-3 shrink-0"
+            // §2.4: the padding grows the hit area to 44px and the negative
+            // margin returns the space, so the row does not move.
+            className="-m-[16px] box-content h-3 w-3 shrink-0 p-[16px] md:m-0 md:ml-1 md:box-border md:p-0"
           />
         )}
 
@@ -215,7 +221,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
               type="button"
               onClick={() => onSelectThread(thread.id)}
               className={cn(
-                "flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-[5px] text-left text-[12.5px]",
+                "flex min-h-11 min-w-0 flex-1 items-center gap-1.5 px-1.5 py-[5px] text-left text-[12.5px] md:min-h-0",
                 active ? "font-semibold text-foreground" : "text-[#5a5a5a]",
               )}
             >
@@ -227,7 +233,8 @@ export function ChatSidebar(props: ChatSidebarProps) {
             <button
               type="button"
               onClick={() => setOpenMenu((m) => (m === thread.id ? null : thread.id))}
-              className="px-1.5 py-0.5 text-[13px] text-[#b8b8b8]"
+              aria-label={"Options for " + thread.title}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center px-1.5 py-0.5 text-[13px] text-[#b8b8b8] md:inline-block md:min-h-0 md:min-w-0"
             >
               ⋯
             </button>
@@ -245,7 +252,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                   setRenameValue(thread.title);
                   setOpenMenu(null);
                 }}
-                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+                className="flex min-h-11 w-full items-center rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc] md:block md:min-h-0"
               >
                 Rename
               </button>
@@ -255,7 +262,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                   onTogglePin(thread.id, !thread.pinned);
                   setOpenMenu(null);
                 }}
-                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+                className="flex min-h-11 w-full items-center rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc] md:block md:min-h-0"
               >
                 {thread.pinned ? "Unpin" : "Pin"}
               </button>
@@ -265,7 +272,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                 <select
                   value={thread.projectId ?? ""}
                   onChange={(e) => onAttachProject(thread.id, e.target.value || null)}
-                  className="h-[26px] w-full rounded-sm border border-[--hair-border] bg-background px-1.5 text-[11.5px] outline-none"
+                  className="h-[26px] min-h-11 w-full rounded-sm border border-[--hair-border] bg-background px-1.5 text-[11.5px] outline-none md:min-h-0"
                 >
                   <option value="">No project</option>
                   {projects.map((p) => (
@@ -282,7 +289,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                   <select
                     value={thread.folderId ?? ""}
                     onChange={(e) => onMoveToFolder(thread.id, e.target.value || null)}
-                    className="h-[26px] w-full rounded-sm border border-[--hair-border] bg-background px-1.5 text-[11.5px] outline-none"
+                    className="h-[26px] min-h-11 w-full rounded-sm border border-[--hair-border] bg-background px-1.5 text-[11.5px] outline-none md:min-h-0"
                   >
                     <option value="">No folder</option>
                     {folders.map((f) => (
@@ -301,7 +308,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                   onToggleArchive(thread.id, !thread.archived);
                   setOpenMenu(null);
                 }}
-                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+                className="flex min-h-11 w-full items-center rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc] md:block md:min-h-0"
               >
                 {thread.archived ? "Unarchive" : "Archive"}
               </button>
@@ -311,7 +318,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
                   onDeleteThread(thread.id);
                   setOpenMenu(null);
                 }}
-                className="block w-full rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc]"
+                className="flex min-h-11 w-full items-center rounded-sm px-2 py-1.5 text-left text-[12.5px] hover:bg-[#fcfcfc] md:block md:min-h-0"
                 style={{ color: LAYER.brand }}
               >
                 Delete
@@ -335,7 +342,11 @@ export function ChatSidebar(props: ChatSidebarProps) {
     right?: React.ReactNode;
   }) => (
     <div className="flex items-center justify-between">
-      <button type="button" onClick={() => toggleSection(sectionKey)} className={cn(KX_TIGHT, "flex w-full items-center gap-1 px-1.5 py-1")}>
+      <button
+        type="button"
+        onClick={() => toggleSection(sectionKey)}
+        className={cn(KX_TIGHT, "flex min-h-11 w-full items-center gap-1 px-1.5 py-1 md:min-h-0")}
+      >
         <span
           className="inline-block transition-transform"
           style={{ transform: closed[sectionKey] ? "rotate(0deg)" : "rotate(90deg)" }}
@@ -364,21 +375,24 @@ export function ChatSidebar(props: ChatSidebarProps) {
           >
             <Plus className="h-3.5 w-3.5" /> New chat
           </button>
-          <button
-            type="button"
-            onClick={onCollapse}
-            title="Hide chat list"
-            className="flex h-8 w-8 min-h-11 min-w-11 shrink-0 items-center justify-center md:min-h-0 md:min-w-0 rounded-sm border border-[--zinc-border] bg-background text-muted-foreground"
-          >
-            <ChevronLeft className="h-3 w-3" />
-          </button>
+          {collapsible && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              title="Hide chat list"
+              aria-label="Hide chat list"
+              className="flex h-8 w-8 min-h-11 min-w-11 shrink-0 items-center justify-center md:min-h-0 md:min-w-0 rounded-sm border border-[--zinc-border] bg-background text-muted-foreground"
+            >
+              <ChevronLeft className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search chats"
-          className="h-[30px] rounded-sm border border-[--hair-border] bg-background px-2.5 text-[12.5px] outline-none"
+          className="h-[30px] min-h-11 rounded-sm border border-[--hair-border] bg-background px-2.5 text-[12.5px] outline-none md:min-h-0"
         />
 
         <div className="flex items-center justify-between gap-1">
@@ -392,7 +406,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
               setSelected([]);
               setConfirmDelete(false);
             }}
-            className="shrink-0 px-1 py-0.5 text-[11.5px] text-muted-foreground"
+            className="min-h-11 shrink-0 px-2 py-0.5 text-[11.5px] text-muted-foreground md:min-h-0 md:px-1"
           >
             {selectMode ? "Cancel" : "Select"}
           </button>
@@ -425,7 +439,8 @@ export function ChatSidebar(props: ChatSidebarProps) {
                 type="button"
                 onClick={() => setCreatingFolder(true)}
                 title="New folder"
-                className="px-1.5 py-0.5 text-[13px] text-muted-foreground"
+                aria-label="New folder"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center px-1.5 py-0.5 text-[13px] text-muted-foreground md:inline-block md:min-h-0 md:min-w-0"
               >
                 +
               </button>

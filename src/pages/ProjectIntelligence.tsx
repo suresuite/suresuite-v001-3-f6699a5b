@@ -14,6 +14,13 @@
  *    workspace into the rail column.
  *  - Sidebar file/memory panels are layer-tinted disclosures (teal #14b8c4 /
  *    purple #7c3aed) so they cost 36px when closed.
+ *
+ * Below md this shell is not used at all. The phone composition is a different
+ * tree (MobileIntelligence) — PAGES.md 16: the page title, agent strip, memory
+ * strip and suggestion chips fold into a chat header, a ⋯ menu and a composer
+ * lightbulb, reclaiming ~150px for the conversation. Everything it renders
+ * comes from the props and hooks below, so the two platforms share one data
+ * flow and one message stream.
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -21,7 +28,6 @@ import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { PAGE_GUTTER } from "@/components/shared/PageBody";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { PanelLeft, X } from "lucide-react";
 import { useGlobalProject, type Project } from "@/hooks/useGlobalProject";
 import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -29,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/intelligence/ChatSidebar";
 import { ChatWorkspace } from "@/components/intelligence/ChatWorkspace";
+import { MobileIntelligence } from "@/components/intelligence/MobileIntelligence";
 import { useChatThreads, QUICK_THREAD_ID } from "@/hooks/useChatThreads";
 import { getStoredModel, setStoredModel } from "@/components/chat/ModelPicker";
 import { fileWorkspaceUiEnabled, useUserFiles, expiryCountdown } from "@/hooks/useUserFiles";
@@ -77,9 +84,8 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
 
   // Below md the three-column grid cannot work: at 390px a 264px sidebar plus
   // the 5px handle leaves the workspace ~120px, and the handle is mouse-only so
-  // it can never be collapsed by touch. One column, sidebar as an overlay.
+  // it can never be collapsed by touch. The phone gets its own tree instead.
   const isMobile = useIsMobile();
-  const [chatListOpen, setChatListOpen] = useState(false);
 
   const {
     threads,
@@ -237,14 +243,11 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
   const handleSelectThread = (id: string) => {
     setActiveThread(id);
     setSearchParams({ thread: id }, { replace: true });
-    // No-op above md, where the overlay never opens.
-    setChatListOpen(false);
   };
 
   const handleNewThread = () => {
     const id = newThread();
     if (id) setSearchParams({ thread: id }, { replace: true });
-    setChatListOpen(false);
   };
 
   const handleModelChange = (id: string) => {
@@ -262,9 +265,9 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     updateThread(activeThreadId, { projectId });
   };
 
-  // The single ChatSidebar prop set. Both the desktop grid child and the mobile
-  // overlay spread this, so the two instances can never drift apart; only the
-  // collapse trio below differs, because only the desktop instance collapses.
+  // The single ChatSidebar prop set. The desktop grid child and the mobile
+  // Chats sheet both spread this, so the two instances can never drift apart;
+  // only the collapse trio differs, because only the desktop one collapses.
   const sidebarProps = {
     projects,
     threads,
@@ -300,91 +303,80 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
   const fullName = (user as { user_metadata?: { full_name?: string } } | null)?.user_metadata?.full_name;
   const firstName = (fullName ?? user?.email ?? "").split(/[ @]/)[0];
 
+  // Below md the desktop three-column grid is not reflowed, it is replaced:
+  // MobileIntelligence is the phone composition (PAGES.md 16). Both trees are
+  // fed from the same state above, and the branch sits below every hook so the
+  // hook order is identical on either platform.
+  if (isMobile) {
+    return (
+      <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+        <div className={PAGE_GUTTER}>
+          <MobileIntelligence
+            threads={threads}
+            activeThread={activeThread ?? null}
+            activeThreadId={activeThreadId}
+            projects={projects}
+            projectId={activeThread?.projectId ?? null}
+            agentId={activeThread?.agentId ?? null}
+            model={model}
+            threadMode={activeThread?.mode ?? "review"}
+            serverThreadId={activeThreadId ? getServerThreadId(activeThreadId) : null}
+            threadSummary={activeThread?.summary ?? null}
+            userName={firstName}
+            input={input}
+            onInputChange={setInput}
+            onAgentChange={handleAgentChange}
+            onProjectChange={handleProjectChange}
+            onModelChange={handleModelChange}
+            onModeChange={(m) => activeThreadId && setThreadMode(activeThreadId, m)}
+            onNewThread={handleNewThread}
+            onRenameThread={(id, title) => updateThread(id, { title })}
+            onDeleteThread={deleteThread}
+            onDeleteSummary={() => activeThreadId && clearThreadSummary(activeThreadId)}
+            files={sidebarFiles}
+            memoryEntries={sidebarMemory}
+            filesEnabled={fileWorkspaceUiEnabled() && can("reports")}
+            memoryEnabled={can("project_memory")}
+            onDownloadFile={handleDownloadFile}
+            onKeepFile={handleKeepFile}
+            onAddMemory={handleAddMemory}
+            onArchiveMemory={handleArchiveMemory}
+            sidebar={sidebarProps}
+          />
+        </div>
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
         {/* No subtitle — AdminLayout header pattern. */}
-        <PageHeader
-          title="Project Intelligence"
-          rightContent={
-            isMobile ? (
-              <button
-                type="button"
-                onClick={() => setChatListOpen(true)}
-                aria-label="Chats, files and memory"
-                title="Chats, files and memory"
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-card text-foreground"
-              >
-                <PanelLeft className="h-4 w-4" />
-              </button>
-            ) : undefined
-          }
-        />
+        <PageHeader title="Project Intelligence" />
 
         <div
           className="grid overflow-hidden rounded-sm border border-[--hair-border] bg-background
-                     h-[calc(100svh-var(--pi-chrome,210px))] min-h-[420px]
-                     md:h-[calc(100vh-150px)] md:min-h-[560px]"
+                     h-[calc(100vh-150px)] min-h-[560px]"
           style={{
-            gridTemplateColumns: isMobile
-              ? "minmax(0,1fr)"
-              : sidebarCollapsed
-                ? "48px minmax(0,1fr)"
-                : sidebarWidth + "px 5px minmax(0,1fr)",
+            gridTemplateColumns: sidebarCollapsed
+              ? "48px minmax(0,1fr)"
+              : sidebarWidth + "px 5px minmax(0,1fr)",
           }}
         >
-          {/* Below md the sidebar is off-canvas. It is the SAME component with the
-              same sidebarProps; only the collapse trio differs, and the overlay
-              never collapses — its close button dismisses the drawer instead. */}
-          {isMobile && chatListOpen && (
-            <div className="fixed inset-0 z-[60] flex md:hidden" role="dialog" aria-modal="true">
-              <div className="flex w-[86vw] max-w-[330px] flex-col bg-background shadow-xl">
-                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border pl-3 pr-2">
-                  <span className="flex-1 text-[13px] font-semibold">Chats</span>
-                  <button
-                    type="button"
-                    onClick={() => setChatListOpen(false)}
-                    aria-label="Close"
-                    className="grid h-11 w-11 place-items-center rounded-md hover:bg-accent"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  <ChatSidebar
-                    collapsed={false}
-                    onCollapse={() => setChatListOpen(false)}
-                    onExpand={() => setChatListOpen(true)}
-                    {...sidebarProps}
-                  />
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => setChatListOpen(false)}
-                className="flex-1 bg-foreground/30"
-              />
-            </div>
-          )}
+          {/* display:contents keeps this a DIRECT grid child; a plain wrapper
+              would collapse the three tracks into one cell and squeeze the
+              workspace into the sidebar column. */}
+          <div className="contents">
+            <ChatSidebar
+              collapsed={sidebarCollapsed}
+              onCollapse={() => setCollapsed(true)}
+              onExpand={() => setCollapsed(false)}
+              {...sidebarProps}
+            />
+          </div>
 
-          {/* Exactly one ChatSidebar is mounted at any width — this branch above
-              md, the overlay below it. display:contents keeps this one a DIRECT
-              grid child; a plain wrapper would collapse the three tracks into
-              one cell and squeeze the workspace into the sidebar column. */}
-          {!isMobile && (
-            <div className="contents">
-              <ChatSidebar
-                collapsed={sidebarCollapsed}
-                onCollapse={() => setCollapsed(true)}
-                onExpand={() => setCollapsed(false)}
-                {...sidebarProps}
-              />
-            </div>
-          )}
-
-          {/* 6 · the handle is onMouseDown-only, so it never mounts below md. */}
-          {!isMobile && !sidebarCollapsed && (
+          {/* 6 · the handle is onMouseDown-only. */}
+          {!sidebarCollapsed && (
             <div
               onMouseDown={startResize}
               title="Drag to resize"

@@ -13,7 +13,7 @@ import type { ChatPart, ChatToolCall } from "@/hooks/useProjectChat";
 import { LAYER, MonoChip, TD, TH, tint } from "./piUi";
 import { cn } from "@/lib/utils";
 import { PlanCard, type PlanPartData } from "@/components/chat/PlanCard";
-import { FROZEN_CELL } from '@/components/shared';
+import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 
 const CARD = "mt-2 rounded-sm border border-[--hair-border]";
 const accent = (hex: string) => ({ borderLeft: "2px solid " + hex });
@@ -33,7 +33,7 @@ export function EvidencePart({ data }: { data: any }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="rounded-sm px-2.5 py-1 text-[11px]"
+        className="min-h-11 rounded-sm px-2.5 py-1 text-[11px] md:min-h-0"
         style={{
           background: tint(fallback ? LAYER.brand : "#6b6b6b", 0.1),
           color: fallback ? LAYER.brand : "#5a5a5a",
@@ -73,7 +73,18 @@ export function TablePart({ data }: { data: any }) {
           <thead>
             <tr>
               {columns.map((c, i) => (
-                <th key={c} className={cn(TH, i === 0 && FROZEN_CELL)}>
+                // FROZEN_CELL_ON_TINT, not FROZEN_CELL (§2.7): the TH already
+                // paints an opaque ink fill, and FROZEN_CELL's bg-background
+                // repainted it white — a white label on a white ground, which
+                // is what the first column header looked like on a phone.
+                //
+                // md:bg-transparent is kept deliberately. FROZEN_CELL carried
+                // it, so above md this cell has always rendered transparent
+                // while its neighbours render on ink. That is a desktop defect,
+                // but fixing it is a desktop change and this work is mobile-only
+                // — so the desktop rendering is preserved exactly and the defect
+                // is reported rather than folded in here.
+                <th key={c} className={cn(TH, i === 0 && FROZEN_CELL_ON_TINT, i === 0 && "md:bg-transparent")}>
                   {c}
                 </th>
               ))}
@@ -104,9 +115,16 @@ export function TablePart({ data }: { data: any }) {
 export function KpiPart({ data }: { data: any }) {
   const cards: any[] = data?.cards ?? [];
   return (
+    // Three narrow columns do not fit a 320px phone. Below md the strip is the
+    // §2.3 auto-fit 2-up that collapses to 1-up under 360; at md the desktop
+    // count (up to 3) is restored from --kpi-cols.
     <div
-      className={cn(CARD, "grid gap-px bg-[--hair-divider]")}
-      style={{ ...accent("#b8b8b8"), gridTemplateColumns: "repeat(" + Math.min(cards.length || 1, 3) + ",minmax(0,1fr))" }}
+      className={cn(
+        CARD,
+        "grid grid-cols-[repeat(auto-fit,minmax(min(140px,100%),1fr))] gap-px bg-[--hair-divider]",
+        "md:[grid-template-columns:repeat(var(--kpi-cols),minmax(0,1fr))]",
+      )}
+      style={{ ...accent("#b8b8b8"), "--kpi-cols": Math.min(cards.length || 1, 3) } as React.CSSProperties}
     >
       {cards.map((c, i) => (
         <div key={i} className="bg-background p-2.5">
@@ -235,7 +253,7 @@ export function ActivityGroup({ toolCalls }: { toolCalls: ChatToolCall[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-[7px] bg-[#fcfcfc] px-2.5 py-1.5 text-left text-[12px] text-muted-foreground"
+        className="flex min-h-11 w-full items-center gap-[7px] bg-[#fcfcfc] px-2.5 py-1.5 text-left text-[12px] text-muted-foreground md:min-h-0"
       >
         <span
           className="inline-block h-1.5 w-1.5 rounded-full"

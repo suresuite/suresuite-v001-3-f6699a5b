@@ -29,6 +29,10 @@ export interface MemoryEntry {
   content: string;
 }
 
+/** Where a panel is rendered: the desktop sidebar disclosure, or a mobile
+ * bottom sheet that already supplies its own title and scroll. */
+export type PanelVariant = "panel" | "sheet";
+
 /* ── My files ────────────────────────────────────────────────────────── */
 
 export function MyFilesPanel({
@@ -37,43 +41,61 @@ export function MyFilesPanel({
   onScopeChange,
   onDownload,
   onKeep,
+  variant = "panel",
 }: {
   files: UserFile[];
   scope: "project" | "all";
   onScopeChange: (s: "project" | "all") => void;
   onDownload: (id: string) => void;
   onKeep: (id: string) => void;
+  /** "sheet" is the mobile bottom-sheet body: no disclosure (the sheet title
+   * already names it), no inner scroll cap (the sheet scrolls), 44px actions.
+   * The copy, the retention rule and the handlers are the panel's. */
+  variant?: PanelVariant;
 }) {
   const [open, setOpen] = useState(false);
   const expiring = files.filter((f) => !f.retained).length;
+  const sheet = variant === "sheet";
 
   return (
     <div
-      className="shrink-0 border-t px-2 py-1.5"
-      style={{ borderColor: "#e2f4f6", background: "rgba(20,184,196,.05)" }}
+      className={cn(sheet ? "px-3.5 py-3" : "shrink-0 border-t px-2 py-1.5")}
+      style={sheet ? undefined : { borderColor: "#e2f4f6", background: "rgba(20,184,196,.05)" }}
     >
-      <PanelHeader
-        open={open}
-        onToggle={() => setOpen((v) => !v)}
-        label="My files"
-        count={files.length}
-        color="#0f8a94"
-        right={
-          <Segmented
-            size="sm"
-            className="ml-auto"
-            value={scope}
-            onChange={onScopeChange}
-            options={[
-              { value: "project", label: "Project" },
-              { value: "all", label: "All" },
-            ]}
-          />
-        }
-      />
+      {sheet ? (
+        <Segmented
+          className="[&>button]:min-h-11"
+          value={scope}
+          onChange={onScopeChange}
+          options={[
+            { value: "project", label: "This project" },
+            { value: "all", label: "All" },
+          ]}
+        />
+      ) : (
+        <PanelHeader
+          open={open}
+          onToggle={() => setOpen((v) => !v)}
+          label="My files"
+          count={files.length}
+          color="#0f8a94"
+          right={
+            <Segmented
+              size="sm"
+              className="ml-auto"
+              value={scope}
+              onChange={onScopeChange}
+              options={[
+                { value: "project", label: "Project" },
+                { value: "all", label: "All" },
+              ]}
+            />
+          }
+        />
+      )}
 
-      {open && (
-        <div className="mt-1.5">
+      {(open || sheet) && (
+        <div className={cn(sheet ? "mt-3" : "mt-1.5")}>
           {expiring > 0 && (
             <div
               className="mb-1.5 rounded-sm border bg-background px-2 py-1.5 text-[11px] leading-[1.45] text-[#7a5a12]"
@@ -84,12 +106,12 @@ export function MyFilesPanel({
           )}
 
           {files.length === 0 && (
-            <div className="py-0.5 text-[11.5px] text-muted-foreground">
+            <div className={cn("py-0.5 text-muted-foreground", sheet ? "text-[13px]" : "text-[11.5px]")}>
               Nothing here yet — approved reports land here.
             </div>
           )}
 
-          <div className="max-h-[110px] overflow-y-auto">
+          <div className={cn(!sheet && "max-h-[110px] overflow-y-auto")}>
             {files.map((f) => (
               <div
                 key={f.id}
@@ -99,13 +121,21 @@ export function MyFilesPanel({
                 <div className="flex items-center gap-1.5">
                   <span
                     title={f.name}
-                    className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground"
+                    className={cn(
+                      "min-w-0 flex-1 truncate font-medium text-foreground",
+                      sheet ? "text-[14px]" : "text-[12px]",
+                    )}
                   >
                     {f.name}
                   </span>
                   <MonoChip>{f.kind}</MonoChip>
                 </div>
-                <div className="mt-0.5 flex items-center gap-2 whitespace-nowrap text-[11px] text-muted-foreground">
+                <div
+                  className={cn(
+                    "flex items-center gap-2 whitespace-nowrap text-muted-foreground",
+                    sheet ? "text-[11.5px]" : "mt-0.5 text-[11px]",
+                  )}
+                >
                   <span className="shrink-0" style={{ color: f.retained ? "#0f8a7a" : undefined }}>
                     {f.expiresLabel}
                   </span>
@@ -113,19 +143,24 @@ export function MyFilesPanel({
                     type="button"
                     onClick={() => onDownload(f.id)}
                     title="Download"
-                    className="ml-auto flex items-center p-0.5"
+                    aria-label={"Download " + f.name}
+                    className={cn(
+                      "ml-auto flex items-center",
+                      sheet ? "h-11 w-11 justify-center" : "p-0.5",
+                    )}
                     style={{ color: LAYER.process }}
                   >
-                    <Download className="h-3 w-3" />
+                    <Download className={sheet ? "h-4 w-4" : "h-3 w-3"} />
                   </button>
                   <button
                     type="button"
                     onClick={() => onKeep(f.id)}
                     title={f.retained ? "Kept — click to allow expiry" : "Keep — never auto-delete"}
-                    className="flex items-center p-0.5"
+                    aria-label={f.retained ? "Kept — click to allow expiry" : "Keep — never auto-delete"}
+                    className={cn("flex items-center", sheet ? "h-11 w-11 justify-center" : "p-0.5")}
                     style={{ color: f.retained ? "#0f8a7a" : "#b8b8b8" }}
                   >
-                    <Pin className="h-3 w-3" />
+                    <Pin className={sheet ? "h-4 w-4" : "h-3 w-3"} />
                   </button>
                 </div>
               </div>
@@ -143,14 +178,18 @@ export function ProjectMemoryPanel({
   entries,
   onAdd,
   onArchive,
+  variant = "panel",
 }: {
   entries: MemoryEntry[];
   onAdd: (content: string) => void;
   onArchive: (id: string) => void;
+  /** See MyFilesPanel — "sheet" is the same content without the disclosure. */
+  variant?: PanelVariant;
 }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
+  const sheet = variant === "sheet";
 
   const commit = () => {
     const v = draft.trim();
@@ -161,31 +200,48 @@ export function ProjectMemoryPanel({
 
   return (
     <div
-      className="shrink-0 border-t px-2 py-1.5"
-      style={{ borderColor: "#ece5fb", background: "rgba(124,58,237,.05)" }}
+      className={cn(sheet ? "px-3.5 py-3" : "shrink-0 border-t px-2 py-1.5")}
+      style={sheet ? undefined : { borderColor: "#ece5fb", background: "rgba(124,58,237,.05)" }}
     >
-      <PanelHeader
-        open={open}
-        onToggle={() => setOpen((v) => !v)}
-        label="Project memory"
-        count={entries.length}
-        color={LAYER.product}
-        right={
-          <button
-            type="button"
-            title="Add memory"
-            onClick={() => setAdding((v) => !v)}
-            className="ml-auto text-[14px] text-muted-foreground"
-          >
-            +
-          </button>
-        }
-      />
+      {sheet ? (
+        <>
+          <p className="text-[12.5px] leading-[1.55] text-muted-foreground [text-wrap:pretty]">
+            Adding an entry here is the consent — the model never writes memory on its own.
+          </p>
+          {!adding && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="mt-2.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-sm border border-[--hair-border] bg-background text-[13.5px] text-foreground"
+            >
+              Add a note
+            </button>
+          )}
+        </>
+      ) : (
+        <PanelHeader
+          open={open}
+          onToggle={() => setOpen((v) => !v)}
+          label="Project memory"
+          count={entries.length}
+          color={LAYER.product}
+          right={
+            <button
+              type="button"
+              title="Add memory"
+              onClick={() => setAdding((v) => !v)}
+              className="ml-auto text-[14px] text-muted-foreground"
+            >
+              +
+            </button>
+          }
+        />
+      )}
 
-      {open && (
-        <div className="mt-1.5">
+      {(open || sheet) && (
+        <div className={cn(sheet ? "mt-2.5" : "mt-1.5")}>
           {adding && (
-            <div className="mb-1.5 flex gap-1">
+            <div className={cn("flex gap-1", sheet ? "mb-2.5" : "mb-1.5")}>
               <input
                 autoFocus
                 value={draft}
@@ -198,12 +254,18 @@ export function ProjectMemoryPanel({
                   }
                 }}
                 placeholder="e.g. S3 is our strategic supplier"
-                className="h-6 flex-1 rounded-sm border border-foreground px-1.5 text-[12px] outline-none"
+                className={cn(
+                  "flex-1 rounded-sm border border-foreground px-1.5 outline-none",
+                  sheet ? "min-h-11 text-[14px]" : "h-6 text-[12px]",
+                )}
               />
               <button
                 type="button"
                 onClick={commit}
-                className="rounded-sm bg-foreground px-2 text-[11px] text-background"
+                className={cn(
+                  "rounded-sm bg-foreground px-2 text-background",
+                  sheet ? "min-h-11 px-4 text-[13.5px]" : "text-[11px]",
+                )}
               >
                 Save
               </button>
@@ -211,12 +273,12 @@ export function ProjectMemoryPanel({
           )}
 
           {entries.length === 0 && (
-            <div className="text-[11.5px] text-muted-foreground">
+            <div className={cn("text-muted-foreground", sheet ? "text-[13px]" : "text-[11.5px]")}>
               Nothing saved yet — say “remember…” in a chat.
             </div>
           )}
 
-          <div className="max-h-[110px] overflow-y-auto">
+          <div className={cn(!sheet && "max-h-[110px] overflow-y-auto")}>
             {entries.map((m) => (
               <div
                 key={m.id}
@@ -226,12 +288,15 @@ export function ProjectMemoryPanel({
                 <MonoChip color={LAYER.product} className="mt-0.5 shrink-0">
                   {m.kindLabel}
                 </MonoChip>
-                <span className="flex-1 text-[12px] leading-[1.5] text-foreground">{m.content}</span>
+                <span className={cn("flex-1 leading-[1.5] text-foreground", sheet ? "text-[13.5px]" : "text-[12px]")}>
+                  {m.content}
+                </span>
                 <button
                   type="button"
                   onClick={() => onArchive(m.id)}
                   title="Archive"
-                  className="text-[12px] text-[#c4c4c4]"
+                  aria-label="Archive this memory"
+                  className={cn("text-[#c4c4c4]", sheet ? "grid h-11 w-11 place-items-center text-[15px]" : "text-[12px]")}
                 >
                   ✕
                 </button>
