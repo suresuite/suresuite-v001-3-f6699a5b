@@ -378,6 +378,99 @@ Screenshot hashes were tried first and abandoned: they are not deterministic
 here (`main` differs from itself). `audit-adaptive-ui --all` unchanged at 7,
 `tsc` unchanged at 7, eslint unchanged.
 
+### G12 — The network lens pages · ✅ **done, mobile only**
+
+`ProductLevelNetwork.tsx`, `ProcessLevelNetwork.tsx`, `FirmLevelNetwork.tsx`.
+`PAGES.md` entry 08 records the lens interiors as *landed*. Re-derived against
+the working tree, three things were wrong and two were fatal.
+
+**1. The mobile header was unusable on all three.** `PageHeader`'s right slot
+is `shrink-0` beside a `min-w-0 flex-1` title, and each lens put five or six
+controls in it. Measured in Chromium at 390px: the page title rendered at
+**zero width** and the project select ran to x=506 on a 390px viewport — off
+the screen, unreachable. Fixed with the `md:contents` split `ProjectPolicies`
+already uses (§2 above): below `md` the header holds refresh + the project
+select, which is two of the three §4.1 allows; at `md` every control is handed
+straight back to the same flex row.
+
+The container had to move from `space-x-2` to `gap-2` at the same time —
+`space-x-*` puts its margin on the *DOM* children, so it lands on the
+`md:contents` wrapper instead of the controls inside it and collapses the
+desktop spacing. `gap` is inherited correctly through `display:contents`, and
+for a single-line row the two are geometrically identical. This was caught by
+a 1280px screenshot diff, not by reading the classes.
+
+**Where the displaced controls went.** Search, the map/network toggle, the
+labels toggle, the level-1 filter, "clear filter", the analytics toggle and
+"add disruption" all drive the network graph or the analytics panels, and both
+of those are `hidden md:` on these pages — on a phone they change nothing that
+is on screen. They are now desktop-only, and the page says so in words rather
+than leaving dead chrome. The two that *do* change what a phone shows moved
+next to the thing they change: product's metric calculation and firm's
+prominence recalculation are now action buttons in the centrality card.
+
+**2. `FirmLevelNetwork` did not render at all — on either platform.**
+`import { Map } from 'lucide-react'` shadows the global `Map`, and commit
+`b8f7c09` (the previous pass at this page) added `new Map<string, Set<string>>()`
+inside `mobileFirmMetrics`. Every render threw `TypeError: Map is not a
+constructor` and the route was a blank screen at every width. Reached through
+`globalThis.Map`, which is the workaround `ProductLevelNetwork.tsx` already
+uses for the same shadowing. **This is the one change in this commit that is
+not UI-only** — it is a one-token expression fix with no intended behaviour
+change, made because nothing on the page could be seen, let alone verified,
+without it.
+
+**3. `ProcessLevelNetwork`'s identifying column was blank on every row.**
+The graph blanks `node.data.label` to `''` while the Labels toggle is off
+(`:683`), which is its default and — now — a desktop-only control. The mobile
+table read `node?.data?.label ?? n.id`, and `??` does not catch an empty
+string, so the frozen first column rendered empty. Now `||`.
+
+**What else changed on mobile.** The composition itself is the demo's, and the
+three copies of it are now one presentational module,
+`components/network/MobileLens.tsx`, imported only by the `md:hidden` subtree:
+
+- **"How to read this"** is the shared §3.4 `Disclosure` — a card with a 44px
+  header — instead of a bare `<details>` whose `<summary>` measured 20px. Its
+  body carries the demo's three groups: **Scope**, **Findings**, **Columns**.
+  The column definitions for Degree, Betweenness and Prominence are lifted
+  verbatim from the repo's own legend (`NetworkMetricsTable.tsx:293-298`);
+  the rest are plain descriptions of columns that legend does not cover.
+- **The centrality table** freezes its identifying column (§2.7) — measured
+  under a full horizontal scroll, the name cell stays pinned at the container
+  edge — carries the spec's affordance sentence, and truncates the name in a
+  block span with `title`, because `truncate` on a `<td>`/`<th>` is ignored by
+  the table layout algorithm and clips without an ellipsis. Empty and loading
+  rows drop the `min-width` so their message wraps instead of running off.
+- **Empty / loading / disabled** are all real states: "—" throughout with no
+  project, a disabled action that carries its reason in `title` (§6 — shown,
+  disabled, explained), and a loading row.
+- Structure tiles are `repeat(2,minmax(0,1fr))` with `min-w-0` (§2.3), values
+  use `--fs-stat`, risk figures are `whitespace-nowrap tabular-nums` (§3.3).
+- `MLPrediction`'s docs link — shared with desktop — gained `aria-label`,
+  `title` and a 44px hit area below `md` via the §2.4 negative-margin pattern,
+  with `md:` restoring the bare 16px icon.
+
+**Verified.** 320 / 360 / 375 / 390 / 414 / 768 / 1280 plus landscape 874×402,
+in Chromium against the real components: no horizontal page overflow at any
+width, and **zero** controls under 44×44 below 768 on any of the three (main
+had two per page). Desktop proof is a SHA-256 comparison, not an assertion:
+full-page at 1280 is byte-identical to `main` on all three pages, and the
+header region is byte-identical at 768 / 1024 / 1280 / 1440. (Full-page 768 is
+not a usable signal — React Flow's `fitView` makes it non-deterministic across
+runs on `main` itself.) `tsc` 7 errors, unchanged; `eslint` 49 problems on the
+touched files, unchanged; `audit-adaptive-ui --all` 7, unchanged.
+
+**What was deliberately not built.** The demo's node inspector (`PAGES.md` 09)
+is not here — it writes a scenario, which is a feature PR. The demo's
+lens-specific *prose* findings are not here either: they are statements about
+the prototype's own data, and the equivalent on these pages is the SPOF alert,
+which is already computed from the real graph. "Critical path" and "utilisation
+headroom" stay `—` on every lens, exactly as on `main`; no page computes them,
+and inventing a number is what §3.3 exists to prevent.
+
+---
+
 ## 4. Sequence
 
 Five commits, each independently shippable and revertable, ordered so the
@@ -393,6 +486,7 @@ riskiest visual change lands last and alone.
 | **7** | **Simulation Lab** — G10 | `resultTables.tsx`, `ParameterCard.tsx`, `ScenarioSetupForm.tsx`, `RunGate.tsx`, `RunProgressPanel.tsx`, `PreRunValidationPanel.tsx`, `DisruptionScheduleEditor.tsx`, `DisruptionRecoveryPane.tsx`, `PlaybookPicker.tsx`, `PlaybookSaveDialog.tsx`, `ScenarioLibraryPanel.tsx`, `ScenarioRail.tsx`, `CompareScenariosPanel.tsx`, `ReplicationSeedExplorer.tsx`, `ItemSeriesExplorer.tsx`, `ResultsDashboard.tsx`, `UtilizationHeatmap.tsx`, `SimulationLab.tsx` | ✅ **done** — see G10. Low: reflow only, all `md:`-released |
 | **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |
 | **8** | **Super Admin** — G11 | `adminUi.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, `OrgAccessDrawer.tsx`, 8 admin pages | ✅ **done** — see G11 |
+| **9** | **Network lenses** — G12 | `ProductLevelNetwork.tsx`, `ProcessLevelNetwork.tsx`, `FirmLevelNetwork.tsx`, `network/MobileLens.tsx`, `MLPrediction.tsx` | ✅ **done** — see G12. Medium: a header recomposition plus one crash fix |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
 

@@ -34,10 +34,18 @@ import {
   Search,
   AlertTriangle,
   Tag,
-  ChevronRight,
-  Info,
 } from 'lucide-react';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
+import {
+  LensChip,
+  LensRule,
+  LensHowToRead,
+  LensDesktopOnlyNote,
+  LensStructure,
+  LensRisk,
+  LensTable,
+  LENS_SWIPE_HINT,
+} from '@/components/network/MobileLens';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MLPrediction from '@/components/MLPrediction';
 import { BarChart } from 'lucide-react';
@@ -1145,7 +1153,20 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           onRefresh={fetchData}
           refreshLoading={loading}
           rightContent={
-            <div className="flex items-center space-x-2">
+            /* `gap-2` rather than `space-x-2`: `space-x-*` puts its margin on
+               the DOM children, so it would land on the `md:contents` wrapper
+               below instead of on the controls inside it and collapse the
+               desktop spacing. `gap` is inherited correctly through
+               `display:contents`, and for this single-line row the two
+               produce the same 8px. */
+            <div className="flex items-center gap-2">
+              {/* Spec 4.1 caps the mobile right slot at three controls, and
+                  every control in this group drives the network graph or the
+                  analytics panel, both of which are `hidden md:` on this page.
+                  Below `md` the header therefore holds refresh + the project
+                  select only; `md:contents` hands each control straight back
+                  to the same flex row on desktop, unchanged. */}
+              <span className="hidden md:contents">
               {/* Level 1 Node Filter */}
               {level1Nodes.length > 0 && (
                 <>
@@ -1229,8 +1250,13 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                 </Button>
               )}
               
+              </span>
+
               <Select value={globalSelectedProjectId || ''} onValueChange={setGlobalSelectedProjectId}>
-                <SelectTrigger className="w-[180px] h-9">
+                {/* Case A select (spec 2.1 / parity plan G3): the vw term
+                    exceeds 180px at every width from 768 up, so the clamp
+                    resolves to the desktop literal without an `md:`. */}
+                <SelectTrigger className="w-[clamp(120px,38vw,180px)] h-9">
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1245,36 +1271,39 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           }
         />
 
-        {/* ── Mobile composition (md:hidden) ── */}
-        <div className="md:hidden space-y-6 mt-4">
+        {/* ── Mobile composition (md:hidden) ──────────────────────────
+             Spec 5 row 7 / demo entry 08. See ProductLevelNetwork for the
+             shape; the pieces come from components/network/MobileLens so the
+             three lenses stay identical in composition and differ only in
+             what each lens measures. */}
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-5">
 
-          {/* Lens chip */}
-          <span className="inline-flex items-center gap-1 rounded-sm bg-teal-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
-            Process level
-          </span>
+          <div>
+            <LensChip tone="teal">Process level</LensChip>
+          </div>
 
-          {/* How to read this */}
-          <details className="group border-b border-border pb-3">
-            <summary className="flex cursor-pointer items-center justify-between text-sm font-medium select-none">
-              How to read this
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Nodes represent process steps, materials, and products flowing left to right. Level 1 nodes are manufacturing or assembly steps. High flow volume through a single node indicates a potential bottleneck that constrains the critical path.
-            </p>
-          </details>
+          <LensHowToRead
+            scope="Shop-floor dependencies from this project's multi-tier records — suppliers, materials, process steps and products — ordered by level from raw material through to customer."
+            findings="The ten highest-flow nodes are ranked below. A level-1 node among them is a manufacturing or assembly step, and the highest-flow one is reported as the constraint on the critical path."
+            columns={[
+              { term: 'Node', def: 'The process step, material or product this row measures.' },
+              { term: 'Type', def: 'Which of those it is, read from its level in the multi-tier data.' },
+              { term: 'Flow', def: 'Total weighted volume across the edges touching the node.' },
+              { term: 'In', def: 'Edges arriving at the node.' },
+              { term: 'Out', def: 'Edges leaving the node.' },
+            ]}
+          />
 
-          {/* Desktop-only notice */}
-          <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <Info className="inline-block h-3.5 w-3.5 mr-1 shrink-0 align-text-bottom" />
-            The 3D network space is desktop-only. Open on a larger screen to explore the interactive graph.
-          </p>
+          <LensDesktopOnlyNote>
+            The process graph, its labels and the level analytics are desktop
+            surfaces. Open this lens on a larger screen to explore them; the
+            findings below are the same on both.
+          </LensDesktopOnlyNote>
 
-          {/* Network structure */}
           <section>
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Network structure</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
+            <LensRule>Network structure</LensRule>
+            <LensStructure
+              items={[
                 { label: 'Nodes', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.totalNodes) : '—' },
                 { label: 'Network depth', value: mobileProcessMetrics.networkDepth > 0 ? String(mobileProcessMetrics.networkDepth) : '—' },
                 { label: 'Critical path', value: '—' },
@@ -1283,89 +1312,64 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                   value: mobileProcessMetrics.resilience,
                   red: mobileProcessMetrics.resilienceRed,
                 },
-              ].map(({ label, value, red }) => (
-                <div key={label} className="rounded-sm border border-border p-3">
-                  <p className={`text-xl font-semibold tabular-nums ${red ? 'text-destructive' : ''}`}>{value}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p>
-                </div>
-              ))}
-            </div>
+              ]}
+            />
           </section>
 
-          {/* Structural risk */}
           <section>
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Structural risk</p>
-            <div className="divide-y divide-border rounded-sm border border-border">
-              {[
+            <LensRule>Structural risk</LensRule>
+            <LensRisk
+              rows={[
                 { label: 'Critical path', value: '—' },
                 { label: 'Bottlenecks', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.bottlenecks) : '—' },
                 { label: 'Utilisation headroom', value: '—' },
                 { label: 'Path concentration', value: mobileProcessMetrics.pathConcentration },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between px-3 py-2">
-                  <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className="text-sm font-semibold tabular-nums">{value}</span>
-                </div>
-              ))}
-            </div>
-            {mobileProcessMetrics.bottlenecks > 0 && mobileProcessMetrics.topBottleneckName && (
-              <div className="mt-2 flex items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
-                <p className="text-xs text-destructive">
-                  {mobileProcessMetrics.topBottleneckName} is the highest-flow assembly step and may constrain the critical path.
-                </p>
-              </div>
-            )}
+              ]}
+              alert={
+                mobileProcessMetrics.bottlenecks > 0 && mobileProcessMetrics.topBottleneckName
+                  ? `${mobileProcessMetrics.topBottleneckName} is the highest-flow assembly step and may constrain the critical path.`
+                  : undefined
+              }
+            />
           </section>
 
-          {/* Centrality table */}
           <section>
-            <div className="mb-2 flex items-baseline justify-between">
-              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Centrality</p>
-              <span className="text-[10px] text-muted-foreground">swipe →</span>
-            </div>
-            <div className="overflow-x-auto rounded-sm border border-border">
-              <table className="w-full min-w-[400px] text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="sticky left-0 z-[1] bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Node</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Type</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Flow</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">In</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Out</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {topFlowNodes.length === 0 ? (
-                    <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">No data — select a project</td></tr>
-                  ) : (
-                    topFlowNodes.slice(0, 20).map(n => {
-                      const node = allNodes.find(an => an.id === n.id);
-                      const label = node?.data?.label ?? n.id;
-                      const displayType = getDisplayNodeType(n.level);
-                      const inCount = (node?.data?.incoming as number) ?? 0;
-                      const outCount = (node?.data?.outgoing as number) ?? 0;
-                      return (
-                        <tr key={n.id}>
-                          <td className="sticky left-0 z-[1] bg-background px-3 py-2 font-medium max-w-[120px] truncate" title={String(label)}>{String(label)}</td>
-                          <td className="px-3 py-2 text-muted-foreground capitalize text-xs">{displayType}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{n.flow.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{inCount}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{outCount}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <LensRule trailing={topFlowNodes.length > 0 ? 'swipe →' : undefined}>Centrality</LensRule>
+            <LensTable
+              minWidth={440}
+              loading={loading}
+              columns={[
+                { key: 'node', label: 'Node' },
+                { key: 'type', label: 'Type' },
+                { key: 'flow', label: 'Flow', align: 'right' },
+                { key: 'in', label: 'In', align: 'right' },
+                { key: 'out', label: 'Out', align: 'right' },
+              ]}
+              rows={topFlowNodes.slice(0, 20).map(n => {
+                const node = allNodes.find(an => an.id === n.id);
+                // `||`, not `??`: the graph blanks every node label while the
+                // Labels toggle is off (line 683), and that toggle is a
+                // desktop-graph control. `??` kept the empty string, so the
+                // identifying column rendered blank on every row.
+                const label = node?.data?.label || n.id;
+                return {
+                  key: n.id,
+                  id: String(label),
+                  cells: [
+                    { text: getDisplayNodeType(n.level), className: 'capitalize text-muted-foreground' },
+                    { text: n.flow.toLocaleString() },
+                    { text: String((node?.data?.incoming as number) ?? 0) },
+                    { text: String((node?.data?.outgoing as number) ?? 0) },
+                  ],
+                };
+              })}
+              empty="No process network data. Select a project, then upload and combine its datasets."
+              caption={topFlowNodes.length > 0 ? LENS_SWIPE_HINT : undefined}
+            />
           </section>
 
-          {/* Nexus Node Prediction */}
-          <section
-            aria-label="Nexus Node Prediction — Processing predictions… This may take a few minutes for large datasets."
-          >
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Nexus Node Prediction</p>
+          <section>
+            <LensRule>Prediction</LensRule>
             <MLPrediction selectedPlant={
               globalSelectedProjectId
                 ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
