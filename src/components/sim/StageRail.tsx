@@ -151,7 +151,7 @@ export function RailCollapsedRow({
 }) {
   return (
     <div
-      className="flex items-center px-3 py-1.5 border-b"
+      className="flex flex-col items-start gap-1.5 px-3 py-1.5 border-b md:flex-row md:items-center md:gap-0"
       style={{ borderColor: last ? RAIL.rule : RAIL.hairFaint }}
     >
       <span className={cn(RAIL_LABEL_COL, "flex items-center gap-[7px]")}>

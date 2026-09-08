@@ -1,5 +1,4 @@
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import { PageLayout } from "@/components/shared/PageLayout";
 import { Link } from "react-router-dom";
 import { YouTubeEmbed } from "@/components/shared";
 import { useState, useEffect, useRef } from "react";
@@ -51,7 +50,7 @@ const Section = ({
   children: React.ReactNode;
 }) => (
   <section className="px-6 md:px-12 py-12 border-t bg-background">
-    <div className="max-w-7xl mx-auto">
+    <div>
       <div className="mb-8">
         <h2 className="text-3xl font-bold tracking-tight mb-2">{title}</h2>
         {subtitle ? (
@@ -77,7 +76,7 @@ const DarkSection = ({
   noBorder?: boolean;
 }) => (
   <section className={`px-6 md:px-12 ${compact ? 'py-2' : 'py-16'} ${noBorder ? '' : 'border-t'} bg-black text-white`}>
-    <div className="max-w-7xl mx-auto">
+    <div>
       <div className="mb-8">
         {title ? (
           <h2 className="text-3xl font-bold tracking-tight mb-2">{title}</h2>
@@ -161,12 +160,8 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
   }, []);
 
   return (
-    <div className="min-h-screen bg-background flex relative">
-      <Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-      <main
-        className="flex-1 transition-all duration-300 px-6 md:px-12" // side margins
-        style={{ marginLeft: isCollapsed ? 50 : 192 }}
-      >
+    <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+      <main className="px-6 md:px-12">
         {/* Intro */}
         <div className="relative overflow-hidden border-b">
           {/* background grid + soft gradient */}
@@ -369,7 +364,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
 
         {/* Technical Overview */}
         <section className="px-6 md:px-12 py-16 border-t bg-background">
-          <div className="max-w-7xl mx-auto">
+          <div>
             <div className="mb-12 text-center">
               <h2 className="text-3xl font-bold tracking-tight mb-4 text-foreground">SuReSuite Technical Architecture</h2>
               <p className="text-lg text-muted-foreground max-w-4xl mx-auto">Explore the advanced analytics engine and simulation capabilities that power comprehensive supply chain resilience analysis</p>
@@ -580,9 +575,8 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
           <div className="h-8" />
         </DarkSection>
 
-        <Footer isCollapsed={isCollapsed} />
       </main>
-    </div>
+    </PageLayout>
   );
 };
 

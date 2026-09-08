@@ -41,7 +41,9 @@ export interface StageGuard {
   evidence?: boolean;
 }
 
-const ROW = "flex items-center gap-2.5 px-3 py-1.5";
+// Rows A and B put a w-full label column (RAIL_LABEL_COL) beside shrink-0
+// controls, so below md they stack; md: restores the desktop row exactly.
+const ROW = "flex flex-col items-start gap-2 px-3 py-1.5 md:flex-row md:items-center md:gap-2.5";
 
 /** 26px, 11.5px / 500, radius 4 — primary is ink, secondary is a white hairline. */
 function RailButton({
