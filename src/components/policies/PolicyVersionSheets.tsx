@@ -17,6 +17,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { DIALOG_AS_SHEET } from "@/components/shared";
 import { KX_TIGHT, MonoChip, SURFACE } from "@/components/intelligence/piUi";
 import type { PolicyVersion } from "@/hooks/usePolicies";
 
@@ -58,7 +60,7 @@ export function SaveVersionDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-sm">
+      <DialogContent className={cn(DIALOG_AS_SHEET, "md:max-w-sm")}>
         <DialogHeader>
           <DialogTitle className="text-[13px]">Save model version</DialogTitle>
         </DialogHeader>
@@ -129,6 +131,7 @@ export function PolicyHistorySheet({
   onUpdateNotes?: (versionId: string, notes: string) => Promise<void>;
   exportsSection?: React.ReactNode;
 }) {
+  const isMobile = useIsMobile();
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -137,7 +140,15 @@ export function PolicyHistorySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[440px] overflow-y-auto sm:max-w-[440px]">
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        className={cn(
+          "overflow-y-auto",
+          isMobile
+            ? "max-h-[85svh] rounded-t-xl landscape:max-h-full landscape:rounded-none"
+            : "w-[440px] sm:max-w-[440px]",
+        )}
+      >
         <SheetHeader>
           <SheetTitle className="text-[13px]">Model version history</SheetTitle>
         </SheetHeader>

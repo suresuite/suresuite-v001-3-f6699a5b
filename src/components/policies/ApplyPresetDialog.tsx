@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { DIALOG_AS_SHEET } from "@/components/shared";
 import { useMemo, useState } from "react";
 import {
   Dialog,
@@ -82,7 +84,7 @@ export function ApplyPresetDialog({ open, onOpenChange, preset, ctx, currentBund
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className={cn(DIALOG_AS_SHEET, "md:max-w-3xl")}>
         <DialogHeader>
           <DialogTitle>Apply preset: {preset.name}</DialogTitle>
           <DialogDescription>
