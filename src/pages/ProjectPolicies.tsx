@@ -161,21 +161,26 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
           })}
           rightContent={
             <>
-              <Segmented<"stages" | "guide" | "datamap">
-                size="sm"
-                value={tab}
-                onChange={setTab}
-                options={[
-                  { value: "stages", label: "Policies" },
-                  { value: "guide", label: "Guide" },
-                  { value: "datamap", label: "Data map" },
-                ]}
-              />
+              {/* Below md the header holds the project select only; the tab
+                  switcher renders as the first thing in the content column.
+                  md:contents keeps it a direct rightContent child on desktop. */}
+              <span className="hidden md:contents">
+                <Segmented<"stages" | "guide" | "datamap">
+                  size="sm"
+                  value={tab}
+                  onChange={setTab}
+                  options={[
+                    { value: "stages", label: "Policies" },
+                    { value: "guide", label: "Guide" },
+                    { value: "datamap", label: "Data map" },
+                  ]}
+                />
+              </span>
               <Select
                 value={projectId || ""}
                 onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
               >
-                <SelectTrigger className="h-8 w-[210px] text-[12px]">
+                <SelectTrigger className="h-8 w-[clamp(130px,42vw,210px)] text-[12px] md:w-[210px]">
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -189,6 +194,19 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
             </>
           }
         />
+
+        <div className="mb-3 md:hidden">
+          <Segmented<"stages" | "guide" | "datamap">
+            size="sm"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: "stages", label: "Policies" },
+              { value: "guide", label: "Guide" },
+              { value: "datamap", label: "Data map" },
+            ]}
+          />
+        </div>
 
         {!projectId ? (
           <Alert>
