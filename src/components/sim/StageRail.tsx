@@ -200,12 +200,34 @@ export function RailChevron({ palette = "grey" }: { palette?: "grey" | "zinc" })
   );
 }
 
-type Palette = "grey" | "zinc";
+export type Palette = "grey" | "zinc";
 
 const CARD = {
   grey: { border: "#d4d4d4", bg: "#ffffff", body: "#525252", quiet: "#6b6b6b", chip: "#f0f0f0", done: RAIL.ink },
   zinc: { border: RAIL.zinc.border, bg: "#ffffff", body: RAIL.zinc.body, quiet: RAIL.zinc.quiet, chip: RAIL.zinc.band, done: RAIL.zinc.body },
 } satisfies Record<Palette, Record<string, string>>;
+
+/**
+ * Badge fill for a stage numeral. Exported so a second rendering of the same
+ * step sequence (the Policies mobile step list) carries the identical state
+ * vocabulary instead of a copy that can drift out of step with this one.
+ */
+export function railBadgeStyle(
+  state: RailState,
+  needsSetup = false,
+  palette: Palette = "grey",
+): React.CSSProperties {
+  const c = CARD[palette];
+  if (state === "current") return { background: RAIL.amber, color: "#ffffff" };
+  if (needsSetup)
+    return {
+      background: "rgba(191,35,48,0.08)",
+      color: "#bf2330",
+      boxShadow: "inset 0 0 0 1px rgba(191,35,48,0.4)",
+    };
+  if (state === "done") return { background: c.done, color: "#ffffff" };
+  return { background: c.chip, color: c.quiet };
+}
 
 /**
  * One stage card. White, 1px border, radius 4, in every state — the state is
@@ -238,17 +260,7 @@ export function RailStageCard({
   const done = state === "done";
   const current = state === "current";
   const c = CARD[palette];
-  const badge = current
-    ? { background: RAIL.amber, color: "#ffffff" }
-    : needsSetup
-      ? {
-          background: "rgba(191,35,48,0.08)",
-          color: "#bf2330",
-          boxShadow: "inset 0 0 0 1px rgba(191,35,48,0.4)",
-        }
-      : done
-        ? { background: c.done, color: "#ffffff" }
-        : { background: c.chip, color: c.quiet };
+  const badge = railBadgeStyle(state, needsSetup, palette);
   const track = current ? RAIL.amber : done ? c.done : RAIL.rule;
 
   return (

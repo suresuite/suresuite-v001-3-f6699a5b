@@ -10,7 +10,9 @@
  * redefined locally.
  */
 import React from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   RAIL,
   RAIL_EYEBROW,
@@ -24,6 +26,7 @@ import {
   RailMarker,
   RailReadout,
   RailStageCard,
+  railBadgeStyle,
   type RailState,
 } from "@/components/sim/StageRail";
 
@@ -139,6 +142,8 @@ export function PolicySetupBar({
   activeStage: StageId;
   onStageChange: (s: StageId) => void;
 }) {
+  const isMobile = useIsMobile();
+
   /** Which lettered section is expanded. Exactly one at a time. */
   type OpenSection = "A" | "B" | "C" | "D";
   const openSection: OpenSection = activeStage === "run_validate" ? "D" : "C";
@@ -191,6 +196,175 @@ export function PolicySetupBar({
       ))}
     </>
   );
+
+
+  // ── Phone composition ────────────────────────────────────────────────────
+  // The lettered A/B/C rail is desktop geometry: it puts a 192px label column
+  // beside its controls and lays the four steps out as a horizontal strip, so
+  // on a phone the strip scrolls out of the card and the steps are unreadable.
+  // The prototype replaces it here with discrete cards and a VERTICAL step
+  // list, which is what this branch renders.
+  //
+  // Structural, so `useIsMobile` rather than `md:` - the two trees do not share
+  // a shape, and rendering both would mean two copies of every control in the
+  // DOM. Every value below is the same derivation the desktop rail uses above
+  // (stateOf, metaOf, readyCount); nothing is recomputed, so the two renderings
+  // cannot disagree about what is ready.
+  if (isMobile) {
+    const KICKER = cn(RAIL_EYEBROW, "font-medium");
+    const CARD_SHELL = "rounded-sm border bg-white";
+    return (
+      <div className="mb-[14px] flex flex-col gap-[11px]">
+        {/* Model version */}
+        <section className={cn(CARD_SHELL, "overflow-hidden")} style={{ borderColor: RAIL.rule }}>
+          <div
+            className="flex items-center gap-2 border-b px-[13px] pb-[9px] pt-[11px]"
+            style={{ borderColor: "#ebebeb" }}
+          >
+            <span className={cn(KICKER, "min-w-0 flex-1 truncate")}>Model version</span>
+            <RailChip>{isSnapshot ? "Snapshot" : "Live"}</RailChip>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span
+                className="h-[5px] w-[5px] shrink-0 rounded-full"
+                style={{ background: dirty ? RAIL.amber : RAIL.teal }}
+              />
+              <span
+                className="truncate font-mono text-[10.5px]"
+                style={{ color: dirty ? RAIL.amber : RAIL.muted }}
+              >
+                {dirty ? "unsaved" : "saved"}
+              </span>
+            </span>
+          </div>
+          <div className="flex flex-col gap-[11px] px-[13px] pb-[13px] pt-[11px]">
+            <div className="flex min-w-0 flex-col gap-[3px]">
+              <span className="text-[15.5px] font-semibold leading-tight" style={{ color: RAIL.ink }}>
+                {versionName}
+              </span>
+              {versionStamp && (
+                <span className="font-mono text-[11.5px]" style={{ color: RAIL.muted }}>
+                  {versionStamp}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onSaveVersion}
+                className="min-h-12 flex-1 rounded-sm text-[15px] font-semibold text-white"
+                style={{ background: RAIL.ink }}
+              >
+                Save model version
+              </button>
+              <button
+                type="button"
+                onClick={onOpenHistory}
+                className="flex min-h-12 shrink-0 items-center gap-[7px] rounded-sm border bg-white px-4 text-[15px] font-medium"
+                style={{ borderColor: RAIL.rule, color: RAIL.ink }}
+              >
+                History
+                <RailChip>{versionCount}</RailChip>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Planning unit */}
+        <section
+          className={cn(CARD_SHELL, "flex flex-col gap-2.5 px-[13px] pb-[13px] pt-[11px]")}
+          style={{ borderColor: RAIL.rule }}
+        >
+          <span className={KICKER}>Planning unit</span>
+          <div className="flex gap-1.5">
+            {(["day", "week", "month"] as PlanningUnit[]).map((u) => {
+              const on = u === unit;
+              return (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => onUnitChange(u)}
+                  aria-pressed={on}
+                  className="min-h-12 flex-1 rounded-sm border font-mono text-[13px]"
+                  style={
+                    on
+                      ? { background: RAIL.ink, borderColor: RAIL.ink, color: "#ffffff" }
+                      : { background: "#ffffff", borderColor: RAIL.rule, color: RAIL.muted }
+                  }
+                >
+                  {u}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-col gap-[3px] font-mono text-[12px]" style={{ color: RAIL.muted }}>
+            <span>
+              horizon{" "}
+              <b className="font-medium" style={{ color: RAIL.ink }}>
+                {horizon}
+              </b>
+            </span>
+            <span className="[text-wrap:pretty]">{unitMap}</span>
+          </div>
+        </section>
+
+        {/* Configure SC policies — section rule */}
+        <div className="flex min-w-0 items-center gap-2.5 px-[3px] pt-0.5">
+          <span className={cn(KICKER, "min-w-0 truncate")}>Configure SC policies</span>
+          <span className="h-px min-w-0 flex-1" style={{ background: RAIL.rule }} aria-hidden />
+          <span className="min-w-0 font-mono text-[11.5px] tabular-nums" style={{ color: RAIL.muted }}>
+            <b className="font-medium" style={{ color: RAIL.ink }}>
+              {readyCount}
+            </b>{" "}
+            / {stages.length} ready
+          </span>
+        </div>
+
+        {/* The four steps, stacked — the sequence reads top to bottom instead of
+            scrolling off the right edge. */}
+        <section className={cn(CARD_SHELL, "overflow-hidden")} style={{ borderColor: RAIL.rule }}>
+          {stages.map((stage, i) => {
+            const state = stateOf(stage);
+            const needsSetup = stage.id !== "run_validate" && stage.needs > 0;
+            return (
+              <button
+                key={stage.id}
+                type="button"
+                onClick={() => onStageChange(stage.id)}
+                aria-current={state === "current" ? "step" : undefined}
+                className={cn(
+                  "flex min-h-14 w-full items-center gap-[11px] px-[13px] py-3 text-left",
+                  i > 0 && "border-t",
+                )}
+                style={i > 0 ? { borderColor: "#f4f4f4" } : undefined}
+              >
+                <span
+                  className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full font-mono text-[12px] font-medium leading-none"
+                  style={railBadgeStyle(state, needsSetup)}
+                >
+                  {i + 1}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                  <span
+                    className="truncate text-[15px] font-semibold leading-tight"
+                    style={{ color: state === "todo" ? RAIL.muted : RAIL.ink }}
+                  >
+                    {stage.title}
+                  </span>
+                  <span
+                    className="truncate font-mono text-[11.5px] tabular-nums"
+                    style={{ color: needsSetup ? "#bf2330" : RAIL.muted }}
+                  >
+                    {metaOf(stage)}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0" style={{ color: RAIL.quiet }} />
+              </button>
+            );
+          })}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(RAIL_SHELL, "mb-[14px]")}>
