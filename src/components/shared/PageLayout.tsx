@@ -58,7 +58,17 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
       </div>
       <div
         className={cn(
-          'min-h-screen overflow-x-hidden bg-[hsl(var(--surface-sunken))] md:pb-10 md:transition-all md:duration-300',
+          // `overflow-x-clip`, NOT `-hidden`. Per CSS Overflow 3, `overflow-x:
+          // hidden` with a visible y computes `overflow-y: auto`, which makes
+          // this wrapper a scroll container. It is `min-h-screen` with no fixed
+          // height, so it never actually scrolls - the document does - and a
+          // `position: sticky` child resolves against THIS scrollport and
+          // therefore never sticks. That silently unpinned every <PageHeader>
+          // in the product while the class said `sticky top-0`. `clip` does the
+          // same clipping (measured: documentElement.scrollWidth stays at the
+          // viewport width) without establishing a scrollport, and leaves
+          // `position: fixed` descendants - MobileSheet is one - unclipped.
+          'min-h-screen overflow-x-clip bg-[hsl(var(--surface-sunken))] md:pb-10 md:transition-all md:duration-300',
           'ml-0',
           isCollapsed ? 'md:ml-14' : 'md:ml-48'
         )}

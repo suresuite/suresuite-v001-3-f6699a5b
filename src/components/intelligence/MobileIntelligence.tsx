@@ -28,6 +28,11 @@ import { CHAT_MODELS, getModelLabel } from "@/components/chat/ModelPicker";
 import { AUTO_TOOLTIP, chatModesUiEnabled } from "@/components/chat/ModeSwitch";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { MobileSheet, MobileSheetRow } from "@/components/shared/MobileSheet";
+import {
+  PAGE_HEADER_ROW,
+  PAGE_HEADER_SHELL,
+  PAGE_HEADER_TITLE,
+} from "@/components/shared/PageHeader";
 import { AGENT_COLOR, AGENT_MONO, KX_TIGHT, tint } from "./piUi";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageStream } from "./MessageStream";
@@ -192,7 +197,13 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
 
   /* ── header ──────────────────────────────────────────────────────── */
   const header = (
-    <header className="flex shrink-0 items-center gap-2.5 border-b border-[--hair-border] bg-[#fafafa]/95 px-[clamp(0.6875rem,3.4vw,0.9375rem)] py-2.5 backdrop-blur">
+    // Same chrome as every other page (PAGE_HEADER_SHELL/_ROW). It used to
+    // carry a hand-rolled copy: #fafafa instead of the header tint - a literal
+    // that ignores the dark theme - --hair-border instead of the header rule,
+    // and a bespoke gutter clamp that put this screen's left edge ~2px inboard
+    // of every other header. `shrink-0` stays: this header is a flex child of
+    // the fixed-height chat column, not a page-flow element.
+    <header className={cn(PAGE_HEADER_SHELL, PAGE_HEADER_ROW, "shrink-0")}>
       <button
         type="button"
         onClick={() => setSheet("chats")}
@@ -204,7 +215,11 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
       </button>
 
       <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-        <span className="truncate text-[17px] font-semibold leading-tight text-foreground">{threadTitle}</span>
+        {/* An <h1>, not a <span>: this is the page title on this route, and it
+            was the one app screen that rendered no h1 at all. */}
+        <h1 className={PAGE_HEADER_TITLE} title={threadTitle}>
+          {threadTitle}
+        </h1>
         {/* §2.4: padding grows the hit area to 44px, the negative margin
             returns the space so the line sits exactly where it looks. */}
         <button
@@ -248,7 +263,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
 
   /* ── empty state ─────────────────────────────────────────────────── */
   const emptyState = (
-    <div className="flex min-h-full flex-col justify-center px-[clamp(0.6875rem,3.4vw,0.9375rem)] py-5">
+    <div className="flex min-h-full flex-col justify-center px-[clamp(0.75rem,4vw,1.125rem)] py-5">
       <div className="mb-5 flex items-center justify-center gap-2.5">
         <span className="h-[26px] w-[26px] rounded-sm bg-foreground" />
         <span className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">{greeting(userName)}</span>
@@ -291,7 +306,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
 
   /* ── composer ────────────────────────────────────────────────────── */
   const composer = (
-    <div className="shrink-0 border-t border-[--hair-border] bg-[#fcfcfc] px-[clamp(0.6875rem,3.4vw,0.9375rem)] py-2.5">
+    <div className="shrink-0 border-t border-[--hair-border] bg-[#fcfcfc] px-[clamp(0.75rem,4vw,1.125rem)] py-2.5">
       <div className="rounded-sm border border-[--hair-border] bg-background">
         <textarea
           ref={taRef}
@@ -689,7 +704,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
         <div className="min-h-0 flex-1 overflow-y-auto bg-[#fafafa]">
           {emptyState}
           {error && (
-            <div className="mx-[clamp(0.6875rem,3.4vw,0.9375rem)] mb-4 rounded-sm border border-[#f0c7cb] bg-[#fdf2f3] px-3 py-2 text-[12.5px] text-[#8a2a30]">
+            <div className="mx-[clamp(0.75rem,4vw,1.125rem)] mb-4 rounded-sm border border-[#f0c7cb] bg-[#fdf2f3] px-3 py-2 text-[12.5px] text-[#8a2a30]">
               {error}
             </div>
           )}
@@ -702,7 +717,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           threadMode={threadMode}
           onModeChange={onModeChange}
           className="bg-[#fafafa]"
-          containerClassName="px-[clamp(0.6875rem,3.4vw,0.9375rem)] pb-[18px] pt-3.5"
+          containerClassName="px-[clamp(0.75rem,4vw,1.125rem)] pb-[18px] pt-3.5"
         />
       )}
 

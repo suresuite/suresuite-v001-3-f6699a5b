@@ -91,7 +91,9 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
     <AdminLayout
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Projects"
       onRefresh={load} refreshLoading={loading}
-      actions={<Input placeholder="Search name, org, owner, plant…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-64 rounded-sm md:min-h-0" />}
+      /* Same fixed-width overflow as /admin/users: the clamp reaches the 256px
+         desktop width at 610px, so `md:w-64` is what actually renders there. */
+      actions={<Input placeholder="Search name, org, owner, plant…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-[clamp(130px,42vw,256px)] rounded-sm md:min-h-0 md:w-64" />}
     >
       {isMobile ? (
         <div className={`${SURFACE} overflow-hidden`}>

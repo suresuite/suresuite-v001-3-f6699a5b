@@ -105,7 +105,11 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       refreshLoading={loading}
       actions={
         <div className="flex items-center gap-2">
-          <Input placeholder="Search name, email, org…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-60 rounded-sm md:min-h-0" />
+          {/* §2.4/G3: the header's right slot is `shrink-0`, so a fixed 240px
+              search field cannot give width back to the title - at 390px it
+              took the row past the viewport. The clamp reaches 240px from
+              572px up, so the desktop width is unchanged. */}
+          <Input placeholder="Search name, email, org…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-[clamp(130px,42vw,240px)] rounded-sm md:min-h-0 md:w-60" />
           <AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />
         </div>
       }
