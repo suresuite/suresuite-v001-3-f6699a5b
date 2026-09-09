@@ -147,6 +147,22 @@ for (const file of files) {
       if (emoji) report(file, ln, 'Emoji', '3.5', [...new Set(emoji)].join(' '));
     }
 
+    // ── §2.1 The app gutter is ONE scale. Project Intelligence's phone shell
+    // carried `clamp(0.6875rem,3.4vw,0.9375rem)` in five places, so its header
+    // rule, its title and its message column all sat ~2px inboard of every
+    // other screen — close enough to read as sloppy rather than as a variant.
+    // Any horizontal padding/margin whose value is a clamp() and is not the
+    // canonical gutter is a second scale (§2 "Do not invent new scales").
+    const GUTTER = 'clamp(0.75rem,4vw,1.125rem)';
+    const hClamp = /-?[mp][xlr]-\[(clamp\([^\]]*?\))\]/g;
+    for (const m of text.matchAll(hClamp)) {
+      // Landing/auth keep their own marketing scale, same exemption C6 grants.
+      if (!isMarketing && m[1].replace(/\s+/g, '') !== GUTTER) {
+        report(file, ln, 'Off-scale horizontal gutter — the app gutter is one clamp', '2.1',
+          m[1].slice(0, 46) + ' → ' + GUTTER);
+      }
+    }
+
     // ── §2.3 Bare 1fr. `min-width:auto` floors the track at its widest
     // child, which is what turns a "responsive" grid into a sideways scroll.
     const gridCols = /grid-cols-\[([^\]]+)\]|gridTemplateColumns:\s*['"`]([^'"`]+)/.exec(text);

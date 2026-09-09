@@ -102,6 +102,12 @@ Use these. Do not invent new scales.
 className="-mx-[clamp(0.75rem,4vw,1.125rem)] -mt-4 md:-mx-12 md:-mt-6"
 ```
 
+This clamp is the **only** horizontal one in an app surface. A near-miss reads as
+sloppiness rather than as a variant — mobile Project Intelligence carried
+`clamp(0.6875rem,3.4vw,0.9375rem)` in five places, so its header rule, its title and
+its message column all sat ~2px inboard of every other screen. `audit:ui` now reports
+any `[mp][xlr]-[clamp(…)]` that is not this one (§2.1), marketing surfaces excepted.
+
 ### 2.2 Fluid type — three scales only
 
 ```css
@@ -341,7 +347,37 @@ Never uppercase a heading or a button to make it fit.
 **Rules.** Max **three** controls in the right slot on mobile; the rest go to an
 overflow `⋯`. Title truncates with `title={title}`. The subtitle collapses entirely
 when empty — never render an empty line. Back appears only where a parent route
-exists; it is not decoration.
+exists; it is not decoration. Nothing in the right slot may be a fixed width or
+unbounded text: the slot is `shrink-0`, so a `w-60` search field or a bare project
+name takes the row past the viewport instead of giving width back to the title.
+Use `w-[clamp(130px,42vw,<desktop px>)] md:w-<desktop>`, and bound interpolated
+text with `max-w-[…vw] md:max-w-none` + `truncate`.
+
+**The chrome has one definition.** `PageHeader.tsx` exports it as three constants,
+and the two screens that compose their own header row — mobile Getting Started (an
+avatar link where the actions go) and mobile Project Intelligence (a two-line title
+stack inside a fixed-height flex column) — import them rather than re-declaring:
+
+```ts
+PAGE_HEADER_SHELL  // sticky top-0 z-40 + header tint + backdrop blur + bottom rule
+PAGE_HEADER_ROW    // the §2.1 gutter + py-2.5 md:py-3.5 + gap-2 md:gap-4
+PAGE_HEADER_TITLE  // --fs-page-title, md:15px, semibold, truncate
+```
+
+A screen that needs the bar to bleed past a page gutter adds its own
+`-mx-[clamp(0.75rem,4vw,1.125rem)]`; everything else comes from the constants. Do
+not hand-roll a header: the three that existed drifted to three tints, two border
+tokens, two gutters and two title scales.
+
+**`sticky top-0` only pins because the shell is `overflow-x-clip`.** Per CSS
+Overflow 3, `overflow-x: hidden` against a visible `y` computes `overflow-y: auto`,
+which makes `PageLayout`'s content wrapper a scroll container. It is `min-h-screen`
+with no fixed height, so it never scrolls — the document does — and a `sticky` child
+resolves against that motionless scrollport and never sticks. Every `PageHeader` in
+the product scrolled away while its class said otherwise. `clip` clips identically
+(`documentElement.scrollWidth` stays at the viewport width) without establishing a
+scrollport, and leaves `position: fixed` descendants such as `MobileSheet`
+unclipped. If a header stops pinning, look at that class first.
 
 ### 4.2 Mobile tab bar
 

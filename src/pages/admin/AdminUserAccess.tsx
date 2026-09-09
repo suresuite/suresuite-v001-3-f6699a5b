@@ -139,12 +139,22 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
   return (
     <AdminLayout
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title={title}
+      subtitle={subtitle}
+      /* The one admin screen with a real parent route, so it gets the header's
+         own back affordance below `md` (spec §4.1) instead of a third text
+         button competing with the title for a 390px row. The desktop Back
+         button is unchanged - `md:contents` hands it straight back to the
+         actions flex row above the breakpoint. */
+      onBack={() => navigate('/admin/users')}
+      backLabel="Back to users"
       actions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="rounded-sm" onClick={() => setPreview((p) => !p)}>
             {preview ? <EyeOff className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}{preview ? 'Hide preview' : 'Preview as user'}
           </Button>
-          <Button variant="outline" size="sm" className="rounded-sm" onClick={() => navigate('/admin/users')}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button>
+          <span className="hidden md:contents">
+            <Button variant="outline" size="sm" className="rounded-sm" onClick={() => navigate('/admin/users')}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button>
+          </span>
         </div>
       }
     >
