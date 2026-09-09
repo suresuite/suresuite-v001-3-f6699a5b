@@ -297,7 +297,7 @@ export function FloatingChatBubble() {
             if (dragState.current?.moved) { dragState.current.moved = false; return; }
             setOpen(true);
           }}
-          className="group fixed z-[90] flex cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-foreground text-background shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing"
+          className="group fixed z-[90] hidden cursor-grab select-none items-center justify-center rounded-full border border-[#ff0033]/30 bg-foreground text-background shadow-lg shadow-[0_0_14px_3px_rgba(255,0,51,0.6)] transition hover:bg-neutral-900 active:cursor-grabbing md:flex"
           aria-label="Ask SC assistant"
           title="Ask SC assistant"
         >
