@@ -68,15 +68,15 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
                 paddingBottom:
                   `calc(${chromePx}px + env(safe-area-inset-bottom, 0px))`,
                 // Published for the mobile surfaces that must fill exactly
-                // the space this reservation leaves — Project Intelligence's
-                // full-height chat column, and the Simulation Lab's column,
-                // whose gate footer has to stay on screen. It is the
-                // reservation plus the gutter's 1rem top and bottom, so the
-                // composer (and the Run button) land on the credit bar however
-                // the bar wraps, and follow it when the bar is dismissed.
-                // Every other page just scrolls.
-                '--pi-chrome':
-                  `calc(${chromePx}px + env(safe-area-inset-bottom, 0px) + 2rem)`,
+                // the space this reservation leaves: Project Intelligence's
+                // full-height chat column and the Simulation Lab's column,
+                // whose gate footer has to stay on screen. It is the bottom
+                // reservation and nothing else — PI runs edge to edge, and a
+                // reader that sits inside PAGE_GUTTER subtracts that gutter
+                // itself. The composer and the Run button therefore land on
+                // the credit bar however the bar wraps, and follow it when the
+                // bar is dismissed. Every other page just scrolls.
+                '--pi-chrome': `calc(${chromePx}px + env(safe-area-inset-bottom, 0px))`,
               } as React.CSSProperties)
             : undefined
         }

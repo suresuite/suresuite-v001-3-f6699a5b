@@ -210,7 +210,7 @@ More" signal and the one-tap route back. The rest is cosmetic alignment.
 ### G7 — `npm run verify:mobile` is broken · ✅ **done**
 
 `package.json` pointed at `handoff/verify-repo.mjs`, deleted in `e0bb85c`, so it
-failed for everyone. It now runs `scripts/audit-adaptive-ui.mjs` (with G11).
+failed for everyone. It now runs `scripts/audit-adaptive-ui.mjs` (with G13).
 
 ### G8 — Two rounded display numbers (pre-existing)
 
@@ -290,6 +290,52 @@ and follows it when the bar is dismissed. Nothing else reads the variable.
 sub-44px control on any of the mobile surfaces, no console or page errors, `tsc`
 clean, `audit-adaptive-ui --all` unchanged at 7.
 
+#### G9.1 — second pass: measured against the demo, not remembered
+
+The first pass got the composition right (header, sheets, composer chip) but was
+built from reading the demo's markup. It was then **rendered**: the standalone
+bundle unpacks and runs, so the demo's own AI screen was driven in a browser and
+its computed styles diffed against the shipped page element by element. Two
+things that reading had missed:
+
+1. **The surface was inset in the page gutter.** `PAGE_GUTTER` plus a card
+   border put ~31px of padding and a rounded frame around a conversation that
+   the demo runs edge to edge. It also cost the in-reply cards ~17px of line
+   length, which is what made KPI labels wrap that fit in the demo. The mobile
+   branch now renders `MobileIntelligence` with no gutter, and `--pi-chrome`
+   dropped its `+2rem` allowance to match.
+2. **The in-message table was the page ledger.** `TablePart` used piUi's `TH`/`TD`
+   — the ink header with sans cells. The demo's in-reply table is a different
+   object: `#fafafa` header, `#8a8a8a` mono labels, `#ebebeb` / `#f4f4f4`
+   hairlines, and **every cell in mono** so figures line up column to column.
+   That is now `TH_MESSAGE` / `TD_MESSAGE` in `piUi.tsx`, mobile value with
+   `md:` restoring the ledger literal.
+
+Also brought to the demo's numbers: card hairline `#ebebeb`, KPI label 9.5px
+`#8a8a8a` with tabular-nums values on an `#f4f4f4` grid rule, source note, the
+evidence chip and its citation rows, the activity disclosure, the composer's
+inner `#f4f4f4` rule, and the composer's two-row resting height (the demo's
+collapsed textarea is ~61px, not one line — `height:auto` lets `rows` set the
+floor so auto-grow still measures from there).
+
+**Two demo behaviours deliberately not ported:**
+
+- The demo colours any table cell whose **text** matches `/source|unset/` brand
+  red. That is a prototype shortcut, not a semantic: it would paint a supplier
+  legitimately named "Source Ltd" as a risk. Cell emphasis needs a real field on
+  the server's table part before it can ship.
+- The demo's header reads "New thread" on an empty chat. `PAGES.md` 16 is
+  explicit that "chat" is the user-visible word and "thread" is the data term,
+  so the shipped header says **New chat** — the demo contradicts its own spec
+  here.
+
+**Flag-dependent, worth knowing before a demo:** the composer's mode segment and
+the suggestions lightbulb only appear when `VITE_CHAT_MODES_ENABLED` and
+`VITE_SUGGESTED_ACTIONS_ENABLED` are on; the memory and files rows in the ⋯ menu
+need the `project_memory` / `reports` capabilities and an attached project. With
+those off the screen is correct but thinner than the demo's screenshots.
+
+---
 
 ### G10 — Simulation Lab was never taken past its rail · ✅ **done, mobile only**
 
@@ -348,9 +394,142 @@ also behaviour. The demo's Lab copy ("No disruption schedule yet — this projec
 has no network to disrupt", "swipe →", "Ask the AI about this run") was **not**
 ported: changing product strings is not a reflow, and §6 forbids copy that
 differs between platforms, so it needs one decision covering both.
-**G11 took that decision** — see below.
+**G13 took that decision** — see below.
 
-### G11 — the Lab's demo composition, ported · ✅ **done, mobile only**
+---
+
+### G11 — Super Admin was desktop-only below the card lists · ✅ **done, mobile only**
+
+`PAGES.md` entry 19 records this surface as *landed*. The eight `useIsMobile`
+card branches had landed; nothing behind them had. Re-derived against the tree
+and measured in Chromium, the gaps were:
+
+| Gap | Where | Fix |
+|---|---|---|
+| KPI ledger is `grid-cols-4` — 80px cells with 27px figures at 320 | `AdminDashboard.tsx` | 2-up over a 1px divider grid below md; `md:grid-cols-4` and the index-driven `border-r` restore the literal. Figures use `--fs-stat`, `md:text-[27px]` |
+| Two Top ledgers side by side (~150px each at 320) | `AdminDashboard.tsx` | `grid-cols-1 md:grid-cols-[repeat(2,minmax(0,1fr))]` |
+| `Toggle` is 34×18 · `Segmented` 55×25 · `SortTH` 28px · `Checkbox` 16×16 · `Switch` 44×24 · close ✕ 16×16 · every `SelectItem`/`DropdownMenuItem` 32px | `adminUi.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, 6 pages | Spec §2.4. Pad-and-negate where the control carries its own visual (the pill and the checkbox box are redrawn as `::before` so nothing moves), `min-h-11 md:min-h-0` everywhere else |
+| Eight centred dialogs on a phone | Users, Orgs ×2, Projects ×4, Models | `DIALOG_AS_SHEET` + `md:max-w-lg md:rounded-sm`; inner 2-ups stack below md |
+| Role matrix and the two AI-Usage sub-tables scroll with no frozen column or affordance | `AdminRoles.tsx`, `AdminUsage.tsx` | `FROZEN_CELL`/`FROZEN_CELL_ON_TINT` + the §2.7 affordance line, `md:hidden` |
+| Three `sm:` layout grids — a second breakpoint (§6) | `AdminUserAccess.tsx` | Moved to `md:`; changes only 640–767px, which is mobile territory |
+
+**Two defects found by measuring, both pre-existing.** The model-allowlist row's
+44px `<label>` is inert — it wraps a Radix *button*, not an input, so tapping the
+row text toggled nothing; the control is now the 44px target itself. And
+`place-items-center` on a `<button>` is **not** inert: it feeds the button's
+anonymous inner box and silently widened the Radix check indicator from 14px to
+16px. Both were caught only by a computed-geometry diff against `main`.
+
+**Not built: the demo's phone hub.** `shots/27-admin-hub.png` replaces the
+eight-tab strip with search → "Needs attention" → today 2×2 → People → Recent
+changes → Reference. Every block needs data this route does not fetch —
+cross-entity search, per-user budget-vs-spend, and the audit tail all live on
+*other* routes' queries. Mounting them is a behaviour change, so it is outside
+gate 1 and deliberately left out.
+
+**Verified.** 320 · 360 · 375 · 390 · 414 · 768 · 1280 and landscape 874×402
+across all nine routes, plus every dialog, sheet, menu and select popover, and
+the empty / loading / error states: no horizontal overflow, no sub-44px control
+below md. Desktop proved by computed-geometry diff against `main` served from a
+separate worktree — **every element rect identical** on all nine routes and all
+eight open dialogs; the only computed deltas are inert (`min-height`/`min-width`
+`auto`→`0`, grid `gap: normal`→`0px`, `z-index` on `position: static` cells).
+Screenshot hashes were tried first and abandoned: they are not deterministic
+here (`main` differs from itself). `audit-adaptive-ui --all` unchanged at 7,
+`tsc` unchanged at 7, eslint unchanged.
+
+### G12 — The network lens pages · ✅ **done, mobile only**
+
+`ProductLevelNetwork.tsx`, `ProcessLevelNetwork.tsx`, `FirmLevelNetwork.tsx`.
+`PAGES.md` entry 08 records the lens interiors as *landed*. Re-derived against
+the working tree, three things were wrong and two were fatal.
+
+**1. The mobile header was unusable on all three.** `PageHeader`'s right slot
+is `shrink-0` beside a `min-w-0 flex-1` title, and each lens put five or six
+controls in it. Measured in Chromium at 390px: the page title rendered at
+**zero width** and the project select ran to x=506 on a 390px viewport — off
+the screen, unreachable. Fixed with the `md:contents` split `ProjectPolicies`
+already uses (§2 above): below `md` the header holds refresh + the project
+select, which is two of the three §4.1 allows; at `md` every control is handed
+straight back to the same flex row.
+
+The container had to move from `space-x-2` to `gap-2` at the same time —
+`space-x-*` puts its margin on the *DOM* children, so it lands on the
+`md:contents` wrapper instead of the controls inside it and collapses the
+desktop spacing. `gap` is inherited correctly through `display:contents`, and
+for a single-line row the two are geometrically identical. This was caught by
+a 1280px screenshot diff, not by reading the classes.
+
+**Where the displaced controls went.** Search, the map/network toggle, the
+labels toggle, the level-1 filter, "clear filter", the analytics toggle and
+"add disruption" all drive the network graph or the analytics panels, and both
+of those are `hidden md:` on these pages — on a phone they change nothing that
+is on screen. They are now desktop-only, and the page says so in words rather
+than leaving dead chrome. The two that *do* change what a phone shows moved
+next to the thing they change: product's metric calculation and firm's
+prominence recalculation are now action buttons in the centrality card.
+
+**2. `FirmLevelNetwork` did not render at all — on either platform.**
+`import { Map } from 'lucide-react'` shadows the global `Map`, and commit
+`b8f7c09` (the previous pass at this page) added `new Map<string, Set<string>>()`
+inside `mobileFirmMetrics`. Every render threw `TypeError: Map is not a
+constructor` and the route was a blank screen at every width. Reached through
+`globalThis.Map`, which is the workaround `ProductLevelNetwork.tsx` already
+uses for the same shadowing. **This is the one change in this commit that is
+not UI-only** — it is a one-token expression fix with no intended behaviour
+change, made because nothing on the page could be seen, let alone verified,
+without it.
+
+**3. `ProcessLevelNetwork`'s identifying column was blank on every row.**
+The graph blanks `node.data.label` to `''` while the Labels toggle is off
+(`:683`), which is its default and — now — a desktop-only control. The mobile
+table read `node?.data?.label ?? n.id`, and `??` does not catch an empty
+string, so the frozen first column rendered empty. Now `||`.
+
+**What else changed on mobile.** The composition itself is the demo's, and the
+three copies of it are now one presentational module,
+`components/network/MobileLens.tsx`, imported only by the `md:hidden` subtree:
+
+- **"How to read this"** is the shared §3.4 `Disclosure` — a card with a 44px
+  header — instead of a bare `<details>` whose `<summary>` measured 20px. Its
+  body carries the demo's three groups: **Scope**, **Findings**, **Columns**.
+  The column definitions for Degree, Betweenness and Prominence are lifted
+  verbatim from the repo's own legend (`NetworkMetricsTable.tsx:293-298`);
+  the rest are plain descriptions of columns that legend does not cover.
+- **The centrality table** freezes its identifying column (§2.7) — measured
+  under a full horizontal scroll, the name cell stays pinned at the container
+  edge — carries the spec's affordance sentence, and truncates the name in a
+  block span with `title`, because `truncate` on a `<td>`/`<th>` is ignored by
+  the table layout algorithm and clips without an ellipsis. Empty and loading
+  rows drop the `min-width` so their message wraps instead of running off.
+- **Empty / loading / disabled** are all real states: "—" throughout with no
+  project, a disabled action that carries its reason in `title` (§6 — shown,
+  disabled, explained), and a loading row.
+- Structure tiles are `repeat(2,minmax(0,1fr))` with `min-w-0` (§2.3), values
+  use `--fs-stat`, risk figures are `whitespace-nowrap tabular-nums` (§3.3).
+- `MLPrediction`'s docs link — shared with desktop — gained `aria-label`,
+  `title` and a 44px hit area below `md` via the §2.4 negative-margin pattern,
+  with `md:` restoring the bare 16px icon.
+
+**Verified.** 320 / 360 / 375 / 390 / 414 / 768 / 1280 plus landscape 874×402,
+in Chromium against the real components: no horizontal page overflow at any
+width, and **zero** controls under 44×44 below 768 on any of the three (main
+had two per page). Desktop proof is a SHA-256 comparison, not an assertion:
+full-page at 1280 is byte-identical to `main` on all three pages, and the
+header region is byte-identical at 768 / 1024 / 1280 / 1440. (Full-page 768 is
+not a usable signal — React Flow's `fitView` makes it non-deterministic across
+runs on `main` itself.) `tsc` 7 errors, unchanged; `eslint` 49 problems on the
+touched files, unchanged; `audit-adaptive-ui --all` 7, unchanged.
+
+**What was deliberately not built.** The demo's node inspector (`PAGES.md` 09)
+is not here — it writes a scenario, which is a feature PR. The demo's
+lens-specific *prose* findings are not here either: they are statements about
+the prototype's own data, and the equivalent on these pages is the SPOF alert,
+which is already computed from the real graph. "Critical path" and "utilisation
+headroom" stay `—` on every lens, exactly as on `main`; no page computes them,
+and inventing a number is what §3.3 exists to prevent.
+
+### G13 — the Lab's demo composition, ported · ✅ **done, mobile only**
 
 G10 made every existing Lab surface usable below `md`. It deliberately did not
 recompose the page, and said so. This is the recomposition.
@@ -543,7 +722,6 @@ diff that is not this change's.
   cross-platform numeric equality is no longer the applicable test and is not
   claimed. Recharts' x-axis tick labels re-thin by width — on the base commit
   too — and are excluded from the comparison rather than "fixed".
-
 ---
 
 ## 4. Sequence
@@ -560,7 +738,9 @@ riskiest visual change lands last and alone.
 | **5** | **Getting Started** — G5 | `GettingStarted.tsx`, `home/MobileGettingStarted.tsx` | ✅ **done** — see §5 |
 | **7** | **Simulation Lab** — G10 | `resultTables.tsx`, `ParameterCard.tsx`, `ScenarioSetupForm.tsx`, `RunGate.tsx`, `RunProgressPanel.tsx`, `PreRunValidationPanel.tsx`, `DisruptionScheduleEditor.tsx`, `DisruptionRecoveryPane.tsx`, `PlaybookPicker.tsx`, `PlaybookSaveDialog.tsx`, `ScenarioLibraryPanel.tsx`, `ScenarioRail.tsx`, `CompareScenariosPanel.tsx`, `ReplicationSeedExplorer.tsx`, `ItemSeriesExplorer.tsx`, `ResultsDashboard.tsx`, `UtilizationHeatmap.tsx`, `SimulationLab.tsx` | ✅ **done** — see G10. Low: reflow only, all `md:`-released |
 | **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |
-| **8** | **Simulation Lab composition** — G11 | `sim/MobileSimulationLab.tsx`, `SimulationLab.tsx`, `ScenarioSetupForm.tsx`, `DisruptionRecoveryPane.tsx`, `CompareScenariosPanel.tsx`, `package.json` | ✅ **done** — see G11. Medium: a new phone tree, but desktop is a separate branch |
+| **8** | **Super Admin** — G11 | `adminUi.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, `OrgAccessDrawer.tsx`, 8 admin pages | ✅ **done** — see G11 |
+| **9** | **Network lenses** — G12 | `ProductLevelNetwork.tsx`, `ProcessLevelNetwork.tsx`, `FirmLevelNetwork.tsx`, `network/MobileLens.tsx`, `MLPrediction.tsx` | ✅ **done** — see G12. Medium: a header recomposition plus one crash fix |
+| **10** | **Simulation Lab composition** — G13 | `sim/MobileSimulationLab.tsx`, `SimulationLab.tsx`, `ScenarioSetupForm.tsx`, `DisruptionRecoveryPane.tsx`, `CompareScenariosPanel.tsx`, `PageLayout.tsx`, `package.json` | ✅ **done** — see G13. Medium: a new phone tree, but desktop is a separate branch |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
 

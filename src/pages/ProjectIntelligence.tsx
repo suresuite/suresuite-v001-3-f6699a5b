@@ -310,40 +310,42 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
   if (isMobile) {
     return (
       <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-        <div className={PAGE_GUTTER}>
-          <MobileIntelligence
-            threads={threads}
-            activeThread={activeThread ?? null}
-            activeThreadId={activeThreadId}
-            projects={projects}
-            projectId={activeThread?.projectId ?? null}
-            agentId={activeThread?.agentId ?? null}
-            model={model}
-            threadMode={activeThread?.mode ?? "review"}
-            serverThreadId={activeThreadId ? getServerThreadId(activeThreadId) : null}
-            threadSummary={activeThread?.summary ?? null}
-            userName={firstName}
-            input={input}
-            onInputChange={setInput}
-            onAgentChange={handleAgentChange}
-            onProjectChange={handleProjectChange}
-            onModelChange={handleModelChange}
-            onModeChange={(m) => activeThreadId && setThreadMode(activeThreadId, m)}
-            onNewThread={handleNewThread}
-            onRenameThread={(id, title) => updateThread(id, { title })}
-            onDeleteThread={deleteThread}
-            onDeleteSummary={() => activeThreadId && clearThreadSummary(activeThreadId)}
-            files={sidebarFiles}
-            memoryEntries={sidebarMemory}
-            filesEnabled={fileWorkspaceUiEnabled() && can("reports")}
-            memoryEnabled={can("project_memory")}
-            onDownloadFile={handleDownloadFile}
-            onKeepFile={handleKeepFile}
-            onAddMemory={handleAddMemory}
-            onArchiveMemory={handleArchiveMemory}
-            sidebar={sidebarProps}
-          />
-        </div>
+        {/* No PAGE_GUTTER: on a phone this surface IS the screen, edge to edge
+            from the header rule to the composer, exactly as the demo has it.
+            A gutter here would inset the conversation in a card and cost ~31px
+            of the line length the whole composition exists to reclaim. */}
+        <MobileIntelligence
+          threads={threads}
+          activeThread={activeThread ?? null}
+          activeThreadId={activeThreadId}
+          projects={projects}
+          projectId={activeThread?.projectId ?? null}
+          agentId={activeThread?.agentId ?? null}
+          model={model}
+          threadMode={activeThread?.mode ?? "review"}
+          serverThreadId={activeThreadId ? getServerThreadId(activeThreadId) : null}
+          threadSummary={activeThread?.summary ?? null}
+          userName={firstName}
+          input={input}
+          onInputChange={setInput}
+          onAgentChange={handleAgentChange}
+          onProjectChange={handleProjectChange}
+          onModelChange={handleModelChange}
+          onModeChange={(m) => activeThreadId && setThreadMode(activeThreadId, m)}
+          onNewThread={handleNewThread}
+          onRenameThread={(id, title) => updateThread(id, { title })}
+          onDeleteThread={deleteThread}
+          onDeleteSummary={() => activeThreadId && clearThreadSummary(activeThreadId)}
+          files={sidebarFiles}
+          memoryEntries={sidebarMemory}
+          filesEnabled={fileWorkspaceUiEnabled() && can("reports")}
+          memoryEnabled={can("project_memory")}
+          onDownloadFile={handleDownloadFile}
+          onKeepFile={handleKeepFile}
+          onAddMemory={handleAddMemory}
+          onArchiveMemory={handleArchiveMemory}
+          sidebar={sidebarProps}
+        />
       </PageLayout>
     );
   }

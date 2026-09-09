@@ -80,6 +80,11 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
           </tbody>
         </table>
         </div>
+        {/* Spec 2.7: this matrix is the one admin table that keeps its columns on
+            a phone, so it needs the scroll affordance. Desktop never sees it. */}
+        <p className="border-t border-[--hair-divider] px-4 py-2 text-[11.5px] text-muted-foreground md:hidden">
+          swipe the table sideways for the remaining roles
+        </p>
       </div>
     </div>
   );

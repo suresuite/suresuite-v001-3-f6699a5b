@@ -901,11 +901,14 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   );
 
   return (
-    // --pi-chrome is published by PageLayout: the measured bottom reservation
-    // plus this page's gutter. The fallback only covers the first paint before
-    // the credit bar is measured. The column is fixed-height so the gate footer
-    // stays on screen — an honest gate you have to scroll to find is not one.
-    <div className="flex h-[calc(100svh-var(--pi-chrome,210px))] min-h-[420px] flex-col overflow-hidden rounded-sm border border-[#d4d4d4] bg-[#ebebeb]">
+    // --pi-chrome is published by PageLayout: the measured bottom reservation,
+    // and nothing else. Project Intelligence runs edge to edge and uses it as
+    // given; this page sits inside PAGE_GUTTER, so it subtracts that gutter's
+    // 1rem top and bottom itself. The fallback only covers the first paint
+    // before the credit bar is measured. The column is fixed-height so the gate
+    // footer stays on screen — an honest gate you have to scroll to find is not
+    // one.
+    <div className="flex h-[calc(100svh-var(--pi-chrome,170px)-2rem)] min-h-[420px] flex-col overflow-hidden rounded-sm border border-[#d4d4d4] bg-[#ebebeb]">
       {header}
       <main className="flex min-h-0 flex-1 flex-col gap-[11px] overflow-auto p-[13px] pb-[22px]">{body}</main>
       {projectId && selected ? footer : null}

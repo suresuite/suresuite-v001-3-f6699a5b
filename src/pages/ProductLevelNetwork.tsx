@@ -33,8 +33,6 @@ import {
   RotateCcw,
   AlertTriangle,
   Map as MapIcon,
-  ChevronRight,
-  Info,
 } from 'lucide-react';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
 import MLPrediction from '@/components/MLPrediction';
@@ -44,6 +42,17 @@ import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MapView from '@/components/MapView';
 import { NetworkMetricsTable } from '@/components/NetworkMetricsTable';
 import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/networkMetrics';
+import {
+  LensChip,
+  LensRule,
+  LensHowToRead,
+  LensDesktopOnlyNote,
+  LensStructure,
+  LensRisk,
+  LensTable,
+  LensAction,
+  LENS_SWIPE_HINT,
+} from '@/components/network/MobileLens';
 
 const GROUP_ORDER = ['A', 'B', 'C', 'D'] as const;
 type GroupKey = typeof GROUP_ORDER[number];
@@ -873,7 +882,20 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
           onRefresh={fetchData}
           refreshLoading={loading}
           rightContent={
-            <div className="flex items-center space-x-2">
+            /* `gap-2` rather than `space-x-2`: `space-x-*` puts its margin on
+               the DOM children, so it would land on the `md:contents` wrapper
+               below instead of on the controls inside it and collapse the
+               desktop spacing. `gap` is inherited correctly through
+               `display:contents`, and for this single-line row the two
+               produce the same 8px. */
+            <div className="flex items-center gap-2">
+              {/* Spec 4.1 caps the mobile right slot at three controls, and
+                  everything in this group drives the network graph / analytics
+                  panels, which are `hidden md:` on this page. Below `md` the
+                  header therefore holds refresh + the project select only, and
+                  `md:contents` hands every control straight back to the same
+                  flex row on desktop - so the desktop header is unchanged. */}
+              <span className="hidden md:contents">
               {selectedNode && (
                 <>
                   <Button
@@ -935,9 +957,13 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                 <RotateCcw className="w-4 h-4 mr-1" />
                 Refresh
               </Button>
+              </span>
 
               <Select value={globalSelectedProjectId || ''} onValueChange={setGlobalSelectedProjectId}>
-                <SelectTrigger className="w-[180px] h-9">
+                {/* Case A select (spec 2.1 / parity plan G3): the vw term
+                    exceeds 180px at every width from 768 up, so the clamp
+                    resolves to the desktop literal without an `md:`. */}
+                <SelectTrigger className="w-[clamp(120px,38vw,180px)] h-9">
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -952,36 +978,40 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
           }
         />
 
-        {/* ── Mobile composition (md:hidden) ── */}
-        <div className="md:hidden space-y-6 mt-4">
+        {/* ── Mobile composition (md:hidden) ──────────────────────────
+             Spec 5 row 7 / demo entry 08. Nothing below md: renders the
+             graph, so this column is the lens itself: how to read it, the
+             structure, the risk, the ranking, the prediction. Every piece
+             is a presentational component from components/network/MobileLens
+             so the three lenses cannot drift apart again. */}
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-5">
 
-          {/* Lens chip */}
-          <span className="inline-flex items-center gap-1 rounded-sm bg-violet-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">
-            Product level
-          </span>
+          <div>
+            <LensChip tone="violet">Product level</LensChip>
+          </div>
 
-          {/* How to read this */}
-          <details className="group border-b border-border pb-3">
-            <summary className="flex cursor-pointer items-center justify-between text-sm font-medium select-none">
-              How to read this
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Nodes represent suppliers, materials, products, and customers. Edges show sourcing and flow relationships. Prominence (betweenness centrality) identifies materials that are critical bottlenecks — high scores signal single points of failure.
-            </p>
-          </details>
+          <LensHowToRead
+            scope="Suppliers, materials, products and customers built from this project's inbound, BOM and outbound records. Multi-tier rows are excluded here — the deep-tier graph is the firm lens."
+            findings="A material is reported as a nexus material once its prominence reaches 0.800: at that level the graph has no path around it. Prominence is coloured from 0.400 up, so a row is worth reading before it becomes a finding."
+            columns={[
+              { term: 'Node', def: 'The material this row measures.' },
+              { term: 'Prominence', def: 'Overall network importance.' },
+              { term: 'Betweenness', def: 'Bridge between network clusters.' },
+              { term: 'Degree', def: 'Connection ratio to max possible.' },
+              { term: 'Connections', def: 'Distinct nodes this one is joined to.' },
+            ]}
+          />
 
-          {/* Desktop-only notice */}
-          <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <Info className="inline-block h-3.5 w-3.5 mr-1 shrink-0 align-text-bottom" />
-            The 3D network space is desktop-only. Open on a larger screen to explore the interactive graph.
-          </p>
+          <LensDesktopOnlyNote>
+            The network graph, the map view and the supplier charts are desktop
+            surfaces. Open this lens on a larger screen to explore them; the
+            findings below are the same on both.
+          </LensDesktopOnlyNote>
 
-          {/* Network structure */}
           <section>
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Network structure</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
+            <LensRule>Network structure</LensRule>
+            <LensStructure
+              items={[
                 { label: 'Nodes', value: mobileProductMetrics.totalNodes > 0 ? String(mobileProductMetrics.totalNodes) : '—' },
                 { label: 'Network depth', value: mobileProductMetrics.networkDepth > 0 ? String(mobileProductMetrics.networkDepth) : '—' },
                 { label: 'Critical path', value: '—' },
@@ -990,89 +1020,79 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                   value: mobileProductMetrics.totalNodes > 0 ? mobileProductMetrics.resilience : '—',
                   red: mobileProductMetrics.resilienceRed && mobileProductMetrics.totalNodes > 0,
                 },
-              ].map(({ label, value, red }) => (
-                <div key={label} className="rounded-sm border border-border p-3">
-                  <p className={`text-xl font-semibold tabular-nums ${red ? 'text-destructive' : ''}`}>{value}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p>
-                </div>
-              ))}
-            </div>
+              ]}
+            />
           </section>
 
-          {/* Structural risk */}
           <section>
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Structural risk</p>
-            <div className="divide-y divide-border rounded-sm border border-border">
-              {[
+            <LensRule>Structural risk</LensRule>
+            <LensRisk
+              rows={[
                 { label: 'Single-source risk', value: supplierMetrics.supplierDiversity > 0 ? supplierMetrics.singleSourceRisk : '—' },
                 { label: 'Concentration risk', value: materialMetrics.materialDiversity > 0 ? materialMetrics.materialConcentrationRisk : '—' },
                 { label: 'Mean HHI', value: mobileProductMetrics.totalNodes > 0 ? mobileProductMetrics.hhi : '—' },
                 { label: 'Nexus materials', value: networkMetrics.length > 0 ? String(mobileProductMetrics.nexusMaterials) : '—' },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between px-3 py-2">
-                  <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className="text-sm font-semibold tabular-nums">{value}</span>
-                </div>
-              ))}
-            </div>
-            {mobileProductMetrics.hasSPOF && mobileProductMetrics.topNexusName && (
-              <div className="mt-2 flex items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
-                <p className="text-xs text-destructive">
-                  {mobileProductMetrics.topNexusName} is a nexus material — a single source of failure in the supply network.
-                </p>
-              </div>
-            )}
+              ]}
+              alert={
+                mobileProductMetrics.hasSPOF && mobileProductMetrics.topNexusName
+                  ? `${mobileProductMetrics.topNexusName} is a nexus material — a single source of failure in the supply network.`
+                  : undefined
+              }
+            />
           </section>
 
-          {/* Centrality table */}
           <section>
-            <div className="mb-2 flex items-baseline justify-between">
-              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Centrality</p>
-              <span className="text-[10px] text-muted-foreground">swipe →</span>
-            </div>
-            <div className="overflow-x-auto rounded-sm border border-border">
-              <table className="w-full min-w-[480px] text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="sticky left-0 z-[1] bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Node</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Prominence</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Betweenness</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Degree</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Connections</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {networkMetrics.length === 0 ? (
-                    <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">Run centrality analysis to see metrics</td></tr>
-                  ) : (
-                    [...networkMetrics]
-                      .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
-                      .slice(0, 20)
-                      .map(n => {
-                        const p = n.prominence ?? 0;
-                        const colorClass = p >= 0.8 ? 'text-destructive font-semibold' : p >= 0.6 ? 'text-warning font-medium' : p >= 0.4 ? 'text-primary' : 'text-muted-foreground';
-                        return (
-                          <tr key={n.id}>
-                            <td className="sticky left-0 z-[1] bg-background px-3 py-2 font-medium max-w-[120px] truncate" title={n.name}>{n.name}</td>
-                            <td className={`px-3 py-2 text-right tabular-nums ${colorClass}`}>{n.prominence != null ? n.prominence.toFixed(3) : '—'}</td>
-                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{n.betweenness_centrality != null ? n.betweenness_centrality.toFixed(3) : '—'}</td>
-                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{n.degree_centrality != null ? n.degree_centrality.toFixed(3) : '—'}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{n.connection_count}</td>
-                          </tr>
-                        );
-                      })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <LensRule trailing={networkMetrics.length > 0 ? 'swipe →' : undefined}>Centrality</LensRule>
+            <LensTable
+              minWidth={480}
+              loading={networkMetricsLoading}
+              columns={[
+                { key: 'node', label: 'Node' },
+                { key: 'prominence', label: 'Prominence', align: 'right' },
+                { key: 'betweenness', label: 'Betweenness', align: 'right' },
+                { key: 'degree', label: 'Degree', align: 'right' },
+                { key: 'connections', label: 'Connections', align: 'right' },
+              ]}
+              rows={[...networkMetrics]
+                .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
+                .slice(0, 20)
+                .map(n => {
+                  const p = n.prominence ?? 0;
+                  const tone = p >= 0.8
+                    ? 'text-destructive font-semibold'
+                    : p >= 0.6
+                      ? 'text-warning font-medium'
+                      : p >= 0.4
+                        ? 'text-primary'
+                        : 'text-muted-foreground';
+                  return {
+                    key: n.id,
+                    id: n.name,
+                    cells: [
+                      { text: n.prominence != null ? n.prominence.toFixed(3) : '—', className: tone },
+                      { text: n.betweenness_centrality != null ? n.betweenness_centrality.toFixed(3) : '—', className: 'text-muted-foreground' },
+                      { text: n.degree_centrality != null ? n.degree_centrality.toFixed(3) : '—', className: 'text-muted-foreground' },
+                      { text: String(n.connection_count) },
+                    ],
+                  };
+                })}
+              empty="No centrality metrics yet. Calculate them to rank the materials in this lens."
+              caption={networkMetrics.length > 0 ? LENS_SWIPE_HINT : undefined}
+              action={
+                <LensAction
+                  onClick={handleRefreshMetrics}
+                  disabled={networkMetricsLoading || !globalSelectedProjectId}
+                  disabledReason={!globalSelectedProjectId ? 'Select a project first' : 'Already calculating'}
+                >
+                  <RotateCcw className={`h-3.5 w-3.5 ${networkMetricsLoading ? 'animate-spin' : ''}`} />
+                  Calculate
+                </LensAction>
+              }
+            />
           </section>
 
-          {/* Nexus Node Prediction */}
-          <section
-            aria-label="Nexus Node Prediction — Processing predictions… This may take a few minutes for large datasets."
-          >
-            <p className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">Nexus Node Prediction</p>
+          <section>
+            <LensRule>Prediction</LensRule>
             <MLPrediction selectedPlant={
               globalSelectedProjectId
                 ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
