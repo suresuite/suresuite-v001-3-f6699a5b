@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { DIALOG_AS_SHEET } from '@/components/shared';
+import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface Provider { id: string; code: string; display_name: string; enabled: boolean; }
@@ -78,21 +80,21 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
       actions={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button size="sm" className="rounded-sm"><Plus className="mr-1.5 h-3.5 w-3.5" /> Add model</Button></DialogTrigger>
-          <DialogContent className="rounded-sm">
+          <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
             <DialogHeader><DialogTitle>Add AI model</DialogTitle></DialogHeader>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
+              <div className="min-w-0 md:col-span-2">
                 <Label className="text-xs">Provider</Label>
                 <Select value={draft.provider_id ?? ''} onValueChange={(v) => setDraft({ ...draft, provider_id: v || null })}>
                   <SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="Select provider" /></SelectTrigger>
-                  <SelectContent>{providers.map((p) => <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{providers.map((p) => <SelectItem key={p.id} value={p.id} className="min-h-11 md:min-h-0">{p.display_name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2"><Label className="text-xs">Code (e.g. openai/gpt-5.5)</Label><Input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} className="mt-1 rounded-sm font-mono" /></div>
-              <div className="col-span-2"><Label className="text-xs">Display name</Label><Input value={draft.display_name} onChange={(e) => setDraft({ ...draft, display_name: e.target.value })} className="mt-1 rounded-sm" /></div>
+              <div className="min-w-0 md:col-span-2"><Label className="text-xs">Code (e.g. openai/gpt-5.5)</Label><Input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} className="mt-1 rounded-sm font-mono" /></div>
+              <div className="min-w-0 md:col-span-2"><Label className="text-xs">Display name</Label><Input value={draft.display_name} onChange={(e) => setDraft({ ...draft, display_name: e.target.value })} className="mt-1 rounded-sm" /></div>
               <div><Label className="text-xs">Input $/1k</Label><Input type="number" step="0.0001" value={draft.input_cost_per_1k} onChange={(e) => setDraft({ ...draft, input_cost_per_1k: Number(e.target.value) })} className="mt-1 rounded-sm font-mono" /></div>
               <div><Label className="text-xs">Output $/1k</Label><Input type="number" step="0.0001" value={draft.output_cost_per_1k} onChange={(e) => setDraft({ ...draft, output_cost_per_1k: Number(e.target.value) })} className="mt-1 rounded-sm font-mono" /></div>
-              <div className="col-span-2"><Label className="text-xs">Max context</Label><Input type="number" value={draft.max_context} onChange={(e) => setDraft({ ...draft, max_context: Number(e.target.value) })} className="mt-1 rounded-sm font-mono" /></div>
+              <div className="min-w-0 md:col-span-2"><Label className="text-xs">Max context</Label><Input type="number" value={draft.max_context} onChange={(e) => setDraft({ ...draft, max_context: Number(e.target.value) })} className="mt-1 rounded-sm font-mono" /></div>
             </div>
             <DialogFooter>
               <Button variant="outline" className="rounded-sm" onClick={() => setOpen(false)}>Cancel</Button>
@@ -131,7 +133,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                   </span>
                 </div>
                 <div className="mt-2.5 flex justify-end">
-                  <button title="Delete" className="grid h-11 w-11 place-items-center text-[#c98a8f] hover:text-[#bf2330]" onClick={() => remove(m)}>
+                  <button title="Delete" aria-label="Delete" className="grid h-11 w-11 place-items-center text-[#c98a8f] hover:text-[#bf2330]" onClick={() => remove(m)}>
                     <Trash2 className="h-[15px] w-[15px]" />
                   </button>
                 </div>
@@ -165,7 +167,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
                   <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{m.max_context.toLocaleString()}</td>
                   <td className={TD}><Toggle checked={m.enabled} onCheckedChange={() => toggle(m)} /></td>
                   <td className={`${TD} text-right`}>
-                    <button title="Delete" className="text-[#c98a8f] hover:text-[#bf2330]" onClick={() => remove(m)}><Trash2 className="h-[15px] w-[15px]" /></button>
+                    <button title="Delete" aria-label="Delete" className="text-[#c98a8f] hover:text-[#bf2330]" onClick={() => remove(m)}><Trash2 className="h-[15px] w-[15px]" /></button>
                   </td>
                 </tr>
               ))}

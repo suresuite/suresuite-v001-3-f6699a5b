@@ -77,6 +77,11 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
                 // Every other page just scrolls.
                 '--pi-chrome':
                   `calc(${chromePx}px + env(safe-area-inset-bottom, 0px) + 2rem)`,
+                // full-height chat column, which runs edge to edge with no
+                // page gutter of its own. The composer therefore lands on the
+                // credit bar however the bar wraps, and follows it when the
+                // bar is dismissed. Every other page just scrolls.
+                '--pi-chrome': `calc(${chromePx}px + env(safe-area-inset-bottom, 0px))`,
               } as React.CSSProperties)
             : undefined
         }

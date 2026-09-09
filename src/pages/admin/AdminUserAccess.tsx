@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Eye, EyeOff, Loader2, Lock, ShieldCheck, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface CapRow {
@@ -165,7 +166,26 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
                     <div className="space-y-1">
                       {models.map((m) => (
                         <label key={m.id} className="flex min-h-11 items-center gap-2.5 rounded-sm px-1 py-1 text-sm hover:bg-[#fafafa] md:min-h-0">
-                          <Checkbox checked={data.models.allowed_ids.includes(m.id)} disabled={isSuper} onCheckedChange={(v) => toggleModel(m.id, !!v)} />
+                          <Checkbox
+                            // Spec 2.4. The 44px label around this is inert — it wraps a
+                            // Radix button, not an input, so clicking the row text toggles
+                            // nothing (measured). Below md the control itself becomes the
+                            // 44x44 target, the negative margin hands the space back, and
+                            // the 16x16 box is redrawn as a ::before so nothing moves.
+                            // md: hides the pseudo box and restores the primitive's own
+                            // geometry and fill exactly.
+                            className={cn(
+                              'relative -m-[14px] h-11 w-11 rounded-none border-0 bg-transparent',
+                              "before:absolute before:left-1/2 before:top-1/2 before:h-4 before:w-4 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-sm before:border before:border-primary before:content-['']",
+                              'data-[state=checked]:bg-transparent data-[state=checked]:before:bg-primary',
+                              '[&>span]:relative [&>span]:z-[1]',
+                              'md:static md:m-0 md:block md:h-4 md:w-4 md:rounded-sm md:border md:border-primary md:before:hidden',
+                              'md:data-[state=checked]:bg-primary md:[&>span]:static md:[&>span]:z-auto',
+                            )}
+                            checked={data.models.allowed_ids.includes(m.id)}
+                            disabled={isSuper}
+                            onCheckedChange={(v) => toggleModel(m.id, !!v)}
+                          />
                           <span>{m.display_name}</span>
                           <span className="ml-auto font-mono text-[11px] text-muted-foreground">{m.code}</span>
                         </label>
@@ -175,32 +195,32 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
                 ))}
               </div>
               <div className="my-4 h-px bg-[--hair-border]" />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
                 <div>
                   <Label className="text-xs">Default model</Label>
                   <Select value={data.models.default_id ?? 'none'} onValueChange={(v) => saveModels({ default_id: v === 'none' ? null : v })}>
                     <SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">—</SelectItem>{data.models.catalog.map((m) => <SelectItem key={m.id} value={m.id}>{m.display_name}</SelectItem>)}</SelectContent>
+                    <SelectContent><SelectItem value="none" className="min-h-11 md:min-h-0">—</SelectItem>{data.models.catalog.map((m) => <SelectItem key={m.id} value={m.id} className="min-h-11 md:min-h-0">{m.display_name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-xs">Fallback model</Label>
                   <Select value={data.models.fallback_id ?? 'none'} onValueChange={(v) => saveModels({ fallback_id: v === 'none' ? null : v })}>
                     <SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">—</SelectItem>{data.models.catalog.map((m) => <SelectItem key={m.id} value={m.id}>{m.display_name}</SelectItem>)}</SelectContent>
+                    <SelectContent><SelectItem value="none" className="min-h-11 md:min-h-0">—</SelectItem>{data.models.catalog.map((m) => <SelectItem key={m.id} value={m.id} className="min-h-11 md:min-h-0">{m.display_name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
             </Section>
 
             <Section title="Budgets & limits">
-              <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <div className="mb-4 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2.5 md:grid-cols-[repeat(4,minmax(0,1fr))]">
                 <UsageStat label="Cost MTD" value={`$${data.budgets.mtd_cost_usd.toFixed(2)}`} cap={data.budgets.monthly_usd != null ? `of $${data.budgets.monthly_usd.toFixed(2)}` : undefined} over={data.budgets.monthly_usd != null && data.budgets.mtd_cost_usd >= data.budgets.monthly_usd} />
                 <UsageStat label="Cost today" value={`$${data.budgets.today_cost_usd.toFixed(2)}`} cap={data.budgets.daily_usd != null ? `of $${data.budgets.daily_usd.toFixed(2)}` : undefined} over={data.budgets.daily_usd != null && data.budgets.today_cost_usd >= data.budgets.daily_usd} />
                 <UsageStat label="Req MTD" value={data.budgets.mtd_requests.toLocaleString()} />
                 <UsageStat label="Req today" value={data.budgets.today_requests.toLocaleString()} cap={data.budgets.rpd != null ? `of ${data.budgets.rpd}` : undefined} over={data.budgets.rpd != null && data.budgets.today_requests >= data.budgets.rpd} />
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(3,minmax(0,1fr))] [&>*]:min-w-0">
                 <Field label="Monthly budget (USD)" value={monthly} set={setMonthly} placeholder="e.g. 25.00" />
                 <Field label="Daily budget (USD)" value={daily} set={setDaily} placeholder="e.g. 2.00" />
                 <Field label="Monthly token limit" value={tokenLimit} set={setTokenLimit} />
@@ -238,7 +258,7 @@ function CapMatrix({ rows, isSuper, onSet }: { rows: CapRow[]; isSuper: boolean;
       {rows.map((row) => {
         const locked = ALWAYS_ON.has(row.key);
         return (
-          <div key={row.key} className="flex flex-wrap items-center gap-3 py-2.5">
+          <div key={row.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 md:gap-y-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-[13px] font-medium">{row.label}{locked && <Lock className="h-3 w-3 text-muted-foreground" />}</div>
             </div>
