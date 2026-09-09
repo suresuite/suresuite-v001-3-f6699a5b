@@ -667,6 +667,25 @@ Neither was in G10's inventory; both surfaced only under the `long-text` and
    one-line PR against `shared/TableShell.tsx`. Below `md` it is gone, because
    the phone tree's `main` is its own scroll container.
 
+### Merging `main`: `--pi-chrome` changed meaning
+
+`main` took G11 and G12 while this branch was in flight, and the merge had one
+substantive conflict. Project Intelligence now runs **edge to edge with no page
+gutter**, so `main` dropped the `+ 2rem` term from `--pi-chrome`. This page sits
+inside `PAGE_GUTTER` and had added that term for its own column. Taking either
+side alone puts the other surface out by 32px — PI would leave a gap above the
+credit bar, or the Lab's gate footer would sit below the fold.
+
+Resolved so neither loses behaviour: `--pi-chrome` is **the bottom reservation
+and nothing else**, and a reader that sits inside the gutter subtracts it
+itself — `h-[calc(100svh-var(--pi-chrome,170px)-2rem)]`. The probe now asserts
+this directly rather than by eye: at every mobile width it checks the column's
+bottom edge against the viewport, so a footer pushed below the fold fails the
+run. 0 of 400 mobile measurements do.
+
+`main` also dropped the **G10 section** while appending G11 and G12, leaving
+sequence row 7's "see G10" pointing at nothing. It is restored verbatim.
+
 ### Housekeeping
 
 `npm run verify:mobile` (G7) pointed at `handoff/verify-repo.mjs`, deleted in
@@ -680,9 +699,10 @@ you have to scroll to find is not one.
 
 Two Vite servers, not `git stash` (HMR silently serves stale modules and
 produces a false "identical"): the branch on :5199 and a `git worktree` of the
-branch's base commit `aa3fba9` on :5301. `aa3fba9` rather than `origin/main`
-because `main` has since taken unrelated mobile work, which would show up as a
-diff that is not this change's.
+base on :5302. Measured twice — first against the branch's own base commit
+`aa3fba9`, then re-measured in full against **`origin/main`** after merging it
+in, because that merge changed a value this page's layout depends on (see
+below). Both passes give the same result.
 
 - **80 fixture states** — 5 panes × 16 modes (no-project · no-scenario ·
   loading · no-run · no-reps · queued · running · done · failed · blocking-gate ·
@@ -693,19 +713,22 @@ diff that is not this change's.
   other 9 are the `results` pane, and SHA is the wrong instrument there: the
   **same code screenshotted twice from the same server** does not reproduce
   byte-for-byte, because recharts redraws its plots slightly differently. So
-  those 9 were measured both ways — branch↔base *and* base↔base — and the
-  differing-pixel counts are the same order of magnitude with the same ~103-row
-  band (the chart's own height); in `clear-gate`, `no-events` and `warn-only`
-  the **same-code** difference is the larger of the two. A layout change would
-  shift everything below it and show a band running to the foot of the page; none
-  does. `setup/long-text` also failed the first SHA pass by 14 pixels of text
+  those 9 were measured both ways — branch↔base *and* base↔base. Three
+  (`dirty-policy`, `long-text`, `warn-only`) came back byte-identical on
+  re-capture, taking it to 74. The remaining six sit inside the renderer's own
+  measured noise: `no-events` differs by 566 px / 102-row band in **both**
+  directions, `running` by 426 vs 432 px, `empty-library` by 7 vs 7, and on
+  `done` the **same-code** difference (304 px) is the larger of the two. The
+  102-row band is the chart's own height; a layout change would shift everything
+  below it and show a band running to the foot of the page. None does.
+  `setup/long-text` also failed the first SHA pass by 14 pixels of text
   antialiasing across 3 bands, and re-measured byte-identical.
 - Every overlay opened and measured at 320 / 390 / 414 and landscape: all ten
   sheets, the scenario library (populated and empty), the stress drawer, the
   playbook save dialog, the mapping report and the Select popovers. Clean
-  everywhere except the `Dialog` primitive's own 16 × 16 close button, which
-  G10 already scoped out — it is a global control on ~40 surfaces and identical
-  on the base commit.
+  everywhere. The `Dialog`/`Sheet` primitive's 16 × 16 close button — the one
+  finding G10 had to scope out as a ~40-surface cross-page change — was raised
+  to 44px on `main` in the G11 pass, so merging `main` in closes it.
 - **Landscape is 740 × 380, not 874 × 402.** 874 ≥ 768, so at that width the Lab
   correctly renders its *desktop* tree and the sheet rules are not exercised at
   all; a landscape phone under the breakpoint is what tests them. Both were
