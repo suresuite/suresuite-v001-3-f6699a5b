@@ -691,6 +691,15 @@ sequence row 7's "see G10" pointing at nothing. It is restored verbatim.
 `npm run verify:mobile` (G7) pointed at `handoff/verify-repo.mjs`, deleted in
 `e0bb85c`, and failed for everyone. It now runs `scripts/audit-adaptive-ui.mjs`.
 
+**The same breakage was in CI, and only surfaced when this PR ran it.**
+`.github/workflows/mobile-verify.yml` invoked that deleted script directly, so
+its `verify` job has been failing with `MODULE_NOT_FOUND` on *every* PR
+touching `src/**` — including the ones that landed G11 and G12. Repointed at
+the same audit, called directly so the job keeps its no-install design. That
+makes it a second run of `ui-audit.yml`'s gate; restoring the real copy-deck
+gates means restoring the checker from `e0bb85c^` first, which is a separate
+decision. A duplicated green gate beats a permanently red one.
+
 `PageLayout`'s `--pi-chrome` now has a second reader: the Lab column is
 `100svh - var(--pi-chrome)` so the gate footer stays on screen. An honest gate
 you have to scroll to find is not one.
