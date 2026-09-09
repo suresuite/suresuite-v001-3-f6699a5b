@@ -27,6 +27,14 @@ interface Props {
   /** project-level recovery defaults (merged into overrides for the live preview) */
   projectRecovery: RecoveryConfig | null;
   onSave: (patch: Partial<ScenarioWithPlaybook>) => void;
+  /**
+   * Which card to render. `"all"` is both and is what desktop mounts, so the
+   * desktop pane is unchanged. The phone tree renders the schedule as the
+   * demo's table and opens THIS pane's playbook card in a sheet, so the
+   * picker, the enable switch and the six strategy toggles are the same
+   * controls with the same handlers — not a second copy. Presentational only.
+   */
+  sections?: "all" | "schedule" | "playbook";
 }
 
 interface StrategyParamDef {
@@ -139,7 +147,7 @@ function shallowEqualConfig(a: Record<string, unknown>, b: Record<string, unknow
   return true;
 }
 
-export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Props) {
+export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave, sections = "all" }: Props) {
   const { globalSelectedProjectId: projectId } = useGlobalProject();
   const { playbooks, create: createPlaybook, update: updatePlaybook, remove: removePlaybook } =
     useRecoveryPlaybooks(projectId);
@@ -254,9 +262,12 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
     "reroute",
   ];
 
+  const show = (s: Props["sections"]) => sections === "all" || sections === s;
+
   return (
     <div className="flex flex-col gap-4">
       {/* Disruption timeline */}
+      {show("schedule") ? (
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Disruption schedule</CardTitle>
@@ -269,8 +280,10 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
           />
         </CardContent>
       </Card>
+      ) : null}
 
       {/* Recovery playbook */}
+      {show("playbook") ? (
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
@@ -385,6 +398,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave }: Pr
           </div>
         </CardContent>
       </Card>
+      ) : null}
     </div>
   );
 }

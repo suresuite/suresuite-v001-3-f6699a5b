@@ -19,8 +19,12 @@ interface Props {
   runsByScenario: Record<string, SimulationRun>;
 }
 
+// §2.4: with no comparable scenarios both selects have no options, so they
+// collapse to their 38px chrome — under the touch floor on the one state where
+// the user most needs to reach them. `min-w-11` floors the width below `md`;
+// `md:` hands back the intrinsic width the desktop panel has always had.
 const SELECT =
-  "h-7 min-h-11 min-w-0 max-w-full rounded-sm border border-[#d4d4d8] bg-white px-2 text-[12.5px] text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0";
+  "h-7 min-h-11 min-w-11 max-w-full rounded-sm border border-[#d4d4d8] bg-white px-2 text-[12.5px] text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0 md:min-w-0";
 
 /** §9.3: CRN pairing plus a single-component RunKey difference. */
 function comparabilityFailures(
