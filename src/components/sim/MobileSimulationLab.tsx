@@ -37,6 +37,7 @@ import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight, Truck, TriangleAlert } from "lucide-react";
 import { MobileSheet } from "@/components/shared/MobileSheet";
+import { PAGE_GUTTER_BLEED } from "@/components/shared/PageBody";
 import { cn } from "@/lib/utils";
 import { ScenarioSetupForm } from "./ScenarioSetupForm";
 import { DisruptionScheduleEditor } from "./DisruptionScheduleEditor";
@@ -903,12 +904,20 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   return (
     // --pi-chrome is published by PageLayout: the measured bottom reservation,
     // and nothing else. Project Intelligence runs edge to edge and uses it as
-    // given; this page sits inside PAGE_GUTTER, so it subtracts that gutter's
-    // 1rem top and bottom itself. The fallback only covers the first paint
-    // before the credit bar is measured. The column is fixed-height so the gate
-    // footer stays on screen — an honest gate you have to scroll to find is not
-    // one.
-    <div className="flex h-[calc(100svh-var(--pi-chrome,170px)-2rem)] min-h-[420px] flex-col overflow-hidden rounded-sm border border-[#d4d4d4] bg-[#ebebeb]">
+    // given; this page bleeds out of PAGE_GUTTER the same way PageHeader does
+    // everywhere else (PAGE_GUTTER_BLEED), so it only has PAGE_GUTTER's bottom
+    // 1rem left to subtract, not both — the top gutter is cancelled by the
+    // bleed itself. The fallback only covers the first paint before the credit
+    // bar is measured. The column is fixed-height so the gate footer stays on
+    // screen — an honest gate you have to scroll to find is not one.
+    //
+    // No outer border/radius/fill here: that combination boxed the whole page
+    // — header included — inside a visible card floating inside the page's own
+    // gutter, a "frame in a frame" no other mobile page has. Every sibling page
+    // has exactly one boundary (PageHeader's own bottom border, flush to the
+    // screen edge); header and footer below already carry their own
+    // border/background bars, so they read correctly with nothing wrapping them.
+    <div className={cn(PAGE_GUTTER_BLEED, "flex h-[calc(100svh-var(--pi-chrome,170px)-1rem)] min-h-[420px] flex-col overflow-hidden")}>
       {header}
       <main className="flex min-h-0 flex-1 flex-col gap-[11px] overflow-auto p-[13px] pb-[22px]">{body}</main>
       {projectId && selected ? footer : null}
