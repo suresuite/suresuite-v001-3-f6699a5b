@@ -235,9 +235,12 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   /* ── header ───────────────────────────────────────────────────────────── */
   // The demo's 58px top padding is its own phone-frame notch allowance; the
   // product sits under real app chrome and the page gutter already spaces it,
-  // so only the demo's 11px is ported.
+  // so only the demo's 11px is ported. Horizontal padding is the app's one
+  // gutter clamp (spec §2.1) now that this header bleeds to the screen edge
+  // like every other page's — its own bespoke clamp(11px,3.4vw,15px) was the
+  // same near-miss §2.1 was written to catch on mobile Project Intelligence.
   const header = (
-    <header className="shrink-0 border-b border-[#d4d4d4] bg-[rgba(250,250,250,0.95)] px-[clamp(11px,3.4vw,15px)] py-[11px] backdrop-blur-[8px]">
+    <header className="shrink-0 border-b border-[#d4d4d4] bg-[rgba(250,250,250,0.95)] px-[clamp(0.75rem,4vw,1.125rem)] py-[11px] backdrop-blur-[8px]">
       <div className="mb-[11px] flex min-h-11 items-center gap-[10px]">
         <button
           type="button"
