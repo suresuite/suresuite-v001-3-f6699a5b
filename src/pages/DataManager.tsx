@@ -717,8 +717,15 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
           rightContent={
             <div className="flex items-center space-x-2">
               {selectedProject && (
-                <Badge variant="secondary" className="text-xs">
-                  {selectedProject.name}
+                /* A project name is user data and arbitrarily long, and this
+                   sits in the header's `shrink-0` right slot - unbounded, it
+                   pushes the row past the viewport (§2.5). Bounded here, and
+                   truncated on the inner span because `truncate` on a flex
+                   container does not ellipsize its own text. */
+                <Badge variant="secondary" className="max-w-[36vw] text-xs md:max-w-none">
+                  <span className="min-w-0 truncate" title={selectedProject.name}>
+                    {selectedProject.name}
+                  </span>
                 </Badge>
               )}
               {canModify && (

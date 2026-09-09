@@ -23,9 +23,17 @@ interface AdminLayoutProps {
   isCollapsed: boolean;
   setIsCollapsed: (v: boolean) => void;
   title: string;
+  /** Forwarded to PageHeader. Admin pages that carry a context line (user
+   *  access has email + role + super-admin) had nowhere to put it, so it was
+   *  computed and dropped on the floor. */
+  subtitle?: ReactNode;
   actions?: ReactNode;
   onRefresh?: () => void;
   refreshLoading?: boolean;
+  /** Forwarded to PageHeader's mobile back affordance (spec §4.1). Only the
+   *  drill-down pages have a parent route; it is not decoration. */
+  onBack?: () => void;
+  backLabel?: string;
   children: ReactNode;
 }
 
@@ -44,9 +52,12 @@ export function AdminLayout({
   isCollapsed,
   setIsCollapsed,
   title,
+  subtitle,
   actions,
   onRefresh,
   refreshLoading,
+  onBack,
+  backLabel,
   children,
 }: AdminLayoutProps) {
   const { pathname } = useLocation();
@@ -65,9 +76,12 @@ export function AdminLayout({
       <div className={PAGE_GUTTER}>
         <PageHeader
           title={title}
+          subtitle={subtitle}
           rightContent={actions}
           onRefresh={onRefresh}
           refreshLoading={refreshLoading}
+          onBack={onBack}
+          backLabel={backLabel}
         />
 
         {/* Horizontal tab nav — same TabsList/TabsTrigger treatment as Developer API.

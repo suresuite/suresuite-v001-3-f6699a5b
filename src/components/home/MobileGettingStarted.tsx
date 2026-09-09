@@ -31,6 +31,11 @@ import { KX_TIGHT, LAYER } from '@/components/intelligence/piUi';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import {
+  PAGE_HEADER_ROW,
+  PAGE_HEADER_SHELL,
+  PAGE_HEADER_TITLE,
+} from '@/components/shared/PageHeader';
 
 /** Sharp-dialect card: 4px radius, 1px --hair-border, white. */
 const CARD = 'overflow-hidden rounded-sm border border-[--hair-border] bg-card';
@@ -117,11 +122,19 @@ export function MobileGettingStarted() {
     // owns its vertical rhythm (the header sits flush at the top), but the
     // horizontal term is the same clamp, so it lines up with every other page.
     <div className="px-[clamp(0.75rem,4vw,1.125rem)] pb-6">
-      <header className="flex items-center gap-3 py-3.5">
-        <h1
-          className="min-w-0 flex-1 truncate text-[length:var(--fs-page-title)] font-semibold leading-tight"
-          title="Getting started"
-        >
+      {/* The same chrome <PageHeader> wears - sticky bar, header tint, bottom
+          rule, gutter, title scale - because this is the home tab and it was
+          the one app screen whose header scrolled away under no rule at all.
+          The negative margin bleeds the bar back out of the page gutter above;
+          PAGE_HEADER_ROW puts the same gutter back inside it. */}
+      <header
+        className={cn(
+          PAGE_HEADER_SHELL,
+          PAGE_HEADER_ROW,
+          '-mx-[clamp(0.75rem,4vw,1.125rem)] mb-4',
+        )}
+      >
+        <h1 className={cn(PAGE_HEADER_TITLE, 'min-w-0 flex-1')} title="Getting started">
           Getting started
         </h1>
         <Link

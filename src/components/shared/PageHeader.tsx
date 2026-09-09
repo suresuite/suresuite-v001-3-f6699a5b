@@ -4,6 +4,33 @@ import { ChevronLeft, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PAGE_GUTTER_BLEED } from './PageBody';
 
+// The app header, published as three class constants.
+//
+// Two screens compose their own header row rather than calling <PageHeader>:
+// mobile Getting Started (an avatar link where the actions go) and mobile
+// Project Intelligence (a two-line title stack inside a fixed-height flex
+// column). Before this, each re-declared the chrome by hand and all three
+// drifted - different tint, different rule, different gutter, different title
+// scale. The chrome now has one definition and they wear it.
+//
+// SHELL is the bar itself. It is `sticky top-0`, which only pins because
+// PageLayout's content wrapper is `overflow-x-clip`: `overflow-x-hidden`
+// computes `overflow-y: auto`, making that wrapper a scroll container that
+// never scrolls, and a sticky child of a scrollport that does not move never
+// sticks. Change that class and every header in the product silently unpins.
+export const PAGE_HEADER_SHELL =
+  'sticky top-0 z-40 bg-header-background/95 backdrop-blur-md border-b border-header-border';
+
+// ROW is the app gutter (PageBody's clamp, term for term) plus the header's
+// own vertical rhythm and the gap between back / title / actions.
+export const PAGE_HEADER_ROW =
+  'flex items-center gap-2 px-[clamp(0.75rem,4vw,1.125rem)] py-2.5 md:gap-4 md:px-8 md:py-3.5';
+
+// TITLE is the one page-title scale: --fs-page-title on mobile (spec 2.2),
+// the audit's 15px from `md` up.
+export const PAGE_HEADER_TITLE =
+  'text-[length:var(--fs-page-title)] md:text-[15px] font-semibold text-foreground leading-tight truncate';
+
 interface PageHeaderProps {
   title: string;
   subtitle?: React.ReactNode;
@@ -32,13 +59,14 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        'sticky top-0 z-40 mb-4 md:mb-5 bg-header-background/95 backdrop-blur-md border-b border-header-border',
+        PAGE_HEADER_SHELL,
+        'mb-4 md:mb-5',
         PAGE_GUTTER_BLEED,
       )}
     >
       {/* Inner padding mirrors the gutter on mobile and holds the audit's
           px-8 py-3.5 from `md` up (C3). */}
-      <div className="px-[clamp(0.75rem,4vw,1.125rem)] py-2.5 md:px-8 md:py-3.5 flex items-center gap-2 md:gap-4">
+      <div className={PAGE_HEADER_ROW}>
         {onBack && (
           <button
             type="button"
@@ -52,10 +80,7 @@ export function PageHeader({
         )}
 
         <div className="min-w-0 flex-1">
-          <h1
-            className="text-[length:var(--fs-page-title)] md:text-[15px] font-semibold text-foreground leading-tight truncate"
-            title={title}
-          >
+          <h1 className={PAGE_HEADER_TITLE} title={title}>
             {title}
           </h1>
           {subtitle && (
