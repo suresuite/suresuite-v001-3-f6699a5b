@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageLayout } from "@/components/shared/PageLayout";
@@ -30,6 +31,7 @@ import {
 import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
 import { GateBar } from "@/components/sim/RunGate";
 import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
+import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import {
   compileGateFindings,
   gateFindingsToFindings,
@@ -46,6 +48,7 @@ type Pane = PaneId;
 
 export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [searchParams] = useSearchParams();
+  const isMobile = useIsMobile();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
   const projectId = globalSelectedProjectId;
   const { projects } = useProjects();
@@ -276,6 +279,121 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     scenariosWithResults: scenarios.filter((s) => runsByScenario[s.id]).length,
   });
 
+  // The five scenario mutations the aside owns, lifted so both trees dispatch
+  // the identical call. Nothing here is new behaviour — it is the desktop
+  // aside's own handlers, named.
+  const createScenario = async () => {
+    // §2.6: scenarios created under a validated triple inherit the adopted
+    // warm-up + replication count at birth.
+    const s = await create(`Scenario ${scenarios.length + 1}`);
+    if (!s) return;
+    inheritTried.current.add(s.id);
+    void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty }).then((cardId) => {
+      if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
+    });
+    setSelectedId(s.id);
+  };
+  const duplicateScenario = async (s: (typeof scenarios)[number]) => {
+    const d = await duplicate(s);
+    if (d) setSelectedId(d.id);
+  };
+  const deleteScenario = async (id: string) => {
+    await remove(id);
+    if (selectedId === id) setSelectedId(null);
+  };
+  const launchStress = async (preset: StressTestPreset) => {
+    const s = await create(preset.name);
+    if (!s) return;
+    await update(s.id, {
+      description: preset.description,
+      disruption_schedule: preset.disruption_schedule,
+    });
+    // Stress scenarios share the baseline world (events are excluded from the
+    // fingerprint, §2.3) — they inherit too.
+    inheritTried.current.add(s.id);
+    void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty });
+    setSelectedId(s.id);
+    setPane("recovery");
+    toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
+  };
+
+  const runVersionLabel = latestRun?.policy_version_id
+    ? (policyVersions.find((v) => v.id === latestRun.policy_version_id)?.label ??
+      latestRun.policy_version_id.slice(0, 8))
+    : null;
+  const currentVersionLabel = policyVersionId
+    ? (policyVersions.find((v) => v.id === policyVersionId)?.label ?? policyVersionId.slice(0, 8))
+    : null;
+
+  // Below md the desktop rail + aside + pane grid is not reflowed, it is
+  // replaced: MobileSimulationLab is the phone composition (PAGES.md 14 · 15).
+  // Both trees are fed from the state above, and the branch sits below every
+  // hook so hook order is identical on either platform — the rule G5 and G9
+  // set and the reason they work.
+  if (isMobile) {
+    return (
+      <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+        <div className={PAGE_GUTTER}>
+          <MobileSimulationLab
+            projects={projects as Array<{ id: string; name: string }>}
+            projectId={projectId}
+            onProjectChange={(v) => setGlobalSelectedProjectId(v || null)}
+            scenarios={scenarios}
+            scenariosLoading={loading}
+            selected={selected}
+            selectedId={selectedId}
+            credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
+            onSelectScenario={setSelectedId}
+            onCreateScenario={createScenario}
+            onDuplicateScenario={duplicateScenario}
+            onDeleteScenario={deleteScenario}
+            onBrowseLibrary={() => setLibraryOpen(true)}
+            stressCount={STRESS_TESTS.length}
+            stressOpen={stressOpen}
+            onToggleStress={() => setStressOpen((v) => !v)}
+            onLaunchStress={launchStress}
+            pane={pane}
+            onPane={setPane}
+            onSaveScenario={(patch) => selected && update(selected.id, patch)}
+            projectRecovery={projectRecovery}
+            effectiveRecovery={effectiveRecovery}
+            policyVersionLabel={currentVersionLabel}
+            policyDirty={policyDirty}
+            credibility={credibility}
+            runCredibility={cred.resolveRun(latestRun)}
+            gateFindings={gateFindings}
+            gateBlocks={gateBlocks}
+            gateWarns={gateWarns}
+            ackWarnings={ackWarnings}
+            onAckWarnings={setAckWarnings}
+            runBlockedReason={runBlockedReason}
+            findingsSource={serverFindings ? "gate rejection" : "pre-run check"}
+            supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
+            latestRun={latestRun}
+            reps={reps}
+            runVersionLabel={runVersionLabel}
+            onRun={handleRun}
+            onSaveVersionAndRun={handleSaveVersionAndRun}
+            onCancel={handleCancel}
+            onAddReps={handleAddReps}
+            runsByScenario={runsByScenario}
+          />
+        </div>
+        {projectId && (
+          <ScenarioLibraryPanel
+            open={libraryOpen}
+            projectId={projectId}
+            onClose={() => setLibraryOpen(false)}
+            onCloned={(id) => {
+              setSelectedId(id);
+              setPane("recovery");
+            }}
+          />
+        )}
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
@@ -324,25 +442,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   open={stressOpen}
                   onToggle={() => setStressOpen((v) => !v)}
                 />
-                {stressOpen ? (
-                  <StressTestDrawer
-                    onLaunch={async (preset: StressTestPreset) => {
-                      const s = await create(preset.name);
-                      if (!s) return;
-                      await update(s.id, {
-                        description: preset.description,
-                        disruption_schedule: preset.disruption_schedule,
-                      });
-                      // Stress scenarios share the baseline world (events are
-                      // excluded from the fingerprint, §2.3) — they inherit too.
-                      inheritTried.current.add(s.id);
-                      void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty });
-                      setSelectedId(s.id);
-                      setPane("recovery");
-                      toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
-                    }}
-                  />
-                ) : null}
+                {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
                 <ScenarioList
                   scenarios={scenarios}
                   selectedId={selectedId}
@@ -350,29 +450,9 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
                   onSelect={setSelectedId}
                   onBrowseSaved={() => setLibraryOpen(true)}
-                  onCreate={async () => {
-                    const s = await create(`Scenario ${scenarios.length + 1}`);
-                    if (!s) return;
-                    // §2.6: scenarios created under a validated triple inherit
-                    // the adopted warm-up + replication count at birth.
-                    inheritTried.current.add(s.id);
-                    void cred
-                      .applyIfValidated(s, policyVersionId, { dirty: policyDirty })
-                      .then((cardId) => {
-                        if (cardId) {
-                          toast.message("Warm-up & replications inherited from the model validation.");
-                        }
-                      });
-                    setSelectedId(s.id);
-                  }}
-                  onDuplicate={async (s) => {
-                    const d = await duplicate(s);
-                    if (d) setSelectedId(d.id);
-                  }}
-                  onDelete={async (id) => {
-                    await remove(id);
-                    if (selectedId === id) setSelectedId(null);
-                  }}
+                  onCreate={createScenario}
+                  onDuplicate={duplicateScenario}
+                  onDelete={deleteScenario}
                 />
               </aside>
 
@@ -440,12 +520,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     <RunProgressPanel
                       run={latestRun}
                       reps={reps}
-                      versionLabel={
-                        latestRun?.policy_version_id
-                          ? policyVersions.find((v) => v.id === latestRun.policy_version_id)?.label ??
-                            latestRun.policy_version_id.slice(0, 8)
-                          : null
-                      }
+                      versionLabel={runVersionLabel}
                       credibility={cred.resolveRun(latestRun)}
                       onCancel={handleCancel}
                       onAddReps={handleAddReps}

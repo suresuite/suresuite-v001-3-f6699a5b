@@ -207,11 +207,10 @@ page disagree about what this page *is*, not merely how it is laid out.
 Covering the tab bar is the substantive part: the user loses the "you are in
 More" signal and the one-tap route back. The rest is cosmetic alignment.
 
-### G7 — `npm run verify:mobile` is broken
+### G7 — `npm run verify:mobile` is broken · ✅ **done**
 
-`package.json` points at `handoff/verify-repo.mjs`, deleted in `e0bb85c`. It
-fails for everyone. Either drop the script or repoint it at
-`scripts/audit-adaptive-ui.mjs`.
+`package.json` pointed at `handoff/verify-repo.mjs`, deleted in `e0bb85c`, so it
+failed for everyone. It now runs `scripts/audit-adaptive-ui.mjs` (with G13).
 
 ### G8 — Two rounded display numbers (pre-existing)
 
@@ -335,6 +334,67 @@ the suggestions lightbulb only appear when `VITE_CHAT_MODES_ENABLED` and
 `VITE_SUGGESTED_ACTIONS_ENABLED` are on; the memory and files rows in the ⋯ menu
 need the `project_memory` / `reports` capabilities and an attached project. With
 those off the screen is correct but thinner than the demo's screenshots.
+
+---
+
+### G10 — Simulation Lab was never taken past its rail · ✅ **done, mobile only**
+
+`PAGES.md` entry 14 records this screen as *"shell landed · rail remaining"*,
+and the rail did land — `StageRail` scrolls its five stage cards below `md` and
+centres the active one. Everything **behind** those five cards did not. Measured
+in Chromium against the real components, at 320px:
+
+| # | Defect | Measured |
+|---|---|---|
+| G10.1 | Tables clipped, not scrolled — `TableShell` and `ParameterCard` are `overflow-hidden` | KPI summary 576px in 292px · comparison 595px in 292px · recovery impact 360px in 292px · Run window 409px in a **131px** card · Precision 472px in **152px** · Objective 517px in 294px |
+| G10.2 | `RunProgressPanel`'s header pushed the document sideways | `scrollWidth` 471 at 320, 474 at 414, **778 at 768** |
+| G10.3 | `ScenarioLibraryPanel` is a fixed 420px sheet | renders at `left:-93` — 93px permanently off-screen |
+| G10.4 | `DisruptionScheduleEditor`'s six fields share 12 columns | 31px per input |
+| G10.5 | `GateBar` truncates the blocked-run reason | §3.1 never-truncate list |
+| G10.6 | 60+ controls under the 44px floor across all five panes | now 0 |
+
+**What shipped.** Reflows only — no recomposition, no new component tree. Every
+change is a mobile value with `md:` restoring the existing literal. The clipped
+tables scroll with the identifying column frozen (`FROZEN_CELL_ON_TINT`) and
+carry the swipe affordance; the two parameter cards stack; the run header and
+the gate bar wrap; the library sheet clamps to the viewport; the playbook save
+dialog uses `DIALOG_AS_SHEET`; the schedule editor is two columns below `md`.
+G3's three Lab selects (`SimulationLab.tsx:290`, `PlaybookPicker.tsx:55`,
+`ReplicationSeedExplorer.tsx:80`) closed with it.
+
+**Two desktop regressions were introduced and caught only by measuring at 1280**,
+both worth knowing:
+
+1. A scroll wrapper around a table that held `flex-1` **takes** that `flex-1`,
+   so the card's surplus height stopped being shared across its rows.
+   `md:contents` removes the wrapper from desktop layout entirely.
+2. `FROZEN_CELL` carries `md:bg-transparent`, which stripped the parameter
+   grid's provenance rows of their `#fffdf7` tint above `md` — the same class
+   of defect G9 recorded on the ledger `TH`. A cell that already carries an
+   opaque fill wants `FROZEN_CELL_ON_TINT`.
+
+**Verified.** 320 / 360 / 375 / 390 / 414 / 768 / 1280 plus landscape 874x402,
+across five panes and the empty, loading, no-project, no-scenario, no-run,
+queued, running, failed, blocked-gate, warn-only, clear-gate, dirty-policy and
+long-text states, and behind every control: the library sheet, the stress-test
+drawer, the save dialog, the mapping report and all five Select popovers. No
+horizontal overflow and no sub-44px control anywhere below `md`. **Desktop
+proved rather than asserted: 21 full-page screenshots at 1280 are byte-identical
+by SHA-256 to `main`.** `audit-adaptive-ui` clean with the baseline unchanged at
+7; `tsc` unchanged at 7 pre-existing errors; `eslint` on the changed file set
+identical to `main`; every rendered number identical at 320 and 1280.
+
+**Not done, and why.** The `Dialog`/`Sheet` primitive's close button is 16x16 —
+a global control on ~40 surfaces, so raising it is a cross-page change that
+cannot be verified inside one page. The scenario row is a `div` with an
+`onClick` and so is not keyboard reachable; making it a real control is a
+behaviour change. `CredibilityBadge` and the per-replication cells explain
+themselves only through hover (`title` / tooltip), which is inert on touch —
+also behaviour. The demo's Lab copy ("No disruption schedule yet — this project
+has no network to disrupt", "swipe →", "Ask the AI about this run") was **not**
+ported: changing product strings is not a reflow, and §6 forbids copy that
+differs between platforms, so it needs one decision covering both.
+**G13 took that decision** — see below.
 
 ---
 
@@ -469,6 +529,231 @@ which is already computed from the real graph. "Critical path" and "utilisation
 headroom" stay `—` on every lens, exactly as on `main`; no page computes them,
 and inventing a number is what §3.3 exists to prevent.
 
+### G13 — the Lab's demo composition, ported · ✅ **done, mobile only**
+
+G10 made every existing Lab surface usable below `md`. It deliberately did not
+recompose the page, and said so. This is the recomposition.
+
+**The demo does not reflow the Lab, it replaces it.** Read against the
+prototype's source (`handoff/SuReSuite Live Demo (standalone).html`, recoverable
+from `e0bb85c^`; the Lab block starts at offset ~124483 and runs ~40 KB), the
+phone screen is: a header carrying the title, a status dot + scenario name and a
+44px project button; a five-chip pane strip — **the demo has no lettered stage
+rail**; one pane at a time in a scrolling `main`; and a sticky footer holding the
+gate and the Run button. So this ships as a separate phone tree,
+`components/sim/MobileSimulationLab.tsx`, mounted from `SimulationLab.tsx`
+behind `useIsMobile()` — the precedent §5 set for `MobileGettingStarted` and G9
+for `MobileIntelligence`. The branch sits **below every hook**, so hook order is
+identical on both platforms. Desktop renders exactly what it rendered before.
+
+**The one thing that would have ruined it.** The demo is a prototype with less
+functionality than the product: its Setup pane is READ-ONLY fact rows, and it
+has no playbook picker, no strategy toggles, no seed explorer, no item-series
+explorer and no inline supplier fix. Spec §6 is explicit — the product shows a
+control, disables it and explains why; it never hides one. So the resolution is
+the demo's own idiom: **where the demo shows a read-only value row, that row
+opens a bottom sheet holding the REAL existing editor.**
+
+| Demo row / affordance | Sheet, and what is actually inside it |
+|---|---|
+| header scenario line | `ExperimentLibraryBox` + `StressTestDrawer` + the real `ScenarioList` (select · Library · new · duplicate · delete) |
+| header project button | the project list, replacing the `Select` below `md` |
+| Scenario | `ScenarioSetupForm section="identity"` — name, description, `TimeUnitBar` |
+| Horizon · Warm-up | `ScenarioSetupForm section="runWindow"` — horizon, steady-state start, warm-up detection, time step |
+| Replications · Random seed | `ScenarioSetupForm section="precision"` — replications, CRN, seed, stopping rule |
+| Primary KPI | `ScenarioSetupForm section="objective"` |
+| "Add disruption" / a schedule row | the real `DisruptionScheduleEditor` |
+| "Response strategies" | `DisruptionRecoveryPane sections="playbook"` — the picker, save/reset/delete, the enable switch, all six strategy toggles and their parameter inputs |
+| "Engine mapping report" | the real `MappingWarningsCard` |
+| blocked-gate button / "view" | the real `PreRunValidationPanel`, with its per-finding routes and the inline supplier fix |
+
+`section` / `sections` are new **presentational** props on `ScenarioSetupForm`
+and `DisruptionRecoveryPane`, defaulting to the whole form, so desktop mounts
+what it always mounted. There is one editor per control, rendered in two
+chromes — a control cannot drift between platforms because there is only one of
+it. `shared/MobileSheet.tsx` backs all ten sheets; it already implements §4.4
+and already stops above the tab bar (G6). No second sheet shell was written.
+
+**Two rows the demo does not have** are added, as rows of the same kind rather
+than hidden: **Scenario** (the product has a name and a description; the demo
+puts the name in the header and has no description) and **Primary KPI** (the
+product has an objective; the demo does not). **Policy version** stays a
+read-only value row, because this page holds no editor for it.
+
+**One card the demo does not have.** The demo's Events pane is the schedule and
+nothing else, but the product's pane also carries the playbook — 23 controls.
+Dropping them is forbidden by §6, so they keep the demo's card vocabulary
+("Recovery playbook" is the demo's own string, from its Results pane) and their
+rows open the real editors. This is the one place the composition is *extended*
+rather than reproduced, and it is recorded here rather than discovered in review.
+
+**Copy is the demo's, verbatim** — "No disruption schedule yet — this project has
+no network to disrupt.", "swipe →", "Add disruption", "Setup", "Go to Run",
+"Spec", "warm-up & n* not adopted — set them in Policies", "view", "Experiment
+design", "Disruption schedule", "edit in Events", "Recovery playbook",
+"Per replication". This **closes the open question G10 left**: the phone chip for
+the `recovery` pane reads **"Events"** while the desktop rail reads **"Recovery
+playbook"**, and the phone's Setup rows are read-only where desktop's are
+editable. That is copy that differs between platforms, which §6's table lists as
+an anti-pattern, so it is a **knowing exception**, taken for the same reason §5's
+dialect divergence was: the brief was to port the demo's composition, and the
+demo's composition *is* its vocabulary. The pane behind the "Events" chip names
+its second card "Recovery playbook", so neither name is lost.
+
+### What was deliberately NOT built, and why
+
+Three demo elements need data this page does not hold. None was faked and no
+query was added — the gate-1 rule G5's record established:
+
+1. **"Fill rate · 52 weeks"** (the demo's inline SVG: playbook-on vs
+   playbook-off, event bands, a dashed baseline, a TTR rule). The page holds no
+   weekly fill-rate path with the playbook counterfactual — the demo computes it
+   from a prototype model. The real weekly evidence is
+   `ReplicationSeedExplorer`, which renders the persisted per-seed traces, and
+   it occupies that slot.
+2. **The KPI tiles' delta line.** A delta needs a baseline to diff against; the
+   run holds its own means and CI half-widths and nothing to compare them to.
+   The tiles carry `± 95% CI` instead — a number the run recorded.
+3. **"Ask the AI about this run".** The demo's hand-off seeds a Project
+   Intelligence question with the run's context. That is chat state this page
+   does not own, so the button is not built rather than built as a dead link.
+4. **"Open Nordic retail DC"** on the empty-results card. The demo hard-codes a
+   second project's name; spec §12 lists exactly that class of fixed value as a
+   demo device, not product behaviour. The card keeps "Go to Run".
+
+**Two places the demo's copy is deliberately not used**, because the product's
+table is a different table, not the same table renamed:
+
+- **Compare.** The demo's five columns are `Scenario | Service | Fill | Cost |
+  TTR` — one row per scenario. The product's Compare is a **paired** experiment:
+  `KPI | A mean | ± CI | B mean | ± CI | B − A | CI overlap`, and §9.3 refuses to
+  show a number at all unless the two runs are CRN-paired and differ in exactly
+  one RunKey component. Porting the demo's columns would mean rendering a
+  per-scenario summary the product deliberately withholds. The real
+  `CompareScenariosPanel` is mounted unchanged, with its own copy and its own
+  refusal reasons.
+- **Utilization.** The demo says "Utilization · node × week". The engine emits
+  per-tick series whose unit is the scenario's time step, so the product says
+  "node × time". Relabelling it "week" would assert a unit the data need not
+  have — §3.3 territory.
+
+**One behavioural consequence worth knowing.** On the phone the playbook editor
+lives behind a sheet, so `DisruptionRecoveryPane` — and therefore
+`useRecoveryPlaybooks` — mounts only when that sheet is opened, where desktop
+mounts it whenever the pane is shown. That **defers** a request; it does not add
+one, so it stays inside gate 1. Everything else on the screen is built from
+state the page had already loaded.
+
+`ResultsDashboard` is mounted unchanged below the tiles, so every chart and every
+table on the phone is the same component, the same maths and the same numbers as
+desktop. Its `credibility` badge is omitted on the phone only because the demo's
+credibility chip above it is already that readout, and the badge explains itself
+only through a hover tooltip, which is inert on touch.
+
+### Two pre-existing defects found by measuring, both in Compare
+
+Neither was in G10's inventory; both surfaced only under the `long-text` and
+`no-run` fixtures:
+
+1. **`CompareScenariosPanel`'s A/B selects collapse to 38 × 44** when no
+   scenario has results — under the touch floor on precisely the state where the
+   user needs to reach them. Fixed with `min-w-11 md:min-w-0`.
+2. **A long scenario name pushes the document sideways at 768** —
+   `scrollWidth` 1274 against a 768 viewport — because a native `<select>`'s
+   intrinsic width is set by its longest `<option>` and nothing in `TableName`'s
+   action slot carries `min-w-0`. This is a **desktop** defect (768 is at the
+   breakpoint, so the desktop tree renders), gate 2 freezes desktop, and it is
+   identical on `main`. **Left unfixed and recorded here**; it wants its own
+   one-line PR against `shared/TableShell.tsx`. Below `md` it is gone, because
+   the phone tree's `main` is its own scroll container.
+
+### Merging `main`: `--pi-chrome` changed meaning
+
+`main` took G11 and G12 while this branch was in flight, and the merge had one
+substantive conflict. Project Intelligence now runs **edge to edge with no page
+gutter**, so `main` dropped the `+ 2rem` term from `--pi-chrome`. This page sits
+inside `PAGE_GUTTER` and had added that term for its own column. Taking either
+side alone puts the other surface out by 32px — PI would leave a gap above the
+credit bar, or the Lab's gate footer would sit below the fold.
+
+Resolved so neither loses behaviour: `--pi-chrome` is **the bottom reservation
+and nothing else**, and a reader that sits inside the gutter subtracts it
+itself — `h-[calc(100svh-var(--pi-chrome,170px)-2rem)]`. The probe now asserts
+this directly rather than by eye: at every mobile width it checks the column's
+bottom edge against the viewport, so a footer pushed below the fold fails the
+run. 0 of 400 mobile measurements do.
+
+`main` also dropped the **G10 section** while appending G11 and G12, leaving
+sequence row 7's "see G10" pointing at nothing. It is restored verbatim.
+
+### Housekeeping
+
+`npm run verify:mobile` (G7) pointed at `handoff/verify-repo.mjs`, deleted in
+`e0bb85c`, and failed for everyone. It now runs `scripts/audit-adaptive-ui.mjs`.
+
+**The same breakage was in CI, and only surfaced when this PR ran it.**
+`.github/workflows/mobile-verify.yml` invoked that deleted script directly, so
+its `verify` job has been failing with `MODULE_NOT_FOUND` on *every* PR
+touching `src/**` — including the ones that landed G11 and G12. Repointed at
+the same audit, called directly so the job keeps its no-install design. That
+makes it a second run of `ui-audit.yml`'s gate; restoring the real copy-deck
+gates means restoring the checker from `e0bb85c^` first, which is a separate
+decision. A duplicated green gate beats a permanently red one.
+
+`PageLayout`'s `--pi-chrome` now has a second reader: the Lab column is
+`100svh - var(--pi-chrome)` so the gate footer stays on screen. An honest gate
+you have to scroll to find is not one.
+
+### Verified — measured, not asserted
+
+Two Vite servers, not `git stash` (HMR silently serves stale modules and
+produces a false "identical"): the branch on :5199 and a `git worktree` of the
+base on :5302. Measured twice — first against the branch's own base commit
+`aa3fba9`, then re-measured in full against **`origin/main`** after merging it
+in, because that merge changed a value this page's layout depends on (see
+below). Both passes give the same result.
+
+- **80 fixture states** — 5 panes × 16 modes (no-project · no-scenario ·
+  loading · no-run · no-reps · queued · running · done · failed · blocking-gate ·
+  warn-only · clear-gate · dirty-policy · no-events · long-text · empty-library)
+  at 320 / 360 / 375 / 390 / 414 / 768 / 1280 = **560 measurements**.
+- **Desktop proved, not asserted:** full-page 1280 screenshots of all 80 states
+  compared against the base worktree. **71 are byte-identical by SHA-256.** The
+  other 9 are the `results` pane, and SHA is the wrong instrument there: the
+  **same code screenshotted twice from the same server** does not reproduce
+  byte-for-byte, because recharts redraws its plots slightly differently. So
+  those 9 were measured both ways — branch↔base *and* base↔base. Three
+  (`dirty-policy`, `long-text`, `warn-only`) came back byte-identical on
+  re-capture, taking it to 74. The remaining six sit inside the renderer's own
+  measured noise: `no-events` differs by 566 px / 102-row band in **both**
+  directions, `running` by 426 vs 432 px, `empty-library` by 7 vs 7, and on
+  `done` the **same-code** difference (304 px) is the larger of the two. The
+  102-row band is the chart's own height; a layout change would shift everything
+  below it and show a band running to the foot of the page. None does.
+  `setup/long-text` also failed the first SHA pass by 14 pixels of text
+  antialiasing across 3 bands, and re-measured byte-identical.
+- Every overlay opened and measured at 320 / 390 / 414 and landscape: all ten
+  sheets, the scenario library (populated and empty), the stress drawer, the
+  playbook save dialog, the mapping report and the Select popovers. Clean
+  everywhere. The `Dialog`/`Sheet` primitive's 16 × 16 close button — the one
+  finding G10 had to scope out as a ~40-surface cross-page change — was raised
+  to 44px on `main` in the G11 pass, so merging `main` in closes it.
+- **Landscape is 740 × 380, not 874 × 402.** 874 ≥ 768, so at that width the Lab
+  correctly renders its *desktop* tree and the sheet rules are not exercised at
+  all; a landscape phone under the breakpoint is what tests them. Both were
+  measured. The §2.6 check is that the 76% cap does not **clip** — a short sheet
+  staying short is correct — so it asserts that a sheet whose body overflows is
+  using the room it has. None is clipped.
+- `node scripts/audit-adaptive-ui.mjs` clean, baseline unchanged at **7**;
+  `tsc` unchanged at **7** pre-existing errors in `src/hooks/useErpConnections.tsx`;
+  `eslint` on `src/components/sim/**` + `SimulationLab.tsx` unchanged at
+  **1 error / 13 warnings**, the error pre-existing in `ExperimentDesigner.tsx`
+  (a file nothing imports). `MobileSimulationLab.tsx` contributes zero.
+- §3.3: numeric text is identical across every width **within** each platform.
+  Across the 768 boundary the Lab now renders two different compositions, so
+  cross-platform numeric equality is no longer the applicable test and is not
+  claimed. Recharts' x-axis tick labels re-thin by width — on the base commit
+  too — and are excluded from the comparison rather than "fixed".
 ---
 
 ## 4. Sequence
@@ -487,6 +772,7 @@ riskiest visual change lands last and alone.
 | **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |
 | **8** | **Super Admin** — G11 | `adminUi.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, `OrgAccessDrawer.tsx`, 8 admin pages | ✅ **done** — see G11 |
 | **9** | **Network lenses** — G12 | `ProductLevelNetwork.tsx`, `ProcessLevelNetwork.tsx`, `FirmLevelNetwork.tsx`, `network/MobileLens.tsx`, `MLPrediction.tsx` | ✅ **done** — see G12. Medium: a header recomposition plus one crash fix |
+| **10** | **Simulation Lab composition** — G13 | `sim/MobileSimulationLab.tsx`, `SimulationLab.tsx`, `ScenarioSetupForm.tsx`, `DisruptionRecoveryPane.tsx`, `CompareScenariosPanel.tsx`, `PageLayout.tsx`, `package.json` | ✅ **done** — see G13. Medium: a new phone tree, but desktop is a separate branch |
 
 Housekeeping (G7) rides with commit 1. G8 is out of scope.
 

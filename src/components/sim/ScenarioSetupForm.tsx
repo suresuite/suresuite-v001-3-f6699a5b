@@ -8,6 +8,15 @@ interface Props {
   scenario: Scenario;
   projectId: string | null | undefined;
   onSave: (patch: Partial<Scenario>) => void;
+  /**
+   * Which part of the form to render. `"all"` is the whole form and is what
+   * desktop mounts, so the desktop pane is unchanged. The phone tree
+   * (MobileSimulationLab) mounts one section per sheet, so each of the demo's
+   * Setup rows opens the REAL editor for the fields it names rather than a
+   * second copy of them. Purely presentational — the state, the commit
+   * semantics and the patch shape are identical in every section.
+   */
+  section?: "all" | "identity" | "runWindow" | "precision" | "objective";
 }
 
 const KPI_OPTIONS = [
@@ -24,7 +33,7 @@ const KPI_OPTIONS = [
  * pages read as siblings. Days stay the stored truth; the planning unit is a
  * display concern owned by useTimeUnit.
  */
-export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
+export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all" }: Props) {
   const [local, setLocal] = useState<Scenario>(scenario);
   const { unit, setUnit, fromDays, toDays } = useTimeUnit(projectId);
   const displayUnit = unit ?? "day";
@@ -192,8 +201,11 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
     ],
   };
 
+  const show = (s: Props["section"]) => section === "all" || section === s;
+
   return (
     <div className="flex flex-col gap-3">
+      {show("identity") ? (
       <section className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
         <div className="flex flex-col gap-1 px-4 py-3">
           <input
@@ -216,22 +228,29 @@ export function ScenarioSetupForm({ scenario, projectId, onSave }: Props) {
           horizonDays={local.horizon_days}
         />
       </section>
+      ) : null}
 
       {/* Two cards side by side leave 131px and 152px at 320px — narrower than
           either card's own header. They stack below `md`; `md:` restores the
           desktop template literally. */}
+      {show("runWindow") || show("precision") ? (
       <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.16fr)]">
+        {show("runWindow") ? (
         <ParameterCard
           group={runWindow}
           footer={`${local.horizon_days} d horizon · ${local.warmup_days} d warm-up · ${measured} d measured`}
         />
+        ) : null}
+        {show("precision") ? (
         <ParameterCard
           group={precision}
           footer={`${local.replications} × ${local.horizon_days} d = ${simDays.toLocaleString()} sim-days · seed ${local.seed}`}
         />
+        ) : null}
       </div>
+      ) : null}
 
-      <ParameterCard group={objective} />
+      {show("objective") ? <ParameterCard group={objective} /> : null}
     </div>
   );
 }
