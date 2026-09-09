@@ -244,7 +244,7 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
         >
           <div className="max-w-[900px] mx-auto">
             {/* Replace VIDEO_ID with your home page intro video ID */}
-            <YouTubeEmbed videoId="VIDEO_ID" title="SuReSuite introduction" />
+            <YouTubeEmbed videoId="842GrIYxPb0" title="SuReSuite introduction" />
             <div className="mt-4 flex justify-center">
               <Button variant="outline" size="sm" asChild>
                 <Link to="/help/network-sci">

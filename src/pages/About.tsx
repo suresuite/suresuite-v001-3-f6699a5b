@@ -31,7 +31,7 @@ const EU_LOGO = { src: '/funding/funded-by-eu.png', alt: 'Funded by the European
 const PROGRAMMES = [
   {
     key: 'accurate',
-    logo: '/funding/accurate.png',
+    logo: '/funding/accurate-logo.webp',
     alt: 'ACCURATE',
     line: 'Horizon Europe',
     status: 'Running',
@@ -40,7 +40,7 @@ const PROGRAMMES = [
   },
   {
     key: 'eurofmx',
-    logo: '/funding/eurofmx.png',
+    logo: '/funding/EUF-MX-Logo.png',
     alt: 'euroFMX',
     line: 'Horizon Europe',
     status: 'Next',
@@ -155,7 +155,7 @@ function FundingStrip() {
         <div className="bg-border px-6 py-8">
           <span className={KICKER}>Home</span>
           <img
-            src="/funding/hwr-berlin.png"
+            src="/funding/Hochschule_für_Wirtschaft_und_Recht_Berlin_logo.svg.webp"
             alt="HWR Berlin"
             className="mt-3.5 h-10 w-auto max-w-[150px] object-contain object-left"
           />
