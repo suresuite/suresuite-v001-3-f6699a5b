@@ -42,6 +42,11 @@ import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
 import { groupByKeyA, summarise } from "@/lib/policies/groupRows";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
+import {
+  masterValueFor as masterValueForShared,
+  derivedValueFor as derivedValueForShared,
+  getEffectiveValue as getEffectiveValueShared,
+} from "@/lib/policies/resolveEffective";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
 import { ParameterSheet } from "./ParameterSheet";
@@ -169,13 +174,12 @@ export function StagePolicyTable({
     for (const c of specFor(stageKey).cols) if (c.master) m.set(c.field, c);
     return m;
   }, [stageKey]);
-  const masterValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined => {
-    if (!col.master) return undefined;
-    const id = String(r[col.master.idFrom] ?? "");
-    const v = masterRowById[col.master.table].get(id)?.[col.master.field];
-    const n = Number(v);
-    return v == null || !Number.isFinite(n) ? undefined : n;
-  };
+  // masterValueFor/derivedValueFor/getEffective delegate to
+  // lib/policies/resolveEffective.ts — the single source of truth also used
+  // by MobileStagePolicyList, so the two surfaces cannot disagree about a
+  // line's own resolved value.
+  const masterValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined =>
+    masterValueForShared(col, r, masterRowById);
   // Suppliers the user can assign to an "(unassigned supplier)" material:
   // the suppliers master plus every supplier already sourcing in this stage.
   const knownSuppliers = useMemo(() => {
@@ -273,18 +277,8 @@ export function StagePolicyTable({
     }
   };
 
-  const derivedValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined => {
-    if (!col.master) return undefined;
-    const id = String(r[col.master.idFrom] ?? "");
-    if (col.master.table === "materials" && col.master.field === "cost")
-      return derived.materialCost.get(id);
-    if (col.master.field === "sell_price") return derived.sellPrice.get(id);
-    if (col.master.field === "demand_mean") {
-      const v = derived.demandMean.get(id) ?? 0;
-      return v > 0 ? v : undefined;
-    }
-    return undefined; // production_capacity has no logistics-derived fallback
-  };
+  const derivedValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined =>
+    derivedValueForShared(col, r, derived);
 
   // Per-column "contains" filters (key = column id/field) + single active sort.
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
@@ -454,26 +448,21 @@ export function StagePolicyTable({
     dataRow: Record<string, unknown>,
     field: string,
     family?: PolicyFamily,
-  ): unknown => {
-    const draft = drafts[rowKey]?.[field];
-    if (draft !== undefined) return draft;
-    const mcol = masterColByField.get(field);
-    if (mcol) {
-      const mv = masterValueFor(mcol, dataRow);
-      return mv !== undefined ? mv : derivedValueFor(mcol, dataRow);
-    }
-    if (dataRow[field] !== undefined && dataRow[field] !== null) return dataRow[field];
-    const bundle = effectivePolicy(defaults, overrides, spec.scope, rowKey);
-    if (family) {
-      const own = bundle[family] as Record<string, unknown> | undefined;
-      if (own && own[field] !== undefined) return own[field];
-    }
-    for (const fam of families) {
-      const eff = bundle[fam] as Record<string, unknown>;
-      if (eff[field] !== undefined) return eff[field];
-    }
-    return undefined;
-  };
+  ): unknown =>
+    getEffectiveValueShared({
+      rowKey,
+      dataRow,
+      field,
+      family,
+      families,
+      draft: drafts[rowKey]?.[field],
+      masterColByField,
+      masterRowById,
+      derived,
+      defaults,
+      overrides,
+      scope: spec.scope,
+    });
 
   const getDefault = (field: string, family: PolicyFamily): unknown =>
     ((defaults[family] ?? {}) as Record<string, unknown>)[field];

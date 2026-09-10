@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { LAYER, tint } from "@/components/intelligence/piUi";
 import * as XLSX from "xlsx";
 import { StagePolicyTable } from "./StagePolicyTable";
+import { MobileStagePolicyList } from "./MobileStagePolicyList";
 import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
 import { ApplyPresetDialog } from "./ApplyPresetDialog";
 import { PresetDiffBanner } from "./PresetDiffBanner";
@@ -20,6 +21,8 @@ import { getStagePresets } from "@/lib/policies/presets/stagePresets";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
 import type { PresetDefinition, ProjectContext, ResolvedPreset } from "@/lib/policies/resolvePreset";
+import { FIELD_LABELS, visibleFieldGroups } from "@/lib/policies/schemas";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   downloadWorkbook,
   exportStageWorkbook,
@@ -71,6 +74,7 @@ export function FocusedStage({
   rowsByStage,
 }: Props) {
   const stage = getStage(stageKey);
+  const isMobile = useIsMobile();
   const presets = useMemo(() => getStagePresets(stageKey), [stageKey]);
   const [presetDraft, setPresetDraft] = useState<PresetDefinition | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -203,17 +207,65 @@ export function FocusedStage({
     </>
   );
 
+  const noDataBanner = showNoData && (
+    <div
+      className="flex items-center gap-2 rounded-sm border px-2.5 py-1.5 font-mono text-[11px]"
+      style={{ borderColor: tint(LAYER.brand, 0.4), color: LAYER.brand }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.brand }} />
+      no supply-chain data — upload and combine datasets in Data Manager
+    </div>
+  );
+
+  // Mobile: check/verify, not configure (spec — see MobileStagePolicyList's own
+  // header comment). No filter/sort/bulk-edit toolbar, no "apply a preset"
+  // dropdown, no preset-applied banner (the banner exists to explain a bulk
+  // change that can't happen from here), and the fulfillment defaults render
+  // as a plain read-only summary instead of PolicyDefaultsCard's form.
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-3">
+        {noDataBanner}
+        <MobileStagePolicyList
+          projectId={projectId}
+          stageKey={stageKey}
+          defaults={defaults}
+          overrides={overrides}
+          fulfillmentStrategy={fulfillmentStrategy}
+          stageRows={rowsByStage[stageKey]}
+        />
+        {stageKey === "customer" && (
+          <div className="overflow-hidden rounded-sm border border-[--hair-border]">
+            <div className="border-b border-[--hair-divider] bg-[--hair-th] px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted-foreground">
+              Fulfillment defaults (project-wide)
+            </div>
+            {Object.values(visibleFieldGroups("fulfillment")).flat().map((field) => {
+              const value = (defaults.fulfillment as Record<string, unknown>)[field];
+              const shown =
+                typeof value === "boolean"
+                  ? value ? "Yes" : "No"
+                  : value === undefined || value === null || value === ""
+                    ? "—"
+                    : String(value);
+              return (
+                <div
+                  key={field}
+                  className="flex min-h-11 items-center justify-between gap-3 border-b border-[--hair-divider] px-3 py-2 last:border-b-0"
+                >
+                  <span className="text-[12.5px] text-muted-foreground">{FIELD_LABELS[field] ?? field}</span>
+                  <span className="font-mono text-[13px] tabular-nums text-foreground">{shown}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      {showNoData && (
-        <div
-          className="flex items-center gap-2 rounded-sm border px-2.5 py-1.5 font-mono text-[11px]"
-          style={{ borderColor: tint(LAYER.brand, 0.4), color: LAYER.brand }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.brand }} />
-          no supply-chain data — upload and combine datasets in Data Manager
-        </div>
-      )}
+      {noDataBanner}
 
       {showBanner && (
         <PresetDiffBanner
