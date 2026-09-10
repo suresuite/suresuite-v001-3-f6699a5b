@@ -307,9 +307,12 @@ export default function DocsLayout() {
         </aside>
 
         {/* Center content */}
-        <main className="min-w-0 px-6 lg:px-10 py-8">
+        <main className="min-w-0 px-[var(--m-gutter)] py-6 md:px-6 md:py-8 lg:px-10">
           {/* Breadcrumb */}
-          <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
+          {/* §4: the skin's chrome budget has no band for a breadcrumb, and
+              the group is already the doc's own section head. Desktop keeps
+              it — this is additive below `md`, not a deletion. */}
+          <nav className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
             <Link to="/help" className="hover:text-foreground">Home</Link>
             {page && (
               <>
@@ -321,12 +324,14 @@ export default function DocsLayout() {
             )}
           </nav>
 
-          <div ref={contentRef} style={{ zoom: FONT_STEPS[fontStep] }} className="space-y-6">
+          <div ref={contentRef} style={{ zoom: FONT_STEPS[fontStep] }} className="m-cq space-y-6">
             <Outlet />
           </div>
 
           {/* Prev / next pager */}
-          <div className="mt-12 pt-6 border-t grid grid-cols-2 gap-3">
+          {/* The pager is the last band on a page with no tab bar under it,
+              so it carries the device inset itself (v2 §5.2). */}
+          <div className="pb-safe mt-12 grid grid-cols-1 gap-3 border-t border-[--hair-rule] pt-6 sm:grid-cols-2">
             {prev ? (
               <Link
                 to={`/help/${prev.slug}`}
