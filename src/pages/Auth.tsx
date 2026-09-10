@@ -85,11 +85,15 @@ const Auth = () => {
           </h1>
 
           {formError && (
-            <div className="flex items-start gap-[11px] rounded border border-[#f3c9cd] bg-[#fdf5f5] px-[14px] py-[13px]">
+            // Below `md` the tinted panel goes: the skin allows no colour
+            // fill larger than a chip, so the failure is carried by the 6px
+            // dot alone against the panel outline (§3, §12). Desktop keeps the
+            // tint it has always had.
+            <div className="flex items-start gap-[11px] rounded-[4px] border border-[#d4d4d4] bg-white px-[14px] py-[13px] md:rounded md:border-[#f3c9cd] md:bg-[#fdf5f5]">
               <span className="mt-[6px] size-[6px] shrink-0 rounded-full bg-[#BF2330]" />
               <div className="flex flex-col gap-[3px]">
-                <span className="text-[13px] font-semibold tracking-[-0.01em] text-[#8f1a24]">Sign-in failed</span>
-                <span className="text-[13px] leading-[1.5] text-[#a04249]">{formError}</span>
+                <span className="text-[13px] font-semibold tracking-[-0.01em] text-[#18181b] md:text-[#8f1a24]">Sign-in failed</span>
+                <span className="text-[13px] leading-[1.5] text-[#3f3f46] md:text-[#a04249]">{formError}</span>
               </div>
             </div>
           )}
@@ -120,7 +124,7 @@ const Auth = () => {
                         autoComplete="username"
                         placeholder="you@organisation.com"
                         disabled={isBusy}
-                        className="h-[46px] rounded border-[#e0e0e0] px-[14px] text-[14.5px] transition-[border-color,box-shadow] duration-150 hover:border-[#c4c4c4] focus-visible:border-[#171717] focus-visible:ring-[3px] focus-visible:ring-[#171717]/[0.09] focus-visible:ring-offset-0"
+                        className="h-[46px] rounded-[6px] border-[#d4d4d4] px-[14px] text-[14.5px] md:rounded md:border-[#e0e0e0] transition-[border-color,box-shadow] duration-150 hover:border-[#c4c4c4] focus-visible:border-[#171717] focus-visible:ring-[3px] focus-visible:ring-[#171717]/[0.09] focus-visible:ring-offset-0"
                       />
                     </FormControl>
                     <FormMessage className="text-[12px]" />
@@ -138,7 +142,7 @@ const Auth = () => {
                         Password
                       </FormLabel>
                       {/* TODO: point at a real reset route once it exists */}
-                      <a href="#" className="text-[12px] text-[#737373] no-underline hover:text-[#171717]">
+                      <a href="#" className="text-[12px] text-[#525252] no-underline hover:text-[#171717] md:text-[#737373]">
                         Forgot password?
                       </a>
                     </div>
@@ -150,7 +154,7 @@ const Auth = () => {
                           autoComplete="current-password"
                           placeholder="Enter your password"
                           disabled={isBusy}
-                          className="h-[46px] rounded border-[#e0e0e0] pl-[14px] pr-[74px] text-[14.5px] transition-[border-color,box-shadow] duration-150 hover:border-[#c4c4c4] focus-visible:border-[#171717] focus-visible:ring-[3px] focus-visible:ring-[#171717]/[0.09] focus-visible:ring-offset-0"
+                          className="h-[46px] rounded-[6px] border-[#d4d4d4] pl-[14px] pr-[74px] text-[14.5px] md:rounded md:border-[#e0e0e0] transition-[border-color,box-shadow] duration-150 hover:border-[#c4c4c4] focus-visible:border-[#171717] focus-visible:ring-[3px] focus-visible:ring-[#171717]/[0.09] focus-visible:ring-offset-0"
                         />
                         <button
                           type="button"
@@ -190,7 +194,10 @@ const Auth = () => {
               <button
                 type="submit"
                 disabled={isBusy}
-                className="mt-1 inline-flex h-[46px] w-full items-center justify-center gap-2 rounded bg-[#171717] text-[14.5px] font-medium tracking-[-0.008em] text-white shadow-sm transition-[background-color,transform] duration-150 hover:bg-black active:translate-y-px disabled:opacity-100"
+                // §7/§12 below `md`: 6px, and no shadow — a shadow is never
+                // what separates two things in this skin. `active:translate-y-px`
+                // stays: a 1px nudge is exactly the press the spec allows.
+                className="mt-1 inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-[6px] bg-[#18181b] text-[13.5px] font-semibold tracking-[-0.008em] text-white transition-[background-color,transform] duration-150 hover:bg-black active:translate-y-px disabled:opacity-100 md:rounded md:bg-[#171717] md:text-[14.5px] md:font-medium md:shadow-sm"
               >
                 {isBusy ? (
                   <span className="inline-flex items-center gap-[9px] opacity-85">
@@ -207,8 +214,8 @@ const Auth = () => {
           </Form>
 
           <div className="flex flex-col gap-3 border-t border-[--hair-border] pt-5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#737373]">No account yet</span>
-            <p className="m-0 text-pretty text-[13px] leading-[1.6] text-[#737373]">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252] md:tracking-[0.2em] md:text-[#737373]">No account yet</span>
+            <p className="m-0 text-pretty text-[13px] leading-[1.6] text-[#525252] md:text-[#737373]">
               Accounts are approved by the Digital SC Lab. Email{' '}
               <a href="mailto:phu.nguyen@hwr-berlin.de" className="font-medium text-[#BF2330] hover:underline">
                 phu.nguyen@hwr-berlin.de

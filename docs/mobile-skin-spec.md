@@ -311,15 +311,53 @@ rather than in a diff.
 
 ### Status
 
+Converted means: every container on the surface is the panel, the type is the
+five sizes, colour is a dot or a chip, and the screen assembles in §13's order.
+
 | Surface | State |
 |---|---|
-| Primitives (`src/components/mobile/`) | Done |
-| Chrome — header, tab bar, credit footer, bottom reservation | Done |
-| Simulation Lab + run detail | Done |
-| Policies — page shell, setup bar, stage list, line sheet | Done |
-| Policies — Run & validate stage (`RunValidateStage.tsx`) | Not started; no mobile branch today |
-| Project Intelligence | Not started |
-| Project Manager | Not started |
-| Network (product / process / firm) — mobile composition | Done; `MLPrediction` inside it is a shared desktop component and unconverted |
-| Developer API · Super Admin · About & help · Auth | Not started |
-| Getting Started | Done |
+| Primitives (`src/components/mobile/`) | **Done** |
+| Chrome — page header, tab bar, credit footer, bottom reservation, page canvas | **Done** — applies to every mobile screen, converted or not |
+| Bottom sheets (`MobileSheet`, `MobileSheetRow`) | **Done** — mobile-only by construction, so every sheet in the product moved at once |
+| Simulation Lab + run detail | **Done** |
+| Policies — page shell, setup bar, stage list, line sheet | **Done** |
+| Network — product / process / firm (`MobileLens`) | **Done** |
+| Getting Started | **Done** |
+| Project Intelligence — header, empty state, composer, thread canvas | **Done** |
+| Auth | **Done** |
+| Policies — Run & validate stage (`RunValidateStage.tsx`, 2 956 lines) | **Not started.** It has no mobile branch at all: the same tree renders at every width, and it is one of the four files the audit's `lg:` allowlist covers. |
+| Project Manager (`DataManager.tsx`, 1 041 lines) | **Not started.** No mobile branch; shadcn `Card` throughout. Needs either a branch or a `md:`-gated pass. |
+| Developer API (`DeveloperApi.tsx`, 1 164 lines) | **Not started.** |
+| Super Admin (six pages under `src/pages/admin/`) | **Not started.** Each has a hand-rolled mobile card list to fold into the panel. |
+| About & help | **Not started.** About is a marketing-scale page and carries the funding credit the mobile footer no longer does; Help is `docBodies.tsx` behind `DocsLayout`. |
+
+Shared components that render inside a converted surface and still wear the
+desktop vocabulary. Each is used by both platforms, so each needs a class hook
+(the way `MessageStream` took `userBubbleClassName`) rather than an edit:
+
+| Component | Where it shows |
+|---|---|
+| `ResultsDashboard`, `CompareScenariosPanel` | Simulation Lab — Results and Compare |
+| `MessageParts`, `ProposalCard` | Project Intelligence — the assistant turn |
+| `MLPrediction` | all three network lenses — Prediction |
+| `PolicyVersionSheets` | Policies — version history |
+
+### Verification
+
+There is no visual regression harness in the repo. What each conversion was
+checked against:
+
+- `npx tsc --noEmit -p tsconfig.app.json` — two pre-existing errors in
+  `useErpConnections.tsx` and nothing else. Note that the three network pages
+  carry `@ts-nocheck` for a schema mismatch, so they are checked by lifting it
+  temporarily.
+- `npx eslint` on the touched files, compared against the same files before
+  the change — the counts must not move.
+- `node scripts/audit-adaptive-ui.mjs` — the mechanical guard for
+  `docs/mobile-ui-spec.md`. Clean, with the seven baseline violations
+  untouched.
+- `npx vite build`.
+- The primitives themselves were measured in a browser at 320, 360, 390 and
+  430px against §5, §7, §8 and §9 — computed font size, weight, tracking,
+  padding, radius and `scrollWidth`. That pass is what found the 4px button
+  radius, the frozen action-bar spacer and the overflowing 8-digit stat.
