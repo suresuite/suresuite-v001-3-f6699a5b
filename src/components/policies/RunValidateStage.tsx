@@ -2084,7 +2084,9 @@ function StepShell({
   if (isMobile) {
     return (
       <MobilePanel
-        tone="primary"
+        // Quiet on purpose. The Policies screen's one ink head is the stage
+        // list in <PolicySetupBar>, which is on this same screen — the ration
+        // is per SCREEN, not per component (v2 §2).
         label={`Step ${index + 1} · ${title}`}
         counter={sub}
         bare

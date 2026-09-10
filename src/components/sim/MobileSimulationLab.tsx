@@ -805,6 +805,10 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         : "No saved model version — a run requires a saved policy version.";
 
   /* ── the screen ───────────────────────────────────────────────────────── */
+  // Three literals, one screen. These two are the WHOLE body when they render
+  // — there is no gate, no scenario band and no pane beneath them — and the
+  // gate above renders only when a project and a scenario exist. So exactly
+  // one ink head reaches any given screen (v2 §2).
   const body = !projectId ? (
     <MobilePanel tone="primary" label="Project">
       <EmptyBody>

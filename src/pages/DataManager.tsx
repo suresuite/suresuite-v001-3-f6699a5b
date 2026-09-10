@@ -1095,7 +1095,9 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
 
         {projects.length === 0 ? (
           isMobile ? (
-            <MobilePanel tone="primary" label="Projects" counter="none">
+            // One ink head per screen: with the create form open above, the
+            // form is what changed and this steps back (v2 §2).
+            <MobilePanel tone={isCreating ? 'secondary' : 'primary'} label="Projects" counter="none">
               <div className="flex flex-col items-center gap-3 px-6 py-9 text-center">
                 <span className="text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
                   No projects yet — create your first one to get started.
