@@ -79,26 +79,26 @@ landed; this is a finishing job, not a rebuild.
 
 Ordered by user impact. Line numbers are current, not `FINAL.md`'s (they drifted).
 
-### G1 — `StagePolicyTable.tsx` is desktop-only · **highest impact**
+### G1 — `StagePolicyTable.tsx` is desktop-only · **highest impact** · ✅ **done**
 
-76 KB, the largest UI file in the repo, and **zero `md:` branches**. It is the
-grid a planner spends most of their time in.
+76 KB, the largest UI file in the repo. It is the grid a planner spends most of
+their time in.
 
 The table already scrolls (`:1480` is `max-h-[614px] overflow-auto`), so the
-column set is preserved correctly — §2.7 is satisfied in spirit. What is missing
-is everything that makes that scroll *usable* on a phone:
+column set is preserved correctly — §2.7 is satisfied in spirit. Re-derived
+against the working tree: **G1.1 had already landed** — every key `<th>`/`<td>`
+(`keyLeft(i)`, `:989`/`:1533`/`:1661`/`:1689`) is `sticky` unconditionally, not
+`md:`-gated, so the identifying column was already frozen on a phone same as
+desktop. What was missing was G1.2 and G1.3:
 
 | # | Gap | Where | Fix |
 |---|---|---|---|
-| G1.1 | No frozen identifying column — scroll sideways and you lose which row you are editing | first `<th>` / first `<td>` of each row | `FROZEN_CELL_ON_TINT` on the `<th>`, `FROZEN_CELL` on the `<td>`. Both already exist in `shared/index.ts:38-40` and both release at `md:static`, so desktop is byte-identical |
-| G1.2 | No scroll affordance | under the container at `:1480` | The spec's line: `swipe the table sideways for the remaining columns`, `md:hidden` |
-| G1.3 | 15px touch targets on the primary row controls | `:1004`, `:1672` | Spec §2.4 pattern — `-m-[14px] box-content p-[14px] md:m-0 md:p-0`. Grows the target to 43px; the negative margin returns the space, so **nothing moves visually** |
-
-`FROZEN_CELL` is already used in 10 other files — this is applying an established
-repo pattern to the one surface that never got it, not inventing anything.
+| ~~G1.1~~ | ~~No frozen identifying column~~ | — | Already landed — `sticky` + `keyLeft(i)` on every key cell, unconditional |
+| G1.2 | No scroll affordance | under the container at `:1480` | ✅ Added the spec's line, `swipe the table sideways for the remaining columns`, `md:hidden`, right below the scroll container |
+| G1.3 | 15px touch targets on the primary row controls | `:1004`, `:1672` | ✅ Spec §2.4 pattern — `-m-[14px] box-content p-[14px] md:m-0 md:p-0` on both group expand/collapse toggles. Grows the target to 43px; the negative margin returns the space, so **nothing moves visually** |
 
 *Note:* `max-h-[614px]` exceeds a landscape phone's ~402px viewport. Worth a
-`max-h-[min(614px,70vh)]`; flagged, low priority.
+`max-h-[min(614px,70vh)]`; flagged, low priority, not part of this pass.
 
 ### G2 — `PolicySetupBar.tsx` chip rows push the page sideways
 
@@ -194,18 +194,24 @@ page disagree about what this page *is*, not merely how it is laid out.
 > else in this plan is a mechanical UI fix. Replacing the marketing page with the
 > resume card changes what a returning user sees first. Options in §5.
 
-### G6 — The "More" panel is a drawer, not the demo's sheet
+### G6 — The "More" panel is a drawer, not the demo's sheet · ✅ **done**
 
-| | Demo (`shots/26-more.png`) | Shipped (`MobileNav.tsx`) |
-|---|---|---|
-| Shape | Full-width panel | 300px drawer sliding from the left |
-| Tab bar | Stays visible, **More shown active** | Covered (`z-[60]` over the bar's `z-50`) |
-| Brand | Full `SuReSuite` logo lockup | `logo-mark.png` only |
-| Rows | Full-bleed, hairline-divided groups | Inset `rounded-md` rows |
-| Foot | Account row + the EU/ACCURATE credit band | Account row only |
+| | Demo (`shots/26-more.png`) | Shipped before this change | Now |
+|---|---|---|---|
+| Shape | Full-width panel | 300px drawer sliding from the left | Full-width panel (`inset-x-0`) |
+| Tab bar | Stays visible, **More shown active** | Covered (`z-[60]` over the bar's `z-50`) | Visible; `MobileTabBar` takes a `moreActive` prop and bolds More the same way a route match bolds any other tab |
+| Brand | Full `SuReSuite` logo lockup | `logo-mark.png` only | `logo-mark.png` **is** the full lockup (verified pixel-for-pixel against the demo's own asset) — only the height was off, now 20px to match |
+| Rows | Full-bleed, hairline-divided groups | Inset `rounded-md` rows | Full-bleed, `border-b` hairline rows in `PageHeader`'s own header shell |
+| Foot | Account row + the EU/ACCURATE credit band | Account row only | Account row unchanged; the credit band was **not** missing — `Footer.tsx` already floats it above the tab bar globally, this screen included. Not duplicated inside the panel |
 
-Covering the tab bar is the substantive part: the user loses the "you are in
-More" signal and the one-tap route back. The rest is cosmetic alignment.
+Covering the tab bar was the substantive part, fixed by stopping the panel at
+`bottomInsetPx` (PageLayout's own measured chrome reservation) instead of
+`inset-0`, so it sits above the tab bar rather than over it. No dismiss
+button/backdrop any more — More is a fifth tab-bar root now, not a dialog;
+closing happens by picking a destination, tapping another tab (closes on its
+own `pathname` change), or Escape. Verified rendered (not just read) via a
+temporary unauthenticated preview route, screenshotted at 414×896 and
+compared against the demo's own `isMore` screen — since removed.
 
 ### G7 — `npm run verify:mobile` is broken · ✅ **done**
 
@@ -763,10 +769,10 @@ riskiest visual change lands last and alone.
 
 | # | Scope | Files | Risk |
 |---|---|---|---|
-| **1** | **Policy grid** — G1.1–G1.3, G2 | `StagePolicyTable.tsx`, `PolicySetupBar.tsx` | Low. Additive classes, all `md:`-released |
-| **2** | **Selects** — G3 (all 10) | 5 pages + 4 sim components | Low. One-line each |
-| **3** | **Bulk edit sheet** — G4 | `BulkEditDialog.tsx` | Low. Shell swap, logic untouched |
-| **4** | **More panel** — G6 | `MobileNav.tsx` | Medium. Re-layout; keep the tab bar visible |
+| **1** | **Policy grid** — G1.1–G1.3, G2 | `StagePolicyTable.tsx`, `PolicySetupBar.tsx` | ✅ **done**. G1 closed this pass (see G1); G2 had already landed — `PolicySetupBar.tsx` carries its own `isMobile` card-stack composition, not the shared-markup chip row this line originally described |
+| **2** | **Selects** — G3 (all 10) | 5 pages + 4 sim components | ✅ **done**, landed piecemeal with G10/G12. Re-verified: `ProcessLevelNetwork.tsx`/`FirmLevelNetwork.tsx`/`ProductLevelNetwork.tsx` are `w-[clamp(120px,38vw,180px)]`; the one literal `w-[160px]` left in `ProcessLevelNetwork.tsx` sits inside G12's `hidden md:contents` split — desktop-only, not a mobile gap |
+| **3** | **Bulk edit sheet** — G4 | `BulkEditDialog.tsx` | ✅ **done**, landed as part of `31d362c` ("make the surfaces behind the Policies controls usable"), which also covered History and Save-model-version — beyond this line's original scope |
+| **4** | **More panel** — G6 | `MobileNav.tsx` | ✅ **done** this pass — see G6 |
 | **5** | **Getting Started** — G5 | `GettingStarted.tsx`, `home/MobileGettingStarted.tsx` | ✅ **done** — see §5 |
 | **7** | **Simulation Lab** — G10 | `resultTables.tsx`, `ParameterCard.tsx`, `ScenarioSetupForm.tsx`, `RunGate.tsx`, `RunProgressPanel.tsx`, `PreRunValidationPanel.tsx`, `DisruptionScheduleEditor.tsx`, `DisruptionRecoveryPane.tsx`, `PlaybookPicker.tsx`, `PlaybookSaveDialog.tsx`, `ScenarioLibraryPanel.tsx`, `ScenarioRail.tsx`, `CompareScenariosPanel.tsx`, `ReplicationSeedExplorer.tsx`, `ItemSeriesExplorer.tsx`, `ResultsDashboard.tsx`, `UtilizationHeatmap.tsx`, `SimulationLab.tsx` | ✅ **done** — see G10. Low: reflow only, all `md:`-released |
 | **6** | **Project Intelligence** — G9 | `intelligence/MobileIntelligence.tsx`, `shared/MobileSheet.tsx`, `intelligence/MessageStream.tsx`, `ProjectIntelligence.tsx`, `ChatSidebar.tsx`, `SidebarPanels.tsx`, `MessageParts.tsx`, `PageLayout.tsx` | ✅ **done** — see G9. Medium: a new phone tree, but desktop is a separate branch |

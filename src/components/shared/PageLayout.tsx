@@ -95,8 +95,12 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
         {children}
       </div>
       <Footer isCollapsed={isCollapsed} hasNavBar />
-      <MobileTabBar onOpenDrawer={() => setDrawerOpen(true)} />
-      <MobileNavDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <MobileTabBar moreActive={drawerOpen} onToggleMore={() => setDrawerOpen((v) => !v)} />
+      <MobileNavDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        bottomInsetPx={chromePx}
+      />
     </div>
   );
 }
