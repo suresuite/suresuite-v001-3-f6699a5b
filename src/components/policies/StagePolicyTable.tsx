@@ -1350,8 +1350,13 @@ export function StagePolicyTable({
         </div>
       )}
 
-      {/* Toolbar — sticky under the page header so the actions follow the grid. */}
-      <div className="sticky top-[62px] z-20 flex flex-wrap items-center gap-2 bg-background py-0.5">
+      {/* Toolbar — sticky under the page header so the actions follow the grid.
+          `top-[62px]` is desktop's PageHeader height; below `md` the mobile
+          header is taller (two-line title + project switcher) and this offset
+          would stick the toolbar too high, so the table's own `sticky top-0`
+          thead — inside its own scroll container, z-40 — paints over it during
+          scroll (the overlap the user hit). Not sticky at all below `md`. */}
+      <div className="static z-20 flex flex-wrap items-center gap-2 bg-background py-0.5 md:sticky md:top-[62px]">
         <span className="font-mono text-[11px] text-muted-foreground">
           {filtered.length}/{dataRows.length} lines
         </span>
