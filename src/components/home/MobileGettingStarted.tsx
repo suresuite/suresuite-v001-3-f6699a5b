@@ -38,6 +38,7 @@ import {
   M,
   MobileActionBar,
   MobileChip,
+  MobileGroup,
   MobilePanel,
   MobileRow,
 } from '@/components/mobile';
@@ -99,13 +100,13 @@ export function MobileGettingStarted() {
   const meta = selectedProject ? projectMeta(selectedProject) : '';
 
   return (
-    <div className="flex flex-col gap-3 px-4 pb-4">
+    <div className="flex flex-col gap-[var(--m-gap)] px-[var(--m-gutter)] pb-4">
       {/* §4's title band: a 19px title and one right-hand element. The avatar
           is that element — an icon-only control at the spec's 34px, with the
           label and title an icon-only control always carries. */}
       <div className="flex items-center justify-between gap-2.5 pt-1">
         <h1
-          className="min-w-0 flex-1 truncate text-[19px] font-semibold leading-tight tracking-[-0.019em] text-[#18181b]"
+          className="min-w-0 flex-1 truncate text-[length:var(--fs-title)] font-semibold leading-tight tracking-[-0.019em] text-[#171717]"
           title="Getting started"
         >
           Getting started
@@ -124,19 +125,20 @@ export function MobileGettingStarted() {
 
       {/* ── Where you left off ─────────────────────────────────────────── */}
       <MobilePanel
+        tone="primary"
         label="Where you left off"
         counter={selectedProject ? undefined : 'none'}
       >
         {selectedProject ? (
           <div className="flex flex-col gap-1.5 p-3">
             <span
-              className="truncate text-[14px] font-semibold tracking-[-0.006em] text-[#18181b]"
+              className="truncate text-[14px] font-semibold tracking-[-0.006em] text-[#171717]"
               title={selectedProject.name}
             >
               {selectedProject.name}
             </span>
             {meta && (
-              <span className="font-mono text-[10.5px] leading-tight tracking-[0.04em] text-[#525252] [text-wrap:pretty]">
+              <span className="font-mono text-[length:var(--fs-micro)] leading-tight tracking-[0.04em] text-[#525252] [text-wrap:pretty]">
                 {meta}
               </span>
             )}
@@ -146,7 +148,7 @@ export function MobileGettingStarted() {
           // project row, so this state is common rather than exceptional - it
           // gets a real destination, not an apology.
           <div className="flex flex-col gap-1.5 p-3">
-            <span className="text-[14px] font-semibold tracking-[-0.006em] text-[#18181b]">
+            <span className="text-[14px] font-semibold tracking-[-0.006em] text-[#171717]">
               No project open
             </span>
             <span className="text-[12.5px] leading-[1.45] text-[#525252] [text-wrap:pretty]">
@@ -157,6 +159,7 @@ export function MobileGettingStarted() {
       </MobilePanel>
 
       {/* ── Quick start ────────────────────────────────────────────────── */}
+      <MobileGroup label="Start here">
       <MobilePanel label="Quick start" counter={`${QUICK_START.length}`}>
         {QUICK_START.map((step) => (
           <MobileRow
@@ -172,6 +175,7 @@ export function MobileGettingStarted() {
           />
         ))}
       </MobilePanel>
+      </MobileGroup>
 
       {/* §8 — the one primary action, pinned. */}
       <MobileActionBar

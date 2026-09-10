@@ -42,9 +42,9 @@ import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MapView from '@/components/MapView';
 import { NetworkMetricsTable } from '@/components/NetworkMetricsTable';
 import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/networkMetrics';
+import { MobileGroup } from '@/components/mobile';
 import {
   LensChip,
-  LensRule,
   LensSection,
   LensHowToRead,
   LensDesktopOnlyNote,
@@ -984,7 +984,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
              structure, the risk, the ranking, the prediction. Every piece
              is a presentational component from components/network/MobileLens
              so the three lenses cannot drift apart again. */}
-        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-3">
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-[var(--m-gap)]">
 
           <div>
             <LensChip tone="violet">Product level</LensChip>
@@ -1023,7 +1023,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             ]}
           />
 
-          <LensSection label="Structural risk" counter="4">
+          <LensSection label="Structural risk" counter="4" tone="primary" lens="violet">
             <LensRisk
               rows={[
                 { label: 'Single-source risk', value: supplierMetrics.supplierDiversity > 0 ? supplierMetrics.singleSourceRisk : '—' },
@@ -1039,7 +1039,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             />
           </LensSection>
 
-          <LensSection label="Centrality" counter={networkMetrics.length ? String(Math.min(20, networkMetrics.length)) : undefined}>
+          <LensSection label="Centrality" lens="violet" counter={networkMetrics.length ? String(Math.min(20, networkMetrics.length)) : undefined}>
             <LensTable
               loading={networkMetricsLoading}
               columns={[
@@ -1086,14 +1086,13 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             />
           </LensSection>
 
-          <section>
-            <LensRule>Prediction</LensRule>
+          <MobileGroup label="Prediction">
             <MLPrediction selectedPlant={
               globalSelectedProjectId
                 ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
                 : null
             } />
-          </section>
+          </MobileGroup>
 
         </div>
         {/* ── End mobile composition ── */}

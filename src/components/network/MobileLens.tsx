@@ -20,6 +20,8 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Disclosure } from '@/components/shared';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import { useRowBudget } from '@/hooks/useViewport';
 import {
   M,
   M_LABEL,
@@ -67,16 +69,28 @@ export function LensChip({ tone, children }: { tone: LensTone; children: React.R
 export function LensSection({
   label,
   counter,
-  tone = 'primary',
+  tone = 'secondary',
+  lens,
   children,
 }: {
   label: string;
   counter?: React.ReactNode;
+  /** The ink head. One per screen (v2 §2) — on a lens that is the findings
+   *  band, not the ranked list beneath it. */
   tone?: 'primary' | 'secondary';
+  /** The lens this section belongs to. It renders as the panel's 2px left
+   *  rule — the one accent a panel gets, and exactly the case v2 §2 reserves
+   *  it for: a panel that belongs to a layer. */
+  lens?: LensTone;
   children: React.ReactNode;
 }) {
   return (
-    <MobilePanel label={label} counter={counter} tone={tone}>
+    <MobilePanel
+      label={label}
+      counter={counter}
+      tone={tone}
+      accent={lens ? LENS_TONE[lens] : undefined}
+    >
       {children}
     </MobilePanel>
   );
@@ -251,6 +265,7 @@ export function LensTable({
   loading = false,
   caption,
   action,
+  title = 'Ranked list',
 }: {
   columns: LensColumn[];
   rows: LensRow[];
@@ -258,7 +273,15 @@ export function LensTable({
   loading?: boolean;
   caption?: string;
   action?: React.ReactNode;
+  /** The deferral sheet's title — what the full ledger is called. */
+  title?: string;
 }) {
+  // As many rows as the device can hold, and the rest one tap away with every
+  // column intact (v2 §5.4). A ranked list is exactly the case: the top three
+  // rows are the finding, and the twentieth is still evidence.
+  const budget = useRowBudget(5, 8, 12);
+  const [full, setFull] = React.useState(false);
+
   if (loading || rows.length === 0) {
     return (
       <p className="bg-white px-3 py-8 text-center text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
@@ -267,27 +290,46 @@ export function LensTable({
     );
   }
 
+  const renderRow = (r: LensRow) => {
+    const primaryIdx = Math.max(0, r.cells.findIndex((c) => c.primary));
+    const primary = r.cells[primaryIdx];
+    const dot = r.cells.find((c) => c.tone)?.tone;
+    const sub = r.cells
+      .map((c, i) => (i === primaryIdx ? null : `${columns[i + 1]?.label ?? ''} ${c.text}`.trim()))
+      .filter(Boolean)
+      .join(' · ');
+    return (
+      <MobileRow
+        key={r.key}
+        chevron={false}
+        dot={dot ? CELL_DOT[dot] : undefined}
+        label={r.id}
+        sub={sub || undefined}
+        value={primary?.text}
+      />
+    );
+  };
+
+  const shown = rows.slice(0, budget);
+
   return (
     <>
-      {rows.map((r) => {
-        const primaryIdx = Math.max(0, r.cells.findIndex((c) => c.primary));
-        const primary = r.cells[primaryIdx];
-        const dot = r.cells.find((c) => c.tone)?.tone;
-        const sub = r.cells
-          .map((c, i) => (i === primaryIdx ? null : `${columns[i + 1]?.label ?? ''} ${c.text}`.trim()))
-          .filter(Boolean)
-          .join(' · ');
-        return (
-          <MobileRow
-            key={r.key}
-            chevron={false}
-            dot={dot ? CELL_DOT[dot] : undefined}
-            label={r.id}
-            sub={sub || undefined}
-            value={primary?.text}
-          />
-        );
-      })}
+      {shown.map(renderRow)}
+      {rows.length > shown.length && (
+        <MobileRow
+          label={`All ${rows.length} rows`}
+          sub={`${rows.length - shown.length} more`}
+          onClick={() => setFull(true)}
+        />
+      )}
+      <MobileSheet
+        open={full}
+        title={title}
+        sub={`${rows.length} rows, ranked, with every column the desktop table shows.`}
+        onClose={() => setFull(false)}
+      >
+        <div className="flex flex-col">{rows.map(renderRow)}</div>
+      </MobileSheet>
       {(caption || action) && (
         <div className="flex min-w-0 items-center gap-3 bg-white px-3 py-[11px]">
           {caption && (
@@ -326,27 +368,5 @@ export function LensAction({
     >
       {children}
     </MobileButton>
-  );
-}
-
-/** The lens chip's legacy export surface — a section rule with a mono label —
- *  kept only for the Prediction block, whose body (`MLPrediction`) is a shared
- *  desktop component and has not been converted yet. Everything else is a
- *  <LensSection>. */
-export function LensRule({
-  children,
-  trailing,
-}: {
-  children: React.ReactNode;
-  trailing?: React.ReactNode;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-2 pb-2">
-      <span className={cn(M_LABEL, 'whitespace-nowrap text-[#525252]')}>{children}</span>
-      <span className="h-px min-w-0 flex-1 bg-[#d4d4d4]" />
-      {trailing && (
-        <span className="whitespace-nowrap font-mono text-[10px] text-[#525252]">{trailing}</span>
-      )}
-    </div>
   );
 }

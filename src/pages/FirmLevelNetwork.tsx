@@ -40,9 +40,9 @@ import MLPrediction from '@/components/MLPrediction';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MapView from '@/components/MapView';
 import { FROZEN_CELL } from '@/components/shared';
+import { MobileGroup } from '@/components/mobile';
 import {
   LensChip,
-  LensRule,
   LensHowToRead,
   LensDesktopOnlyNote,
   LensStructure,
@@ -1241,7 +1241,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
              shape; the pieces come from components/network/MobileLens so the
              three lenses stay identical in composition and differ only in
              what each lens measures. */}
-        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-3">
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-[var(--m-gap)]">
 
           <div>
             <LensChip tone="amber">Firm level</LensChip>
@@ -1280,7 +1280,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             ]}
           />
 
-          <LensSection label="Structural risk" counter="4">
+          <LensSection label="Structural risk" counter="4" tone="primary" lens="amber">
             <LensRisk
               rows={[
                 { label: 'Supplier diversity', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.supplierDiversity) : '—' },
@@ -1296,7 +1296,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             />
           </LensSection>
 
-          <LensSection label="Centrality" counter={networkNodes.length ? String(Math.min(20, networkNodes.length)) : undefined}>
+          <LensSection label="Centrality" lens="amber" counter={networkNodes.length ? String(Math.min(20, networkNodes.length)) : undefined}>
             <LensTable
               loading={loading}
               columns={[
@@ -1343,14 +1343,13 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             />
           </LensSection>
 
-          <section>
-            <LensRule>Prediction</LensRule>
+          <MobileGroup label="Prediction">
             <MLPrediction selectedPlant={
               globalSelectedProjectId
                 ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
                 : null
             } />
-          </section>
+          </MobileGroup>
 
         </div>
         {/* ── End mobile composition ── */}

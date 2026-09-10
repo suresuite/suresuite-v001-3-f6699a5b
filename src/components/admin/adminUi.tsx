@@ -93,7 +93,9 @@ export function Toggle({
         // replaced and the desktop box tree is identical.
         'relative grid -m-[13px] h-11 w-[60px] place-items-center rounded-none bg-transparent p-0',
         "before:absolute before:h-[18px] before:w-[34px] before:rounded-full before:content-['']",
-        checked ? 'before:bg-foreground' : 'before:bg-[#e4e4e4]',
+        // The skin's toggle-off track is the outer rule weight (#d4d4d4); the
+        // `md:` half below keeps the literal desktop has always drawn.
+        checked ? 'before:bg-foreground' : 'before:bg-[#d4d4d4]',
         'md:static md:m-0 md:inline-flex md:h-[18px] md:w-[34px] md:items-center md:rounded-full md:p-[2px] md:transition-colors md:before:hidden',
         checked ? 'md:justify-end md:bg-foreground' : 'md:justify-start md:bg-[#e4e4e4]',
         disabled && 'opacity-55',

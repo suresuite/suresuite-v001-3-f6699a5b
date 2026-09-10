@@ -8,6 +8,8 @@ import { RecoveryImpactCard } from "./RecoveryImpactCard";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { RecoveryConfig, DisruptionEvent } from "@/lib/sim/recoveryScore";
 import { CredibilityBadge } from "./CredibilityBadge";
+import { M, MobileChip, MobilePanel, MobileRow } from "@/components/mobile";
+import { cn } from "@/lib/utils";
 import type { Credibility } from "@/hooks/useModelValidation";
 
 interface Props {
@@ -17,6 +19,19 @@ interface Props {
   scenario?: { disruption_schedule?: DisruptionEvent[]; horizon_days?: number } | null;
   /** B0b (§9.5): badge from the run's stamped card + engine-fingerprint check. */
   credibility?: Credibility | null;
+  /**
+   * Wear the mobile skin (v2 §4C).
+   *
+   * This component is mounted by both platforms, so the skin arrives as a
+   * prop rather than as an edit: `skin` is false everywhere desktop renders
+   * and the desktop tree below is byte-identical to what it has always been.
+   * What it changes is this component's OWN chrome — the two badges become
+   * chips, the engine notes become a panel — and it opens a container query
+   * (`.m-cq`) so the charts and tables it hosts size to the panel they are in
+   * rather than to the viewport, which stops being the same thing the moment
+   * the wide band goes two-column (v2 §5.5).
+   */
+  skin?: boolean;
 }
 
 interface RunMeta {
@@ -34,7 +49,14 @@ function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | 
   return fromRep ?? null;
 }
 
-export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility }: Props) {
+export function ResultsDashboard({
+  run,
+  reps,
+  primaryKpi,
+  scenario,
+  credibility,
+  skin = false,
+}: Props) {
   if (!run) {
     return (
       <div className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
@@ -56,31 +78,60 @@ export function ResultsDashboard({ run, reps, primaryKpi, scenario, credibility 
         }))
       : [];
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {isStub ? (
-          <Badge variant="outline" className="text-[11px] gap-1 border-yellow-400 text-yellow-700 bg-yellow-50">
-            Preliminary estimate — Monte Carlo engine computing…
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-[11px] gap-1 border-green-500 text-green-700 bg-green-50">
-            Monte Carlo result · {run?.rep_count_done ?? 0} replications
-          </Badge>
-        )}
-        {credibility && <CredibilityBadge credibility={credibility} />}
-      </div>
+    <div className={cn('flex flex-col', skin ? 'm-cq gap-2' : 'gap-3')}>
+      {skin ? (
+        // A state, in the skin's vocabulary: a chip, never a coloured panel
+        // (§3). The stub case is amber because it is the firm-level "derived"
+        // meaning; a finished run is the process teal.
+        <div className="flex flex-wrap items-center gap-1.5">
+          <MobileChip fill={isStub ? M.warnFill : undefined} ink={isStub ? M.warnInk : M.body}>
+            {isStub
+              ? 'Preliminary — engine computing'
+              : `Monte Carlo · ${run?.rep_count_done ?? 0} reps`}
+          </MobileChip>
+          {credibility && <CredibilityBadge credibility={credibility} />}
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {isStub ? (
+            <Badge variant="outline" className="text-[11px] gap-1 border-yellow-400 text-yellow-700 bg-yellow-50">
+              Preliminary estimate — Monte Carlo engine computing…
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[11px] gap-1 border-green-500 text-green-700 bg-green-50">
+              Monte Carlo result · {run?.rep_count_done ?? 0} replications
+            </Badge>
+          )}
+          {credibility && <CredibilityBadge credibility={credibility} />}
+        </div>
+      )}
 
       {meta?.scsim_notes && meta.scsim_notes.length > 0 && (
-        <details className="text-xs text-muted-foreground border border-border rounded-md px-3 py-2">
-          <summary className="flex min-h-11 cursor-pointer select-none items-center md:min-h-0 md:list-item">
-            Engine conversion notes ({meta.scsim_notes.length})
-          </summary>
-          <ul className="list-disc pl-4 pt-1 space-y-0.5">
+        skin ? (
+          // A disclosure triangle is not in the skin's control inventory, and
+          // the notes are not optional reading — they are what the engine had
+          // to change about the model. So they are a panel, open.
+          <MobilePanel
+            label="Engine conversion notes"
+            counter={`${meta.scsim_notes.length}`}
+            accent={M.firm}
+          >
             {meta.scsim_notes.map((n, i) => (
-              <li key={i}>{n}</li>
+              <MobileRow key={i} chevron={false} label={n} />
             ))}
-          </ul>
-        </details>
+          </MobilePanel>
+        ) : (
+          <details className="text-xs text-muted-foreground border border-border rounded-md px-3 py-2">
+            <summary className="flex min-h-11 cursor-pointer select-none items-center md:min-h-0 md:list-item">
+              Engine conversion notes ({meta.scsim_notes.length})
+            </summary>
+            <ul className="list-disc pl-4 pt-1 space-y-0.5">
+              {meta.scsim_notes.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          </details>
+        )
       )}
 
       {meta?.recovery && (

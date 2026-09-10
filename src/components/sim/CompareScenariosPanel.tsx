@@ -9,6 +9,8 @@
 import { useMemo, useState } from "react";
 import { CompareTable, type CompareRow } from "./resultTables";
 import { TableBlock } from "@/components/shared";
+import { M, MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
+import { cn } from "@/lib/utils";
 import { kpiDisplay, signedDelta } from "@/lib/sim/kpiDisplay";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { SimulationRun } from "@/hooks/useSimulationRun";
@@ -17,6 +19,15 @@ interface Props {
   scenarios: Scenario[];
   /** scenario_id → newest completed run (useScenarioRuns). */
   runsByScenario: Record<string, SimulationRun>;
+  /**
+   * Wear the mobile skin (v2 §4C). The panel is mounted by both platforms, so
+   * the skin arrives as a prop: false everywhere desktop renders, and the
+   * `TableBlock` tree below is untouched. What changes is the chrome — the
+   * shell becomes the panel, the A/B pickers become rows, and the reasons a
+   * pair is not comparable become the skin's caveat rather than a bulleted
+   * list. The comparison itself, and every number in it, is the same.
+   */
+  skin?: boolean;
 }
 
 // §2.4: with no comparable scenarios both selects have no options, so they
@@ -62,7 +73,7 @@ function comparabilityFailures(
   return failures;
 }
 
-export function CompareScenariosPanel({ scenarios, runsByScenario }: Props) {
+export function CompareScenariosPanel({ scenarios, runsByScenario, skin = false }: Props) {
   const withResults = useMemo(
     () => scenarios.filter((s) => runsByScenario[s.id]),
     [scenarios, runsByScenario],
@@ -119,6 +130,82 @@ export function CompareScenariosPanel({ scenarios, runsByScenario }: Props) {
         };
       });
   }, [pair, failures.length]);
+
+  // The body states, shared by both chromes so a message can never differ
+  // between platforms.
+  const shortfall =
+    withResults.length < 2
+      ? `${withResults.length} of ${scenarios.length} ${
+          scenarios.length === 1 ? "scenario has" : "scenarios have"
+        } completed results — a comparison needs two`
+      : !pair
+        ? "Pick two different scenarios"
+        : failures.length === 0 && rows.length === 0
+          ? "The two runs share no KPI in their aggregates"
+          : null;
+
+  if (skin) {
+    const picker = (
+      label: string,
+      value: string,
+      onChange: (id: string) => void,
+      disabled: boolean,
+    ) => (
+      <MobileRow
+        chevron={false}
+        label={label}
+        trailing={
+          <select
+            className={cn(
+              "h-11 min-w-0 max-w-[52vw] shrink rounded-[6px] border border-[#d4d4d4] bg-white",
+              "px-2 text-[length:var(--fs-row)] text-[#171717] focus:border-[#18181b] focus:outline-none",
+            )}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+            aria-label={`Scenario ${label}`}
+          >
+            {withResults.map((sc) => (
+              <option key={sc.id} value={sc.id}>
+                {sc.name || "Untitled scenario"}
+              </option>
+            ))}
+          </select>
+        }
+      />
+    );
+
+    return (
+      <>
+        <MobilePanel label="Paired comparison" counter={`${withResults.length} with results`}>
+          {picker("A", a?.id ?? "", setAId, withResults.length === 0)}
+          {picker("B", b?.id ?? "", setBId, withResults.length < 2)}
+          {shortfall ? (
+            <MobileRow chevron={false} label={shortfall} />
+          ) : failures.length > 0 ? (
+            <MobileRow
+              chevron={false}
+              dot={M.firm}
+              label="Not a paired experiment"
+              sub="§9.3 requires CRN pairing and exactly one differing RunKey component"
+            />
+          ) : (
+            // A comparison IS a table, and §9.5 allows one to scroll inside
+            // its own container. Every column the desktop table has is here.
+            <div className="m-cq overflow-x-auto">
+              <CompareTable rows={rows} />
+            </div>
+          )}
+        </MobilePanel>
+
+        {/* One caveat per screen (§13.6). The reasons are the caveat, and they
+            are a consequence of the pick rather than something blocking. */}
+        {failures.length > 0 ? (
+          <MobileNote tone="caveat">{failures.join(" · ")}</MobileNote>
+        ) : null}
+      </>
+    );
+  }
 
   return (
     // L1: the name and the A/B pickers move onto the canvas above the shell.

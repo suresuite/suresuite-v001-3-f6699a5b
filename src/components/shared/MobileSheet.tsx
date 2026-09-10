@@ -80,7 +80,7 @@ export function MobileSheet({ open, title, sub, onClose, onBack, children }: Mob
           onTouchStart={dragStart}
           onTouchMove={dragMove}
           onTouchEnd={dragEnd}
-          className="relative flex shrink-0 items-center gap-2 border-b border-[#e4e4e4] px-3 py-3.5 [touch-action:none]"
+          className="relative flex shrink-0 items-center gap-2 border-b border-[#d4d4d4] px-3 py-3.5 [touch-action:none]"
         >
           <span className="absolute left-1/2 top-1.5 h-1 w-9 -translate-x-1/2 rounded-full bg-[#d4d4d4]" />
           {onBack && (
@@ -159,7 +159,7 @@ export function MobileSheetRow({
       title={hint}
       aria-disabled={disabled || undefined}
       className={cn(
-        "flex w-full min-h-11 items-center gap-2.5 border-b border-[#e4e4e4] bg-white px-3 py-[13px] text-left last:border-b-0",
+        "flex w-full min-h-11 items-center gap-2.5 border-b border-[#e8e8ea] bg-white px-3 py-[var(--m-row-y)] text-left last:border-b-0",
         disabled ? "cursor-not-allowed opacity-60" : "active:bg-[#fafafa]",
       )}
     >

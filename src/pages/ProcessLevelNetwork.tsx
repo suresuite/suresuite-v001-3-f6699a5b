@@ -36,9 +36,9 @@ import {
   Tag,
 } from 'lucide-react';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
+import { MobileGroup } from '@/components/mobile';
 import {
   LensChip,
-  LensRule,
   LensHowToRead,
   LensDesktopOnlyNote,
   LensStructure,
@@ -1276,7 +1276,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
              shape; the pieces come from components/network/MobileLens so the
              three lenses stay identical in composition and differ only in
              what each lens measures. */}
-        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-3">
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-[var(--m-gap)]">
 
           <div>
             <LensChip tone="teal">Process level</LensChip>
@@ -1315,7 +1315,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
             ]}
           />
 
-          <LensSection label="Structural risk" counter="4">
+          <LensSection label="Structural risk" counter="4" tone="primary" lens="teal">
             <LensRisk
               rows={[
                 { label: 'Critical path', value: '—' },
@@ -1331,7 +1331,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
             />
           </LensSection>
 
-          <LensSection label="Centrality" counter={topFlowNodes.length ? String(Math.min(20, topFlowNodes.length)) : undefined}>
+          <LensSection label="Centrality" lens="teal" counter={topFlowNodes.length ? String(Math.min(20, topFlowNodes.length)) : undefined}>
             <LensTable
               loading={loading}
               columns={[
@@ -1363,14 +1363,13 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
             />
           </LensSection>
 
-          <section>
-            <LensRule>Prediction</LensRule>
+          <MobileGroup label="Prediction">
             <MLPrediction selectedPlant={
               globalSelectedProjectId
                 ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
                 : null
             } />
-          </section>
+          </MobileGroup>
 
         </div>
         {/* ── End mobile composition ── */}

@@ -60,6 +60,7 @@ import {
   MobileActionBar,
   MobileButton,
   MobileButtonRow,
+  MobileGroup,
   MobilePanel,
   MobileRow,
   MobileSegmented,
@@ -68,6 +69,7 @@ import {
   type MobileStat,
   type SegmentedItem,
 } from "@/components/mobile";
+import { useRowBudget, useStatBudget } from "@/hooks/useViewport";
 import { ScenarioSetupForm } from "./ScenarioSetupForm";
 import { DisruptionScheduleEditor } from "./DisruptionScheduleEditor";
 import { DisruptionRecoveryPane } from "./DisruptionRecoveryPane";
@@ -98,6 +100,8 @@ type Sheet =
   | "playbook"
   | "findings"
   | "mapping"
+  | "events"
+  | "reps"
   | null;
 
 /** The five panes, in the order the desktop stage rail uses. `recovery` is
@@ -227,6 +231,13 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
   const [sheet, setSheet] = useState<Sheet>(null);
   const close = () => setSheet(null);
+
+  // How much of a ledger the device can hold before the rest is deferred into
+  // a sheet (v2 §5.4). A count is the one decision CSS cannot make; everything
+  // else about how these rows look is a clamp.
+  const eventBudget = useRowBudget();
+  const repBudget = useRowBudget(4, 6, 9);
+  const statBudget = useStatBudget();
   // Read-only here: the planning unit is set by TimeUnitBar inside the
   // Scenario sheet, which is the real control. This only labels the row.
   const { unit } = useTimeUnit(projectId);
@@ -242,8 +253,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   // panes below are about, gets a panel row of its own rather than the subtitle
   // the budget no longer has a band for.
   const header = (
-    <div className="flex items-center justify-between gap-2.5 px-4 pb-2.5 pt-1">
-      <h1 className="min-w-0 flex-1 truncate text-[19px] font-semibold leading-tight tracking-[-0.019em] text-[#18181b]">
+    <div className="flex items-center justify-between gap-2.5 px-[var(--m-gutter)] pb-2.5 pt-1">
+      <h1 className="min-w-0 flex-1 truncate text-[length:var(--fs-title)] font-semibold leading-tight tracking-[-0.019em] text-[#171717]">
         Simulation Lab
       </h1>
       <button
@@ -282,9 +293,17 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
       .filter(Boolean)
       .join(" · ") || "the engine applies its defaults";
 
-  const gatePanel =
-    gateBlocks > 0 || gateWarns > 0 ? (
+  const gated = gateBlocks > 0 || gateWarns > 0;
+
+  // v2 §2: the ink head is rationed to ONE panel per screen — the thing that
+  // changed or the thing that blocks. On this screen that is the gate whenever
+  // it has anything to say; when it does not, the pane's own principal panel
+  // takes the voice. `paneTone` below is how each pane asks.
+  const paneTone = gated ? "secondary" : "primary";
+
+  const gatePanel = gated ? (
       <MobilePanel
+        tone="primary"
         label="Required-data gate"
         counter={gateBlocks > 0 ? `${gateBlocks} blocking` : `${gateWarns} warn`}
       >
@@ -318,7 +337,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           </>
         )}
       </MobilePanel>
-    ) : null;
+  ) : null;
 
   /* ── the scenario band ────────────────────────────────────────────────── */
   // The dot is the scenario's own credibility, not merely "something is
@@ -412,8 +431,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     : [];
 
   const setupPane = (
-    <>
-      <MobilePanel label="Experiment design" counter={`${setupRows.length}`}>
+    <MobileGroup label="Experiment">
+      <MobilePanel tone={paneTone} label="Experiment design" counter={`${setupRows.length}`}>
         {setupRows.map((r) => (
           <MobileRow
             key={r.label}
@@ -427,26 +446,26 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
       {/* A cross-screen note WITH A ROUTE, not a dead-end warning. */}
       {selected && !inherited ? (
-        <MobilePanel label="Model validation" tone="secondary">
+        <MobilePanel label="Model validation" accent={M.firm}>
           <Link
             to="/policies"
-            className="flex min-h-11 w-full items-center gap-2.5 px-3 py-[13px] text-left active:bg-[#fafafa]"
+            className="flex min-h-11 w-full items-center gap-2.5 px-3 py-[var(--m-row-y)] text-left active:bg-[#fafafa]"
           >
             <span
               aria-hidden
               className="h-1.5 w-1.5 shrink-0 rounded-full"
               style={{ background: M.firm }}
             />
-            <span className="min-w-0 flex-1 text-[13.5px] font-medium leading-tight text-[#18181b] [text-wrap:pretty]">
+            <span className="min-w-0 flex-1 text-[length:var(--fs-row)] font-medium leading-tight text-[#171717] [text-wrap:pretty]">
               Warm-up &amp; n* not adopted — set them in Policies
             </span>
-            <span aria-hidden className="shrink-0 text-[15px] leading-none text-[#525252]">
+            <span aria-hidden className="shrink-0 text-[15px] leading-none text-[#6b6b6b]">
               ›
             </span>
           </Link>
         </MobilePanel>
       ) : null}
-    </>
+    </MobileGroup>
   );
 
   /* ── Events ───────────────────────────────────────────────────────────── */
@@ -455,49 +474,65 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   // mono sub-line — and nothing scrolls sideways (§9.5, §10).
   const eventsPane = (
     <>
-      <MobilePanel label="Disruption schedule" counter={`${events.length}`}>
-        {events.length === 0 ? (
-          <EmptyBody>
-            <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
-              No disruption schedule yet — this project has no network to disrupt.
-            </span>
-          </EmptyBody>
-        ) : (
-          events.map((e, i) => (
-            <MobileRow
-              key={i}
-              chevron={false}
-              label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
-              sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
-              value={`d${e.start_day}`}
-            />
-          ))
-        )}
-      </MobilePanel>
+      <MobileGroup label="Schedule">
+        <MobilePanel tone={paneTone} label="Disruption schedule" counter={`${events.length}`}>
+          {events.length === 0 ? (
+            <EmptyBody>
+              <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+                No disruption schedule yet — this project has no network to disrupt.
+              </span>
+            </EmptyBody>
+          ) : (
+            <>
+              {events.slice(0, eventBudget).map((e, i) => (
+                <MobileRow
+                  key={i}
+                  chevron={false}
+                  label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
+                  sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
+                  value={`d${e.start_day}`}
+                />
+              ))}
+              {/* Defer, never truncate (§10, v2 §5.4). What the device cannot
+                  hold is one tap away with every column intact — the row is
+                  not optional, and it counts what it is deferring. */}
+              {events.length > eventBudget ? (
+                <MobileRow
+                  label={`All ${events.length} disruptions`}
+                  sub={`${events.length - eventBudget} more`}
+                  onClick={() => setSheet("events")}
+                />
+              ) : null}
+            </>
+          )}
+        </MobilePanel>
 
-      <MobileButtonRow>
-        <MobileButton weight="secondary" onClick={() => setSheet("schedule")}>
-          Add disruption
-        </MobileButton>
-        <MobileButton weight="secondary" onClick={() => onPane("setup")}>
-          Setup
-        </MobileButton>
-      </MobileButtonRow>
+        <MobileButtonRow>
+          <MobileButton weight="secondary" onClick={() => setSheet("schedule")}>
+            Add disruption
+          </MobileButton>
+          <MobileButton weight="secondary" onClick={() => onPane("setup")}>
+            Setup
+          </MobileButton>
+        </MobileButtonRow>
+      </MobileGroup>
 
       {/* The reference's Events pane carries no playbook. The product's does,
           and §8 forbids hiding a control — so it keeps its own panel and its
           row opens the real editor. */}
-      <MobilePanel
-        label="Recovery playbook"
-        counter={effectiveRecovery.enabled ? "enabled" : "disabled"}
-      >
-        <MobileRow
-          label="Response strategies"
-          sub={levers.length ? levers.map((l) => RESPONSE_LABELS[l]).join(" · ") : "none active"}
-          value={`${levers.length} / ${STRATEGY_COUNT}`}
-          onClick={() => setSheet("playbook")}
-        />
-      </MobilePanel>
+      <MobileGroup label="Recovery">
+        <MobilePanel
+          label="Recovery playbook"
+          counter={effectiveRecovery.enabled ? "enabled" : "disabled"}
+        >
+          <MobileRow
+            label="Response strategies"
+            sub={levers.length ? levers.map((l) => RESPONSE_LABELS[l]).join(" · ") : "none active"}
+            value={`${levers.length} / ${STRATEGY_COUNT}`}
+            onClick={() => setSheet("playbook")}
+          />
+        </MobilePanel>
+      </MobileGroup>
     </>
   );
 
@@ -524,13 +559,14 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
   const runPane = (
     <>
-      <MobilePanel label="Run" counter={runStatus ?? "not started"}>
+      <MobileGroup label="Progress">
+        <MobilePanel tone={paneTone} label="Run" counter={runStatus ?? "not started"}>
         <div className="flex flex-col gap-2.5 p-3">
           <div className="flex items-baseline justify-between gap-2.5">
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.006em] text-[#18181b]">
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.006em] text-[#171717]">
               {selected?.name || "Untitled scenario"}
             </span>
-            <span className="shrink-0 whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums text-[#18181b]">
+            <span className="shrink-0 whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums text-[#171717]">
               {pct}%
             </span>
           </div>
@@ -544,7 +580,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
               )}
               style={{ background: statusDot }}
             />
-            <span className="block h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e4e4e4]">
+            <span className="block h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-[#d4d4d4]">
               <span className="block h-full bg-[#18181b]" style={{ width: `${pct}%` }} />
             </span>
           </span>
@@ -596,29 +632,41 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           value={String(latestRun?.mapping_warnings?.length ?? 0)}
           onClick={() => setSheet("mapping")}
         />
-      </MobilePanel>
+        </MobilePanel>
 
-      {runStats.length > 0 ? <MobileStatGrid stats={runStats} /> : null}
+        {runStats.length > 0 ? <MobileStatGrid stats={runStats.slice(0, statBudget)} /> : null}
+      </MobileGroup>
 
-      <MobilePanel label="Per replication" counter={`${reps.length} / ${repsTarget}`}>
-        {reps.length === 0 ? (
-          <EmptyBody>
-            <span className="text-[13px] leading-relaxed text-[#525252]">
-              Waiting for first replication…
-            </span>
-          </EmptyBody>
-        ) : (
-          reps.map((r) => (
-            <MobileRow
-              key={r.id}
-              chevron={false}
-              label={`Rep ${r.rep_index}`}
-              sub={`seed ${r.seed_used}`}
-              value={r.status}
-            />
-          ))
-        )}
-      </MobilePanel>
+      <MobileGroup>
+        <MobilePanel label="Per replication" counter={`${reps.length} / ${repsTarget}`}>
+          {reps.length === 0 ? (
+            <EmptyBody>
+              <span className="text-[13px] leading-relaxed text-[#525252]">
+                Waiting for first replication…
+              </span>
+            </EmptyBody>
+          ) : (
+            <>
+              {reps.slice(0, repBudget).map((r) => (
+                <MobileRow
+                  key={r.id}
+                  chevron={false}
+                  label={`Rep ${r.rep_index}`}
+                  sub={`seed ${r.seed_used}`}
+                  value={r.status}
+                />
+              ))}
+              {reps.length > repBudget ? (
+                <MobileRow
+                  label={`All ${reps.length} replications`}
+                  sub={`${reps.length - repBudget} more`}
+                  onClick={() => setSheet("reps")}
+                />
+              ) : null}
+            </>
+          )}
+        </MobilePanel>
+      </MobileGroup>
     </>
   );
 
@@ -643,7 +691,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const credState = runCredibility.state;
   const resultsPane =
     !latestRun || latestRun.status !== "done" ? (
-      <MobilePanel label="Results">
+      <MobilePanel tone={paneTone} label="Results">
         <EmptyBody>
           <Truck className="h-[22px] w-[22px] text-[#525252]" strokeWidth={2} />
           <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
@@ -658,21 +706,29 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
       </MobilePanel>
     ) : (
       <>
-        {kpiTiles.length > 0 ? (
-          <MobileStatGrid stats={kpiTiles.map((k) => ({ label: k.label, value: k.value }))} />
-        ) : null}
+        <MobileGroup label="Headline">
+          {kpiTiles.length > 0 ? (
+            <MobileStatGrid
+              stats={kpiTiles
+                .slice(0, statBudget)
+                .map((k) => ({ label: k.label, value: k.value }))}
+            />
+          ) : null}
 
-        {/* §6 keeps the confidence line out of the stat cell; it lands here
-            rather than disappearing. */}
-        {kpiTiles.length > 0 ? (
-          <MobilePanel label="Confidence" tone="secondary" counter={`n = ${repsDone}`}>
-            {kpiTiles.map((k) => (
-              <MobileRow key={k.key} chevron={false} label={k.label} value={k.ci} />
-            ))}
-          </MobilePanel>
-        ) : null}
+          {/* §6 keeps the confidence line out of the stat cell; it lands here
+              rather than disappearing — every KPI, not only the ones the grid
+              had room for. */}
+          {kpiTiles.length > 0 ? (
+            <MobilePanel label="Confidence" counter={`n = ${repsDone}`}>
+              {kpiTiles.map((k) => (
+                <MobileRow key={k.key} chevron={false} label={k.label} value={k.ci} />
+              ))}
+            </MobilePanel>
+          ) : null}
+        </MobileGroup>
 
-        <MobilePanel label="Provenance" tone="secondary" counter={credState}>
+        <MobileGroup label="Evidence">
+        <MobilePanel label="Provenance" counter={credState}>
           <MobileRow
             chevron={false}
             dot={credState === "validated" ? M.process : credState === "stale" ? M.firm : M.idle}
@@ -700,6 +756,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             </span>
           </div>
         </MobilePanel>
+        </MobileGroup>
 
         {/* The charts and tables are the product's, unchanged: the same
             components desktop mounts, so no number can differ between them.
@@ -708,12 +765,15 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             only through a hover tooltip, which is inert on touch. Desktop
             still passes it. These two still wear the desktop vocabulary; they
             are on the skin's own list of surfaces still to convert. */}
-        <ResultsDashboard
-          run={latestRun}
-          reps={reps}
-          primaryKpi={selected?.primary_kpi ?? ""}
-          scenario={selected}
-        />
+        <MobileGroup>
+          <ResultsDashboard
+            run={latestRun}
+            reps={reps}
+            primaryKpi={selected?.primary_kpi ?? ""}
+            scenario={selected}
+            skin
+          />
+        </MobileGroup>
       </>
     );
 
@@ -746,13 +806,13 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
   /* ── the screen ───────────────────────────────────────────────────────── */
   const body = !projectId ? (
-    <MobilePanel label="Project">
+    <MobilePanel tone="primary" label="Project">
       <EmptyBody>
         <span className="text-[13px] leading-relaxed text-[#525252]">No project selected</span>
       </EmptyBody>
     </MobilePanel>
   ) : !selected ? (
-    <MobilePanel label="Scenario">
+    <MobilePanel tone="primary" label="Scenario">
       <EmptyBody>
         <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
           {scenariosLoading ? "Loading scenarios…" : "No scenario selected."}
@@ -766,8 +826,10 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     </MobilePanel>
   ) : (
     <>
-      {gatePanel}
-      {scenarioPanel}
+      <MobileGroup>
+        {gatePanel}
+        {scenarioPanel}
+      </MobileGroup>
       {pane === "setup"
         ? setupPane
         : pane === "recovery"
@@ -776,7 +838,15 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             ? runPane
             : pane === "results"
               ? resultsPane
-              : <CompareScenariosPanel scenarios={scenarios} runsByScenario={runsByScenario} />}
+              : (
+                <MobileGroup>
+                  <CompareScenariosPanel
+                    scenarios={scenarios}
+                    runsByScenario={runsByScenario}
+                    skin
+                  />
+                </MobileGroup>
+              )}
     </>
   );
 
@@ -788,8 +858,10 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     // as `--pi-chrome`.
     <div className="flex flex-col pb-4">
       {header}
-      <div className="px-4 pb-3">{segmented}</div>
-      <main className="flex min-w-0 flex-col gap-3 px-4">{body}</main>
+      <div className="px-[var(--m-gutter)] pb-3">{segmented}</div>
+      {/* The gap is the gap between GROUPS (v2 §2). Panels inside a group sit
+          8px apart; a band is 18-24px from the next. */}
+      <main className="flex min-w-0 flex-col gap-[var(--m-gap)] px-[var(--m-gutter)]">{body}</main>
 
       {projectId && selected ? (
         <MobileActionBar
@@ -813,13 +885,13 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                 onProjectChange(p.id);
                 close();
               }}
-              className="flex min-h-11 w-full items-center gap-2.5 border-b border-[#e4e4e4] px-3 py-[13px] text-left last:border-b-0 active:bg-[#fafafa]"
+              className="flex min-h-11 w-full items-center gap-2.5 border-b border-[#e8e8ea] px-3 py-[var(--m-row-y)] text-left last:border-b-0 active:bg-[#fafafa]"
             >
-              <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[#18181b]">
+              <span className="min-w-0 flex-1 truncate text-[length:var(--fs-row)] font-medium text-[#171717]">
                 {p.name}
               </span>
               {p.id === projectId ? (
-                <span className="shrink-0 text-[15px] text-[#18181b]">✓</span>
+                <span className="shrink-0 text-[15px] text-[#171717]">✓</span>
               ) : null}
             </button>
           ))}
@@ -964,6 +1036,48 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
               derive or default. It exists once a run has finished.
             </p>
           )}
+        </div>
+      </MobileSheet>
+
+      {/* ── the deferred ledgers ─────────────────────────────────────────
+          "Defer, never truncate" (§10, v2 §5.4): the panels above show what
+          the device can hold and these hold the rest, in full, with every
+          column the desktop ledger has. Nothing here is a summary. */}
+      <MobileSheet
+        open={sheet === "events"}
+        title="Disruption schedule"
+        sub="Every disruption in this scenario, in the order the engine applies them."
+        onClose={close}
+      >
+        <div className="flex flex-col">
+          {events.map((e, i) => (
+            <MobileRow
+              key={i}
+              chevron={false}
+              label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
+              sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
+              value={`d${e.start_day}`}
+            />
+          ))}
+        </div>
+      </MobileSheet>
+
+      <MobileSheet
+        open={sheet === "reps"}
+        title="Per replication"
+        sub={`${reps.length} of ${repsTarget} replications, with the seed each one used.`}
+        onClose={close}
+      >
+        <div className="flex flex-col">
+          {reps.map((r) => (
+            <MobileRow
+              key={r.id}
+              chevron={false}
+              label={`Rep ${r.rep_index}`}
+              sub={`seed ${r.seed_used}`}
+              value={r.status}
+            />
+          ))}
         </div>
       </MobileSheet>
     </div>
