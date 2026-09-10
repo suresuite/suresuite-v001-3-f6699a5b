@@ -1001,7 +1001,7 @@ export function StagePolicyTable({
                     e.stopPropagation();
                     toggleGroup(groupMeta.groupId);
                   }}
-                  className="grid h-[15px] w-[15px] shrink-0 place-items-center font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                  className="-m-[14px] box-content grid h-[15px] w-[15px] shrink-0 place-items-center p-[14px] font-mono text-[10px] text-muted-foreground hover:text-foreground md:m-0 md:p-0"
                   title="Collapse this group"
                 >
                   ▾
@@ -1669,7 +1669,7 @@ export function StagePolicyTable({
                         <button
                           type="button"
                           onClick={() => toggleGroup(groupId)}
-                          className="grid h-[15px] w-[15px] shrink-0 place-items-center font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                          className="-m-[14px] box-content grid h-[15px] w-[15px] shrink-0 place-items-center p-[14px] font-mono text-[10px] text-muted-foreground hover:text-foreground md:m-0 md:p-0"
                           title="Expand this group"
                         >
                           ▸
@@ -1735,6 +1735,12 @@ export function StagePolicyTable({
         </table>
       </div>
 
+      {/* §2.7's affordance line — the identifying column freezes (keyLeft
+          above), this just says so below `md`, where a table this wide is
+          always wider than the viewport. */}
+      <p className="mt-1 font-mono text-[10px] text-muted-foreground md:hidden">
+        swipe the table sideways for the remaining columns
+      </p>
 
       <AlertDialog open={confirmPrefill} onOpenChange={setConfirmPrefill}>
         <AlertDialogContent>
