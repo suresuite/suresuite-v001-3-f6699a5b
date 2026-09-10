@@ -56,7 +56,7 @@ export const M = {
 /** 10px mono uppercase — panel head label, stat label, agent badge. The only
  *  uppercase in the skin. Carries no colour: the head sets white, a secondary
  *  head sets `M.quiet`. */
-export const M_LABEL = 'font-mono text-[10px] font-medium uppercase tracking-[0.14em]';
+export const M_LABEL = 'font-mono text-[10px] uppercase tracking-[0.14em]';
 
 /** 10.5px mono — row sub-line, ids, counters, timestamps. */
 export const M_MICRO = 'font-mono text-[10.5px] leading-tight tracking-[0.04em] text-[#525252]';

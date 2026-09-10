@@ -257,13 +257,45 @@ screens' fluid clamp with it. It comes out when the last surface converts.
 4. Getting Started last — it is the legacy generation and the largest delta.
 5. A pass at 320px, 360px, 390px and 430px against the five §9 rules.
 
+### Recorded deviations
+
+Each of these is a place the code does something the sections above do not
+literally say. They are here so the next person finds them in the contract
+rather than in a diff.
+
+- **The Simulation Lab's segmented control carries five items, not two or
+  three (§4).** The skin does not get to reduce a screen's inventory, and the
+  Lab has five panes. At 320px the widest label ("Compare") ellipses by a
+  hair; from 360px up it fits with room. Wrapping to two rows would cost a
+  permanent 76px chrome band at every width to fix one label at one width, a
+  smaller type size would add a sixth size to a five-size ladder, and
+  scrolling the strip is what §9.5 forbids. A screen that grows a sixth pane
+  is two screens (§13), not a tighter control.
+- **A stat value steps down inside the 20-28px band when the figure is long.**
+  §6 fixes the band, not a single size. An 8-digit seed at 28px overflowed a
+  2-up cell at 320px, and a clipped figure is what §12 forbids outright — so
+  the type moves and the number never does.
+- **`rounded-md` is not the button radius.** `tailwind.config.ts` maps
+  `rounded-sm|md|lg` all to `--radius` (4px), so the spec's 6px button is
+  written `rounded-[6px]`. Anything reaching for a radius by name gets the
+  panel's, silently.
+- **The Simulation Lab's gate moved from the footer to the top of the
+  content.** The action bar holds actions and nothing else (§8), and §13 puts
+  what needs attention at band 3. Its warning acknowledgement is now the
+  skin's toggle rather than a checkbox — the same binary control, in the only
+  vocabulary the skin has for one.
+- **A stat label uppercased by CSS changes a Greek lowercase letter's glyph.**
+  "Fill rate α" renders as "FILL RATE Α". The DOM text keeps its case, so
+  assistive tech is unaffected, and the reference prototype does the same —
+  recorded because it looks like a defect and is not one.
+
 ### Status
 
 | Surface | State |
 |---|---|
 | Primitives (`src/components/mobile/`) | Done |
 | Chrome — header, tab bar, credit footer, bottom reservation | Done |
-| Simulation Lab + run detail | Not started |
+| Simulation Lab + run detail | Done |
 | Policies + policy detail | Not started |
 | Project Intelligence | Not started |
 | Project Manager | Not started |

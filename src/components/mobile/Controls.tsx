@@ -39,7 +39,10 @@ export function MobileButton({
       type="button"
       {...rest}
       className={cn(
-        'inline-flex h-[46px] items-center justify-center rounded-md px-4',
+        // `rounded-[6px]`, not `rounded-md`: tailwind.config.ts maps
+        // rounded-sm|md|lg all to --radius (4px), so `md` would silently give
+        // the panel's radius instead of the button's (spec §7).
+        'inline-flex h-[46px] items-center justify-center rounded-[6px] px-4',
         'text-[13.5px] font-semibold leading-none',
         'disabled:cursor-not-allowed disabled:opacity-45',
         block ? 'w-full min-w-0 flex-1' : 'shrink-0',
@@ -68,6 +71,10 @@ export function MobileButtonRow({
 }
 
 // ── Action bar ───────────────────────────────────────────────────────────
+
+/** The bar with no note: 8px top padding + a 46px button + 10px bottom.
+ *  The first-paint floor for the spacer, before the bar is measured. */
+const BAR_BASE_H = 64;
 
 interface ActionSpec {
   label: string;
@@ -100,10 +107,28 @@ export function MobileActionBar({
   secondary?: ActionSpec;
   note?: React.ReactNode;
 }) {
+  // The band is 64px with no note (8 + 46 + 10). A note is one 12px line on
+  // top of that, and the spec requires the note wherever the action is
+  // unavailable — so the spacer is measured off the live bar rather than
+  // frozen at 64, which would let the bar sit on the last 24px of the page
+  // exactly when it is explaining why the user cannot proceed.
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const [barH, setBarH] = React.useState(BAR_BASE_H);
+  React.useEffect(() => {
+    const el = barRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setBarH(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <>
-      <div aria-hidden className="h-16" />
+      <div aria-hidden style={{ height: barH }} />
       <div
+        ref={barRef}
         className="fixed inset-x-0 z-40 border-t border-[#e4e4e4] bg-white px-4 pb-2.5 pt-2"
         style={{ bottom: 'var(--pi-chrome, 0px)' }}
       >
@@ -160,11 +185,38 @@ export function MobileSegmented<T extends string>({
   ariaLabel: string;
   className?: string;
 }) {
+  // Four or more items give up the inter-item gap and the cell's own padding.
+  // Neither is a value the spec fixes; the type size and the track's 2px inset
+  // are, and neither moves.
+  //
+  // This is the honest limit of the control, and it is worth stating rather
+  // than hiding. §4 reserves the segmented control for two or three peer
+  // views. The Simulation Lab has five, because the skin does not get to
+  // reduce a screen's inventory. Measured at each reachable width, the widest
+  // label the product puts in one ("Compare", 57px at 11.5px/600):
+  //
+  //   320px — 56.8px of cell. Ellipses, by a hair, at dpr 3.
+  //   360px — 64.8px. Fits, with room.
+  //   390px — 70.8px. Fits.
+  //   430px — 78.8px. Fits.
+  //
+  // The alternatives were worse. Wrapping to two rows costs a permanent 76px
+  // chrome band at every width to fix one label at one width; a smaller type
+  // size adds a sixth size to a five-size ladder; scrolling the strip is what
+  // §9.5 forbids outright. So the label ellipses at 320 and carries `title`,
+  // and a screen that grows a sixth pane should be two screens (§13) rather
+  // than a tighter control.
+  const tight = items.length >= 4;
+
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn('flex gap-0.5 rounded-[5px] bg-[#e4e4e7] p-0.5', className)}
+      className={cn(
+        'flex rounded-[5px] bg-[#e4e4e7] p-0.5',
+        tight ? 'gap-0' : 'gap-0.5',
+        className,
+      )}
     >
       {items.map((item) => {
         const active = item.value === value;
@@ -175,9 +227,11 @@ export function MobileSegmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(item.value)}
+            title={item.label}
             className={cn(
               'flex min-h-[34px] min-w-0 flex-1 items-center justify-center gap-1.5',
-              'rounded-[4px] px-1 text-[11.5px] font-semibold',
+              'rounded-[4px] text-[11.5px] font-semibold',
+              tight ? 'px-0' : 'px-1',
               active ? 'bg-[#18181b] text-white' : 'bg-transparent text-[#3f3f46]',
               M_FADE,
             )}

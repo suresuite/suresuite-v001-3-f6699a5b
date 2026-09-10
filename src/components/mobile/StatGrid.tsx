@@ -49,11 +49,24 @@ export function MobileStatGrid({
   if (stats.length === 0) return null;
 
   const cols = columns ?? columnsFor(stats.length);
-  // 20px at three across, 28px at one or two — both inside the 20–28 band the
-  // spec reserves for stat values, picked so the widest figure still fits at
-  // 320px without shrinking the label.
-  const valueSize = cols >= 3 ? 'text-[20px]' : 'text-[28px]';
   const orphan = stats.length % cols === 1;
+
+  // A figure is never clipped and never rounded off to look tidier (§6, §12),
+  // so when the longest one will not fit the cell at 28px, the TYPE steps down
+  // inside the 20-28 band the spec reserves for stat values — the number does
+  // not change.
+  //
+  // The ladder is calibrated at 320px, the narrowest width the skin holds. A
+  // 2-up cell is (320 - 32 gutter - 1 gap)/2 - 24 padding = 118px of inner
+  // width, and Inter's tabular digit runs about 0.62em — so eight characters
+  // need ~24px and an 8-digit seed at 28px overflowed its cell by 18px. 3-up
+  // starts at 20px because the cell is 71px wide before anything else.
+  const longest = stats.reduce(
+    (n, s) => Math.max(n, String(s.value).length),
+    0,
+  );
+  const valueSize =
+    cols >= 3 || longest > 9 ? 'text-[20px]' : longest > 6 ? 'text-[22px]' : 'text-[28px]';
 
   return (
     <div
@@ -79,7 +92,11 @@ export function MobileStatGrid({
                 style={{ background: s.dot }}
               />
             )}
-            <span className="min-w-0 truncate">{s.label}</span>
+            {/* The label is the one thing in a stat cell allowed to ellipse —
+                the figure never is — so it carries its full text in `title`. */}
+            <span className="min-w-0 truncate" title={s.label}>
+              {s.label}
+            </span>
           </span>
           <span
             className={cn(

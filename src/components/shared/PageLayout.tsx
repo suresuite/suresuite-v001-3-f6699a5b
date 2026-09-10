@@ -62,7 +62,13 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
           // same clipping (measured: documentElement.scrollWidth stays at the
           // viewport width) without establishing a scrollport, and leaves
           // `position: fixed` descendants - MobileSheet is one - unclipped.
-          'min-h-screen overflow-x-clip bg-[hsl(var(--surface-sunken))] md:pb-10 md:transition-all md:duration-300',
+          // The skin's 96% ground is the page canvas on every mobile screen
+          // (mobile skin spec §2), so it is painted once here rather than by
+          // each converted surface — a screen whose own content is shorter
+          // than the viewport would otherwise show the desktop 92% below it.
+          // Released at `md`, where the desktop canvas is unchanged.
+          'min-h-screen overflow-x-clip bg-[hsl(var(--m-canvas))] md:bg-[hsl(var(--surface-sunken))]',
+          'md:pb-10 md:transition-all md:duration-300',
           'ml-0',
           isCollapsed ? 'md:ml-14' : 'md:ml-48'
         )}
