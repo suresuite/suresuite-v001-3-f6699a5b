@@ -17,8 +17,8 @@ interface PageLayoutProps {
   setIsCollapsed: (value: boolean) => void;
 }
 
-// Bottom chrome on mobile: tab bar + its border + the credit bar, then 16px of
-// breathing room, then the device inset.
+// Bottom chrome on mobile: tab bar + its border + the credit bar, then (for
+// ordinary scrolling pages only) 16px of breathing room, then the device inset.
 //
 // The tab bar is a fixed height, but the credit bar WRAPS — measured, it is
 // three lines (64px) at 320-390, two (48px) at 414-600, and the single line
@@ -26,9 +26,17 @@ interface PageLayoutProps {
 // element rather than assumed: a constant here leaves the last 16px of content
 // underneath the bar at every common iPhone width, which is precisely what this
 // reservation exists to prevent. MOBILE_FOOTER_H stays the first-paint floor.
+//
+// Two different values come out of this, and they must not be conflated:
+// `chromeOnlyPx` is the exact top edge of the tab bar/credit bar and nothing
+// more — what a surface that wants to fill the screen right up to the chrome
+// asks for (`--pi-chrome`, `MobileNavDrawer`'s `bottomInsetPx`). `chromePx`
+// adds 16px of breathing room on top — what an ordinary scrolling page's
+// `paddingBottom` wants, so its last line of content isn't flush against the
+// bar. Handing the breathing-inclusive value to a `--pi-chrome` consumer
+// leaves a 16px gap of bare background above the bar on every render.
 const MOBILE_BREATHING_PX = 16;
-const MOBILE_CHROME_BASE_PX =
-  MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER + MOBILE_BREATHING_PX;
+const MOBILE_CHROME_ONLY_BASE_PX = MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER;
 
 export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayoutProps) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -48,7 +56,8 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
     return () => ro.disconnect();
   }, [isMobile]);
 
-  const chromePx = MOBILE_CHROME_BASE_PX + (footerH ?? MOBILE_FOOTER_H);
+  const chromeOnlyPx = MOBILE_CHROME_ONLY_BASE_PX + (footerH ?? MOBILE_FOOTER_H);
+  const chromePx = chromeOnlyPx + MOBILE_BREATHING_PX;
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,8 +94,11 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
                 // reader that sits inside PAGE_GUTTER subtracts that gutter
                 // itself. The composer and the Run button therefore land on
                 // the credit bar however the bar wraps, and follow it when the
-                // bar is dismissed. Every other page just scrolls.
-                '--pi-chrome': `calc(${chromePx}px + env(safe-area-inset-bottom, 0px))`,
+                // bar is dismissed. Every other page just scrolls. Deliberately
+                // `chromeOnlyPx`, not `chromePx` — these surfaces want the exact
+                // chrome boundary, not the 16px of breathing room a scrolling
+                // page's own `paddingBottom` (below) adds on top.
+                '--pi-chrome': `calc(${chromeOnlyPx}px + env(safe-area-inset-bottom, 0px))`,
               } as React.CSSProperties)
             : undefined
         }
@@ -99,7 +111,7 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
       <MobileNavDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        bottomInsetPx={chromePx}
+        bottomInsetPx={chromeOnlyPx}
       />
     </div>
   );
