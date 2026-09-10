@@ -295,6 +295,15 @@ rather than in a diff.
   ranked figure is the value, and every remaining column — labelled — is on the
   mono sub-line. The desktop table's four prominence thresholds become the
   row's dot rather than coloured type.
+- **The Project Intelligence composer is 22px, not a full pill.** §7 gives the
+  composer the pill radius, and the reference's composer is one line. The
+  product's holds a textarea over a control row, so a true `9999px` would bow
+  the sides; 22px is a pill at the collapsed height and still reads as one
+  expanded.
+- **A bottom sheet keeps its one explanatory line.** §4 removes the page
+  subtitle, but a sheet is a screen of its own with no tab bar or action bar
+  competing for the band, and the line is what several sheets use to say what
+  the rows below them do.
 - **A stat label uppercased by CSS changes a Greek lowercase letter's glyph.**
   "Fill rate α" renders as "FILL RATE Α". The DOM text keeps its case, so
   assistive tech is unaffected, and the reference prototype does the same —
@@ -313,4 +322,4 @@ rather than in a diff.
 | Project Manager | Not started |
 | Network (product / process / firm) — mobile composition | Done; `MLPrediction` inside it is a shared desktop component and unconverted |
 | Developer API · Super Admin · About & help · Auth | Not started |
-| Getting Started | Not started |
+| Getting Started | Done |

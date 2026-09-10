@@ -64,9 +64,12 @@ export function MobileSheet({ open, title, sub, onClose, onBack, children }: Mob
     <div className="fixed inset-0 z-40 flex flex-col justify-end bg-foreground/30 md:hidden" role="dialog" aria-modal="true">
       <button type="button" aria-label="Close" onClick={onClose} className="min-h-11 flex-1" />
       <div
-        className="flex max-h-[76%] shrink-0 flex-col rounded-t-xl border-t border-border bg-background
+        // §7: 16px top corners, and the one shadow the skin has — the one
+        // under a bottom sheet. Borders separate everywhere else.
+        className="flex max-h-[76%] shrink-0 flex-col rounded-t-[16px] bg-white
                    landscape:max-h-full landscape:rounded-none"
         style={{
+          boxShadow: "0 -8px 28px rgba(0,0,0,.14)",
           transform: dragY ? "translateY(" + dragY + "px)" : undefined,
           transition: dragY ? "none" : "transform 0.2s cubic-bezier(0.2,0,0,1)",
           marginBottom:
@@ -77,32 +80,39 @@ export function MobileSheet({ open, title, sub, onClose, onBack, children }: Mob
           onTouchStart={dragStart}
           onTouchMove={dragMove}
           onTouchEnd={dragEnd}
-          className="relative flex shrink-0 items-start gap-2.5 border-b border-border px-3.5 py-4 [touch-action:none]"
+          className="relative flex shrink-0 items-center gap-2 border-b border-[#e4e4e4] px-3 py-3.5 [touch-action:none]"
         >
-          <span className="absolute left-1/2 top-1.5 h-1 w-9 -translate-x-1/2 rounded-full bg-border" />
+          <span className="absolute left-1/2 top-1.5 h-1 w-9 -translate-x-1/2 rounded-full bg-[#d4d4d4]" />
           {onBack && (
             <button
               type="button"
               onClick={onBack}
               aria-label="Back"
               title="Back"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-card"
+              className="-ml-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#18181b]"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-[20px] w-[20px]" />
             </button>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="text-[17px] font-semibold text-foreground">{title}</h2>
-            {sub && <p className="mt-1 text-[12px] leading-snug text-muted-foreground [text-wrap:pretty]">{sub}</p>}
+            <h2 className="truncate text-[19px] font-semibold leading-tight tracking-[-0.019em] text-[#18181b]">
+              {title}
+            </h2>
+            {/* The sheet is a screen of its own, so its one explanatory line
+                stays where §4 removes a page subtitle — a sheet has no tab bar
+                or action bar competing for the band. */}
+            {sub && (
+              <p className="mt-1 text-[12px] leading-snug text-[#525252] [text-wrap:pretty]">{sub}</p>
+            )}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
             title="Close"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-card"
+            className="-mr-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#525252]"
           >
-            <X className="h-4 w-4" />
+            <X className="h-[18px] w-[18px]" />
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">{children}</div>
@@ -149,38 +159,45 @@ export function MobileSheetRow({
       title={hint}
       aria-disabled={disabled || undefined}
       className={cn(
-        "flex w-full min-h-11 items-center gap-2.5 border-b border-[--hair-divider] px-3.5 py-2.5 text-left last:border-b-0",
-        disabled ? "cursor-not-allowed" : "active:bg-[#f4f4f5]",
+        "flex w-full min-h-11 items-center gap-2.5 border-b border-[#e4e4e4] bg-white px-3 py-[13px] text-left last:border-b-0",
+        disabled ? "cursor-not-allowed opacity-60" : "active:bg-[#fafafa]",
       )}
     >
       {mono && (
+        // The skin's mono chip: a filled 3px tag, which is the largest a
+        // colour fill is allowed to be (§3, §7).
         <span
-          className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-sm font-mono text-[11px] font-semibold"
-          style={monoColor ? { background: monoColor + "1f", color: monoColor } : undefined}
+          className="shrink-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white"
+          style={{ background: monoColor ?? "#18181b" }}
         >
           {mono}
         </span>
       )}
-      <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span
           className={cn(
-            "truncate text-[15px] font-semibold",
-            disabled && "text-muted-foreground",
-            !disabled && !danger && "text-foreground",
+            "truncate text-[13.5px] font-medium leading-tight",
+            disabled ? "text-[#525252]" : !danger && "text-[#18181b]",
           )}
           style={!disabled && danger ? { color: DESTRUCTIVE } : undefined}
         >
           {title}
         </span>
-        {meta && <span className="text-[11.5px] leading-[1.45] text-muted-foreground [text-wrap:pretty]">{meta}</span>}
+        {meta && (
+          <span className="font-mono text-[10.5px] leading-[1.45] tracking-[0.04em] text-[#525252] [text-wrap:pretty]">
+            {meta}
+          </span>
+        )}
       </span>
       {tag && (
         <span
-          className="shrink-0 whitespace-nowrap rounded-[3px] border px-[5px] py-px font-mono text-[9.5px] uppercase tracking-[0.08em]"
+          // 10px is the floor for a mono micro-label in this skin — #8a8a8a
+          // at 9.5px is exactly the pair §2 retires for daylight.
+          className="shrink-0 whitespace-nowrap rounded-[3px] border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em]"
           style={
             tagTone === "warn"
-              ? { borderColor: "rgba(224,147,11,0.35)", background: "rgba(224,147,11,0.1)", color: "#b45309" }
-              : { borderColor: "#e4e4e4", color: "#8a8a8a" }
+              ? { borderColor: "#e0930b", background: "#e0930b1f", color: "#6b4405" }
+              : { borderColor: "#d4d4d4", color: "#525252" }
           }
         >
           {tag}
