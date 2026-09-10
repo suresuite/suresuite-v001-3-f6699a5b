@@ -11,9 +11,9 @@
 // so a line's resolved value and provenance dot can never disagree between
 // the two surfaces.
 import { useMemo, useState } from "react";
-import { LAYER } from "@/components/intelligence/piUi";
-import { ProvenanceDot, RowFlag, rowAccent } from "./policyGridUi";
+import { ProvenanceDot, rowAccent } from "./policyGridUi";
 import { MobileSheet } from "@/components/shared/MobileSheet";
+import { M, MobileChip, MobilePanel, MobileRow } from "@/components/mobile";
 import {
   specFor,
   familiesForStage,
@@ -44,12 +44,17 @@ const FAMILY_ORDER: PolicyFamily[] = [
   "demand",
 ];
 
+// Every member of PolicyFamily, so the map cannot fall out of step with the
+// enum. `recovery` has no column in any stage spec today — familiesForStage
+// derives its result from the columns — so it never reaches the render; it is
+// here to keep the record total rather than to add a section.
 const FAMILY_TITLE: Record<PolicyFamily, string> = {
   sourcing: "Sourcing",
   inventory: "Inventory",
   transport: "Transport",
   production: "Production",
   fulfillment: "Fulfillment",
+  recovery: "Recovery",
   demand: "Demand",
 };
 
@@ -159,34 +164,26 @@ export function MobileStagePolicyList({
       familyDefault,
     });
 
-  if (loading) {
+  if (loading || dataRows.length === 0) {
     return (
-      <div className="py-8 text-center font-mono text-[11px] text-muted-foreground">
-        loading lines…
-      </div>
-    );
-  }
-
-  if (dataRows.length === 0) {
-    return (
-      <div className="py-8 text-center font-mono text-[11px] text-muted-foreground">
-        no lines for this stage
-      </div>
+      <MobilePanel label={spec.keyCols[0].label}>
+        <p className="px-3 py-8 text-center text-[13px] leading-relaxed text-[#525252]">
+          {loading ? "Loading lines…" : "No lines for this stage."}
+        </p>
+      </MobilePanel>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {groups.map((group) => {
         const keyALabel = String(group.members[0].row[spec.keyCols[0].id] ?? "");
         return (
-          <div key={group.id} className="overflow-hidden rounded-sm border border-[--hair-border]">
-            <div className="border-b border-[--hair-divider] bg-[--hair-th] px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted-foreground">
-              {spec.keyCols[0].label}: {keyALabel || "—"}
-              {group.members.length > 1 && (
-                <span className="ml-1.5 text-[--hair-quiet]">· {group.members.length} lines</span>
-              )}
-            </div>
+          <MobilePanel
+            key={group.id}
+            label={`${spec.keyCols[0].label} · ${keyALabel || "—"}`}
+            counter={`${group.members.length}`}
+          >
             {group.members.map(({ row }) => {
               const rowKey = String(row.key);
               const keyBLabel = String(row[spec.keyCols[1]?.id ?? ""] ?? "");
@@ -196,31 +193,39 @@ export function MobileStagePolicyList({
                 Number((row as Record<string, unknown>).__lane_count ?? 0) > 1;
               const isPrimaryMissing =
                 multiSource && !groupHasPrimary(stageKey, row, dataRows as Record<string, unknown>[], resolveForGuard);
-              const accent = rowAccent({ edited: false, attention, multiSource });
               const overridden = hasOverride(rowKey);
+              // The desktop grid carries the same three states as a 2px left
+              // accent; the skin spends colour as a 6px dot instead (§3), so
+              // `rowAccent`'s value becomes the dot and the flags stay chips.
+              // Same function, same precedence — nothing is re-derived here.
+              const accent = rowAccent({ edited: false, attention, multiSource });
               return (
-                <button
+                <MobileRow
                   key={rowKey}
-                  type="button"
                   onClick={() => setOpenRowKey(rowKey)}
-                  className="flex w-full min-h-11 items-center gap-2.5 border-b border-[--hair-divider] px-2.5 py-2 text-left last:border-b-0 active:bg-[#fafafa]"
-                  style={accent ? { borderLeft: `2px solid ${accent}` } : undefined}
-                >
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
-                    {spec.keyCols[1]?.label ?? spec.keyCols[0].label}: {keyBLabel || "—"}
-                  </span>
-                  {overridden && (
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LAYER.product }} title="Has a saved override" />
-                  )}
-                  {(row as Record<string, unknown>).__needs_supplier && (
-                    <RowFlag title="No supplier assigned">no supplier</RowFlag>
-                  )}
-                  {isPrimaryMissing && <RowFlag title="Multiple sources — no primary picked">pick primary</RowFlag>}
-                  <span className="shrink-0 text-[--hair-faint]">›</span>
-                </button>
+                  dot={accent || (overridden ? M.product : undefined)}
+                  label={`${spec.keyCols[1]?.label ?? spec.keyCols[0].label}: ${keyBLabel || "—"}`}
+                  sub={
+                    overridden
+                      ? "has a saved override"
+                      : attention
+                        ? "needs input"
+                        : undefined
+                  }
+                  trailing={
+                    (row as Record<string, unknown>).__needs_supplier || isPrimaryMissing ? (
+                      <span className="flex shrink-0 items-center gap-1">
+                        {(row as Record<string, unknown>).__needs_supplier ? (
+                          <MobileChip>no supplier</MobileChip>
+                        ) : null}
+                        {isPrimaryMissing ? <MobileChip>pick primary</MobileChip> : null}
+                      </span>
+                    ) : undefined
+                  }
+                />
               );
             })}
-          </div>
+          </MobilePanel>
         );
       })}
 
@@ -235,7 +240,7 @@ export function MobileStagePolicyList({
         onClose={() => setOpenRowKey(null)}
       >
         {openRow && (
-          <div className="flex flex-col gap-4 p-3.5">
+          <div className="flex flex-col gap-3 p-3.5">
             {FAMILY_ORDER.filter((fam) => families.includes(fam)).map((fam) => {
               const rowCtx: ColSpecCtx = {
                 fulfillmentStrategy,
@@ -256,44 +261,36 @@ export function MobileStagePolicyList({
               const activeParams =
                 vectorCols.length > 0 ? inventoryParamsForType(type).filter((p) => p.field !== "basis") : [];
               return (
-                <div key={fam}>
-                  <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-                    {FAMILY_TITLE[fam]}
-                  </div>
-                  <div className="overflow-hidden rounded-sm border border-[--hair-border]">
-                    {cols.map((col) => {
-                      const { value, provenance } = resolveCol(openRow, col);
-                      return (
-                        <div
-                          key={col.field}
-                          className="relative flex min-h-11 items-center justify-between gap-3 border-b border-[--hair-divider] px-3 py-2 last:border-b-0"
-                        >
-                          <span className="text-[12.5px] text-muted-foreground">{col.label}</span>
-                          <span className="flex items-center gap-1.5 font-mono text-[13px] tabular-nums text-foreground">
+                <MobilePanel
+                  key={fam}
+                  label={FAMILY_TITLE[fam]}
+                  counter={`${cols.length + activeParams.length}`}
+                >
+                  {cols.map((col) => {
+                    const { value, provenance } = resolveCol(openRow, col);
+                    return (
+                      <MobileRow
+                        key={col.field}
+                        chevron={false}
+                        label={col.label}
+                        value={
+                          <span className="inline-flex items-center gap-1.5">
                             {formatValue(col, value)}
                             <span className="relative inline-block h-2 w-2">
                               <ProvenanceDot p={provenance} />
                             </span>
                           </span>
-                        </div>
-                      );
-                    })}
-                    {activeParams.map((p) => {
-                      const raw = resolveCol(openRow, { field: p.field, family: fam, label: p.label } as ColSpec).value;
-                      const n = typeof raw === "number" ? raw : Number(raw);
-                      const shown = Number.isFinite(n) ? `${n}${p.unit ? ` ${p.unit}` : ""}` : "—";
-                      return (
-                        <div
-                          key={p.field}
-                          className="flex min-h-11 items-center justify-between gap-3 border-b border-[--hair-divider] px-3 py-2 last:border-b-0"
-                        >
-                          <span className="text-[12.5px] text-muted-foreground">{p.label}</span>
-                          <span className="font-mono text-[13px] tabular-nums text-foreground">{shown}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                        }
+                      />
+                    );
+                  })}
+                  {activeParams.map((p) => {
+                    const raw = resolveCol(openRow, { field: p.field, family: fam, label: p.label } as ColSpec).value;
+                    const n = typeof raw === "number" ? raw : Number(raw);
+                    const shown = Number.isFinite(n) ? `${n}${p.unit ? ` ${p.unit}` : ""}` : "—";
+                    return <MobileRow key={p.field} chevron={false} label={p.label} value={shown} />;
+                  })}
+                </MobilePanel>
               );
             })}
           </div>

@@ -296,7 +296,8 @@ rather than in a diff.
 | Primitives (`src/components/mobile/`) | Done |
 | Chrome — header, tab bar, credit footer, bottom reservation | Done |
 | Simulation Lab + run detail | Done |
-| Policies + policy detail | Not started |
+| Policies — page shell, setup bar, stage list, line sheet | Done |
+| Policies — Run & validate stage (`RunValidateStage.tsx`) | Not started; no mobile branch today |
 | Project Intelligence | Not started |
 | Project Manager | Not started |
 | Network (product / process / firm) | Not started |
