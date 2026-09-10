@@ -284,6 +284,17 @@ rather than in a diff.
   what needs attention at band 3. Its warning acknowledgement is now the
   skin's toggle rather than a checkbox — the same binary control, in the only
   vocabulary the skin has for one.
+- **The network lenses lost their "Network structure" section heading.** The
+  figures under it are §13.4's numbers band, and a stat grid carries no head —
+  the four stat labels name the figures. The kicker-and-hairline rule the three
+  pages drew above each block was a borderless section (§12); every other block
+  is a panel now, and its head is where the section name lives.
+- **The lenses' five-column centrality table is a list of rows.** Same
+  reasoning as the Simulation Lab's ledgers: §9.5 forbids the sideways scroll
+  and §10 asks a dense table to summarise. The identity is the row label, the
+  ranked figure is the value, and every remaining column — labelled — is on the
+  mono sub-line. The desktop table's four prominence thresholds become the
+  row's dot rather than coloured type.
 - **A stat label uppercased by CSS changes a Greek lowercase letter's glyph.**
   "Fill rate α" renders as "FILL RATE Α". The DOM text keeps its case, so
   assistive tech is unaffected, and the reference prototype does the same —
@@ -300,6 +311,6 @@ rather than in a diff.
 | Policies — Run & validate stage (`RunValidateStage.tsx`) | Not started; no mobile branch today |
 | Project Intelligence | Not started |
 | Project Manager | Not started |
-| Network (product / process / firm) | Not started |
+| Network (product / process / firm) — mobile composition | Done; `MLPrediction` inside it is a shared desktop component and unconverted |
 | Developer API · Super Admin · About & help · Auth | Not started |
 | Getting Started | Not started |
