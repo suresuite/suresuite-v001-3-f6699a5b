@@ -131,8 +131,27 @@ export function MobileNavDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  // Stays mounted through the close animation (same duration as the
+  // data-[state=closed]:duration-300 below) instead of the old hard
+  // `if (!open) return null` cut, which is the "it used to slide in" the
+  // user is asking for back. Same motion language as ui/sheet.tsx's
+  // data-state-driven animate-in/out — driven by our own boolean since this
+  // panel isn't Radix-backed, not a new vocabulary.
+  const CLOSE_MS = 300;
+  const [mounted, setMounted] = React.useState(open);
   React.useEffect(() => {
-    if (!open) return;
+    if (open) {
+      setMounted(true);
+      return;
+    }
+    if (!mounted) return;
+    const t = setTimeout(() => setMounted(false), CLOSE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!mounted) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -141,13 +160,20 @@ export function MobileNavDrawer({
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [mounted, onClose]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-40 flex flex-col bg-background md:hidden"
+      data-state={open ? 'open' : 'closed'}
+      className={cn(
+        'fixed inset-x-0 top-0 z-40 flex flex-col bg-background md:hidden',
+        'data-[state=open]:animate-in data-[state=closed]:animate-out',
+        'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
+        'data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left',
+        'data-[state=closed]:duration-300 data-[state=open]:duration-500',
+      )}
       style={{ bottom: `calc(${bottomInsetPx}px + env(safe-area-inset-bottom, 0px))` }}
       role="region"
       aria-label="More"
@@ -160,10 +186,10 @@ export function MobileNavDrawer({
         </div>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto" aria-label="More destinations">
+      <nav className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="More destinations">
         {visibleSections.map((section, i) => (
           <React.Fragment key={i}>
-            {i > 0 && <Separator className="bg-border" />}
+            {i > 0 && <Separator className="my-3 bg-border/50" />}
             {section.items.map((item) => {
               const active = pathname === item.to || pathname.startsWith(item.to + '/');
               const Icon = item.icon;
@@ -173,15 +199,17 @@ export function MobileNavDrawer({
                   to={item.to}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'relative flex min-h-[48px] items-center gap-3',
-                    'border-b border-border px-[clamp(0.75rem,4vw,1.125rem)] text-[14px]',
-                    active ? 'font-medium text-foreground' : 'text-foreground',
+                    'relative flex min-h-[44px] items-center gap-2.5 rounded-md px-2.5',
+                    'text-[13.5px]',
+                    active
+                      ? 'bg-muted/80 font-medium text-foreground'
+                      : 'text-muted-foreground hover:bg-accent',
                   )}
                 >
                   {active && (
                     <span className="absolute inset-y-2 left-0 w-[3px] rounded bg-foreground" />
                   )}
-                  <Icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground" />
+                  <Icon className="h-[15px] w-[15px] shrink-0" />
                   <span className="truncate">{item.label}</span>
                 </Link>
               );
