@@ -333,52 +333,50 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   if (isMobile) {
     return (
       <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-        <div className={PAGE_GUTTER}>
-          <MobileSimulationLab
-            projects={projects as Array<{ id: string; name: string }>}
-            projectId={projectId}
-            onProjectChange={(v) => setGlobalSelectedProjectId(v || null)}
-            scenarios={scenarios}
-            scenariosLoading={loading}
-            selected={selected}
-            selectedId={selectedId}
-            credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
-            onSelectScenario={setSelectedId}
-            onCreateScenario={createScenario}
-            onDuplicateScenario={duplicateScenario}
-            onDeleteScenario={deleteScenario}
-            onBrowseLibrary={() => setLibraryOpen(true)}
-            stressCount={STRESS_TESTS.length}
-            stressOpen={stressOpen}
-            onToggleStress={() => setStressOpen((v) => !v)}
-            onLaunchStress={launchStress}
-            pane={pane}
-            onPane={setPane}
-            onSaveScenario={(patch) => selected && update(selected.id, patch)}
-            projectRecovery={projectRecovery}
-            effectiveRecovery={effectiveRecovery}
-            policyVersionLabel={currentVersionLabel}
-            policyDirty={policyDirty}
-            credibility={credibility}
-            runCredibility={cred.resolveRun(latestRun)}
-            gateFindings={gateFindings}
-            gateBlocks={gateBlocks}
-            gateWarns={gateWarns}
-            ackWarnings={ackWarnings}
-            onAckWarnings={setAckWarnings}
-            runBlockedReason={runBlockedReason}
-            findingsSource={serverFindings ? "gate rejection" : "pre-run check"}
-            supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
-            latestRun={latestRun}
-            reps={reps}
-            runVersionLabel={runVersionLabel}
-            onRun={handleRun}
-            onSaveVersionAndRun={handleSaveVersionAndRun}
-            onCancel={handleCancel}
-            onAddReps={handleAddReps}
-            runsByScenario={runsByScenario}
-          />
-        </div>
+        <MobileSimulationLab
+          projects={projects as Array<{ id: string; name: string }>}
+          projectId={projectId}
+          onProjectChange={(v) => setGlobalSelectedProjectId(v || null)}
+          scenarios={scenarios}
+          scenariosLoading={loading}
+          selected={selected}
+          selectedId={selectedId}
+          credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
+          onSelectScenario={setSelectedId}
+          onCreateScenario={createScenario}
+          onDuplicateScenario={duplicateScenario}
+          onDeleteScenario={deleteScenario}
+          onBrowseLibrary={() => setLibraryOpen(true)}
+          stressCount={STRESS_TESTS.length}
+          stressOpen={stressOpen}
+          onToggleStress={() => setStressOpen((v) => !v)}
+          onLaunchStress={launchStress}
+          pane={pane}
+          onPane={setPane}
+          onSaveScenario={(patch) => selected && update(selected.id, patch)}
+          projectRecovery={projectRecovery}
+          effectiveRecovery={effectiveRecovery}
+          policyVersionLabel={currentVersionLabel}
+          policyDirty={policyDirty}
+          credibility={credibility}
+          runCredibility={cred.resolveRun(latestRun)}
+          gateFindings={gateFindings}
+          gateBlocks={gateBlocks}
+          gateWarns={gateWarns}
+          ackWarnings={ackWarnings}
+          onAckWarnings={setAckWarnings}
+          runBlockedReason={runBlockedReason}
+          findingsSource={serverFindings ? "gate rejection" : "pre-run check"}
+          supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
+          latestRun={latestRun}
+          reps={reps}
+          runVersionLabel={runVersionLabel}
+          onRun={handleRun}
+          onSaveVersionAndRun={handleSaveVersionAndRun}
+          onCancel={handleCancel}
+          onAddReps={handleAddReps}
+          runsByScenario={runsByScenario}
+        />
         {projectId && (
           <ScenarioLibraryPanel
             open={libraryOpen}
