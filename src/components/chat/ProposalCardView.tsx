@@ -87,7 +87,11 @@ export function ProposalCardView({
       )}
       style={{ borderLeft: "2px solid " + color, opacity: proposal.status === "rejected" ? 0.55 : 1 }}
     >
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Inside a two-column wide band this card can be narrower than 320px,
+          and the viewport no longer says so — the container query does
+          (v2 §5.5). Below that width the head stacks rather than wrapping the
+          status onto a line of its own. */}
+      <div className={cn('flex flex-wrap items-center gap-2', skin && 'm-cq-stack')}>
         <span
           className="flex h-[22px] w-[22px] items-center justify-center rounded-sm font-mono text-[9px] font-semibold"
           style={{ background: tint(color, 0.12), color }}

@@ -4,7 +4,7 @@
 // boundary is what keeps these values out of the desktop system.
 
 export { M, M_LABEL, M_MICRO, M_ROW, M_PROSE, M_TITLE, M_STAT, M_CODE, M_FADE } from './tokens';
-export { MobilePanel, MobileRow, MobileNote, MobileChip, MobileDot } from './Panel';
+export { MobilePanel, MobileRow, MobileNote, MobileChip, MobileDot, MobileProse } from './Panel';
 export { MobileStatGrid } from './StatGrid';
 export type { MobileStat } from './StatGrid';
 export {

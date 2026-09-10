@@ -28,7 +28,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { M, M_LABEL, M_MICRO, M_ROW } from './tokens';
+import { M, M_LABEL, M_MICRO, M_PROSE, M_ROW } from './tokens';
 
 interface MobilePanelProps {
   /** The mono micro-label in the head. Sentence case in, uppercased by CSS. */
@@ -311,5 +311,76 @@ export function MobileDot({
       )}
       style={{ background: tone }}
     />
+  );
+}
+
+/**
+ * Prose that clamps by LINES, never by pixels (v2 §5.4).
+ *
+ * A pixel `max-height` on text is the one thing §9.4 rules out: the same 120px
+ * is five lines at 13.5px and three at 15px, and it cuts a word in half at the
+ * boundary. `-webkit-line-clamp` cuts at a line, and the count comes from the
+ * device's height band — 4 lines on an SE, 6 on a 14, 8 on a Pro Max — so a
+ * tall phone shows more of the same block rather than the same amount with
+ * more canvas under it.
+ *
+ * "Show more" expands IN PLACE. Nothing is deferred to another screen and
+ * nothing is lost: this is a first-screen budget, not a truncation.
+ */
+export function MobileProse({
+  children,
+  lines,
+  className,
+}: {
+  children: React.ReactNode;
+  /** Lines before the clamp. Defaults to the device's band via
+   *  `useProseLines()` at the call site — pass a number to override. */
+  lines: number;
+  className?: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [clamped, setClamped] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // Only offer "Show more" when the text actually overflows its clamp —
+  // otherwise every two-line reply grows a control it does not need.
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setClamped(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [children, lines, open]);
+
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-1', className)}>
+      <div
+        ref={ref}
+        className={cn(M_PROSE, 'min-w-0 whitespace-pre-wrap', !open && 'overflow-hidden')}
+        style={
+          open
+            ? undefined
+            : {
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: lines,
+              }
+        }
+      >
+        {children}
+      </div>
+      {(clamped || open) && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="min-h-11 self-start font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252]"
+        >
+          {open ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
   );
 }

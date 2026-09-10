@@ -11,6 +11,8 @@ import React, { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/hooks/useProjectChat";
 import { ActivityGroup, AgentDivider, MessagePart } from "./MessageParts";
 import { ProposalCard } from "@/components/chat/ProposalCard";
+import { MobileProse } from "@/components/mobile";
+import { useProseLines } from "@/hooks/useViewport";
 import { cn } from "@/lib/utils";
 
 interface MessageStreamProps {
@@ -48,6 +50,7 @@ export function MessageStream({
   skin = false,
 }: MessageStreamProps) {
   const streamRef = useRef<HTMLDivElement | null>(null);
+  const proseLines = useProseLines();
   const [, setSavedMemory] = useState<Record<string, boolean>>({});
 
   // Keep the newest turn in view without scrollIntoView.
@@ -76,9 +79,17 @@ export function MessageStream({
           }
           return (
             <div key={m.id}>
-              {m.content && (
-                <div className="whitespace-pre-wrap text-[14px] leading-[1.65] text-foreground">{m.content}</div>
-              )}
+              {m.content &&
+                (skin ? (
+                  // Agent prose clamps by lines on a phone (v2 §5.4): a long
+                  // reply shows what the device can hold and expands in place.
+                  // Nothing is deferred and nothing is lost.
+                  <MobileProse lines={proseLines}>{m.content}</MobileProse>
+                ) : (
+                  <div className="whitespace-pre-wrap text-[14px] leading-[1.65] text-foreground">
+                    {m.content}
+                  </div>
+                ))}
               {(m.parts ?? []).map((part, i) => {
                 // Proposals render via ProposalCard in the app (they need
                 // the proposals hook for approve/apply state).
