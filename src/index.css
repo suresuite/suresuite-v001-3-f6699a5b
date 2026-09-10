@@ -41,8 +41,15 @@
     --surface-sunken: 0 0% 92%;
     /* The mobile skin's page canvas (`docs/mobile-skin-spec.md` §2). Held
        apart from --surface-dense on purpose: the skin is additive below `md`
-       and must not re-tint the desktop canvas, which stays at 92%. */
-    --m-canvas: 0 0% 96%;
+       and must not re-tint the desktop canvas, which stays at 92%.
+
+       93%, not the 96% the skin shipped with. A 4% step against a #fff panel
+       is not a step: panels floated, and the black frame was doing all the
+       separating. At 93% the panel separates from the ground by value, which
+       is what lets the ink head become rare (v2 §2). --surface-dense and
+       --surface-sunken keep their 92% — the desktop canvas is not part of
+       this. */
+    --m-canvas: 0 0% 93%;
     --header-background: 0 0% 99%;
     /* The sticky page-header's bottom border is a rule directly on the canvas,
        so it tracks --hair-rule (#d4d4d4 = 0 0% 83%), not --border. */
@@ -102,6 +109,20 @@
     --fs-section: clamp(13px, 3.6vw, 14px);     /* in-content headings */
     --fs-stat: clamp(18px, 5.4vw, 26px);        /* StatCard value */
     --fs-body: clamp(13px, 3.6vw, 15px);        /* mobile body copy */
+
+    /* ── The mobile skin's half of that scale (v2 §5.3) ──────────────────
+       The skin used to adapt on width only, by a media query it did not
+       have: one set of fixed pixels for every phone from a 320x568 SE to a
+       430x932 Pro Max. These finish the set above rather than starting a
+       parallel one, and every floor is the skin's own minimum — a micro-label
+       never goes below 10px, a row label never below 13.5px, a row never
+       below the 44px touch floor. Same `length:` hint applies. */
+    --fs-micro:  clamp(10px, 2.7vw, 11px);      /* mono sub-lines, counters  */
+    --fs-row:    clamp(13.5px, 3.7vw, 15px);    /* the workhorse row label   */
+    --fs-title:  clamp(17px, 5vw, 21px);        /* screen title (19px @ 390) */
+    --m-gutter:  clamp(14px, 4.1vw, 18px);      /* screen gutter (16px @ 390)*/
+    --m-gap:     clamp(18px, 5.6vw, 24px);      /* gap between groups        */
+    --m-row-y:   clamp(11px, 3.3vw, 14px);      /* row vertical padding      */
 
     /* Additional Vercel-style colors */
     --gray-50: 0 0% 98%;
@@ -202,8 +223,15 @@
     --surface-sunken: 0 0% 92%;
     /* The mobile skin's page canvas (`docs/mobile-skin-spec.md` §2). Held
        apart from --surface-dense on purpose: the skin is additive below `md`
-       and must not re-tint the desktop canvas, which stays at 92%. */
-    --m-canvas: 0 0% 96%;
+       and must not re-tint the desktop canvas, which stays at 92%.
+
+       93%, not the 96% the skin shipped with. A 4% step against a #fff panel
+       is not a step: panels floated, and the black frame was doing all the
+       separating. At 93% the panel separates from the ground by value, which
+       is what lets the ink head become rare (v2 §2). --surface-dense and
+       --surface-sunken keep their 92% — the desktop canvas is not part of
+       this. */
+    --m-canvas: 0 0% 93%;
     --header-background: 0 0% 99%;
     /* The sticky page-header's bottom border is a rule directly on the canvas,
        so it tracks --hair-rule (#d4d4d4 = 0 0% 83%), not --border. */
@@ -287,6 +315,39 @@
 }
 
 @layer utilities {
+  /* ── The dynamic viewport (v2 §5.2) ───────────────────────────────────
+     `100vh` on a phone is the height the viewport has when the URL bar is
+     COLLAPSED, so a `min-h-screen` shell is taller than the window on first
+     paint and the page jumps as the bar retracts. Three declarations, in
+     support order: a browser that knows `dvh` takes the last one, one that
+     knows only `svh` takes the middle, everything else keeps `vh`.
+
+     `dvh` is the right one for a min-height: the shell may grow as the bar
+     collapses, which is the behaviour we want. A FIXED height would jitter,
+     which is why nothing here sets one. */
+  .min-h-dvh {
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+  }
+
+  /* The bottom bands add the device inset to their PADDING, never to their
+     height: spec §4's 58px tab bar and 64px action bar are content bands and
+     stay 58 and 64 above the inset (v2 §5.2). */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+  /* Container queries for anything embedded (v2 §5.5). Tailwind 3.4 has no
+     `@container` variant without the container-queries plugin, and §7 rules
+     out adding a dependency — so the query is written here in plain CSS,
+     which every browser the product supports has shipped since 2023.
+
+     Put `.m-cq` on a panel body; the children then size to the PANEL, not to
+     the viewport, which is what a two-column wide band needs. */
+  .m-cq {
+    container-type: inline-size;
+    container-name: mpanel;
+  }
+
   .tabular-nums { font-variant-numeric: tabular-nums; }
   .shadow-xs { box-shadow: var(--shadow-xs); }
   .shadow-sharp-sm { box-shadow: var(--shadow-sm); }
@@ -377,5 +438,19 @@
     .mascot-blink {
       animation: none !important;
     }
+  }
+}
+/* The embedded-panel breakpoints (v2 §5.5). A panel narrower than 320px is
+   inside a two-column wide band or a split pane; it drops to one column and
+   gives up the horizontal pairs the full-width panel can afford. */
+@container mpanel (max-width: 319px) {
+  .m-cq-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .m-cq-hide {
+    display: none;
   }
 }

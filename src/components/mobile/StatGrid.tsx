@@ -5,9 +5,11 @@
 // line, no confidence line, no unit spelled out twice. Precision that matters
 // (±0.03, n = 50) belongs on the detail screen (spec §6).
 //
-// The grid separates with 1px gap lines rather than borders — a #d4d4d4 fill
-// showing through a 1px `gap`, so every internal rule is exactly one pixel at
-// every device ratio and the outer frame is the same single border.
+// The grid separates with 1px gap lines rather than borders — a fill showing
+// through a 1px `gap`, so every internal rule is exactly one pixel at every
+// device ratio. Two weights, as everywhere else in v2: the outer frame is
+// #d4d4d4 because it touches the canvas, the gap lines are #e8e8ea because
+// they are inside the object.
 //
 // Column count is not `auto-fit` by default, and that is the point. `auto-fit`
 // with four cells orphans the fourth onto a row of its own at the widths where
@@ -71,7 +73,7 @@ export function MobileStatGrid({
   return (
     <div
       className={cn(
-        'grid gap-px overflow-hidden rounded-[4px] border border-[#d4d4d4] bg-[#d4d4d4]',
+        'grid gap-px overflow-hidden rounded-[4px] border border-[#d4d4d4] bg-[#e8e8ea]',
         className,
       )}
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
@@ -101,7 +103,7 @@ export function MobileStatGrid({
           <span
             className={cn(
               valueSize,
-              'font-semibold leading-[1.05] tracking-[-0.022em] tabular-nums text-[#18181b]',
+              'font-semibold leading-[1.05] tracking-[-0.022em] tabular-nums text-[#171717]',
             )}
           >
             {s.value}

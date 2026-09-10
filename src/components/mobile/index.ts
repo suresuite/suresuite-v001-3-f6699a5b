@@ -16,4 +16,4 @@ export {
   MobileStepper,
 } from './Controls';
 export type { SegmentedItem } from './Controls';
-export { MobileScreen } from './Screen';
+export { MobileScreen, MobileGroup, MobileGroupGrid } from './Screen';
