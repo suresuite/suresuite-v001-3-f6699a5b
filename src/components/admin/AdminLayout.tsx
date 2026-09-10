@@ -2,7 +2,7 @@
 // active item uses the SuReSuite red rail + soft-grey pill (bg-muted/80), and
 // spacing is tightened to the Ledger language. Drop-in replacement for
 // src/components/admin/AdminLayout.tsx.
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -16,7 +16,10 @@ import {
 } from 'lucide-react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { PAGE_GUTTER } from '@/components/shared/PageBody';
+import { PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared/PageBody';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import { M, MobilePanel, MobileRow } from '@/components/mobile';
 import { cn } from '@/lib/utils';
 
 interface AdminLayoutProps {
@@ -62,6 +65,11 @@ export function AdminLayout({
 }: AdminLayoutProps) {
   const { pathname } = useLocation();
   const activeRef = useRef<HTMLAnchorElement>(null);
+  const isMobile = useIsMobile();
+  const [navOpen, setNavOpen] = useState(false);
+
+  const active =
+    ADMIN_NAV.find((i) => (i.end ? pathname === i.to : pathname.startsWith(i.to))) ?? ADMIN_NAV[0];
 
   useEffect(() => {
     const el = activeRef.current;
@@ -73,8 +81,9 @@ export function AdminLayout({
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={PAGE_GUTTER}>
+      <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
         <PageHeader
+          skin={isMobile}
           title={title}
           subtitle={subtitle}
           rightContent={actions}
@@ -84,9 +93,48 @@ export function AdminLayout({
           backLabel={backLabel}
         />
 
-        {/* Horizontal tab nav — same TabsList/TabsTrigger treatment as Developer API.
-            overflow-x-auto is the real fix: at 390px this strip is ~855px wide against
-            a ~336px container, so without it the last five tabs are unreachable. */}
+        {/* Below `md` the eight sections are a row that names where you are
+            and a sheet that holds all eight (v2 §4B). The strip is ~855px wide
+            against a ~336px container, so it scrolled sideways — which §9.5
+            allows only inside a deliberate table sheet or a code block, and
+            which hid five of the eight destinations behind a swipe. Same
+            eight, same order, same labels, same routes; one of them is now
+            visible rather than five of them hidden. */}
+        {isMobile ? (
+          <div className="mb-[var(--m-gap)] flex flex-col gap-[var(--m-gap)]">
+            <MobilePanel label="Super admin" counter={`${ADMIN_NAV.length} sections`}>
+              <MobileRow
+                dot={M.ink}
+                label={active.label}
+                sub="tap to switch section"
+                onClick={() => setNavOpen(true)}
+              />
+            </MobilePanel>
+
+            <MobileSheet
+              open={navOpen}
+              title="Super admin"
+              sub="Every section of the admin console."
+              onClose={() => setNavOpen(false)}
+            >
+              <div className="flex flex-col">
+                {ADMIN_NAV.map((item) => {
+                  const isActive = item.end ? pathname === item.to : pathname.startsWith(item.to);
+                  return (
+                    <NavLink key={item.to} to={item.to} end={item.end} onClick={() => setNavOpen(false)}>
+                      <MobileRow
+                        dot={isActive ? M.ink : undefined}
+                        label={item.label}
+                        chevron={!isActive}
+                        value={isActive ? '✓' : undefined}
+                      />
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </MobileSheet>
+          </div>
+        ) : (
         <div
           className="mb-5 flex h-auto max-w-full items-stretch gap-0.5 overflow-x-auto rounded-sm
                      border border-[--hair-border] bg-white p-[3px]
@@ -115,6 +163,7 @@ export function AdminLayout({
             );
           })}
         </div>
+        )}
 
         <main className="min-w-0">{children}</main>
       </div>

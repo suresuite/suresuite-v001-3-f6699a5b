@@ -10,6 +10,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { MobilePanel } from '@/components/mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { SURFACE, KX, StatusDot, Segmented, MonoChip, type Tri } from '@/components/admin/adminUi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -251,6 +253,19 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
 }
 
 function Section({ title, badge, children }: { title: string; badge?: string; children: React.ReactNode }) {
+  const isMobile = useIsMobile();
+
+  // v2 §4B: below `md` a section is the panel — its title is the head's mono
+  // micro-label and the badge is the head's one counter, which is exactly what
+  // the head is for. Above `md` it is the SURFACE card it has always been.
+  if (isMobile) {
+    return (
+      <MobilePanel label={title} counter={badge} bare bodyClassName="px-3 py-2">
+        {children}
+      </MobilePanel>
+    );
+  }
+
   return (
     <section className={`${SURFACE} p-4`}>
       <div className="mb-3 flex items-center gap-2">
@@ -264,15 +279,15 @@ function Section({ title, badge, children }: { title: string; badge?: string; ch
 
 function CapMatrix({ rows, isSuper, onSet }: { rows: CapRow[]; isSuper: boolean; onSet: (row: CapRow, tri: Tri) => void }) {
   return (
-    <div className="divide-y divide-[--hair-divider]">
+    <div className="divide-y divide-[#e8e8ea] md:divide-[--hair-divider]">
       {rows.map((row) => {
         const locked = ALWAYS_ON.has(row.key);
         return (
           <div key={row.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 md:gap-y-3">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 text-[13px] font-medium">{row.label}{locked && <Lock className="h-3 w-3 text-muted-foreground" />}</div>
+              <div className="flex items-center gap-1.5 text-[length:var(--fs-row)] font-medium text-[#171717] md:text-[13px] md:text-foreground">{row.label}{locked && <Lock className="h-3 w-3 text-muted-foreground" />}</div>
             </div>
-            <span className="shrink-0 font-mono text-[10px] text-[#a3a3a3]">default {row.role_default ? 'allow' : 'deny'}</span>
+            <span className="shrink-0 font-mono text-[10px] text-[#6b6b6b] md:text-[#a3a3a3]">default {row.role_default ? 'allow' : 'deny'}</span>
             {locked || isSuper ? (
               <span className="w-full text-right text-[11px] text-muted-foreground sm:w-[210px]">{locked ? 'Always available' : 'Full access'}</span>
             ) : (
@@ -290,7 +305,7 @@ function CapMatrix({ rows, isSuper, onSet }: { rows: CapRow[]; isSuper: boolean;
 
 function UsageStat({ label, value, cap, over }: { label: string; value: string; cap?: string; over?: boolean }) {
   return (
-    <div className="rounded-sm border border-[--hair-border] px-3 py-2">
+    <div className="rounded-[4px] border border-[#d4d4d4] px-3 py-2 md:rounded-sm md:border-[--hair-border]">
       <div className={KX}>{label}</div>
       <div className={`mt-1 text-sm font-semibold ${over ? 'text-[#bf2330]' : ''}`}>{value}</div>
       {cap && <div className="text-[11px] text-muted-foreground">{cap}</div>}

@@ -4,8 +4,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { SURFACE, TH, TD, ROW_HOVER, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import {
+  SURFACE, TH, TD, ROW_HOVER, EmptyRow, LoadingRow, useTableSort, useColumnFilters,
+  AdminMobileList, AdminMobileRow,
+} from '@/components/admin/adminUi';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import { M_CODE, MobileRow } from '@/components/mobile';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useRowBudget } from '@/hooks/useViewport';
+import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface AuditRow {
@@ -17,6 +24,9 @@ const db = supabase as any;
 
 export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
   const isMobile = useIsMobile();
+  const entryBudget = useRowBudget(4, 6, 9);
+  const [openEntryId, setOpenEntryId] = useState<string | null>(null);
+  const [allOpen, setAllOpen] = useState(false);
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,35 +55,47 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
     action: (r: AuditRow) => r.action.toLowerCase(), target: (r: AuditRow) => (r.target_type || '').toLowerCase(),
   }), []);
   const { sorted, SortTH } = useTableSort(filtered, sortGetters);
+  const openEntry = rows.find((r) => r.id === openEntryId) ?? null;
 
   return (
     <AdminLayout
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Audit Log" onRefresh={load} refreshLoading={loading}
     >
       {isMobile ? (
-        <div className={`${SURFACE} overflow-hidden`}>
-          {loading ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
-          ) : sorted.length === 0 ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">No audit entries yet.</div>
-          ) : (
-            sorted.map((r) => (
-              <div key={r.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{r.actor_name || '—'}</span>
-                  <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground" title={r.action}>{r.action}</span>
-                </div>
-                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
-                  {new Date(r.created_at).toLocaleString()} · {r.target_type}{r.target_id ? `:${r.target_id.slice(0, 8)}` : ''}
-                </div>
-                <div className="mt-2 break-words font-mono text-[10.5px] leading-relaxed text-[#737373]">
-                  <span className="text-[#a3a3a3]">before</span> {r.before ? JSON.stringify(r.before) : '—'}<br />
-                  <span className="text-[#a3a3a3]">after</span> {r.after ? JSON.stringify(r.after) : '—'}
-                </div>
-              </div>
-            ))
+        // The five-column ledger summarises into rows; the diff each entry
+        // records is what the row opens, in full, rather than four wrapped
+        // mono lines under every entry (§10, v2 §5.4).
+        <AdminMobileList
+          label="Audit log"
+          counter={`${sorted.length}`}
+          loading={loading}
+          empty={sorted.length === 0 ? 'No audit entries yet.' : undefined}
+        >
+          {sorted.slice(0, entryBudget).map((r) => (
+            <AdminMobileRow
+              key={r.id}
+              label={r.actor_name || '—'}
+              sub={`${r.action} · ${new Date(r.created_at).toLocaleString()} · ${r.target_type}${
+                r.target_id ? `:${r.target_id.slice(0, 8)}` : ''
+              }`}
+              actionsTitle={r.action}
+              actions={[
+                {
+                  label: 'Show the change',
+                  sub: 'before and after, as recorded',
+                  onClick: () => setOpenEntryId(r.id),
+                },
+              ]}
+            />
+          ))}
+          {sorted.length > entryBudget && (
+            <MobileRow
+              label={`All ${sorted.length} entries`}
+              sub={`${sorted.length - entryBudget} more`}
+              onClick={() => setAllOpen(true)}
+            />
           )}
-        </div>
+        </AdminMobileList>
       ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
@@ -107,6 +129,67 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
           </table>
         </div>
       </div>
+      )}
+
+      {isMobile && (
+        <>
+          {/* The diff, in full — an error message and a recorded change are
+              both on the never-truncate list (§3.1). */}
+          <MobileSheet
+            open={openEntry != null}
+            title={openEntry?.action ?? ''}
+            sub={
+              openEntry
+                ? `${openEntry.actor_name || '—'} · ${new Date(openEntry.created_at).toLocaleString()}`
+                : undefined
+            }
+            onClose={() => setOpenEntryId(null)}
+          >
+            {openEntry && (
+              <div className="flex flex-col gap-3 p-3.5">
+                <div className="flex flex-col gap-1">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252]">
+                    Before
+                  </span>
+                  <span className={cn(M_CODE, 'leading-relaxed text-[#3f3f46]')}>
+                    {openEntry.before ? JSON.stringify(openEntry.before) : '—'}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252]">
+                    After
+                  </span>
+                  <span className={cn(M_CODE, 'leading-relaxed text-[#3f3f46]')}>
+                    {openEntry.after ? JSON.stringify(openEntry.after) : '—'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </MobileSheet>
+
+          <MobileSheet
+            open={allOpen}
+            title="Audit log"
+            sub={`${sorted.length} entries, newest first.`}
+            onClose={() => setAllOpen(false)}
+          >
+            <div className="flex flex-col">
+              {sorted.map((r) => (
+                <MobileRow
+                  key={r.id}
+                  label={r.actor_name || '—'}
+                  sub={`${r.action} · ${new Date(r.created_at).toLocaleString()} · ${r.target_type}${
+                    r.target_id ? `:${r.target_id.slice(0, 8)}` : ''
+                  }`}
+                  onClick={() => {
+                    setAllOpen(false);
+                    setOpenEntryId(r.id);
+                  }}
+                />
+              ))}
+            </div>
+          </MobileSheet>
+        </>
       )}
     </AdminLayout>
   );

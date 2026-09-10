@@ -7,9 +7,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { SURFACE, KX, TH, TD, ROW_HOVER, StatusDot, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters, type DotTone } from '@/components/admin/adminUi';
+import { AdminMobileList, SURFACE, KX, TH, TD, ROW_HOVER, StatusDot, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters, type DotTone } from '@/components/admin/adminUi';
 import { TableBlock, FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import { M, MobileRow } from '@/components/mobile';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useRowBudget } from '@/hooks/useViewport';
 import { aggregateMatrixByModel, type ModelCapabilityRow, type ModelMatrixAggregate } from '@/lib/modelMatrix';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -29,6 +32,8 @@ const db = supabase as any;
 
 export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
   const isMobile = useIsMobile();
+  const usageBudget = useRowBudget(5, 8, 12);
+  const [allUsageOpen, setAllUsageOpen] = useState(false);
   const [rows, setRows] = useState<LogRow[]>([]);
   const [fileRows, setFileRows] = useState<OrgFileUsageRow[]>([]);
   const [matrixRows, setMatrixRows] = useState<ModelMatrixAggregate[]>([]);
@@ -86,39 +91,44 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
       actions={<Button variant="outline" size="sm" className="rounded-sm" onClick={exportCsv}>Export CSV</Button>}
     >
       {isMobile ? (
-        <div className={`${SURFACE} overflow-hidden`}>
-          {loading ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
-          ) : sorted.length === 0 ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">No usage recorded yet. Trigger a chat request to see logs here.</div>
-          ) : (
-            sorted.map((r) => (
-              <div key={r.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{r.user_name || '—'}</span>
-                  <span className="shrink-0"><StatusDot tone={statusTone(r.status)} label={r.status} /></span>
-                </div>
-                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
-                  {new Date(r.created_at).toLocaleString()} · {r.model_code || '—'}
-                </div>
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Total tok</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{Number(r.total_tokens).toLocaleString()}</span>
-                  </span>
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Cost</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">${Number(r.cost_usd).toFixed(4)}</span>
-                  </span>
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Latency</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{r.latency_ms ?? '—'}</span>
-                  </span>
-                </div>
-              </div>
-            ))
+        <AdminMobileList
+          label="AI usage"
+          counter={`${sorted.length}`}
+          loading={loading}
+          empty={
+            sorted.length === 0
+              ? 'No usage recorded yet. Trigger a chat request to see logs here.'
+              : undefined
+          }
+        >
+          {sorted.slice(0, usageBudget).map((r) => (
+            <MobileRow
+              key={r.id}
+              chevron={false}
+              dot={
+                statusTone(r.status) === 'active'
+                  ? M.process
+                  : statusTone(r.status) === 'error'
+                    ? M.blocking
+                    : M.idle
+              }
+              label={r.user_name || '—'}
+              sub={`${new Date(r.created_at).toLocaleString()} · ${r.model_code || '—'} · ${r.status} · ${Number(
+                r.prompt_tokens,
+              ).toLocaleString()} + ${Number(r.completion_tokens).toLocaleString()} tok · ${
+                r.latency_ms ?? '—'
+              } ms`}
+              value={`$${Number(r.cost_usd).toFixed(4)}`}
+            />
+          ))}
+          {sorted.length > usageBudget && (
+            <MobileRow
+              label={`All ${sorted.length} requests`}
+              sub={`${sorted.length - usageBudget} more`}
+              onClick={() => setAllUsageOpen(true)}
+            />
           )}
-        </div>
+        </AdminMobileList>
       ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
@@ -213,6 +223,37 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
             swipe the table sideways for the remaining columns
           </p>
         </TableBlock>
+      )}
+      {isMobile && (
+        <MobileSheet
+          open={allUsageOpen}
+          title="AI usage"
+          sub={`${sorted.length} requests, newest first, with every column the ledger has.`}
+          onClose={() => setAllUsageOpen(false)}
+        >
+          <div className="flex flex-col">
+            {sorted.map((r) => (
+              <MobileRow
+                key={r.id}
+                chevron={false}
+                dot={
+                  statusTone(r.status) === 'active'
+                    ? M.process
+                    : statusTone(r.status) === 'error'
+                      ? M.blocking
+                      : M.idle
+                }
+                label={r.user_name || '—'}
+                sub={`${new Date(r.created_at).toLocaleString()} · ${r.model_code || '—'} · ${r.status} · ${Number(
+                  r.prompt_tokens,
+                ).toLocaleString()} + ${Number(r.completion_tokens).toLocaleString()} tok · ${
+                  r.latency_ms ?? '—'
+                } ms`}
+                value={`$${Number(r.cost_usd).toFixed(4)}`}
+              />
+            ))}
+          </div>
+        </MobileSheet>
       )}
     </AdminLayout>
   );

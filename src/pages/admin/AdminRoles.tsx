@@ -6,6 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, TH, TD, ROW_HOVER, Toggle } from '@/components/admin/adminUi';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import { M, MobileGroup, MobileNote, MobilePanel, MobileRow, MobileToggle } from '@/components/mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
@@ -20,6 +23,8 @@ const ALWAYS_ON = new Set(['/profile']);
 
 export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
   const { user: actor } = useAuth();
+  const isMobile = useIsMobile();
+  const [openCapKey, setOpenCapKey] = useState<string | null>(null);
   const [caps, setCaps] = useState<Cap[]>([]);
   const [roles, setRoles] = useState<RoleMap>({});
   const [loading, setLoading] = useState(true);
@@ -46,6 +51,39 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
     if (err) { toast.error(err.message); load(); }
     else toast.success(`${role} · ${cap.label}: ${allowed ? 'allowed' : 'denied'}`);
   };
+
+  const allowedCount = (cap: Cap) =>
+    ROLE_ORDER.filter((role) => role === 'super_admin' || ALWAYS_ON.has(cap.key) || !!roles[role]?.[cap.key])
+      .length;
+
+  const openCap = caps.find((c) => c.key === openCapKey) ?? null;
+
+  // Below `md` the 5x N matrix is a list, not a sideways-scrolling grid. §9.5
+  // allows horizontal scroll only inside a deliberate table sheet, and the
+  // "swipe for the remaining roles" hint was an admission that three of the
+  // four roles were off-screen. Each capability is a row that says how many
+  // roles have it; tapping it opens the four toggles — the same four, with the
+  // same forced-on locks and the same handler (v2 §4B).
+  const renderMobileSection = (title: string, rows: Cap[]) => (
+    <MobileGroup label={title} key={title}>
+      <MobilePanel label={title} counter={`${rows.length}`}>
+        {rows.map((cap) => {
+          const locked = ALWAYS_ON.has(cap.key);
+          const on = allowedCount(cap);
+          return (
+            <MobileRow
+              key={cap.key}
+              dot={on === ROLE_ORDER.length ? M.process : on === 1 ? M.idle : undefined}
+              label={cap.label}
+              sub={locked ? 'always on · ' + cap.key : cap.key}
+              value={`${on}/${ROLE_ORDER.length}`}
+              onClick={() => setOpenCapKey(cap.key)}
+            />
+          );
+        })}
+      </MobilePanel>
+    </MobileGroup>
+  );
 
   const renderSection = (title: string, rows: Cap[]) => (
     <div>
@@ -98,6 +136,50 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
         <div className="grid h-40 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
       ) : error ? (
         <div className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-4 text-sm text-[#bf2330]">{error}</div>
+      ) : isMobile ? (
+        <div className="flex flex-col gap-[var(--m-gap)]">
+          {/* §13.6 — the screen's one caveat, and it is a caveat rather than a
+              blocking consequence: it explains two locks, it does not stop
+              anyone. */}
+          <MobileNote tone="caveat" mark="·">
+            Super admins and My Profile are always on. Their toggles are shown, locked and
+            explained rather than hidden.
+          </MobileNote>
+          {renderMobileSection('Pages', pages)}
+          {renderMobileSection('Features', features)}
+
+          <MobileSheet
+            open={openCap != null}
+            title={openCap?.label ?? ''}
+            sub={openCap ? `${openCap.key} — which roles get this by default.` : undefined}
+            onClose={() => setOpenCapKey(null)}
+          >
+            {openCap && (
+              <div className="flex flex-col">
+                {ROLE_ORDER.map((role) => {
+                  const forcedOn = role === 'super_admin' || ALWAYS_ON.has(openCap.key);
+                  const checked = forcedOn ? true : !!roles[role]?.[openCap.key];
+                  return (
+                    <MobileRow
+                      key={role}
+                      chevron={false}
+                      label={role.replace('_', ' ')}
+                      sub={forcedOn ? 'always on — cannot be changed' : undefined}
+                      trailing={
+                        <MobileToggle
+                          checked={checked}
+                          disabled={forcedOn}
+                          label={`${role} · ${openCap.label}`}
+                          onChange={(v) => setCell(role, openCap, v)}
+                        />
+                      }
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </MobileSheet>
+        </div>
       ) : (
         <div className="space-y-5">
           <div className="inline-flex items-center gap-1.5 rounded-sm border border-[--zinc-border] px-2.5 py-1 text-[11.5px] text-muted-foreground">
