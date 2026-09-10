@@ -28,22 +28,26 @@ export const ROW_HOVER = "hover:bg-[#fcfcfc]";
  * The in-MESSAGE table (MessageParts.TablePart) — NOT the ledger above.
  *
  * A table inside an assistant reply is a quiet block in a card, not a Ledger:
- * the demo gives it a light #fafafa header with grey mono labels and hairline
- * #ebebeb / #f4f4f4 rules, and sets every cell in mono so figures line up
- * column to column. The ink TH is right for a full-page ledger and far too
- * loud for three rows inside a chat bubble.
+ * a light #fafafa header with mono labels and hairline rules, every cell in
+ * mono so figures line up column to column. The ink TH is right for a
+ * full-page ledger and far too loud for three rows inside a chat bubble.
  *
  * Mobile value first, `md:` restoring the ledger literal — desktop renders
  * exactly what it rendered before (spec §2.5C).
+ *
+ * v2 §2 moves the mobile half onto the separation model: the head sits on
+ * #fafafa above the outer rule, the body divides on the inner one, and the
+ * label rises from the retired #8a8a8a to the ink ladder's #525252. Every
+ * `md:` term is untouched.
  */
 export const TH_MESSAGE =
   "px-2.5 text-left font-mono text-[10px] font-medium uppercase tracking-[0.14em] whitespace-nowrap " +
-  "bg-[#fafafa] py-[7px] text-[#8a8a8a] border-b border-b-[#ebebeb] " +
+  "bg-[#fafafa] py-[7px] text-[#525252] border-b border-b-[#d4d4d4] " +
   "md:border-b-0 md:bg-[--brand-ink] md:py-1.5 md:text-white md:border-r md:border-r-[rgba(255,255,255,0.22)] md:last:border-r-0";
 
 export const TD_MESSAGE =
   "px-2.5 text-[12.5px] text-foreground border-b " +
-  "py-[7px] font-mono whitespace-nowrap border-b-[#f4f4f4] " +
+  "py-[7px] font-mono whitespace-nowrap border-b-[#e8e8ea] " +
   "md:py-1.5 md:font-sans md:whitespace-normal md:border-b-[--hair-divider]";
 export const MONO = "font-mono";
 
@@ -109,7 +113,7 @@ export function MonoChip({
       style={
         color
           ? { background: tint(color, 0.1), color }
-          : { background: "#f4f4f4", color: "var(--hair-quiet)" }
+          : { background: "#eeeef0", color: "var(--hair-quiet)" }
       }
     >
       {children}

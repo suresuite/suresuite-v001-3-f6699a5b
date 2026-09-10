@@ -148,7 +148,7 @@ const SIMULATION_STATS = [
 
 function StatViewport({ stats }: { stats: { label: string; value: string }[] }) {
   return (
-    <div className="relative min-h-[220px] lg:h-[500px] bg-black">
+    <div className="relative min-h-[clamp(200px,26dvh,260px)] bg-black lg:h-[500px]">
       <div className="grid h-full place-content-center p-5 md:p-8">
         <div className="grid grid-cols-1 gap-px border border-white/10 bg-white/10 sm:grid-cols-2">
           {stats.map((s) => (
@@ -269,7 +269,7 @@ export default function Landing() {
   return (
     <div className="min-h-dvh flex flex-col overflow-x-hidden bg-background text-foreground">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-[--hair-rule] bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:px-6">
           <Link to="/" className="flex items-center">
             <img
@@ -323,14 +323,14 @@ export default function Landing() {
             <Link
               to="/about"
               onClick={() => setMobileNavOpen(false)}
-              className="flex min-h-11 items-center border-b border-border/60 text-sm font-medium"
+              className="flex min-h-11 items-center border-b border-[--hair-rule] text-sm font-medium"
             >
               About
             </Link>
             <a
               href="#video"
               onClick={() => setMobileNavOpen(false)}
-              className="flex min-h-11 items-center border-b border-border/60 text-sm font-medium"
+              className="flex min-h-11 items-center border-b border-[--hair-rule] text-sm font-medium"
             >
               Demo
             </a>
@@ -347,9 +347,9 @@ export default function Landing() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden border-b border-border/60">
+        <section className="relative overflow-hidden border-b border-[--hair-rule]">
           <HeroRipple />
-          <div className="relative mx-auto max-w-6xl px-5 pt-12 pb-9 md:px-6 md:pt-20 md:pb-24">
+          <div className="relative mx-auto max-w-6xl px-5 pt-[clamp(48px,11vw,80px)] pb-[clamp(40px,10vw,96px)] md:px-6">
             {/* Eyebrow */}
             <span className="inline-flex items-center rounded-sm border border-border bg-card px-3 py-1.5">
               <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#BF2330]" />
@@ -361,12 +361,16 @@ export default function Landing() {
 
             {/* Headline block */}
             <div className="mt-9 max-w-4xl">
-              <h1 className="text-[31px] font-semibold leading-[1.08] tracking-[-0.024em] text-balance
+              {/* v2 §5.6: the headline steps once at `md` and then not again,
+                  so a 320px phone and a 430px one get the same 31px. It is
+                  fluid now — 30px at 320, 36px at 430, the 60px desktop
+                  literal from 706px up, where the `md:` term takes over. */}
+              <h1 className="text-[length:clamp(30px,8.5vw,60px)] font-semibold leading-[1.08] tracking-[-0.024em] text-balance
                              md:text-6xl md:leading-[1.03] md:tracking-tight">
                 Design supply chains that survive{' '}
                 <span className="font-serif italic font-medium">the next shock.</span>
               </h1>
-              <p className="mt-5 max-w-xl text-[16px] leading-[1.62] text-muted-foreground text-pretty
+              <p className="mt-5 max-w-xl text-[length:clamp(15px,4vw,18px)] leading-[1.62] text-muted-foreground text-pretty
                             md:mt-7 md:text-lg md:leading-relaxed">
                 Build a digital twin of your network, run rigorous experiments, and pick
                 the strategy that holds up under pressure
@@ -400,7 +404,9 @@ export default function Landing() {
                   The depth of a research lab, the speed of a workspace.
                 </h2>
               </div>
-              <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+              {/* v2 §5.6: auto-fit with a `min()` floor, so a single column at
+                  320px never overflows and no cell is orphaned on the way up. */}
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-px overflow-hidden rounded-md border border-border bg-border">
                 {WHY_TEAMS.map((item, i) => {
                   const Icon = item.icon;
                   return (
@@ -431,15 +437,15 @@ export default function Landing() {
         </section>
 
         {/* Deep network AI — the 3D model, three lenses */}
-        <section className="border-b border-border/60 bg-black text-white">
-          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
+        <section className="border-b border-[--hair-rule] bg-black text-white">
+          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="grid items-stretch gap-10 md:gap-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
               {/* Left: copy + lenses */}
               <div className="max-w-md">
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#BF2330]">
                   Deep network AI
                 </span>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight leading-[1.1] text-white">
+                <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight leading-[1.1] text-white">
                   One network, <span className="font-serif italic font-medium">three lenses.</span>
                 </h2>
                 <p className="mt-4 text-base leading-relaxed text-white/70">
@@ -483,7 +489,10 @@ export default function Landing() {
                         'radial-gradient(ellipse 54% 26% at 46% 72%, rgba(214,168,20,0.16), transparent 70%)',
                     }}
                   />
-                  <div className="relative h-[300px] md:h-[460px] lg:h-[560px]">
+                  {/* v2 §5.6: a ratio and a dvh cap, never a fixed pixel
+                      height — 300px is a third of a 932px phone and two
+                      thirds of a landscape one. */}
+                  <div className="relative aspect-[4/3] max-h-[60dvh] w-full md:aspect-[16/10] md:max-h-none md:h-[460px] lg:h-[560px]">
                     <NetworkVisualization3D />
                   </div>
                 </div>
@@ -496,11 +505,11 @@ export default function Landing() {
         </section>
 
         {/* See SuReSuite in two minutes — intro video */}
-        <section id="video" className="border-b border-border/60">
-          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
+        <section id="video" className="border-b border-[--hair-rule]">
+          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>Introduction</span>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+              <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">
                 See SuReSuite in <span className="font-serif italic font-medium">two minutes.</span>
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
@@ -522,11 +531,11 @@ export default function Landing() {
         </section>
 
         {/* Technical Architecture */}
-        <section className="border-t border-border/60">
-          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
+        <section className="border-t border-[--hair-rule]">
+          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>01 / 02 — Architecture</span>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+              <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">
                 SuReSuite Technical Architecture
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
@@ -700,7 +709,7 @@ export default function Landing() {
         </section>
 
         {/* CTA band — black, highlighted */}
-        <section className="relative overflow-hidden border-t border-border/60 bg-black text-white">
+        <section className="relative overflow-hidden border-t border-[--hair-rule] bg-black text-white">
           <div
             aria-hidden
             className="absolute inset-0 opacity-50"
@@ -709,13 +718,13 @@ export default function Landing() {
                 'radial-gradient(ellipse 50% 80% at 80% 50%, rgba(191,35,48,0.18), transparent 70%)',
             }}
           />
-          <div className="relative mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
+          <div className="relative mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
                   Next step
                 </span>
-                <h3 className="mt-3.5 max-w-2xl text-3xl font-semibold tracking-tight leading-tight text-white">
+                <h3 className="mt-3.5 max-w-2xl text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight leading-tight text-white">
                   Put your supply chain under pressure —{' '}
                   <span className="font-serif italic font-medium">on purpose.</span>
                 </h3>
@@ -734,19 +743,19 @@ export default function Landing() {
         </section>
 
         {/* Roadmap */}
-        <section className="border-t border-border/60">
-          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
+        <section className="border-t border-[--hair-rule]">
+          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>02 / 02 — Roadmap</span>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Roadmap</h2>
+              <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">Roadmap</h2>
               <p className="mt-4 text-base text-muted-foreground">What we're building next.</p>
             </div>
 
-            <div className="mt-10 border-t border-border/60 md:mt-12">
+            <div className="mt-10 border-t border-[--hair-rule] md:mt-12">
               {ROADMAP.map((item) => (
                 <div
                   key={item.title}
-                  className="grid gap-2 border-b border-border/60 py-6 md:grid-cols-12 md:gap-6"
+                  className="grid gap-2 border-b border-[--hair-rule] py-6 md:grid-cols-12 md:gap-6"
                 >
                   <div className="flex items-center justify-between md:contents">
                     <span className={`${KICKER} md:col-span-2 md:pt-1`}>{item.phase}</span>
@@ -765,8 +774,8 @@ export default function Landing() {
         </section>
 
         {/* Funding & attribution — content KEPT VERBATIM */}
-        <section className="border-t border-border/60 bg-black text-white">
-          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-16">
+        <section className="border-t border-[--hair-rule] bg-black text-white">
+          <div className="mx-auto max-w-6xl px-5 py-[clamp(40px,10vw,64px)] md:px-6">
             <div className="grid grid-cols-1 gap-y-10 md:grid-cols-12 md:gap-x-6 items-start">
               <div className="md:col-span-4">
                 <img src="/logo3.png" alt="Digital SC Lab" className="h-auto max-h-12 w-auto max-w-full mb-4" />
@@ -792,8 +801,10 @@ export default function Landing() {
       </main>
 
       {/* Slim footer */}
-      <footer className="border-t border-border/60">
-        <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 md:px-6 md:py-0 text-xs text-muted-foreground">
+      <footer className="border-t border-[--hair-rule]">
+        {/* v2 §5.6: no tab bar here, but the home indicator is still there —
+            the last band adds the inset to its padding. */}
+        <div className="pb-safe mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 text-xs text-muted-foreground md:px-6 md:py-0">
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>

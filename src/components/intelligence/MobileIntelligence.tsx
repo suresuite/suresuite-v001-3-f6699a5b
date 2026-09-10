@@ -747,8 +747,9 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           // §2: the thread canvas is white — the conversation IS the page
           // here, so it gets the panel interior rather than the page ground.
           className="bg-white"
-          containerClassName="px-4 pb-[18px] pt-3.5"
+          containerClassName="px-[var(--m-gutter)] pb-[18px] pt-3.5"
           userBubbleClassName="rounded-[16px] rounded-br-[4px] px-3.5 py-2.5 text-[14.5px] leading-[1.5]"
+          skin
         />
       )}
 

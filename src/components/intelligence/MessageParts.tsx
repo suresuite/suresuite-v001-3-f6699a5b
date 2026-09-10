@@ -48,12 +48,12 @@ export function EvidencePart({ data }: { data: any }) {
       {open && (
         <div className={cn(CARD, "mt-1.5")} style={accent("#9a9a9a")}>
           {fallback && (
-            <div className="border-b border-b-[#ebebeb] px-2.5 py-2 text-[11.5px] text-muted-foreground md:border-b-[--hair-border]">
+            <div className="border-b border-b-[#e8e8ea] px-2.5 py-2 text-[11.5px] text-muted-foreground md:border-b-[--hair-border]">
               The drafted reply couldn't be traced to project data, so a grounded fallback shipped instead.
             </div>
           )}
           {citations.map((c, i) => (
-            <div key={i} className="flex gap-2 border-b border-b-[#f4f4f4] px-[11px] py-2 text-[12px] last:border-b-0 md:border-b-[--hair-divider] md:px-2.5 md:py-1.5">
+            <div key={i} className="flex gap-2 border-b border-b-[#e8e8ea] px-[11px] py-2 text-[12px] last:border-b-0 md:border-b-[--hair-divider] md:px-2.5 md:py-1.5">
               <span className="font-mono text-muted-foreground">[{i + 1}]</span>
               <span className="text-muted-foreground">{c.label ?? c.kind}</span>
               <span className="font-mono text-foreground">{c.ref ?? c.reference ?? ""}</span>
@@ -108,7 +108,7 @@ export function TablePart({ data }: { data: any }) {
         </table>
       </div>
       {data?.sourceTool && (
-        <div className="border-t border-t-[#f4f4f4] px-2.5 py-1.5 text-[10.5px] text-[#8a8a8a] md:border-t-[--hair-divider] md:py-1 md:text-muted-foreground">
+        <div className="border-t border-t-[#e8e8ea] px-2.5 py-1.5 text-[length:var(--fs-micro)] text-[#525252] md:border-t-[--hair-divider] md:py-1 md:text-muted-foreground">
           Source: <span className="font-mono">{data.sourceTool}</span>
         </div>
       )}
@@ -125,14 +125,14 @@ export function KpiPart({ data }: { data: any }) {
     <div
       className={cn(
         CARD,
-        "grid grid-cols-[repeat(auto-fit,minmax(min(140px,100%),1fr))] gap-px bg-[#f4f4f4] md:bg-[--hair-divider]",
+        "grid grid-cols-[repeat(auto-fit,minmax(min(140px,100%),1fr))] gap-px bg-[#e8e8ea] md:bg-[--hair-divider]",
         "md:[grid-template-columns:repeat(var(--kpi-cols),minmax(0,1fr))]",
       )}
       style={{ ...accent("#b8b8b8"), "--kpi-cols": Math.min(cards.length || 1, 3) } as React.CSSProperties}
     >
       {cards.map((c, i) => (
         <div key={i} className="bg-background px-[11px] py-2.5 md:p-2.5">
-          <div className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#8a8a8a] md:text-[10px] md:text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#525252] md:text-[10px] md:text-muted-foreground">
             {c.label}
           </div>
           <div className="mt-[3px] text-[16px] font-semibold tabular-nums text-foreground md:mt-0.5">{c.value}</div>

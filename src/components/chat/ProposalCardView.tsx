@@ -45,6 +45,14 @@ export interface Proposal {
   citations?: string[];
 }
 
+/**
+ * Wear the mobile skin (v2 §4C). The card is already the panel's shape — a
+ * hairline box with a 2px agent rule down its left edge — so `skin` only
+ * moves it onto the separation model: the outer rule weight, the 4px radius,
+ * a chip that is a chip rather than a grey wash, and a container query on the
+ * value table so it sizes to the bubble it is inside. Desktop passes nothing
+ * and renders exactly what it rendered before.
+ */
 const STATUS_COLOR = (p: Proposal) => {
   if (p.status === "applied") return LAYER.process;
   if (p.status === "rejected") return "#9a9a9a";
@@ -57,11 +65,13 @@ export function ProposalCardView({
   onApprove,
   onReject,
   onRetry,
+  skin = false,
 }: {
   proposal: Proposal;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onRetry: (id: string) => void;
+  skin?: boolean;
 }) {
   const color = AGENT_COLOR[proposal.agentId ?? ""] ?? LAYER.firm;
   const mono = AGENT_MONO[proposal.agentId ?? ""] ?? proposal.agent.slice(0, 2).toUpperCase();
@@ -71,7 +81,10 @@ export function ProposalCardView({
 
   return (
     <div
-      className="mt-2 rounded-sm border border-[--hair-border] px-3 py-2.5"
+      className={cn(
+        "mt-2 border px-3 py-2.5",
+        skin ? "m-cq rounded-[4px] border-[#d4d4d4] bg-white" : "rounded-sm border-[--hair-border]",
+      )}
       style={{ borderLeft: "2px solid " + color, opacity: proposal.status === "rejected" ? 0.55 : 1 }}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -82,7 +95,14 @@ export function ProposalCardView({
           {mono}
         </span>
         <span className="text-[13px] font-semibold text-foreground">{proposal.agent}</span>
-        <span className="rounded-sm bg-[#f4f4f4] px-[7px] py-px text-[10.5px] font-medium text-muted-foreground">
+        <span
+          className={cn(
+            "px-[7px] py-px text-[10.5px] font-medium",
+            skin
+              ? "rounded-[3px] border border-[#d4d4d4] font-mono text-[#525252]"
+              : "rounded-sm bg-[#f4f4f4] text-muted-foreground",
+          )}
+        >
           {proposal.provenance}
         </span>
         <span

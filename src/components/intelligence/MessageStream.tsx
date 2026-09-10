@@ -31,6 +31,9 @@ interface MessageStreamProps {
    * implementation of the nine part kinds.
    */
   userBubbleClassName?: string;
+  /** Wear the mobile skin (v2 §4C) in the parts this stream renders itself —
+   *  today that is the proposal card. Desktop passes nothing. */
+  skin?: boolean;
 }
 
 export function MessageStream({
@@ -42,6 +45,7 @@ export function MessageStream({
   className,
   containerClassName,
   userBubbleClassName,
+  skin = false,
 }: MessageStreamProps) {
   const streamRef = useRef<HTMLDivElement | null>(null);
   const [, setSavedMemory] = useState<Record<string, boolean>>({});
@@ -86,7 +90,7 @@ export function MessageStream({
                       {d?.agent && <AgentDivider agentName={d.agent} />}
                       {/* The container resolves the proposal (approve/
                           apply state) and renders ProposalCardView. */}
-                      <ProposalCard proposalId={d.proposal_id} />
+                      <ProposalCard proposalId={d.proposal_id} skin={skin} />
                     </React.Fragment>
                   );
                 }

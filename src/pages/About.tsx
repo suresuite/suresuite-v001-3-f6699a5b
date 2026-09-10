@@ -150,7 +150,7 @@ function FundingStrip() {
     <div className="relative border-t border-border bg-border">
       {/* hairline grid: the divider IS the 1px gap, so it turns horizontal when
           the two columns stack instead of leaving a stray left border */}
-      <div className="mx-auto grid max-w-6xl grid-cols-[repeat(auto-fit,minmax(330px,1fr))] gap-px bg-border-strong">
+      <div className="mx-auto grid max-w-6xl grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))] gap-px bg-border-strong">
         {/* Home — HWR / lab identity */}
         <div className="bg-border px-6 py-8">
           <span className={KICKER}>Home</span>
@@ -213,7 +213,7 @@ function FundingStrip() {
             />
           </div>
 
-          <div className="relative mt-4 min-h-[48px]">
+          <div className="relative mt-4 min-h-[64px] md:min-h-[48px]">
             {PROGRAMMES.map((p, n) => (
               <div
                 key={p.key}
@@ -224,14 +224,20 @@ function FundingStrip() {
                 }`}
               >
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
-                  <span className="text-[14.5px] leading-normal">{p.line}</span>
+                  <span className="text-[length:clamp(15px,4vw,16px)] leading-normal md:text-[14.5px]">
+                    {p.line}
+                  </span>
                   <span
                     className={`whitespace-nowrap rounded-sm border px-[7px] py-[3px] font-mono text-[9px] uppercase tracking-[0.18em] ${p.statusClass}`}
                   >
                     {p.status}
                   </span>
                 </div>
-                <span className="mt-[5px] block font-mono text-[11px] tracking-[0.05em] text-muted-foreground tabular-nums">
+                {/* v2 §5.6: below `md` this is the ONLY place the funding
+                    credit appears — Footer.tsx no longer renders there — so it
+                    is body copy, not fine print. `md:` keeps the 11px the
+                    desktop band has always had. */}
+                <span className="mt-[5px] block font-mono text-[length:var(--fs-body)] leading-[1.5] tracking-[0.05em] text-muted-foreground tabular-nums md:text-[11px]">
                   {p.detail}
                 </span>
               </div>
@@ -271,7 +277,7 @@ export default function About() {
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top bar — same as Landing */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-[--hair-rule] bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:h-16 md:px-6">
           <Link to="/" className="flex items-center">
             <img
@@ -307,7 +313,7 @@ export default function About() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden border-b border-border/60">
+        <section className="relative overflow-hidden border-b border-[--hair-rule]">
           {/* Desktop's 60px headline leaves the right half of the hero clear, so the
               lattice sits beside the copy; a 390px frame puts the copy over the whole
               figure, so it recedes (opacity-50) and tucks into the top-right corner
@@ -331,12 +337,12 @@ export default function About() {
               <span className={KICKER}>About us</span>
             </span>
 
-            <h1 className="mt-9 max-w-[20ch] text-[31px] leading-[1.08] tracking-[-0.024em] text-balance font-semibold
+            <h1 className="mt-9 max-w-[20ch] text-[length:clamp(30px,8.5vw,60px)] leading-[1.08] tracking-[-0.024em] text-balance font-semibold
                            md:text-[clamp(36px,5vw,60px)] md:leading-[1.03] md:tracking-[-0.022em]">
               Built inside a research lab,{' '}
               <span className="font-serif font-medium italic">shipped as a product.</span>
             </h1>
-            <p className="mt-5 max-w-xl text-[16px] leading-[1.62] text-muted-foreground text-pretty
+            <p className="mt-5 max-w-xl text-[length:clamp(15px,4vw,18px)] leading-[1.62] text-muted-foreground text-pretty
                           md:mt-7 md:text-lg md:leading-relaxed">
               SuReSuite is built at the Digital-AI Supply Chain Lab at HWR Berlin — the group
               behind the ripple-effect and supply chain viability research. The same small team
@@ -348,8 +354,8 @@ export default function About() {
         </section>
 
         {/* Key people */}
-        <section id="people" className="border-b border-border/60">
-          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
+        <section id="people" className="border-b border-[--hair-rule]">
+          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-[600px]">
               <span
                 className="inline-flex items-center gap-[7px] whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em]"
@@ -358,13 +364,13 @@ export default function About() {
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
                 Key people
               </span>
-              <h2 className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.022em]">
+              <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold leading-[1.14] tracking-[-0.022em]">
                 The science and the build,{' '}
                 <span className="font-serif font-medium italic">core team.</span>
               </h2>
             </div>
 
-            <div className="mt-[26px] grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] items-stretch gap-px overflow-hidden rounded-sm border border-border bg-border">
+            <div className="mt-[26px] grid grid-cols-[repeat(auto-fit,minmax(min(100%,370px),1fr))] items-stretch gap-px overflow-hidden rounded-sm border border-border bg-border">
               {PEOPLE.map((p) => (
                 <article key={p.slug} className="relative flex flex-col bg-card p-8">
                   <span className="absolute right-8 top-8 font-mono text-[9px] tracking-[0.16em] text-muted-foreground/50">
@@ -404,7 +410,7 @@ export default function About() {
 
                   <div className="min-h-[20px] flex-1" />
 
-                  <div className="flex flex-wrap gap-x-[22px] gap-y-1.5 whitespace-nowrap border-t border-border/60 pt-4 font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground">
+                  <div className="flex flex-wrap gap-x-[22px] gap-y-1.5 whitespace-nowrap border-t border-[--hair-rule] pt-4 font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground">
                     {p.meta}
                   </div>
                 </article>
@@ -415,19 +421,19 @@ export default function About() {
 
         {/* Contributors */}
         <section className="bg-secondary">
-          <div className="mx-auto max-w-6xl px-5 py-9 md:px-6 md:py-24">
+          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-[600px]">
               <span className={`${KICKER} whitespace-nowrap`}>Contributors</span>
-              <h2 className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.022em]">
+              <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold leading-[1.14] tracking-[-0.022em]">
                 And the people around them.
               </h2>
             </div>
 
-            <div className="mt-7 border-t border-border/60">
+            <div className="mt-7 border-t border-[--hair-rule]">
               {CONTRIBUTORS.map((c, n) => (
                 <div
                   key={`${c.group}-${n}`}
-                  className="grid grid-cols-1 gap-x-6 gap-y-1.5 border-b border-border/60 py-5
+                  className="grid grid-cols-1 gap-x-6 gap-y-1.5 border-b border-[--hair-rule] py-5
                              md:grid-cols-[minmax(104px,150px)_minmax(0,1fr)_minmax(0,max-content)]
                              md:items-center md:gap-y-4"
                 >
@@ -451,8 +457,8 @@ export default function About() {
       </main>
 
       {/* Slim footer — same as Landing */}
-      <footer className="border-t border-border/60">
-        <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
+      <footer className="border-t border-[--hair-rule]">
+        <div className="pb-safe mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-4">
             <Link to="/#video" className="hover:text-foreground md:hidden">

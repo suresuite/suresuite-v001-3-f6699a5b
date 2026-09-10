@@ -1364,7 +1364,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           </LensSection>
 
           <MobileGroup label="Prediction">
-            <MLPrediction selectedPlant={
+            <MLPrediction skin selectedPlant={
               globalSelectedProjectId
                 ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
                 : null
