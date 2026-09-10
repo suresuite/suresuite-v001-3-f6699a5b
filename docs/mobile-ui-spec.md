@@ -7,6 +7,16 @@ contract (`docs/design/ui-consistency-audit.md`, C1–C9) or from the design sys
 (`SKILL.md` / readme §3). Where this file and the audit disagree, **the audit wins** —
 except on the two points §0.3 lists as deliberate mobile amendments.
 
+> **Superseded on appearance by `docs/mobile-skin-spec.md`.**
+> This document is the *structural* mobile pass — the tab bar, sheet-instead-of-dialog,
+> the 44px touch floor, the responsive mechanics, and the audit
+> (`scripts/audit-adaptive-ui.mjs`) that enforces them. All of that still holds.
+> The mobile **skin** spec replaces it on colour, type scale, container, density and the
+> chrome budget. Where the two disagree — the app gutter is the clearest case, a fluid
+> clamp here and a flat 16px there — the skin wins on a surface that has been converted,
+> and this document still describes every surface that has not. Check the skin spec's
+> status table before assuming which one a file is under.
+
 ---
 
 ## 0. Read this before you touch a file

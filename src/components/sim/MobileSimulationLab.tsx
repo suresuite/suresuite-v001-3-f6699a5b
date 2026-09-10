@@ -1,32 +1,47 @@
 /**
- * Simulation Lab — the phone tree (PAGES.md 14 · 15, mobile-ui-spec §2.6 / §4.4).
+ * Simulation Lab — the phone tree (PAGES.md 14 · 15, mobile skin spec).
  *
  * WHY A SEPARATE TREE, not `md:` classes on SimulationLab. Below 768px this is a
- * different composition, not a reflow of the desktop one. The demo does not
- * reflow the Lab, it replaces it: the lettered stage rail, the 256px scenario
- * aside, the stress-test drawer and the per-pane card stacks all fold into a
- * header (title · scenario · project), a five-chip pane strip, one pane at a
- * time, and a sticky gate footer whose Run button is always on screen.
+ * different composition, not a reflow of the desktop one: the lettered stage
+ * rail, the 256px scenario aside, the stress-test drawer and the per-pane card
+ * stacks all fold into a title band, a five-way segmented control, one pane at
+ * a time, and a pinned action bar whose Run button is always on screen.
  * `use-is-mobile.ts` reserves the hook for exactly this case (a different
- * component tree); the desktop tree is untouched and renders what it rendered
- * before. This is the case §5 established for GettingStarted and G9 for
- * Project Intelligence.
+ * component tree); the desktop tree is untouched.
  *
  * WHAT IT DOES NOT OWN. Every value here arrives as a prop from the page, which
  * already computed it. This adds no query, no RPC and no state shape — the only
  * state it owns is which sheet is open, which is purely visual.
  *
- * MATCHING THE DEMO MUST NOT DELETE PRODUCT CAPABILITY (spec §6: the product
- * shows a control, disables it, and explains why — it never hides one). The
- * demo is a prototype with a READ-ONLY Setup pane and no playbook picker, no
- * strategy toggles, no seed explorer and no inline supplier fix. So the demo's
- * chrome, hierarchy, typography and navigation are ported as-is, and every
- * place the demo shows a read-only value row, that row opens a bottom sheet
- * holding the REAL existing editor — `ScenarioSetupForm` sectioned by its new
- * `section` prop, `DisruptionScheduleEditor`, `DisruptionRecoveryPane`'s own
- * playbook card, `PreRunValidationPanel`, `MappingWarningsCard`,
- * `ScenarioList` and `StressTestDrawer`. One editor, two chromes: a control
- * cannot drift between platforms because there is only one of it.
+ * MATCHING THE SPEC MUST NOT DELETE PRODUCT CAPABILITY (skin spec §8: the
+ * product shows a control, disables it, and explains why — it never hides one).
+ * Every place a value is shown read-only, that row opens a bottom sheet holding
+ * the REAL existing editor — `ScenarioSetupForm` sectioned by its `section`
+ * prop, `DisruptionScheduleEditor`, `DisruptionRecoveryPane`'s playbook card,
+ * `PreRunValidationPanel`, `MappingWarningsCard`, `ScenarioList` and
+ * `StressTestDrawer`. One editor, two chromes: a control cannot drift between
+ * platforms because there is only one of it.
+ *
+ * THE SKIN (docs/mobile-skin-spec.md). Every container on this screen is the
+ * black-headed panel; there is no second container style. Three deliberate
+ * readings of the spec are worth naming, because each is a place a reviewer
+ * will look:
+ *
+ *  - §4 reserves the segmented control for "2-3 peer views" and the Lab has
+ *    five panes. The inventory is not ours to reduce — the skin changes how a
+ *    screen looks, never what it holds — so the five ride one segmented control
+ *    rather than the old scrolling chip strip, which the skin has no vocabulary
+ *    for. Measured at 320px each cell is ~55px against a widest label
+ *    ("Compare", 11.5px/600) of ~47px, so nothing truncates at the narrowest
+ *    reachable width.
+ *  - §9.5 forbids horizontal scroll outside a deliberate full-table sheet, and
+ *    §10 says a dense table summarises with the ledger deferred. The event and
+ *    replication tables were sideways-scrolling ledgers; each column now rides
+ *    a row instead — label, mono sub-line, value. Every column survives; none
+ *    is truncated, and nothing scrolls sideways.
+ *  - §6 keeps a confidence line out of a stat cell. The four KPI figures are a
+ *    stat grid and their CI half-widths move to a panel of their own directly
+ *    beneath it — deferred, not dropped.
  *
  * Sheet catalogue (all through the one MobileSheet shell, which stops above the
  * tab bar per G6): projects · scenarios · scenario · run window · precision ·
@@ -35,9 +50,24 @@
  */
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ChevronRight, Truck, TriangleAlert } from "lucide-react";
+import { ChevronDown, Truck } from "lucide-react";
 import { MobileSheet } from "@/components/shared/MobileSheet";
 import { cn } from "@/lib/utils";
+import {
+  M,
+  M_LABEL,
+  M_MICRO,
+  MobileActionBar,
+  MobileButton,
+  MobileButtonRow,
+  MobilePanel,
+  MobileRow,
+  MobileSegmented,
+  MobileStatGrid,
+  MobileToggle,
+  type MobileStat,
+  type SegmentedItem,
+} from "@/components/mobile";
 import { ScenarioSetupForm } from "./ScenarioSetupForm";
 import { DisruptionScheduleEditor } from "./DisruptionScheduleEditor";
 import { DisruptionRecoveryPane } from "./DisruptionRecoveryPane";
@@ -56,40 +86,6 @@ import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { Credibility } from "@/hooks/useModelValidation";
 import type { Finding } from "@/lib/policies/validationService";
 
-/* ── the demo's Lab vocabulary, as extracted from the prototype ───────────
- * Every literal below is the demo's own value. Kept together so the five panes
- * cannot drift into five card treatments.
- */
-/** Card: white, 1px #d4d4d4, radius 4, clipped. */
-const CARD = "min-w-0 shrink-0 overflow-hidden rounded-sm border border-[#d4d4d4] bg-white";
-/** Card header: 11px 13px 10px, closed by a 1px #ebebeb rule. */
-const CARD_HEAD = "flex items-center gap-2 border-b border-[#ebebeb] px-[13px] pb-[10px] pt-[11px]";
-/** Mono kicker: 10.5px, .07em, uppercase, muted. */
-const KICKER = "min-w-0 truncate font-mono text-[10.5px] uppercase tracking-[0.07em] text-[#6b6b6b]";
-/** Right-aligned scroll affordance / meta. */
-const SWIPE = "shrink-0 whitespace-nowrap font-mono text-[11px] text-[#a1a1a1]";
-/** Value row: 52px minimum, 9px 13px, divided on #f4f4f4. */
-const ROW =
-  "flex w-full min-h-[52px] items-center gap-[11px] border-b border-[#f4f4f4] px-[13px] py-[9px] text-left last:border-b-0";
-const ROW_LABEL = "text-[14.5px] leading-snug text-[#171717]";
-const ROW_HINT = "min-w-0 truncate font-mono text-[11px] leading-snug text-[#8a8a8a]";
-const ROW_VALUE = "shrink-0 font-mono text-[14px] tabular-nums text-[#171717]";
-/** Table head cell — the demo's, at Ledger tracking (.04em, §4.3). */
-const TH =
-  "whitespace-nowrap bg-[#fafafa] px-3 py-[9px] text-left font-mono text-[11px] font-medium uppercase tracking-[0.04em] text-[#8a8a8a]";
-/** Table body cell. Rows divide on the SIM divider, #ececee — not #f4f4f4. */
-const TD = "whitespace-nowrap px-3 py-[9px] font-mono tabular-nums text-[#171717]";
-/** Frozen identifying column (§2.7). Mobile-only by construction — this whole
- *  tree is — so it needs no `md:` release. */
-const FROZEN_TD = "sticky left-0 z-[1] border-r border-[#ebebeb] bg-white";
-const FROZEN_TH = "sticky left-0 z-[1] border-r border-[#ebebeb]";
-/** Secondary action button, the demo's 48px. */
-const BTN =
-  "flex min-h-12 min-w-0 items-center justify-center rounded-sm border border-[#d4d4d4] bg-white px-[14px] text-[15px] font-medium text-[#171717] active:bg-[#f4f4f5]";
-/** The mono uppercase micro-button the demo uses for Spec / Cancel / +10 reps. */
-const MONO_BTN =
-  "-my-1.5 flex min-h-11 shrink-0 items-center gap-[5px] rounded-sm border border-[#e0e0e3] bg-white px-2 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#6b6b6b] active:bg-[#f4f4f5]";
-
 /** Every sheet this screen can show. `null` is the pane itself. */
 type Sheet =
   | "projects"
@@ -104,19 +100,28 @@ type Sheet =
   | "mapping"
   | null;
 
-/** The demo's five chips, in the demo's order. `recovery` is the demo's
+/** The five panes, in the order the desktop stage rail uses. `recovery` is
  *  "Events"; the pane it opens carries the playbook too, so the playbook keeps
- *  its own name on the card inside. */
-const PANES: Array<{ id: PaneId; label: string }> = [
-  { id: "setup", label: "Setup" },
-  { id: "recovery", label: "Events" },
-  { id: "run", label: "Run" },
-  { id: "results", label: "Results" },
-  { id: "compare", label: "Compare" },
+ *  its own name on the panel inside. */
+const PANES: ReadonlyArray<SegmentedItem<PaneId>> = [
+  { value: "setup", label: "Setup" },
+  { value: "recovery", label: "Events" },
+  { value: "run", label: "Run" },
+  { value: "results", label: "Results" },
+  { value: "compare", label: "Compare" },
 ];
 
 /** Named only so the playbook row can count the levers it is not showing. */
 const STRATEGY_COUNT = 6;
+
+/** An empty state is still a panel — there is no bare card in the skin. */
+function EmptyBody({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-9 text-center">
+      {children}
+    </div>
+  );
+}
 
 export interface MobileSimulationLabProps {
   /* header */
@@ -231,75 +236,125 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const levers = (effectiveRecovery.response ?? []) as RecoveryResponseKey[];
   const findings = gateFindings ?? [];
 
-  /* ── header ───────────────────────────────────────────────────────────── */
-  // The demo's 58px top padding is its own phone-frame notch allowance; the
-  // product sits under real app chrome and the page gutter already spaces it,
-  // so only the demo's 11px is ported. Horizontal padding is the app's one
-  // gutter clamp (spec §2.1) now that this header bleeds to the screen edge
-  // like every other page's — its own bespoke clamp(11px,3.4vw,15px) was the
-  // same near-miss §2.1 was written to catch on mobile Project Intelligence.
+  /* ── header — §4's title band ──────────────────────────────────────────── */
+  // 19px title and at most ONE right-hand element. The project chooser takes
+  // that slot because it is the outer context; the scenario, which is what the
+  // panes below are about, gets a panel row of its own rather than the subtitle
+  // the budget no longer has a band for.
   const header = (
-    <header className="shrink-0 border-b border-[#d4d4d4] bg-[rgba(250,250,250,0.95)] px-[clamp(0.75rem,4vw,1.125rem)] py-[11px] backdrop-blur-[8px]">
-      <div className="mb-[11px] flex min-h-11 items-center gap-[10px]">
-        <button
-          type="button"
-          onClick={() => setSheet("scenarios")}
-          className="flex min-w-0 flex-1 flex-col items-start gap-[2px] text-left"
-        >
-          <span className="text-[20px] font-semibold tracking-[-0.022em] text-[#171717]">
-            Simulation Lab
-          </span>
-          <span className="flex min-w-0 max-w-full items-center gap-[6px]">
-            <span
-              className="h-[6px] w-[6px] shrink-0 rounded-full"
-              style={{ background: selected ? "#14b8c4" : "#d4d4d4" }}
+    <div className="flex items-center justify-between gap-2.5 px-4 pb-2.5 pt-1">
+      <h1 className="min-w-0 flex-1 truncate text-[19px] font-semibold leading-tight tracking-[-0.019em] text-[#18181b]">
+        Simulation Lab
+      </h1>
+      <button
+        type="button"
+        onClick={() => setSheet("projects")}
+        title={activeProject?.name ?? "Select project"}
+        className="flex min-h-11 max-w-[46vw] shrink-0 items-center gap-1.5 text-[#525252]"
+      >
+        <span className={cn(M_MICRO, "min-w-0 truncate")}>
+          {activeProject?.name ?? "Select project"}
+        </span>
+        <ChevronDown className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
+      </button>
+    </div>
+  );
+
+  const segmented = (
+    <MobileSegmented
+      items={PANES}
+      value={pane}
+      onChange={onPane}
+      ariaLabel="Simulation Lab panes"
+    />
+  );
+
+  /* ── the gate — §13.3, the one thing that needs attention ─────────────── */
+  // It used to live in the footer. The skin's action bar holds actions and
+  // nothing else, and §13 puts what needs attention at the TOP of the content,
+  // so the gate is the screen's first panel whenever it has something to say.
+  // The blocking case is a red dot on a row, not a red panel: §3 caps a
+  // meaning colour at a dot, a 2px rule or a chip.
+  const warnSummary =
+    findings
+      .filter((f) => f.severity === "warn")
+      .map((f) => f.field)
+      .filter(Boolean)
+      .join(" · ") || "the engine applies its defaults";
+
+  const gatePanel =
+    gateBlocks > 0 || gateWarns > 0 ? (
+      <MobilePanel
+        label="Required-data gate"
+        counter={gateBlocks > 0 ? `${gateBlocks} blocking` : `${gateWarns} warn`}
+      >
+        {gateBlocks > 0 ? (
+          <MobileRow
+            dot={M.blocking}
+            label={`Run rejected — ${gateBlocks} blocking ${gateBlocks === 1 ? "gap" : "gaps"}`}
+            sub={runBlockedReason ?? "see the findings panel"}
+            onClick={() => setSheet("findings")}
+          />
+        ) : (
+          <>
+            <MobileRow
+              dot={M.firm}
+              label={`Acknowledge ${gateWarns} ${gateWarns === 1 ? "warning" : "warnings"}`}
+              sub={warnSummary}
+              chevron={false}
+              trailing={
+                <MobileToggle
+                  checked={ackWarnings}
+                  onChange={onAckWarnings}
+                  label={`Acknowledge ${gateWarns} ${gateWarns === 1 ? "warning" : "warnings"}`}
+                />
+              }
             />
-            <span className="min-w-0 truncate text-[11.5px] text-[#6b6b6b]">
-              {selected ? selected.name || "Untitled scenario" : "No scenario yet"}
-            </span>
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setSheet("projects")}
-          title={activeProject?.name ?? "Select project"}
-          className="flex h-11 min-w-0 max-w-[42vw] shrink-0 items-center gap-[6px] rounded-sm border border-[#d4d4d4] bg-white px-3 text-[13.5px] font-medium text-[#171717] active:bg-[#f4f4f5]"
-        >
-          <span className="min-w-0 truncate">{activeProject?.name ?? "Select project"}</span>
-          <ChevronDown className="h-[13px] w-[13px] shrink-0 text-[#6b6b6b]" strokeWidth={2} />
-        </button>
-      </div>
-      {/* The demo has NO lettered stage rail on the phone — the five panes are
-          chips. `StageRail` is the desktop vocabulary and stays there. */}
-      <div className="flex gap-[7px] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {PANES.map((p) => {
-          const on = p.id === pane;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onPane(p.id)}
-              aria-current={on ? "page" : undefined}
-              className={cn(
-                "min-h-11 shrink-0 whitespace-nowrap rounded-sm border px-[14px] text-[14px]",
-                on
-                  ? "border-[#171717] bg-[#171717] font-semibold text-white"
-                  : "border-[#e0e0e3] bg-white font-medium text-[#6b6b6b]",
-              )}
-            >
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
-    </header>
+            <MobileRow
+              label="View findings"
+              sub={findingsSource}
+              onClick={() => setSheet("findings")}
+            />
+          </>
+        )}
+      </MobilePanel>
+    ) : null;
+
+  /* ── the scenario band ────────────────────────────────────────────────── */
+  // The dot is the scenario's own credibility, not merely "something is
+  // selected": validated reads as healthy, stale as derived, anything else as
+  // inactive. Desktop shows the same fact on a badge with a hover tooltip,
+  // which a thumb cannot reach.
+  const scenarioDot =
+    !selected
+      ? M.idle
+      : credibility.state === "validated"
+        ? M.process
+        : credibility.state === "stale"
+          ? M.firm
+          : M.idle;
+
+  const scenarioPanel = (
+    <MobilePanel label="Scenario" counter={`${scenarios.length}`}>
+      <MobileRow
+        dot={scenarioDot}
+        label={selected ? selected.name || "Untitled scenario" : "No scenario yet"}
+        sub={
+          selected
+            ? `model ${credibility.state} · ${selected.description || "no description"}`
+            : scenariosLoading
+              ? "loading…"
+              : "choose or create one"
+        }
+        onClick={() => setSheet("scenarios")}
+      />
+    </MobilePanel>
   );
 
   /* ── Setup ────────────────────────────────────────────────────────────── */
-  // The demo's Setup pane is read-only fact rows. The product's is an editable
-  // form, so every row opens the REAL editor in a sheet. Nothing is dropped:
-  // Scenario and Primary KPI are product fields the demo has no row for, and
-  // they are added as rows of the same kind rather than hidden.
+  // Read-only fact rows over the REAL editors. Nothing is dropped: Scenario and
+  // Primary KPI are product fields with no counterpart in the reference, and
+  // they are rows of the same kind rather than hidden.
   const inherited = !!selected?.inherited_validation_id;
   const setupRows: Array<{
     label: string;
@@ -357,131 +412,92 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     : [];
 
   const setupPane = (
-    <div className={CARD}>
-      <div className={CARD_HEAD}>
-        <span className={KICKER}>Experiment design</span>
-      </div>
-      {setupRows.map((r) => {
-        const inner = (
-          <>
-            <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-              <span className={ROW_LABEL}>{r.label}</span>
-              <span className={ROW_HINT} title={r.hint}>
-                {r.hint}
-              </span>
-            </span>
-            <span className={ROW_VALUE}>{r.value}</span>
-            {r.sheet || r.pane ? (
-              <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#a1a1a1]" strokeWidth={2} />
-            ) : null}
-          </>
-        );
-        return r.sheet || r.pane ? (
-          <button
+    <>
+      <MobilePanel label="Experiment design" counter={`${setupRows.length}`}>
+        {setupRows.map((r) => (
+          <MobileRow
             key={r.label}
-            type="button"
-            onClick={() => (r.sheet ? setSheet(r.sheet) : onPane(r.pane!))}
-            className={cn(ROW, "active:bg-[#fafafa]")}
-          >
-            {inner}
-          </button>
-        ) : (
-          <div key={r.label} className={ROW}>
-            {inner}
-          </div>
-        );
-      })}
+            label={r.label}
+            sub={r.hint}
+            value={r.value}
+            onClick={r.sheet ? () => setSheet(r.sheet!) : r.pane ? () => onPane(r.pane!) : undefined}
+          />
+        ))}
+      </MobilePanel>
+
       {/* A cross-screen note WITH A ROUTE, not a dead-end warning. */}
       {selected && !inherited ? (
-        <Link
-          to="/policies"
-          className="flex min-h-11 w-full items-center gap-[9px] px-[13px] py-[11px] text-left active:bg-[#fafafa]"
-        >
-          <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-[#f59e0b]" />
-          <span className="min-w-0 flex-1 font-mono text-[11.5px] leading-snug text-[#6b6b6b] [text-wrap:pretty]">
-            warm-up &amp; n* not adopted — set them in Policies
-          </span>
-          <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#a1a1a1]" strokeWidth={2} />
-        </Link>
+        <MobilePanel label="Model validation" tone="secondary">
+          <Link
+            to="/policies"
+            className="flex min-h-11 w-full items-center gap-2.5 px-3 py-[13px] text-left active:bg-[#fafafa]"
+          >
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: M.firm }}
+            />
+            <span className="min-w-0 flex-1 text-[13.5px] font-medium leading-tight text-[#18181b] [text-wrap:pretty]">
+              Warm-up &amp; n* not adopted — set them in Policies
+            </span>
+            <span aria-hidden className="shrink-0 text-[15px] leading-none text-[#525252]">
+              ›
+            </span>
+          </Link>
+        </MobilePanel>
       ) : null}
-    </div>
+    </>
   );
 
   /* ── Events ───────────────────────────────────────────────────────────── */
+  // The ledger was a sideways-scrolling four-column table. Every column is
+  // still here — the target, the start day and the duration ride the row's
+  // mono sub-line — and nothing scrolls sideways (§9.5, §10).
   const eventsPane = (
     <>
-      <div className={CARD}>
-        <div className={CARD_HEAD}>
-          <span className={KICKER}>Disruption schedule</span>
-          <span className="flex-1" />
-          {events.length > 0 ? <span className={SWIPE}>swipe →</span> : null}
-        </div>
+      <MobilePanel label="Disruption schedule" counter={`${events.length}`}>
         {events.length === 0 ? (
-          <div className="min-w-0 px-6 py-9 text-center text-[13.5px] leading-relaxed text-[#6b6b6b] [text-wrap:pretty]">
-            No disruption schedule yet — this project has no network to disrupt.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="border-collapse whitespace-nowrap text-[13.5px]">
-              <thead>
-                <tr>
-                  <th className={cn(TH, FROZEN_TH)}>Event</th>
-                  <th className={TH}>Target</th>
-                  <th className={TH}>Start</th>
-                  <th className={TH}>Duration</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((e, i) => (
-                  <tr key={i} className="border-t border-[#ececee]">
-                    <td className={cn(TD, FROZEN_TD, "font-sans text-[14px] font-medium")}>
-                      {e.target_type === "edge" ? "Lane" : "Node"} · {e.magnitude_pct}%
-                    </td>
-                    <td className={TD} title={e.target}>
-                      {e.target || "—"}
-                    </td>
-                    <td className={TD}>d{e.start_day}</td>
-                    <td className={TD}>{e.duration_days} d</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="flex min-w-0 shrink-0 gap-2">
-        <button type="button" onClick={() => setSheet("schedule")} className={cn(BTN, "flex-1")}>
-          Add disruption
-        </button>
-        <button type="button" onClick={() => onPane("setup")} className={cn(BTN, "shrink-0")}>
-          Setup
-        </button>
-      </div>
-
-      {/* The demo's Events pane carries no playbook. The product's pane does,
-          and §6 forbids hiding a control — so it keeps the demo's card
-          vocabulary ("Recovery playbook" is the demo's own string, from its
-          Results pane) and its rows open the real editors. */}
-      <div className={CARD}>
-        <div className={CARD_HEAD}>
-          <span className={KICKER}>Recovery playbook</span>
-          <span className="flex-1" />
-          <span className={SWIPE}>{effectiveRecovery.enabled ? "enabled" : "disabled"}</span>
-        </div>
-        <button type="button" onClick={() => setSheet("playbook")} className={cn(ROW, "active:bg-[#fafafa]")}>
-          <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-            <span className={ROW_LABEL}>Response strategies</span>
-            <span className={ROW_HINT} title={levers.map((l) => RESPONSE_LABELS[l]).join(" · ")}>
-              {levers.length ? levers.map((l) => RESPONSE_LABELS[l]).join(" · ") : "none active"}
+          <EmptyBody>
+            <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+              No disruption schedule yet — this project has no network to disrupt.
             </span>
-          </span>
-          <span className={ROW_VALUE}>
-            {levers.length} / {STRATEGY_COUNT}
-          </span>
-          <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#a1a1a1]" strokeWidth={2} />
-        </button>
-      </div>
+          </EmptyBody>
+        ) : (
+          events.map((e, i) => (
+            <MobileRow
+              key={i}
+              chevron={false}
+              label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
+              sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
+              value={`d${e.start_day}`}
+            />
+          ))
+        )}
+      </MobilePanel>
+
+      <MobileButtonRow>
+        <MobileButton weight="secondary" onClick={() => setSheet("schedule")}>
+          Add disruption
+        </MobileButton>
+        <MobileButton weight="secondary" onClick={() => onPane("setup")}>
+          Setup
+        </MobileButton>
+      </MobileButtonRow>
+
+      {/* The reference's Events pane carries no playbook. The product's does,
+          and §8 forbids hiding a control — so it keeps its own panel and its
+          row opens the real editor. */}
+      <MobilePanel
+        label="Recovery playbook"
+        counter={effectiveRecovery.enabled ? "enabled" : "disabled"}
+      >
+        <MobileRow
+          label="Response strategies"
+          sub={levers.length ? levers.map((l) => RESPONSE_LABELS[l]).join(" · ") : "none active"}
+          value={`${levers.length} / ${STRATEGY_COUNT}`}
+          onClick={() => setSheet("playbook")}
+        />
+      </MobilePanel>
     </>
   );
 
@@ -493,11 +509,12 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const repsDone = latestRun?.rep_count_done ?? 0;
   const repsTarget = latestRun?.rep_count_target ?? selected?.replications ?? 0;
   const pct = repsTarget ? Math.min(100, Math.round((repsDone / repsTarget) * 100)) : 0;
+  const statusDot = runStatus === "running" ? M.process : done ? M.process : bad ? M.blocking : M.idle;
 
-  const specCells = selected
+  // Scenario name and policy version are the panel's own headline and meta
+  // line, so the grid carries the four figures and does not repeat them.
+  const runStats: MobileStat[] = selected
     ? [
-        { label: "Scenario", value: selected.name || "Untitled scenario" },
-        { label: "Policy version", value: runVersionLabel ?? policyVersionLabel ?? "—" },
         { label: "Replications", value: String(repsTarget) },
         { label: "Warm-up", value: `${selected.warmup_days} d` },
         { label: "Seed", value: String(selected.seed) },
@@ -507,88 +524,45 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
   const runPane = (
     <>
-      <div className={CARD}>
-        <div className={CARD_HEAD}>
-          <span
-            className="h-[8px] w-[8px] shrink-0 rounded-full"
-            style={{
-              background: runStatus === "running" ? "#171717" : done ? "#14b8c4" : bad ? "#bf2330" : "#d4d4d4",
-            }}
-          />
-          <span
-            className="whitespace-nowrap font-mono text-[11.5px] uppercase tracking-[0.06em]"
-            style={{ color: latestRun ? "#171717" : "#8a8a8a" }}
-          >
-            {runStatus ?? "not started"}
+      <MobilePanel label="Run" counter={runStatus ?? "not started"}>
+        <div className="flex flex-col gap-2.5 p-3">
+          <div className="flex items-baseline justify-between gap-2.5">
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.006em] text-[#18181b]">
+              {selected?.name || "Untitled scenario"}
+            </span>
+            <span className="shrink-0 whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums text-[#18181b]">
+              {pct}%
+            </span>
+          </div>
+          {/* The one ambient animation in the skin belongs to a running job. */}
+          <span className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                runStatus === "running" && "animate-pulse motion-reduce:animate-none",
+              )}
+              style={{ background: statusDot }}
+            />
+            <span className="block h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e4e4e4]">
+              <span className="block h-full bg-[#18181b]" style={{ width: `${pct}%` }} />
+            </span>
           </span>
-          <span className="flex-1" />
-          {active ? (
-            <button type="button" onClick={onCancel} className={MONO_BTN}>
-              Cancel
-            </button>
-          ) : done ? (
-            <button type="button" onClick={() => onAddReps(10)} className={MONO_BTN}>
-              +10 reps
-            </button>
-          ) : (
-            <span className={SWIPE}>queue empty</span>
-          )}
-        </div>
-        <div className="flex flex-col gap-3 px-[13px] pb-[13px] pt-3">
-          <div className="flex items-start gap-[10px]">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="text-[17px] font-semibold tracking-[-0.018em] text-[#171717] [text-wrap:pretty]">
-                {selected?.name || "Untitled scenario"}
-              </div>
-              {/* Desktop puts credibility on a badge whose only explanation is a
-                  hover tooltip — inert on touch. The state is a fact, so it is
-                  named in words here rather than left as a colour. */}
-              <div className="font-mono text-[11.5px] leading-snug text-[#6b6b6b] [text-wrap:pretty]">
-                {[
-                  latestRun ? `model ${runCredibility.state}` : null,
-                  runVersionLabel ?? policyVersionLabel ?? "no saved version",
-                  selected ? `warm-up ${selected.warmup_days} d` : null,
-                  selected ? `seed ${selected.seed}` : null,
-                  latestRun?.warmup_detected_at != null
-                    ? `detected day ${latestRun.warmup_detected_at}`
-                    : "warm-up pending",
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </div>
-            </div>
-            <button type="button" onClick={() => onPane("setup")} className={MONO_BTN}>
-              {latestRun ? "Spec" : "Edit"}
-            </button>
-          </div>
-
-          {specCells.length > 0 ? (
-            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-px overflow-hidden rounded-sm border border-[#ebebeb] bg-[#ebebeb]">
-              {specCells.map((c) => (
-                <div key={c.label} className="flex min-w-0 flex-col gap-[3px] bg-white px-[11px] py-[9px]">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#8a8a8a]">
-                    {c.label}
-                  </span>
-                  <span
-                    className="min-w-0 truncate font-mono text-[13px] tabular-nums text-[#171717]"
-                    title={c.value}
-                  >
-                    {c.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="flex flex-col gap-[7px]">
-            <div className="flex flex-wrap items-baseline gap-[6px] font-mono text-[12px] text-[#6b6b6b]">
-              <b className="text-[19px] font-medium tabular-nums text-[#171717]">{repsDone}</b>
-              <span>/ {repsTarget} replications</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-sm bg-[#ebebeb]">
-              <div className="h-full rounded-sm bg-[#171717]" style={{ width: `${pct}%` }} />
-            </div>
-          </div>
+          {/* Desktop puts credibility on a badge whose only explanation is a
+              hover tooltip — inert on touch. The state is a fact, so it is
+              named in words here rather than left as a colour. */}
+          <span className={cn(M_MICRO, "[text-wrap:pretty]")}>
+            {[
+              `${repsDone} / ${repsTarget} replications`,
+              latestRun ? `model ${runCredibility.state}` : null,
+              runVersionLabel ?? policyVersionLabel ?? "no saved version",
+              latestRun?.warmup_detected_at != null
+                ? `detected day ${latestRun.warmup_detected_at}`
+                : "warm-up pending",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
 
           {/* §3.1: an error message is on the never-truncate list. */}
           {latestRun?.error_message ? (
@@ -597,66 +571,58 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             </p>
           ) : null}
           {runStatus === "queued" ? (
-            <p className="text-[12.5px] leading-snug text-[#6b6b6b]">Queued — waiting for a worker</p>
+            <p className="text-[12.5px] leading-snug text-[#525252]">Queued — waiting for a worker</p>
           ) : null}
+
+          <MobileButtonRow>
+            {active ? (
+              <MobileButton weight="secondary" onClick={onCancel}>
+                Cancel run
+              </MobileButton>
+            ) : done ? (
+              <MobileButton weight="secondary" onClick={() => onAddReps(10)}>
+                Add 10 reps
+              </MobileButton>
+            ) : null}
+            <MobileButton weight="secondary" onClick={() => onPane("setup")}>
+              {latestRun ? "Run spec" : "Edit spec"}
+            </MobileButton>
+          </MobileButtonRow>
         </div>
 
-        <button
-          type="button"
+        <MobileRow
+          label="Engine mapping report"
+          sub={latestRun ? "values the engine derived or defaulted" : "written when a run dispatches"}
+          value={String(latestRun?.mapping_warnings?.length ?? 0)}
           onClick={() => setSheet("mapping")}
-          className={cn(ROW, "border-t border-[#f4f4f4] active:bg-[#fafafa]")}
-        >
-          <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-            <span className={ROW_LABEL}>Engine mapping report</span>
-            <span className={ROW_HINT}>
-              {latestRun ? "values the engine derived or defaulted" : "written when a run dispatches"}
-            </span>
-          </span>
-          <span className={ROW_VALUE}>{latestRun?.mapping_warnings?.length ?? 0}</span>
-          <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#a1a1a1]" strokeWidth={2} />
-        </button>
-      </div>
+        />
+      </MobilePanel>
 
-      <div className={CARD}>
-        <div className={CARD_HEAD}>
-          <span className={KICKER}>Per replication · {repsTarget}</span>
-          <span className="flex-1" />
-          {reps.length > 0 ? <span className={SWIPE}>swipe →</span> : null}
-        </div>
+      {runStats.length > 0 ? <MobileStatGrid stats={runStats} /> : null}
+
+      <MobilePanel label="Per replication" counter={`${reps.length} / ${repsTarget}`}>
         {reps.length === 0 ? (
-          <div className="px-[13px] py-6 text-[12.5px] leading-relaxed text-[#6b6b6b]">
-            Waiting for first replication…
-          </div>
+          <EmptyBody>
+            <span className="text-[13px] leading-relaxed text-[#525252]">
+              Waiting for first replication…
+            </span>
+          </EmptyBody>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="border-collapse whitespace-nowrap text-[13.5px]">
-              <thead>
-                <tr>
-                  <th className={cn(TH, FROZEN_TH)}>Rep</th>
-                  <th className={TH}>Seed</th>
-                  <th className={TH}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reps.map((r) => (
-                  <tr key={r.id} className="border-t border-[#ececee]">
-                    <td className={cn(TD, FROZEN_TD)}>{r.rep_index}</td>
-                    <td className={TD}>{r.seed_used}</td>
-                    <td className={cn(TD, "font-sans")}>{r.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          reps.map((r) => (
+            <MobileRow
+              key={r.id}
+              chevron={false}
+              label={`Rep ${r.rep_index}`}
+              sub={`seed ${r.seed_used}`}
+              value={r.status}
+            />
+          ))
         )}
-      </div>
+      </MobilePanel>
     </>
   );
 
   /* ── Results ──────────────────────────────────────────────────────────── */
-  // The demo's KPI tiles carry a delta against a baseline this page does not
-  // hold, so the tile's third line is the run's own CI half-width — a number
-  // the run recorded, not an invented comparison.
   const kpiTiles = useMemo(() => {
     const agg = latestRun?.aggregate_kpis ?? {};
     const ci = latestRun?.ci_half_widths ?? {};
@@ -677,83 +643,71 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const credState = runCredibility.state;
   const resultsPane =
     !latestRun || latestRun.status !== "done" ? (
-      <div className={cn(CARD, "flex flex-col items-center gap-3 px-6 py-11 text-center")}>
-        <Truck className="h-[22px] w-[22px] text-[#a1a1a1]" strokeWidth={2} />
-        <span className="max-w-[250px] text-[13.5px] leading-relaxed text-[#6b6b6b] [text-wrap:pretty]">
-          {latestRun && (latestRun.status === "running" || latestRun.status === "queued")
-            ? "Run in progress — results appear when it finishes."
-            : `No completed replications for ${activeProject?.name ?? "this project"} yet.`}
-        </span>
-        <button type="button" onClick={() => onPane("run")} className={cn(BTN, "min-h-11 px-4 text-[14px]")}>
-          Go to Run
-        </button>
-      </div>
+      <MobilePanel label="Results">
+        <EmptyBody>
+          <Truck className="h-[22px] w-[22px] text-[#525252]" strokeWidth={2} />
+          <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+            {latestRun && (latestRun.status === "running" || latestRun.status === "queued")
+              ? "Run in progress — results appear when it finishes."
+              : `No completed replications for ${activeProject?.name ?? "this project"} yet.`}
+          </span>
+          <MobileButton weight="secondary" onClick={() => onPane("run")}>
+            Go to Run
+          </MobileButton>
+        </EmptyBody>
+      </MobilePanel>
     ) : (
       <>
-        <div className="flex min-w-0 shrink-0 items-start gap-[9px] px-[3px] pt-[2px]">
-          <span
-            className="inline-flex shrink-0 items-center gap-[6px] rounded-sm px-2 py-1 font-mono text-[10.5px] uppercase tracking-[0.06em]"
-            style={
-              credState === "validated"
-                ? { border: "1px solid rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.1)", color: "#047857" }
-                : credState === "stale"
-                  ? { border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.1)", color: "#b45309" }
-                  : { border: "1px solid #e0e0e3", background: "#fafafa", color: "#6b6b6b" }
-            }
-          >
-            {credState}
-          </span>
-          <span className="min-w-0 flex-1 text-right font-mono text-[10.5px] leading-normal text-[#8a8a8a] [overflow-wrap:anywhere]">
-            {[
-              latestRun.policy_hash ? `policy ${latestRun.policy_hash.slice(0, 6)}` : null,
-              latestRun.scenario_hash ? `scenario ${latestRun.scenario_hash.slice(0, 6)}` : null,
-              latestRun.code_version,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        </div>
+        {kpiTiles.length > 0 ? (
+          <MobileStatGrid stats={kpiTiles.map((k) => ({ label: k.label, value: k.value }))} />
+        ) : null}
 
-        <div className="flex min-w-0 shrink-0 items-center gap-2 overflow-hidden px-[3px]">
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#6b6b6b]">
-            {[
+        {/* §6 keeps the confidence line out of the stat cell; it lands here
+            rather than disappearing. */}
+        {kpiTiles.length > 0 ? (
+          <MobilePanel label="Confidence" tone="secondary" counter={`n = ${repsDone}`}>
+            {kpiTiles.map((k) => (
+              <MobileRow key={k.key} chevron={false} label={k.label} value={k.ci} />
+            ))}
+          </MobilePanel>
+        ) : null}
+
+        <MobilePanel label="Provenance" tone="secondary" counter={credState}>
+          <MobileRow
+            chevron={false}
+            dot={credState === "validated" ? M.process : credState === "stale" ? M.firm : M.idle}
+            label="Model credibility"
+            sub={[
               selected?.name,
               runVersionLabel ?? policyVersionLabel,
-              `n = ${repsDone}`,
               selected ? `warm-up ${selected.warmup_days} d` : null,
               selected ? `seed ${selected.seed}` : null,
               `${events.length} events`,
             ]
               .filter(Boolean)
               .join(" · ")}
-          </span>
-          <button type="button" onClick={() => onPane("setup")} className={MONO_BTN}>
-            Spec
-          </button>
-        </div>
-
-        {kpiTiles.length > 0 ? (
-          <div className="grid shrink-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-[9px]">
-            {kpiTiles.map((k) => (
-              <div key={k.key} className={cn(CARD, "flex flex-col gap-1.5 px-[13px] py-3")}>
-                <div className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#6b6b6b] [text-wrap:pretty]">
-                  {k.label}
-                </div>
-                <div className="text-[25px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-[#171717]">
-                  {k.value}
-                </div>
-                <div className="font-mono text-[11.5px] tabular-nums text-[#6b6b6b] [text-wrap:pretty]">{k.ci}</div>
-              </div>
-            ))}
+            value={credState}
+          />
+          <div className="px-3 py-[13px]">
+            <span className="block font-mono text-[10.5px] leading-relaxed tracking-[0.04em] text-[#525252] [word-break:break-all]">
+              {[
+                latestRun.policy_hash ? `policy ${latestRun.policy_hash.slice(0, 6)}` : null,
+                latestRun.scenario_hash ? `scenario ${latestRun.scenario_hash.slice(0, 6)}` : null,
+                latestRun.code_version,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
           </div>
-        ) : null}
+        </MobilePanel>
 
-        {/* The demo's charts and tables are the product's, unchanged: the same
+        {/* The charts and tables are the product's, unchanged: the same
             components desktop mounts, so no number can differ between them.
-            `credibility` is omitted because the demo's chip above already IS
-            the credibility readout — the dashboard's badge explains itself only
-            through a hover tooltip, which is inert on touch, so a second one
-            would be decoration. Desktop still passes it. */}
+            `credibility` is omitted because the Provenance panel above already
+            IS the credibility readout — the dashboard's badge explains itself
+            only through a hover tooltip, which is inert on touch. Desktop
+            still passes it. These two still wear the desktop vocabulary; they
+            are on the skin's own list of surfaces still to convert. */}
         <ResultsDashboard
           run={latestRun}
           reps={reps}
@@ -763,10 +717,10 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
       </>
     );
 
-  /* ── footer — the honest gate ─────────────────────────────────────────── */
+  /* ── the action bar — the honest gate ─────────────────────────────────── */
   const canRun = !runBlockedReason;
   const runLabel = policyDirty
-    ? "Save a policy version first"
+    ? "Save version & run"
     : gateBlocks > 0
       ? `Blocked by ${gateBlocks} ${gateBlocks === 1 ? "finding" : "findings"}`
       : gateWarns > 0 && !ackWarnings
@@ -779,153 +733,74 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
               ? "Run again"
               : "Run simulation";
 
-  const warnSummary =
-    findings
-      .filter((f) => f.severity === "warn")
-      .map((f) => f.field)
-      .filter(Boolean)
-      .join(" · ") || "the engine applies its defaults";
-
-  const footer = (
-    <div className="flex shrink-0 flex-col gap-[9px] border-t border-[#d4d4d4] bg-[#fafafa] px-[13px] py-[11px]">
-      {gateBlocks > 0 ? (
-        <button
-          type="button"
-          onClick={() => setSheet("findings")}
-          className="flex min-h-11 items-center gap-[10px] rounded-sm border border-[rgba(191,35,48,0.3)] bg-[rgba(191,35,48,0.06)] px-[11px] py-[9px] text-left active:bg-[rgba(191,35,48,0.1)]"
-        >
-          <TriangleAlert className="h-4 w-4 shrink-0 text-[#bf2330]" strokeWidth={2} />
-          <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-            <span className="text-[14px] font-medium leading-snug text-[#bf2330] [text-wrap:pretty]">
-              Run rejected — {gateBlocks} blocking {gateBlocks === 1 ? "gap" : "gaps"}
-            </span>
-            <span className="font-mono text-[11px] leading-snug text-[#6b6b6b] [text-wrap:pretty]">
-              {runBlockedReason ?? "see the findings panel"}
-            </span>
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-[#bf2330]" strokeWidth={2} />
-        </button>
-      ) : gateWarns > 0 ? (
-        <div className="flex min-h-11 items-center gap-[10px] text-left">
-          <button
-            type="button"
-            onClick={() => onAckWarnings(!ackWarnings)}
-            aria-pressed={ackWarnings}
-            aria-label={`Acknowledge ${gateWarns} ${gateWarns === 1 ? "warning" : "warnings"}`}
-            className="-m-[10px] box-content grid h-6 w-6 shrink-0 place-items-center p-[10px]"
-          >
-            <span
-              className={cn(
-                "grid h-6 w-6 place-items-center rounded-sm border text-[13px] leading-none text-white",
-                ackWarnings ? "border-[#171717] bg-[#171717]" : "border-[#a1a1a1] bg-white",
-              )}
-            >
-              {ackWarnings ? "✓" : ""}
-            </span>
-          </button>
-          <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-            <span className="text-[14px] font-medium leading-snug text-[#171717] [text-wrap:pretty]">
-              Acknowledge {gateWarns} {gateWarns === 1 ? "warning" : "warnings"}
-            </span>
-            <span className="font-mono text-[11px] leading-snug text-[#6b6b6b] [text-wrap:pretty]">
-              {warnSummary}
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setSheet("findings")}
-            className="-mx-[10px] -my-[11px] flex min-h-11 min-w-11 shrink-0 items-center justify-center px-[10px] py-[11px] font-mono text-[10.5px] text-[#6b6b6b] underline underline-offset-2"
-          >
-            view
-          </button>
-        </div>
-      ) : null}
-
-      <div className="flex items-center gap-2 px-px">
-        <span
-          className="h-[6px] w-[6px] shrink-0 rounded-full"
-          style={{
-            background: policyDirty ? "#f59e0b" : credibility.state === "validated" ? "#14b8c4" : "#d4d4d4",
-          }}
-        />
-        <span className="min-w-0 flex-1 font-mono text-[11px] leading-snug text-[#6b6b6b] [text-wrap:pretty]">
-          {policyDirty
-            ? "unsaved policy state — save a version to bind the run"
-            : policyVersionLabel
-              ? `binds policy version ${policyVersionLabel}`
-              : "no saved model version — runs require a saved policy version"}
-        </span>
-      </div>
-
-      <button
-        type="button"
-        disabled={!canRun}
-        onClick={policyDirty ? onSaveVersionAndRun : onRun}
-        className={cn(
-          "min-h-[52px] w-full rounded-sm px-3 text-[16px] font-semibold",
-          canRun ? "bg-[#171717] text-white" : "cursor-not-allowed bg-[#ebebeb] text-[#8a8a8a]",
-        )}
-      >
-        {runLabel}
-      </button>
-      {/* §3.1: the reason a control is disabled is never truncated, and never
-          hidden behind a title attribute. The blocked-gate button above already
-          carries it, so this covers the capability and dirty-policy cases. */}
-      {!canRun && runBlockedReason && gateBlocks === 0 ? (
-        <span className="text-[12.5px] leading-snug text-[#a1650a] [text-wrap:pretty]">{runBlockedReason}</span>
-      ) : null}
-    </div>
-  );
+  // §8: a control that cannot be used is shown, disabled and explained in one
+  // line underneath. The policy-binding state is that line whether or not it
+  // blocks, because it is what the run will be bound to.
+  const actionNote = policyDirty
+    ? "Unsaved policy state — saving a version binds the run to it."
+    : !canRun && runBlockedReason
+      ? runBlockedReason
+      : policyVersionLabel
+        ? `Binds policy version ${policyVersionLabel}.`
+        : "No saved model version — a run requires a saved policy version.";
 
   /* ── the screen ───────────────────────────────────────────────────────── */
   const body = !projectId ? (
-    <div className={cn(CARD, "px-3 py-[10px] text-[12.5px] text-[#6b6b6b]")}>No project selected</div>
+    <MobilePanel label="Project">
+      <EmptyBody>
+        <span className="text-[13px] leading-relaxed text-[#525252]">No project selected</span>
+      </EmptyBody>
+    </MobilePanel>
   ) : !selected ? (
-    <div className={cn(CARD, "flex flex-col items-center gap-3 px-6 py-11 text-center")}>
-      <span className="max-w-[250px] text-[13.5px] leading-relaxed text-[#6b6b6b] [text-wrap:pretty]">
-        {scenariosLoading ? "Loading scenarios…" : "No scenario selected."}
-      </span>
-      {!scenariosLoading ? (
-        <button type="button" onClick={() => setSheet("scenarios")} className={cn(BTN, "min-h-11 px-4 text-[14px]")}>
-          Choose a scenario
-        </button>
-      ) : null}
-    </div>
-  ) : pane === "setup" ? (
-    setupPane
-  ) : pane === "recovery" ? (
-    eventsPane
-  ) : pane === "run" ? (
-    runPane
-  ) : pane === "results" ? (
-    resultsPane
+    <MobilePanel label="Scenario">
+      <EmptyBody>
+        <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+          {scenariosLoading ? "Loading scenarios…" : "No scenario selected."}
+        </span>
+        {!scenariosLoading ? (
+          <MobileButton weight="secondary" onClick={() => setSheet("scenarios")}>
+            Choose a scenario
+          </MobileButton>
+        ) : null}
+      </EmptyBody>
+    </MobilePanel>
   ) : (
-    <CompareScenariosPanel scenarios={scenarios} runsByScenario={runsByScenario} />
+    <>
+      {gatePanel}
+      {scenarioPanel}
+      {pane === "setup"
+        ? setupPane
+        : pane === "recovery"
+          ? eventsPane
+          : pane === "run"
+            ? runPane
+            : pane === "results"
+              ? resultsPane
+              : <CompareScenariosPanel scenarios={scenarios} runsByScenario={runsByScenario} />}
+    </>
   );
 
   return (
-    // --pi-chrome is published by PageLayout: the measured bottom reservation,
-    // and nothing else. Like Project Intelligence, this page runs edge to
-    // edge on a phone — SimulationLab.tsx no longer wraps this tree in
-    // PAGE_GUTTER (it used to; that left a real, visible 1rem of the parent's
-    // own bottom padding below the gate footer, which the demo does not have
-    // — shots/14-lab-run.png has the blocked-run button flush against the tab
-    // bar). No bleed and no extra term to subtract any more: there is no
-    // parent gutter left to cancel. The fallback only covers the first paint
-    // before the credit bar is measured. The column is fixed-height so the
-    // gate footer stays on screen — an honest gate you have to scroll to
-    // find is not one.
-    //
-    // No outer border/radius/fill here: that combination boxed the whole page
-    // — header included — inside a visible card floating inside the page's own
-    // gutter, a "frame in a frame" no other mobile page has. Every sibling page
-    // has exactly one boundary (PageHeader's own bottom border, flush to the
-    // screen edge); header and footer below already carry their own
-    // border/background bars, so they read correctly with nothing wrapping them.
-    <div className="flex h-[calc(100svh-var(--pi-chrome,170px))] min-h-[420px] flex-col overflow-hidden">
+    // Edge to edge on the page canvas, which PageLayout paints. This screen
+    // scrolls with the document like every other skinned surface — the Run
+    // button no longer needs a fixed-height column to stay on screen, because
+    // <MobileActionBar> is pinned to the chrome boundary PageLayout publishes
+    // as `--pi-chrome`.
+    <div className="flex flex-col pb-4">
       {header}
-      <main className="flex min-h-0 flex-1 flex-col gap-[11px] overflow-auto p-[13px] pb-[22px]">{body}</main>
-      {projectId && selected ? footer : null}
+      <div className="px-4 pb-3">{segmented}</div>
+      <main className="flex min-w-0 flex-col gap-3 px-4">{body}</main>
+
+      {projectId && selected ? (
+        <MobileActionBar
+          primary={{
+            label: runLabel,
+            onClick: policyDirty ? onSaveVersionAndRun : onRun,
+            disabled: !canRun,
+          }}
+          note={actionNote}
+        />
+      ) : null}
 
       {/* ── sheets — every one holds the REAL editor ─────────────────────── */}
       <MobileSheet open={sheet === "projects"} title="Switch project" onClose={close}>
@@ -938,14 +813,18 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                 onProjectChange(p.id);
                 close();
               }}
-              className="flex min-h-11 w-full items-center gap-2.5 border-b border-[#f4f4f4] px-3.5 py-2.5 text-left last:border-b-0 active:bg-[#f4f4f5]"
+              className="flex min-h-11 w-full items-center gap-2.5 border-b border-[#e4e4e4] px-3 py-[13px] text-left last:border-b-0 active:bg-[#fafafa]"
             >
-              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-[#171717]">{p.name}</span>
-              {p.id === projectId ? <span className="shrink-0 text-[15px] text-[#171717]">✓</span> : null}
+              <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[#18181b]">
+                {p.name}
+              </span>
+              {p.id === projectId ? (
+                <span className="shrink-0 text-[15px] text-[#18181b]">✓</span>
+              ) : null}
             </button>
           ))}
           {projects.length === 0 ? (
-            <p className="px-3.5 py-3 text-[12.5px] text-[#6b6b6b]">No projects available.</p>
+            <p className="px-3 py-3 text-[12.5px] text-[#525252]">No projects available.</p>
           ) : null}
         </div>
       </MobileSheet>
@@ -1080,7 +959,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           {latestRun && (latestRun.status === "done" || latestRun.mapping_warnings?.length) ? (
             <MappingWarningsCard warnings={latestRun.mapping_warnings} status={latestRun.status} />
           ) : (
-            <p className="text-[12.5px] leading-snug text-[#6b6b6b] [text-wrap:pretty]">
+            <p className="text-[12.5px] leading-snug text-[#525252] [text-wrap:pretty]">
               The mapping report is written by the engine — it lists every value the mapper had to
               derive or default. It exists once a run has finished.
             </p>

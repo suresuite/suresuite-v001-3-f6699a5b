@@ -28,12 +28,9 @@ import { CHAT_MODELS, getModelLabel } from "@/components/chat/ModelPicker";
 import { AUTO_TOOLTIP, chatModesUiEnabled } from "@/components/chat/ModeSwitch";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { MobileSheet, MobileSheetRow } from "@/components/shared/MobileSheet";
-import {
-  PAGE_HEADER_ROW,
-  PAGE_HEADER_SHELL,
-  PAGE_HEADER_TITLE,
-} from "@/components/shared/PageHeader";
-import { AGENT_COLOR, AGENT_MONO, KX_TIGHT, tint } from "./piUi";
+import { PAGE_HEADER_SHELL } from "@/components/shared/PageHeader";
+import { M, M_LABEL, M_MICRO, MobilePanel, MobileRow } from "@/components/mobile";
+import { AGENT_COLOR, AGENT_MONO } from "./piUi";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageStream } from "./MessageStream";
 import { MyFilesPanel, ProjectMemoryPanel, type MemoryEntry, type UserFile } from "./SidebarPanels";
@@ -203,21 +200,32 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
     // and a bespoke gutter clamp that put this screen's left edge ~2px inboard
     // of every other header. `shrink-0` stays: this header is a flex child of
     // the fixed-height chat column, not a page-flow element.
-    <header className={cn(PAGE_HEADER_SHELL, PAGE_HEADER_ROW, "shrink-0")}>
+    <header
+      className={cn(
+        PAGE_HEADER_SHELL,
+        // The skin's header sits ON the canvas: no rule, no blur, no tint of
+        // its own, a flat 16px gutter, and a ~46px band (§4).
+        "shrink-0 border-b-0 bg-[hsl(var(--m-canvas))] backdrop-blur-none",
+        "flex min-h-[46px] items-center gap-2 px-4 py-1.5",
+      )}
+    >
       <button
         type="button"
         onClick={() => setSheet("chats")}
         aria-label="Chats"
         title="Chats"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-card text-foreground"
+        className="-ml-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#18181b]"
       >
-        <MessageSquare className="h-4 w-4" />
+        <MessageSquare className="h-[18px] w-[18px]" />
       </button>
 
       <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
         {/* An <h1>, not a <span>: this is the page title on this route, and it
             was the one app screen that rendered no h1 at all. */}
-        <h1 className={PAGE_HEADER_TITLE} title={threadTitle}>
+        <h1
+          className="min-w-0 truncate text-[19px] font-semibold leading-tight tracking-[-0.019em] text-[#18181b]"
+          title={threadTitle}
+        >
           {threadTitle}
         </h1>
         {/* §2.4: padding grows the hit area to 44px, the negative margin
@@ -228,24 +236,21 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           aria-label={agent ? agent.name + " — change agent" : "Choose an agent"}
           className="-my-[11px] flex min-h-11 max-w-full items-center gap-1.5 self-start py-[11px]"
         >
+          {/* The agent badge is the skin's mono chip: a filled 3px tag, the
+              largest a colour fill is allowed to get (§3, §7). */}
           <span
-            className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-sm font-mono text-[9px] font-semibold"
-            style={{
-              background: tint(agent ? AGENT_COLOR[agent.id] ?? "#111111" : "#8a8a8a", 0.12),
-              color: agent ? AGENT_COLOR[agent.id] ?? "#111111" : "#8a8a8a",
-            }}
+            className="shrink-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white"
+            style={{ background: agent ? AGENT_COLOR[agent.id] ?? M.ink : M.quiet }}
           >
             {agent ? AGENT_MONO[agent.id] ?? "GA" : "··"}
           </span>
-          <span className="min-w-0 truncate text-[12px] font-medium text-foreground">
+          <span className={cn(M_MICRO, "min-w-0 truncate")}>
             {agent ? agent.name : "Choose an agent"}
           </span>
           {modesOn && threadMode === "review" && (
-            <span className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-              · review
-            </span>
+            <span className={cn(M_MICRO, "shrink-0 whitespace-nowrap")}>· review</span>
           )}
-          <ChevronDown className="h-3 w-3 shrink-0 text-[#a1a1a1]" />
+          <ChevronDown className="h-3 w-3 shrink-0 text-[#525252]" />
         </button>
       </div>
 
@@ -254,79 +259,88 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
         onClick={() => setSheet("menu")}
         aria-label="Chat options"
         title="Chat options"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-card text-foreground"
+        className="-mr-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#18181b]"
       >
-        <MoreVertical className="h-4 w-4" />
+        <MoreVertical className="h-[18px] w-[18px]" />
       </button>
     </header>
   );
 
   /* ── empty state ─────────────────────────────────────────────────── */
   const emptyState = (
-    <div className="flex min-h-full flex-col justify-center px-[clamp(0.75rem,4vw,1.125rem)] py-5">
-      <div className="mb-5 flex items-center justify-center gap-2.5">
-        <span className="h-[26px] w-[26px] rounded-sm bg-foreground" />
-        <span className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">{greeting(userName)}</span>
+    <div className="flex min-h-full flex-col justify-center gap-3 px-4 py-5">
+      <div className="flex items-center justify-center gap-2.5">
+        <span className="h-[26px] w-[26px] rounded-[4px] bg-[#18181b]" />
+        <span className="text-[19px] font-semibold tracking-[-0.019em] text-[#18181b]">
+          {greeting(userName)}
+        </span>
       </div>
-      <p className={cn(KX_TIGHT, "flex justify-center")}>Choose an agent</p>
-      <div className="mt-3 grid grid-cols-2 gap-2 [&>*]:min-w-0">
+      {/* The agent picker was a 2-up grid of bordered cards — a second
+          container style, which the skin does not have (§12). It is one panel
+          of rows now: badge, name, blurb, and the "needs project" chip where
+          it applies. Same agents, same order, same handler. */}
+      <MobilePanel label="Choose an agent" counter={`${AGENTS.length}`}>
         {AGENTS.map((a) => (
-          <button
+          <MobileRow
             key={a.id}
-            type="button"
             onClick={() => onAgentChange(a.id)}
-            className={cn(
-              "block min-h-11 w-full rounded-sm border bg-background px-3 py-[11px] text-left",
-              a.id === agentId ? "border-foreground" : "border-[--hair-border]",
-            )}
-          >
-            <span
-              className="grid h-[26px] w-[26px] place-items-center rounded-sm font-mono text-[10px] font-semibold"
-              style={{
-                background: tint(AGENT_COLOR[a.id] ?? "#111111", 0.12),
-                color: AGENT_COLOR[a.id] ?? "#111111",
-              }}
-            >
-              {AGENT_MONO[a.id]}
-            </span>
-            <span className="mt-2 block text-[13.5px] font-semibold text-foreground">{a.name}</span>
-            <span className="mt-[3px] block text-[11.5px] leading-[1.45] text-muted-foreground [text-wrap:pretty]">
-              {a.blurb}
-            </span>
-            {a.requiresProject && (
-              <span className="mt-2 inline-block rounded-[3px] border border-[#e4e4e4] px-[5px] py-px font-mono text-[9.5px] uppercase tracking-[0.08em] text-muted-foreground">
-                needs project
+            chevron={false}
+            dot={a.id === agentId ? M.ink : undefined}
+            leading={
+              <span
+                className="shrink-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white"
+                style={{ background: AGENT_COLOR[a.id] ?? M.ink }}
+              >
+                {AGENT_MONO[a.id]}
               </span>
-            )}
-          </button>
+            }
+            label={a.name}
+            sub={a.blurb}
+            trailing={
+              a.requiresProject ? (
+                <span
+                  className={cn(
+                    M_LABEL,
+                    "shrink-0 whitespace-nowrap rounded-[3px] border border-[#d4d4d4] px-1.5 py-0.5 text-[#525252]",
+                  )}
+                >
+                  needs project
+                </span>
+              ) : undefined
+            }
+          />
         ))}
-      </div>
+      </MobilePanel>
     </div>
   );
 
   /* ── composer ────────────────────────────────────────────────────── */
   const composer = (
-    <div className="shrink-0 border-t border-[--hair-border] bg-[#fcfcfc] px-[clamp(0.75rem,4vw,1.125rem)] py-2.5">
-      <div className="rounded-sm border border-[--hair-border] bg-background">
+    <div className="shrink-0 border-t border-[#e4e4e4] bg-white px-4 py-2.5">
+      {/* §7 gives the composer the pill radius. It holds a textarea over a
+          control row rather than the reference's single line, so the corners
+          are 22px — a pill at the collapsed height, and still reading as one
+          at the expanded one. */}
+      <div className="rounded-[22px] border border-[#18181b] bg-white">
         <textarea
           ref={taRef}
           rows={2}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           placeholder={agent ? "Ask the " + agent.name + "…" : "How can I help you today?"}
-          className="block w-full resize-none rounded-t-sm border-none bg-transparent px-[11px] pb-[9px] pt-[11px] text-[14px] leading-[1.45] text-foreground outline-none placeholder:text-[#a8a8a8]"
+          className="block w-full resize-none border-none bg-transparent px-4 pb-[9px] pt-[13px] text-[14.5px] leading-[1.5] text-[#18181b] outline-none placeholder:text-[#525252]"
           style={{ minHeight: COLLAPSED_MIN, overflow: "hidden" }}
         />
-        <div className="flex items-center gap-1.5 border-t border-t-[#f4f4f4] px-[7px] py-1.5">
+        <div className="flex items-center gap-1.5 border-t border-t-[#e4e4e4] px-2 py-1.5">
           {/* The one control row: project · model · mode as a single chip. */}
           <button
             type="button"
             onClick={() => setSheet("setup")}
             title={setupLabel}
-            className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 rounded-sm border border-[--zinc-border] bg-background px-2 text-[11.5px] text-muted-foreground"
+            className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 px-1 text-[#525252]"
           >
-            <span className="min-w-0 flex-1 truncate text-left">{setupLabel}</span>
-            <ChevronDown className="h-3 w-3 shrink-0 text-[#8a8a8a]" />
+            <span className={cn(M_MICRO, "min-w-0 flex-1 truncate text-left")}>{setupLabel}</span>
+            <ChevronDown className="h-3 w-3 shrink-0 text-[#525252]" />
           </button>
 
           {suggestions.length > 0 && (
@@ -335,9 +349,9 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
               onClick={() => setSheet("suggest")}
               aria-label="Suggested actions"
               title="Suggested actions"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-sm border border-[--zinc-border] bg-background text-muted-foreground"
+              className="grid h-11 w-11 shrink-0 place-items-center text-[#525252]"
             >
-              <Lightbulb className="h-3.5 w-3.5" />
+              <Lightbulb className="h-4 w-4" />
             </button>
           )}
 
@@ -350,11 +364,11 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
             aria-label={expanded ? "Collapse composer" : "Expand composer for longer input"}
             title={expanded ? "Collapse composer" : "Expand composer for longer input"}
             className={cn(
-              "grid h-11 w-11 shrink-0 place-items-center rounded-sm border",
-              expanded ? "border-foreground bg-foreground text-background" : "border-[--zinc-border] bg-background text-muted-foreground",
+              "grid h-11 w-11 shrink-0 place-items-center",
+              expanded ? "text-[#18181b]" : "text-[#525252]",
             )}
           >
-            {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
 
           <button
@@ -362,12 +376,18 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
             onClick={submit}
             disabled={!canSend}
             aria-label="Send"
-            className={cn(
-              "grid h-11 w-[46px] shrink-0 place-items-center rounded-sm",
-              canSend ? "bg-foreground text-background" : "cursor-default bg-[#f0f0f0] text-[#b8b8b8]",
-            )}
+            // The reference's 32px send disc, inside a 44px hit area so the
+            // touch floor holds without growing the circle.
+            className="grid h-11 w-11 shrink-0 place-items-center"
           >
-            <ArrowUp className="h-4 w-4" />
+            <span
+              className={cn(
+                "grid h-8 w-8 place-items-center rounded-full",
+                canSend ? "bg-[#18181b] text-white" : "cursor-default bg-[#e4e4e4] text-[#a1a1a1]",
+              )}
+            >
+              <ArrowUp className="h-4 w-4" />
+            </span>
           </button>
         </div>
       </div>
@@ -697,15 +717,20 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
     // --pi-chrome is published by PageLayout: the measured bottom reservation
     // plus this page's gutter. The fallback only covers the first paint before
     // the credit bar is measured.
-    <div className="relative flex h-[calc(100svh-var(--pi-chrome,170px))] min-h-[420px] flex-col overflow-hidden bg-background">
+    <div className="relative flex h-[calc(100svh-var(--pi-chrome,170px))] min-h-[420px] flex-col overflow-hidden bg-white">
       {header}
 
       {messages.length === 0 ? (
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#fafafa]">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[hsl(var(--m-canvas))]">
           {emptyState}
           {error && (
-            <div className="mx-[clamp(0.75rem,4vw,1.125rem)] mb-4 rounded-sm border border-[#f0c7cb] bg-[#fdf2f3] px-3 py-2 text-[12.5px] text-[#8a2a30]">
-              {error}
+            <div className="mx-4 mb-4 flex gap-2.5 rounded-[4px] border border-[#e0930b] bg-[#e0930b1f] px-3 py-[11px]">
+              <span aria-hidden className="shrink-0 font-mono text-[12px] leading-[1.3] text-[#6b4405]">
+                !
+              </span>
+              <p className="m-0 text-[12.5px] leading-[1.5] text-[#6b4405] [text-wrap:pretty]">
+                {error}
+              </p>
             </div>
           )}
         </div>
@@ -716,8 +741,11 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           error={error}
           threadMode={threadMode}
           onModeChange={onModeChange}
-          className="bg-[#fafafa]"
-          containerClassName="px-[clamp(0.75rem,4vw,1.125rem)] pb-[18px] pt-3.5"
+          // §2: the thread canvas is white — the conversation IS the page
+          // here, so it gets the panel interior rather than the page ground.
+          className="bg-white"
+          containerClassName="px-4 pb-[18px] pt-3.5"
+          userBubbleClassName="rounded-[16px] rounded-br-[4px] px-3.5 py-2.5 text-[14.5px] leading-[1.5]"
         />
       )}
 

@@ -1,10 +1,12 @@
 // Mobile-only presentation for the three network lens pages
 // (Product-Level, Process-Level, Firm-Level).
 //
-// Spec: docs/mobile-ui-spec.md §2.3 (grids that cannot overflow), §2.4 (44px
-// touch floor), §2.5 (min-w-0 / no shrink-0 on text), §2.7 (tables scroll and
-// freeze their identifying column), §3.1 (the adaptive-text ladder), §3.3
-// (numbers never adapt), §3.4 (the disclosure card).
+// Spec: `docs/mobile-skin-spec.md` — every container here is the black-headed
+// panel, colour is a 6px dot, and the numbers are one stat grid. The earlier
+// structural rules (`docs/mobile-ui-spec.md` §2.3 grids that cannot overflow,
+// §2.4 the 44px touch floor, §2.5 min-w-0 / no shrink-0 on text, §3.3 numbers
+// never adapt, §6 a disabled control explains itself) still hold and are what
+// the composition is built on.
 //
 // Everything here renders inside each page's `md:hidden` subtree, so none of
 // it can reach a desktop viewport - the desktop trees import nothing from this
@@ -13,67 +15,70 @@
 //
 // Presentational only: no hook that fetches, no state a caller reads. The one
 // piece of local state is `Disclosure`'s open/closed, which is the shared
-// primitive's own and is sanctioned by spec §0.1 A.
+// primitive's own.
 
 import * as React from 'react';
-import { AlertTriangle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Disclosure } from '@/components/shared';
+import {
+  M,
+  M_LABEL,
+  MobileButton,
+  MobileChip,
+  MobileDot,
+  MobileNote,
+  MobilePanel,
+  MobileRow,
+  MobileStatGrid,
+  type MobileStat,
+} from '@/components/mobile';
 
 /* ── the lens badge ────────────────────────────────────────────────────── */
 
 export type LensTone = 'violet' | 'teal' | 'amber';
 
+/** The three lens colours are the skin's three level colours, and they are
+ *  the same three: product violet, process teal, firm amber (§3). */
 const LENS_TONE: Record<LensTone, string> = {
-  violet: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
-  teal: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',
-  amber: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  violet: M.product,
+  teal: M.process,
+  amber: M.firm,
 };
 
 export function LensChip({ tone, children }: { tone: LensTone; children: React.ReactNode }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-sm px-2 py-0.5',
-        'font-mono text-[10px] font-semibold uppercase tracking-widest',
-        LENS_TONE[tone],
-      )}
-    >
-      {children}
+    <span className="inline-flex items-center gap-2">
+      <MobileDot tone={LENS_TONE[tone]} />
+      <span className={cn(M_LABEL, 'text-[#525252]')}>{children}</span>
     </span>
   );
 }
 
-/* ── section rule ──────────────────────────────────────────────────────── */
+/* ── a section ─────────────────────────────────────────────────────────── */
 
 /**
- * The mono kicker + hairline that separates the lens sections, with an
- * optional trailing note. The kicker is `shrink-0` because it is fixed
- * chrome; the rule takes the slack (spec §2.5 rule 2 covers text, not this).
+ * The one container. A lens section is a panel: a black head carrying the
+ * section's mono label and at most one counter, and rows inside it.
+ *
+ * This replaces the kicker-plus-hairline rule the three pages used to draw
+ * above each block. That rule was a borderless section, which the skin does
+ * not have (§12) — the head of the panel is where a section name lives now.
  */
-export function LensRule({
+export function LensSection({
+  label,
+  counter,
+  tone = 'primary',
   children,
-  trailing,
 }: {
+  label: string;
+  counter?: React.ReactNode;
+  tone?: 'primary' | 'secondary';
   children: React.ReactNode;
-  trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 pb-2">
-      {/* `whitespace-nowrap` rather than `shrink-0`: these are short fixed
-          labels, but spec 2.5 rule 2 keeps `shrink-0` off anything textual so
-          a long one can never push the row past the viewport. The rule between
-          them is the flex child that takes the slack. */}
-      <span className="whitespace-nowrap font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {children}
-      </span>
-      <span className="h-px min-w-0 flex-1 bg-border" />
-      {trailing && (
-        <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">
-          {trailing}
-        </span>
-      )}
-    </div>
+    <MobilePanel label={label} counter={counter} tone={tone}>
+      {children}
+    </MobilePanel>
   );
 }
 
@@ -85,9 +90,10 @@ export interface ColumnDef {
 }
 
 /**
- * Spec §3.4 / demo entry 08: the definitions live behind a disclosure so they
- * are available *before* the numbers without occupying the screen. Three
- * groups, in the demo's order: Scope, Findings, Columns.
+ * The definitions live behind a disclosure so they are available *before* the
+ * numbers without occupying the screen. Three groups, in order: Scope,
+ * Findings, Columns. It is a supporting panel, so it wears the quieter
+ * secondary head rather than competing with the findings below it.
  */
 export function LensHowToRead({
   scope,
@@ -99,53 +105,48 @@ export function LensHowToRead({
   columns: ColumnDef[];
 }) {
   return (
-    <Disclosure summary="How to read this">
-      <div className="flex flex-col gap-3.5">
-        <LensNote label="Scope">{scope}</LensNote>
-        <LensNote label="Findings">{findings}</LensNote>
-        <div className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            Columns
-          </span>
-          <dl className="m-0 flex flex-col gap-1.5">
-            {columns.map((c) => (
-              <div key={c.term} className="flex min-w-0 gap-2.5">
-                <dt className="w-[86px] shrink-0 font-medium text-foreground">{c.term}</dt>
-                <dd className="m-0 min-w-0 flex-1 [text-wrap:pretty]">{c.def}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+    <MobilePanel label="How to read this" tone="secondary" bare>
+      <div className="px-3 py-2">
+        <Disclosure summary="Definitions">
+          <div className="flex flex-col gap-3.5">
+            <LensNote label="Scope">{scope}</LensNote>
+            <LensNote label="Findings">{findings}</LensNote>
+            <div className="flex flex-col gap-1.5">
+              <span className={cn(M_LABEL, 'text-[#525252]')}>Columns</span>
+              <dl className="m-0 flex flex-col gap-1.5">
+                {columns.map((c) => (
+                  <div key={c.term} className="flex min-w-0 gap-2.5">
+                    <dt className="w-[86px] shrink-0 font-medium text-[#18181b]">{c.term}</dt>
+                    <dd className="m-0 min-w-0 flex-1 text-[#3f3f46] [text-wrap:pretty]">{c.def}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
+        </Disclosure>
       </div>
-    </Disclosure>
+    </MobilePanel>
   );
 }
 
 function LensNote({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        {label}
-      </span>
-      <span className="min-w-0 [text-wrap:pretty]">{children}</span>
+      <span className={cn(M_LABEL, 'text-[#525252]')}>{label}</span>
+      <span className="min-w-0 text-[#3f3f46] [text-wrap:pretty]">{children}</span>
     </div>
   );
 }
 
 /* ── the "graph is desktop-only" notice ────────────────────────────────── */
 
+/** §13.6 — the screen's one consequence line, in the one frame the skin has
+ *  for one. Two sentences, never more. */
 export function LensDesktopOnlyNote({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 items-start gap-2 rounded-sm border border-border bg-muted/40 px-3 py-2">
-      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <p className="min-w-0 text-[12px] leading-relaxed text-muted-foreground [text-wrap:pretty]">
-        {children}
-      </p>
-    </div>
-  );
+  return <MobileNote mark="·">{children}</MobileNote>;
 }
 
-/* ── network structure: the 2-up stat grid ─────────────────────────────── */
+/* ── network structure: the numbers band ───────────────────────────────── */
 
 export interface StructureItem {
   label: string;
@@ -154,30 +155,19 @@ export interface StructureItem {
 }
 
 /**
- * Fixed 2-up. `minmax(0,1fr)` + `min-w-0` per spec §2.3 - a bare `1fr` floors
- * at its widest child, which is what makes a "responsive" grid scroll
- * sideways at 320. Labels wrap rather than truncate (spec §4.5).
+ * §13.4 — the numbers, as the one stat grid on the screen. It carries no head:
+ * a stat grid is its own container (§7), and the figures name themselves.
+ *
+ * `red` becomes a 6px dot beside the stat label rather than red type. Colour
+ * in this skin is a dot, a 2px rule or a chip, and never a figure (§3).
  */
 export function LensStructure({ items }: { items: StructureItem[] }) {
-  return (
-    <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 [&>*]:min-w-0">
-      {items.map((it) => (
-        <div key={it.label} className="min-w-0 rounded-sm border border-border p-3">
-          <p
-            className={cn(
-              'text-[length:var(--fs-stat)] font-semibold leading-none tabular-nums tracking-[-0.02em]',
-              it.red && 'text-destructive',
-            )}
-          >
-            {it.value}
-          </p>
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground [text-wrap:pretty]">
-            {it.label}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
+  const stats: MobileStat[] = items.map((it) => ({
+    label: it.label,
+    value: it.value,
+    dot: it.red ? M.blocking : undefined,
+  }));
+  return <MobileStatGrid stats={stats} />;
 }
 
 /* ── structural risk: label / value rows ───────────────────────────────── */
@@ -190,23 +180,16 @@ export interface RiskRow {
 export function LensRisk({ rows, alert }: { rows: RiskRow[]; alert?: React.ReactNode }) {
   return (
     <>
-      <div className="divide-y divide-border rounded-sm border border-border">
-        {rows.map((r) => (
-          <div key={r.label} className="flex min-w-0 items-center gap-3 px-3 py-2.5">
-            <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted-foreground [text-wrap:pretty]">
-              {r.label}
-            </span>
-            {/* spec §3.3 - a figure is never truncated, abbreviated or wrapped */}
-            <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold tabular-nums">
-              {r.value}
-            </span>
-          </div>
-        ))}
-      </div>
+      {rows.map((r) => (
+        <MobileRow key={r.label} chevron={false} label={r.label} value={r.value} />
+      ))}
       {alert && (
-        <div className="mt-2 flex min-w-0 items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
-          <p className="min-w-0 text-[12px] leading-relaxed text-destructive [text-wrap:pretty]">
+        // A blocking finding is a dot and prose, not a red panel — §3 caps a
+        // meaning colour at a dot, a rule or a chip, and the amber frame means
+        // caveat, not blocked. So it is the last row of the risk panel.
+        <div className="flex gap-2.5 bg-white px-3 py-[13px]">
+          <MobileDot tone={M.blocking} className="mt-[7px]" />
+          <p className="m-0 min-w-0 text-[12.5px] leading-[1.5] text-[#3f3f46] [text-wrap:pretty]">
             {alert}
           </p>
         </div>
@@ -215,40 +198,55 @@ export function LensRisk({ rows, alert }: { rows: RiskRow[]; alert?: React.React
   );
 }
 
-/* ── centrality table ──────────────────────────────────────────────────── */
+/* ── the ranked list ───────────────────────────────────────────────────── */
 
 export interface LensColumn {
   key: string;
   label: string;
+  /** Kept because the call sites declare it and it still describes the
+   *  desktop table's intent. The row form has one value slot and one
+   *  sub-line, so nothing here is aligned by column any more. */
   align?: 'left' | 'right';
 }
 
 export interface LensCell {
   text: string;
-  className?: string;
+  /** Meaning, as the row's 6px dot. */
+  tone?: 'blocking' | 'warn' | 'notable';
+  /** The ranked figure — the row's right-hand value. Defaults to the first cell. */
+  primary?: boolean;
 }
 
 export interface LensRow {
   key: string;
-  /** The identifying value. Frozen in the first column and carried in `title`. */
+  /** The identifying value — the row's label. */
   id: string;
   cells: LensCell[];
 }
 
+const CELL_DOT: Record<NonNullable<LensCell['tone']>, string> = {
+  blocking: M.blocking,
+  warn: M.firm,
+  notable: M.ink,
+};
+
 /**
- * Spec §2.7: the column set IS the information, so the table keeps every
- * column, scrolls sideways, and freezes the identifying column so a row never
- * loses its name mid-swipe. The frozen cells carry an opaque background of
- * their own - a sticky cell without one lets the columns underneath show
- * through as it passes.
+ * The ranked list, as rows.
  *
- * No `md:` releases here: the whole subtree is inside the page's `md:hidden`,
- * so it has no desktop rendering to protect.
+ * It used to be a five-column table that scrolled sideways with its
+ * identifying column frozen. §9.5 allows horizontal scroll only inside a
+ * deliberate full-table sheet or a code block, and §10 asks a dense table to
+ * summarise. So each row now carries its identity as the label, the ranked
+ * figure as the value, and every remaining column — labelled — on the mono
+ * sub-line. No column is dropped and no figure is shortened; the ledger is
+ * re-laid-out, not truncated, and nothing scrolls sideways.
+ *
+ * Renders rows only: the caller wraps it in a <LensSection>, which is the
+ * panel.
  */
 export function LensTable({
   columns,
   rows,
-  minWidth,
   empty,
   loading = false,
   caption,
@@ -256,108 +254,55 @@ export function LensTable({
 }: {
   columns: LensColumn[];
   rows: LensRow[];
-  minWidth: number;
   empty: string;
   loading?: boolean;
   caption?: string;
   action?: React.ReactNode;
 }) {
-  const span = columns.length;
-  const hasRows = !loading && rows.length > 0;
+  if (loading || rows.length === 0) {
+    return (
+      <p className="bg-white px-3 py-8 text-center text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+        {loading ? 'Loading…' : empty}
+      </p>
+    );
+  }
+
   return (
-    <div className="min-w-0 overflow-hidden rounded-sm border border-border bg-card">
-      <div className="overflow-x-auto overscroll-x-contain">
-        {/* The min-width is what forces the sideways scroll that keeps every
-            column (spec 2.7) - but only when there are rows to scroll. An
-            empty or loading table stays inside the viewport so its message
-            can wrap instead of running off the edge. */}
-        <table
-          className="w-full border-collapse whitespace-nowrap text-[13px]"
-          style={hasRows ? { minWidth: `${minWidth}px` } : undefined}
-        >
-          <thead className={hasRows ? undefined : 'sr-only'}>
-            <tr className="border-b border-border bg-muted">
-              {columns.map((c, i) => (
-                <th
-                  key={c.key}
-                  scope="col"
-                  className={cn(
-                    'bg-muted px-3 py-2 font-mono text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground',
-                    c.align === 'right' ? 'text-right' : 'text-left',
-                    i === 0 && 'sticky left-0 z-[2]',
-                  )}
-                >
-                  {c.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {loading ? (
-              <tr>
-                <td colSpan={span} className="whitespace-normal px-3 py-4 text-center text-[12px] text-muted-foreground">
-                  Loading…
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={span} className="whitespace-normal px-3 py-4 text-center text-[12px] leading-relaxed text-muted-foreground [text-wrap:pretty]">
-                  {empty}
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.key}>
-                  <th
-                    scope="row"
-                    className="sticky left-0 z-[1] max-w-[128px] bg-card px-3 py-2 text-left font-medium"
-                  >
-                    {/* rung 2 of the ladder: the ellipsis needs a block box of
-                        its own - `truncate` on a <td>/<th> is ignored by the
-                        table layout algorithm and clips without a marker. */}
-                    <span className="block max-w-[104px] truncate" title={r.id}>
-                      {r.id}
-                    </span>
-                  </th>
-                  {r.cells.map((c, i) => (
-                    <td
-                      key={columns[i + 1]?.key ?? i}
-                      className={cn(
-                        'px-3 py-2',
-                        columns[i + 1]?.align === 'right' && 'text-right tabular-nums',
-                        c.className,
-                      )}
-                    >
-                      {c.text}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+    <>
+      {rows.map((r) => {
+        const primaryIdx = Math.max(0, r.cells.findIndex((c) => c.primary));
+        const primary = r.cells[primaryIdx];
+        const dot = r.cells.find((c) => c.tone)?.tone;
+        const sub = r.cells
+          .map((c, i) => (i === primaryIdx ? null : `${columns[i + 1]?.label ?? ''} ${c.text}`.trim()))
+          .filter(Boolean)
+          .join(' · ');
+        return (
+          <MobileRow
+            key={r.key}
+            chevron={false}
+            dot={dot ? CELL_DOT[dot] : undefined}
+            label={r.id}
+            sub={sub || undefined}
+            value={primary?.text}
+          />
+        );
+      })}
       {(caption || action) && (
-        <div className="flex min-w-0 items-center gap-3 border-t border-border px-3 py-2">
+        <div className="flex min-w-0 items-center gap-3 bg-white px-3 py-[11px]">
           {caption && (
-            <span className="min-w-0 flex-1 text-[11.5px] leading-snug text-muted-foreground [text-wrap:pretty]">
+            <span className="min-w-0 flex-1 text-[12px] leading-snug text-[#525252] [text-wrap:pretty]">
               {caption}
             </span>
           )}
           {action}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
-/**
- * The §2.7 affordance line. Rendered under a table that scrolls, in words -
- * the "swipe →" in the section rule is the glyph, this is the sentence.
- */
-export const LENS_SWIPE_HINT = 'swipe the table sideways for the remaining columns';
-
-/* ── a 44px action button for the mobile body ──────────────────────────── */
+/* ── an action for the mobile body ─────────────────────────────────────── */
 
 export function LensAction({
   onClick,
@@ -367,23 +312,41 @@ export function LensAction({
 }: {
   onClick: () => void;
   disabled?: boolean;
-  /** Spec §6: a disabled control is shown and explains itself, never hidden. */
+  /** §8: a disabled control is shown and explains itself, never hidden. */
   disabledReason?: string;
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <MobileButton
+      weight="secondary"
       onClick={onClick}
       disabled={disabled}
       title={disabled ? disabledReason : undefined}
-      className={cn(
-        'flex min-h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap',
-        'rounded-md border border-border bg-card px-3 text-[12.5px] font-medium text-foreground',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-      )}
+      className="h-11 gap-1.5 px-3 text-[12.5px]"
     >
       {children}
-    </button>
+    </MobileButton>
+  );
+}
+
+/** The lens chip's legacy export surface — a section rule with a mono label —
+ *  kept only for the Prediction block, whose body (`MLPrediction`) is a shared
+ *  desktop component and has not been converted yet. Everything else is a
+ *  <LensSection>. */
+export function LensRule({
+  children,
+  trailing,
+}: {
+  children: React.ReactNode;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 pb-2">
+      <span className={cn(M_LABEL, 'whitespace-nowrap text-[#525252]')}>{children}</span>
+      <span className="h-px min-w-0 flex-1 bg-[#d4d4d4]" />
+      {trailing && (
+        <span className="whitespace-nowrap font-mono text-[10px] text-[#525252]">{trailing}</span>
+      )}
+    </div>
   );
 }

@@ -23,6 +23,14 @@ interface MessageStreamProps {
   className?: string;
   /** Inner column classes — the max-width and gutter differ per platform. */
   containerClassName?: string;
+  /**
+   * The user turn's bubble. Omit it and the desktop bubble renders exactly as
+   * it always has; the mobile tree passes the skin's 16px bubble (spec §7,
+   * which reserves that radius for a sheet and a chat bubble and nothing
+   * else). It is a class override rather than a branch so there is still one
+   * implementation of the nine part kinds.
+   */
+  userBubbleClassName?: string;
 }
 
 export function MessageStream({
@@ -33,6 +41,7 @@ export function MessageStream({
   onModeChange,
   className,
   containerClassName,
+  userBubbleClassName,
 }: MessageStreamProps) {
   const streamRef = useRef<HTMLDivElement | null>(null);
   const [, setSavedMemory] = useState<Record<string, boolean>>({});
@@ -50,7 +59,12 @@ export function MessageStream({
           if (m.role === "user") {
             return (
               <div key={m.id} className="flex justify-end">
-                <div className="max-w-[78%] whitespace-pre-wrap rounded-sm bg-foreground px-3 py-2 text-[14px] leading-[1.55] text-background">
+                <div
+                  className={cn(
+                    "max-w-[78%] whitespace-pre-wrap rounded-sm bg-foreground px-3 py-2 text-[14px] leading-[1.55] text-background",
+                    userBubbleClassName,
+                  )}
+                >
                   {m.content}
                 </div>
               </div>

@@ -49,7 +49,7 @@ import {
   LensRisk,
   LensTable,
   LensAction,
-  LENS_SWIPE_HINT,
+  LensSection,
 } from '@/components/network/MobileLens';
 
 
@@ -1241,7 +1241,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
              shape; the pieces come from components/network/MobileLens so the
              three lenses stay identical in composition and differ only in
              what each lens measures. */}
-        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-5">
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-3">
 
           <div>
             <LensChip tone="amber">Firm level</LensChip>
@@ -1265,24 +1265,22 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             findings below are the same on both.
           </LensDesktopOnlyNote>
 
-          <section>
-            <LensRule>Network structure</LensRule>
-            <LensStructure
-              items={[
-                { label: 'Nodes', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.totalNodes) : '—' },
-                { label: 'Network depth', value: mobileFirmMetrics.networkDepth > 0 ? String(mobileFirmMetrics.networkDepth) : '—' },
-                { label: 'Critical path', value: '—' },
-                {
-                  label: 'Resilience',
-                  value: mobileFirmMetrics.totalNodes > 0 ? mobileFirmMetrics.resilience : '—',
-                  red: mobileFirmMetrics.resilienceRed && mobileFirmMetrics.totalNodes > 0,
-                },
-              ]}
-            />
-          </section>
+          {/* §13.4 — the numbers band. A stat grid is its own container and
+              carries no head; the figures name themselves. */}
+          <LensStructure
+            items={[
+              { label: 'Nodes', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.totalNodes) : '—' },
+              { label: 'Network depth', value: mobileFirmMetrics.networkDepth > 0 ? String(mobileFirmMetrics.networkDepth) : '—' },
+              { label: 'Critical path', value: '—' },
+              {
+                label: 'Resilience',
+                value: mobileFirmMetrics.totalNodes > 0 ? mobileFirmMetrics.resilience : '—',
+                red: mobileFirmMetrics.resilienceRed && mobileFirmMetrics.totalNodes > 0,
+              },
+            ]}
+          />
 
-          <section>
-            <LensRule>Structural risk</LensRule>
+          <LensSection label="Structural risk" counter="4">
             <LensRisk
               rows={[
                 { label: 'Supplier diversity', value: mobileFirmMetrics.totalNodes > 0 ? String(mobileFirmMetrics.supplierDiversity) : '—' },
@@ -1296,12 +1294,10 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   : undefined
               }
             />
-          </section>
+          </LensSection>
 
-          <section>
-            <LensRule trailing={networkNodes.length > 0 ? 'swipe →' : undefined}>Centrality</LensRule>
+          <LensSection label="Centrality" counter={networkNodes.length ? String(Math.min(20, networkNodes.length)) : undefined}>
             <LensTable
-              minWidth={440}
               loading={loading}
               columns={[
                 { key: 'firm', label: 'Firm' },
@@ -1314,27 +1310,26 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                 .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
                 .slice(0, 20)
                 .map(node => {
+                  // The same four thresholds the desktop table colours its
+                  // prominence cell with, spent as the row's 6px dot instead
+                  // of as coloured type (skin §3).
                   const p = node.prominence ?? 0;
-                  const tone = p >= 0.8
-                    ? 'text-destructive font-semibold'
-                    : p >= 0.6
-                      ? 'text-warning font-medium'
-                      : p >= 0.4
-                        ? 'text-primary'
-                        : 'text-muted-foreground';
+                  const tone = p >= 0.8 ? 'blocking' as const
+                    : p >= 0.6 ? 'warn' as const
+                      : p >= 0.4 ? 'notable' as const
+                        : undefined;
                   return {
                     key: node.id,
                     id: node.name ?? node.uid,
                     cells: [
-                      { text: getTierFromDepth(node.depth, node.is_seed ?? false), className: 'text-muted-foreground' },
-                      { text: node.prominence != null ? node.prominence.toFixed(3) : '—', className: tone },
+                      { text: getTierFromDepth(node.depth, node.is_seed ?? false) },
+                      { text: node.prominence != null ? node.prominence.toFixed(3) : '—', tone, primary: true },
                       { text: String(networkEdges.filter(e => e.dst_uid === node.uid).length) },
                       { text: String(networkEdges.filter(e => e.src_uid === node.uid).length) },
                     ],
                   };
                 })}
               empty="No deep-tier network data. Select a project with deep-tier sourcing enabled."
-              caption={networkNodes.length > 0 ? LENS_SWIPE_HINT : undefined}
               action={
                 <LensAction
                   onClick={recalculateProminence}
@@ -1346,7 +1341,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                 </LensAction>
               }
             />
-          </section>
+          </LensSection>
 
           <section>
             <LensRule>Prediction</LensRule>

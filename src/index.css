@@ -39,6 +39,10 @@
        between them per page, so both names are kept deliberately. */
     --surface-dense: 0 0% 92%;
     --surface-sunken: 0 0% 92%;
+    /* The mobile skin's page canvas (`docs/mobile-skin-spec.md` §2). Held
+       apart from --surface-dense on purpose: the skin is additive below `md`
+       and must not re-tint the desktop canvas, which stays at 92%. */
+    --m-canvas: 0 0% 96%;
     --header-background: 0 0% 99%;
     /* The sticky page-header's bottom border is a rule directly on the canvas,
        so it tracks --hair-rule (#d4d4d4 = 0 0% 83%), not --border. */
@@ -196,6 +200,10 @@
        between them per page, so both names are kept deliberately. */
     --surface-dense: 0 0% 92%;
     --surface-sunken: 0 0% 92%;
+    /* The mobile skin's page canvas (`docs/mobile-skin-spec.md` §2). Held
+       apart from --surface-dense on purpose: the skin is additive below `md`
+       and must not re-tint the desktop canvas, which stays at 92%. */
+    --m-canvas: 0 0% 96%;
     --header-background: 0 0% 99%;
     /* The sticky page-header's bottom border is a rule directly on the canvas,
        so it tracks --hair-rule (#d4d4d4 = 0 0% 83%), not --border. */

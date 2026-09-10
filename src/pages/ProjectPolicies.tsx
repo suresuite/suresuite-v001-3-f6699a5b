@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { PAGE_GUTTER } from "@/components/shared/PageBody";
+import { PAGE_GUTTER_SKIN } from "@/components/shared/PageBody";
+import { MobileSegmented } from "@/components/mobile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Segmented } from "@/components/intelligence/piUi";
@@ -147,8 +148,9 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={PAGE_GUTTER}>
+      <div className={PAGE_GUTTER_SKIN}>
         <PageHeader
+          skin
           title="Supply chain policies"
           subtitle={policyContextLine({
             plant: ctx?.plant_name || selectedProject?.plant_name || "—",
@@ -180,7 +182,17 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                 value={projectId || ""}
                 onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
               >
-                <SelectTrigger className="h-8 w-[clamp(130px,42vw,210px)] text-[12px] md:w-[210px]">
+                {/* The header's one right-hand element (§4). Below `md` it
+                    drops its box and reads as the quiet mono context line the
+                    skin puts beside a title; from `md` up it is the bordered
+                    select the desktop header has always had. */}
+                <SelectTrigger
+                  className="h-11 w-auto max-w-[46vw] gap-1.5 border-0 bg-transparent px-0
+                             font-mono text-[10.5px] tracking-[0.04em] text-[#525252]
+                             md:h-8 md:w-[210px] md:border md:border-input md:bg-background
+                             md:px-3 md:font-sans md:text-[12px] md:tracking-normal
+                             md:text-foreground"
+                >
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -195,12 +207,15 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
           }
         />
 
+        {/* §13.2 — the segmented control is the screen's second band, directly
+            under the title. Same three peer views, same handler; only the
+            control's own chrome changes below `md`. */}
         <div className="mb-3 md:hidden">
-          <Segmented<"stages" | "guide" | "datamap">
-            size="sm"
+          <MobileSegmented<"stages" | "guide" | "datamap">
+            ariaLabel="Policies views"
             value={tab}
             onChange={setTab}
-            options={[
+            items={[
               { value: "stages", label: "Policies" },
               { value: "guide", label: "Guide" },
               { value: "datamap", label: "Data map" },

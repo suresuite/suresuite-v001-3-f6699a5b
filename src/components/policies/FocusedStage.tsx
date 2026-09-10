@@ -11,6 +11,7 @@ import { LAYER, tint } from "@/components/intelligence/piUi";
 import * as XLSX from "xlsx";
 import { StagePolicyTable } from "./StagePolicyTable";
 import { MobileStagePolicyList } from "./MobileStagePolicyList";
+import { MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
 import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
 import { ApplyPresetDialog } from "./ApplyPresetDialog";
 import { PresetDiffBanner } from "./PresetDiffBanner";
@@ -217,6 +218,15 @@ export function FocusedStage({
     </div>
   );
 
+  // Below `md` the same sentence is the skin's amber consequence line (§13.6):
+  // one frame, one voice, and the only fill the skin allows at that size. The
+  // desktop banner above is untouched and only the mobile branch swaps.
+  const noDataNote = showNoData && (
+    <MobileNote>
+      No supply-chain data — upload and combine datasets in Data Manager.
+    </MobileNote>
+  );
+
   // Mobile: check/verify, not configure (spec — see MobileStagePolicyList's own
   // header comment). No filter/sort/bulk-edit toolbar, no "apply a preset"
   // dropdown, no preset-applied banner (the banner exists to explain a bulk
@@ -225,7 +235,7 @@ export function FocusedStage({
   if (isMobile) {
     return (
       <div className="flex flex-col gap-3">
-        {noDataBanner}
+        {noDataNote}
         <MobileStagePolicyList
           projectId={projectId}
           stageKey={stageKey}
@@ -235,10 +245,7 @@ export function FocusedStage({
           stageRows={rowsByStage[stageKey]}
         />
         {stageKey === "customer" && (
-          <div className="overflow-hidden rounded-sm border border-[--hair-border]">
-            <div className="border-b border-[--hair-divider] bg-[--hair-th] px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted-foreground">
-              Fulfillment defaults (project-wide)
-            </div>
+          <MobilePanel label="Fulfillment defaults" counter="project-wide">
             {Object.values(visibleFieldGroups("fulfillment")).flat().map((field) => {
               const value = (defaults.fulfillment as Record<string, unknown>)[field];
               const shown =
@@ -248,16 +255,15 @@ export function FocusedStage({
                     ? "—"
                     : String(value);
               return (
-                <div
+                <MobileRow
                   key={field}
-                  className="flex min-h-11 items-center justify-between gap-3 border-b border-[--hair-divider] px-3 py-2 last:border-b-0"
-                >
-                  <span className="text-[12.5px] text-muted-foreground">{FIELD_LABELS[field] ?? field}</span>
-                  <span className="font-mono text-[13px] tabular-nums text-foreground">{shown}</span>
-                </div>
+                  chevron={false}
+                  label={FIELD_LABELS[field] ?? field}
+                  value={shown}
+                />
               );
             })}
-          </div>
+          </MobilePanel>
         )}
       </div>
     );

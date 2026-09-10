@@ -44,7 +44,7 @@ import {
   LensStructure,
   LensRisk,
   LensTable,
-  LENS_SWIPE_HINT,
+  LensSection,
 } from '@/components/network/MobileLens';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MLPrediction from '@/components/MLPrediction';
@@ -1276,7 +1276,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
              shape; the pieces come from components/network/MobileLens so the
              three lenses stay identical in composition and differ only in
              what each lens measures. */}
-        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-5">
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-3">
 
           <div>
             <LensChip tone="teal">Process level</LensChip>
@@ -1300,24 +1300,22 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
             findings below are the same on both.
           </LensDesktopOnlyNote>
 
-          <section>
-            <LensRule>Network structure</LensRule>
-            <LensStructure
-              items={[
-                { label: 'Nodes', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.totalNodes) : '—' },
-                { label: 'Network depth', value: mobileProcessMetrics.networkDepth > 0 ? String(mobileProcessMetrics.networkDepth) : '—' },
-                { label: 'Critical path', value: '—' },
-                {
-                  label: 'Resilience',
-                  value: mobileProcessMetrics.resilience,
-                  red: mobileProcessMetrics.resilienceRed,
-                },
-              ]}
-            />
-          </section>
+          {/* §13.4 — the numbers band. A stat grid is its own container and
+              carries no head; the figures name themselves. */}
+          <LensStructure
+            items={[
+              { label: 'Nodes', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.totalNodes) : '—' },
+              { label: 'Network depth', value: mobileProcessMetrics.networkDepth > 0 ? String(mobileProcessMetrics.networkDepth) : '—' },
+              { label: 'Critical path', value: '—' },
+              {
+                label: 'Resilience',
+                value: mobileProcessMetrics.resilience,
+                red: mobileProcessMetrics.resilienceRed,
+              },
+            ]}
+          />
 
-          <section>
-            <LensRule>Structural risk</LensRule>
+          <LensSection label="Structural risk" counter="4">
             <LensRisk
               rows={[
                 { label: 'Critical path', value: '—' },
@@ -1331,12 +1329,10 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                   : undefined
               }
             />
-          </section>
+          </LensSection>
 
-          <section>
-            <LensRule trailing={topFlowNodes.length > 0 ? 'swipe →' : undefined}>Centrality</LensRule>
+          <LensSection label="Centrality" counter={topFlowNodes.length ? String(Math.min(20, topFlowNodes.length)) : undefined}>
             <LensTable
-              minWidth={440}
               loading={loading}
               columns={[
                 { key: 'node', label: 'Node' },
@@ -1356,17 +1352,16 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                   key: n.id,
                   id: String(label),
                   cells: [
-                    { text: getDisplayNodeType(n.level), className: 'capitalize text-muted-foreground' },
-                    { text: n.flow.toLocaleString() },
+                    { text: getDisplayNodeType(n.level) },
+                    { text: n.flow.toLocaleString(), primary: true },
                     { text: String((node?.data?.incoming as number) ?? 0) },
                     { text: String((node?.data?.outgoing as number) ?? 0) },
                   ],
                 };
               })}
               empty="No process network data. Select a project, then upload and combine its datasets."
-              caption={topFlowNodes.length > 0 ? LENS_SWIPE_HINT : undefined}
             />
-          </section>
+          </LensSection>
 
           <section>
             <LensRule>Prediction</LensRule>

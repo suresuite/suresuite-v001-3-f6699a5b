@@ -45,13 +45,13 @@ import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/netw
 import {
   LensChip,
   LensRule,
+  LensSection,
   LensHowToRead,
   LensDesktopOnlyNote,
   LensStructure,
   LensRisk,
   LensTable,
   LensAction,
-  LENS_SWIPE_HINT,
 } from '@/components/network/MobileLens';
 
 const GROUP_ORDER = ['A', 'B', 'C', 'D'] as const;
@@ -984,7 +984,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
              structure, the risk, the ranking, the prediction. Every piece
              is a presentational component from components/network/MobileLens
              so the three lenses cannot drift apart again. */}
-        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-5">
+        <div className="md:hidden mt-4 flex min-w-0 flex-col gap-3">
 
           <div>
             <LensChip tone="violet">Product level</LensChip>
@@ -1008,24 +1008,22 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             findings below are the same on both.
           </LensDesktopOnlyNote>
 
-          <section>
-            <LensRule>Network structure</LensRule>
-            <LensStructure
-              items={[
-                { label: 'Nodes', value: mobileProductMetrics.totalNodes > 0 ? String(mobileProductMetrics.totalNodes) : '—' },
-                { label: 'Network depth', value: mobileProductMetrics.networkDepth > 0 ? String(mobileProductMetrics.networkDepth) : '—' },
-                { label: 'Critical path', value: '—' },
-                {
-                  label: 'Resilience',
-                  value: mobileProductMetrics.totalNodes > 0 ? mobileProductMetrics.resilience : '—',
-                  red: mobileProductMetrics.resilienceRed && mobileProductMetrics.totalNodes > 0,
-                },
-              ]}
-            />
-          </section>
+          {/* §13.4 — the numbers band. A stat grid is its own container and
+              carries no head; the figures name themselves. */}
+          <LensStructure
+            items={[
+              { label: 'Nodes', value: mobileProductMetrics.totalNodes > 0 ? String(mobileProductMetrics.totalNodes) : '—' },
+              { label: 'Network depth', value: mobileProductMetrics.networkDepth > 0 ? String(mobileProductMetrics.networkDepth) : '—' },
+              { label: 'Critical path', value: '—' },
+              {
+                label: 'Resilience',
+                value: mobileProductMetrics.totalNodes > 0 ? mobileProductMetrics.resilience : '—',
+                red: mobileProductMetrics.resilienceRed && mobileProductMetrics.totalNodes > 0,
+              },
+            ]}
+          />
 
-          <section>
-            <LensRule>Structural risk</LensRule>
+          <LensSection label="Structural risk" counter="4">
             <LensRisk
               rows={[
                 { label: 'Single-source risk', value: supplierMetrics.supplierDiversity > 0 ? supplierMetrics.singleSourceRisk : '—' },
@@ -1039,12 +1037,10 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                   : undefined
               }
             />
-          </section>
+          </LensSection>
 
-          <section>
-            <LensRule trailing={networkMetrics.length > 0 ? 'swipe →' : undefined}>Centrality</LensRule>
+          <LensSection label="Centrality" counter={networkMetrics.length ? String(Math.min(20, networkMetrics.length)) : undefined}>
             <LensTable
-              minWidth={480}
               loading={networkMetricsLoading}
               columns={[
                 { key: 'node', label: 'Node' },
@@ -1057,27 +1053,26 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                 .sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))
                 .slice(0, 20)
                 .map(n => {
+                  // The same four thresholds the desktop table colours its
+                  // prominence cell with, spent as the row's 6px dot instead
+                  // of as coloured type (skin §3).
                   const p = n.prominence ?? 0;
-                  const tone = p >= 0.8
-                    ? 'text-destructive font-semibold'
-                    : p >= 0.6
-                      ? 'text-warning font-medium'
-                      : p >= 0.4
-                        ? 'text-primary'
-                        : 'text-muted-foreground';
+                  const tone = p >= 0.8 ? 'blocking' as const
+                    : p >= 0.6 ? 'warn' as const
+                      : p >= 0.4 ? 'notable' as const
+                        : undefined;
                   return {
                     key: n.id,
                     id: n.name,
                     cells: [
-                      { text: n.prominence != null ? n.prominence.toFixed(3) : '—', className: tone },
-                      { text: n.betweenness_centrality != null ? n.betweenness_centrality.toFixed(3) : '—', className: 'text-muted-foreground' },
-                      { text: n.degree_centrality != null ? n.degree_centrality.toFixed(3) : '—', className: 'text-muted-foreground' },
+                      { text: n.prominence != null ? n.prominence.toFixed(3) : '—', tone, primary: true },
+                      { text: n.betweenness_centrality != null ? n.betweenness_centrality.toFixed(3) : '—' },
+                      { text: n.degree_centrality != null ? n.degree_centrality.toFixed(3) : '—' },
                       { text: String(n.connection_count) },
                     ],
                   };
                 })}
               empty="No centrality metrics yet. Calculate them to rank the materials in this lens."
-              caption={networkMetrics.length > 0 ? LENS_SWIPE_HINT : undefined}
               action={
                 <LensAction
                   onClick={handleRefreshMetrics}
@@ -1089,7 +1084,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                 </LensAction>
               }
             />
-          </section>
+          </LensSection>
 
           <section>
             <LensRule>Prediction</LensRule>
