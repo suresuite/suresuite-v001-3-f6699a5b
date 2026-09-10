@@ -1,13 +1,9 @@
 import React from "react";
-import { X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { MOBILE_TABBAR_H, MOBILE_TABBAR_BORDER } from "@/components/MobileNav";
 
-/** Single-LINE credit bar height, in px (px-3 py-2 text-xs) — the first-paint
- *  floor only. The bar wraps on narrow screens (three lines at 320-390, two at
- *  414-600), so PageLayout measures the live element and falls back to this
- *  until the first measurement lands. Do not treat it as the bar's height. */
-export const MOBILE_FOOTER_H = 32;
+/** Retained for callers that still import it; the bar no longer renders below
+ *  `md`, so the mobile reservation it used to describe is zero. */
+export const MOBILE_FOOTER_H = 0;
 
 interface FooterProps {
   isCollapsed?: boolean;
@@ -16,45 +12,32 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }) => {
   const isMobile = useIsMobile();
-  const [dismissed, setDismissed] = React.useState(() => {
-    try {
-      return localStorage.getItem("ss.footerCredit") === "dismissed";
-    } catch {
-      return false;
-    }
-  });
 
-  const dismiss = () => {
-    try {
-      localStorage.setItem("ss.footerCredit", "dismissed");
-    } catch {
-      /* ignore storage failures */
-    }
-    setDismissed(true);
-  };
+  // The credit bar does not come to mobile (mobile skin spec §4: the chrome
+  // budget is status bar, page header, segmented row, action bar, tab bar —
+  // and nothing else). It wrapped to three lines at 320-390px and spent a
+  // fifth of the screen on every page saying the same sentence.
+  //
+  // The credit itself is not lost, which is the condition on removing it:
+  // About & help carries it in full — the people section names the developer
+  // and the supervisor, and the funding strip carries HWR, ACCURATE and the
+  // EU acknowledgement with its grant number. Desktop is unchanged.
+  //
+  // The dismiss control went with it. It was `md:hidden` — a mobile-only
+  // affordance for a bar that no longer appears on mobile — so the stored
+  // `ss.footerCredit` preference has nothing left to gate and is not read.
+  if (isMobile) return null;
 
   return (
-    <footer
-      className={`fixed left-0 right-0 z-30 md:bottom-0 ${
-        dismissed ? "hidden md:block" : ""
-      }`}
-      style={
-        isMobile
-          ? {
-              // sits ABOVE the tab bar: its height, its border, then the inset.
-              // The border term is what gives the visible gap.
-              bottom:
-                `calc(${MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER}px` +
-                ` + env(safe-area-inset-bottom, 0px))`,
-            }
-          : undefined
-      }
-    >
+    // `md:bottom-0`, not `bottom-0`: the bar only exists from `md` up, and
+    // writing the pin at the breakpoint that owns it says so in the class
+    // rather than in a comment. It is also what keeps the adaptive-UI audit's
+    // §2.6 rule pointed at real mobile chrome.
+    <footer className="fixed left-0 right-0 z-30 md:bottom-0">
       <div
-        className={`relative text-white pl-3 pr-10 py-2 text-xs text-center transition-all duration-500 md:pr-3
-          bg-[linear-gradient(to_right,rgba(0,0,0,0.55)_0%,rgba(0,0,0,0.60)_10%,rgba(0,0,0,0.64)_22%,rgba(0,0,0,0.68)_34%,rgba(0,0,0,0.72)_44%,rgba(0,0,0,0.78)_50%,rgba(0,0,0,0.72)_56%,rgba(0,0,0,0.68)_66%,rgba(0,0,0,0.64)_78%,rgba(0,0,0,0.60)_90%,rgba(0,0,0,0.55)_100%)]
-          md:bg-[linear-gradient(to_right,rgba(0,0,0,0.45)_0%,rgba(0,0,0,0.50)_10%,rgba(0,0,0,0.56)_22%,rgba(0,0,0,0.61)_34%,rgba(0,0,0,0.66)_44%,rgba(0,0,0,0.68)_50%,rgba(0,0,0,0.66)_56%,rgba(0,0,0,0.61)_66%,rgba(0,0,0,0.56)_78%,rgba(0,0,0,0.50)_90%,rgba(0,0,0,0.45)_100%)]
-          ${hasNavBar ? (isCollapsed ? "ml-0 md:ml-14" : "ml-0 md:ml-48") : ""}`}
+        className={`relative px-3 py-2 text-center text-xs text-white transition-all duration-500
+          bg-[linear-gradient(to_right,rgba(0,0,0,0.45)_0%,rgba(0,0,0,0.50)_10%,rgba(0,0,0,0.56)_22%,rgba(0,0,0,0.61)_34%,rgba(0,0,0,0.66)_44%,rgba(0,0,0,0.68)_50%,rgba(0,0,0,0.66)_56%,rgba(0,0,0,0.61)_66%,rgba(0,0,0,0.56)_78%,rgba(0,0,0,0.50)_90%,rgba(0,0,0,0.45)_100%)]
+          ${hasNavBar ? (isCollapsed ? "ml-14" : "ml-48") : ""}`}
         style={{
           WebkitBackdropFilter: "blur(8px)",
           backdropFilter: "blur(8px)",
@@ -63,14 +46,6 @@ const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }
       >
         Developed by <span className="font-semibold">Phu Nguyen</span> &{" "}
         <span className="font-semibold">Prof. Dmitry Ivanov</span> (HWR Berlin) · WP4 - ACCURATE project, funded by the European Union
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss credit bar"
-          className="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center text-white md:hidden"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
     </footer>
   );

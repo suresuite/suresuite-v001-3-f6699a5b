@@ -45,6 +45,19 @@ interface PageHeaderProps {
    */
   onBack?: () => void;
   backLabel?: string;
+  /**
+   * Wear the mobile skin below `md` (`docs/mobile-skin-spec.md` §4): a 19px
+   * title on the 96% canvas, a 16px gutter, no rule, no subtitle, and at most
+   * one right-hand element. Above `md` it is byte-identical to the header
+   * every other page renders.
+   *
+   * This is a migration seam, not a permanent variant. It exists because the
+   * skin lands one surface at a time and a converted screen's 16px gutter must
+   * not drag the unconverted screens' fluid clamp with it — at 320px those are
+   * 16px and 12px, and a header 4px out of line with its own content reads as
+   * a bug. It comes out, along with the flag, when the last surface converts.
+   */
+  skin?: boolean;
 }
 
 export function PageHeader({
@@ -55,36 +68,66 @@ export function PageHeader({
   refreshLoading = false,
   onBack,
   backLabel = 'Back',
+  skin = false,
 }: PageHeaderProps) {
   return (
     <div
       className={cn(
         PAGE_HEADER_SHELL,
+        skin &&
+          // The skin's header sits ON the canvas: no rule, no blur, no tint of
+          // its own. Everything here is released at `md`, where the shell's
+          // own values take back over untouched.
+          'border-b-0 bg-[hsl(var(--m-canvas))] backdrop-blur-none ' +
+            'md:border-b md:bg-header-background/95 md:backdrop-blur-md',
         'mb-4 md:mb-5',
+        skin && 'mb-3 md:mb-5',
         PAGE_GUTTER_BLEED,
+        skin && '-mx-4 md:-mx-12',
       )}
     >
       {/* Inner padding mirrors the gutter on mobile and holds the audit's
           px-8 py-3.5 from `md` up (C3). */}
-      <div className={PAGE_HEADER_ROW}>
+      <div className={cn(PAGE_HEADER_ROW, skin && 'min-h-[46px] px-4 py-1.5 md:px-8 md:py-3.5')}>
         {onBack && (
           <button
             type="button"
             onClick={onBack}
             aria-label={backLabel}
             title={backLabel}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-card text-foreground md:hidden"
+            className={cn(
+              'grid h-11 w-11 shrink-0 place-items-center rounded-md md:hidden',
+              skin
+                // `‹` and the title, nothing between them — the skin gives the
+                // back affordance no box of its own (§4).
+                ? '-ml-3 border-0 bg-transparent text-[#18181b]'
+                : 'border border-border bg-card text-foreground',
+            )}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className={skin ? 'h-[22px] w-[22px]' : 'h-4 w-4'} />
           </button>
         )}
 
         <div className="min-w-0 flex-1">
-          <h1 className={PAGE_HEADER_TITLE} title={title}>
+          <h1
+            className={cn(
+              PAGE_HEADER_TITLE,
+              skin && 'text-[19px] tracking-[-0.019em] text-[#18181b] md:text-[15px]',
+            )}
+            title={title}
+          >
             {title}
           </h1>
+          {/* The skin drops the subtitle below `md` rather than shrinking it:
+              a second line of chrome is a band the budget does not have (§4).
+              It is not deleted — desktop still renders it. */}
           {subtitle && (
-            <div className="text-[12px] text-muted-foreground mt-0.5 truncate">
+            <div
+              className={cn(
+                'mt-0.5 truncate text-[12px] text-muted-foreground',
+                skin && 'hidden md:block',
+              )}
+            >
               {subtitle}
             </div>
           )}

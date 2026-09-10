@@ -25,7 +25,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 /** Bottom-chrome geometry, in px, published so PageLayout reserves space FROM
  *  these rather than from a hand-summed literal. Change a height here and the
  *  reservation follows; it cannot drift. */
-export const MOBILE_TABBAR_H = 56;      // min-h-[56px] on each tab
+export const MOBILE_TABBAR_H = 58;      // min-h-[58px] on each tab
 export const MOBILE_TABBAR_BORDER = 1;  // border-t
 
 const TABS = [
@@ -46,32 +46,31 @@ export function MobileTabBar({
 }) {
   const { pathname } = useLocation();
 
+  // The skin's tab bar (spec §4): 58px, white, a #d4d4d4 rule along the top,
+  // a 19px icon over a 10px/600 label. Active is ink, inactive is `M.quiet` —
+  // colour and weight carry the state, which is why the old top marker bar is
+  // gone. The tab inventory, its labels and its routes are untouched.
+  const tab = (active: boolean) =>
+    cn(
+      'flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-1 px-0.5',
+      active ? 'text-[#18181b]' : 'text-[#525252]',
+      'transition-colors duration-200 motion-reduce:transition-none',
+    );
+  const tabLabel = 'max-w-full truncate text-[10px] font-semibold';
+
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 flex items-stretch border-t border-border
-                 bg-header-background md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 items-stretch
+                 border-t border-[#d4d4d4] bg-white md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Primary"
     >
       {TABS.map(({ to, label, icon: Icon }) => {
         const active = !moreActive && (pathname === to || pathname.startsWith(to + '/'));
         return (
-          <Link
-            key={to}
-            to={to}
-            aria-current={active ? 'page' : undefined}
-            className={cn(
-              'relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1',
-              active ? 'text-foreground' : 'text-muted-foreground',
-            )}
-          >
-            {active && (
-              <span className="absolute top-0 h-0.5 w-[26px] rounded-b bg-foreground" />
-            )}
-            <Icon className="h-[21px] w-[21px]" strokeWidth={active ? 2.1 : 1.8} />
-            <span className={cn('text-[10.5px]', active ? 'font-semibold' : 'font-medium')}>
-              {label}
-            </span>
+          <Link key={to} to={to} aria-current={active ? 'page' : undefined} className={tab(active)}>
+            <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.1 : 1.8} />
+            <span className={tabLabel}>{label}</span>
           </Link>
         );
       })}
@@ -80,18 +79,10 @@ export function MobileTabBar({
         type="button"
         onClick={onToggleMore}
         aria-current={moreActive ? 'page' : undefined}
-        className={cn(
-          'relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1',
-          moreActive ? 'text-foreground' : 'text-muted-foreground',
-        )}
+        className={tab(moreActive)}
       >
-        {moreActive && (
-          <span className="absolute top-0 h-0.5 w-[26px] rounded-b bg-foreground" />
-        )}
-        <Menu className="h-[21px] w-[21px]" strokeWidth={moreActive ? 2.1 : 1.8} />
-        <span className={cn('text-[10.5px]', moreActive ? 'font-semibold' : 'font-medium')}>
-          More
-        </span>
+        <Menu className="h-[19px] w-[19px]" strokeWidth={moreActive ? 2.1 : 1.8} />
+        <span className={tabLabel}>More</span>
       </button>
     </nav>
   );
@@ -104,9 +95,9 @@ export function MobileNavDrawer({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Where the tab bar (plus the credit bar above it) starts, in px — the
-   *  panel stops there instead of covering them. PageLayout already measures
-   *  this for its own content padding; passed through rather than re-derived. */
+  /** Where the tab bar starts, in px — the panel stops there instead of
+   *  covering it. PageLayout already derives this for its own content
+   *  padding; passed through rather than re-computed. */
   bottomInsetPx: number;
 }) {
   const { pathname } = useLocation();
@@ -219,9 +210,8 @@ export function MobileNavDrawer({
       </nav>
 
       {/* Mirrors the sidebar's account row: 28px avatar, ring-1, 11px/10px
-          stack. The EU/ACCURATE credit line is not repeated here — Footer's
-          own credit bar already floats above the tab bar on every mobile
-          screen, this one included. */}
+          stack. The EU/ACCURATE credit line is not repeated here — it lives
+          in About & help, which this panel links to. */}
       <div className="shrink-0 border-t border-border bg-header-background p-3">
         <div className="flex items-center gap-2.5">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full
