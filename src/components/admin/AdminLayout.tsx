@@ -3,7 +3,7 @@
 // spacing is tightened to the Ledger language. Drop-in replacement for
 // src/components/admin/AdminLayout.tsx.
 import { ReactNode, useEffect, useRef, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -13,13 +13,14 @@ import {
   Activity,
   ScrollText,
   ShieldCheck,
+  RotateCw,
 } from 'lucide-react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared/PageBody';
 import { MobileSheet } from '@/components/shared/MobileSheet';
 import { useIsMobile } from '@/hooks/use-is-mobile';
-import { M, MobilePanel, MobileRow } from '@/components/mobile';
+import { M, MobilePageHeader, MobilePanel, MobileRow } from '@/components/mobile';
 import { cn } from '@/lib/utils';
 
 interface AdminLayoutProps {
@@ -64,6 +65,7 @@ export function AdminLayout({
   children,
 }: AdminLayoutProps) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const activeRef = useRef<HTMLAnchorElement>(null);
   const isMobile = useIsMobile();
   const [navOpen, setNavOpen] = useState(false);
@@ -79,19 +81,59 @@ export function AdminLayout({
     strip.scrollLeft = Math.max(0, target);
   }, [pathname]);
 
+  // Admin isn't one of the tab bar's four roots (isMobileRootRoute), so T2
+  // hides the tab bar on every /admin/* route — the only way back is this
+  // header's own back target. A page that names its own parent (AdminUserAccess
+  // → Users) keeps it; every other admin page falls back to browser back,
+  // since there is no single fixed parent for a screen reached from More.
+  const effectiveOnBack = onBack ?? (() => navigate(-1));
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
-        <PageHeader
-          skin={isMobile}
+      {/* v3 §1.1: the one PageHeader component, as a sibling before the
+          padded content — never nested inside PAGE_GUTTER_SKIN. Detail
+          variant, not root: see effectiveOnBack above. `actions` (search
+          boxes, "Add x" dialogs) doesn't fit the header's one-meta-action
+          rule, so it moves into the gutter as the body's first band instead
+          of being dropped — refresh is the one action that does fit. */}
+      {isMobile && (
+        <MobilePageHeader
+          variant="detail"
           title={title}
-          subtitle={subtitle}
-          rightContent={actions}
-          onRefresh={onRefresh}
-          refreshLoading={refreshLoading}
-          onBack={onBack}
+          onBack={effectiveOnBack}
           backLabel={backLabel}
+          meta={
+            onRefresh ? (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshLoading}
+                aria-label="Refresh"
+                title="Refresh"
+                className="relative -mr-1 grid h-[32px] w-[32px] shrink-0 place-items-center text-[#18181b] after:absolute after:-inset-1.5 after:content-['']"
+              >
+                <RotateCw className={cn('h-[16px] w-[16px]', refreshLoading && 'animate-spin')} />
+              </button>
+            ) : undefined
+          }
         />
+      )}
+      <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
+        {!isMobile && (
+          <PageHeader
+            title={title}
+            subtitle={subtitle}
+            rightContent={actions}
+            onRefresh={onRefresh}
+            refreshLoading={refreshLoading}
+            onBack={onBack}
+            backLabel={backLabel}
+          />
+        )}
+
+        {isMobile && actions && (
+          <div className="mb-[var(--m-gap)] flex flex-wrap items-center gap-2">{actions}</div>
+        )}
 
         {/* Below `md` the eight sections are a row that names where you are
             and a sheet that holds all eight (v2 §4B). The strip is ~855px wide

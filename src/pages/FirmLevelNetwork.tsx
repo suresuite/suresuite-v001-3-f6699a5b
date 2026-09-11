@@ -35,12 +35,14 @@ import {
   Map,
   Building2,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
+import { useNavigate } from 'react-router-dom';
+import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import MLPrediction from '@/components/MLPrediction';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MapView from '@/components/MapView';
 import { FROZEN_CELL } from '@/components/shared';
-import { MobileGroup } from '@/components/mobile';
+import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
 import {
   LensChip,
   LensHowToRead,
@@ -146,6 +148,8 @@ function getTierFromDepth(depth: number | null, isPlant: boolean = false): TierK
 
 export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLevelNetworkProps) {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -1133,7 +1137,43 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={PAGE_GUTTER}>
+      {/* v3 §1.1/§1.4: sibling before the gutter. Not one of the tab bar's
+          four roots (reached from More), so T2 hides the tab bar and this
+          back target is the only way out — detail variant, not root. The
+          chip stays despite that: it's the one real capability this screen
+          would otherwise lose (project switching), the desktop <Select>
+          below is the only place it lives today, and GAP-CLOSE T4 names it
+          explicitly for Network. Refresh is the one meta-slot action; the
+          search/analytics/map/recalculate controls stay desktop-only exactly
+          as before (`hidden md:contents`), so nothing that already worked on
+          mobile is lost. */}
+      {isMobile && (
+        <MobilePageHeader
+          variant="detail"
+          title="Firm-Level Network Intelligence"
+          onBack={() => navigate(-1)}
+          meta={
+            <button
+              type="button"
+              onClick={fetchData}
+              disabled={loading}
+              aria-label="Refresh"
+              title="Refresh"
+              className="relative -mr-1 grid h-[32px] w-[32px] shrink-0 place-items-center text-[#18181b] after:absolute after:-inset-1.5 after:content-['']"
+            >
+              <RefreshCw className={loading ? 'h-[16px] w-[16px] animate-spin' : 'h-[16px] w-[16px]'} />
+            </button>
+          }
+        >
+          <ProjectChip
+            projects={projects}
+            selectedId={globalSelectedProjectId}
+            onSelect={setGlobalSelectedProjectId}
+          />
+        </MobilePageHeader>
+      )}
+      <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
+        {!isMobile && (
         <PageHeader
           title="Firm-Level Network Intelligence"
           subtitle={`Deep-tier network of ${tierCounts['Tier 1']} Tier 1, ${tierCounts['Tier 2']} Tier 2, ${tierCounts['Tier 3']} Tier 3 suppliers, and ${tierCounts['Plant']} plant${tierCounts['Plant'] !== 1 ? 's' : ''}`}
@@ -1235,6 +1275,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             </div>
           }
         />
+        )}
 
         {/* ── Mobile composition (md:hidden) ──────────────────────────
              Spec 5 row 7 / demo entry 08. See ProductLevelNetwork for the

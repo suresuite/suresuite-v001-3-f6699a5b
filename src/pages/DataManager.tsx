@@ -1,6 +1,6 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import {
   M,
   MobileButton,
   MobileGroup,
+  MobilePageHeader,
   MobilePanel,
   MobileStatGrid,
 } from '@/components/mobile';
@@ -717,6 +718,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
 
   // The create form, hoisted so both chromes mount the same controls (§8).
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   // §13.4 — the numbers, as the one stat grid on the screen. Derived from the
   // list already in hand; no new query, no new state (v2 §7).
@@ -1013,42 +1015,54 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
             </div>
     </>
   );
+  // Not a tab-bar root (isMobileRootRoute) — reached from More, so T2 hides
+  // the tab bar here and the header's own back target is the only way out.
+  const newProjectAction = canModify && (
+    <Button onClick={handleOpenCreateForm} disabled={isCreating} size="sm">
+      <Plus className="h-4 w-4 mr-2" />
+      New Project
+    </Button>
+  );
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+      {/* v3 §1.1: sibling before the padded content, detail variant (see
+          comment above) — the active-project badge doesn't fit the one-action
+          meta slot, so it stays out; "New Project" moves into the gutter as
+          the body's first band rather than the header, same move T4 makes for
+          AdminLayout's actions. */}
+      {isMobile && (
+        <MobilePageHeader variant="detail" title="Your Projects" onBack={() => navigate(-1)} />
+      )}
       <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
-        <PageHeader
-          skin={isMobile}
-          title="Your Projects"
-          subtitle={canModify
-            ? 'Create and manage your supply chain projects'
-            : 'View available projects'}
-          rightContent={
-            <div className="flex items-center space-x-2">
-              {selectedProject && (
-                /* A project name is user data and arbitrarily long, and this
-                   sits in the header's `shrink-0` right slot - unbounded, it
-                   pushes the row past the viewport (§2.5). Bounded here, and
-                   truncated on the inner span because `truncate` on a flex
-                   container does not ellipsize its own text. */
-                <Badge variant="secondary" className="max-w-[36vw] text-xs md:max-w-none">
-                  <span className="min-w-0 truncate" title={selectedProject.name}>
-                    {selectedProject.name}
-                  </span>
-                </Badge>
-              )}
-              {canModify && (
-                <Button
-                  onClick={handleOpenCreateForm}
-                  disabled={isCreating}
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Project
-                </Button>
-              )}
-            </div>
-          }
-        />
+        {!isMobile && (
+          <PageHeader
+            title="Your Projects"
+            subtitle={canModify
+              ? 'Create and manage your supply chain projects'
+              : 'View available projects'}
+            rightContent={
+              <div className="flex items-center space-x-2">
+                {selectedProject && (
+                  /* A project name is user data and arbitrarily long, and this
+                     sits in the header's `shrink-0` right slot - unbounded, it
+                     pushes the row past the viewport (§2.5). Bounded here, and
+                     truncated on the inner span because `truncate` on a flex
+                     container does not ellipsize its own text. */
+                  <Badge variant="secondary" className="max-w-[36vw] text-xs md:max-w-none">
+                    <span className="min-w-0 truncate" title={selectedProject.name}>
+                      {selectedProject.name}
+                    </span>
+                  </Badge>
+                )}
+                {newProjectAction}
+              </div>
+            }
+          />
+        )}
+        {isMobile && newProjectAction && (
+          <div className="mb-[var(--m-gap)]">{newProjectAction}</div>
+        )}
         <div className={isMobile ? 'flex flex-col gap-[var(--m-gap)]' : 'space-y-4'}>
             {/* §13.4 — the numbers band, one stat grid, below `md` only. */}
             {isMobile && projects.length > 0 && (
