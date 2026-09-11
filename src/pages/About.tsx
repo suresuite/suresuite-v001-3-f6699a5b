@@ -241,7 +241,8 @@ function FundingStrip() {
                     credit appears — Footer.tsx no longer renders there — so it
                     is body copy, not fine print. `md:` keeps the 11px the
                     desktop band has always had. */}
-                <span className="mt-[5px] block font-mono text-[length:var(--fs-body)] leading-[1.5] tracking-[0.05em] text-muted-foreground tabular-nums md:text-[11px]">
+                <span className="mt-[5px] block font-mono text-[10px] tracking-[0.05em] text-muted-foreground tabular-nums md:text-[11px]">
+                {/* <span className="mt-[5px] block font-mono text-[length:var(--fs-body)] leading-[1.5] tracking-[0.05em] text-muted-foreground tabular-nums md:text-[11px]"> */}
                   {p.detail}
                 </span>
               </div>

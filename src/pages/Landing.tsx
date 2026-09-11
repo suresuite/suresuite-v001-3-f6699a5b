@@ -32,7 +32,7 @@ import {
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
 
 // Swap in your real YouTube video id.
-const YOUTUBE_ID = 'ScMzIvxBSi4';
+const YOUTUBE_ID = '8vMlb3OZ8_g';
 
 // "Why teams choose SuReSuite" — the strong capability grid.
 const WHY_TEAMS = [
@@ -492,7 +492,8 @@ export default function Landing() {
                   {/* v2 §5.6: a ratio and a dvh cap, never a fixed pixel
                       height — 300px is a third of a 932px phone and two
                       thirds of a landscape one. */}
-                  <div className="relative aspect-[4/3] max-h-[60dvh] w-full md:aspect-[16/10] md:max-h-none md:h-[460px] lg:h-[560px]">
+                  <div className="relative aspect-[5/4] max-h-[72dvh] w-full md:aspect-[16/10] md:max-h-none md:h-[460px] lg:h-[560px]">
+                  {/* <div className="relative aspect-[4/3] max-h-[60dvh] w-full md:aspect-[16/10] md:max-h-none md:h-[460px] lg:h-[560px]"> */}
                     <NetworkVisualization3D />
                   </div>
                 </div>
@@ -531,7 +532,7 @@ export default function Landing() {
         </section>
 
         {/* Technical Architecture */}
-        <section className="border-t border-[--hair-rule]">
+        {/* <section className="border-t border-[--hair-rule]">
           <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>01 / 02 — Architecture</span>
@@ -541,10 +542,10 @@ export default function Landing() {
               <p className="mt-4 text-base text-muted-foreground">
                 Explore the advanced analytics engine and simulation capabilities that power comprehensive supply chain resilience analysis.
               </p>
-            </div>
+            </div> */}
 
             {/* Tab Navigation */}
-            <div className="mt-12">
+            {/* <div className="mt-12">
               <div
                 role="tablist"
                 aria-label="Technical architecture views"
@@ -572,10 +573,10 @@ export default function Landing() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div> */}
 
             {/* Content Panel */}
-            <div className="relative isolate mt-10">
+            {/* <div className="relative isolate mt-10">
               <div
                 aria-hidden
                 className="absolute -inset-x-6 -inset-y-8 -z-10 bg-grid opacity-[0.35] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
@@ -614,13 +615,13 @@ export default function Landing() {
                         </div>
                       </div>
                     </div>
-                    <div className="lg:col-span-2">
+                    <div className="lg:col-span-2"> */}
                       {/* Mobile: stat viewport (3D viz is invisible at 220px on black bg) */}
-                      <div className="md:hidden">
+                      {/* <div className="md:hidden">
                         <StatViewport stats={NETWORK_STATS} />
-                      </div>
+                      </div> */}
                       {/* md+: 3D visualization */}
-                      <div className="hidden md:block md:h-[500px] relative bg-black">
+                      {/* <div className="hidden md:block md:h-[500px] relative bg-black">
                         <div className="absolute inset-0 opacity-[0.15] [background-image:linear-gradient(to_right,rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
                         <div className="relative h-full">
                           <NetworkVisualization3D />
@@ -706,10 +707,10 @@ export default function Landing() {
               </div>
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* CTA band — black, highlighted */}
-        <section className="relative overflow-hidden border-t border-[--hair-rule] bg-black text-white">
+        {/* <section className="relative overflow-hidden border-t border-[--hair-rule] bg-black text-white">
           <div
             aria-hidden
             className="absolute inset-0 opacity-50"
@@ -740,10 +741,10 @@ export default function Landing() {
               </Button>
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* Roadmap */}
-        <section className="border-t border-[--hair-rule]">
+        {/* <section className="border-t border-[--hair-rule]">
           <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>02 / 02 — Roadmap</span>
@@ -771,7 +772,7 @@ export default function Landing() {
               ))}
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* Funding & attribution — content KEPT VERBATIM */}
         <section className="border-t border-[--hair-rule] bg-black text-white">
