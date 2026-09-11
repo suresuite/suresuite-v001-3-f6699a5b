@@ -60,7 +60,6 @@ type Person = {
   photo: string | null; // null → monogram tile renders instead
   initials: string;
   monogramGlow: string;
-  tags: string[];
 };
 
 const PEOPLE: Person[] = [
@@ -82,7 +81,6 @@ const PEOPLE: Person[] = [
     photo: "/team/phu-nguyen.jpg",
     initials: 'PN',
     monogramGlow: 'rgba(255,255,255,0.24)',
-    tags: ['Simulation engine', 'Network modelling', 'Platform architecture', 'AI agents'],
   },
   {
     slug: 'dmitry-ivanov',
@@ -100,12 +98,6 @@ const PEOPLE: Person[] = [
     photo: "/team/dmitry-ivanov.jpg",
     initials: 'DI',
     monogramGlow: 'rgba(191,35,48,0.4)',
-    tags: [
-      'Supply chain resilience',
-      'Ripple effect & viability',
-      'Digital twins',
-      'Simulation & control',
-    ],
   },
 ];
 
@@ -387,17 +379,6 @@ export default function About() {
                     <p className="clear-left mt-5 text-[14.5px] leading-[1.72] text-muted-foreground text-pretty">
                       {p.bio}
                     </p>
-                  </div>
-
-                  <div className="mt-6 flex flex-wrap gap-[7px]">
-                    {p.tags.map((t) => (
-                      <span
-                        key={t}
-                        className="whitespace-nowrap rounded-sm border border-border px-2 py-1 text-xs text-foreground/70"
-                      >
-                        {t}
-                      </span>
-                    ))}
                   </div>
 
                   <div className="min-h-[20px] flex-1" />
