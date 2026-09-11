@@ -79,7 +79,7 @@ const PEOPLE: Person[] = [
         2025).
       </>
     ),
-    photo: "public/team/fig-Phu-Nguyen.jpg",
+    photo: "/team/phu-nguyen.jpg",
     initials: 'PN',
     monogramGlow: 'rgba(255,255,255,0.24)',
     tags: ['Simulation engine', 'Network modelling', 'Platform architecture', 'AI agents'],
@@ -99,7 +99,7 @@ const PEOPLE: Person[] = [
         policy library, and the resilience metrics it reports.
       </>
     ),
-    photo: "public/team/fig-Prof-Ivanov.jpg",
+    photo: "/team/dmitry-ivanov.jpg",
     initials: 'DI',
     monogramGlow: 'rgba(191,35,48,0.4)',
     tags: [
