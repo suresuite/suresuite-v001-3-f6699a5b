@@ -50,7 +50,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Truck } from "lucide-react";
+import { Truck } from "lucide-react";
 import { MobileSheet } from "@/components/shared/MobileSheet";
 import { cn } from "@/lib/utils";
 import {
@@ -61,11 +61,13 @@ import {
   MobileButton,
   MobileButtonRow,
   MobileGroup,
+  MobilePageHeader,
   MobilePanel,
   MobileRow,
   MobileSegmented,
   MobileStatGrid,
   MobileToggle,
+  ProjectChip,
   type MobileStat,
   type SegmentedItem,
 } from "@/components/mobile";
@@ -90,7 +92,6 @@ import type { Finding } from "@/lib/policies/validationService";
 
 /** Every sheet this screen can show. `null` is the pane itself. */
 type Sheet =
-  | "projects"
   | "scenarios"
   | "scenario"
   | "runWindow"
@@ -247,37 +248,28 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const levers = (effectiveRecovery.response ?? []) as RecoveryResponseKey[];
   const findings = gateFindings ?? [];
 
-  /* ── header — §4's title band ──────────────────────────────────────────── */
-  // 19px title and at most ONE right-hand element. The project chooser takes
-  // that slot because it is the outer context; the scenario, which is what the
-  // panes below are about, gets a panel row of its own rather than the subtitle
-  // the budget no longer has a band for.
+  /* ── header — the chrome contract's root header (v3 §1.1) ───────────────── */
+  // The project chip and the five-pane segmented control both live on the
+  // header's second row, pinned with the title — the scenario, which is what
+  // the panes below are about, gets a panel row of its own rather than the
+  // subtitle the budget no longer has a band for.
   const header = (
-    <div className="flex items-center justify-between gap-2.5 px-[var(--m-gutter)] pb-2.5 pt-1">
-      <h1 className="min-w-0 flex-1 truncate text-[length:var(--fs-title)] font-semibold leading-tight tracking-[-0.019em] text-[#171717]">
-        Simulation Lab
-      </h1>
-      <button
-        type="button"
-        onClick={() => setSheet("projects")}
-        title={activeProject?.name ?? "Select project"}
-        className="flex min-h-11 max-w-[46vw] shrink-0 items-center gap-1.5 text-[#525252]"
-      >
-        <span className={cn(M_MICRO, "min-w-0 truncate")}>
-          {activeProject?.name ?? "Select project"}
-        </span>
-        <ChevronDown className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
-      </button>
-    </div>
-  );
-
-  const segmented = (
-    <MobileSegmented
-      items={PANES}
-      value={pane}
-      onChange={onPane}
-      ariaLabel="Simulation Lab panes"
-    />
+    <MobilePageHeader variant="root" title="Simulation Lab">
+      {/* Stacked, not shared on one line: five panes plus the chip would
+          crowd below ~375px (Controls.tsx's own 320px measurement assumes
+          the segmented control gets the full row). Both still live in the
+          one pinned header block (v3 §1.1) — just on their own lines of it. */}
+      <div className="flex w-full flex-col gap-2.5">
+        <ProjectChip projects={projects} selectedId={projectId} onSelect={onProjectChange} />
+        <MobileSegmented
+          className="w-full"
+          items={PANES}
+          value={pane}
+          onChange={onPane}
+          ariaLabel="Simulation Lab panes"
+        />
+      </div>
+    </MobilePageHeader>
   );
 
   /* ── the gate — §13.3, the one thing that needs attention ─────────────── */
@@ -862,7 +854,6 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     // as `--pi-chrome`.
     <div className="flex flex-col pb-4">
       {header}
-      <div className="px-[var(--m-gutter)] pb-3">{segmented}</div>
       {/* The gap is the gap between GROUPS (v2 §2). Panels inside a group sit
           8px apart; a band is 18-24px from the next. */}
       <main className="flex min-w-0 flex-col gap-[var(--m-gap)] px-[var(--m-gutter)]">{body}</main>
@@ -879,31 +870,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
       ) : null}
 
       {/* ── sheets — every one holds the REAL editor ─────────────────────── */}
-      <MobileSheet open={sheet === "projects"} title="Switch project" onClose={close}>
-        <div className="flex flex-col">
-          {projects.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                onProjectChange(p.id);
-                close();
-              }}
-              className="flex min-h-11 w-full items-center gap-2.5 border-b border-[#e8e8ea] px-3 py-[var(--m-row-y)] text-left last:border-b-0 active:bg-[#fafafa]"
-            >
-              <span className="min-w-0 flex-1 truncate text-[length:var(--fs-row)] font-medium text-[#171717]">
-                {p.name}
-              </span>
-              {p.id === projectId ? (
-                <span className="shrink-0 text-[15px] text-[#171717]">✓</span>
-              ) : null}
-            </button>
-          ))}
-          {projects.length === 0 ? (
-            <p className="px-3 py-3 text-[12.5px] text-[#525252]">No projects available.</p>
-          ) : null}
-        </div>
-      </MobileSheet>
+      {/* Switching projects is the header's <ProjectChip>, which owns its own
+          sheet — see the header block above. */}
 
       <MobileSheet
         open={sheet === "scenarios"}

@@ -17,3 +17,6 @@ export {
 } from './Controls';
 export type { SegmentedItem } from './Controls';
 export { MobileScreen, MobileGroup, MobileGroupGrid } from './Screen';
+export { MobilePageHeader } from './PageHeader';
+export { ProjectChip } from './ProjectChip';
+export type { ProjectChipProject } from './ProjectChip';
