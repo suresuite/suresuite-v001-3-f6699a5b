@@ -61,7 +61,6 @@ type Person = {
   initials: string;
   monogramGlow: string;
   tags: string[];
-  meta: React.ReactNode;
 };
 
 const PEOPLE: Person[] = [
@@ -74,8 +73,8 @@ const PEOPLE: Person[] = [
     bio: (
       <>
         He designs and builds SuReSuite end to end — the discrete-event simulation engine, the
-        three-lens network model, the policy library, the workspace around them, and the supply
-        chain intelligent agents that bring it to life. Co-author of{' '}
+        three-lens network model, the policy library, the supply chain intelligent agents, and the
+        workspace around them. Co-author of{' '}
         <em>Introduction to Operations and Supply Chain Simulation with AnyLogic</em> (Springer,
         2025).
       </>
@@ -84,7 +83,6 @@ const PEOPLE: Person[] = [
     initials: 'PN',
     monogramGlow: 'rgba(255,255,255,0.24)',
     tags: ['Simulation engine', 'Network modelling', 'Platform architecture', 'AI agents'],
-    meta: <span>Digital-AI SC Lab · HWR Berlin</span>,
   },
   {
     slug: 'dmitry-ivanov',
@@ -108,19 +106,6 @@ const PEOPLE: Person[] = [
       'Digital twins',
       'Simulation & control',
     ],
-    meta: (
-      <>
-        <a
-          href="https://blog.hwr-berlin.de/ivanov/"
-          target="_blank"
-          rel="noreferrer"
-          className="border-b border-border pb-0.5 hover:text-[#BF2330]"
-        >
-          blog.hwr-berlin.de/ivanov
-        </a>
-        <span>HWR Berlin · dmitry.ivanov@hwr-berlin.de</span>
-      </>
-    ),
   },
 ];
 
@@ -416,10 +401,6 @@ export default function About() {
                   </div>
 
                   <div className="min-h-[20px] flex-1" />
-
-                  <div className="flex flex-wrap gap-x-[22px] gap-y-1.5 whitespace-nowrap border-t border-[--hair-rule] pt-4 font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground">
-                    {p.meta}
-                  </div>
                 </article>
               ))}
             </div>
