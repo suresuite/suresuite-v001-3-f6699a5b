@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { PAGE_GUTTER_SKIN } from "@/components/shared/PageBody";
-import { MobilePageHeader, MobileSegmented, ProjectChip } from "@/components/mobile";
+import {
+  M,
+  MobileChip,
+  MobileGroup,
+  MobileHeaderSearch,
+  MobilePageHeader,
+  MobilePanel,
+  MobileRow,
+  ProjectChip,
+} from "@/components/mobile";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +22,8 @@ import { usePolicies } from "@/hooks/usePolicies";
 import { useProjectContext } from "@/hooks/useProjectContext";
 import { useModelValidation } from "@/hooks/useModelValidation";
 import { useStageGuards } from "@/hooks/useStageGuards";
+import { useItemMasters } from "@/hooks/useItemMasters";
+import { usePolicySearchIndex, type SearchObjectType, type SearchResult } from "@/hooks/usePolicySearchIndex";
 import { useTimeUnit, DAYS_PER_UNIT, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
 import { FocusedStage } from "@/components/policies/FocusedStage";
 import { GuidePanel } from "@/components/policies/GuidePanel";
@@ -34,6 +45,40 @@ import type { StageKey } from "@/lib/policies/stages";
 interface Props {
   isCollapsed: boolean;
   setIsCollapsed: (c: boolean) => void;
+}
+
+// v3 §3.1 — lens dot per object type; "policy" carries none.
+const SEARCH_DOT: Partial<Record<SearchObjectType, string>> = {
+  supplier: M.firm,
+  customer: M.firm,
+  plant: M.firm,
+  material: M.product,
+  product: M.product,
+  lane: M.process,
+};
+const SEARCH_GROUP_LABEL: Record<SearchObjectType, string> = {
+  supplier: "Suppliers",
+  customer: "Customers",
+  plant: "Plant",
+  material: "Materials",
+  product: "Products",
+  lane: "Lanes",
+  policy: "Policies",
+};
+
+/** §3.1: `background:#f0f0f0` on the matched run, `#171717` text — never
+ *  `#F8D448` (readme §3.9's four uses, none of them this). */
+function highlightMatch(text: string, query: string) {
+  if (!query) return text;
+  const i = text.toLowerCase().indexOf(query.toLowerCase());
+  if (i === -1) return text;
+  return (
+    <>
+      {text.slice(0, i)}
+      <span style={{ background: "#f0f0f0", color: "#171717" }}>{text.slice(i, i + query.length)}</span>
+      {text.slice(i + query.length)}
+    </>
+  );
 }
 
 /** Horizon + "Week 1 = …" calendar mapping, from the project's sim window. */
@@ -134,6 +179,9 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
   const [activeStage, setActiveStage] = useState<StageKey>("supplier");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  // v3 §3.1 (gap-close T6): search the network, not the catalog.
+  const [policyQuery, setPolicyQuery] = useState("");
+  const [policyFilter, setPolicyFilter] = useState<SearchObjectType | "all">("all");
 
   // Stage 4 evidence: an adopted model card exists — the persisted proof that
   // replications ran and a warm-up was adopted (G13).
@@ -145,38 +193,80 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     overrides,
     evidence: cards.length > 0,
   });
+  const { materials, products, suppliers } = useItemMasters(projectId);
+  const searchIndex = usePolicySearchIndex({
+    rowsByStage,
+    overrides,
+    materials: materials.map((m) => ({ id: m.material_id, name: m.name })),
+    products: products.map((p) => ({ id: p.product_id, name: p.name })),
+    suppliers: suppliers.map((s) => ({ id: s.supplier_id, name: s.name })),
+    plantName: ctx?.plant_name,
+  });
+  const policyQueryLower = policyQuery.trim().toLowerCase();
+  // §6: "one query result produces the chip counts, the group headers and
+  // the hidden-row lines" — searchMatches is that one result; every count
+  // below reads from it, none are computed separately.
+  const searchMatches = useMemo(
+    () =>
+      policyQueryLower
+        ? searchIndex.filter(
+            (r) =>
+              r.name.toLowerCase().includes(policyQueryLower) ||
+              (r.sub ?? "").toLowerCase().includes(policyQueryLower),
+          )
+        : [],
+    [searchIndex, policyQueryLower],
+  );
+  const searchTypeCounts = useMemo(() => {
+    const counts = new Map<SearchObjectType, number>();
+    for (const r of searchMatches) counts.set(r.type, (counts.get(r.type) ?? 0) + 1);
+    return counts;
+  }, [searchMatches]);
+  const filteredMatches =
+    policyFilter === "all" ? searchMatches : searchMatches.filter((r) => r.type === policyFilter);
+  // Groups ordered by how hard the query hits — most matches first, read
+  // straight off searchMatches, the same one result the chips read.
+  const groupedMatches = useMemo(() => {
+    const groups = new Map<SearchObjectType, SearchResult[]>();
+    for (const r of filteredMatches) {
+      (groups.get(r.type) ?? groups.set(r.type, []).get(r.type)!).push(r);
+    }
+    return [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  }, [filteredMatches]);
+  const searching = policyQueryLower.length > 0;
+
+  const openSearchResult = (result: SearchResult) => {
+    if (result.targetStage) setActiveStage(result.targetStage);
+    setTab("stages");
+    setPolicyQuery("");
+  };
 
   const currentVersion = versions.find((v) => v.id === selectedVersionId) ?? null;
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      {/* The chrome contract's root header (v3 §1.1): project chip and the
-          three-view segmented control both live on the header's second row,
-          pinned with the title, so search-in-header screens like Policies
-          never scroll their own switcher away. Desktop keeps the shared
-          <PageHeader> untouched below. */}
+      {/* The chrome contract's root header (v3 §1.1) — D2: search takes the
+          second row, not the three-view segmented (frame B1 wants search;
+          the code had the segmented; both don't fit under the chip at
+          320–375px, and §1.2's whole argument for search-in-header is that
+          it never scrolls away). Guide and Data map demote to rows inside
+          the body (the "Views" panel below) instead. Desktop keeps the
+          shared <PageHeader> and its own segmented, untouched. */}
       {isMobile && (
         <MobilePageHeader variant="root" title="Policies">
           {/* Stacked, not shared on one line, matching the Simulation Lab
-              root header — a chip beside the tabs leaves too little room for
-              either at 320-375px, and the two screens should read the same
-              way regardless (v3 §1.1). */}
+              root header — a chip beside search leaves too little room for
+              either at 320-375px (same reasoning the segmented had). */}
           <div className="flex w-full flex-col gap-2.5">
             <ProjectChip
               projects={projects}
               selectedId={projectId}
               onSelect={(id) => setGlobalSelectedProjectId(id)}
             />
-            <MobileSegmented<"stages" | "guide" | "datamap">
-              className="w-full"
-              ariaLabel="Policies views"
-              value={tab}
-              onChange={setTab}
-              items={[
-                { value: "stages", label: "Policies" },
-                { value: "guide", label: "Guide" },
-                { value: "datamap", label: "Data map" },
-              ]}
+            <MobileHeaderSearch
+              value={policyQuery}
+              onChange={setPolicyQuery}
+              placeholder="Search suppliers, materials, policies…"
             />
           </div>
         </MobilePageHeader>
@@ -230,16 +320,97 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
           <Alert>
             <AlertDescription>Select a project to configure policies.</AlertDescription>
           </Alert>
-        ) : tab === "datamap" ? (
-          <DataMapGrid projectId={projectId} />
-        ) : tab === "guide" ? (
-          <GuidePanel
-            onJumpToStage={(s) => {
-              setActiveStage(s);
-              setTab("stages");
-            }}
-          />
+        ) : isMobile && searching ? (
+          // v3 §3.1: the network, not the catalog — business objects
+          // alongside policies, grouped by type, every object carrying a
+          // real policy count. Tapping a result jumps to the stage that
+          // governs it, where the existing (already-correct) grid shows the
+          // full resolved detail — B2's bespoke object-detail sheet isn't
+          // built here; see the commit message for why.
+          <div className="flex flex-col gap-[var(--m-gap)]">
+            {searchTypeCounts.size > 0 && (
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button
+                  type="button"
+                  onClick={() => setPolicyFilter("all")}
+                  className={
+                    policyFilter === "all"
+                      ? "shrink-0 whitespace-nowrap rounded-full border border-[#18181b] bg-[#18181b] px-3 py-1.5 font-mono text-[11px] text-white"
+                      : "shrink-0 whitespace-nowrap rounded-full border border-[#d4d4d4] bg-white px-3 py-1.5 font-mono text-[11px] text-[#3f3f46]"
+                  }
+                >
+                  All {searchMatches.length}
+                </button>
+                {[...searchTypeCounts.entries()].map(([type, count]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setPolicyFilter(type)}
+                    className={
+                      policyFilter === type
+                        ? "shrink-0 whitespace-nowrap rounded-full border border-[#18181b] bg-[#18181b] px-3 py-1.5 font-mono text-[11px] text-white"
+                        : "shrink-0 whitespace-nowrap rounded-full border border-[#d4d4d4] bg-white px-3 py-1.5 font-mono text-[11px] text-[#3f3f46]"
+                    }
+                  >
+                    {SEARCH_GROUP_LABEL[type]} {count}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {groupedMatches.length === 0 ? (
+              <MobilePanel label="Search" counter="0">
+                <p className="px-3 py-8 text-center text-[13px] leading-relaxed text-[#525252]">
+                  No matches for “{policyQuery}”.
+                </p>
+              </MobilePanel>
+            ) : (
+              groupedMatches.map(([type, results]) => (
+                <MobileGroup key={type} label={`${SEARCH_GROUP_LABEL[type]} · ${results.length}`}>
+                  <MobilePanel label={SEARCH_GROUP_LABEL[type]} counter={String(results.length)}>
+                    {results.map((r) => (
+                      <MobileRow
+                        key={`${r.type}-${r.id}`}
+                        dot={SEARCH_DOT[r.type]}
+                        label={highlightMatch(r.name, policyQuery)}
+                        sub={r.type === "policy" ? `param ${r.matchedField}` : r.sub}
+                        trailing={
+                          r.policyCount != null ? <MobileChip>{r.policyCount} pol</MobileChip> : undefined
+                        }
+                        onClick={() => openSearchResult(r)}
+                      />
+                    ))}
+                  </MobilePanel>
+                </MobileGroup>
+              ))
+            )}
+          </div>
         ) : (
+          <>
+            {isMobile && (
+              // D2: Guide and Data map demote to rows here, off the header's
+              // second row (now search's).
+              <MobilePanel label="Views">
+                <MobileRow
+                  label="Policies"
+                  chevron={false}
+                  dot={tab === "stages" ? M.ink : undefined}
+                  onClick={() => setTab("stages")}
+                />
+                <MobileRow label="Guide" chevron onClick={() => setTab("guide")} />
+                <MobileRow label="Data map" chevron onClick={() => setTab("datamap")} />
+              </MobilePanel>
+            )}
+            {tab === "datamap" ? (
+              <DataMapGrid projectId={projectId} />
+            ) : tab === "guide" ? (
+              <GuidePanel
+                onJumpToStage={(s) => {
+                  setActiveStage(s);
+                  setTab("stages");
+                }}
+              />
+            ) : (
           <>
             <PolicySetupBar
               versionName={
@@ -289,6 +460,8 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
             {loading && (
               <p className="mt-2 font-mono text-[11px] text-muted-foreground">loading policies…</p>
+            )}
+          </>
             )}
           </>
         )}
