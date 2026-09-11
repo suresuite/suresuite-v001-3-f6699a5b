@@ -36,10 +36,14 @@ interface MobileSheetProps {
   onClose: () => void;
   /** Present on a drilled-into sheet; renders the back chevron. */
   onBack?: () => void;
+  /** A pinned `[ secondary ][ primary flex ]` footer at 46px (SC Intelligences
+   *  handoff §3) — attach/sources need one, the five chat sheets don't, so
+   *  this is optional rather than every sheet growing an empty bar. */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function MobileSheet({ open, title, sub, onClose, onBack, children }: MobileSheetProps) {
+export function MobileSheet({ open, title, sub, onClose, onBack, footer, children }: MobileSheetProps) {
   const startY = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
   const { pathname } = useLocation();
@@ -122,6 +126,9 @@ export function MobileSheet({ open, title, sub, onClose, onBack, children }: Mob
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+        {footer && (
+          <div className="flex shrink-0 gap-2 border-t border-[#ebebeb] px-3 py-2.5">{footer}</div>
+        )}
       </div>
     </div>
   );
