@@ -95,8 +95,7 @@ const PEOPLE: Person[] = [
       <>
         He leads the Digital-AI Supply Chain Lab and is academic director of the M.A. Global Supply
         Chain and Operations Management. His work introduced the ripple effect and supply chain
-        viability to the field, and it sets the scientific direction behind SuReSuite's engine, its
-        policy library, and the resilience metrics it reports.
+        viability to the field, and it sets the scientific direction behind SuReSuite's engine.
       </>
     ),
     photo: "/team/dmitry-ivanov.jpg",
