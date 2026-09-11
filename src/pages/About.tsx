@@ -125,7 +125,7 @@ const PEOPLE: Person[] = [
 ];
 
 const CONTRIBUTORS = [
-  { group: 'Research', name: 'Name to add', body: 'Simulation methods, experiment design, and the policy library.', org: 'HWR Berlin' },
+  { group: 'Engineering', name: 'Ngan Ho', body: 'App layout developer and the MRP module extending SuReSuite.', org: 'Digital-AI SC Lab' },
   { group: 'Research', name: 'Name to add', body: 'Network data, case studies, and validation of the firm-level model.', org: 'HWR Berlin' },
   { group: 'Engineering', name: 'Name to add', body: 'Data pipelines, the public API, and the simulation worker.', org: 'Digital-AI SC Lab' },
   { group: 'Project', name: 'Name to add', body: 'WP4 coordination, reporting, and consortium liaison.', org: 'ACCURATE' },
