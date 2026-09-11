@@ -192,8 +192,11 @@ function FundingStrip() {
           </div>
 
           <div className="mt-4 flex items-center gap-5">
+          {/* <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5"> */}
+          {/* <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2"> */}
             {/* programme logo — the only thing that swaps */}
-            <div className="relative h-[46px] w-[168px] flex-none">
+            {/* <div className="relative h-[46px] w-[168px] flex-none"> */}
+            <div className="relative h-9 w-[120px] flex-none md:h-[46px] md:w-[168px]">
               {PROGRAMMES.map((p, n) => (
                 <img
                   key={p.key}
@@ -209,7 +212,8 @@ function FundingStrip() {
             <img
               src={EU_LOGO.src}
               alt={EU_LOGO.alt}
-              className="h-[46px] w-[158px] flex-none object-contain object-left"
+              className="h-9 w-[110px] flex-none object-contain object-left md:h-[46px] md:w-[158px]"
+              // className="h-[46px] w-[158px] flex-none object-contain object-left"
             />
           </div>
 
@@ -369,8 +373,10 @@ export default function About() {
                 <span className="font-serif font-medium italic">core team.</span>
               </h2>
             </div>
+            
 
-            <div className="mt-[26px] grid grid-cols-[repeat(auto-fit,minmax(min(100%,370px),1fr))] items-stretch gap-px overflow-hidden rounded-sm border border-border bg-border">
+            <div className="mt-[26px] grid grid-cols-1 items-stretch gap-px overflow-hidden rounded-sm border border-border bg-border md:grid-cols-[repeat(auto-fit,minmax(370px,1fr))]">
+            {/* <div className="mt-[26px] grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] items-stretch gap-px overflow-hidden rounded-sm border border-border bg-border"> */}
               {PEOPLE.map((p) => (
                 <article key={p.slug} className="relative flex flex-col bg-card p-8">
                   <span className="absolute right-8 top-8 font-mono text-[9px] tracking-[0.16em] text-muted-foreground/50">
