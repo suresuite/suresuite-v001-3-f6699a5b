@@ -20,7 +20,6 @@
 // treatment so every table/card is consistent. All data flow, RPCs, hooks and
 // interactive primitives (Button/Dialog/Select/Input/Checkbox) are unchanged.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -462,7 +461,6 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
      `#F8D448` template download keeps its "begin here" fill, which is the one
      place in the skin that colour is allowed (§3). */
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   const [tab, setTab] = useState<'keys' | 'quickstart' | 'notebook'>('keys');
   const [openKeyId, setOpenKeyId] = useState<string | null>(null);
   const [endpointsOpen, setEndpointsOpen] = useState(false);
@@ -1085,15 +1083,14 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
   if (isMobile) {
     return (
       <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-        {/* v3 §1.1: sibling before the gutter, detail variant — Developer API
-            isn't one of the tab bar's four roots (reached from More), so T2
-            hides the tab bar here and this back target is the only way out.
-            The three-view segmented is exactly the "peer views" case the
-            second row is for; refresh takes the one meta-slot action. */}
+        {/* v3 §1.1, D3-a: sibling before the gutter, root variant — Developer
+            API is a root with no tab of its own (D3-a names it explicitly),
+            so it keeps the tab bar (no item active) rather than a back
+            arrow. The three-view segmented is exactly the "peer views" case
+            the second row is for; refresh takes the one meta-slot action. */}
         <MobilePageHeader
-          variant="detail"
+          variant="root"
           title="Developer API"
-          onBack={() => navigate(-1)}
           meta={
             <button
               type="button"

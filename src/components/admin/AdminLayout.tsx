@@ -3,7 +3,7 @@
 // spacing is tightened to the Ledger language. Drop-in replacement for
 // src/components/admin/AdminLayout.tsx.
 import { ReactNode, useEffect, useRef, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -65,7 +65,6 @@ export function AdminLayout({
   children,
 }: AdminLayoutProps) {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const activeRef = useRef<HTMLAnchorElement>(null);
   const isMobile = useIsMobile();
   const [navOpen, setNavOpen] = useState(false);
@@ -81,26 +80,26 @@ export function AdminLayout({
     strip.scrollLeft = Math.max(0, target);
   }, [pathname]);
 
-  // Admin isn't one of the tab bar's four roots (isMobileRootRoute), so T2
-  // hides the tab bar on every /admin/* route — the only way back is this
-  // header's own back target. A page that names its own parent (AdminUserAccess
-  // → Users) keeps it; every other admin page falls back to browser back,
-  // since there is no single fixed parent for a screen reached from More.
-  const effectiveOnBack = onBack ?? (() => navigate(-1));
+  // D3-a: Admin is a root with no tab of its own — the tab bar shows (no
+  // item active) rather than a header back arrow, EXCEPT the one genuine
+  // drill-down that already names its own parent (AdminUserAccess → Users,
+  // via its own `onBack`). Variant follows that prop directly: detail only
+  // when a page actually supplies one.
+  const isPushed = Boolean(onBack);
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       {/* v3 §1.1: the one PageHeader component, as a sibling before the
-          padded content — never nested inside PAGE_GUTTER_SKIN. Detail
-          variant, not root: see effectiveOnBack above. `actions` (search
-          boxes, "Add x" dialogs) doesn't fit the header's one-meta-action
-          rule, so it moves into the gutter as the body's first band instead
-          of being dropped — refresh is the one action that does fit. */}
+          padded content — never nested inside PAGE_GUTTER_SKIN. `actions`
+          (search boxes, "Add x" dialogs) doesn't fit the header's
+          one-meta-action rule, so it moves into the gutter as the body's
+          first band instead of being dropped — refresh is the one action
+          that does fit. */}
       {isMobile && (
         <MobilePageHeader
-          variant="detail"
+          variant={isPushed ? "detail" : "root"}
           title={title}
-          onBack={effectiveOnBack}
+          onBack={onBack}
           backLabel={backLabel}
           meta={
             onRefresh ? (

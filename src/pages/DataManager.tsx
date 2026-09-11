@@ -1,6 +1,6 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -791,7 +791,6 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
 
   // The create form, hoisted so both chromes mount the same controls (§8).
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
 
   // §13.4 — the numbers, as the one stat grid on the screen. Derived from the
   // list already in hand; no new query, no new state (v2 §7). Desktop only
@@ -1147,16 +1146,18 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      {/* v3 §1.1/§2.1: sibling before the padded content, detail variant (see
-          comment above) — the active-project badge doesn't fit the one-action
-          meta slot, so it stays out; "New Project" moves into the gutter as
-          the body's first band rather than the header, same move T4 makes for
-          AdminLayout's actions. Search rides the second row — pinned, so it
-          never scrolls away (§1.2) — matching name and plant name (the
-          closest real field to "description"; this project shape carries no
-          separate description text). */}
+      {/* v3 §1.1/§2.1, D3-a: sibling before the padded content, root variant
+          — Project Manager is a root with no tab of its own (D3-a names it
+          explicitly), so it keeps the tab bar rather than a back arrow. The
+          active-project badge doesn't fit the one-action meta slot, so it
+          stays out; "New Project" moves into the gutter as the body's first
+          band rather than the header, same move T4 makes for AdminLayout's
+          actions. Search rides the second row — pinned, so it never scrolls
+          away (§1.2) — matching name and plant name (the closest real field
+          to "description"; this project shape carries no separate
+          description text). */}
       {isMobile && (
-        <MobilePageHeader variant="detail" title="Your Projects" onBack={() => navigate(-1)}>
+        <MobilePageHeader variant="root" title="Your Projects">
           <MobileHeaderSearch value={projectQuery} onChange={setProjectQuery} placeholder="Find a project" />
         </MobilePageHeader>
       )}

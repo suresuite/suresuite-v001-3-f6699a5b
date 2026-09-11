@@ -1,16 +1,41 @@
 /**
- * The mobile tab bar's root routes (v3 §1.3): the four tab destinations —
- * Home, Policies, Lab, AI. `MobileNav.tsx`'s `TABS` builds its labels and
- * icons from this same list, and re-exports `isMobileRootRoute` for
- * `PageLayout` and `MobileSheet` — one list, so "is this a root or a pushed
- * view" can never disagree between the bar, the chrome reservation and a
- * sheet's bottom offset.
+ * D3-a (RESOLVED, supersedes the narrower §1.3 reading this file originally
+ * implemented): the tab bar is hidden if and only if the screen's header
+ * shows a back arrow — i.e. it was pushed onto a stack from a root. Every
+ * root shows the bar, including a root with no tab of its own (the three
+ * network lenses, Developer API, Super Admin, Project Manager, Getting
+ * Started, About & help) — with no item active, no marker bar, since none
+ * of `MobileNav.tsx`'s four tabs matches that route.
  *
- * A plain module, not a component file, so it can export a function without
- * tripping `react-refresh/only-export-components` on `MobileNav.tsx`.
+ * Design review caught the bug the old allowlist produced: Network,
+ * Developer API and Super Admin shipped with no bottom nav because showing
+ * the bar required opting a route IN. This file inverts that: a route
+ * shows the bar unless it matches a known PUSHED pattern — a real
+ * drill-down with a back target (AdminUserAccess is the one that exists
+ * today). A new destination that forgets to register defaults to showing
+ * the bar (safe) rather than defaulting to stranding the user (the bug),
+ * so most work — the DoD's "grep the router" check is now "does this
+ * pattern list account for every real drill-down", a much shorter list to
+ * audit than "does every root remember to opt in".
+ *
+ * `MOBILE_TAB_ROUTES` is the separate, narrower concern: which four routes
+ * `MobileNav.tsx`'s `TABS` builds icons and labels for. A route can be a
+ * root (bar shown) without being one of these four (no tab highlighted).
+ *
+ * A plain module, not a component file, so it can export a function
+ * without tripping `react-refresh/only-export-components` on
+ * `MobileNav.tsx`.
  */
-export const MOBILE_ROOT_ROUTES = ['/app', '/policies', '/simulation-lab', '/project-intelligence'] as const;
+export const MOBILE_TAB_ROUTES = ['/app', '/policies', '/simulation-lab', '/project-intelligence'] as const;
+
+/** Routes reached by drilling into a root — the header shows a back arrow
+ *  there and the tab bar hides. Keep this list to genuine stack-pushes
+ *  only; a root with no tab of its own (Network, Developer API, Super
+ *  Admin, Project Manager, Getting Started, About & help) is NOT here. */
+const PUSHED_ROUTE_PATTERNS: RegExp[] = [
+  /^\/admin\/users\/[^/]+$/, // AdminUserAccess — drilled in from /admin/users
+];
 
 export function isMobileRootRoute(pathname: string): boolean {
-  return MOBILE_ROOT_ROUTES.some((to) => pathname === to || pathname.startsWith(to + '/'));
+  return !PUSHED_ROUTE_PATTERNS.some((re) => re.test(pathname));
 }

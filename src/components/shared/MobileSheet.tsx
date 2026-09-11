@@ -43,9 +43,10 @@ export function MobileSheet({ open, title, sub, onClose, onBack, children }: Mob
   const startY = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
   const { pathname } = useLocation();
-  // The bar is only there to stop above on a root route (v3 §1.3) — on a
-  // pushed view it isn't rendered at all, and reserving its height anyway
-  // leaves 59px of dead space between the sheet and the bottom edge.
+  // The bar is only there to stop above on a root route (D3-a: shown unless
+  // the screen was pushed onto a stack) — on a pushed view it isn't rendered
+  // at all, and reserving its height anyway leaves 59px of dead space
+  // between the sheet and the bottom edge.
   const tabBarOffset = isMobileRootRoute(pathname) ? MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER : 0;
 
   if (!open) return null;

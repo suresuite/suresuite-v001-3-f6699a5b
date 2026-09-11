@@ -35,7 +35,6 @@ import {
   AlertTriangle,
   Tag,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
@@ -194,7 +193,6 @@ function getDisplayNodeType(level: number): string {
 export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: NetworkVisualizationProps) {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -1150,16 +1148,14 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      {/* v3 §1.1/§1.4 — see FirmLevelNetwork's identical comment: detail
-          variant (not a tab-bar root, T2 hides the bar, this is the only way
-          back), chip kept despite that (the one real capability lost
-          otherwise), refresh as the one meta action, the rest stays
-          desktop-only exactly as before. */}
+      {/* v3 §1.1/§1.4, D3-a — see FirmLevelNetwork's identical comment: root
+          variant (a root with no tab of its own keeps the bar, no item
+          active — not a back arrow), chip on the second row, refresh as the
+          one meta action, the rest stays desktop-only exactly as before. */}
       {isMobile && (
         <MobilePageHeader
-          variant="detail"
+          variant="root"
           title="Process-level Network Intelligence"
-          onBack={() => navigate(-1)}
           meta={
             <button
               type="button"
