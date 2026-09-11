@@ -45,7 +45,9 @@ const TABS = [
   { to: MOBILE_TAB_ROUTES[0], label: 'Home', icon: Home },
   { to: MOBILE_TAB_ROUTES[1], label: 'Policies', icon: SlidersHorizontal },
   { to: MOBILE_TAB_ROUTES[2], label: 'Lab', icon: FlaskConical },
-  { to: MOBILE_TAB_ROUTES[3], label: 'AI', icon: Brain },
+  // SC Intelligences handoff §0/T1: "AI" retired — 10px in a 78px column
+  // won't hold "SC Intelligences", so the tab reads "SC Intel".
+  { to: MOBILE_TAB_ROUTES[3], label: 'SC Intel', icon: Brain },
 ] as const;
 
 /** Re-exported so `PageLayout` and `MobileSheet` import their root-route

@@ -156,7 +156,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/project-intelligence"
+                  path="/project-intelligence/*"
                   element={
                     <ProtectedRoute>
                     <RoleGuard><ProjectIntelligence 

@@ -34,6 +34,14 @@ export const MOBILE_TAB_ROUTES = ['/app', '/policies', '/simulation-lab', '/proj
  *  Admin, Project Manager, Getting Started, About & help) is NOT here. */
 const PUSHED_ROUTE_PATTERNS: RegExp[] = [
   /^\/admin\/users\/[^/]+$/, // AdminUserAccess — drilled in from /admin/users
+  // SC Intelligences (handoff §2/§3): every screen pushed from the
+  // /project-intelligence root — new question, a thread, the roster, one
+  // intelligence, a proposal — carries a detail header and hides the bar.
+  /^\/project-intelligence\/new$/,
+  /^\/project-intelligence\/thread\/[^/]+$/,
+  /^\/project-intelligence\/roster$/,
+  /^\/project-intelligence\/roster\/[^/]+$/,
+  /^\/project-intelligence\/proposal\/[^/]+$/,
 ];
 
 export function isMobileRootRoute(pathname: string): boolean {

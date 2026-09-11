@@ -79,6 +79,9 @@ interface MobilePageHeaderProps {
   /** Detail only. The caller owns navigation and hiding the tab bar. */
   onBack?: () => void;
   backLabel?: string;
+  /** Detail only — mono 10px, naming the object's owner or kind (SC
+   *  Intelligences handoff §3: `SM · simulation modeller`). */
+  subtitle?: string;
   /** The optional second row: project chip, search, segmented tabs. */
   children?: React.ReactNode;
   className?: string;
@@ -90,6 +93,7 @@ export function MobilePageHeader({
   meta,
   onBack,
   backLabel = 'Back',
+  subtitle,
   children,
   className,
 }: MobilePageHeaderProps) {
@@ -126,15 +130,20 @@ export function MobilePageHeader({
           </button>
         )}
 
-        <h1
-          className={cn(
-            'min-w-0 flex-1 truncate font-semibold leading-tight tracking-[-0.019em] text-[#171717]',
-            detail ? 'text-[18px]' : 'text-[length:var(--fs-title)]',
+        <span className="min-w-0 flex-1">
+          <h1
+            className={cn(
+              'truncate font-semibold leading-tight tracking-[-0.019em] text-[#171717]',
+              detail ? 'text-[18px]' : 'text-[length:var(--fs-title)]',
+            )}
+            title={title}
+          >
+            {title}
+          </h1>
+          {subtitle && (
+            <span className="block truncate font-mono text-[10px] text-[#9a9a9a]">{subtitle}</span>
           )}
-          title={title}
-        >
-          {title}
-        </h1>
+        </span>
 
         {meta != null && (
           <span

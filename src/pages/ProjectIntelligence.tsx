@@ -35,7 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/intelligence/ChatSidebar";
 import { ChatWorkspace } from "@/components/intelligence/ChatWorkspace";
-import { MobileIntelligence } from "@/components/intelligence/MobileIntelligence";
+import { ScIntelMobile } from "@/components/intelligence/mobile/ScIntelMobile";
 import { useChatThreads, QUICK_THREAD_ID } from "@/hooks/useChatThreads";
 import { getStoredModel, setStoredModel } from "@/components/chat/ModelPicker";
 import { fileWorkspaceUiEnabled, useUserFiles, expiryCountdown } from "@/hooks/useUserFiles";
@@ -65,7 +65,7 @@ const KEY_SIDEBAR_COLLAPSED = "projectIntelligence.sidebarCollapsed.v1";
 const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, setIsCollapsed }) => {
   const { user } = useAuth();
   const { can } = useCapabilities();
-  const { setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
+  const { globalSelectedProjectId, setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState(() => getStoredModel());
@@ -180,7 +180,14 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
   // Route ↔ active thread sync. Without a ?thread=, fall back to the most
   // recent real chat — the Quick chat pseudo-thread is no longer listed here
   // (it backs the floating bubble only) and is never selected by default.
+  //
+  // Desktop only: the SC Intelligences mobile tree has no "active thread"
+  // driving the whole page (its root lists threads rather than opening one),
+  // and its own nested routes own which thread is on screen — running this
+  // there would fight the ProjectChip's project scope with whatever thread
+  // this picks as "most recent".
   useEffect(() => {
+    if (isMobile) return;
     const urlThread = searchParams.get("thread");
     if (urlThread) {
       if (urlThread !== activeThreadId) setActiveThread(urlThread);
@@ -191,17 +198,19 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     if (mostRecent) setActiveThread(mostRecent.id);
     else if (activeThreadId) setActiveThread(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, threads]);
+  }, [isMobile, searchParams, threads]);
 
-  // Keep the global project selector in sync with the active thread's project.
+  // Keep the global project selector in sync with the active thread's project
+  // (desktop only — see above).
   useEffect(() => {
+    if (isMobile) return;
     if (!activeThread?.projectId) return;
     const match = projects.find((p) => p.id === activeThread.projectId);
     if (match) {
       setGlobalSelectedProjectId(activeThread.projectId);
       setSelectedProject(match);
     }
-  }, [activeThread?.projectId, projects, setGlobalSelectedProjectId, setSelectedProject]);
+  }, [isMobile, activeThread?.projectId, projects, setGlobalSelectedProjectId, setSelectedProject]);
 
   const persistWidth = (w: number) => {
     setSidebarWidth(w);
@@ -265,6 +274,14 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     updateThread(activeThreadId, { projectId });
   };
 
+  // SC Intelligences (mobile): the root's ProjectChip scopes the whole
+  // surface, not a single thread — there is no "active thread" on that
+  // screen to attach a project to, unlike the desktop/legacy chip above.
+  const handleGlobalProjectChange = (projectId: string | null) => {
+    setGlobalSelectedProjectId(projectId);
+    setSelectedProject(projects.find((p) => p.id === projectId) ?? null);
+  };
+
   // The single ChatSidebar prop set. The desktop grid child and the mobile
   // Chats sheet both spread this, so the two instances can never drift apart;
   // only the collapse trio differs, because only the desktop one collapses.
@@ -314,37 +331,14 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
             from the header rule to the composer, exactly as the demo has it.
             A gutter here would inset the conversation in a card and cost ~31px
             of the line length the whole composition exists to reclaim. */}
-        <MobileIntelligence
-          threads={threads}
-          activeThread={activeThread ?? null}
-          activeThreadId={activeThreadId}
+        <ScIntelMobile
           projects={projects}
-          projectId={activeThread?.projectId ?? null}
-          agentId={activeThread?.agentId ?? null}
+          projectId={globalSelectedProjectId}
+          onProjectChange={handleGlobalProjectChange}
+          threads={threads}
           model={model}
-          threadMode={activeThread?.mode ?? "review"}
-          serverThreadId={activeThreadId ? getServerThreadId(activeThreadId) : null}
-          threadSummary={activeThread?.summary ?? null}
-          userName={firstName}
-          input={input}
-          onInputChange={setInput}
-          onAgentChange={handleAgentChange}
-          onProjectChange={handleProjectChange}
-          onModelChange={handleModelChange}
-          onModeChange={(m) => activeThreadId && setThreadMode(activeThreadId, m)}
-          onNewThread={handleNewThread}
-          onRenameThread={(id, title) => updateThread(id, { title })}
-          onDeleteThread={deleteThread}
-          onDeleteSummary={() => activeThreadId && clearThreadSummary(activeThreadId)}
-          files={sidebarFiles}
-          memoryEntries={sidebarMemory}
-          filesEnabled={fileWorkspaceUiEnabled() && can("reports")}
-          memoryEnabled={can("project_memory")}
-          onDownloadFile={handleDownloadFile}
-          onKeepFile={handleKeepFile}
-          onAddMemory={handleAddMemory}
-          onArchiveMemory={handleArchiveMemory}
-          sidebar={sidebarProps}
+          newThread={newThread}
+          updateThread={updateThread}
         />
       </PageLayout>
     );
