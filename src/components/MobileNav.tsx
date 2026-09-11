@@ -22,6 +22,7 @@ import { PAGE_HEADER_SHELL, PAGE_HEADER_ROW } from '@/components/shared/PageHead
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useCompactChrome } from '@/hooks/useViewport';
+import { MOBILE_ROOT_ROUTES } from './mobileRootRoutes';
 
 /** Bottom-chrome geometry, in px, published so PageLayout reserves space FROM
  *  these rather than from a hand-summed literal. Change a height here and the
@@ -36,12 +37,23 @@ export const MOBILE_TABBAR_H = 58;      // min-h-[58px] on each tab
 export const MOBILE_TABBAR_H_LANDSCAPE = 52;
 export const MOBILE_TABBAR_BORDER = 1;  // border-t
 
+// Route strings come from MOBILE_ROOT_ROUTES (mobileRootRoutes.ts) — the same
+// list `isMobileRootRoute` reads below, so the tab bar and the allowlist that
+// decides where it renders can never name a different set of roots.
 const TABS = [
-  { to: '/app', label: 'Home', icon: Home },
-  { to: '/policies', label: 'Policies', icon: SlidersHorizontal },
-  { to: '/simulation-lab', label: 'Lab', icon: FlaskConical },
-  { to: '/project-intelligence', label: 'AI', icon: Brain },
+  { to: MOBILE_ROOT_ROUTES[0], label: 'Home', icon: Home },
+  { to: MOBILE_ROOT_ROUTES[1], label: 'Policies', icon: SlidersHorizontal },
+  { to: MOBILE_ROOT_ROUTES[2], label: 'Lab', icon: FlaskConical },
+  { to: MOBILE_ROOT_ROUTES[3], label: 'AI', icon: Brain },
 ] as const;
+
+/** Re-exported so `PageLayout` and `MobileSheet` import their root-route
+ *  check from the same place they import the tab bar's own geometry. Lives in
+ *  `mobileRootRoutes.ts` (a plain module, not a component file) so this
+ *  re-export cannot trip `react-refresh` on a file that also exports
+ *  components — the disable covers only the re-export itself. */
+// eslint-disable-next-line react-refresh/only-export-components
+export { isMobileRootRoute } from './mobileRootRoutes';
 
 export function MobileTabBar({
   moreActive,

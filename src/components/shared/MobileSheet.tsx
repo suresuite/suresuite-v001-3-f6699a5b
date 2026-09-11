@@ -17,8 +17,9 @@
  *    (This chat → Model), so a sub-sheet is never a dead end.
  */
 import React, { useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ChevronLeft, X } from "lucide-react";
-import { MOBILE_TABBAR_BORDER, MOBILE_TABBAR_H } from "@/components/MobileNav";
+import { MOBILE_TABBAR_BORDER, MOBILE_TABBAR_H, isMobileRootRoute } from "@/components/MobileNav";
 import { cn } from "@/lib/utils";
 
 /** Drag distance that dismisses instead of springing back (spec §4.4). */
@@ -41,6 +42,11 @@ interface MobileSheetProps {
 export function MobileSheet({ open, title, sub, onClose, onBack, children }: MobileSheetProps) {
   const startY = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
+  const { pathname } = useLocation();
+  // The bar is only there to stop above on a root route (v3 §1.3) — on a
+  // pushed view it isn't rendered at all, and reserving its height anyway
+  // leaves 59px of dead space between the sheet and the bottom edge.
+  const tabBarOffset = isMobileRootRoute(pathname) ? MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER : 0;
 
   if (!open) return null;
 
@@ -72,8 +78,7 @@ export function MobileSheet({ open, title, sub, onClose, onBack, children }: Mob
           boxShadow: "0 -8px 28px rgba(0,0,0,.14)",
           transform: dragY ? "translateY(" + dragY + "px)" : undefined,
           transition: dragY ? "none" : "transform 0.2s cubic-bezier(0.2,0,0,1)",
-          marginBottom:
-            "calc(" + (MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER) + "px + env(safe-area-inset-bottom, 0px))",
+          marginBottom: "calc(" + tabBarOffset + "px + env(safe-area-inset-bottom, 0px))",
         }}
       >
         <div
