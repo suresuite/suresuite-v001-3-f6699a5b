@@ -4,7 +4,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { SURFACE, TH, TD, ROW_HOVER, Toggle, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { AdminMobileList, SURFACE, TH, TD, ROW_HOVER, Toggle, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import { M, MobileRow, MobileToggle } from '@/components/mobile';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +27,7 @@ const empty: Omit<Model, 'id'> = { provider_id: null, code: '', display_name: ''
 
 export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
   const isMobile = useIsMobile();
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,42 +108,39 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
       }
     >
       {isMobile ? (
-        <div className={`${SURFACE} overflow-hidden`}>
-          {loading ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
-          ) : sorted.length === 0 ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">No models in the catalog yet.</div>
-          ) : (
-            sorted.map((m) => (
-              <div key={m.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{m.display_name}</span>
-                  <span className="shrink-0"><Toggle checked={m.enabled} onCheckedChange={() => toggle(m)} /></span>
-                </div>
-                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">{m.code}</div>
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Input $/1k</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">${Number(m.input_cost_per_1k).toFixed(4)}</span>
-                  </span>
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Output $/1k</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">${Number(m.output_cost_per_1k).toFixed(4)}</span>
-                  </span>
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Context</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{m.max_context.toLocaleString()}</span>
-                  </span>
-                </div>
-                <div className="mt-2.5 flex justify-end">
-                  <button title="Delete" aria-label="Delete" className="grid h-11 w-11 place-items-center text-[#c98a8f] hover:text-[#bf2330]" onClick={() => remove(m)}>
-                    <Trash2 className="h-[15px] w-[15px]" />
-                  </button>
-                </div>
-              </div>
-            ))
+        <AdminMobileList
+          label="Model catalog"
+          counter={`${sorted.filter((m) => m.enabled).length} / ${sorted.length} enabled`}
+          loading={loading}
+          empty={sorted.length === 0 ? 'No models in the catalog yet.' : undefined}
+        >
+          {sorted.map((m) => (
+            <MobileRow
+              key={m.id}
+              chevron={false}
+              dot={m.enabled ? M.process : M.idle}
+              label={m.display_name}
+              sub={`${m.code} · in $${Number(m.input_cost_per_1k).toFixed(4)}/1k · out $${Number(
+                m.output_cost_per_1k,
+              ).toFixed(4)}/1k · ${m.max_context.toLocaleString()} ctx`}
+              trailing={
+                <MobileToggle
+                  checked={m.enabled}
+                  label={`${m.display_name} enabled`}
+                  onChange={() => toggle(m)}
+                />
+              }
+            />
+          ))}
+          {sorted.length > 0 && (
+            <MobileRow
+              label="Remove a model"
+              sub="deletes it from the catalog"
+              value={`${sorted.length}`}
+              onClick={() => setRemoveOpen(true)}
+            />
           )}
-        </div>
+        </AdminMobileList>
       ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
@@ -175,6 +175,32 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
           </table>
         </div>
       </div>
+      )}
+      {isMobile && (
+        // Delete was a 15px trash glyph in the corner of every card. It is a
+        // destructive action on a shared catalog, so it gets a named row and
+        // a confirm rather than an icon a thumb can hit by accident (§8).
+        <MobileSheet
+          open={removeOpen}
+          title="Remove a model"
+          sub="Deletes the model from the catalog. Runs that already used it keep their record."
+          onClose={() => setRemoveOpen(false)}
+        >
+          <div className="flex flex-col">
+            {sorted.map((m) => (
+              <MobileRow
+                key={m.id}
+                dot={M.blocking}
+                label={`Delete ${m.display_name}`}
+                sub={m.code}
+                onClick={() => {
+                  setRemoveOpen(false);
+                  remove(m);
+                }}
+              />
+            ))}
+          </div>
+        </MobileSheet>
       )}
     </AdminLayout>
   );

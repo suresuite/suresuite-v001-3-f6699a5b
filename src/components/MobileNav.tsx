@@ -21,11 +21,19 @@ import { NAV_SECTIONS, filterVisibleSections } from '@/components/Navbar';
 import { PAGE_HEADER_SHELL, PAGE_HEADER_ROW } from '@/components/shared/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useCompactChrome } from '@/hooks/useViewport';
 
 /** Bottom-chrome geometry, in px, published so PageLayout reserves space FROM
  *  these rather than from a hand-summed literal. Change a height here and the
- *  reservation follows; it cannot drift. */
+ *  reservation follows; it cannot drift.
+ *
+ *  The landscape height is not a smaller design, it is the same design laid
+ *  out along the axis that has room: a phone on its side has ~390px of
+ *  height, and 58px of tab bar plus 64px of action bar is a third of it
+ *  (v2 §5.2). The icon and the 10px label sit side by side instead of
+ *  stacked, and no tab, label or destination changes. */
 export const MOBILE_TABBAR_H = 58;      // min-h-[58px] on each tab
+export const MOBILE_TABBAR_H_LANDSCAPE = 52;
 export const MOBILE_TABBAR_BORDER = 1;  // border-t
 
 const TABS = [
@@ -45,15 +53,20 @@ export function MobileTabBar({
   onToggleMore: () => void;
 }) {
   const { pathname } = useLocation();
+  const compact = useCompactChrome();
 
   // The skin's tab bar (spec §4): 58px, white, a #d4d4d4 rule along the top,
-  // a 19px icon over a 10px/600 label. Active is ink, inactive is `M.quiet` —
-  // colour and weight carry the state, which is why the old top marker bar is
-  // gone. The tab inventory, its labels and its routes are untouched.
+  // a 19px icon over a 10px/600 label. Active is ink, inactive is the ink
+  // ladder's floor (v2 §2) — colour and weight carry the state, which is why
+  // the old top marker bar is gone. The tab inventory, its labels and its
+  // routes are untouched, in either orientation.
   const tab = (active: boolean) =>
     cn(
-      'flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-1 px-0.5',
-      active ? 'text-[#18181b]' : 'text-[#525252]',
+      'flex min-w-0 items-center justify-center px-0.5',
+      compact
+        ? 'min-h-[52px] flex-row gap-1.5'
+        : 'min-h-[58px] flex-col gap-1',
+      active ? 'text-[#18181b]' : 'text-[#6b6b6b]',
       'transition-colors duration-200 motion-reduce:transition-none',
     );
   const tabLabel = 'max-w-full truncate text-[10px] font-semibold';

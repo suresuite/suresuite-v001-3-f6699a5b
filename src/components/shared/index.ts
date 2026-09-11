@@ -1,6 +1,12 @@
 export { PageLayout } from './PageLayout';
 export { PageHeader } from './PageHeader';
-export { PageBody, PAGE_GUTTER, PAGE_GUTTER_BLEED, PAGE_GUTTER_SKIN } from './PageBody';
+export {
+  PageBody,
+  PAGE_GUTTER,
+  PAGE_GUTTER_BLEED,
+  PAGE_GUTTER_SKIN,
+  PAGE_GUTTER_SKIN_BLEED,
+} from './PageBody';
 export { ResponsiveLedger } from './ResponsiveLedger';
 export type { LedgerColumn } from './ResponsiveLedger';
 export { ProjectSelector } from './ProjectSelector';

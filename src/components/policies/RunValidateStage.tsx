@@ -94,6 +94,8 @@ import type { OverrideRow } from "@/lib/policies/resolve";
 import { MappingWarningsCard } from "@/components/sim/RunProgressPanel";
 import { RunQueueConsole } from "@/components/sim/RunQueueConsole";
 import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import { M, MobileChip, MobileGroup, MobilePanel, MobileRow } from '@/components/mobile';
 
 // Runs launched from the policies stage all reuse this single auto-managed
 // scenario so the Lab's scenario list doesn't fill up with validation runs.
@@ -257,6 +259,7 @@ export function RunValidateStage({
   plantRows,
   customerRows,
 }: Props) {
+  const isMobile = useIsMobile();
   const itemMasters = useItemMasters(projectId);
   const dataset = useDatasetVersion(projectId);
   const { unit: timeUnit } = useTimeUnit(projectId);
@@ -1310,8 +1313,44 @@ export function RunValidateStage({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Section D as a band — the sim-lab surface, zinc ramp. */}
-      <div className={cn(RAIL_STAGE_ROW_OPEN, "flex-col md:flex-row")} style={RAIL_STAGE_ROW_OPEN_STYLE}>
+      {/* Section D as a band — the sim-lab surface, zinc ramp.
+          Below `md` the four stage cards sit in a flex row that squeezes each
+          to ~70px at 320: four numerals and no legible label. The steps are a
+          list there, in the same shape the Policies stage list uses, with the
+          same states and the same handler (v2 §4B). */}
+      {isMobile ? (
+        <MobileGroup label="Run &amp; validate">
+          <MobilePanel label="Steps" counter={`${doneCount} / ${STEPS.length} done`}>
+            {STEPS.map((s, i) => {
+              const meta = stepMeta(i);
+              const done = completed.has(i);
+              const blocked = !done && meta.blocked;
+              return (
+                <MobileRow
+                  key={s.id}
+                  onClick={() => setStep(i)}
+                  dot={blocked ? M.blocking : done ? M.process : step === i ? M.ink : M.idle}
+                  leading={
+                    <MobileChip
+                      fill={step === i ? M.ink : undefined}
+                      ink={step === i ? '#ffffff' : M.quiet}
+                    >
+                      {i + 1}
+                    </MobileChip>
+                  }
+                  label={s.label}
+                  sub={meta.text}
+                />
+              );
+            })}
+          </MobilePanel>
+        </MobileGroup>
+      ) : null}
+
+      <div
+        className={cn(RAIL_STAGE_ROW_OPEN, 'hidden md:flex', 'flex-col md:flex-row')}
+        style={RAIL_STAGE_ROW_OPEN_STYLE}
+      >
         <div className="flex w-full min-w-0 flex-col justify-center gap-[3px] pb-2 md:w-[192px] md:shrink-0 md:pb-0 md:pr-2.5">
           <span className="flex items-center gap-[7px]">
             <RailMarker>D</RailMarker>
@@ -1358,7 +1397,7 @@ export function RunValidateStage({
             index={0}
             title="Verification"
             action={
-              <Button size="sm" className="h-[26px] px-2.5 text-[11.5px]" onClick={onVerify}>
+              <Button size="sm" className="h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0" onClick={onVerify}>
                 Run checks
               </Button>
             }
@@ -1443,7 +1482,7 @@ export function RunValidateStage({
             </button>
             {showDiagnostics && (
             <div className={cn(SURFACE, "flex flex-wrap items-center gap-2 px-2.5 py-1.5")}>
-              <Button size="sm" variant="outline" className="h-[24px] px-2.5 text-[11px]"
+              <Button size="sm" variant="outline" className="h-[24px] min-h-11 px-2.5 text-[11px] md:min-h-0"
                 onClick={onSelfTest} disabled={selfTestState.kind === "running"}>
                 {selfTestState.kind === "running" ? "Testing…" : "Test engine"}
               </Button>
@@ -1480,7 +1519,7 @@ export function RunValidateStage({
             {runPhase.kind !== "idle" && <RunStatusBanner phase={runPhase} />}
 
             <Tabs value={runTab} onValueChange={(v) => setRunTab(v as "single" | "multi")} className="w-full">
-              <TabsList className="grid h-8 w-full grid-cols-2">
+              <TabsList className="grid h-auto min-h-11 w-full grid-cols-2 md:h-8 md:min-h-0">
                 <TabsTrigger value="single" className="text-[11.5px]">
                   Single run
                   {singleQueuedAt && <MonoChip className="ml-1.5">queued</MonoChip>}
@@ -1520,7 +1559,7 @@ export function RunValidateStage({
                   </Field>
                   <Button
                     size="sm"
-                    className="h-[26px] px-2.5 text-[11.5px]"
+                    className="h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
                     onClick={onRunSingle}
                     disabled={submitting === "single"}
                   >
@@ -1613,7 +1652,7 @@ export function RunValidateStage({
                     </Field>
                     <Button
                       size="sm"
-                      className="mt-auto h-[26px] px-2.5 text-[11.5px]"
+                      className="mt-auto h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
                       onClick={onRunMulti}
                       disabled={submitting === "multi"}
                     >
@@ -1800,7 +1839,7 @@ export function RunValidateStage({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-[26px] px-2.5 text-[11.5px]"
+                    className="h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
                     onClick={detectWarmup}
                   >
                     Auto-detect
@@ -1819,7 +1858,7 @@ export function RunValidateStage({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-[24px] px-2.5 text-[11px]"
+                        className="h-[24px] min-h-11 px-2.5 text-[11px] md:min-h-0"
                         onClick={() => setStep(3)}
                       >
                         Apply to validation
@@ -1851,7 +1890,7 @@ export function RunValidateStage({
             action={
               <Button
                 size="sm"
-                className="h-[26px] px-2.5 text-[11.5px]"
+                className="h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
                 onClick={runValidation}
                 disabled={Object.keys(empirical).length === 0}
               >
@@ -1994,7 +2033,7 @@ export function RunValidateStage({
         <Button
           variant="outline"
           size="sm"
-          className="h-[26px] px-2.5 text-[11.5px]"
+          className="h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0}
         >
@@ -2005,7 +2044,7 @@ export function RunValidateStage({
         </span>
         <Button
           size="sm"
-          className="h-[26px] px-2.5 text-[11.5px]"
+          className="h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
           onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
           disabled={step === STEPS.length - 1 || !canContinue(step)}
           title={!canContinue(step) ? "Complete the current step first" : undefined}
@@ -2034,6 +2073,31 @@ function StepShell({
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const isMobile = useIsMobile();
+
+  // v2 §4B. The step shell IS the panel: `SURFACE` with a #fafafa head and a
+  // micro-label is the panel drawn by hand, and the ONE thing it was missing
+  // is the head's counter slot and the outer rule weight. What comes off below
+  // `md` is the 340px floor — a fixed pixel height on a container that holds
+  // text is the one thing §9.4 rules out, and on a 568px SE it strands the
+  // step's own action below the fold.
+  if (isMobile) {
+    return (
+      <MobilePanel
+        // Quiet on purpose. The Policies screen's one ink head is the stage
+        // list in <PolicySetupBar>, which is on this same screen — the ration
+        // is per SCREEN, not per component (v2 §2).
+        label={`Step ${index + 1} · ${title}`}
+        counter={sub}
+        bare
+        bodyClassName="flex flex-col gap-3 p-3"
+      >
+        {action && <div className="flex flex-wrap gap-2 [&_button]:min-h-11">{action}</div>}
+        {children}
+      </MobilePanel>
+    );
+  }
+
   return (
     <div className={cn(SURFACE, "min-h-[340px] border-t-2 border-t-foreground")}>
       <div className="flex flex-wrap items-center gap-[9px] border-b border-[--hair-border] bg-[#fafafa] px-3 py-2">
@@ -2050,8 +2114,11 @@ function StepShell({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+    // The 44px floor below `md` reaches the input this wraps, whatever it is —
+    // a select, a number field or a stepper (§8). `md:` hands the desktop
+    // geometry straight back.
+    <div className="flex min-w-0 flex-col gap-1 [&_input]:min-h-11 [&_select]:min-h-11 md:[&_input]:min-h-0 md:[&_select]:min-h-0">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252] md:tracking-[0.08em] md:text-muted-foreground">
         {label}
       </span>
       {children}
@@ -2279,7 +2346,7 @@ function AdoptStep({
       )}
 
       <Button
-        className="h-[26px] self-start px-2.5 text-[11.5px]"
+        className="h-[26px] min-h-11 self-start px-2.5 text-[11.5px] md:min-h-0"
         size="sm"
         onClick={onMarkValid}
         disabled={!ready || adopting}
@@ -2337,7 +2404,12 @@ function WeeklySeriesChart({
           engine data · {traces.length} rep(s)
         </span>
       </div>
-      <ResponsiveContainer width="100%" height={height}>
+      {/* A panel whose content is a chart gets an aspect-ratio, never a fixed
+          height (v2 §5.4): 140px is a quarter of a 568px SE and a seventh of a
+          932px Pro Max. `md:` keeps the caller's pixel height. */}
+      <div className="aspect-[4/3] w-full max-h-[42dvh] md:aspect-auto md:max-h-none md:h-[var(--chart-h)]"
+           style={{ ['--chart-h' as string]: `${height}px` }}>
+        <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeOpacity={0.15} />
           <XAxis dataKey="week" tick={{ fontSize: 9 }} />
@@ -2359,6 +2431,7 @@ function WeeklySeriesChart({
           ))}
         </LineChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -2504,7 +2577,7 @@ function ReplicationAdequacy({
         <Button
           size="sm"
           variant="outline"
-          className="h-[26px] self-start px-2.5 text-[11.5px]"
+          className="h-[26px] min-h-11 self-start px-2.5 text-[11.5px] md:min-h-0"
           onClick={() => onAddReps(10)}
         >
           Add 10 replications
@@ -2582,7 +2655,7 @@ function MultiRunResultsPanel({
           engine data · {reps.length} rep(s)
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-2 border-b border-[--hair-border] px-2.5 py-1.5 text-[11px]">
+      <div className="grid grid-cols-2 gap-2 border-b border-[--hair-border] px-2.5 py-1.5 text-[11px] md:grid-cols-4">
         <Stat label="Mean" value={overall.mean.toFixed(3)} unit={meta.unit} />
         <Stat label="Std" value={overall.std.toFixed(3)} />
         <Stat label="CI half-width" value={overall.half.toFixed(3)} />
@@ -2927,7 +3000,7 @@ function SanityScalars({ reps }: { reps: Replication[] }) {
   const util = avg("capacity_utilization");
   const lostInbound = avg("lost_inbound_units");
   return (
-    <div className={cn(SURFACE, "grid grid-cols-2 gap-2 bg-[#fafafa] px-2.5 py-1.5")}>
+    <div className={cn(SURFACE, "grid grid-cols-[repeat(auto-fit,minmax(min(100%,120px),1fr))] gap-2 bg-[#fafafa] px-2.5 py-1.5")}>
       <Stat
         label="Capacity utilization"
         value={util != null ? fmtKpi("capacity_utilization", util) : "not recorded"}
@@ -2942,11 +3015,11 @@ function SanityScalars({ reps }: { reps: Replication[] }) {
 
 function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252] md:tracking-[0.08em] md:text-muted-foreground">
         {label}
       </span>
-      <span className="font-mono text-[14px] font-medium tabular-nums text-foreground">
+      <span className="font-mono text-[15px] font-medium tabular-nums text-[#171717] md:text-[14px] md:text-foreground">
         {value}
         {unit && <span className="ml-1 text-[10px] font-normal text-muted-foreground">{unit}</span>}
       </span>

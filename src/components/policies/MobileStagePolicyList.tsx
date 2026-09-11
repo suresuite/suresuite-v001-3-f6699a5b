@@ -13,7 +13,8 @@
 import { useMemo, useState } from "react";
 import { ProvenanceDot, rowAccent } from "./policyGridUi";
 import { MobileSheet } from "@/components/shared/MobileSheet";
-import { M, MobileChip, MobilePanel, MobileRow } from "@/components/mobile";
+import { M, MobileChip, MobileGroup, MobilePanel, MobileRow } from "@/components/mobile";
+import { useRowBudget } from "@/hooks/useViewport";
 import {
   specFor,
   familiesForStage,
@@ -87,6 +88,10 @@ export function MobileStagePolicyList({
   const { rows: dataRows, loading } = stageRows;
   const { materials, products, suppliers, derived } = useItemMasters(projectId);
   const [openRowKey, setOpenRowKey] = useState<string | null>(null);
+  // A group can hold forty lanes. The panel shows what the device can hold and
+  // the rest is one tap away, in full (§10, v2 §5.4) — never sliced off.
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const memberBudget = useRowBudget(4, 6, 9);
 
   const masterRowById: MasterRowMaps = useMemo(
     () => ({
@@ -174,60 +179,84 @@ export function MobileStagePolicyList({
     );
   }
 
+  // One definition of the line row, rendered both in the panel and in the
+  // sheet that holds the lines the panel deferred — so the two can never
+  // disagree about a dot, a chip or a label.
+  const memberRow = ({ row }: { row: Record<string, unknown> }) => {
+    const rowKey = String(row.key);
+    const keyBLabel = String(row[spec.keyCols[1]?.id ?? ""] ?? "");
+    const attention = lineNeedsInput(stageKey, row, dataRows as Record<string, unknown>[], resolveForGuard);
+    const multiSource =
+      (stageKey === "supplier" || stageKey === "customer") &&
+      Number((row as Record<string, unknown>).__lane_count ?? 0) > 1;
+    const isPrimaryMissing =
+      multiSource && !groupHasPrimary(stageKey, row, dataRows as Record<string, unknown>[], resolveForGuard);
+    const overridden = hasOverride(rowKey);
+    // The desktop grid carries the same three states as a 2px left accent;
+    // the skin spends colour as a 6px dot instead (§3), so `rowAccent`'s
+    // value becomes the dot and the flags stay chips. Same function, same
+    // precedence — nothing is re-derived here.
+    const accent = rowAccent({ edited: false, attention, multiSource });
+    return (
+      <MobileRow
+        key={rowKey}
+        onClick={() => setOpenRowKey(rowKey)}
+        dot={accent || (overridden ? M.product : undefined)}
+        label={`${spec.keyCols[1]?.label ?? spec.keyCols[0].label}: ${keyBLabel || "—"}`}
+        sub={overridden ? "has a saved override" : attention ? "needs input" : undefined}
+        trailing={
+          (row as Record<string, unknown>).__needs_supplier || isPrimaryMissing ? (
+            <span className="flex shrink-0 items-center gap-1">
+              {(row as Record<string, unknown>).__needs_supplier ? (
+                <MobileChip>no supplier</MobileChip>
+              ) : null}
+              {isPrimaryMissing ? <MobileChip>pick primary</MobileChip> : null}
+            </span>
+          ) : undefined
+        }
+      />
+    );
+  };
+
+  const openGroup = groups.find((g) => g.id === openGroupId) ?? null;
+
   return (
-    <div className="flex flex-col gap-3">
+    <MobileGroup>
       {groups.map((group) => {
         const keyALabel = String(group.members[0].row[spec.keyCols[0].id] ?? "");
+        const shown = group.members.slice(0, memberBudget);
         return (
           <MobilePanel
             key={group.id}
             label={`${spec.keyCols[0].label} · ${keyALabel || "—"}`}
             counter={`${group.members.length}`}
           >
-            {group.members.map(({ row }) => {
-              const rowKey = String(row.key);
-              const keyBLabel = String(row[spec.keyCols[1]?.id ?? ""] ?? "");
-              const attention = lineNeedsInput(stageKey, row, dataRows as Record<string, unknown>[], resolveForGuard);
-              const multiSource =
-                (stageKey === "supplier" || stageKey === "customer") &&
-                Number((row as Record<string, unknown>).__lane_count ?? 0) > 1;
-              const isPrimaryMissing =
-                multiSource && !groupHasPrimary(stageKey, row, dataRows as Record<string, unknown>[], resolveForGuard);
-              const overridden = hasOverride(rowKey);
-              // The desktop grid carries the same three states as a 2px left
-              // accent; the skin spends colour as a 6px dot instead (§3), so
-              // `rowAccent`'s value becomes the dot and the flags stay chips.
-              // Same function, same precedence — nothing is re-derived here.
-              const accent = rowAccent({ edited: false, attention, multiSource });
-              return (
-                <MobileRow
-                  key={rowKey}
-                  onClick={() => setOpenRowKey(rowKey)}
-                  dot={accent || (overridden ? M.product : undefined)}
-                  label={`${spec.keyCols[1]?.label ?? spec.keyCols[0].label}: ${keyBLabel || "—"}`}
-                  sub={
-                    overridden
-                      ? "has a saved override"
-                      : attention
-                        ? "needs input"
-                        : undefined
-                  }
-                  trailing={
-                    (row as Record<string, unknown>).__needs_supplier || isPrimaryMissing ? (
-                      <span className="flex shrink-0 items-center gap-1">
-                        {(row as Record<string, unknown>).__needs_supplier ? (
-                          <MobileChip>no supplier</MobileChip>
-                        ) : null}
-                        {isPrimaryMissing ? <MobileChip>pick primary</MobileChip> : null}
-                      </span>
-                    ) : undefined
-                  }
-                />
-              );
-            })}
+            {shown.map(memberRow)}
+            {group.members.length > shown.length ? (
+              <MobileRow
+                label={`All ${group.members.length} lines`}
+                sub={`${group.members.length - shown.length} more`}
+                onClick={() => setOpenGroupId(group.id)}
+              />
+            ) : null}
           </MobilePanel>
         );
       })}
+
+      {/* The deferred ledger: every line in the group, with the same row the
+          panel above renders — not a summary of it. */}
+      <MobileSheet
+        open={openGroup != null}
+        title={
+          openGroup
+            ? `${spec.keyCols[0].label} · ${String(openGroup.members[0].row[spec.keyCols[0].id] ?? "—")}`
+            : ""
+        }
+        sub={openGroup ? `${openGroup.members.length} lines — tap one for its fields.` : undefined}
+        onClose={() => setOpenGroupId(null)}
+      >
+        <div className="flex flex-col">{(openGroup?.members ?? []).map(memberRow)}</div>
+      </MobileSheet>
 
       <MobileSheet
         open={openRow != null}
@@ -296,6 +325,6 @@ export function MobileStagePolicyList({
           </div>
         )}
       </MobileSheet>
-    </div>
+    </MobileGroup>
   );
 }

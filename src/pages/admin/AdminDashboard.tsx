@@ -8,6 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, KX, TH, TD, ROW_HOVER, useTableSort } from '@/components/admin/adminUi';
 import { TableBlock } from '@/components/shared';
+import { M, MobileGroup, MobilePanel, MobileRow, MobileStatGrid } from '@/components/mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useRowBudget } from '@/hooks/useViewport';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface Kpis { orgs: number; projects: number; users: number; requests: number; costMtd: number; costToday: number; activeUsers7d: number; }
@@ -16,6 +19,8 @@ interface TopRow { label: string; requests: number; cost: number; }
 const db = supabase as any;
 
 export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
+  const isMobile = useIsMobile();
+  const topBudget = useRowBudget(4, 6, 10);
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [topUsers, setTopUsers] = useState<TopRow[]>([]);
@@ -72,6 +77,81 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
 
   const reach = kpis ? [['Organizations', n(kpis.orgs)], ['Projects', n(kpis.projects)], ['Users', n(kpis.users)], ['Active · 7d', n(kpis.activeUsers7d)]] : [];
   const spend = kpis ? [['Requests', n(kpis.requests), 'all-time', false], ['Cost today', $(kpis.costToday), '', false], ['Cost MTD', $(kpis.costMtd), '', true], ['Avg $/req', $(avg), 'month-to-date', false]] : [];
+
+  if (isMobile) {
+    // §13.4 — the numbers band, as the skin's stat grid. Same eight figures in
+    // the same order; the grid derives its columns from the cell count rather
+    // than from an index-driven border, and the four-cell case is a fixed 2-up
+    // so `auto-fit` cannot orphan the fourth (§9.2).
+    return (
+      <AdminLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Platform Overview">
+        {loading || !kpis ? (
+          <MobilePanel label="Platform overview">
+            <p className="px-3 py-8 text-center text-[13px] text-[#525252]">Loading…</p>
+          </MobilePanel>
+        ) : (
+          <div className="flex flex-col gap-[var(--m-gap)]">
+            <MobileGroup label="Reach">
+              <MobileStatGrid
+                stats={reach.map(([label, value]) => ({ label: String(label), value: String(value) }))}
+              />
+            </MobileGroup>
+
+            <MobileGroup label="AI spend">
+              <MobileStatGrid
+                stats={spend.map(([label, value, , emph]) => ({
+                  label: String(label),
+                  value: String(value),
+                  // "Cost MTD" is the figure the band is about — the #F8D448
+                  // 2px rule was saying so on desktop; here it is the dot,
+                  // which is the only other place a meaning colour is allowed.
+                  dot: emph ? M.begin : undefined,
+                }))}
+              />
+            </MobileGroup>
+
+            <MobileGroup label="Month to date">
+              <MobilePanel label="Top users" counter={`${topUsers.length}`}>
+                {topUsers.length === 0 ? (
+                  <p className="px-3 py-8 text-center text-[13px] text-[#525252]">
+                    No usage recorded yet.
+                  </p>
+                ) : (
+                  topUsers.slice(0, topBudget).map((r) => (
+                    <MobileRow
+                      key={r.label}
+                      chevron={false}
+                      label={r.label}
+                      sub={`${r.requests.toLocaleString()} requests`}
+                      value={`$${r.cost.toFixed(2)}`}
+                    />
+                  ))
+                )}
+              </MobilePanel>
+
+              <MobilePanel label="Top organizations" counter={`${topOrgs.length}`}>
+                {topOrgs.length === 0 ? (
+                  <p className="px-3 py-8 text-center text-[13px] text-[#525252]">
+                    No usage recorded yet.
+                  </p>
+                ) : (
+                  topOrgs.slice(0, topBudget).map((r) => (
+                    <MobileRow
+                      key={r.label}
+                      chevron={false}
+                      label={r.label}
+                      sub={`${r.requests.toLocaleString()} requests`}
+                      value={`$${r.cost.toFixed(2)}`}
+                    />
+                  ))
+                )}
+              </MobilePanel>
+            </MobileGroup>
+          </div>
+        )}
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Platform Overview">

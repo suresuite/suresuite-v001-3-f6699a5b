@@ -7,6 +7,14 @@ import { Brain, Loader2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  M,
+  MobileButton,
+  MobileNote,
+  MobilePanel,
+  MobileRow,
+  MobileStatGrid,
+} from '@/components/mobile';
 
 interface PredictionStats {
   total: number;
@@ -17,9 +25,20 @@ interface PredictionStats {
 
 interface MLPredictionProps {
   selectedPlant: string | null;
+  /**
+   * Wear the mobile skin (v2 §4C).
+   *
+   * This is the last shadcn `Card` inside the three converted lens pages, and
+   * it is mounted by both platforms — so the skin arrives as a prop. `skin`
+   * false leaves the desktop card below byte-identical; true renders the same
+   * inventory in the skin's vocabulary: the panel, the stat grid, the one
+   * black button, and the caveat line. Same handler, same figures, same copy,
+   * same link — nothing is added and nothing is hidden.
+   */
+  skin?: boolean;
 }
 
-export default function MLPrediction({ selectedPlant }: MLPredictionProps) {
+export default function MLPrediction({ selectedPlant, skin = false }: MLPredictionProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stats, setStats] = useState<PredictionStats | null>(null);
@@ -108,6 +127,67 @@ export default function MLPrediction({ selectedPlant }: MLPredictionProps) {
     void fetchPredictionStats();
   }, [selectedPlant, user?.id]);
 
+  const nexusCopy =
+    'Nexus nodes are a prediction about cascading failure. The single-source ' +
+    'material count on the lens pages is a structural fact about sourcing — ' +
+    'the two answer different questions.';
+
+  if (skin) {
+    return (
+      <>
+        <MobilePanel
+          label="Nexus node prediction"
+          counter={isRunning ? `${Math.round(progress)}%` : undefined}
+        >
+          <MobileRow
+            chevron={false}
+            dot={isRunning ? M.process : undefined}
+            label={isRunning ? 'Processing predictions…' : 'Last run'}
+            sub={
+              stats?.last_prediction
+                ? new Date(stats.last_prediction).toLocaleString()
+                : 'never'
+            }
+            value={isRunning ? `${Math.round(progress)}%` : undefined}
+          />
+          <MobileRow
+            label="What a nexus node is"
+            sub="opens the reference"
+            onClick={() => window.open('/docs/nexus-node.md', '_blank', 'noopener,noreferrer')}
+          />
+          <div className="p-3">
+            {/* §8: the control is shown and disabled, and the line beneath it
+                says why — it is never hidden. */}
+            <MobileButton
+              block
+              onClick={runPrediction}
+              disabled={isRunning || !selectedPlant}
+            >
+              {isRunning ? 'Running prediction…' : 'Run prediction'}
+            </MobileButton>
+            {!selectedPlant && (
+              <p className="mt-1.5 text-[12px] leading-[1.4] text-[#525252] [text-wrap:pretty]">
+                Select a project first — the prediction runs against one plant's network.
+              </p>
+            )}
+          </div>
+        </MobilePanel>
+
+        {stats && (
+          <MobileStatGrid
+            stats={[
+              { label: 'Total nodes', value: String(stats.total) },
+              { label: 'Nexus', value: String(stats.critical), dot: M.blocking },
+              { label: 'Non-nexus', value: String(stats.non_critical), dot: M.process },
+            ]}
+          />
+        )}
+
+        {stats && <MobileNote tone="caveat" mark="·">{nexusCopy}</MobileNote>}
+      </>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -191,9 +271,7 @@ export default function MLPrediction({ selectedPlant }: MLPredictionProps) {
               </div>
 
               <p className="pt-1 text-[11.5px] leading-relaxed text-muted-foreground">
-                Nexus nodes are a prediction about cascading failure. The
-                single-source material count on the lens pages is a structural
-                fact about sourcing — the two answer different questions.
+                {nexusCopy}
               </p>
             </div>
           )}

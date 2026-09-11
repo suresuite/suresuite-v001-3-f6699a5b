@@ -11,7 +11,7 @@ import { LAYER, tint } from "@/components/intelligence/piUi";
 import * as XLSX from "xlsx";
 import { StagePolicyTable } from "./StagePolicyTable";
 import { MobileStagePolicyList } from "./MobileStagePolicyList";
-import { MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
+import { MobileGroup, MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
 import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
 import { ApplyPresetDialog } from "./ApplyPresetDialog";
 import { PresetDiffBanner } from "./PresetDiffBanner";
@@ -234,7 +234,7 @@ export function FocusedStage({
   // as a plain read-only summary instead of PolicyDefaultsCard's form.
   if (isMobile) {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-[var(--m-gap)]">
         {noDataNote}
         <MobileStagePolicyList
           projectId={projectId}
@@ -245,6 +245,7 @@ export function FocusedStage({
           stageRows={rowsByStage[stageKey]}
         />
         {stageKey === "customer" && (
+          <MobileGroup label="Project-wide">
           <MobilePanel label="Fulfillment defaults" counter="project-wide">
             {Object.values(visibleFieldGroups("fulfillment")).flat().map((field) => {
               const value = (defaults.fulfillment as Record<string, unknown>)[field];
@@ -264,6 +265,7 @@ export function FocusedStage({
               );
             })}
           </MobilePanel>
+          </MobileGroup>
         )}
       </div>
     );

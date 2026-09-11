@@ -36,6 +36,16 @@ import {
 } from 'lucide-react';
 import { getCombineStatusStyle, getCombineStatusIcon, getCombineStatusText } from '@/utils/combineStatus';
 import { getFallbackSimulationDates } from '@/utils/dateHelpers';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import {
+  M,
+  MobileChip,
+  MobilePanel,
+  MobileRow,
+  MobileToggle,
+} from '@/components/mobile';
+import { cn } from '@/lib/utils';
 
 interface Project {
   id: string;
@@ -142,6 +152,384 @@ export function ProjectCard({
   onEditSimulationEndChange,
   onEditDeepTierEnabledChange,
 }: ProjectCardProps) {
+  // The edit form, hoisted so BOTH chromes mount the same controls. It is
+  // the real editor either way — the mobile branch wraps it in the panel
+  // and applies the touch floor; nothing about the fields changes (§8).
+  const editForm = (
+    <>
+          <div>
+            <Label htmlFor={`edit-name-${project.id}`}>Project Name</Label>
+            <Input
+              id={`edit-name-${project.id}`}
+              value={editProjectName}
+              onChange={(e) => onEditProjectNameChange(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor={`edit-plant-${project.id}`}>Plant</Label>
+            <Input
+              id={`edit-plant-${project.id}`}
+              value={editPlantName}
+              onChange={(e) => onEditPlantNameChange(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Data</Label>
+            <RadioGroup
+              value={editDataType}
+              onValueChange={onEditDataTypeChange}
+              className="flex gap-4 mt-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="curated" id={`edit-data-curated-${project.id}`} />
+                <Label htmlFor={`edit-data-curated-${project.id}`}>Curated data</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="uncurated" id={`edit-data-uncurated-${project.id}`} />
+                <Label htmlFor={`edit-data-uncurated-${project.id}`}>Uncurated data</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <div>
+            <Label>Supply Chain Model</Label>
+            <RadioGroup
+              value={editSupplyChainModel}
+              onValueChange={onEditSupplyChainModelChange}
+              className="flex gap-4 mt-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Make-To-Order" id={`edit-model-mto-${project.id}`} />
+                <Label htmlFor={`edit-model-mto-${project.id}`}>Make-To-Order</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Make-To-Stock" id={`edit-model-mts-${project.id}`} />
+                <Label htmlFor={`edit-model-mts-${project.id}`}>Make-To-Stock</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <div>
+            <Label>BOM Level</Label>
+            <RadioGroup
+              value={editBomLevel}
+              onValueChange={onEditBomLevelChange}
+              className="flex gap-4 mt-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="single" id={`edit-bom-single-${project.id}`} />
+                <Label htmlFor={`edit-bom-single-${project.id}`}>Single Level BOM</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="multi" id={`edit-bom-multi-${project.id}`} />
+                <Label htmlFor={`edit-bom-multi-${project.id}`}>Multiple Level BOM</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Deep Tier Network</Label>
+            <div className="flex items-center space-x-3">
+              <Switch
+                id={`deep-tier-edit-${project.id}`}
+                checked={editDeepTierEnabled}
+                onCheckedChange={onEditDeepTierEnabledChange}
+              />
+              <Label htmlFor={`deep-tier-edit-${project.id}`}>
+                Enable Deep Tier Network Analysis
+              </Label>
+            </div>
+            {editDeepTierEnabled && (
+              <p className="text-xs text-muted-foreground">
+                This will enable tier-2 and tier-3 supplier data collection for extended supply chain visibility.
+              </p>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs">Simulation Start Date</Label>
+              <StepwiseDatePicker
+                date={editSimulationStart}
+                onSelect={onEditSimulationStartChange}
+                placeholder="Pick start date"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Simulation End Date</Label>
+              <StepwiseDatePicker
+                date={editSimulationEnd}
+                onSelect={onEditSimulationEndChange}
+                placeholder="Pick end date"
+                disabled={(date) => editSimulationStart ? date < editSimulationStart : false}
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateProject();
+              }}
+              disabled={!editProjectName.trim() || !editPlantName.trim()}
+            >
+              Save
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelEdit();
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+    </>
+  );
+  const isMobile = useIsMobile();
+  const [sheet, setSheet] = useState(false);
+
+  const fallbackDates = getFallbackSimulationDates(project.simulation_start, project.simulation_end);
+  const period =
+    fallbackDates.start.toLocaleDateString() + ' → ' + fallbackDates.end.toLocaleDateString();
+  const periodDefaulted = !project.simulation_start || !project.simulation_end;
+
+  const owns = canModify && (project.modeler_id === userId || role === 'admin');
+  const isGlobal = globalSelectedProjectId === project.id;
+  const hasBasicData = completion.bom && completion.inbound && completion.outbound;
+
+  // The dataset checklist, as one sentence and one dot rather than six
+  // coloured badges — a meaning colour is a dot, a 2px rule or a chip (§3).
+  const datasets: Array<[string, boolean]> = [
+    ['BOM', completion.bom],
+    ['Inbound', completion.inbound],
+    ['Outbound', completion.outbound],
+    ...(project.deep_tier_enabled
+      ? ([
+          ['Deep nodes', Boolean(completion.deepNodes)],
+          ['Deep edges', Boolean(completion.deepEdges)],
+        ] as Array<[string, boolean]>)
+      : []),
+  ];
+  const datasetsDone = datasets.filter(([, ok]) => ok).length;
+  const datasetsComplete = datasetsDone === datasets.length;
+
+  if (isMobile) {
+    // Project Manager, converted (v2 §4B). Every shadcn Card on this surface
+    // is the panel; the badge wall becomes rows; and the six actions that
+    // used to hide inside a `…` dropdown — which §8 forbids — become named
+    // rows in a sheet. Nothing is added, removed or renamed: the same
+    // handlers, the same copy, the same destinations.
+    //
+    // The editing state keeps the REAL form. It is the same inputs desktop
+    // edits with, inside the panel rather than a bordered card, with the 44px
+    // touch floor applied to every control it holds.
+    if (isEditing) {
+      return (
+        <MobilePanel label="Edit project" counter={project.name}>
+          <div
+            className={cn(
+              'space-y-4 p-3',
+              '[&_input]:min-h-11 [&_button]:min-h-11 [&_[role=radio]]:min-h-6',
+            )}
+          >
+            {editForm}
+          </div>
+        </MobilePanel>
+      );
+    }
+
+    const action = (
+      label: string,
+      onClick: () => void,
+      sub?: string,
+      disabled?: boolean,
+      note?: string,
+    ) => (
+      <MobileRow
+        label={label}
+        sub={sub}
+        disabled={disabled}
+        note={disabled ? note : undefined}
+        onClick={disabled ? undefined : onClick}
+        chevron={!disabled}
+      />
+    );
+
+    return (
+      <>
+        <MobilePanel
+          // The globally active project is the one thing on this screen that
+          // is different from the others, so it is the screen's one ink head
+          // (v2 §2) — and there is at most one active project by definition.
+          tone={isGlobal ? 'primary' : 'secondary'}
+          label={project.name}
+          counter={`${datasetsDone} / ${datasets.length}`}
+        >
+          <MobileRow
+            chevron={false}
+            label={project.plant_name}
+            sub={[
+              project.supply_chain_model,
+              project.bom_level === 'single' ? 'Single-level BOM' : 'Multi-level BOM',
+              project.data_type === 'uncurated' ? 'Uncurated data' : 'Curated data',
+              project.deep_tier_enabled ? 'Deep tier' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            trailing={
+              project.combine_status ? (
+                <MobileChip>{getCombineStatusText(project.combine_status)}</MobileChip>
+              ) : undefined
+            }
+          />
+
+          <MobileRow
+            chevron={false}
+            dot={datasetsComplete ? M.process : M.blocking}
+            label="Datasets"
+            sub={datasets.map(([name, ok]) => `${name} ${ok ? '✓' : '✗'}`).join(' · ')}
+            value={`${datasetsDone}/${datasets.length}`}
+          />
+
+          <MobileRow
+            chevron={false}
+            dot={periodDefaulted ? M.firm : undefined}
+            label="Simulation period"
+            sub={periodDefaulted ? 'defaults — no dates saved on the project' : undefined}
+            value={period}
+          />
+
+          <MobileRow
+            chevron={false}
+            label="Active project"
+            sub="the project the rest of the app works on"
+            trailing={
+              <MobileToggle
+                checked={isGlobal}
+                label={`Set ${project.name} as the active project`}
+                onChange={(next) => {
+                  onGlobalSelect(next ? project.id : null);
+                  toast({
+                    title: next ? 'Global project selected' : 'Global project deselected',
+                    description: next
+                      ? `"${project.name}" is now the active project across the app`
+                      : 'No project is currently active across the app',
+                  });
+                }}
+              />
+            }
+          />
+
+          <MobileRow
+            label="Project actions"
+            sub={owns ? 'data, item master, combine, edit, delete' : 'view data'}
+            value={owns ? '6' : '1'}
+            onClick={() => setSheet(true)}
+          />
+
+          <MobileRow
+            chevron={false}
+            label="Modeller"
+            sub={`created ${new Date(project.created_at).toLocaleDateString()}`}
+            value={project.modeler_name}
+          />
+        </MobilePanel>
+
+        <MobileSheet
+          open={sheet}
+          title={project.name}
+          sub="Every action this project has. One row each — nothing is hidden behind a menu."
+          onClose={() => setSheet(false)}
+        >
+          <div className="flex flex-col">
+            {action(
+              'View data',
+              () => {
+                onViewData(project);
+                setSheet(false);
+              },
+              'the datasets loaded into this project',
+              !owns,
+              'Only the project’s modeller or an admin can open its data.',
+            )}
+            {action(
+              'Upload data',
+              () => {
+                onUploadData(project);
+                setSheet(false);
+              },
+              'the upload wizard',
+              !owns,
+              'Only the project’s modeller or an admin can upload.',
+            )}
+            {action(
+              'Edit item master',
+              () => {
+                onEditItemMaster(project);
+                setSheet(false);
+              },
+              'materials, products and suppliers',
+              !owns,
+              'Only the project’s modeller or an admin can edit the item master.',
+            )}
+            {action(
+              completion.nodeList && hasBasicData ? 'Download node list' : 'Generate node list',
+              () => {
+                if (completion.nodeList && hasBasicData) onDownloadNodeList(project);
+                else onGenerateNodeList(project);
+                setSheet(false);
+              },
+              'optional — enhance it with location data and re-upload',
+              !hasBasicData,
+              'Upload BOM, inbound and outbound first — the node list is combined from them.',
+            )}
+            {action(
+              project.combine_status === 'failed' ? 'Retry combine datasets' : 'Combine datasets',
+              () => {
+                onCombine(project);
+                setSheet(false);
+              },
+              project.combine_status ? getCombineStatusText(project.combine_status) : undefined,
+              !owns || project.combine_status === 'running',
+              project.combine_status === 'running'
+                ? 'A combine is already running for this project.'
+                : 'Only the project’s modeller or an admin can combine datasets.',
+            )}
+            {action(
+              'Edit project',
+              () => {
+                onEdit(project);
+                setSheet(false);
+              },
+              'name, plant, model, BOM level, dates',
+              !owns,
+              'Only the project’s modeller or an admin can edit this project.',
+            )}
+            {action(
+              'Delete project',
+              () => {
+                const isComplexProject = project.deep_tier_enabled && project.bom_level === 'multi_level';
+                const message = isComplexProject
+                  ? `Delete project "${project.name}"? This is a complex project that will be force-deleted (all data cleaned first).`
+                  : `Are you sure you want to delete project "${project.name}"?`;
+                if (confirm(message)) {
+                  onDelete(project);
+                  setSheet(false);
+                }
+              },
+              'permanent',
+              !owns,
+              'Only the project’s modeller or an admin can delete this project.',
+            )}
+          </div>
+        </MobileSheet>
+      </>
+    );
+  }
+
   return (
     <Card
       className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
@@ -157,137 +545,7 @@ export function ProjectCard({
     >
       <CardContent className="p-4">
         {isEditing ? (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor={`edit-name-${project.id}`}>Project Name</Label>
-              <Input
-                id={`edit-name-${project.id}`}
-                value={editProjectName}
-                onChange={(e) => onEditProjectNameChange(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor={`edit-plant-${project.id}`}>Plant</Label>
-              <Input
-                id={`edit-plant-${project.id}`}
-                value={editPlantName}
-                onChange={(e) => onEditPlantNameChange(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Data</Label>
-              <RadioGroup
-                value={editDataType}
-                onValueChange={onEditDataTypeChange}
-                className="flex gap-4 mt-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="curated" id={`edit-data-curated-${project.id}`} />
-                  <Label htmlFor={`edit-data-curated-${project.id}`}>Curated data</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="uncurated" id={`edit-data-uncurated-${project.id}`} />
-                  <Label htmlFor={`edit-data-uncurated-${project.id}`}>Uncurated data</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            <div>
-              <Label>Supply Chain Model</Label>
-              <RadioGroup
-                value={editSupplyChainModel}
-                onValueChange={onEditSupplyChainModelChange}
-                className="flex gap-4 mt-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Make-To-Order" id={`edit-model-mto-${project.id}`} />
-                  <Label htmlFor={`edit-model-mto-${project.id}`}>Make-To-Order</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Make-To-Stock" id={`edit-model-mts-${project.id}`} />
-                  <Label htmlFor={`edit-model-mts-${project.id}`}>Make-To-Stock</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            <div>
-              <Label>BOM Level</Label>
-              <RadioGroup
-                value={editBomLevel}
-                onValueChange={onEditBomLevelChange}
-                className="flex gap-4 mt-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="single" id={`edit-bom-single-${project.id}`} />
-                  <Label htmlFor={`edit-bom-single-${project.id}`}>Single Level BOM</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="multi" id={`edit-bom-multi-${project.id}`} />
-                  <Label htmlFor={`edit-bom-multi-${project.id}`}>Multiple Level BOM</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Deep Tier Network</Label>
-              <div className="flex items-center space-x-3">
-                <Switch
-                  id={`deep-tier-edit-${project.id}`}
-                  checked={editDeepTierEnabled}
-                  onCheckedChange={onEditDeepTierEnabledChange}
-                />
-                <Label htmlFor={`deep-tier-edit-${project.id}`}>
-                  Enable Deep Tier Network Analysis
-                </Label>
-              </div>
-              {editDeepTierEnabled && (
-                <p className="text-xs text-muted-foreground">
-                  This will enable tier-2 and tier-3 supplier data collection for extended supply chain visibility.
-                </p>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs">Simulation Start Date</Label>
-                <StepwiseDatePicker
-                  date={editSimulationStart}
-                  onSelect={onEditSimulationStartChange}
-                  placeholder="Pick start date"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Simulation End Date</Label>
-                <StepwiseDatePicker
-                  date={editSimulationEnd}
-                  onSelect={onEditSimulationEndChange}
-                  placeholder="Pick end date"
-                  disabled={(date) => editSimulationStart ? date < editSimulationStart : false}
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onUpdateProject();
-                }}
-                disabled={!editProjectName.trim() || !editPlantName.trim()}
-              >
-                Save
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCancelEdit();
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <div className="space-y-4">{editForm}</div>
         ) : (
           <div className="flex items-start justify-between">
             <div className="flex-1">

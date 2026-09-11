@@ -17,7 +17,16 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
-import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
+import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import {
+  M,
+  MobileButton,
+  MobileGroup,
+  MobilePanel,
+  MobileStatGrid,
+} from '@/components/mobile';
+import { cn } from '@/lib/utils';
 import { Toggle } from '@/components/ui/toggle';
 import ProjectDataViewer from '@/components/ProjectDataViewer';
 import ItemMasterEditor from '@/components/ItemMasterEditor';
@@ -706,10 +715,309 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
     }
   };
 
+  // The create form, hoisted so both chromes mount the same controls (§8).
+  const isMobile = useIsMobile();
+
+  // §13.4 — the numbers, as the one stat grid on the screen. Derived from the
+  // list already in hand; no new query, no new state (v2 §7).
+  const completeCount = projects.filter((p) => {
+    const c = getCompletionInfo(p);
+    return c.bom && c.inbound && c.outbound;
+  }).length;
+
+  // The project list, hoisted so the mobile group and the desktop stack
+  // mount the SAME cards with the same handlers — <ProjectCard> is what
+  // branches on the viewport, not this page (v2 §4B).
+  const projectList = (
+    <>
+          {projects.map((project) => {
+            const completion = getCompletionInfo(project);
+            const isSelected = selectedProject?.id === project.id;
+
+            return (
+              <div key={project.id}>
+                <ProjectCard
+                  project={project}
+                  completion={completion}
+                  isSelected={isSelected}
+                  isEditing={editingProject?.id === project.id}
+                  globalSelectedProjectId={globalSelectedProjectId}
+                  canModify={canModify}
+                  role={role}
+                  userId={user?.id || ''}
+                  editProjectName={editProjectName}
+                  editPlantName={editPlantName}
+                  editSupplyChainModel={editSupplyChainModel}
+                  editBomLevel={editBomLevel}
+                  editDataType={editDataType}
+                  editSimulationStart={editSimulationStart}
+                  editSimulationEnd={editSimulationEnd}
+                  onSelect={setSelectedProject}
+                  onGlobalSelect={setGlobalSelectedProjectId}
+                  onDownloadNodeList={handleDownloadNodeList}
+                  onGenerateNodeList={handleGenerateNodeList}
+                  onViewData={(project) => {
+                    setSelectedProject(project);
+                    setUploadingProject(null);
+                    setExpandedProjectId(expandedProjectId === project.id ? null : project.id);
+                  }}
+                  onUploadData={(project) => {
+                    setSelectedProject(project);
+                    setExpandedProjectId(null);
+                    setUploadingProject((current) =>
+                      current?.id === project.id ? null : project
+                    );
+                  }}
+                  onEditItemMaster={(project) => {
+                    setSelectedProject(project);
+                    setItemMasterProjectId((current) =>
+                      current === project.id ? null : project.id
+                    );
+                  }}
+                  onEdit={(project) => {
+                    setSelectedProject(project);
+                    setEditingProject(project);
+                    setEditProjectName(project.name);
+                    setEditPlantName(project.plant_name);
+                    setEditDataType(project.data_type || 'curated');
+                    setEditSupplyChainModel(project.supply_chain_model);
+                    setEditBomLevel(project.bom_level);
+                    setEditSimulationStart(project.simulation_start ? new Date(project.simulation_start) : undefined);
+                    setEditSimulationEnd(project.simulation_end ? new Date(project.simulation_end) : undefined);
+                  }}
+                  onDelete={handleDeleteProject}
+                  onCombine={handleCombineProject}
+                  onCancelEdit={() => setEditingProject(null)}
+                  onUpdateProject={handleUpdateProject}
+                  onEditProjectNameChange={setEditProjectName}
+                  onEditPlantNameChange={setEditPlantName}
+                  onEditSupplyChainModelChange={setEditSupplyChainModel}
+                  onEditBomLevelChange={setEditBomLevel}
+                  onEditDataTypeChange={setEditDataType}
+                  onEditSimulationStartChange={setEditSimulationStart}
+                  onEditSimulationEndChange={setEditSimulationEnd}
+                  onEditDeepTierEnabledChange={setEditDeepTierEnabled}
+                  editDeepTierEnabled={editDeepTierEnabled}
+                />
+
+                {expandedProjectId === project.id && (
+                  <div className={cn(
+                      'mt-4 space-y-4',
+                      // The 32px indent is a third of a 320px gutter. Below `md` the
+                      // relationship is carried by the 2px rule alone (v2 §2).
+                      isMobile ? 'border-l-2 border-[#d4d4d4] pl-2.5' : 'ml-4 border-l-2 border-border pl-4',
+                    )}>
+                     <ProjectDataViewer
+                       project={project}
+                       onClose={() => setExpandedProjectId(null)}
+                       onDataDeleted={() => {
+                         checkProjectDataCompletion(project.id).then((status) => {
+                           setProjectDataStatus((prev) => ({ ...prev, [project.id]: status }));
+                         });
+                       }}
+                     />
+                     {/* Complementary to the Upload Wizard above, never a replacement —
+                         docs/design/erp-mrp-integration-plan.md §2.0, §6c. */}
+                     <ErpConnectionsPanel projectId={project.id} />
+                  </div>
+                )}
+                {itemMasterProjectId === project.id && (
+                  <div className={cn(
+                      'mt-4',
+                      isMobile ? 'border-l-2 border-[#d4d4d4] pl-2.5' : 'ml-4 border-l-2 border-border pl-4',
+                    )}>
+                    <ItemMasterEditor
+                      projectId={project.id}
+                      initialTab={
+                        walkToTable === 'materials' || walkToTable === 'products' || walkToTable === 'suppliers'
+                          ? walkToTable
+                          : undefined
+                      }
+                      onClose={() => setItemMasterProjectId(null)}
+                    />
+                  </div>
+                )}
+                {uploadingProject?.id === project.id && (
+                  <div className={cn(
+                      'mt-4',
+                      isMobile ? 'border-l-2 border-[#d4d4d4] pl-2.5' : 'ml-4 border-l-2 border-border pl-4',
+                    )}>
+                    <UploadWizard
+                      selectedProject={uploadingProject}
+                      userId={user?.id || ''}
+                      onUploadComplete={async () => {
+                        console.log('🔄 Upload completion callback triggered for project:', project.name);
+                        
+                        try {
+                          // Step 1: Clear upload state immediately to prevent UI issues
+                          setUploadingProject(null);
+                          
+                          console.log('📊 Refreshing project status after upload...');
+                          
+                          // Step 2: Sequential async operations to prevent race conditions
+                          await new Promise(resolve => setTimeout(resolve, 200)); // Brief delay to ensure upload transaction completes
+                          
+                          // Step 3: Reload projects and check completion status
+                          await loadProjects();
+                          const updatedStatus = await checkProjectDataCompletion(project.id);
+                          setProjectDataStatus((prev) => ({ ...prev, [project.id]: updatedStatus }));
+                          
+                          console.log('📈 Updated project status:', updatedStatus);
+                          
+                          // Step 4: Check if project datasets are complete (excluding node list initially)
+                          const isCompleteByData = updatedStatus.bom && updatedStatus.inbound && updatedStatus.outbound;
+                          
+                          if (isCompleteByData && !updatedStatus.nodeList) {
+                            console.log('ℹ️ Core datasets complete. Skipping auto-completion to avoid timeouts in Multi Level BOM projects.');
+                            toast.success(`All datasets uploaded. Click "Refresh Data" to finalize project "${project.name}".`);
+                          } else {
+                            console.log('ℹ️ Upload complete, no additional processing needed');
+                          }
+                          
+                        } catch (completionError) {
+                          console.error('❌ Upload completion callback failed:', completionError);
+                          toast.error("Upload completed but status refresh failed. Please refresh the page.");
+                        }
+                      }}
+                      onClose={() => setUploadingProject(null)}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+    </>
+  );
+  const createForm = (
+    <>
+            <div>
+              <Label htmlFor="projectName">Project Name</Label>
+              <Input
+                id="projectName"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Enter project name"
+              />
+              {isDuplicateName && (
+                <p className="text-sm text-red-500 mt-1">A project with this name already exists</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="plantName">Plant</Label>
+              <Input
+                id="plantName"
+                value={plantName}
+                onChange={(e) => setPlantName(e.target.value)}
+                placeholder="Enter plant name"
+              />
+            </div>
+            <div>
+              <Label>Data</Label>
+              <RadioGroup
+                value={dataType}
+                onValueChange={setDataType}
+                className="flex gap-4 mt-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="curated" id="data-curated" />
+                  <Label htmlFor="data-curated">Curated data</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="uncurated" id="data-uncurated" />
+                  <Label htmlFor="data-uncurated">Uncurated data</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <div>
+              <Label>Supply Chain Model</Label>
+              <RadioGroup
+                value={supplyChainModel}
+                onValueChange={setSupplyChainModel}
+                className="flex gap-4 mt-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Make-To-Order" id="model-mto" />
+                  <Label htmlFor="model-mto">Make-To-Order</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Make-To-Stock" id="model-mts" />
+                  <Label htmlFor="model-mts">Make-To-Stock</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <div>
+              <Label>BOM Level</Label>
+              <RadioGroup
+                value={bomLevel}
+                onValueChange={setBomLevel}
+                className="flex gap-4 mt-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="bom-single" />
+                  <Label htmlFor="bom-single">Single Level BOM</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="multi" id="bom-multi" />
+                  <Label htmlFor="bom-multi">Multiple Level BOM</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Deep Tier Network</Label>
+              <div className="flex items-center space-x-3">
+                <Switch
+                  id="deep-tier-enabled"
+                  checked={deepTierEnabled}
+                  onCheckedChange={setDeepTierEnabled}
+                />
+                <Label htmlFor="deep-tier-enabled" className="text-xs">
+                  Enable Deep Tier Network Analysis
+                </Label>
+              </div>
+              {deepTierEnabled && (
+                <p className="text-xs text-muted-foreground">
+                  This will enable tier-2 and tier-3 supplier data collection for extended supply chain visibility.
+                </p>
+              )}
+            </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs">Simulation Start Date</Label>
+              <StepwiseDatePicker
+                date={simulationStart}
+                onSelect={setSimulationStart}
+                placeholder="Pick start date"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Simulation End Date</Label>
+              <StepwiseDatePicker
+                date={simulationEnd}
+                onSelect={setSimulationEnd}
+                placeholder="Pick end date"
+                disabled={(date) => simulationStart ? date < simulationStart : false}
+              />
+            </div>
+          </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCreateProject}
+                disabled={!newProjectName.trim() || !plantName.trim() || isDuplicateName}
+              >
+                Create Project
+              </Button>
+              <Button variant="outline" onClick={() => setIsCreating(false)}>
+                Cancel
+              </Button>
+            </div>
+    </>
+  );
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={PAGE_GUTTER}>
+      <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
         <PageHeader
+          skin={isMobile}
           title="Your Projects"
           subtitle={canModify
             ? 'Create and manage your supply chain projects'
@@ -741,141 +1049,67 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
             </div>
           }
         />
-        <div className="space-y-4">
+        <div className={isMobile ? 'flex flex-col gap-[var(--m-gap)]' : 'space-y-4'}>
+            {/* §13.4 — the numbers band, one stat grid, below `md` only. */}
+            {isMobile && projects.length > 0 && (
+              <MobileStatGrid
+                stats={[
+                  { label: 'Projects', value: String(projects.length) },
+                  {
+                    label: 'Data complete',
+                    value: String(completeCount),
+                    dot: completeCount === projects.length ? M.process : M.firm,
+                  },
+                  {
+                    label: 'Active',
+                    value: globalSelectedProjectId ? '1' : '0',
+                    dot: globalSelectedProjectId ? M.process : M.idle,
+                  },
+                ]}
+              />
+            )}
+
             {/* Create New Project Form */}
         {isCreating && canModify && (
+          isMobile ? (
+            // The dashed card is a second container style, which the skin does
+            // not have (§12) — the form is the panel, with the touch floor on
+            // every control it holds. Same fields, same handler, same copy.
+            <MobilePanel tone="primary" label="Create new project">
+              <div className="space-y-4 p-3 [&_input]:min-h-11 [&_button]:min-h-11">
+                {createForm}
+              </div>
+            </MobilePanel>
+          ) : (
           <Card className="border-dashed">
             <CardHeader className="pb-4">
               <CardTitle className="text-sm">Create New Project</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="projectName">Project Name</Label>
-                <Input
-                  id="projectName"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  placeholder="Enter project name"
-                />
-                {isDuplicateName && (
-                  <p className="text-sm text-red-500 mt-1">A project with this name already exists</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="plantName">Plant</Label>
-                <Input
-                  id="plantName"
-                  value={plantName}
-                  onChange={(e) => setPlantName(e.target.value)}
-                  placeholder="Enter plant name"
-                />
-              </div>
-              <div>
-                <Label>Data</Label>
-                <RadioGroup
-                  value={dataType}
-                  onValueChange={setDataType}
-                  className="flex gap-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="curated" id="data-curated" />
-                    <Label htmlFor="data-curated">Curated data</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="uncurated" id="data-uncurated" />
-                    <Label htmlFor="data-uncurated">Uncurated data</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              <div>
-                <Label>Supply Chain Model</Label>
-                <RadioGroup
-                  value={supplyChainModel}
-                  onValueChange={setSupplyChainModel}
-                  className="flex gap-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Make-To-Order" id="model-mto" />
-                    <Label htmlFor="model-mto">Make-To-Order</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Make-To-Stock" id="model-mts" />
-                    <Label htmlFor="model-mts">Make-To-Stock</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              <div>
-                <Label>BOM Level</Label>
-                <RadioGroup
-                  value={bomLevel}
-                  onValueChange={setBomLevel}
-                  className="flex gap-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="single" id="bom-single" />
-                    <Label htmlFor="bom-single">Single Level BOM</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="multi" id="bom-multi" />
-                    <Label htmlFor="bom-multi">Multiple Level BOM</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Deep Tier Network</Label>
-                <div className="flex items-center space-x-3">
-                  <Switch
-                    id="deep-tier-enabled"
-                    checked={deepTierEnabled}
-                    onCheckedChange={setDeepTierEnabled}
-                  />
-                  <Label htmlFor="deep-tier-enabled" className="text-xs">
-                    Enable Deep Tier Network Analysis
-                  </Label>
-                </div>
-                {deepTierEnabled && (
-                  <p className="text-xs text-muted-foreground">
-                    This will enable tier-2 and tier-3 supplier data collection for extended supply chain visibility.
-                  </p>
-                )}
-              </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs">Simulation Start Date</Label>
-                <StepwiseDatePicker
-                  date={simulationStart}
-                  onSelect={setSimulationStart}
-                  placeholder="Pick start date"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Simulation End Date</Label>
-                <StepwiseDatePicker
-                  date={simulationEnd}
-                  onSelect={setSimulationEnd}
-                  placeholder="Pick end date"
-                  disabled={(date) => simulationStart ? date < simulationStart : false}
-                />
-              </div>
-            </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleCreateProject}
-                  disabled={!newProjectName.trim() || !plantName.trim() || isDuplicateName}
-                >
-                  Create Project
-                </Button>
-                <Button variant="outline" onClick={() => setIsCreating(false)}>
-                  Cancel
-                </Button>
-              </div>
+              {createForm}
             </CardContent>
           </Card>
+          )
         )}
 
 
         {projects.length === 0 ? (
+          isMobile ? (
+            // One ink head per screen: with the create form open above, the
+            // form is what changed and this steps back (v2 §2).
+            <MobilePanel tone={isCreating ? 'secondary' : 'primary'} label="Projects" counter="none">
+              <div className="flex flex-col items-center gap-3 px-6 py-9 text-center">
+                <span className="text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+                  No projects yet — create your first one to get started.
+                </span>
+                {canModify && (
+                  <MobileButton weight="secondary" onClick={handleOpenCreateForm}>
+                    New project
+                  </MobileButton>
+                )}
+              </div>
+            </MobilePanel>
+          ) : (
           <Card>
             <CardContent className="p-8 text-center">
               <div className="text-muted-foreground">
@@ -884,153 +1118,16 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
               </div>
             </CardContent>
           </Card>
+          )
+        ) : isMobile ? (
+          // Each project is a panel; the group names the band so no panel has
+          // to shout to say what the list is (v2 §2).
+          <MobileGroup label={`${projects.length} ${projects.length === 1 ? 'project' : 'projects'}`}>
+            {projectList}
+          </MobileGroup>
         ) : (
           <div className="space-y-4">
-            {projects.map((project) => {
-              const completion = getCompletionInfo(project);
-              const isSelected = selectedProject?.id === project.id;
-
-              return (
-                <div key={project.id}>
-                  <ProjectCard
-                    project={project}
-                    completion={completion}
-                    isSelected={isSelected}
-                    isEditing={editingProject?.id === project.id}
-                    globalSelectedProjectId={globalSelectedProjectId}
-                    canModify={canModify}
-                    role={role}
-                    userId={user?.id || ''}
-                    editProjectName={editProjectName}
-                    editPlantName={editPlantName}
-                    editSupplyChainModel={editSupplyChainModel}
-                    editBomLevel={editBomLevel}
-                    editDataType={editDataType}
-                    editSimulationStart={editSimulationStart}
-                    editSimulationEnd={editSimulationEnd}
-                    onSelect={setSelectedProject}
-                    onGlobalSelect={setGlobalSelectedProjectId}
-                    onDownloadNodeList={handleDownloadNodeList}
-                    onGenerateNodeList={handleGenerateNodeList}
-                    onViewData={(project) => {
-                      setSelectedProject(project);
-                      setUploadingProject(null);
-                      setExpandedProjectId(expandedProjectId === project.id ? null : project.id);
-                    }}
-                    onUploadData={(project) => {
-                      setSelectedProject(project);
-                      setExpandedProjectId(null);
-                      setUploadingProject((current) =>
-                        current?.id === project.id ? null : project
-                      );
-                    }}
-                    onEditItemMaster={(project) => {
-                      setSelectedProject(project);
-                      setItemMasterProjectId((current) =>
-                        current === project.id ? null : project.id
-                      );
-                    }}
-                    onEdit={(project) => {
-                      setSelectedProject(project);
-                      setEditingProject(project);
-                      setEditProjectName(project.name);
-                      setEditPlantName(project.plant_name);
-                      setEditDataType(project.data_type || 'curated');
-                      setEditSupplyChainModel(project.supply_chain_model);
-                      setEditBomLevel(project.bom_level);
-                      setEditSimulationStart(project.simulation_start ? new Date(project.simulation_start) : undefined);
-                      setEditSimulationEnd(project.simulation_end ? new Date(project.simulation_end) : undefined);
-                    }}
-                    onDelete={handleDeleteProject}
-                    onCombine={handleCombineProject}
-                    onCancelEdit={() => setEditingProject(null)}
-                    onUpdateProject={handleUpdateProject}
-                    onEditProjectNameChange={setEditProjectName}
-                    onEditPlantNameChange={setEditPlantName}
-                    onEditSupplyChainModelChange={setEditSupplyChainModel}
-                    onEditBomLevelChange={setEditBomLevel}
-                    onEditDataTypeChange={setEditDataType}
-                    onEditSimulationStartChange={setEditSimulationStart}
-                    onEditSimulationEndChange={setEditSimulationEnd}
-                    onEditDeepTierEnabledChange={setEditDeepTierEnabled}
-                    editDeepTierEnabled={editDeepTierEnabled}
-                  />
-
-                  {expandedProjectId === project.id && (
-                    <div className="mt-4 ml-4 pl-4 border-l-2 border-border space-y-4">
-                       <ProjectDataViewer
-                         project={project}
-                         onClose={() => setExpandedProjectId(null)}
-                         onDataDeleted={() => {
-                           checkProjectDataCompletion(project.id).then((status) => {
-                             setProjectDataStatus((prev) => ({ ...prev, [project.id]: status }));
-                           });
-                         }}
-                       />
-                       {/* Complementary to the Upload Wizard above, never a replacement —
-                           docs/design/erp-mrp-integration-plan.md §2.0, §6c. */}
-                       <ErpConnectionsPanel projectId={project.id} />
-                    </div>
-                  )}
-                  {itemMasterProjectId === project.id && (
-                    <div className="mt-4 ml-4 pl-4 border-l-2 border-border">
-                      <ItemMasterEditor
-                        projectId={project.id}
-                        initialTab={
-                          walkToTable === 'materials' || walkToTable === 'products' || walkToTable === 'suppliers'
-                            ? walkToTable
-                            : undefined
-                        }
-                        onClose={() => setItemMasterProjectId(null)}
-                      />
-                    </div>
-                  )}
-                  {uploadingProject?.id === project.id && (
-                    <div className="mt-4 ml-4 pl-4 border-l-2 border-border">
-                      <UploadWizard
-                        selectedProject={uploadingProject}
-                        userId={user?.id || ''}
-                        onUploadComplete={async () => {
-                          console.log('🔄 Upload completion callback triggered for project:', project.name);
-                          
-                          try {
-                            // Step 1: Clear upload state immediately to prevent UI issues
-                            setUploadingProject(null);
-                            
-                            console.log('📊 Refreshing project status after upload...');
-                            
-                            // Step 2: Sequential async operations to prevent race conditions
-                            await new Promise(resolve => setTimeout(resolve, 200)); // Brief delay to ensure upload transaction completes
-                            
-                            // Step 3: Reload projects and check completion status
-                            await loadProjects();
-                            const updatedStatus = await checkProjectDataCompletion(project.id);
-                            setProjectDataStatus((prev) => ({ ...prev, [project.id]: updatedStatus }));
-                            
-                            console.log('📈 Updated project status:', updatedStatus);
-                            
-                            // Step 4: Check if project datasets are complete (excluding node list initially)
-                            const isCompleteByData = updatedStatus.bom && updatedStatus.inbound && updatedStatus.outbound;
-                            
-                            if (isCompleteByData && !updatedStatus.nodeList) {
-                              console.log('ℹ️ Core datasets complete. Skipping auto-completion to avoid timeouts in Multi Level BOM projects.');
-                              toast.success(`All datasets uploaded. Click "Refresh Data" to finalize project "${project.name}".`);
-                            } else {
-                              console.log('ℹ️ Upload complete, no additional processing needed');
-                            }
-                            
-                          } catch (completionError) {
-                            console.error('❌ Upload completion callback failed:', completionError);
-                            toast.error("Upload completed but status refresh failed. Please refresh the page.");
-                          }
-                        }}
-                        onClose={() => setUploadingProject(null)}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {projectList}
           </div>
         )}
           </div>

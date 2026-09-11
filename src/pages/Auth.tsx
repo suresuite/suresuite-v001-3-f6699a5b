@@ -70,7 +70,7 @@ const Auth = () => {
   const isBusy = isLoading || signedIn;
 
   return (
-    <div className="flex min-h-screen items-stretch bg-white text-[#171717]">
+    <div className="flex min-h-dvh items-stretch bg-white text-[#171717]">
       {/* Form column */}
       <div className="flex w-full shrink-0 grow-0 basis-auto flex-col justify-start border-[--hair-border] px-[clamp(1rem,5vw,76px)] pb-8 pt-9 md:w-auto md:basis-[clamp(420px,44%,600px)] md:border-r">
         <img

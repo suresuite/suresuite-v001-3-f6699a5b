@@ -138,6 +138,23 @@ export function PolicyHistorySheet({
   const parentLabel = (id: string | null) =>
     versions.find((v) => v.id === id)?.label || (id ? id.slice(0, 8) : "—");
 
+  // v2 §4C. The sheet is mounted by both platforms and already branches on
+  // `isMobile` for its side and its radius, so the skin rides that branch
+  // rather than a second prop: below `md` a version is a panel row — the
+  // outer rule around the list, the inner rule between entries, the 13.5px
+  // label and the mono sub-lines — instead of a stack of bordered cards,
+  // which is the second container style §12 rules out. Above `md` every
+  // class below is the literal it has always been.
+  const card = isMobile
+    ? "border-b border-[#e8e8ea] bg-white last:border-b-0"
+    : cn(SURFACE);
+  const label = isMobile
+    ? "truncate text-[length:var(--fs-row)] font-medium text-[#171717]"
+    : "truncate text-[12.5px] font-medium";
+  const meta = isMobile
+    ? "font-mono text-[length:var(--fs-micro)] tracking-[0.04em] text-[#525252]"
+    : "font-mono text-[11px] text-muted-foreground";
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -178,6 +195,12 @@ export function PolicyHistorySheet({
             </p>
           )}
 
+          <div
+            className={cn(
+              isMobile && "overflow-hidden rounded-[4px] border border-[#d4d4d4]",
+              !isMobile && "contents",
+            )}
+          >
           {versions.map((v) => {
             const isSelected = v.id === selectedVersionId;
             const refCount = (v.run_count ?? 0) + (v.card_count ?? 0);
@@ -186,10 +209,14 @@ export function PolicyHistorySheet({
             return (
               <div
                 key={v.id}
-                className={cn(SURFACE, "flex flex-col gap-1 p-2.5", isSelected && "border-foreground")}
+                className={cn(
+                  card,
+                  "flex flex-col gap-1 p-2.5",
+                  isSelected && (isMobile ? "bg-[#fafafa]" : "border-foreground"),
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-[12.5px] font-medium">{versionDisplayName(v)}</span>
+                  <span className={label}>{versionDisplayName(v)}</span>
                   <div className="flex shrink-0 items-center gap-1">
                     {referenced && (
                       <MonoChip>
@@ -203,12 +230,10 @@ export function PolicyHistorySheet({
                     {isSelected && <MonoChip color="#111111">selected</MonoChip>}
                   </div>
                 </div>
-                <span className="font-mono text-[11px] text-muted-foreground">
+                <span className={meta}>
                   {formatVersionWhen(v.created_at)} · {v.author_name || v.author_email || "unknown"}
                 </span>
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  parent {parentLabel(v.parent_version_id)}
-                </span>
+                <span className={meta}>parent {parentLabel(v.parent_version_id)}</span>
 
                 {editing ? (
                   <div className="mt-1 flex flex-col gap-1.5">
@@ -275,7 +300,12 @@ export function PolicyHistorySheet({
                   )
                 )}
 
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <div
+                  className={cn(
+                    "mt-1.5 flex flex-wrap items-center gap-2",
+                    "[&_button]:min-h-11 md:[&_button]:min-h-0",
+                  )}
+                >
                   <Button
                     variant="outline"
                     size="sm"
@@ -341,6 +371,7 @@ export function PolicyHistorySheet({
               </div>
             );
           })}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

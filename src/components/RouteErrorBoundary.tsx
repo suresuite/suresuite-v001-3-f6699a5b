@@ -13,7 +13,7 @@ interface FallbackProps {
  */
 function RouteErrorFallback({ error, onReset }: FallbackProps) {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-4">
         <h1 className="text-lg font-semibold text-foreground">This page hit a snag</h1>
         <p className="text-sm text-muted-foreground">

@@ -31,6 +31,7 @@ import {
   M,
   MobileActionBar,
   MobileChip,
+  MobileGroup,
   MobilePanel,
   MobileRow,
   MobileSegmented,
@@ -226,7 +227,12 @@ export function PolicySetupBar({
       needsSetup ? M.blocking : state === "done" ? M.process : state === "current" ? M.ink : M.idle;
 
     return (
-      <div className="mb-3 flex flex-col gap-3">
+      // Two bands: what the model IS (version, planning unit) and what there is
+      // left to configure. The band label is the desktop rail's own eyebrow —
+      // it names the group without spending a container on it (v2 §2), which is
+      // what lets the ink head below be the only one on the screen.
+      <div className="mb-3 flex flex-col gap-[var(--m-gap)]">
+        <MobileGroup label="Model setup">
         <MobilePanel label="Model version" counter={isSnapshot ? "Snapshot" : "Live"}>
           <MobileRow
             chevron={false}
@@ -259,8 +265,12 @@ export function PolicySetupBar({
           <MobileRow chevron={false} label="Horizon" value={horizon} />
           <MobileRow chevron={false} label="Unit mapping" sub={unitMap} />
         </MobilePanel>
+        </MobileGroup>
 
+        {/* The screen's one ink head (v2 §2): the stage list is what the user
+            is here to act on, and what still needs setup. */}
         <MobilePanel
+          tone="primary"
           label="Configure SC policies"
           counter={`${readyCount} / ${stages.length} ready`}
         >

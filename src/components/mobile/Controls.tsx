@@ -6,6 +6,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { useCompactChrome } from '@/hooks/useViewport';
 import { M_FADE } from './tokens';
 
 // ── Buttons ──────────────────────────────────────────────────────────────
@@ -26,11 +27,16 @@ interface MobileButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement
   weight?: ButtonWeight;
   /** Fill the remaining width rather than hugging the label. */
   block?: boolean;
+  /** The landscape band's height. 40px is still above the 44px touch floor
+   *  once the bar's own padding is counted, and it is only ever used inside
+   *  <MobileActionBar> (v2 §5.2). */
+  compact?: boolean;
 }
 
 export function MobileButton({
   weight = 'primary',
   block = false,
+  compact = false,
   className,
   ...rest
 }: MobileButtonProps) {
@@ -42,7 +48,8 @@ export function MobileButton({
         // `rounded-[6px]`, not `rounded-md`: tailwind.config.ts maps
         // rounded-sm|md|lg all to --radius (4px), so `md` would silently give
         // the panel's radius instead of the button's (spec §7).
-        'inline-flex h-[46px] items-center justify-center rounded-[6px] px-4',
+        'inline-flex items-center justify-center rounded-[6px] px-4',
+        compact ? 'h-[40px]' : 'h-[46px]',
         'text-[13.5px] font-semibold leading-none',
         'disabled:cursor-not-allowed disabled:opacity-45',
         block ? 'w-full min-w-0 flex-1' : 'shrink-0',
@@ -112,6 +119,12 @@ export function MobileActionBar({
   // unavailable — so the spacer is measured off the live bar rather than
   // frozen at 64, which would let the bar sit on the last 24px of the page
   // exactly when it is explaining why the user cannot proceed.
+  //
+  // Sideways, the band is 52px (6 + 40 + 6) and the tab bar beneath it is 52
+  // rather than 58 (v2 §5.2): a landscape phone has ~390px of height, and the
+  // portrait bands would spend a third of it on chrome. Nothing is removed —
+  // the same primary, the same secondary, the same note.
+  const compact = useCompactChrome();
   const barRef = React.useRef<HTMLDivElement>(null);
   const [barH, setBarH] = React.useState(BAR_BASE_H);
   React.useEffect(() => {
@@ -129,7 +142,13 @@ export function MobileActionBar({
       <div aria-hidden style={{ height: barH }} />
       <div
         ref={barRef}
-        className="fixed inset-x-0 z-40 border-t border-[#e4e4e4] bg-white px-4 pb-2.5 pt-2"
+        className={cn(
+          // The top rule touches the canvas, so it is the outer weight
+          // (#d4d4d4), not a row divider (v2 §2). The gutter is the screen's
+          // own, so the button's edge lands on the panel's edge above it.
+          'fixed inset-x-0 z-40 border-t border-[#d4d4d4] bg-white px-[var(--m-gutter)]',
+          compact ? 'pb-1.5 pt-1.5' : 'pb-2.5 pt-2',
+        )}
         style={{ bottom: 'var(--pi-chrome, 0px)' }}
       >
         {note != null && (
@@ -140,6 +159,7 @@ export function MobileActionBar({
         <div className="flex gap-2">
           {secondary && (
             <MobileButton
+              compact={compact}
               weight={secondary.weight ?? 'secondary'}
               onClick={secondary.onClick}
               disabled={secondary.disabled}
@@ -149,6 +169,7 @@ export function MobileActionBar({
           )}
           <MobileButton
             block
+            compact={compact}
             weight={primary.weight ?? 'primary'}
             onClick={primary.onClick}
             disabled={primary.disabled || primary.loading}

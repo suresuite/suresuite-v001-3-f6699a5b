@@ -7,7 +7,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { SURFACE, TH, TD, ROW_HOVER, StatusDot, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { AdminMobileList, AdminMobileRow, SURFACE, TH, TD, ROW_HOVER, StatusDot, EmptyRow, LoadingRow, useTableSort, useColumnFilters } from '@/components/admin/adminUi';
+import { M } from '@/components/mobile';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,52 +70,31 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
       actions={<AddOrgDialog actorArgs={actorArgs} onCreated={load} />}
     >
       {isMobile ? (
-        <div className={`${SURFACE} overflow-hidden`}>
-          {loading ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">Loading…</div>
-          ) : sorted.length === 0 ? (
-            <div className="px-4 py-14 text-center text-[13px] text-muted-foreground">No organizations yet.</div>
-          ) : (
-            sorted.map((o) => (
-              <div key={o.id} className="border-b border-[--hair-divider] p-3 last:border-b-0">
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{o.name}</span>
-                  <span className="shrink-0"><StatusDot tone={o.status === 'active' ? 'active' : 'error'} label={o.status} /></span>
-                </div>
-                <div className="mt-1.5 break-words font-mono text-[11px] text-muted-foreground">
-                  {o.slug} · {new Date(o.created_at).toLocaleDateString()}
-                </div>
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Members</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{o.members}</span>
-                  </span>
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Projects</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">{o.projects}</span>
-                  </span>
-                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-[3px] border border-[--zinc-border] px-1.5 py-px">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Cost MTD</span>
-                    <span className="font-mono text-[11.5px] tabular-nums text-foreground">${o.cost_mtd.toFixed(2)}</span>
-                  </span>
-                </div>
-                <div className="mt-2.5 flex justify-end">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => setRenameOrg(o)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
-                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => setAccessOrg(o)}><ShieldCheck className="mr-2 h-4 w-4" /> Access defaults…</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => toggleStatus(o)}>
-                        {o.status === 'active' ? <><Ban className="mr-2 h-4 w-4" /> Suspend</> : <><Undo2 className="mr-2 h-4 w-4" /> Reactivate</>}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <AdminMobileList
+          label="Organizations"
+          counter={`${sorted.length}`}
+          loading={loading}
+          empty={sorted.length === 0 ? 'No organizations yet.' : undefined}
+        >
+          {sorted.map((o) => (
+            <AdminMobileRow
+              key={o.id}
+              label={o.name}
+              dot={o.status === 'active' ? M.process : M.blocking}
+              sub={`${o.slug} · ${o.status} · ${o.members} members · ${o.projects} projects · created ${new Date(o.created_at).toLocaleDateString()}`}
+              value={`$${o.cost_mtd.toFixed(2)}`}
+              actions={[
+                { label: 'Rename…', onClick: () => setRenameOrg(o) },
+                { label: 'Access defaults…', onClick: () => setAccessOrg(o) },
+                {
+                  label: o.status === 'active' ? 'Suspend' : 'Reactivate',
+                  tone: o.status === 'active' ? 'danger' : 'default',
+                  onClick: () => toggleStatus(o),
+                },
+              ]}
+            />
+          ))}
+        </AdminMobileList>
       ) : (
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">

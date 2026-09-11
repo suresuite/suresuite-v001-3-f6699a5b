@@ -2,7 +2,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PAGE_GUTTER_BLEED } from './PageBody';
+import { PAGE_GUTTER_BLEED, PAGE_GUTTER_SKIN_BLEED } from './PageBody';
+import { useCompactChrome } from '@/hooks/useViewport';
 
 // The app header, published as three class constants.
 //
@@ -46,16 +47,16 @@ interface PageHeaderProps {
   onBack?: () => void;
   backLabel?: string;
   /**
-   * Wear the mobile skin below `md` (`docs/mobile-skin-spec.md` §4): a 19px
-   * title on the 96% canvas, a 16px gutter, no rule, no subtitle, and at most
-   * one right-hand element. Above `md` it is byte-identical to the header
-   * every other page renders.
+   * Wear the mobile skin below `md` (`docs/mobile-skin-spec.md` §4): a
+   * 17-21px title on the 93% canvas, the skin's fluid gutter, no rule, no
+   * subtitle, and at most one right-hand element. Above `md` it is
+   * byte-identical to the header every other page renders.
    *
    * This is a migration seam, not a permanent variant. It exists because the
-   * skin lands one surface at a time and a converted screen's 16px gutter must
-   * not drag the unconverted screens' fluid clamp with it — at 320px those are
-   * 16px and 12px, and a header 4px out of line with its own content reads as
-   * a bug. It comes out, along with the flag, when the last surface converts.
+   * skin lands one surface at a time and a converted screen's gutter must not
+   * drag the unconverted screens' with it — the two clamps are close now but
+   * not identical, and a header out of line with its own content reads as a
+   * bug. It comes out, along with the flag, when the last surface converts.
    */
   skin?: boolean;
 }
@@ -70,6 +71,8 @@ export function PageHeader({
   backLabel = 'Back',
   skin = false,
 }: PageHeaderProps) {
+  const compactChrome = useCompactChrome();
+
   return (
     <div
       className={cn(
@@ -82,13 +85,22 @@ export function PageHeader({
             'md:border-b md:bg-header-background/95 md:backdrop-blur-md',
         'mb-4 md:mb-5',
         skin && 'mb-3 md:mb-5',
-        PAGE_GUTTER_BLEED,
-        skin && '-mx-4 md:-mx-12',
+        skin ? PAGE_GUTTER_SKIN_BLEED : PAGE_GUTTER_BLEED,
       )}
     >
       {/* Inner padding mirrors the gutter on mobile and holds the audit's
           px-8 py-3.5 from `md` up (C3). */}
-      <div className={cn(PAGE_HEADER_ROW, skin && 'min-h-[46px] px-4 py-1.5 md:px-8 md:py-3.5')}>
+      <div
+        className={cn(
+          PAGE_HEADER_ROW,
+          skin && 'min-h-[46px] px-[var(--m-gutter)] py-1.5 md:px-8 md:py-3.5',
+          // A phone on its side has no band to spare for a 19px title, so the
+          // title drops to the desktop 15px scale and the row to the 44px
+          // touch floor — never below it, even here (v2 §5.2). The title does
+          // not move out of the header and nothing else in the band changes.
+          skin && compactChrome && 'min-h-11 py-1',
+        )}
+      >
         {onBack && (
           <button
             type="button"
@@ -112,7 +124,9 @@ export function PageHeader({
           <h1
             className={cn(
               PAGE_HEADER_TITLE,
-              skin && 'text-[19px] tracking-[-0.019em] text-[#18181b] md:text-[15px]',
+              skin &&
+                'text-[length:var(--fs-title)] tracking-[-0.019em] text-[#171717] md:text-[15px]',
+              skin && compactChrome && 'text-[15px]',
             )}
             title={title}
           >

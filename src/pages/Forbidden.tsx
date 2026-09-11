@@ -19,7 +19,7 @@ const Forbidden = ({ isCollapsed, setIsCollapsed }: ForbiddenProps) => {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="min-h-dvh bg-background flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center space-y-6">
           <div className="mx-auto h-14 w-14 rounded-full bg-muted flex items-center justify-center">
             <ShieldAlert className="h-7 w-7 text-muted-foreground" />

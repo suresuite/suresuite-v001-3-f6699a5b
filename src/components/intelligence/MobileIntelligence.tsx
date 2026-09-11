@@ -223,7 +223,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
         {/* An <h1>, not a <span>: this is the page title on this route, and it
             was the one app screen that rendered no h1 at all. */}
         <h1
-          className="min-w-0 truncate text-[19px] font-semibold leading-tight tracking-[-0.019em] text-[#18181b]"
+          className="min-w-0 truncate text-[length:var(--fs-title)] font-semibold leading-tight tracking-[-0.019em] text-[#171717]"
           title={threadTitle}
         >
           {threadTitle}
@@ -271,7 +271,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
     <div className="flex min-h-full flex-col justify-center gap-3 px-4 py-5">
       <div className="flex items-center justify-center gap-2.5">
         <span className="h-[26px] w-[26px] rounded-[4px] bg-[#18181b]" />
-        <span className="text-[19px] font-semibold tracking-[-0.019em] text-[#18181b]">
+        <span className="text-[length:var(--fs-title)] font-semibold tracking-[-0.019em] text-[#171717]">
           {greeting(userName)}
         </span>
       </div>
@@ -279,7 +279,10 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           container style, which the skin does not have (§12). It is one panel
           of rows now: badge, name, blurb, and the "needs project" chip where
           it applies. Same agents, same order, same handler. */}
-      <MobilePanel label="Choose an agent" counter={`${AGENTS.length}`}>
+      {/* The screen's one ink head: with no thread open, choosing the agent
+          IS the screen (v2 §2). The per-agent colour rides the row badge, so
+          the panel takes no accent of its own. */}
+      <MobilePanel tone="primary" label="Choose an agent" counter={`${AGENTS.length}`}>
         {AGENTS.map((a) => (
           <MobileRow
             key={a.id}
@@ -316,7 +319,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
 
   /* ── composer ────────────────────────────────────────────────────── */
   const composer = (
-    <div className="shrink-0 border-t border-[#e4e4e4] bg-white px-4 py-2.5">
+    <div className="shrink-0 border-t border-[#d4d4d4] bg-white px-[var(--m-gutter)] py-2.5">
       {/* §7 gives the composer the pill radius. It holds a textarea over a
           control row rather than the reference's single line, so the corners
           are 22px — a pill at the collapsed height, and still reading as one
@@ -331,7 +334,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           className="block w-full resize-none border-none bg-transparent px-4 pb-[9px] pt-[13px] text-[14.5px] leading-[1.5] text-[#18181b] outline-none placeholder:text-[#525252]"
           style={{ minHeight: COLLAPSED_MIN, overflow: "hidden" }}
         />
-        <div className="flex items-center gap-1.5 border-t border-t-[#e4e4e4] px-2 py-1.5">
+        <div className="flex items-center gap-1.5 border-t border-t-[#e8e8ea] px-2 py-1.5">
           {/* The one control row: project · model · mode as a single chip. */}
           <button
             type="button"
@@ -383,7 +386,7 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
             <span
               className={cn(
                 "grid h-8 w-8 place-items-center rounded-full",
-                canSend ? "bg-[#18181b] text-white" : "cursor-default bg-[#e4e4e4] text-[#a1a1a1]",
+                canSend ? "bg-[#18181b] text-white" : "cursor-default bg-[#d4d4d4] text-[#6b6b6b]",
               )}
             >
               <ArrowUp className="h-4 w-4" />
@@ -744,8 +747,9 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           // §2: the thread canvas is white — the conversation IS the page
           // here, so it gets the panel interior rather than the page ground.
           className="bg-white"
-          containerClassName="px-4 pb-[18px] pt-3.5"
+          containerClassName="px-[var(--m-gutter)] pb-[18px] pt-3.5"
           userBubbleClassName="rounded-[16px] rounded-br-[4px] px-3.5 py-2.5 text-[14.5px] leading-[1.5]"
+          skin
         />
       )}
 

@@ -6,9 +6,11 @@ import {
   MobileTabBar,
   MobileNavDrawer,
   MOBILE_TABBAR_H,
+  MOBILE_TABBAR_H_LANDSCAPE,
   MOBILE_TABBAR_BORDER,
 } from '@/components/MobileNav';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useCompactChrome } from '@/hooks/useViewport';
 import { cn } from '@/lib/utils';
 
 interface PageLayoutProps {
@@ -36,16 +38,23 @@ interface PageLayoutProps {
 // every render.
 const MOBILE_BREATHING_PX = 16;
 const MOBILE_CHROME_ONLY_BASE_PX = MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER;
+const MOBILE_CHROME_ONLY_LANDSCAPE_PX = MOBILE_TABBAR_H_LANDSCAPE + MOBILE_TABBAR_BORDER;
 
 export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayoutProps) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const isMobile = useIsMobile();
+  // A phone on its side wears the compact band (v2 §5.2). The reservation is
+  // derived from the same predicate the bar itself uses, so the two can never
+  // disagree about where the chrome starts.
+  const compactChrome = useCompactChrome();
 
-  const chromeOnlyPx = MOBILE_CHROME_ONLY_BASE_PX;
+  const chromeOnlyPx = compactChrome
+    ? MOBILE_CHROME_ONLY_LANDSCAPE_PX
+    : MOBILE_CHROME_ONLY_BASE_PX;
   const chromePx = chromeOnlyPx + MOBILE_BREATHING_PX;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       {/* sidebar is desktop-only now — the bottom tab bar + drawer replace it below md */}
       <div className="hidden md:block">
         <Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
@@ -62,12 +71,16 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
           // same clipping (measured: documentElement.scrollWidth stays at the
           // viewport width) without establishing a scrollport, and leaves
           // `position: fixed` descendants - MobileSheet is one - unclipped.
-          // The skin's 96% ground is the page canvas on every mobile screen
-          // (mobile skin spec §2), so it is painted once here rather than by
+          // The skin's 93% ground is the page canvas on every mobile screen
+          // (mobile skin spec §2, v2 §2), so it is painted once here rather than by
           // each converted surface — a screen whose own content is shorter
           // than the viewport would otherwise show the desktop 92% below it.
           // Released at `md`, where the desktop canvas is unchanged.
-          'min-h-screen overflow-x-clip bg-[hsl(var(--m-canvas))] md:bg-[hsl(var(--surface-sunken))]',
+          // `min-h-dvh`, not `min-h-screen`: `100vh` on a phone is the height
+          // the window has once the URL bar has collapsed, so the shell was
+          // taller than the viewport on first paint and the canvas resized
+          // mid-scroll (v2 §5.2). The utility falls back vh -> svh -> dvh.
+          'min-h-dvh overflow-x-clip bg-[hsl(var(--m-canvas))] md:bg-[hsl(var(--surface-sunken))]',
           'md:pb-10 md:transition-all md:duration-300',
           'ml-0',
           isCollapsed ? 'md:ml-14' : 'md:ml-48'

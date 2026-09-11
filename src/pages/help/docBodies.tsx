@@ -185,9 +185,13 @@ function ArchitectureDiagram() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border bg-card p-3">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-base font-semibold tabular-nums mt-1">{value}</div>
+    // v2 §2: below `md` a figure sits on the outer rule at the panel's radius;
+    // above it the docs card is untouched.
+    <div className="rounded-[4px] border border-[#d4d4d4] bg-card p-3 md:rounded-md md:border-border">
+      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252] md:text-xs md:font-sans md:tracking-wide md:text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 text-base font-semibold tabular-nums">{value}</div>
     </div>
   );
 }
@@ -195,7 +199,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 /** Body text wrapper — caps prose width so paragraphs stay scannable. */
 function Prose({ children }: { children: React.ReactNode }) {
   return (
-    <div className="max-w-[760px] space-y-5 text-[15px] leading-7 text-foreground/90">
+    <div className="max-w-[760px] space-y-5 text-[15px] leading-7 text-foreground/90 [text-wrap:pretty]">
       {children}
     </div>
   );
@@ -205,6 +209,10 @@ type GroupAccent = {
   text: string;
   border: string;
   bg: string;
+  /** The same wash, released below `md` (v2 §3: no fill larger than a chip).
+   *  Held as a literal because Tailwind scans source text — a class name
+   *  built at runtime is never generated. */
+  bgMd: string;
   chip: string;
   ring: string;
 };
@@ -214,6 +222,7 @@ const GROUP_ACCENT: Record<string, GroupAccent> = {
     text: "text-slate-600 dark:text-slate-300",
     border: "border-slate-400/70 dark:border-slate-500/60",
     bg: "bg-slate-500/5",
+    bgMd: "md:bg-slate-500/5",
     chip: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
     ring: "border-l-slate-400",
   },
@@ -221,6 +230,7 @@ const GROUP_ACCENT: Record<string, GroupAccent> = {
     text: "text-emerald-600 dark:text-emerald-400",
     border: "border-emerald-500/70",
     bg: "bg-emerald-500/5",
+    bgMd: "md:bg-emerald-500/5",
     chip: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     ring: "border-l-emerald-500",
   },
@@ -228,6 +238,7 @@ const GROUP_ACCENT: Record<string, GroupAccent> = {
     text: "text-violet-600 dark:text-violet-400",
     border: "border-violet-500/70",
     bg: "bg-violet-500/5",
+    bgMd: "md:bg-violet-500/5",
     chip: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
     ring: "border-l-violet-500",
   },
@@ -235,6 +246,7 @@ const GROUP_ACCENT: Record<string, GroupAccent> = {
     text: "text-sky-600 dark:text-sky-400",
     border: "border-sky-500/70",
     bg: "bg-sky-500/5",
+    bgMd: "md:bg-sky-500/5",
     chip: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
     ring: "border-l-sky-500",
   },
@@ -242,6 +254,7 @@ const GROUP_ACCENT: Record<string, GroupAccent> = {
     text: "text-amber-600 dark:text-amber-400",
     border: "border-amber-500/70",
     bg: "bg-amber-500/5",
+    bgMd: "md:bg-amber-500/5",
     chip: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
     ring: "border-l-amber-500",
   },
@@ -275,7 +288,16 @@ function Section({
   const a = accent ?? (group ? GROUP_ACCENT[group] : undefined) ?? GROUP_ACCENT.Overview;
   return (
     <section id={id} className="scroll-mt-24 space-y-6 pt-2">
-      <header className={cn("space-y-2 border-l-4 pl-4 pb-3 border-b rounded-r-sm", a.border, a.bg)}>
+      <header
+        className={cn(
+          // §3 caps a colour fill at a chip, so below `md` the group's tint is
+          // the 2px left rule alone and the wash is released; `md:` restores
+          // the documentation card exactly.
+          "space-y-2 border-l-2 pl-3 pb-3 border-b rounded-r-sm md:border-l-4 md:pl-4",
+          a.border,
+          a.bgMd,
+        )}
+      >
         {eyebrow && (
           <div className={cn("text-[11px] font-semibold uppercase tracking-[0.14em]", a.text)}>
             {eyebrow}
@@ -283,7 +305,9 @@ function Section({
         )}
         <div className="flex items-center gap-2.5">
           <Icon className={cn("h-5 w-5", a.text)} />
-          <h2 className="text-[22px] font-semibold tracking-tight">{title}</h2>
+          <h2 className="text-[length:clamp(19px,5vw,22px)] font-semibold tracking-tight [text-wrap:pretty]">
+            {title}
+          </h2>
         </div>
       </header>
       <div className="space-y-5">{children}</div>
@@ -694,15 +718,26 @@ function ScopeLegend() {
   );
 }
 
+/**
+ * A reference table's cell type (v2 §5.3).
+ *
+ * The docs' dense tables run at 10-11px, which is under the skin's floor for a
+ * table cell (12-12.5px) — legible on a monitor and not in daylight. Below
+ * `md` every cell steps up to 12px; `md:` hands the documentation literal
+ * straight back, so the desktop tables are unchanged.
+ */
+const DOC_CELL_10 = "text-[12px] md:text-[10px]";
+const DOC_CELL_11 = "text-[12px] md:text-[11px]";
+
 /** Dense six-column reference table used for both variables and policy parameters. */
 function Row6Table({ head, rows }: { head: typeof PARAM_HEAD; rows: Row6[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs border rounded-md">
+      <table className="w-full text-[12px] border rounded-[4px] md:rounded-md md:text-xs">
         <thead className="bg-muted/40 text-left">
           <tr>
             {head.map((h, i) => (
-              <th key={h} className={cn("px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap", i === 0 && FROZEN_CELL)}>
+              <th key={h} className={cn("px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap md:text-[10px]", i === 0 && FROZEN_CELL)}>
                 {h}
               </th>
             ))}
@@ -711,11 +746,11 @@ function Row6Table({ head, rows }: { head: typeof PARAM_HEAD; rows: Row6[] }) {
         <tbody className="[&_td]:px-2.5 [&_td]:py-2 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
           {rows.map((r, i) => (
             <tr key={i}>
-              <td className={cn("font-mono text-[11px] font-medium whitespace-nowrap", FROZEN_CELL)}>{r[0]}</td>
+              <td className={cn("font-mono font-medium whitespace-nowrap", DOC_CELL_11, FROZEN_CELL)}>{r[0]}</td>
               <td className="text-muted-foreground whitespace-nowrap">{r[1]}</td>
-              <td className="font-mono text-[10px]">{r[2]}</td>
-              <td className="font-mono text-[10px] whitespace-nowrap">{r[3]}</td>
-              <td className="font-mono text-[10px] whitespace-nowrap">{r[4]}</td>
+              <td className={cn("font-mono", DOC_CELL_10)}>{r[2]}</td>
+              <td className={cn("font-mono whitespace-nowrap", DOC_CELL_10)}>{r[3]}</td>
+              <td className={cn("font-mono whitespace-nowrap", DOC_CELL_10)}>{r[4]}</td>
               <td className="text-muted-foreground">{r[5]}</td>
             </tr>
           ))}
@@ -1245,7 +1280,7 @@ function PolicyCard({ p }: { p: Policy }) {
           </div>
         </div>
         <div className="text-xs text-muted-foreground">
-          constraint: <code className="text-[11px]">{p.constraint}</code>
+          constraint: <code className={DOC_CELL_11}>{p.constraint}</code>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -1271,11 +1306,11 @@ function PolicyCard({ p }: { p: Policy }) {
                 <tbody className="[&_td]:px-2.5 [&_td]:py-2 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
                   {p.hooks.map((h, i) => (
                     <tr key={i}>
-                      <td className={cn("font-mono text-[10px] whitespace-nowrap", FROZEN_CELL)}>{h[0]}</td>
-                      <td className="font-mono text-[10px]">{h[1]}</td>
-                      <td className="text-muted-foreground text-[11px]">{h[2]}</td>
-                      <td className="text-muted-foreground text-[11px]">{h[3]}</td>
-                      <td className="text-muted-foreground text-[11px]">{h[4]}</td>
+                      <td className={cn("font-mono whitespace-nowrap", DOC_CELL_10, FROZEN_CELL)}>{h[0]}</td>
+                      <td className={cn("font-mono", DOC_CELL_10)}>{h[1]}</td>
+                      <td className={cn("text-muted-foreground", DOC_CELL_11)}>{h[2]}</td>
+                      <td className={cn("text-muted-foreground", DOC_CELL_11)}>{h[3]}</td>
+                      <td className={cn("text-muted-foreground", DOC_CELL_11)}>{h[4]}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1452,8 +1487,8 @@ function DistTable({ caption, rows }: { caption: string; rows: DistRow[] }) {
           <tbody className="[&_td]:px-2.5 [&_td]:py-2 [&_tr]:border-t [&_tr:nth-child(even)]:bg-muted/20 align-top">
             {rows.map((r) => (
               <tr key={r.name}>
-                <td className={cn("font-mono text-[11px] font-medium whitespace-nowrap", FROZEN_CELL)}>{r.name}</td>
-                <td className="font-mono text-[11px]">{r.form}</td>
+                <td className={cn("font-mono font-medium whitespace-nowrap", DOC_CELL_11, FROZEN_CELL)}>{r.name}</td>
+                <td className={cn("font-mono", DOC_CELL_11)}>{r.form}</td>
                 <td className="text-muted-foreground text-[12px]">{r.notes}</td>
               </tr>
             ))}
@@ -1501,7 +1536,7 @@ function ResilienceIndexTable() {
             <tr key={r.comp}>
               <td className={cn("font-medium text-[13px] whitespace-nowrap", FROZEN_CELL)}>{r.comp}</td>
               <td className="font-mono text-xs whitespace-nowrap">{r.weight}</td>
-              <td className="font-mono text-[11px] whitespace-nowrap">{r.norm}</td>
+              <td className={cn("font-mono whitespace-nowrap", DOC_CELL_11)}>{r.norm}</td>
               <td className="text-muted-foreground text-[12px]">{r.note}</td>
             </tr>
           ))}

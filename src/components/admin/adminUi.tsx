@@ -7,6 +7,8 @@
 //   import { SURFACE, KX, TH, TD, StatusDot, Toggle, Segmented, MonoChip } from './adminUi';
 import { ReactNode, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { MobileSheet } from '@/components/shared/MobileSheet';
+import { M, MobilePanel, MobileRow } from '@/components/mobile';
 
 // ── Core treatment ──────────────────────────────────────────────────────────
 /** Card/table container: 4px corners, --hair-border rule, white surface. */
@@ -93,7 +95,9 @@ export function Toggle({
         // replaced and the desktop box tree is identical.
         'relative grid -m-[13px] h-11 w-[60px] place-items-center rounded-none bg-transparent p-0',
         "before:absolute before:h-[18px] before:w-[34px] before:rounded-full before:content-['']",
-        checked ? 'before:bg-foreground' : 'before:bg-[#e4e4e4]',
+        // The skin's toggle-off track is the outer rule weight (#d4d4d4); the
+        // `md:` half below keeps the literal desktop has always drawn.
+        checked ? 'before:bg-foreground' : 'before:bg-[#d4d4d4]',
         'md:static md:m-0 md:inline-flex md:h-[18px] md:w-[34px] md:items-center md:rounded-full md:p-[2px] md:transition-colors md:before:hidden',
         checked ? 'md:justify-end md:bg-foreground' : 'md:justify-start md:bg-[#e4e4e4]',
         disabled && 'opacity-55',
@@ -232,4 +236,137 @@ export function useColumnFilters<T>(rows: T[], getters: Record<string, (row: T) 
   }
 
   return { filtered, FilterTH };
+}
+
+// ── The admin section's mobile primitives (v2 §4B) ──────────────────────────
+//
+// Every admin page had a hand-rolled mobile card list: a SURFACE wrapper, one
+// `border-b p-3` block per record, an ad-hoc chip strip, and the record's
+// actions behind a `…` menu. That is a second container style (§12) and a
+// hidden control (§8). These two fold the lot into the panel, so the six
+// pages say the same thing the same way.
+
+/** One record: the identity, the columns that did not fit on the mono
+ *  sub-line, the ranked figure as the value, a status dot, and — when the
+ *  record has actions — the row that opens them. */
+export function AdminMobileRow({
+  label,
+  sub,
+  dot,
+  value,
+  onOpen,
+  actions,
+  actionsTitle,
+}: {
+  label: ReactNode;
+  sub?: ReactNode;
+  /** A hex from `M`, or one of the DotTone colours. */
+  dot?: string;
+  value?: ReactNode;
+  /** Tapping the row itself — a drill-down, where the page has one. */
+  onOpen?: () => void;
+  /** The record's actions, each a named row in a sheet rather than an item in
+   *  a `…` menu (§8). */
+  actions?: AdminAction[];
+  actionsTitle?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasActions = Boolean(actions?.length);
+
+  return (
+    <>
+      <MobileRow
+        label={label}
+        sub={sub}
+        dot={dot}
+        value={value}
+        onClick={onOpen ?? (hasActions ? () => setOpen(true) : undefined)}
+      />
+      {hasActions && onOpen && (
+        <MobileRow
+          label="Actions"
+          sub={actions!.map((a) => a.label).join(' · ')}
+          value={String(actions!.length)}
+          onClick={() => setOpen(true)}
+        />
+      )}
+      {hasActions && (
+        <MobileSheet
+          open={open}
+          title={actionsTitle ?? (typeof label === 'string' ? label : 'Actions')}
+          sub="Everything you can do to this record."
+          onClose={() => setOpen(false)}
+        >
+          <div className="flex flex-col">
+            {actions!.map((a) => (
+              <MobileRow
+                key={a.label}
+                label={a.label}
+                sub={a.sub}
+                dot={a.tone === 'danger' ? M.blocking : undefined}
+                disabled={a.disabled}
+                note={a.disabled ? a.disabledReason : undefined}
+                chevron={!a.disabled}
+                onClick={
+                  a.disabled
+                    ? undefined
+                    : () => {
+                        setOpen(false);
+                        a.onClick();
+                      }
+                }
+              />
+            ))}
+          </div>
+        </MobileSheet>
+      )}
+    </>
+  );
+}
+
+export interface AdminAction {
+  label: string;
+  sub?: string;
+  onClick: () => void;
+  tone?: 'default' | 'danger';
+  disabled?: boolean;
+  /** §8: a control that cannot be used is shown, disabled and explained. */
+  disabledReason?: string;
+}
+
+/** The list itself. `empty` and `loading` are states of the panel, not of a
+ *  card that appears in its place — the skin has one container. */
+export function AdminMobileList({
+  label,
+  counter,
+  loading,
+  empty,
+  emptyAction,
+  tone = 'secondary',
+  children,
+}: {
+  label: string;
+  counter?: ReactNode;
+  loading?: boolean;
+  empty?: string;
+  emptyAction?: ReactNode;
+  tone?: 'primary' | 'secondary';
+  children: ReactNode;
+}) {
+  return (
+    <MobilePanel label={label} counter={counter} tone={tone}>
+      {loading ? (
+        <p className="px-3 py-8 text-center text-[13px] text-[#525252]">Loading…</p>
+      ) : empty ? (
+        <div className="flex flex-col items-center gap-3 px-6 py-9 text-center">
+          <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+            {empty}
+          </span>
+          {emptyAction}
+        </div>
+      ) : (
+        children
+      )}
+    </MobilePanel>
+  );
 }

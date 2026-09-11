@@ -89,13 +89,16 @@ function toCitations(citations: Proposal["citations"]): string[] {
 }
 
 interface ProposalCardProps {
+  /** Wear the mobile skin (v2 §4C). Passed straight through to the view; the
+   *  container itself has no chrome of its own. */
+  skin?: boolean;
   proposalId: string | null | undefined;
   /** §17.4: offer a follow-up utterance (prefilled into the composer) — used
    * for the post-apply "save this decision to project memory" suggestion. */
   onSuggestUtterance?: (utterance: string) => void;
 }
 
-export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardProps) {
+export function ProposalCard({ proposalId, onSuggestUtterance, skin = false }: ProposalCardProps) {
   const { proposal, loading, approve, reject, retryApply, recordViewed } = useProposal(proposalId ?? null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -158,6 +161,7 @@ export function ProposalCard({ proposalId, onSuggestUtterance }: ProposalCardPro
   return (
     <>
       <ProposalCardView
+        skin={skin}
         proposal={view}
         onApprove={(id) => run(() => approve(id))}
         onReject={(id) => run(() => reject(id))}

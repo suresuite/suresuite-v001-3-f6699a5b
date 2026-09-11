@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AuthProvider } from '@/hooks/useAuth';
 import { CapabilitiesProvider } from '@/hooks/useCapabilities';
 import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
+import { ViewportProvider } from '@/hooks/useViewport';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -58,6 +59,10 @@ function App() {
         enableSystem={false}
         forcedTheme="light"
       >
+        {/* One viewport listener for the app (v2 §5.1). Everything that sizes
+            itself to the device reads this; nothing adds a resize listener of
+            its own. */}
+        <ViewportProvider>
         <AuthProvider>
           <CapabilitiesProvider>
           <GlobalProjectProvider>
@@ -215,6 +220,7 @@ function App() {
           </GlobalProjectProvider>
           </CapabilitiesProvider>
         </AuthProvider>
+        </ViewportProvider>
         <Toaster />
       </ThemeProvider>
     </QueryClientProvider>

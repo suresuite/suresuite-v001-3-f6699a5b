@@ -66,7 +66,7 @@ export default function OrbitMrpCallback() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-6">
+    <div className="flex items-center justify-center min-h-dvh p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Connect orbit-mrp</CardTitle>
