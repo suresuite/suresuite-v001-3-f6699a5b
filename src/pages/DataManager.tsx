@@ -1,6 +1,6 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,13 +18,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
+import { MobileSheet } from '@/components/shared/MobileSheet';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useRowBudget } from '@/hooks/useViewport';
 import {
   M,
   MobileButton,
   MobileGroup,
+  MobileHeaderSearch,
+  MobilePageHeader,
   MobilePanel,
-  MobileStatGrid,
+  MobileRow,
 } from '@/components/mobile';
 // import { cn } from '@/lib/utils';
 import { Toggle } from '@/components/ui/toggle';
@@ -58,6 +62,67 @@ interface DataManagerProps {
   setIsCollapsed: (value: boolean) => void;
 }
 
+// ── Mobile list redesign (v3 §2.1 / gap-close T5) ───────────────────────
+//
+// "Last opened" has no backing field — the project row carries no per-user
+// view timestamp. Tracked locally instead, the same way the global project
+// selection already persists itself (useGlobalProject.tsx): one localStorage
+// entry, written whenever a project's detail is opened. New, additive state,
+// sanctioned for this flow specifically (§0: v3 "changes three screens'
+// information architecture", Projects among them) — not the general v1/v2
+// "no new state" skin-only rule.
+const LAST_OPENED_KEY = 'suresuite.dataManager.lastOpenedProject';
+
+function recordLastOpened(projectId: string) {
+  try {
+    localStorage.setItem(LAST_OPENED_KEY, JSON.stringify({ id: projectId, ts: Date.now() }));
+  } catch {
+    // Private mode / storage disabled — Resume falls back to most-recent-created.
+  }
+}
+
+function readLastOpened() {
+  try {
+    const raw = localStorage.getItem(LAST_OPENED_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function relativeTime(ts) {
+  const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+
+// The one status derivation both the Resume panel's urgent-state line and
+// the Active rows' status dot read — real fields only (combine_status, the
+// same bom/inbound/outbound completeness ProjectCard already computes).
+// No run-rejection or data-gap language: that data isn't fetched here, and
+// v3 §6 is explicit — do not invent counts, and a fabricated status line is
+// the same defect in different clothing.
+function projectStatus(project, completion) {
+  if (project.combine_status === 'running') {
+    return { dot: M.process, label: 'combining data…' };
+  }
+  if (project.combine_status === 'failed') {
+    return { dot: M.blocking, label: 'combine failed — needs attention' };
+  }
+  const missing = [
+    !completion.bom && 'BOM',
+    !completion.inbound && 'inbound',
+    !completion.outbound && 'outbound',
+  ].filter(Boolean);
+  if (missing.length > 0) {
+    return { dot: M.firm, label: `draft — ${missing.join(', ')} missing` };
+  }
+  return { dot: M.idle, label: 'ready' };
+}
+
 const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   // Walk-to deep link (§8.2 findings → data): ?project=<id> expands the
   // project's data card; &item_master=<materials|products|suppliers> also
@@ -68,11 +133,20 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [uploadingProject, setUploadingProject] = useState<Project | null>(null);
   const [itemMasterProjectId, setItemMasterProjectId] = useState<string | null>(null);
+  // Mobile list redesign (v3 §2.1): which project's full detail — the
+  // existing <ProjectCard/> content, previously shown for every project at
+  // once — is open below its compact row. Desktop is untouched; ProjectCard
+  // there still renders unconditionally for every project, same as always.
+  const [openProjectId, setOpenProjectId] = useState<string | null>(null);
+  const [projectQuery, setProjectQuery] = useState('');
+  const [activeSheetOpen, setActiveSheetOpen] = useState(false);
+  const [sharedSheetOpen, setSharedSheetOpen] = useState(false);
   const walkToTable = searchParams.get('item_master');
   useEffect(() => {
     const walkToProject = searchParams.get('project');
     if (!walkToProject) return;
     setExpandedProjectId(walkToProject);
+    setOpenProjectId(walkToProject);
     if (walkToTable) setItemMasterProjectId(walkToProject);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -717,20 +791,70 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
 
   // The create form, hoisted so both chromes mount the same controls (§8).
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   // §13.4 — the numbers, as the one stat grid on the screen. Derived from the
-  // list already in hand; no new query, no new state (v2 §7).
+  // list already in hand; no new query, no new state (v2 §7). Desktop only
+  // now — §2.1 forbids KPI tiles on the mobile list.
   const completeCount = projects.filter((p) => {
     const c = getCompletionInfo(p);
     return c.bom && c.inbound && c.outbound;
   }).length;
 
+  // v3 §2.1 — Resume · Active · Shared with me. "Archived" is not built: no
+  // field in this data model marks a project archived (no status, no flag),
+  // and inventing one to fill the band would be exactly what §6 rules out —
+  // a count with nothing real behind it. Two real bands ship; Archived is
+  // flagged in the commit, not faked here.
+  //
+  // "Active" / "Shared with me" read real ownership (modeler_id), the
+  // closest real split to the two bands' intent — under a role that already
+  // sees every project (admin), most will land in "Shared with me" even
+  // though nothing was actually shared; that is the data model's limit, not
+  // an invented one.
+  const projectQueryLower = projectQuery.trim().toLowerCase();
+  const matchesQuery = (p: Project) =>
+    !projectQueryLower ||
+    p.name.toLowerCase().includes(projectQueryLower) ||
+    (p.plant_name ?? '').toLowerCase().includes(projectQueryLower);
+  const visibleProjects = projects.filter(matchesQuery);
+
+  // Resume reads visibleProjects too — "no filter chips, the three bands
+  // are the filter" (§2.1) means search narrows all three, Resume included.
+  const lastOpened = readLastOpened();
+  const resumeProject =
+    (lastOpened && visibleProjects.find((p) => p.id === lastOpened.id)) ||
+    [...visibleProjects].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )[0] ||
+    null;
+  // The Resume panel is its own loud panel (§2.1: "the screen's one loud
+  // panel") — pulled out of both other bands so it never shows twice.
+  const activeProjects = visibleProjects.filter(
+    (p) => p.modeler_id === user?.id && p.id !== resumeProject?.id,
+  );
+  const sharedProjects = visibleProjects.filter(
+    (p) => p.modeler_id !== user?.id && p.id !== resumeProject?.id,
+  );
+
+  const activeRowBudget = useRowBudget(2, 3, 5);
+  const shownActive = activeProjects.slice(0, activeRowBudget);
+
+  const openProject = (id: string) => {
+    setOpenProjectId((cur) => (cur === id ? null : id));
+    setActiveSheetOpen(false);
+    setSharedSheetOpen(false);
+    recordLastOpened(id);
+  };
+
   // The project list, hoisted so the mobile group and the desktop stack
   // mount the SAME cards with the same handlers — <ProjectCard> is what
-  // branches on the viewport, not this page (v2 §4B).
-  const projectList = (
-    <>
-          {projects.map((project) => {
+  // branches on the viewport, not this page (v2 §4B). A function now rather
+  // than an inline map, so the mobile compact-row list (below) can render
+  // the identical block for exactly the one project a row opened — the
+  // owner/dates/datasets/KPI content v3 §2.1 says belongs "in the project",
+  // not the list, is this block; it was always here, just always visible.
+  const renderProjectBlock = (project: Project) => {
             const completion = getCompletionInfo(project);
             const isSelected = selectedProject?.id === project.id;
 
@@ -885,9 +1009,8 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                 )}
               </div>
             );
-          })}
-    </>
-  );
+  };
+  const projectList = projects.map(renderProjectBlock);
   const createForm = (
     <>
             <div>
@@ -1013,61 +1136,66 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
             </div>
     </>
   );
+  // Not a tab-bar root (isMobileRootRoute) — reached from More, so T2 hides
+  // the tab bar here and the header's own back target is the only way out.
+  const newProjectAction = canModify && (
+    <Button onClick={handleOpenCreateForm} disabled={isCreating} size="sm">
+      <Plus className="h-4 w-4 mr-2" />
+      New Project
+    </Button>
+  );
+
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+      {/* v3 §1.1/§2.1: sibling before the padded content, detail variant (see
+          comment above) — the active-project badge doesn't fit the one-action
+          meta slot, so it stays out; "New Project" moves into the gutter as
+          the body's first band rather than the header, same move T4 makes for
+          AdminLayout's actions. Search rides the second row — pinned, so it
+          never scrolls away (§1.2) — matching name and plant name (the
+          closest real field to "description"; this project shape carries no
+          separate description text). */}
+      {isMobile && (
+        <MobilePageHeader variant="detail" title="Your Projects" onBack={() => navigate(-1)}>
+          <MobileHeaderSearch value={projectQuery} onChange={setProjectQuery} placeholder="Find a project" />
+        </MobilePageHeader>
+      )}
       <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
-        <PageHeader
-          skin={isMobile}
-          title="Your Projects"
-          subtitle={canModify
-            ? 'Create and manage your supply chain projects'
-            : 'View available projects'}
-          rightContent={
-            <div className="flex items-center space-x-2">
-              {selectedProject && (
-                /* A project name is user data and arbitrarily long, and this
-                   sits in the header's `shrink-0` right slot - unbounded, it
-                   pushes the row past the viewport (§2.5). Bounded here, and
-                   truncated on the inner span because `truncate` on a flex
-                   container does not ellipsize its own text. */
-                <Badge variant="secondary" className="max-w-[36vw] text-xs md:max-w-none">
-                  <span className="min-w-0 truncate" title={selectedProject.name}>
-                    {selectedProject.name}
-                  </span>
-                </Badge>
-              )}
-              {canModify && (
-                <Button
-                  onClick={handleOpenCreateForm}
-                  disabled={isCreating}
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Project
-                </Button>
-              )}
-            </div>
-          }
-        />
+        {!isMobile && (
+          <PageHeader
+            title="Your Projects"
+            subtitle={canModify
+              ? 'Create and manage your supply chain projects'
+              : 'View available projects'}
+            rightContent={
+              <div className="flex items-center space-x-2">
+                {selectedProject && (
+                  /* A project name is user data and arbitrarily long, and this
+                     sits in the header's `shrink-0` right slot - unbounded, it
+                     pushes the row past the viewport (§2.5). Bounded here, and
+                     truncated on the inner span because `truncate` on a flex
+                     container does not ellipsize its own text. */
+                  <Badge variant="secondary" className="max-w-[36vw] text-xs md:max-w-none">
+                    <span className="min-w-0 truncate" title={selectedProject.name}>
+                      {selectedProject.name}
+                    </span>
+                  </Badge>
+                )}
+                {newProjectAction}
+              </div>
+            }
+          />
+        )}
+        {isMobile && newProjectAction && (
+          <div className="mb-[var(--m-gap)]">{newProjectAction}</div>
+        )}
         <div className={isMobile ? 'flex flex-col gap-[var(--m-gap)]' : 'space-y-4'}>
-            {/* §13.4 — the numbers band, one stat grid, below `md` only. */}
-            {isMobile && projects.length > 0 && (
-              <MobileStatGrid
-                stats={[
-                  { label: 'Projects', value: String(projects.length) },
-                  {
-                    label: 'Data complete',
-                    value: String(completeCount),
-                    dot: completeCount === projects.length ? M.process : M.firm,
-                  },
-                  {
-                    label: 'Active',
-                    value: globalSelectedProjectId ? '1' : '0',
-                    dot: globalSelectedProjectId ? M.process : M.idle,
-                  },
-                ]}
-              />
-            )}
+            {/* v3 §2.1: no KPI tiles on the mobile list — the numbers this
+                grid carried move into the project (openProject's expanded
+                <ProjectCard/> block already has them). Desktop never showed
+                this grid either; MobileStatGrid is mobile-only by
+                construction (`@/components/mobile`'s own boundary), so
+                dropping it here is a removal, not a move. */}
 
             {/* Create New Project Form */}
         {isCreating && canModify && (
@@ -1120,11 +1248,140 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
           </Card>
           )
         ) : isMobile ? (
-          // Each project is a panel; the group names the band so no panel has
-          // to shout to say what the list is (v2 §2).
-          <MobileGroup label={`${projects.length} ${projects.length === 1 ? 'project' : 'projects'}`}>
-            {projectList}
-          </MobileGroup>
+          // v3 §2.1: one Resume panel (the screen's one loud panel), Active
+          // rows budgeted per device (v2 §5.4) with an All-N deferral sheet,
+          // Shared with me as a single count row. No Archived band — see the
+          // comment above `sharedProjects`. Tapping any row opens the SAME
+          // <ProjectCard/> block desktop always shows, inline below it —
+          // that block is where owner/dates/datasets/KPIs live now.
+          <>
+            {resumeProject && (() => {
+              const completion = getCompletionInfo(resumeProject);
+              const status = projectStatus(resumeProject, completion);
+              return (
+                <React.Fragment key={resumeProject.id}>
+                  <MobilePanel
+                    tone="primary"
+                    label="Last opened"
+                    counter={lastOpened ? relativeTime(lastOpened.ts) : 'new'}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openProject(resumeProject.id)}
+                      className="flex w-full flex-col gap-1 px-3 py-3 text-left"
+                    >
+                      <span className="text-[17px] font-semibold leading-tight text-[#171717]">
+                        {resumeProject.name}
+                      </span>
+                      <span
+                        className="font-mono text-[10.5px] leading-[1.45] tracking-[0.04em]"
+                        style={{ color: status.dot }}
+                      >
+                        {status.label}
+                      </span>
+                    </button>
+                  </MobilePanel>
+                  {openProjectId === resumeProject.id && renderProjectBlock(resumeProject)}
+                </React.Fragment>
+              );
+            })()}
+
+            {activeProjects.length > 0 && (
+              // A panel, not a bare MobileGroup — MobileGroup is a canvas
+              // label above a panel, not a container itself (v2 §2); every
+              // list in the skin is still the one black-headed panel.
+              <MobilePanel label="Active" counter={String(activeProjects.length)}>
+                {shownActive.map((project) => {
+                  const completion = getCompletionInfo(project);
+                  const status = projectStatus(project, completion);
+                  return (
+                    <React.Fragment key={project.id}>
+                      <MobileRow
+                        dot={status.dot}
+                        label={project.name}
+                        sub={status.label}
+                        onClick={() => openProject(project.id)}
+                      />
+                      {openProjectId === project.id && renderProjectBlock(project)}
+                    </React.Fragment>
+                  );
+                })}
+                {activeProjects.length > shownActive.length && (
+                  <MobileRow
+                    label={`All ${activeProjects.length} projects ›`}
+                    onClick={() => setActiveSheetOpen(true)}
+                  />
+                )}
+              </MobilePanel>
+            )}
+
+            {sharedProjects.length > 0 && (
+              <MobilePanel label="Shared with me" counter={String(sharedProjects.length)}>
+                <MobileRow
+                  label="View shared projects"
+                  onClick={() => setSharedSheetOpen(true)}
+                />
+              </MobilePanel>
+            )}
+
+            {visibleProjects.length === 0 && (
+              <MobilePanel label="Projects" counter="0">
+                <div className="flex flex-col items-center gap-3 px-6 py-9 text-center">
+                  <span className="text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
+                    No projects match “{projectQuery}”.
+                  </span>
+                  <MobileButton weight="secondary" onClick={() => setProjectQuery('')}>
+                    Clear search
+                  </MobileButton>
+                </div>
+              </MobilePanel>
+            )}
+
+            <MobileSheet
+              open={activeSheetOpen}
+              title={`Active · ${activeProjects.length}`}
+              sub="Every active project — tap one to open it."
+              onClose={() => setActiveSheetOpen(false)}
+            >
+              <div className="flex flex-col">
+                {activeProjects.map((project) => {
+                  const completion = getCompletionInfo(project);
+                  const status = projectStatus(project, completion);
+                  return (
+                    <MobileRow
+                      key={project.id}
+                      dot={status.dot}
+                      label={project.name}
+                      sub={status.label}
+                      onClick={() => openProject(project.id)}
+                    />
+                  );
+                })}
+              </div>
+            </MobileSheet>
+
+            <MobileSheet
+              open={sharedSheetOpen}
+              title={`Shared with me · ${sharedProjects.length}`}
+              onClose={() => setSharedSheetOpen(false)}
+            >
+              <div className="flex flex-col">
+                {sharedProjects.map((project) => {
+                  const completion = getCompletionInfo(project);
+                  const status = projectStatus(project, completion);
+                  return (
+                    <MobileRow
+                      key={project.id}
+                      dot={status.dot}
+                      label={project.name}
+                      sub={`${project.modeler_name} · ${status.label}`}
+                      onClick={() => openProject(project.id)}
+                    />
+                  );
+                })}
+              </div>
+            </MobileSheet>
+          </>
         ) : (
           <div className="space-y-4">
             {projectList}

@@ -20,6 +20,8 @@
 // treatment so every table/card is consistent. All data flow, RPCs, hooks and
 // interactive primitives (Button/Dialog/Select/Input/Checkbox) are unchanged.
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ApiCodeBlock, InlineCode, TableBlock, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
@@ -34,6 +36,7 @@ import {
   MobileChip,
   MobileGroup,
   MobileNote,
+  MobilePageHeader,
   MobilePanel,
   MobileRow,
   MobileSegmented,
@@ -459,6 +462,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
      `#F8D448` template download keeps its "begin here" fill, which is the one
      place in the skin that colour is allowed (§3). */
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<'keys' | 'quickstart' | 'notebook'>('keys');
   const [openKeyId, setOpenKeyId] = useState<string | null>(null);
   const [endpointsOpen, setEndpointsOpen] = useState(false);
@@ -1081,18 +1085,28 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
   if (isMobile) {
     return (
       <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-        <div className={PAGE_GUTTER_SKIN}>
-          <PageHeader
-            skin
-            title="Developer API"
-            subtitle="Drive SureSuite programmatically — API keys, scopes, and quickstarts for the /v1 gateway"
-            onRefresh={load}
-            refreshLoading={loading}
-          />
-
-          {/* Three peer views — exactly what §4 reserves the segmented control
-              for. Same three tabs, same names, same order as the desktop
-              TabsList. */}
+        {/* v3 §1.1: sibling before the gutter, detail variant — Developer API
+            isn't one of the tab bar's four roots (reached from More), so T2
+            hides the tab bar here and this back target is the only way out.
+            The three-view segmented is exactly the "peer views" case the
+            second row is for; refresh takes the one meta-slot action. */}
+        <MobilePageHeader
+          variant="detail"
+          title="Developer API"
+          onBack={() => navigate(-1)}
+          meta={
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              aria-label="Refresh"
+              title="Refresh"
+              className="relative -mr-1 grid h-[32px] w-[32px] shrink-0 place-items-center text-[#18181b] after:absolute after:-inset-1.5 after:content-['']"
+            >
+              <RefreshCcw className={cn('h-[16px] w-[16px]', loading && 'animate-spin')} />
+            </button>
+          }
+        >
           <MobileSegmented
             ariaLabel="Developer API views"
             value={tab}
@@ -1103,8 +1117,9 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
               { value: 'notebook', label: 'Notebook' },
             ]}
           />
-
-          <div className="mt-[var(--m-gap)] flex flex-col gap-[var(--m-gap)]">
+        </MobilePageHeader>
+        <div className={PAGE_GUTTER_SKIN}>
+          <div className="flex flex-col gap-[var(--m-gap)]">
             {tab === 'keys' ? mobileKeys : tab === 'quickstart' ? mobileQuickstart : mobileNotebook}
           </div>
 

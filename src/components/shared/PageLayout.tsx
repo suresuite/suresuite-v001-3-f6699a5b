@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import PasswordExpiryBanner from '@/components/PasswordExpiryBanner';
@@ -8,6 +9,7 @@ import {
   MOBILE_TABBAR_H,
   MOBILE_TABBAR_H_LANDSCAPE,
   MOBILE_TABBAR_BORDER,
+  isMobileRootRoute,
 } from '@/components/MobileNav';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useCompactChrome } from '@/hooks/useViewport';
@@ -43,14 +45,23 @@ const MOBILE_CHROME_ONLY_LANDSCAPE_PX = MOBILE_TABBAR_H_LANDSCAPE + MOBILE_TABBA
 export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayoutProps) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const isMobile = useIsMobile();
+  const { pathname } = useLocation();
+  // The tab bar is a root-only fixture (v3 §1.3): shown on the four tab
+  // routes (plus the drawer's own "More" root), hidden on everything pushed
+  // on top. `isMobileRootRoute` is the one list the bar and this reservation
+  // both read, so they cannot drift apart.
+  const isRootRoute = isMobileRootRoute(pathname);
   // A phone on its side wears the compact band (v2 §5.2). The reservation is
   // derived from the same predicate the bar itself uses, so the two can never
   // disagree about where the chrome starts.
   const compactChrome = useCompactChrome();
 
-  const chromeOnlyPx = compactChrome
-    ? MOBILE_CHROME_ONLY_LANDSCAPE_PX
-    : MOBILE_CHROME_ONLY_BASE_PX;
+  const barPx = compactChrome ? MOBILE_CHROME_ONLY_LANDSCAPE_PX : MOBILE_CHROME_ONLY_BASE_PX;
+  // Root route: the tab bar's own height is the chrome boundary, same as
+  // before. Pushed view: no bar to reserve for, so the boundary is the
+  // safe-area inset alone and an ordinary scrolling page gets just its
+  // breathing room on top of that (v3 §1.3 / T2).
+  const chromeOnlyPx = isRootRoute ? barPx : 0;
   const chromePx = chromeOnlyPx + MOBILE_BREATHING_PX;
 
   return (
@@ -109,12 +120,21 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
         {children}
       </div>
       <Footer isCollapsed={isCollapsed} hasNavBar />
-      <MobileTabBar moreActive={drawerOpen} onToggleMore={() => setDrawerOpen((v) => !v)} />
-      <MobileNavDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        bottomInsetPx={chromeOnlyPx}
-      />
+      {/* v3 §1.3: the bar is a root-only fixture, present for a whole screen
+          or absent for a whole screen — never rendered for a pushed view.
+          The drawer only opens from the bar's own More button, so gating it
+          the same way is a no-op on a root route and keeps a stray mount
+          from outliving the bar that owns it on a pushed one. */}
+      {isRootRoute && (
+        <>
+          <MobileTabBar moreActive={drawerOpen} onToggleMore={() => setDrawerOpen((v) => !v)} />
+          <MobileNavDrawer
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            bottomInsetPx={chromeOnlyPx}
+          />
+        </>
+      )}
     </div>
   );
 }

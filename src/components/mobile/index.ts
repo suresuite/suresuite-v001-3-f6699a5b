@@ -20,3 +20,4 @@ export { MobileScreen, MobileGroup, MobileGroupGrid } from './Screen';
 export { MobilePageHeader } from './PageHeader';
 export { ProjectChip } from './ProjectChip';
 export type { ProjectChipProject } from './ProjectChip';
+export { MobileHeaderSearch } from './HeaderSearch';
