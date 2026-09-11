@@ -39,6 +39,7 @@ import {
   MobileActionBar,
   MobileChip,
   MobileGroup,
+  MobilePageHeader,
   MobilePanel,
   MobileRow,
 } from '@/components/mobile';
@@ -100,29 +101,27 @@ export function MobileGettingStarted() {
   const meta = selectedProject ? projectMeta(selectedProject) : '';
 
   return (
-    <div className="flex flex-col gap-[var(--m-gap)] px-[var(--m-gutter)] pb-4">
-      {/* §4's title band: a 19px title and one right-hand element. The avatar
-          is that element — an icon-only control at the spec's 34px, with the
-          label and title an icon-only control always carries. */}
-      <div className="flex items-center justify-between gap-2.5 pt-1">
-        <h1
-          className="min-w-0 flex-1 truncate text-[length:var(--fs-title)] font-semibold leading-tight tracking-[-0.019em] text-[#171717]"
-          title="Getting started"
-        >
-          Getting started
-        </h1>
-        <Link
-          to="/profile"
-          aria-label="Your profile"
-          title="Your profile"
-          className="grid h-11 w-11 shrink-0 place-items-center"
-        >
-          <span className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[#18181b] font-mono text-[11px] font-semibold text-white">
-            {initial ?? <User className="h-4 w-4" />}
-          </span>
-        </Link>
-      </div>
-
+    <>
+      {/* The chrome contract's root header (v3 §1.1): destination name, and
+          the one right-hand element a root may carry — the avatar, at the
+          meta slot's 32px rather than the old 34px hit target. */}
+      <MobilePageHeader
+        variant="root"
+        title="Getting started"
+        meta={
+          <Link
+            to="/profile"
+            aria-label="Your profile"
+            title="Your profile"
+            className="grid h-8 w-8 shrink-0 place-items-center"
+          >
+            <span className="grid h-[30px] w-[30px] place-items-center rounded-full bg-[#18181b] font-mono text-[10.5px] font-semibold text-white">
+              {initial ?? <User className="h-3.5 w-3.5" />}
+            </span>
+          </Link>
+        }
+      />
+      <div className="flex flex-col gap-[var(--m-gap)] px-[var(--m-gutter)] pb-4">
       {/* ── Where you left off ─────────────────────────────────────────── */}
       <MobilePanel
         tone="primary"
@@ -184,7 +183,8 @@ export function MobileGettingStarted() {
           onClick: () => navigate('/project-manager'),
         }}
       />
-    </div>
+      </div>
+    </>
   );
 }
 

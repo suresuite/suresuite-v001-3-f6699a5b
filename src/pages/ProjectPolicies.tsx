@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { PAGE_GUTTER_SKIN } from "@/components/shared/PageBody";
-import { MobileSegmented } from "@/components/mobile";
+import { MobilePageHeader, MobileSegmented, ProjectChip } from "@/components/mobile";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Segmented } from "@/components/intelligence/piUi";
@@ -69,6 +70,7 @@ function useHorizon(
 }
 
 export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) {
+  const isMobile = useIsMobile();
   const {
     globalSelectedProjectId,
     setGlobalSelectedProjectId,
@@ -148,25 +150,52 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
+      {/* The chrome contract's root header (v3 §1.1): project chip and the
+          three-view segmented control both live on the header's second row,
+          pinned with the title, so search-in-header screens like Policies
+          never scroll their own switcher away. Desktop keeps the shared
+          <PageHeader> untouched below. */}
+      {isMobile && (
+        <MobilePageHeader variant="root" title="Policies">
+          {/* Stacked, not shared on one line, matching the Simulation Lab
+              root header — a chip beside the tabs leaves too little room for
+              either at 320-375px, and the two screens should read the same
+              way regardless (v3 §1.1). */}
+          <div className="flex w-full flex-col gap-2.5">
+            <ProjectChip
+              projects={projects}
+              selectedId={projectId}
+              onSelect={(id) => setGlobalSelectedProjectId(id)}
+            />
+            <MobileSegmented<"stages" | "guide" | "datamap">
+              className="w-full"
+              ariaLabel="Policies views"
+              value={tab}
+              onChange={setTab}
+              items={[
+                { value: "stages", label: "Policies" },
+                { value: "guide", label: "Guide" },
+                { value: "datamap", label: "Data map" },
+              ]}
+            />
+          </div>
+        </MobilePageHeader>
+      )}
       <div className={PAGE_GUTTER_SKIN}>
-        <PageHeader
-          skin
-          title="Supply chain policies"
-          subtitle={policyContextLine({
-            plant: ctx?.plant_name || selectedProject?.plant_name || "—",
-            model: selectedProject?.supply_chain_model || "—",
-            bom: selectedProject?.bom_level || "—",
-            suppliers: ctx?.supplier_count ?? 0,
-            plants: ctx?.plant_count ?? 0,
-            customers: ctx?.customer_count ?? 0,
-            strategy: fulfillmentStrategy,
-          })}
-          rightContent={
-            <>
-              {/* Below md the header holds the project select only; the tab
-                  switcher renders as the first thing in the content column.
-                  md:contents keeps it a direct rightContent child on desktop. */}
-              <span className="hidden md:contents">
+        {!isMobile && (
+          <PageHeader
+            title="Supply chain policies"
+            subtitle={policyContextLine({
+              plant: ctx?.plant_name || selectedProject?.plant_name || "—",
+              model: selectedProject?.supply_chain_model || "—",
+              bom: selectedProject?.bom_level || "—",
+              suppliers: ctx?.supplier_count ?? 0,
+              plants: ctx?.plant_count ?? 0,
+              customers: ctx?.customer_count ?? 0,
+              strategy: fulfillmentStrategy,
+            })}
+            rightContent={
+              <>
                 <Segmented<"stages" | "guide" | "datamap">
                   size="sm"
                   value={tab}
@@ -177,51 +206,25 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                     { value: "datamap", label: "Data map" },
                   ]}
                 />
-              </span>
-              <Select
-                value={projectId || ""}
-                onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
-              >
-                {/* The header's one right-hand element (§4). Below `md` it
-                    drops its box and reads as the quiet mono context line the
-                    skin puts beside a title; from `md` up it is the bordered
-                    select the desktop header has always had. */}
-                <SelectTrigger
-                  className="h-11 w-auto max-w-[46vw] gap-1.5 border-0 bg-transparent px-0
-                             font-mono text-[10.5px] tracking-[0.04em] text-[#525252]
-                             md:h-8 md:w-[210px] md:border md:border-input md:bg-background
-                             md:px-3 md:font-sans md:text-[12px] md:tracking-normal
-                             md:text-foreground"
+                <Select
+                  value={projectId || ""}
+                  onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
                 >
-                  <SelectValue placeholder="Select project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </>
-          }
-        />
-
-        {/* §13.2 — the segmented control is the screen's second band, directly
-            under the title. Same three peer views, same handler; only the
-            control's own chrome changes below `md`. */}
-        <div className="mb-3 md:hidden">
-          <MobileSegmented<"stages" | "guide" | "datamap">
-            ariaLabel="Policies views"
-            value={tab}
-            onChange={setTab}
-            items={[
-              { value: "stages", label: "Policies" },
-              { value: "guide", label: "Guide" },
-              { value: "datamap", label: "Data map" },
-            ]}
+                  <SelectTrigger className="h-8 w-[210px] gap-1.5">
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            }
           />
-        </div>
+        )}
 
         {!projectId ? (
           <Alert>
