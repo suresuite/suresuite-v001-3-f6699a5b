@@ -28,8 +28,7 @@ import { CHAT_MODELS, getModelLabel } from "@/components/chat/ModelPicker";
 import { AUTO_TOOLTIP, chatModesUiEnabled } from "@/components/chat/ModeSwitch";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { MobileSheet, MobileSheetRow } from "@/components/shared/MobileSheet";
-import { PAGE_HEADER_SHELL } from "@/components/shared/PageHeader";
-import { M, M_LABEL, M_MICRO, MobilePanel, MobileRow } from "@/components/mobile";
+import { M, M_LABEL, M_MICRO, MobilePageHeader, MobilePanel, MobileRow, ProjectChip } from "@/components/mobile";
 import { AGENT_COLOR, AGENT_MONO } from "./piUi";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageStream } from "./MessageStream";
@@ -193,77 +192,35 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
   const threadTitle = activeThread?.title ?? "New chat";
 
   /* ── header ──────────────────────────────────────────────────────── */
+  // v3 §1.1: the one PageHeader component, root variant — Ask is always a
+  // tab-bar root here (T0's read pass: the thread/evidence/thread-list split
+  // §4.1 assumes as separate PUSHED views doesn't exist yet — Chats is a
+  // sheet, evidence expands inline — so there is no "detail" state to swap
+  // into without inventing navigation the product doesn't have today; that
+  // restructuring is flagged, not built, in this pass). Meta slot holds the
+  // one sanctioned action — Chat options, unchanged in function (rename /
+  // delete / memory / files) from the icon this replaces. The active
+  // thread's name and the agent picker, which the old hand-rolled header
+  // carried alongside that title, move to the composer's control row below:
+  // the header has room for exactly one action (v3 §1.1), not three.
   const header = (
-    // Same chrome as every other page (PAGE_HEADER_SHELL/_ROW). It used to
-    // carry a hand-rolled copy: #fafafa instead of the header tint - a literal
-    // that ignores the dark theme - --hair-border instead of the header rule,
-    // and a bespoke gutter clamp that put this screen's left edge ~2px inboard
-    // of every other header. `shrink-0` stays: this header is a flex child of
-    // the fixed-height chat column, not a page-flow element.
-    <header
-      className={cn(
-        PAGE_HEADER_SHELL,
-        // The skin's header sits ON the canvas: no rule, no blur, no tint of
-        // its own, a flat 16px gutter, and a ~46px band (§4).
-        "shrink-0 border-b-0 bg-[hsl(var(--m-canvas))] backdrop-blur-none",
-        "flex min-h-[46px] items-center gap-2 px-4 py-1.5",
-      )}
-    >
-      <button
-        type="button"
-        onClick={() => setSheet("chats")}
-        aria-label="Chats"
-        title="Chats"
-        className="-ml-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#18181b]"
-      >
-        <MessageSquare className="h-[18px] w-[18px]" />
-      </button>
-
-      <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-        {/* An <h1>, not a <span>: this is the page title on this route, and it
-            was the one app screen that rendered no h1 at all. */}
-        <h1
-          className="min-w-0 truncate text-[length:var(--fs-title)] font-semibold leading-tight tracking-[-0.019em] text-[#171717]"
-          title={threadTitle}
-        >
-          {threadTitle}
-        </h1>
-        {/* §2.4: padding grows the hit area to 44px, the negative margin
-            returns the space so the line sits exactly where it looks. */}
+    <MobilePageHeader
+      variant="root"
+      title="Ask"
+      meta={
         <button
           type="button"
-          onClick={() => setSheet("agents")}
-          aria-label={agent ? agent.name + " — change agent" : "Choose an agent"}
-          className="-my-[11px] flex min-h-11 max-w-full items-center gap-1.5 self-start py-[11px]"
+          onClick={() => setSheet("menu")}
+          aria-label="Chat options"
+          title="Chat options"
+          className="relative -mr-1 grid h-[32px] w-[32px] shrink-0 place-items-center text-[#18181b] after:absolute after:-inset-1.5 after:content-['']"
         >
-          {/* The agent badge is the skin's mono chip: a filled 3px tag, the
-              largest a colour fill is allowed to get (§3, §7). */}
-          <span
-            className="shrink-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white"
-            style={{ background: agent ? AGENT_COLOR[agent.id] ?? M.ink : M.quiet }}
-          >
-            {agent ? AGENT_MONO[agent.id] ?? "GA" : "··"}
-          </span>
-          <span className={cn(M_MICRO, "min-w-0 truncate")}>
-            {agent ? agent.name : "Choose an agent"}
-          </span>
-          {modesOn && threadMode === "review" && (
-            <span className={cn(M_MICRO, "shrink-0 whitespace-nowrap")}>· review</span>
-          )}
-          <ChevronDown className="h-3 w-3 shrink-0 text-[#525252]" />
+          <MoreVertical className="h-[18px] w-[18px]" />
         </button>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setSheet("menu")}
-        aria-label="Chat options"
-        title="Chat options"
-        className="-mr-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#18181b]"
-      >
-        <MoreVertical className="h-[18px] w-[18px]" />
-      </button>
-    </header>
+      }
+    >
+      <ProjectChip projects={projects} selectedId={projectId} onSelect={onProjectChange} />
+    </MobilePageHeader>
   );
 
   /* ── empty state ─────────────────────────────────────────────────── */
@@ -334,8 +291,37 @@ export function MobileIntelligence(props: MobileIntelligenceProps) {
           className="block w-full resize-none border-none bg-transparent px-4 pb-[9px] pt-[13px] text-[14.5px] leading-[1.5] text-[#18181b] outline-none placeholder:text-[#525252]"
           style={{ minHeight: COLLAPSED_MIN, overflow: "hidden" }}
         />
-        <div className="flex items-center gap-1.5 border-t border-t-[#e8e8ea] px-2 py-1.5">
-          {/* The one control row: project · model · mode as a single chip. */}
+        <div className="flex items-center gap-1 border-t border-t-[#e8e8ea] px-1.5 py-1.5">
+          {/* Chats and the agent picker used to live in the header, which the
+              chrome contract gives room for exactly one action (v3 §1.1,
+              spent on Chat options in the meta slot above). Both are still
+              one tap away, just relocated to this row rather than dropped. */}
+          <button
+            type="button"
+            onClick={() => setSheet("chats")}
+            aria-label="Chats"
+            title="Chats"
+            className="grid h-11 w-11 shrink-0 place-items-center text-[#525252]"
+          >
+            <MessageSquare className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSheet("agents")}
+            aria-label={agent ? agent.name + " — change agent" : "Choose an agent"}
+            title={agent ? agent.name + " — change agent" : "Choose an agent"}
+            className="grid h-11 w-11 shrink-0 place-items-center"
+          >
+            <span
+              className="shrink-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white"
+              style={{ background: agent ? AGENT_COLOR[agent.id] ?? M.ink : M.quiet }}
+            >
+              {agent ? AGENT_MONO[agent.id] ?? "GA" : "··"}
+            </span>
+          </button>
+
+          {/* project · model · mode as a single chip. */}
           <button
             type="button"
             onClick={() => setSheet("setup")}
