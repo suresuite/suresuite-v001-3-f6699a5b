@@ -22,7 +22,7 @@ import { PAGE_HEADER_SHELL, PAGE_HEADER_ROW } from '@/components/shared/PageHead
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useCompactChrome } from '@/hooks/useViewport';
-import { MOBILE_ROOT_ROUTES } from './mobileRootRoutes';
+import { MOBILE_TAB_ROUTES } from './mobileRootRoutes';
 
 /** Bottom-chrome geometry, in px, published so PageLayout reserves space FROM
  *  these rather than from a hand-summed literal. Change a height here and the
@@ -37,14 +37,15 @@ export const MOBILE_TABBAR_H = 58;      // min-h-[58px] on each tab
 export const MOBILE_TABBAR_H_LANDSCAPE = 52;
 export const MOBILE_TABBAR_BORDER = 1;  // border-t
 
-// Route strings come from MOBILE_ROOT_ROUTES (mobileRootRoutes.ts) — the same
-// list `isMobileRootRoute` reads below, so the tab bar and the allowlist that
-// decides where it renders can never name a different set of roots.
+// Route strings come from MOBILE_TAB_ROUTES (mobileRootRoutes.ts) — these are
+// the four routes that get a highlighted tab. D3-a: many more routes than
+// these four are "roots" and still show the bar (just with no item active) —
+// see isMobileRootRoute, a separate, broader concern.
 const TABS = [
-  { to: MOBILE_ROOT_ROUTES[0], label: 'Home', icon: Home },
-  { to: MOBILE_ROOT_ROUTES[1], label: 'Policies', icon: SlidersHorizontal },
-  { to: MOBILE_ROOT_ROUTES[2], label: 'Lab', icon: FlaskConical },
-  { to: MOBILE_ROOT_ROUTES[3], label: 'AI', icon: Brain },
+  { to: MOBILE_TAB_ROUTES[0], label: 'Home', icon: Home },
+  { to: MOBILE_TAB_ROUTES[1], label: 'Policies', icon: SlidersHorizontal },
+  { to: MOBILE_TAB_ROUTES[2], label: 'Lab', icon: FlaskConical },
+  { to: MOBILE_TAB_ROUTES[3], label: 'AI', icon: Brain },
 ] as const;
 
 /** Re-exported so `PageLayout` and `MobileSheet` import their root-route
@@ -91,6 +92,12 @@ export function MobileTabBar({
       aria-label="Primary"
     >
       {TABS.map(({ to, label, icon: Icon }) => {
+        // D3-a: a root with no tab of its own (a network lens, Developer
+        // API, Super Admin, …) shows this bar but matches none of the four
+        // routes below — every item, More included, is simply inactive.
+        // Nothing extra to do here; this is just the existing route match
+        // returning false for all five, which is the whole of "no item
+        // active, no marker bar" the contract asks for.
         const active = !moreActive && (pathname === to || pathname.startsWith(to + '/'));
         return (
           <Link key={to} to={to} aria-current={active ? 'page' : undefined} className={tab(active)}>

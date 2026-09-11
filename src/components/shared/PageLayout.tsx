@@ -46,10 +46,10 @@ export function PageLayout({ children, isCollapsed, setIsCollapsed }: PageLayout
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const isMobile = useIsMobile();
   const { pathname } = useLocation();
-  // The tab bar is a root-only fixture (v3 §1.3): shown on the four tab
-  // routes (plus the drawer's own "More" root), hidden on everything pushed
-  // on top. `isMobileRootRoute` is the one list the bar and this reservation
-  // both read, so they cannot drift apart.
+  // D3-a: the bar hides if and only if the screen was pushed onto a stack
+  // (a back arrow in its header) — every root shows it, including a root
+  // with no tab of its own. `isMobileRootRoute` is the one predicate the
+  // bar and this reservation both read, so they cannot drift apart.
   const isRootRoute = isMobileRootRoute(pathname);
   // A phone on its side wears the compact band (v2 §5.2). The reservation is
   // derived from the same predicate the bar itself uses, so the two can never

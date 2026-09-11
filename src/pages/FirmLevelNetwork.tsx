@@ -35,7 +35,6 @@ import {
   Map,
   Building2,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import MLPrediction from '@/components/MLPrediction';
@@ -149,7 +148,6 @@ function getTierFromDepth(depth: number | null, isPlant: boolean = false): TierK
 export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLevelNetworkProps) {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -1137,21 +1135,19 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      {/* v3 §1.1/§1.4: sibling before the gutter. Not one of the tab bar's
-          four roots (reached from More), so T2 hides the tab bar and this
-          back target is the only way out — detail variant, not root. The
-          chip stays despite that: it's the one real capability this screen
-          would otherwise lose (project switching), the desktop <Select>
-          below is the only place it lives today, and GAP-CLOSE T4 names it
-          explicitly for Network. Refresh is the one meta-slot action; the
-          search/analytics/map/recalculate controls stay desktop-only exactly
-          as before (`hidden md:contents`), so nothing that already worked on
-          mobile is lost. */}
+      {/* v3 §1.1/§1.4, D3-a: sibling before the gutter, root variant — Network
+          isn't one of the tab bar's four labelled tabs, but it IS a root
+          (reached from More) and D3-a's design review is explicit that it
+          keeps the tab bar (no item active), not a back arrow. The chip
+          rides the second row exactly as GAP-CLOSE T4 names it for Network.
+          Refresh is the one meta-slot action; the search/analytics/map/
+          recalculate controls stay desktop-only exactly as before
+          (`hidden md:contents`), so nothing that already worked on mobile
+          is lost. */}
       {isMobile && (
         <MobilePageHeader
-          variant="detail"
+          variant="root"
           title="Firm-Level Network Intelligence"
-          onBack={() => navigate(-1)}
           meta={
             <button
               type="button"
