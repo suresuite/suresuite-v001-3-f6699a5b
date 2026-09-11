@@ -68,13 +68,14 @@ const PEOPLE: Person[] = [
   {
     slug: 'phu-nguyen',
     num: '01',
-    role: 'Technical lead',
+    role: 'Technical lead & Product Owner',
     name: 'Phu Nguyen',
     title: 'Research associate, Digital-AI Supply Chain Lab',
     bio: (
       <>
         He designs and builds SuReSuite end to end — the discrete-event simulation engine, the
-        three-lens network model, the policy library, and the workspace around them. Co-author of{' '}
+        three-lens network model, the policy library, the workspace around them, and the supply
+        chain intelligent agents that bring it to life. Co-author of{' '}
         <em>Introduction to Operations and Supply Chain Simulation with AnyLogic</em> (Springer,
         2025).
       </>
