@@ -404,9 +404,9 @@ export default function Landing() {
                   The depth of a research lab, the speed of a workspace.
                 </h2>
               </div>
-              {/* v2 §5.6: auto-fit with a `min()` floor, so a single column at
-                  320px never overflows and no cell is orphaned on the way up. */}
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-px overflow-hidden rounded-md border border-border bg-border">
+              {/* Fixed 3x3 grid on desktop for the 9 cards; stacks down to 2 then 1
+                  column on narrower viewports. */}
+              <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
                 {WHY_TEAMS.map((item, i) => {
                   const Icon = item.icon;
                   return (
