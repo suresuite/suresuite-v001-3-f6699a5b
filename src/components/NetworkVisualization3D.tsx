@@ -342,14 +342,14 @@ const NetworkVisualization3D = () => {
   // Widen fov and pull the camera back on mobile so the stack still fits a
   // narrow, short box; pulling the camera back (rather than rescaling the
   // scene) keeps relative proportions and label anchors correct.
-  const fov = isMobile ? 56 : 50;
+  const fov = isMobile ? 48 : 50;
   const cameraZ = isMobile ? 9 : 8.4;
 
   return (
     <div className="relative w-full h-full overflow-hidden">
       <Canvas
         className="!absolute !inset-0"
-        camera={{ position: [-3, 4, cameraZ], fov }}
+        camera={{ position: [-3, 5, cameraZ], fov }}
         style={{ background: 'transparent' }}
         dpr={[1, 2]}
         frameloop={reducedMotion ? 'demand' : 'always'}
