@@ -337,8 +337,15 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
           onProjectChange={handleGlobalProjectChange}
           threads={threads}
           model={model}
+          onModelChange={handleModelChange}
           newThread={newThread}
           updateThread={updateThread}
+          // The same prop set the desktop ChatSidebar spreads (see
+          // `sidebarProps`'s own comment) — carries a few desktop-only fields
+          // (onSelectThread, syncEnabled, …) the mobile Chats screen's own
+          // prop type just doesn't name, which a spread onto it is free to
+          // ignore.
+          chat={sidebarProps}
         />
       </PageLayout>
     );

@@ -72,6 +72,13 @@ export interface ChatMessage {
   parts?: ChatPart[];
   toolCalls?: ChatToolCall[];
   createdAt: number;
+  /** The persona (`thread.agentId` shape) that produced an assistant turn —
+   * absent on a user message. A thread's persona can change between sends
+   * (SC Intelligences handoff §7: "ask the other" routes the next turn to a
+   * different intelligence without opening a new thread), so this is the
+   * per-message record of who actually answered, not just the thread's
+   * current default. */
+  agentId?: string | null;
 }
 
 interface ChatApiResponse {
@@ -239,6 +246,7 @@ export function useProjectChat(threadId: string | null) {
           parts: data2.parts,
           toolCalls: data2.toolCalls,
           createdAt: Date.now(),
+          agentId,
         };
         const withAssistant = [...withUser, assistant];
         setMessages(withAssistant);
@@ -302,6 +310,7 @@ export function useProjectChat(threadId: string | null) {
           parts: data.parts,
           toolCalls: data.toolCalls,
           createdAt: Date.now(),
+          agentId: thread?.agentId ?? null,
         };
         const next = [...messagesRef.current, assistant];
         setMessages(next);

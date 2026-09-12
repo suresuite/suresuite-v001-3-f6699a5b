@@ -12,6 +12,7 @@ import { MobilePageHeader, MobilePanel, MobileRow, ProjectChip } from "@/compone
 import { IntelBadge } from "../primitives";
 import { getIntel, personaToIntelId } from "../intel";
 import { formatElapsed } from "../format";
+import { isProposalViewed } from "../viewedFlags";
 import type { Thread } from "@/hooks/useChatThreads";
 import type { Proposal } from "@/hooks/useProposals";
 
@@ -25,6 +26,11 @@ export interface RootProps {
   onOpenThread: (id: string) => void;
   onOpenRoster: () => void;
   onOpenProposal: (id: string) => void;
+  onOpenAllProposals: () => void;
+  /** Raised (unprompted) proposals open their own flag screen, not the
+   *  normal proposal review — opening it is what clears its unread dot. */
+  onOpenFlag: (id: string) => void;
+  onOpenChats: () => void;
 }
 
 function lastAssistant(t: Thread) {
@@ -50,6 +56,9 @@ export function Root({
   onOpenThread,
   onOpenRoster,
   onOpenProposal,
+  onOpenAllProposals,
+  onOpenFlag,
+  onOpenChats,
 }: RootProps) {
   const scoped = React.useMemo(
     () => threads.filter((t) => !projectId || t.projectId === projectId).filter((t) => t.messages.length > 0),
@@ -66,6 +75,7 @@ export function Root({
   // asked — the honest signal for "the intelligences raised this on their
   // own" rather than something a client-side flag has to invent.
   const raised = scopedProposals.filter((p) => !p.thread_id);
+  const raisedUnreadCount = raised.filter((p) => !isProposalViewed(p.id)).length;
 
   return (
     <>
@@ -121,6 +131,7 @@ export function Root({
               />
             );
           })}
+          <MobileRow onClick={onOpenChats} label="Manage all chats" chevron />
         </MobilePanel>
 
         {/* 3 · Proposals · N — only when N > 0. */}
@@ -135,22 +146,26 @@ export function Root({
                 sub="awaiting your decision"
               />
             ))}
+            <MobileRow onClick={onOpenAllProposals} label={`All proposals · ${scopedProposals.length}`} chevron />
           </MobilePanel>
         )}
 
         {/* 4 · Raised by this project — unprompted findings, never generic
-            sample questions (§5). */}
+            sample questions (§5). Amber-accented: this is the unprompted-flag
+            surface, and the first unread row carries its own dot. */}
         {raised.length > 0 && (
-          <MobilePanel label="Raised by this project" counter={raised.length}>
+          <MobilePanel label="Raised by this project" counter={raised.length} accent="#e0930b">
             {raised.map((p) => {
               const intel = getIntel(p.agent_id);
               const domain = intel.reads.split(" · ")[0];
+              const unread = !isProposalViewed(p.id);
               return (
                 <MobileRow
                   key={p.id}
-                  onClick={() => onOpenProposal(p.id)}
+                  onClick={() => onOpenFlag(p.id)}
+                  dot={unread ? "#e0930b" : undefined}
                   leading={<IntelBadge id={p.agent_id} />}
-                  label={p.title}
+                  label={unread ? <span className="font-semibold">{p.title}</span> : p.title}
                   sub={`${intel.badge} · from ${domain}`}
                 />
               );

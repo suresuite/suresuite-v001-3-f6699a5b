@@ -1,4 +1,25 @@
 /** Small formatting helpers shared across the SC Intelligences mobile screens. */
+import type { AttachedItem } from "./screens/AttachContextSheet";
+
+/** Folds an attach-context selection into the outgoing question as a plain
+ *  context header — there is no separate context-payload field on the chat
+ *  API today, so this is the honest way to make an attachment actually
+ *  affect the answer rather than just decorate the composer. */
+export function withAttachedContext(text: string, attached: AttachedItem[]): string {
+  if (attached.length === 0) return text;
+  return `Context: ${attached.map((a) => a.label).join(", ")}\n\n${text}`;
+}
+
+const CONTEXT_PREFIX_RE = /^Context: (.+)\n\n([\s\S]*)$/;
+
+/** The inverse of `withAttachedContext`, for rendering a sent turn (§6.1):
+ *  the attached-context line renders as its own mono line beneath the
+ *  bubble rather than inside the question's own prose. */
+export function splitAttachedContext(content: string): { context: string | null; text: string } {
+  const m = content.match(CONTEXT_PREFIX_RE);
+  if (!m) return { context: null, text: content };
+  return { context: m[1], text: m[2] };
+}
 
 /** "2h", "3d" — the root's Open-section elapsed mark (§5.2). */
 export function formatElapsed(fromMs: number, nowMs: number = Date.now()): string {

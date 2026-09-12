@@ -22,6 +22,9 @@ import { PAGE_HEADER_SHELL, PAGE_HEADER_ROW } from '@/components/shared/PageHead
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useCompactChrome } from '@/hooks/useViewport';
+import { useGlobalProject } from '@/hooks/useGlobalProject';
+import { useProposals } from '@/hooks/useProposals';
+import { hasUnreadRaisedFlag } from './intelligence/mobile/viewedFlags';
 import { MOBILE_TAB_ROUTES } from './mobileRootRoutes';
 
 /** Bottom-chrome geometry, in px, published so PageLayout reserves space FROM
@@ -69,6 +72,12 @@ export function MobileTabBar({
 }) {
   const { pathname } = useLocation();
   const compact = useCompactChrome();
+  // The unprompted-flag surface's dot (SC Intelligences handoff): a raised
+  // (thread-less) proposal that hasn't been opened yet, scoped to whichever
+  // project the app has selected — the same scope the SC Intel root uses.
+  const { globalSelectedProjectId } = useGlobalProject();
+  const { proposals } = useProposals(globalSelectedProjectId);
+  const unreadFlag = hasUnreadRaisedFlag(proposals, globalSelectedProjectId);
 
   // The skin's tab bar (spec §4): 58px, white, a #d4d4d4 rule along the top,
   // a 19px icon over a 10px/600 label. Active is ink, inactive is the ink
@@ -101,9 +110,18 @@ export function MobileTabBar({
         // returning false for all five, which is the whole of "no item
         // active, no marker bar" the contract asks for.
         const active = !moreActive && (pathname === to || pathname.startsWith(to + '/'));
+        const showFlagDot = label === 'SC Intel' && unreadFlag;
         return (
           <Link key={to} to={to} aria-current={active ? 'page' : undefined} className={tab(active)}>
-            <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.1 : 1.8} />
+            <span className="relative">
+              <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.1 : 1.8} />
+              {showFlagDot && (
+                <span
+                  aria-hidden
+                  className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[#e0930b]"
+                />
+              )}
+            </span>
             <span className={tabLabel}>{label}</span>
           </Link>
         );

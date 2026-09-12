@@ -16,7 +16,10 @@ export function IntelBadge({
   className,
 }: {
   id: string;
-  size?: 22 | 24;
+  /** 18px is the handoff marker's own size (mobile handoff §Handoff trace) —
+   *  smaller than a list badge because two of them sit side by side around
+   *  an arrow rather than leading a row. */
+  size?: 18 | 22 | 24;
   className?: string;
 }) {
   const intel = getIntel(id);
@@ -24,7 +27,7 @@ export function IntelBadge({
     <span
       className={cn(
         "inline-flex shrink-0 items-center justify-center rounded-[3px] font-mono font-semibold",
-        size === 24 ? "text-[10px]" : "text-[9.5px]",
+        size === 24 ? "text-[10px]" : size === 18 ? "text-[8.5px]" : "text-[9.5px]",
         className,
       )}
       style={{ width: size, height: size, background: intel.bg, color: intel.fg }}
