@@ -296,19 +296,16 @@ export function ThreadScreen({
   const hasHandoff = distinctIntel.length > 1;
 
   const title = thread?.title && thread.title !== "New chat" ? thread.title : messages[0]?.content || "New chat";
-  const subtitle = hasHandoff
-    ? `${distinctIntel.map((id) => getIntel(id).badge).join(" → ")} · ${distinctIntel.length} intelligences`
-    : `${getIntel(activeIntelId).badge} · ${getIntel(activeIntelId).name.toLowerCase()}`;
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
   let prevAssistant: ChatMessage | null = null;
 
   return (
-    <div className="flex h-[calc(100svh-var(--pi-chrome,170px))] min-h-[420px] flex-col overflow-hidden bg-white">
-      <MobilePageHeader variant="detail" title={title} subtitle={subtitle} onBack={onBack} />
+    <div className="flex h-[calc(100svh-var(--pi-chrome,170px))] min-h-[420px] flex-col overflow-hidden">
+      <MobilePageHeader variant="detail" title={title} onBack={onBack} />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-[var(--m-gutter)] py-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto bg-white px-[var(--m-gutter)] py-3">
         {messages.map((m) => {
           if (m.role !== "assistant") {
             return <UserTurn key={m.id} msg={m} />;
@@ -372,22 +369,10 @@ export function ThreadScreen({
           style={focused ? { boxShadow: "0 0 0 3px rgba(24,24,27,.09)" } : undefined}
         >
           <div className="flex items-end gap-1.5 px-2 py-1.5">
-            {!input && (
-              <button
-                type="button"
-                onClick={() => setAttachOpen(true)}
-                aria-label={attached.length > 0 ? `Attach ${attached.length}` : "Attach context"}
-                title="Attach context"
-                className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[#525252]"
-              >
-                <Paperclip className="h-4 w-4" />
-              </button>
-            )}
             <textarea
               ref={taRef}
               rows={1}
               value={input}
-              disabled={showWorking}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               onChange={(e) => setInput(e.target.value)}
@@ -398,60 +383,44 @@ export function ThreadScreen({
                 }
               }}
               placeholder={showWorking ? "Answering…" : `Ask the ${getIntel(activeIntelId).name.toLowerCase()}…`}
-              className="min-h-[22px] max-h-[120px] flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-[15px] leading-[1.4] text-[#171717] outline-none placeholder:text-[#9a9a9a]"
+              className="min-h-[22px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-[inherit] border-0 bg-transparent py-0.5 text-[15px] leading-[1.4] text-[#171717] outline-none [-webkit-tap-highlight-color:transparent] [appearance:none] placeholder:text-[#9a9a9a]"
             />
-            {!input && (
-              <button
-                type="button"
-                onClick={showWorking ? () => setStopped(true) : submit}
-                disabled={!showWorking && !input.trim()}
-                aria-label={showWorking ? "Stop" : "Send"}
-                className={cn(
-                  "grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full transition-colors duration-200 motion-reduce:transition-none",
-                  showWorking || input.trim() ? "bg-[#18181b] text-white" : "bg-[#f0f0f0] text-[#b8b8b8]",
-                )}
-              >
-                {showWorking ? <Square className="h-3 w-3 fill-current" /> : <ArrowUp className="h-4 w-4" />}
-              </button>
-            )}
           </div>
 
-          {Boolean(input) && (
-            <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0.5">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAttachOpen(true)}
-                  aria-label={attached.length > 0 ? `Attach ${attached.length}` : "Attach context"}
-                  title="Attach context"
-                  className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[#525252]"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIntelSheetOpen(true)}
-                  className="flex h-[30px] items-center gap-1 rounded-full border border-[#d4d4d4] px-2 font-mono text-[11px] text-[#3f3f46]"
-                >
-                  <IntelBadge id={activeIntelId} size={18} />
-                  {getModelLabel(model)}
-                  <ChevronDown className="h-3 w-3 text-[#9a9a9a]" />
-                </button>
-              </div>
+          <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={showWorking ? () => setStopped(true) : submit}
-                disabled={!showWorking && !input.trim()}
-                aria-label={showWorking ? "Stop" : "Send"}
-                className={cn(
-                  "grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full transition-colors duration-200 motion-reduce:transition-none",
-                  showWorking || input.trim() ? "bg-[#18181b] text-white" : "bg-[#f0f0f0] text-[#b8b8b8]",
-                )}
+                onClick={() => setAttachOpen(true)}
+                aria-label={attached.length > 0 ? `Attach ${attached.length}` : "Attach context"}
+                title="Attach context"
+                className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[#525252]"
               >
-                {showWorking ? <Square className="h-3 w-3 fill-current" /> : <ArrowUp className="h-4 w-4" />}
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIntelSheetOpen(true)}
+                className="flex h-[30px] items-center gap-1 rounded-full border border-[#d4d4d4] px-2 font-mono text-[11px] text-[#3f3f46]"
+              >
+                <IntelBadge id={activeIntelId} size={18} />
+                {getModelLabel(model)}
+                <ChevronDown className="h-3 w-3 text-[#9a9a9a]" />
               </button>
             </div>
-          )}
+            <button
+              type="button"
+              onClick={showWorking ? () => setStopped(true) : submit}
+              disabled={!showWorking && !input.trim()}
+              aria-label={showWorking ? "Stop" : "Send"}
+              className={cn(
+                "grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full transition-colors duration-200 motion-reduce:transition-none",
+                showWorking || input.trim() ? "bg-[#18181b] text-white" : "bg-[#f0f0f0] text-[#b8b8b8]",
+              )}
+            >
+              {showWorking ? <Square className="h-3 w-3 fill-current" /> : <ArrowUp className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         {attached.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
