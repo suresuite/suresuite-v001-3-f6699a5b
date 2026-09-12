@@ -1,5 +1,5 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -40,7 +40,9 @@ import MLPrediction from '@/components/MLPrediction';
 import SupplierVolumeChart, { SupplierVolumeDatum, aggregateSupplierVolumes } from '@/components/SupplierVolumeChart';
 import SupplierMaterialChart from '@/components/SupplierMaterialChart';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
-import MapView from '@/components/MapView';
+// See the note in FirmLevelNetwork.tsx — mapbox-gl loads only when the user
+// actually switches this card to map view.
+const MapView = lazy(() => import('@/components/MapView'));
 import { NetworkMetricsTable } from '@/components/NetworkMetricsTable';
 import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/networkMetrics';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
@@ -1172,6 +1174,13 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                       )}
                     </>
                   ) : (
+                     <Suspense
+                       fallback={
+                         <div className="h-full grid place-content-center">
+                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                         </div>
+                       }
+                     >
                      <MapView
                       nodes={nodes}
                       selectedNode={selectedNode}
@@ -1180,6 +1189,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                       plantData={projects.find(p => p.id === globalSelectedProjectId) ?? null}
                       countryRiskMap={countryRiskMap}
                     />
+                    </Suspense>
                   )}
                   {!globalSelectedProjectId && (
                     <div className="absolute inset-0 flex items-center justify-center text-muted-foreground pointer-events-none">

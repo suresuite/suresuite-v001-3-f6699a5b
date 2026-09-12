@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { AuthProvider } from '@/hooks/useAuth';
 import { CapabilitiesProvider } from '@/hooks/useCapabilities';
 import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
@@ -10,38 +10,66 @@ import { Toaster } from '@/components/ui/sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import RoleGuard from '@/components/RoleGuard';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
-
-// Import pages
-import Auth from './pages/Auth';
-import OrbitMrpCallback from './pages/OrbitMrpCallback';
-import DataManager from './pages/DataManager';
-import ProductLevelNetwork from './pages/ProductLevelNetwork';
-import ProcessLevelNetwork from './pages/ProcessLevelNetwork';
-import FirmLevelNetwork from './pages/FirmLevelNetwork';
-import InteractiveNetworkSpace from './pages/InteractiveNetworkSpace';
-import GettingStarted from './pages/GettingStarted';
-import ProjectPolicies from './pages/ProjectPolicies';
-import SimulationLab from './pages/SimulationLab';
-import ProjectIntelligence from './pages/ProjectIntelligence';
-import Profile from './pages/Profile';
-import DeveloperApi from './pages/DeveloperApi';
-import Forbidden from './pages/Forbidden';
-import NotFound from './pages/NotFound';
-import DocsLayout from '@/components/docs/DocsLayout';
-import HelpPage from './pages/help/HelpPage';
-import Landing from './pages/Landing';
-import About from './pages/About';
 import { PageLayout } from '@/components/shared/PageLayout';
-import { FloatingChatBubble } from '@/components/chat/FloatingChatBubble';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminUserAccess from './pages/admin/AdminUserAccess';
-import AdminRoles from './pages/admin/AdminRoles';
-import AdminOrganizations from './pages/admin/AdminOrganizations';
-import AdminProjects from './pages/admin/AdminProjects';
-import AdminModels from './pages/admin/AdminModels';
-import AdminUsage from './pages/admin/AdminUsage';
-import AdminAudit from './pages/admin/AdminAudit';
+
+// Renders on every route, but never in the first frame that matters — so the
+// chat tree and its dependencies come after the page, not with it.
+const FloatingChatBubble = lazy(() =>
+  import('@/components/chat/FloatingChatBubble').then((m) => ({ default: m.FloatingChatBubble })),
+);
+
+// The two unauthenticated entry points stay eager. Everything else is lazy.
+//
+// A lazy route costs one extra round trip — the entry chunk has to run before
+// the browser learns the page chunk exists. On an app route that is invisible
+// (you arrive already authenticated, and Phase 2's prefetch-on-intent will hide
+// it entirely). On the public landing page it would land squarely in LCP, for
+// the one visitor whose first impression is the whole point. So `/` and `/auth`
+// are paid for up front; the 25 pages behind the login are not.
+import Landing from './pages/Landing';
+import Auth from './pages/Auth';
+
+const OrbitMrpCallback = lazy(() => import('./pages/OrbitMrpCallback'));
+const DataManager = lazy(() => import('./pages/DataManager'));
+const ProductLevelNetwork = lazy(() => import('./pages/ProductLevelNetwork'));
+const ProcessLevelNetwork = lazy(() => import('./pages/ProcessLevelNetwork'));
+const FirmLevelNetwork = lazy(() => import('./pages/FirmLevelNetwork'));
+const InteractiveNetworkSpace = lazy(() => import('./pages/InteractiveNetworkSpace'));
+const GettingStarted = lazy(() => import('./pages/GettingStarted'));
+const ProjectPolicies = lazy(() => import('./pages/ProjectPolicies'));
+const SimulationLab = lazy(() => import('./pages/SimulationLab'));
+const ProjectIntelligence = lazy(() => import('./pages/ProjectIntelligence'));
+const Profile = lazy(() => import('./pages/Profile'));
+const DeveloperApi = lazy(() => import('./pages/DeveloperApi'));
+const Forbidden = lazy(() => import('./pages/Forbidden'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const DocsLayout = lazy(() => import('@/components/docs/DocsLayout'));
+const HelpPage = lazy(() => import('./pages/help/HelpPage'));
+const About = lazy(() => import('./pages/About'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminUserAccess = lazy(() => import('./pages/admin/AdminUserAccess'));
+const AdminRoles = lazy(() => import('./pages/admin/AdminRoles'));
+const AdminOrganizations = lazy(() => import('./pages/admin/AdminOrganizations'));
+const AdminProjects = lazy(() => import('./pages/admin/AdminProjects'));
+const AdminModels = lazy(() => import('./pages/admin/AdminModels'));
+const AdminUsage = lazy(() => import('./pages/admin/AdminUsage'));
+const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
+
+/** Shown while a route chunk arrives. Deliberately the same spinner
+ *  `ProtectedRoute` shows while it resolves the session — from the user's side
+ *  both are "the page is coming", and two different waits would read as two
+ *  different kinds of slow. */
+function RouteFallback() {
+  return (
+    <div className="min-h-dvh bg-background flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-2 text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 const queryClient = new QueryClient();
 
@@ -68,6 +96,7 @@ function App() {
           <GlobalProjectProvider>
             <Router>
               <RouteErrorBoundary>
+              <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/integrations/orbit-mrp/callback" element={<ProtectedRoute><OrbitMrpCallback /></ProtectedRoute>} />
@@ -210,11 +239,17 @@ function App() {
                     SPA can deep-link, which means 404s land here, not on the host. */}
                 <Route path="*" element={<NotFound isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />} />
               </Routes>
+              </Suspense>
               </RouteErrorBoundary>
               {/* Own boundary: the bubble renders on every route, so a throw
-                  here must not take the routed page down with it. */}
+                  here must not take the routed page down with it. Its own
+                  Suspense too — the bubble arriving a beat late is invisible,
+                  but sharing the route boundary would hold the whole page
+                  behind it. */}
               <RouteErrorBoundary fallback={null}>
-                <FloatingChatBubble />
+                <Suspense fallback={null}>
+                  <FloatingChatBubble />
+                </Suspense>
               </RouteErrorBoundary>
             </Router>
           </GlobalProjectProvider>

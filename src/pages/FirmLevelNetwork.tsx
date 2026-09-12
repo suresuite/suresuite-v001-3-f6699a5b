@@ -1,5 +1,5 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -39,7 +39,10 @@ import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN 
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import MLPrediction from '@/components/MLPrediction';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
-import MapView from '@/components/MapView';
+// mapbox-gl and its CSS are ~200 kB gzipped and only reachable from here and
+// /network/product-level — and then only once the user switches to map view.
+// Lazy keeps it out of this page's chunk entirely for anyone who never does.
+const MapView = lazy(() => import('@/components/MapView'));
 import { FROZEN_CELL } from '@/components/shared';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
 import {
@@ -1434,7 +1437,13 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                       )}
                     </>
                   ) : (
-                    // {/* ✅ add this */}
+                    <Suspense
+                      fallback={
+                        <div className="h-full grid place-content-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                      }
+                    >
                     <MapView
                       nodes={nodes}
                       selectedNode={selectedNode}
@@ -1446,6 +1455,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                       plantData={projects.find(p => p.id === globalSelectedProjectId) ?? null}  
                       countryRiskMap={countryRiskMap}
                     />
+                    </Suspense>
                   )}
                   {!globalSelectedProjectId && (
                     <div className="absolute inset-0 flex items-center justify-center text-muted-foreground pointer-events-none">

@@ -2,11 +2,16 @@
 // Authenticated users are redirected to their app home (`/app` when granted).
 
 import { Link, Navigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import NetworkVisualization3D from '@/components/NetworkVisualization3D';
+
+// three.js + drei are ~1.5 MB of the bundle and this is the only thing on the
+// public landing page that needs them. Eager, they were downloaded and parsed
+// by every visitor on every route — including phones, which render this scene
+// at 220px on a black background. Lazy, they cost nothing until the hero paints.
+const NetworkVisualization3D = lazy(() => import('@/components/NetworkVisualization3D'));
 import {
   ArrowRight,
   Play,
@@ -494,7 +499,12 @@ export default function Landing() {
                       thirds of a landscape one. */}
                   <div className="relative aspect-[5/4] max-h-[72dvh] w-full md:aspect-[16/10] md:max-h-none md:h-[460px] lg:h-[560px]">
                   {/* <div className="relative aspect-[4/3] max-h-[60dvh] w-full md:aspect-[16/10] md:max-h-none md:h-[460px] lg:h-[560px]"> */}
-                    <NetworkVisualization3D />
+                    {/* No fallback box: the wrapper already reserves the space
+                        and the gradient above shows through, so the scene fades
+                        in over the backdrop instead of over a grey rectangle. */}
+                    <Suspense fallback={null}>
+                      <NetworkVisualization3D />
+                    </Suspense>
                   </div>
                 </div>
                 <span className="font-mono text-[10px] tracking-[0.15em] text-white/35">
