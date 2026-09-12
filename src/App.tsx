@@ -29,32 +29,36 @@ const FloatingChatBubble = lazy(() =>
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 
-const OrbitMrpCallback = lazy(() => import('./pages/OrbitMrpCallback'));
-const DataManager = lazy(() => import('./pages/DataManager'));
-const ProductLevelNetwork = lazy(() => import('./pages/ProductLevelNetwork'));
-const ProcessLevelNetwork = lazy(() => import('./pages/ProcessLevelNetwork'));
-const FirmLevelNetwork = lazy(() => import('./pages/FirmLevelNetwork'));
-const InteractiveNetworkSpace = lazy(() => import('./pages/InteractiveNetworkSpace'));
-const GettingStarted = lazy(() => import('./pages/GettingStarted'));
-const ProjectPolicies = lazy(() => import('./pages/ProjectPolicies'));
-const SimulationLab = lazy(() => import('./pages/SimulationLab'));
-const ProjectIntelligence = lazy(() => import('./pages/ProjectIntelligence'));
-const Profile = lazy(() => import('./pages/Profile'));
-const DeveloperApi = lazy(() => import('./pages/DeveloperApi'));
-const Forbidden = lazy(() => import('./pages/Forbidden'));
-const NotFound = lazy(() => import('./pages/NotFound'));
-const DocsLayout = lazy(() => import('@/components/docs/DocsLayout'));
-const HelpPage = lazy(() => import('./pages/help/HelpPage'));
-const About = lazy(() => import('./pages/About'));
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
-const AdminUserAccess = lazy(() => import('./pages/admin/AdminUserAccess'));
-const AdminRoles = lazy(() => import('./pages/admin/AdminRoles'));
-const AdminOrganizations = lazy(() => import('./pages/admin/AdminOrganizations'));
-const AdminProjects = lazy(() => import('./pages/admin/AdminProjects'));
-const AdminModels = lazy(() => import('./pages/admin/AdminModels'));
-const AdminUsage = lazy(() => import('./pages/admin/AdminUsage'));
-const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
+// Lazy pages live in one module with their URL→chunk map, so the nav can
+// prefetch exactly the chunk a route needs (src/routes/lazyPages.ts).
+import {
+  OrbitMrpCallback,
+  DataManager,
+  ProductLevelNetwork,
+  ProcessLevelNetwork,
+  FirmLevelNetwork,
+  InteractiveNetworkSpace,
+  GettingStarted,
+  ProjectPolicies,
+  SimulationLab,
+  ProjectIntelligence,
+  Profile,
+  DeveloperApi,
+  Forbidden,
+  NotFound,
+  DocsLayout,
+  HelpPage,
+  About,
+  AdminDashboard,
+  AdminUsers,
+  AdminUserAccess,
+  AdminRoles,
+  AdminOrganizations,
+  AdminProjects,
+  AdminModels,
+  AdminUsage,
+  AdminAudit,
+} from '@/routes/lazyPages';
 
 /** Shown while a route chunk arrives. Deliberately the same spinner
  *  `ProtectedRoute` shows while it resolves the session — from the user's side
@@ -71,7 +75,27 @@ function RouteFallback() {
   );
 }
 
-const queryClient = new QueryClient();
+// Until Phase 2 this client was mounted but unused — every hook in src/hooks
+// was a hand-rolled useState + useEffect that refetched on mount, so returning
+// to a page you had just left cost exactly as much as the first visit.
+//
+// `staleTime` is the whole point: within the window a second mount of the same
+// query reads the cache instead of the network. A minute is chosen to be short
+// enough that a project edited in another tab shows up on the next navigation,
+// and long enough to cover moving between pages.
+//
+// `refetchOnWindowFocus` stays off deliberately: alt-tabbing back is not a
+// request for fresh data, and on a phone every app-switch would fire one.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function App() {
   const [isCollapsed, setIsCollapsed] = useState(true);

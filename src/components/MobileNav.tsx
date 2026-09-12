@@ -18,6 +18,7 @@ import { Home, SlidersHorizontal, FlaskConical, Brain, Menu, LogOut, User } from
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { NAV_SECTIONS, filterVisibleSections } from '@/components/Navbar';
+import { prefetchRoute } from '@/routes/lazyPages';
 import { PAGE_HEADER_SHELL, PAGE_HEADER_ROW } from '@/components/shared/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -112,7 +113,16 @@ export function MobileTabBar({
         const active = !moreActive && (pathname === to || pathname.startsWith(to + '/'));
         const showFlagDot = label === 'SC Intel' && unreadFlag;
         return (
-          <Link key={to} to={to} aria-current={active ? 'page' : undefined} className={tab(active)}>
+          // `touchstart` fires on the way down, so the chunk starts loading
+          // during the ~100ms before the tap completes. There is no hover to
+          // lean on here, which is exactly why this matters more than on desktop.
+          <Link
+            key={to}
+            to={to}
+            aria-current={active ? 'page' : undefined}
+            onTouchStart={() => prefetchRoute(to)}
+            className={tab(active)}
+          >
             <span className="relative">
               <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.1 : 1.8} />
               {showFlagDot && (
@@ -241,6 +251,7 @@ export function MobileNavDrawer({
                   key={item.to}
                   to={item.to}
                   aria-current={active ? 'page' : undefined}
+                  onTouchStart={() => prefetchRoute(item.to)}
                   className={cn(
                     'relative flex min-h-[44px] items-center gap-2.5 rounded-md px-2.5',
                     'text-[13.5px]',

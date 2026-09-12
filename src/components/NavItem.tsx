@@ -6,6 +6,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { prefetchRoute } from "@/routes/lazyPages";
 import type { LucideIcon } from "lucide-react";
 
 export interface NavItemConfig {
@@ -44,6 +45,12 @@ const NavItem = ({
           <Link
             to={to}
             aria-label={label}
+            // Intent, three ways: the pointer arriving, the keyboard arriving,
+            // and the finger landing before the tap completes. Each starts the
+            // route's chunk so the click has nothing left to wait for.
+            onMouseEnter={() => prefetchRoute(to)}
+            onFocus={() => prefetchRoute(to)}
+            onTouchStart={() => prefetchRoute(to)}
             className={cn(
               linkBase,
               isCollapsed && "justify-center",
