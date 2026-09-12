@@ -53,6 +53,21 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
   // between the sheet and the bottom edge.
   const tabBarOffset = isMobileRootRoute(pathname) ? MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER : 0;
 
+  // Without this, iOS/Android still let a touch that starts over the sheet
+  // (the backdrop, or the header's drag handle) rubber-band the page
+  // scrolling underneath instead of the sheet's own row list — the sheet is
+  // `fixed`, but a fixed overlay doesn't stop the body under it from
+  // scrolling on its own. MobileNav's full-screen panel locks the body the
+  // same way; every sheet built on this shell needs the same lock.
+  React.useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const dragStart = (e: React.TouchEvent) => {
