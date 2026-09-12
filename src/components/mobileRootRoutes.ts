@@ -39,9 +39,14 @@ const PUSHED_ROUTE_PATTERNS: RegExp[] = [
   // intelligence, a proposal — carries a detail header and hides the bar.
   /^\/project-intelligence\/new$/,
   /^\/project-intelligence\/thread\/[^/]+$/,
+  /^\/project-intelligence\/thread\/[^/]+\/trace$/,
   /^\/project-intelligence\/roster$/,
   /^\/project-intelligence\/roster\/[^/]+$/,
   /^\/project-intelligence\/proposal\/[^/]+$/,
+  /^\/project-intelligence\/proposals$/,
+  /^\/project-intelligence\/flag\/[^/]+$/,
+  /^\/project-intelligence\/chats$/,
+  /^\/project-intelligence\/chats\/files$/,
 ];
 
 export function isMobileRootRoute(pathname: string): boolean {
