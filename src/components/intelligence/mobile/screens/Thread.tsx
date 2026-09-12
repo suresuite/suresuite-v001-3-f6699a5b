@@ -383,7 +383,7 @@ export function ThreadScreen({
                 }
               }}
               placeholder={showWorking ? "Answering…" : `Ask the ${getIntel(activeIntelId).name.toLowerCase()}…`}
-              className="min-h-[22px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-[inherit] border-0 bg-transparent py-0.5 text-[15px] leading-[1.4] text-[#171717] outline-none [-webkit-tap-highlight-color:transparent] [appearance:none] placeholder:text-[#9a9a9a]"
+              className="min-h-[22px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-[inherit] border-0 bg-transparent py-0.5 text-[15px] leading-[1.4] text-[#171717] outline-none focus-visible:ring-0 focus-visible:ring-offset-0 appearance-none [-webkit-tap-highlight-color:transparent] placeholder:text-[#9a9a9a]"
             />
           </div>
 
