@@ -31,6 +31,24 @@ export default defineConfig(() => ({
     port: 8080,
   },
   plugins: [react()],
+  build: {
+    // scripts/audit-bundle-size.mjs reads this to walk the real import graph,
+    // so it can tell "a lazy chunk got bigger" (fine) from "a lazy chunk became
+    // reachable from the entry" (a regression). Filenames alone can't.
+    manifest: true,
+  },
+  // NO manualChunks here, deliberately. Routes and the two WebGL components are
+  // lazy (src/App.tsx, Landing, GettingStarted, Firm/ProductLevelNetwork), and
+  // Rollup's default chunking follows the real import graph — a module reached
+  // only through a dynamic import lands in a chunk fetched only when that
+  // import runs.
+  //
+  // Hand-grouping vendors fights that. Object-form `manualChunks` was tried and
+  // reverted: naming `three` and `recharts` there put both chunks into the
+  // ENTRY's static imports even though nothing eager imports either, adding
+  // ~374 kB gzip to first paint — the exact regression this work exists to
+  // remove. If vendor grouping is ever wanted for cache stability, verify with
+  // `node scripts/audit-bundle-size.mjs` that the initial graph did not grow.
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

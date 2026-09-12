@@ -1,0 +1,9 @@
+{
+  "note": "Gzip bytes. `initial-graph` is the entry chunk plus its static imports — what a first visit downloads before paint. The audit fails only ABOVE these numbers plus tolerance. Ratchet down by improving the split and re-running with --update-baseline; never re-record to admit a regression.",
+  "generated": "2026-09-12",
+  "tolerance": "5% or 2048 bytes, whichever is larger",
+  "sizes": {
+    "initial-graph": 194270,
+    "total-js": 1699586
+  }
+}

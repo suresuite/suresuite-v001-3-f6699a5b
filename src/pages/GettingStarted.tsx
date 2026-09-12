@@ -3,10 +3,15 @@ import { MobileGettingStarted } from "@/components/home/MobileGettingStarted";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { Link } from "react-router-dom";
 import { YouTubeEmbed } from "@/components/shared";
-import { useState, useEffect, useRef } from "react";
+import { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import NetworkVisualization3D from "@/components/NetworkVisualization3D";
+import { WhenVisible } from "@/components/WhenVisible";
+
+// Behind a tab, below the fold, and three.js underneath it. Lazy keeps it out
+// of this page's chunk; WhenVisible keeps the GL context from starting until
+// someone has actually scrolled to it.
+const NetworkVisualization3D = lazy(() => import("@/components/NetworkVisualization3D"));
 import {
   Network,
   FileSpreadsheet,
@@ -461,7 +466,11 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
                   
                   {/* Right: 3D Visualization */}
                   <div className="lg:col-span-2 h-[500px] bg-gradient-to-br from-slate-900 to-gray-800">
-                    <NetworkVisualization3D />
+                    <WhenVisible className="h-full">
+                      <Suspense fallback={null}>
+                        <NetworkVisualization3D />
+                      </Suspense>
+                    </WhenVisible>
                   </div>
                 </div>
               )}

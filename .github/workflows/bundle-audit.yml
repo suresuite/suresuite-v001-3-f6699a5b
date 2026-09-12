@@ -1,0 +1,52 @@
+name: bundle size audit
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/audit-bundle-size.mjs"
+      - "scripts/bundle-size-baseline.json"
+      - ".github/workflows/bundle-audit.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/audit-bundle-size.mjs"
+      - "scripts/bundle-size-baseline.json"
+  workflow_dispatch:
+
+# Guards the initial load graph — the entry chunk plus everything statically
+# reachable from it, which is what a first visit downloads before paint.
+#
+# The failure this catches is invisible in review: one top-level `import` of a
+# page, of MapView or of NetworkVisualization3D silently pulls a lazy chunk back
+# into the entry. That is how the 1.65 MB single bundle happened the first time.
+#
+# Like the adaptive-UI audit, the gate is a RATCHET against
+# scripts/bundle-size-baseline.json (plus a small tolerance so a dependency
+# patch does not fail an unrelated PR). Improve the split, re-run with
+# --update-baseline, commit the smaller number.
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # The audit measures dist/, so the build is the input, not a side errand.
+      - run: npm run build
+
+      - name: Bundle-size audit (fails on growth above the baseline)
+        run: node scripts/audit-bundle-size.mjs
