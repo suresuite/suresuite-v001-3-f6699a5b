@@ -263,9 +263,14 @@ export function ChatsScreen({
         <MobileRow onClick={onOpenFiles} label="Files & project memory" chevron />
       </div>
 
-      {/* 16 · select mode — pinned bulk bar. */}
+      {/* 16 · select mode — pinned bulk bar. This screen is always pushed (no
+          tab bar beneath it), so the bar sits on the true bottom edge and
+          needs its own safe-area padding rather than the tab bar's. */}
       {selectMode && selected.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-[#d4d4d4] bg-white px-[var(--m-gutter)] pb-2.5 pt-2">
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-[#d4d4d4] bg-white px-[var(--m-gutter)] pt-2"
+          style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}
+        >
           <MobileButton
             weight="secondary"
             block
