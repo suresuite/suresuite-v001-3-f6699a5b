@@ -1,5 +1,6 @@
 /**
- * SC Intelligences — thread working state (screen 05, mobile handoff D2).
+ * SC Intelligences — thread working state (screen 05, mobile handoff D2,
+ * skeleton-first pass).
  *
  * D2: the previous version advanced a step every `STEP_MS` and then simply
  * stopped moving once it reached the last step — on a 20-80s turn with two
@@ -19,6 +20,13 @@
  * actual tool calls arrive, in `ChatToolCall[]`. This is an honest
  * approximation of progress against the intelligence's own remit, not a
  * fabricated trace.
+ *
+ * First-open fix: most turns land fast enough that the bordered panel below
+ * never needs to appear at all. `WorkingState` now renders three breathing
+ * skeleton rows the instant a turn starts and only swaps in the ticking
+ * panel — `WorkingPanel`, a separate component so its 1s ticker doesn't
+ * start running until it actually mounts — once the turn has been running
+ * for `PANEL_DELAY_MS`.
  */
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -28,6 +36,10 @@ import { getIntel } from "../intel";
  * last step's own clock running rather than ever "finishing" early — there is
  * nothing to advance to once every declared domain has had its turn. */
 const STEP_MS = 6000;
+
+/** A turn this fast never shows the full bordered panel — the skeleton rows
+ * alone are enough of an answer. */
+const PANEL_DELAY_MS = 600;
 
 /** Re-renders once a second so the elapsed counter and the in-flight step's
  * clock both keep moving without the rest of the tree re-rendering. */
@@ -39,16 +51,23 @@ function useTicker(intervalMs: number) {
   }, [intervalMs]);
 }
 
-export function WorkingState({
+/** Holds the answer's place from the moment a turn starts. */
+function AnswerSkeleton() {
+  return (
+    <div className="flex flex-col gap-1.5" aria-hidden>
+      <div className="pi-skeleton-pulse h-[9px] w-full rounded-[2px] bg-[#f0f0f0]" />
+      <div className="pi-skeleton-pulse h-[9px] w-[92%] rounded-[2px] bg-[#f0f0f0]" />
+      <div className="pi-skeleton-pulse h-[9px] w-[64%] rounded-[2px] bg-[#f0f0f0]" />
+    </div>
+  );
+}
+
+function WorkingPanel({
   intelId,
   turnStartedAt,
   onStop,
 }: {
   intelId: string;
-  /** `Date.now()` at the moment this turn's `send()` was issued — the turn's
-   * own clock, not a per-render timestamp, so the elapsed count survives
-   * re-renders and is the same number the closing line's expectation is
-   * measured against. */
   turnStartedAt: number;
   onStop: () => void;
 }) {
@@ -119,4 +138,35 @@ export function WorkingState({
       </button>
     </div>
   );
+}
+
+export function WorkingState({
+  intelId,
+  turnStartedAt,
+  onStop,
+}: {
+  intelId: string;
+  /** `Date.now()` at the moment this turn's `send()` was issued — the turn's
+   * own clock, not a per-render timestamp, so the elapsed count survives
+   * re-renders and is the same number the closing line's expectation is
+   * measured against. */
+  turnStartedAt: number;
+  onStop: () => void;
+}) {
+  const [panelReady, setPanelReady] = React.useState(() => Date.now() - turnStartedAt >= PANEL_DELAY_MS);
+
+  React.useEffect(() => {
+    const remaining = PANEL_DELAY_MS - (Date.now() - turnStartedAt);
+    if (remaining <= 0) {
+      setPanelReady(true);
+      return;
+    }
+    setPanelReady(false);
+    const id = setTimeout(() => setPanelReady(true), remaining);
+    return () => clearTimeout(id);
+  }, [turnStartedAt]);
+
+  if (!panelReady) return <AnswerSkeleton />;
+
+  return <WorkingPanel intelId={intelId} turnStartedAt={turnStartedAt} onStop={onStop} />;
 }

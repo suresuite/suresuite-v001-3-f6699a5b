@@ -439,6 +439,21 @@
       animation: none !important;
     }
   }
+
+  /* ---- Answer skeleton breathe (PI mobile thread, first-open state) ---- */
+  .pi-skeleton-pulse {
+    animation: pi-skeleton-breathe 1.6s ease-in-out infinite;
+  }
+  @keyframes pi-skeleton-breathe {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pi-skeleton-pulse {
+      animation: none !important;
+      opacity: 1;
+    }
+  }
 }
 /* The embedded-panel breakpoints (v2 §5.5). A panel narrower than 320px is
    inside a two-column wide band or a split pane; it drops to one column and
