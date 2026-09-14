@@ -70,9 +70,9 @@ const Auth = () => {
   const isBusy = isLoading || signedIn;
 
   return (
-    <div className="flex min-h-dvh items-stretch bg-white text-[#171717]">
+    <div className="flex min-h-dvh items-stretch bg-white text-[#171717] min-[1920px]:[zoom:1.15] min-[2560px]:[zoom:1.35]">
       {/* Form column */}
-      <div className="flex w-full shrink-0 grow-0 basis-auto flex-col justify-start border-[--hair-border] px-[clamp(1rem,5vw,76px)] pb-8 pt-9 md:w-auto md:basis-[clamp(420px,44%,600px)] md:border-r">
+      <div className="flex w-full shrink-0 grow-0 basis-auto flex-col justify-start border-[--hair-border] px-[clamp(1rem,5vw,76px)] pb-8 pt-9 md:w-auto md:basis-[max(420px,40%)] md:border-r">
         <img
           src="/logo-lockup.png"
           alt="SuReSuite — Supply Chain Resilience Suite"
