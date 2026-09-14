@@ -13,10 +13,20 @@
  *  - the panel stops above the bottom tab bar rather than covering it, so the
  *    "you are here" signal and the one-tap route out both survive — the same
  *    rule the More panel follows,
+ *  - it renders in a portal on <body> at z-45 — above the pinned
+ *    <MobileActionBar> (z-40), below the tab bar (z-50) it deliberately stops
+ *    short of. Both halves matter: a sheet mounted in its caller's tree is
+ *    trapped inside whatever stacking context that caller sits in (the project
+ *    chip's sheet lives under the `sticky z-40` <PageHeader>), so raising its
+ *    own z-index alone cannot lift it over an action bar that shares the
+ *    header's layer and comes later in the document. Un-portalled, the bar
+ *    painted over the bottom of every long sheet — the last rows were cut off
+ *    mid-row and the swipes meant for them landed on the bar,
  *  - `onBack` renders the drill-down affordance the nested sheets need
  *    (This chat → Model), so a sub-sheet is never a dead end.
  */
 import React, { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { ChevronLeft, X } from "lucide-react";
 import { MOBILE_TABBAR_BORDER, MOBILE_TABBAR_H, isMobileRootRoute } from "@/components/MobileNav";
@@ -86,8 +96,8 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
     if (travelled > DISMISS_PX) onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-40 flex flex-col justify-end bg-foreground/30 md:hidden" role="dialog" aria-modal="true">
+  const sheet = (
+    <div className="fixed inset-0 z-[45] flex flex-col justify-end bg-foreground/30 md:hidden" role="dialog" aria-modal="true">
       <button type="button" aria-label="Close" onClick={onClose} className="min-h-11 flex-1" />
       <div
         // §7: 16px top corners, and the one shadow the skin has — the one
@@ -146,7 +156,13 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
             sheet into whatever will scroll next — on iOS that hands the
             gesture to the page and the list stops dead mid-drag. A long list
             (every project, every policy) is exactly where it shows up. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+        <div
+          // The hook a caller uses to scroll its own rows without reaching for
+          // `scrollIntoView`, which walks every ancestor and drags the page
+          // behind the sheet with it — see ProjectChip.
+          data-sheet-scroll=""
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+        >
           {children}
         </div>
         {footer && (
@@ -155,6 +171,8 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
       </div>
     </div>
   );
+
+  return createPortal(sheet, document.body);
 }
 
 /**
