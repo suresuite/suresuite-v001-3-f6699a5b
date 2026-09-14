@@ -12,7 +12,7 @@
 import React, { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { ChatPart, ChatToolCall } from "@/hooks/useProjectChat";
-import { LAYER, MonoChip, TD_MESSAGE, TH_MESSAGE, tint } from "./piUi";
+import { LAYER, MonoChip, StatusDot, TD_MESSAGE, TH_MESSAGE, tint } from "./piUi";
 import { cn } from "@/lib/utils";
 import { PlanCard, type PlanPartData } from "@/components/chat/PlanCard";
 import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
@@ -281,6 +281,106 @@ export function ActivityGroup({ toolCalls }: { toolCalls: ChatToolCall[] }) {
                 · {c.row_count} {c.row_count === 1 ? "row" : "rows"}
                 {c.duration_ms ? " · " + (c.duration_ms / 1000).toFixed(1) + "s" : ""}
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── merged meta row (v1b space pass) ────────────────────────────────── */
+
+/**
+ * The reply's evidence, as ONE row.
+ *
+ * It used to be two stacked blocks under every grounded answer: the grounding
+ * chip (EvidencePart) and the activity accordion (ActivityGroup), each with
+ * its own border, its own fill and its own disclosure. Two bordered bands
+ * under a three-line answer cost more vertical space than the answer, and
+ * they say one thing between them — where this came from.
+ *
+ * Both affordances are kept, not traded: the steps and the citations both
+ * still expand, from a single chevron, and either half renders alone when
+ * only one is present. The stream composes this in place of the two blocks
+ * (desktop only — the phone tree still stacks them, see MessageStream).
+ */
+export function MetaRow({
+  toolCalls = [],
+  evidence,
+}: {
+  toolCalls?: ChatToolCall[];
+  // useProjectChat's part payloads are untyped JSON by design.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  evidence?: any;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasSteps = toolCalls.length > 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const citations: any[] = evidence?.citations ?? [];
+  const hasEvidence = Boolean(evidence);
+  if (!hasSteps && !hasEvidence) return null;
+
+  const allOk = toolCalls.every((c) => c.ok);
+  const totalMs = toolCalls.reduce((a, c) => a + (c.duration_ms ?? 0), 0);
+  const steps =
+    "Analyzed project data · " +
+    toolCalls.length +
+    (toolCalls.length === 1 ? " step" : " steps") +
+    (totalMs ? " · " + (totalMs / 1000).toFixed(1) + "s" : "");
+
+  const fallback = Boolean(evidence?.fallback ?? evidence?.not_grounded);
+  const grounding = fallback
+    ? "not_grounded — fallback reply"
+    : "grounded — " + citations.length + (citations.length === 1 ? " source" : " sources");
+
+  return (
+    <div className="mt-1.5 overflow-hidden rounded-sm border border-[--hair-border] bg-[#fcfcfc]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full flex-wrap items-center gap-1.5 px-2 py-1 text-left"
+      >
+        {hasSteps && (
+          <>
+            <StatusDot ok={allOk} />
+            <span className="text-[11.5px] text-muted-foreground">{steps}</span>
+          </>
+        )}
+        {hasSteps && hasEvidence && <span className="h-2.5 w-px shrink-0 bg-[#e0e0e0]" />}
+        {hasEvidence && (
+          <span className="text-[11.5px]" style={{ color: fallback ? LAYER.brand : "#5a5a5a" }}>
+            {grounding}
+          </span>
+        )}
+        <ChevronRight
+          className={cn("ml-auto h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+        />
+      </button>
+
+      {open && (hasSteps || fallback || citations.length > 0) && (
+        <div className="border-t border-[--hair-border] bg-background px-2.5 py-1.5">
+          {toolCalls.map((c, i) => (
+            <div key={"s" + i} className="flex items-center gap-[7px] py-0.5 font-mono text-[11px]">
+              <StatusDot ok={c.ok} />
+              <span className="text-foreground">{c.name}</span>
+              <span className="text-muted-foreground">
+                · {c.row_count} {c.row_count === 1 ? "row" : "rows"}
+                {c.duration_ms ? " · " + (c.duration_ms / 1000).toFixed(1) + "s" : ""}
+              </span>
+            </div>
+          ))}
+          {fallback && (
+            <p className="m-0 py-0.5 text-[11.5px] leading-[1.5] text-muted-foreground">
+              The drafted reply couldn't be traced to project data, so a grounded fallback shipped instead.
+            </p>
+          )}
+          {citations.map((c, i) => (
+            <div key={"c" + i} className="flex gap-2 py-0.5 text-[11.5px]">
+              <span className="font-mono text-muted-foreground">[{i + 1}]</span>
+              <span className="text-muted-foreground">{c.label ?? c.kind}</span>
+              <span className="font-mono text-foreground">{c.ref ?? c.reference ?? ""}</span>
             </div>
           ))}
         </div>

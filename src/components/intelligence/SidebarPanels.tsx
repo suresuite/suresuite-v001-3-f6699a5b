@@ -82,7 +82,7 @@ export function MyFilesPanel({
           right={
             <Segmented
               size="sm"
-              className="ml-auto"
+              className="ml-auto shrink-0"
               value={scope}
               onChange={onScopeChange}
               options={[
@@ -230,7 +230,7 @@ export function ProjectMemoryPanel({
               type="button"
               title="Add memory"
               onClick={() => setAdding((v) => !v)}
-              className="ml-auto text-[14px] text-muted-foreground"
+              className="ml-auto shrink-0 text-[14px] text-muted-foreground"
             >
               +
             </button>
@@ -309,18 +309,30 @@ export function ProjectMemoryPanel({
   );
 }
 
-/* ── thread info / memory strip (M1 §14.3) ───────────────────────────── */
+/* ── memory panel (M1 §14.3, v1b space pass) ─────────────────────────── */
 
-export function ThreadInfoStrip({
+/**
+ * What the assistant remembers, and how memory works.
+ *
+ * This was a full-width violet band pinned under the agent strip — a second
+ * chrome row that was almost always collapsed, costing every conversation
+ * ~26px to say the word "Memory". The v1b pass demotes the band to a chip in
+ * the merged chrome band (ChatWorkspace) and keeps everything the band hosted
+ * here, opened on demand: the rolling summary with its delete control, and the
+ * "How memory works" disclosure. Nothing about the copy or the controls moved
+ * — only what it costs when the user is not reading it.
+ *
+ * Controlled by the caller: the chip owns `open`, so the chip can render as
+ * active while the panel is showing.
+ */
+export function MemoryPanel({
   summary,
   onDeleteSummary,
 }: {
   summary: string | null;
   onDeleteSummary: () => void;
 }) {
-  const [openPane, setOpenPane] = useState<"summary" | "how" | null>(null);
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
+  const [openPane, setOpenPane] = useState<"summary" | "how" | null>(summary ? "summary" : "how");
 
   const btn = (active: boolean) =>
     cn(
@@ -328,65 +340,46 @@ export function ThreadInfoStrip({
       active ? "text-[#6d28d9]" : "text-muted-foreground",
     );
 
-  return (
-    <div className="border-b" style={{ borderColor: "#ece5fb", background: "rgba(124,58,237,.045)" }}>
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-4 py-1">
-        <span className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: LAYER.product }}>
-          Memory
-        </span>
-        <span className="h-2.5 w-px" style={{ background: "#ddd0f7" }} />
+  const caret = (active: boolean) => (
+    <span
+      className="inline-block text-[10px] transition-transform"
+      style={{
+        color: active ? LAYER.product : "#c4c4c4",
+        transform: active ? "rotate(90deg)" : "rotate(0deg)",
+      }}
+    >
+      ›
+    </span>
+  );
 
+  return (
+    <div className="shrink-0 border-b" style={{ borderColor: "#ece5fb", background: "rgba(124,58,237,.045)" }}>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-3.5 py-1">
         {summary && (
           <button
             type="button"
-            onClick={() => setOpenPane((p) => (p === "summary" ? null : "summary"))}
+            onClick={() => setOpenPane((pane) => (pane === "summary" ? null : "summary"))}
             className={btn(openPane === "summary")}
             style={openPane === "summary" ? { background: "rgba(124,58,237,.1)" } : undefined}
           >
-            <span
-              className="inline-block text-[10px] transition-transform"
-              style={{
-                color: openPane === "summary" ? LAYER.product : "#c4c4c4",
-                transform: openPane === "summary" ? "rotate(90deg)" : "rotate(0deg)",
-              }}
-            >
-              ›
-            </span>
+            {caret(openPane === "summary")}
             What the assistant remembers
           </button>
         )}
 
         <button
           type="button"
-          onClick={() => setOpenPane((p) => (p === "how" ? null : "how"))}
+          onClick={() => setOpenPane((pane) => (pane === "how" ? null : "how"))}
           className={btn(openPane === "how")}
           style={openPane === "how" ? { background: "rgba(124,58,237,.1)" } : undefined}
         >
-          <span
-            className="inline-block text-[10px] transition-transform"
-            style={{
-              color: openPane === "how" ? LAYER.product : "#c4c4c4",
-              transform: openPane === "how" ? "rotate(90deg)" : "rotate(0deg)",
-            }}
-          >
-            ›
-          </span>
+          {caret(openPane === "how")}
           How memory works
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setDismissed(true)}
-          title="Hide this bar"
-          className="ml-auto px-1 py-0.5 text-[11px] leading-none"
-          style={{ color: "#bda8e8" }}
-        >
-          ✕
         </button>
       </div>
 
       {openPane === "summary" && summary && (
-        <div className="max-w-[720px] px-4 pb-2.5">
+        <div className="max-w-[720px] px-3.5 pb-2.5">
           <p className="mb-1.5 text-[12.5px] leading-[1.6] text-muted-foreground">{summary}</p>
           <button
             type="button"
@@ -399,7 +392,7 @@ export function ThreadInfoStrip({
       )}
 
       {openPane === "how" && (
-        <div className="max-w-[720px] px-4 pb-3 text-[12.5px] leading-[1.6] text-muted-foreground">
+        <div className="max-w-[720px] px-3.5 pb-2.5 text-[12.5px] leading-[1.6] text-muted-foreground">
           Two kinds of memory, both under your control:{" "}
           <strong className="text-foreground">this conversation</strong> keeps a rolling summary you can delete any
           time, and <strong className="text-foreground">project memory</strong> stores facts and decisions only when

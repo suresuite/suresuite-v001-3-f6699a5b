@@ -1,20 +1,38 @@
 /**
- * ChatWorkspace — agent strip, memory strip, message stream, composer.
+ * ChatWorkspace — chrome band, message stream, composer.
  *
  * Data flow is unchanged: useProjectChat(threadId) owns messages/loading/
  * error/send; this component only renders them. Empty threads show the agent
  * picker; populated threads show the stream with the composer docked below.
  *
- * The min-w-0 on the column and the agent strip matters — without it a long
+ * THE BOTTOM-PIN CONTRACT (v1b space pass). This column is
+ *
+ *     flex column, min-h-0
+ *       chrome band     shrink-0
+ *       message stream  flex-1, min-h-0, overflow-y-auto   ← the ONLY flexible child
+ *       composer        shrink-0
+ *
+ * and that is what keeps the composer on the bottom edge at every viewport
+ * size: the stream absorbs all the slack and scrolls. Give the stream a fixed
+ * height, or let the composer grow, and the composer walks up the panel on a
+ * tall screen and off the bottom of it on a short one.
+ *
+ * The agent strip and the violet memory band used to be two stacked full-width
+ * rows, ~60px of chrome above every conversation. They are one ~28px row now:
+ * the memory band is a chip that opens SidebarPanels' MemoryPanel on demand,
+ * and the row's far right carries the window-mode control.
+ *
+ * The min-w-0 on the column and the chrome band matters — without it a long
  * agent blurb widens the grid track and pushes the composer off-screen.
  */
 import React from "react";
+import { Brain, Maximize2, Minimize2 } from "lucide-react";
 import { AGENTS, getAgent } from "@/lib/chat/agents";
 import { useProjectChat } from "@/hooks/useProjectChat";
-import { AGENT_COLOR, AGENT_MONO, KX_TIGHT, LAYER, tint } from "./piUi";
+import { AGENT_COLOR, AGENT_MONO, KX_TIGHT, LAYER, READING_COL, Segmented, tint } from "./piUi";
 import { ChatComposer } from "./ChatComposer";
 import { MessageStream } from "./MessageStream";
-import { ThreadInfoStrip } from "./SidebarPanels";
+import { MemoryPanel } from "./SidebarPanels";
 import { SuggestedActions } from "./SuggestedActions";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +55,10 @@ interface ChatWorkspaceProps {
   serverThreadId?: string | null;
   threadSummary?: string | null;
   onDeleteSummary?: () => void;
+  /** Window mode. The page owns the state (it owns the panel's positioning);
+   *  the control lives here because the chrome band is where it belongs. */
+  fullScreen?: boolean;
+  onFullScreenChange?: (v: boolean) => void;
 }
 
 const greeting = (name: string) => {
@@ -62,9 +84,13 @@ export function ChatWorkspace({
   serverThreadId = null,
   threadSummary = null,
   onDeleteSummary = () => {},
+  fullScreen = false,
+  onFullScreenChange = () => {},
 }: ChatWorkspaceProps) {
   const { messages, loading, error, send } = useProjectChat(threadId);
   const agent = agentId ? getAgent(agentId) : null;
+  const [memoryOpen, setMemoryOpen] = React.useState(false);
+  const hasMemory = Boolean(threadSummary || projectId);
   const submit = () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -104,12 +130,12 @@ export function ChatWorkspace({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col bg-background">
-      {/* agent strip */}
-      {agent && (
-        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[--hair-border] bg-[#fcfcfc] px-4 py-2">
-          <div className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-muted-foreground">
+      {/* chrome band — agent, memory chip and window mode in ONE row */}
+      <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-[--hair-border] bg-[#fcfcfc] py-[5px] pl-3.5 pr-2.5">
+        {agent ? (
+          <>
             <span
-              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm font-mono text-[9px] font-semibold"
+              className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm font-mono text-[9px] font-semibold"
               style={{
                 background: tint(AGENT_COLOR[agent.id] ?? "#111111", 0.12),
                 color: AGENT_COLOR[agent.id] ?? "#111111",
@@ -117,24 +143,68 @@ export function ChatWorkspace({
             >
               {AGENT_MONO[agent.id] ?? "GA"}
             </span>
-            <span className="min-w-0 truncate font-semibold text-foreground" title={agent.name}>{agent.name}</span>
-            <span className="shrink-0 text-[#c4c4c4]">·</span>
-            <span className="min-w-0 flex-1 truncate">{agent.blurb}</span>
-          </div>
+            {/* min-w-0 truncate, not the prototype's flex-shrink:0: an agent
+                name is interpolated text of no fixed width, and pinning it
+                would push the memory chip and the window controls out of the
+                band on a narrow workspace (adaptive-UI audit §2.5). It
+                truncates before the blurb runs out, so the band's controls
+                are always reachable. */}
+            <span className="min-w-0 truncate text-[12px] font-semibold text-foreground" title={agent.name}>
+              {agent.name}
+            </span>
+            <span className="shrink-0 text-[12px] text-[#c4c4c4]">·</span>
+            <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{agent.blurb}</span>
+          </>
+        ) : (
+          /* No agent yet — the band still carries the window control, so the
+             slack has to come from somewhere. */
+          <span className="min-w-0 flex-1" />
+        )}
+
+        {hasMemory && (
+          <button
+            type="button"
+            onClick={() => setMemoryOpen((v) => !v)}
+            aria-expanded={memoryOpen}
+            title="What the assistant remembers"
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-px text-[11px]"
+            style={{
+              background: tint(LAYER.product, memoryOpen ? 0.14 : 0.07),
+              color: LAYER.product,
+            }}
+          >
+            <Brain className="h-[11px] w-[11px]" />
+            Memory
+          </button>
+        )}
+
+        <Segmented
+          size="icon"
+          className="shrink-0"
+          ariaLabel="Window mode"
+          value={fullScreen ? "full" : "app"}
+          onChange={(v) => onFullScreenChange(v === "full")}
+          options={[
+            { value: "app", label: "Fit to the SuReSuite app screen", icon: <Minimize2 className="h-3 w-3" /> },
+            { value: "full", label: "Full screen", icon: <Maximize2 className="h-3 w-3" /> },
+          ]}
+        />
+
+        {agent && (
           <button
             type="button"
             onClick={() => onAgentChange("")}
-            className="shrink-0 text-[13px] text-muted-foreground"
+            title="Clear the agent"
+            aria-label="Clear the agent"
+            className="shrink-0 text-[12px] text-[#b8b8b8] hover:text-foreground"
           >
             ✕
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* memory strip (M1 §14.3) */}
-      {(threadSummary || projectId) && (
-        <ThreadInfoStrip summary={threadSummary} onDeleteSummary={onDeleteSummary} />
-      )}
+      {/* the band the memory chip replaced, on demand (M1 §14.3) */}
+      {hasMemory && memoryOpen && <MemoryPanel summary={threadSummary} onDeleteSummary={onDeleteSummary} />}
 
       {messages.length === 0 ? (
         /* ── empty state ─────────────────────────────────────────────── */
@@ -202,11 +272,12 @@ export function ChatWorkspace({
             error={error}
             threadMode={threadMode}
             onModeChange={onModeChange}
-            containerClassName="mx-auto max-w-[740px] px-5 pb-7 pt-5"
+            mergedMeta
+            containerClassName={cn(READING_COL, "gap-3 px-4 pb-4 pt-3.5")}
           />
 
-          <div className="border-t border-[--hair-border] bg-[#fcfcfc] px-4 py-3">
-            <div className="mx-auto max-w-[740px]">
+          <div className="shrink-0 border-t border-[--hair-border] bg-[#fcfcfc] px-4 py-2">
+            <div className={READING_COL}>
               <SuggestedActions
                 projectId={projectId}
                 threadId={serverThreadId}

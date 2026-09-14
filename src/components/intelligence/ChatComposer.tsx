@@ -36,7 +36,12 @@ interface ChatComposerProps {
 const COLLAPSED_MAX = 160;
 const EXPANDED_MAX = 420;
 const EXPANDED_MIN = 220;
-const BASE = 40;
+// One line of 14px/1.4 plus the 9px/6px box padding. It was 40 while the
+// composer band carried 27px controls; the v1b pass drops the controls to 24px
+// (26px send) and the resting box with them, which is ~14px of the ~60px the
+// pass returns to the conversation. The ceilings are untouched — a long draft
+// still grows to 160, and 420 with the expander.
+const BASE = 34;
 
 export function ChatComposer({
   value,
@@ -99,13 +104,16 @@ export function ChatComposer({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        className="block w-full resize-none rounded-t-sm border-none bg-transparent px-3 pb-2 pt-[11px] text-[14px] leading-[1.4] text-foreground outline-none placeholder:text-[#a8a8a8]"
+        className="block w-full resize-none rounded-t-sm border-none bg-transparent px-3 pb-1.5 pt-[9px] text-[14px] leading-[1.4] text-foreground outline-none placeholder:text-[#a8a8a8]"
         style={{ minHeight: BASE, overflow: "hidden" }}
       />
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-[--hair-divider] px-2 py-1.5">
+      {/* #ececec, not --hair-divider: this rule sits INSIDE the composer box,
+          a hairline lighter than the box's own #d4d4d4 edge, so the box reads
+          as one control rather than two stacked ones. */}
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-[#ececec] px-1.5 py-1">
         <Select value={projectId ?? "none"} onValueChange={(v) => onProjectChange(v === "none" ? null : v)}>
-          <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[--zinc-border] px-1.5 text-[11.5px] text-muted-foreground">
+          <SelectTrigger className="h-6 w-auto gap-1 rounded-sm border-[--zinc-border] px-1.5 text-[11.5px] text-muted-foreground">
             {/* Explicit children so an unattached thread reads "+ Project"
                 instead of the "No project" item label. */}
             <SelectValue>
@@ -127,10 +135,11 @@ export function ChatComposer({
         <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
-            onClick={toggleExpand}
             title={expanded ? "Collapse composer" : "Expand composer for longer input"}
+            aria-label={expanded ? "Collapse composer" : "Expand composer for longer input"}
+            onClick={toggleExpand}
             className={cn(
-              "flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-sm border border-[--hair-border]",
+              "flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[--zinc-border]",
               expanded ? "bg-foreground text-background" : "bg-background text-muted-foreground",
             )}
           >
@@ -138,14 +147,14 @@ export function ChatComposer({
           </button>
 
           {modesOn && (
-            <div className="inline-flex rounded-sm border border-[--hair-border] p-[2px]">
+            <div className="inline-flex rounded-sm border border-[--zinc-border] p-[2px]">
               {(["ask", "review"] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => onModeChange(m)}
                   className={cn(
-                    "rounded-[1px] px-[9px] py-[3px] text-[12px] capitalize",
+                    "rounded-[2px] px-2 py-[2px] text-[11.5px] capitalize",
                     mode === m ? "bg-foreground text-background" : "text-muted-foreground",
                   )}
                 >
@@ -157,7 +166,7 @@ export function ChatComposer({
                 type="button"
                 disabled
                 title="Auto isn't available: it unlocks only after sustained accepted-proposal rates, org opt-in, and resolved identities."
-                className="cursor-not-allowed px-[9px] py-[3px] text-[12px] text-[#c9c9c9]"
+                className="cursor-not-allowed px-2 py-[2px] text-[11.5px] text-[#c9c9c9]"
               >
                 Auto
               </button>
@@ -165,7 +174,7 @@ export function ChatComposer({
           )}
 
           <Select value={model} onValueChange={onModelChange}>
-            <SelectTrigger className="h-[27px] w-auto gap-1 rounded-sm border-[--zinc-border] px-1.5 text-[11.5px] text-muted-foreground">
+            <SelectTrigger className="h-6 w-auto gap-1 rounded-sm border-[--zinc-border] px-1.5 text-[11.5px] text-muted-foreground">
               <SelectValue>{getModelLabel(model)}</SelectValue>
             </SelectTrigger>
             <SelectContent align="end" className="rounded-sm">
@@ -179,10 +188,12 @@ export function ChatComposer({
 
           <button
             type="button"
+            title="Send"
+            aria-label="Send"
             onClick={onSubmit}
             disabled={!canSend}
             className={cn(
-              "flex h-[30px] w-[30px] items-center justify-center rounded-sm",
+              "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-sm",
               canSend ? "bg-foreground text-background" : "cursor-default bg-[#f0f0f0] text-[#b8b8b8]",
             )}
           >

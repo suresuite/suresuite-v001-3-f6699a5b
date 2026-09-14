@@ -8,12 +8,24 @@
  *
  *  - PageHeader with NO subtitle (AdminLayout pattern).
  *  - The chat panel is a resizable/collapsible grid: drag the 5px handle
- *    (200–460px) or collapse to a 48px rail to reclaim workspace. Track count
- *    changes with the state (48px 1fr collapsed vs Wpx 5px 1fr open) —
- *    keeping three tracks while the handle is unmounted squeezes the
- *    workspace into the rail column.
+ *    (200–460px) or collapse to a 48px rail to reclaim workspace. The three
+ *    tracks are constant — `<rail>px 5px minmax(0,1fr)` — and so is the
+ *    divider element, because it carries the panel's ONE vertical rule. A
+ *    track count that changes with the state while the divider is unmounted
+ *    squeezes the workspace into the rail column; a divider that unmounts
+ *    while the tracks stay leaves the rail with no rule at all.
  *  - Sidebar file/memory panels are layer-tinted disclosures (teal #14b8c4 /
  *    purple #7c3aed) so they cost 36px when closed.
+ *  - The panel FILLS the gutter column instead of measuring itself against
+ *    the viewport with `calc(100vh - 150px)`: the column is a flex column of
+ *    a known height, the header is shrink-0 and the panel is `flex-1
+ *    min-h-0`. That is what lets ChatWorkspace pin its composer to the bottom
+ *    edge at every desktop size (see its own bottom-pin contract) — a panel
+ *    whose height is guessed from the viewport is either short of the fold or
+ *    past it at every size the guess was not measured at.
+ *  - Window mode: in-app (default) or full screen, the panel promoted to
+ *    `fixed inset-0`. The control lives in the workspace chrome band; the
+ *    state lives here because positioning the panel is the page's job.
  *
  * Below md this shell is not used at all. The phone composition is a different
  * tree (MobileIntelligence) — PAGES.md 16: the page title, agent strip, memory
@@ -40,6 +52,7 @@ import { useChatThreads, QUICK_THREAD_ID } from "@/hooks/useChatThreads";
 import { getStoredModel, setStoredModel } from "@/components/chat/ModelPicker";
 import { fileWorkspaceUiEnabled, useUserFiles, expiryCountdown } from "@/hooks/useUserFiles";
 import { useProjectMemory } from "@/hooks/useProjectMemory";
+import { cn } from "@/lib/utils";
 
 interface ProjectIntelligenceProps {
   isCollapsed: boolean;
@@ -61,6 +74,9 @@ const SIDEBAR_MAX = 460;
 const SIDEBAR_DEFAULT = 264;
 const KEY_SIDEBAR_W = "projectIntelligence.sidebarWidth.v1";
 const KEY_SIDEBAR_COLLAPSED = "projectIntelligence.sidebarCollapsed.v1";
+const KEY_FULLSCREEN = "projectIntelligence.fullScreen.v1";
+/** The rail's collapsed width. The handle track stays at 5px either way. */
+const SIDEBAR_COLLAPSED_W = 48;
 
 const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, setIsCollapsed }) => {
   const { user } = useAuth();
@@ -81,6 +97,10 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     () => (typeof window !== "undefined" ? window.localStorage.getItem(KEY_SIDEBAR_COLLAPSED) === "1" : false),
   );
   const [resizing, setResizing] = useState(false);
+  // Window mode, persisted alongside the other panel prefs.
+  const [fullScreen, setFullScreenState] = useState<boolean>(
+    () => (typeof window !== "undefined" ? window.localStorage.getItem(KEY_FULLSCREEN) === "1" : false),
+  );
 
   // Below md the three-column grid cannot work: at 390px a 264px sidebar plus
   // the 5px handle leaves the workspace ~120px, and the handle is mouse-only so
@@ -221,6 +241,26 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
     }
   };
 
+  const setFullScreen = (v: boolean) => {
+    setFullScreenState(v);
+    try {
+      window.localStorage.setItem(KEY_FULLSCREEN, v ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Escape leaves full screen. It is the only way out that does not need the
+  // pointer, and the panel covers the nav and the header while it is on.
+  useEffect(() => {
+    if (!fullScreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullScreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullScreen]);
+
   const setCollapsed = (v: boolean) => {
     setSidebarCollapsed(v);
     try {
@@ -353,17 +393,32 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={PAGE_GUTTER}>
+      {/* The gutter column is a flex column of a known height, so the panel
+          below can be its flexible child. `100dvh` less PageLayout's own
+          `md:pb-10` credit-bar reservation: the gutter's `py-6` and that 40px
+          are what sits under the composer, and both are load-bearing (the
+          header bleeds out of this wrapper with `-mx-12 -mt-6`). */}
+      <div className={cn(PAGE_GUTTER, "flex min-h-0 flex-col md:h-[calc(100dvh-2.5rem)]")}>
         {/* No subtitle — AdminLayout header pattern. */}
         <PageHeader title="Project Intelligence" />
 
         <div
-          className="grid overflow-hidden rounded-sm border border-[--hair-border] bg-background
-                     h-[calc(100vh-150px)] min-h-[560px]"
+          className={cn(
+            "grid overflow-hidden bg-background",
+            fullScreen
+              // Over the nav (z-[60], earlier in the DOM), the sticky header
+              // (z-40) and the fixed credit bar (z-30). Same element, same
+              // React position — only the positioning changes, so the thread,
+              // the scroll and the draft all survive the switch.
+              ? "fixed inset-0 z-[60]"
+              // min-h-[420px] is the floor the bottom-pin contract needs: below
+              // it the stream would be shorter than one turn and the composer
+              // would be pushed out of the panel instead of the stream scrolling.
+              : "min-h-[420px] flex-1 rounded-sm border border-[--hair-border]",
+          )}
           style={{
-            gridTemplateColumns: sidebarCollapsed
-              ? "48px minmax(0,1fr)"
-              : sidebarWidth + "px 5px minmax(0,1fr)",
+            gridTemplateColumns:
+              (sidebarCollapsed ? SIDEBAR_COLLAPSED_W : sidebarWidth) + "px 5px minmax(0,1fr)",
           }}
         >
           {/* display:contents keeps this a DIRECT grid child; a plain wrapper
@@ -378,15 +433,22 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
             />
           </div>
 
-          {/* 6 · the handle is onMouseDown-only. */}
-          {!sidebarCollapsed && (
-            <div
-              onMouseDown={startResize}
-              title="Drag to resize"
-              className="cursor-col-resize border-r border-[--hair-border]"
-              style={{ background: resizing ? "var(--hair-border)" : "transparent" }}
-            />
-          )}
+          {/* THE panel's one vertical rule, and the resize target.
+              `border-l`, not `border-r`: the rule belongs against the rail,
+              where the drag target is, and the aside no longer draws its own
+              (ChatSidebar). Rendered in both states so the collapsed rail is
+              still separated from the workspace; only the drag is dropped,
+              since there is nothing to size while the rail is collapsed.
+              6 · the handle is onMouseDown-only. */}
+          <div
+            onMouseDown={sidebarCollapsed ? undefined : startResize}
+            title={sidebarCollapsed ? undefined : "Drag to resize"}
+            className={cn(
+              "border-l border-[--hair-border]",
+              !sidebarCollapsed && "cursor-col-resize",
+            )}
+            style={{ background: resizing ? "var(--hair-border)" : "transparent" }}
+          />
 
           <ChatWorkspace
             threadId={activeThreadId}
@@ -405,6 +467,8 @@ const ProjectIntelligence: React.FC<ProjectIntelligenceProps> = ({ isCollapsed, 
             serverThreadId={activeThreadId ? getServerThreadId(activeThreadId) : null}
             threadSummary={activeThread?.summary ?? null}
             onDeleteSummary={() => activeThreadId && clearThreadSummary(activeThreadId)}
+            fullScreen={fullScreen}
+            onFullScreenChange={setFullScreen}
           />
         </div>
       </div>
