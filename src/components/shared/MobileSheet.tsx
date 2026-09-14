@@ -140,7 +140,15 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
             <X className="h-[18px] w-[18px]" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+        {/* `overscroll-contain` is the other half of the body lock above: the
+            lock stops the page scrolling while the sheet is open, this stops a
+            flick that reaches the end of the rows from chaining out of the
+            sheet into whatever will scroll next — on iOS that hands the
+            gesture to the page and the list stops dead mid-drag. A long list
+            (every project, every policy) is exactly where it shows up. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+          {children}
+        </div>
         {footer && (
           <div className="flex shrink-0 gap-2 border-t border-[#ebebeb] px-3 py-2.5">{footer}</div>
         )}
@@ -186,6 +194,9 @@ export function MobileSheetRow({
       onClick={onClick}
       title={hint}
       aria-disabled={disabled || undefined}
+      // The hook a caller uses to open its sheet AT the current row rather
+      // than at row 1 — see ProjectChip.
+      data-selected={checked ? 'true' : undefined}
       className={cn(
         "flex w-full min-h-11 items-center gap-2.5 border-b border-[#e8e8ea] bg-white px-3 py-[var(--m-row-y)] text-left last:border-b-0",
         disabled ? "cursor-not-allowed opacity-60" : "active:bg-[#fafafa]",

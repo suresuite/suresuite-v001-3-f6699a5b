@@ -138,6 +138,8 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   // once — is open below its compact row. Desktop is untouched; ProjectCard
   // there still renders unconditionally for every project, same as always.
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
+  /** Set only when a sheet opened the project — see `openProject`. */
+  const [revealProjectId, setRevealProjectId] = useState<string | null>(null);
   const [projectQuery, setProjectQuery] = useState('');
   const [activeSheetOpen, setActiveSheetOpen] = useState(false);
   const [sharedSheetOpen, setSharedSheetOpen] = useState(false);
@@ -837,14 +839,46 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   );
 
   const activeRowBudget = useRowBudget(2, 3, 5);
-  const shownActive = activeProjects.slice(0, activeRowBudget);
+  const budgetedActive = activeProjects.slice(0, activeRowBudget);
+  // A project tapped in the All-N sheet is, by definition, usually PAST the
+  // budgeted window — and the window was the only thing the band rendered, so
+  // the sheet closed onto a list that never showed the project just chosen and
+  // the tap read as "nothing happened". The budget is a rule about how much
+  // shows at rest, not a rule that can drop a row the user just asked for (v2
+  // §5.4: deferred into a sheet, never dropped), so the opened one rides along
+  // under the budgeted rows until it is closed again.
+  const openedBeyondBudget = activeProjects.find(
+    (p) => p.id === openProjectId && !budgetedActive.some((b) => b.id === p.id),
+  );
+  const shownActive = openedBeyondBudget
+    ? [...budgetedActive, openedBeyondBudget]
+    : budgetedActive;
+  // Same gap, one band down and total: "Shared with me" renders a single count
+  // row, so a project opened from ITS sheet had nowhere at all to land.
+  const openedShared = sharedProjects.find((p) => p.id === openProjectId) ?? null;
 
-  const openProject = (id: string) => {
+  // `reveal` is the sheet's flag: the row that opened the project is gone with
+  // the sheet, so the block it opened has to bring itself into view or the
+  // whole gesture ends on whatever part of the page happened to be scrolled
+  // to. An inline row passes nothing — it is already on screen, and moving the
+  // page under a finger that just tapped it is the worse behaviour.
+  const openProject = (id: string, reveal = false) => {
     setOpenProjectId((cur) => (cur === id ? null : id));
     setActiveSheetOpen(false);
     setSharedSheetOpen(false);
     recordLastOpened(id);
+    if (reveal) setRevealProjectId(id);
   };
+
+  useEffect(() => {
+    if (!revealProjectId) return;
+    const el = document.getElementById(`m-project-${revealProjectId}`);
+    // The block mounts in the same commit this effect runs after, so one
+    // lookup is enough; the flag clears either way so a later re-render
+    // cannot scroll the page a second time.
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setRevealProjectId(null);
+  }, [revealProjectId]);
 
   // The project list, hoisted so the mobile group and the desktop stack
   // mount the SAME cards with the same handlers — <ProjectCard> is what
@@ -858,7 +892,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
             const isSelected = selectedProject?.id === project.id;
 
             return (
-              <div key={project.id}>
+              <div key={project.id} id={`m-project-${project.id}`}>
                 <ProjectCard
                   project={project}
                   completion={completion}
@@ -1318,6 +1352,21 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
 
             {sharedProjects.length > 0 && (
               <MobilePanel label="Shared with me" counter={String(sharedProjects.length)}>
+                {openedShared && (() => {
+                  const completion = getCompletionInfo(openedShared);
+                  const status = projectStatus(openedShared, completion);
+                  return (
+                    <React.Fragment key={openedShared.id}>
+                      <MobileRow
+                        dot={status.dot}
+                        label={openedShared.name}
+                        sub={`${openedShared.modeler_name} · ${status.label}`}
+                        onClick={() => openProject(openedShared.id)}
+                      />
+                      {renderProjectBlock(openedShared)}
+                    </React.Fragment>
+                  );
+                })()}
                 <MobileRow
                   label="View shared projects"
                   onClick={() => setSharedSheetOpen(true)}
@@ -1354,7 +1403,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                       dot={status.dot}
                       label={project.name}
                       sub={status.label}
-                      onClick={() => openProject(project.id)}
+                      onClick={() => openProject(project.id, true)}
                     />
                   );
                 })}
@@ -1376,7 +1425,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                       dot={status.dot}
                       label={project.name}
                       sub={`${project.modeler_name} · ${status.label}`}
-                      onClick={() => openProject(project.id)}
+                      onClick={() => openProject(project.id, true)}
                     />
                   );
                 })}

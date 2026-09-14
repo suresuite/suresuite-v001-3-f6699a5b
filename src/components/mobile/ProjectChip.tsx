@@ -18,7 +18,13 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { M } from './tokens';
+import { MobileHeaderSearch } from './HeaderSearch';
 import { MobileSheet, MobileSheetRow } from '@/components/shared/MobileSheet';
+
+/** Above this many projects the sheet grows a filter field. Below it, scrolling
+ *  the sheet IS the search and a field would only cost a row of height — a
+ *  modeller with five projects reads them faster than they type. */
+const FILTER_FROM = 8;
 
 export interface ProjectChipProject {
   id: string;
@@ -37,13 +43,35 @@ export function ProjectChip({
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
   const selected = projects.find((p) => p.id === selectedId) ?? null;
+  const rowsRef = React.useRef<HTMLDivElement | null>(null);
+
+  const q = query.trim().toLowerCase();
+  const matches = q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
+
+  // Opening onto row 1 of 40 hides the project you are ON — and with it the
+  // only tick that says which one that is. The sheet opens at the current
+  // project instead, so a long list starts where the user already is and
+  // scrolls both ways from there.
+  React.useEffect(() => {
+    if (!open) return;
+    const el = rowsRef.current?.querySelector('[data-selected="true"]');
+    el?.scrollIntoView({ block: 'center' });
+  }, [open]);
+
+  const openSheet = () => {
+    // A stale filter from the last switch would open the sheet on a subset of
+    // the projects with no sign of why — the field starts empty every time.
+    setQuery('');
+    setOpen(true);
+  };
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openSheet}
         title={selected ? selected.name : 'Choose a project'}
         aria-label={selected ? `Project ${selected.name}, change project` : 'Choose a project'}
         className={cn(
@@ -72,18 +100,42 @@ export function ProjectChip({
         </span>
       </button>
 
-      <MobileSheet open={open} title="Switch project" onClose={() => setOpen(false)}>
-        {projects.map((p) => (
-          <MobileSheetRow
-            key={p.id}
-            title={p.name}
-            checked={p.id === selectedId}
-            onClick={() => {
-              onSelect(p.id);
-              setOpen(false);
-            }}
-          />
-        ))}
+      <MobileSheet
+        open={open}
+        title="Switch project"
+        sub={projects.length >= FILTER_FROM ? `${projects.length} projects` : undefined}
+        onClose={() => setOpen(false)}
+      >
+        {projects.length >= FILTER_FROM && (
+          // Sticky, not scrolled with the rows: on a list long enough to need
+          // a filter at all, a field that scrolls away is a field you have to
+          // scroll back to (the same argument §1.2 makes for header search).
+          <div className="sticky top-0 z-10 flex border-b border-[#e8e8ea] bg-white px-3 py-2">
+            <MobileHeaderSearch
+              value={query}
+              onChange={setQuery}
+              placeholder="Find a project"
+            />
+          </div>
+        )}
+        <div ref={rowsRef}>
+          {matches.map((p) => (
+            <MobileSheetRow
+              key={p.id}
+              title={p.name}
+              checked={p.id === selectedId}
+              onClick={() => {
+                onSelect(p.id);
+                setOpen(false);
+              }}
+            />
+          ))}
+          {matches.length === 0 && (
+            <p className="px-3 py-9 text-center text-[13px] leading-relaxed text-[#525252]">
+              No project matches “{query.trim()}”.
+            </p>
+          )}
+        </div>
       </MobileSheet>
     </>
   );
