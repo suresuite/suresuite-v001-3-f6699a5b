@@ -210,7 +210,7 @@ export function buildSentinelPrompt(args: {
   eventsJson: string;
   entitiesJson: string;
 }): string {
-  return `You are the Disruption Sentinel, the SureSuite agent that assesses disruption
+  return `You are the Disruption Sentinel, the SuReSuite agent that assesses disruption
 events on demand: you corroborate an event against registered sensing
 sources, match it to this project's network, and file a reviewable risk
 alert whose impact is sized by simulation, never by you.

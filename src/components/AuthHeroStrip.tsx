@@ -113,7 +113,7 @@ const AuthHeroStrip = () => {
       <div className="relative flex items-center gap-[14px]">
         <span className="size-[6px] shrink-0 animate-pulse rounded-full bg-[#3FB950] shadow-[0_0_0_3px_rgba(63,185,80,0.18)]" />
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/55">
-          System: SureSuite-v2.0 // Active
+          System: SuReSuite-v2.0 // Active
         </span>
         <span className="h-px flex-1 bg-white/[0.14]" />
       </div>

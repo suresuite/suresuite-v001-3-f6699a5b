@@ -1,4 +1,4 @@
-# SureSuite — First-Time User Walkthrough & Gap Analysis
+# SuReSuite — First-Time User Walkthrough & Gap Analysis
 
 > Purpose: a page-by-page, click-by-click narrative of the product as a brand-new user
 > experiences it, followed by a structured catalog of the gaps between what the UI
@@ -7,7 +7,7 @@
 > (`src/`), not from a marketing deck — every screen, button, empty state, and dead
 > end below is traceable to a component in the codebase.
 >
-> Scope note: SureSuite uses a **custom email/password auth** (Supabase RPC
+> Scope note: SuReSuite uses a **custom email/password auth** (Supabase RPC
 > `authenticate_approved_user`, not Supabase Auth) and a **4-role model**
 > (`super_admin`, `admin`, `modeler`, `user`). Several page-level behaviors branch on
 > role, so where it matters the narrative calls out what each role sees.

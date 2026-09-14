@@ -105,7 +105,7 @@ export function buildWorkbookModel(args: {
 }): WorkbookSheet[] {
   const used = new Set<string>();
   const overview: Cell[][] = [
-    ["SureSuite decision report"],
+    ["SuReSuite decision report"],
     ["Title", args.title],
     ["Template", args.templateId],
     [null],
@@ -157,7 +157,7 @@ export function buildPdfModel(args: {
 }): PdfBlock[] {
   const blocks: PdfBlock[] = [
     { type: "title", text: args.title },
-    { type: "note", text: `SureSuite decision report - template: ${args.templateId}` },
+    { type: "note", text: `SuReSuite decision report - template: ${args.templateId}` },
   ];
   for (const s of args.sections) {
     if (s.kind === "narrative") {

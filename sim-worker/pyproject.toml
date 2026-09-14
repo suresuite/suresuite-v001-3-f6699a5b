@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sim-worker"
 version = "0.1.0"
-description = "SureSuite simulation worker — ingestion + scsim bridge"
+description = "SuReSuite simulation worker — ingestion + scsim bridge"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",

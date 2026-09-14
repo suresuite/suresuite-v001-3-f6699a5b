@@ -2,7 +2,7 @@
 
 **A separation-of-powers architecture for generative AI in supply chain decision-making**
 
-*Research positioning — SureSuite / scsim. Companion to `docs/design/next-gen-platform-design.md` and `docs/design/ai-agents.md`.*
+*Research positioning — SuReSuite / scsim. Companion to `docs/design/next-gen-platform-design.md` and `docs/design/ai-agents.md`.*
 
 ---
 

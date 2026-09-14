@@ -305,7 +305,7 @@ Deno.test("vv prompt template carries the verbatim §5.3 + AGENT_COMMON blocks",
     scenarioHash: "c",
     activeCardJson: "null",
   });
-  assertStringIncludes(prompt, "You are the V&V Analyst, the SureSuite agent that interprets verification &");
+  assertStringIncludes(prompt, "You are the V&V Analyst, the SuReSuite agent that interprets verification &");
   assertStringIncludes(prompt, "call draft_model_card_narrative ONCE, copying every numeric");
   assertStringIncludes(prompt, "the card must be\n  reviewed and approved before it governs Lab runs.");
   assertStringIncludes(prompt, AGENT_COMMON);

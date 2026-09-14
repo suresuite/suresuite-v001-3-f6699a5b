@@ -1134,7 +1134,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
       <div className={PAGE_GUTTER}>
         <PageHeader
           title="Developer API"
-          subtitle="Drive SureSuite programmatically — API keys, scopes, and quickstarts for the /v1 gateway"
+          subtitle="Drive SuReSuite programmatically — API keys, scopes, and quickstarts for the /v1 gateway"
           onRefresh={load}
           refreshLoading={loading}
         />

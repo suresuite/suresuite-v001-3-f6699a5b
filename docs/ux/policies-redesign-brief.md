@@ -9,7 +9,7 @@
 
 ## PROMPT — copy from here ↓
 
-You are closing a set of well-specified UX/engineering gaps in the **SureSuite** Policies workspace
+You are closing a set of well-specified UX/engineering gaps in the **SuReSuite** Policies workspace
 (`/policies`). The analysis is already done — do **not** re-derive it. Read the two canonical
 documents first, then execute the tasks below, smallest-risk first, one PR per task.
 

@@ -98,7 +98,7 @@ export function buildPolicyVersionWorkbook(
   }
 
   const meta: (string | number | null)[][] = [
-    ["SureSuite verifiable export — POLICY SNAPSHOT ONLY"],
+    ["SuReSuite verifiable export — POLICY SNAPSHOT ONLY"],
     [
       "Scope",
       "This workbook is the saved policy bundle of one model version. It contains NO network/" +
@@ -218,7 +218,7 @@ export function buildDatasetWorkbook(
   }
 
   const meta: (string | number | null)[][] = [
-    ["SureSuite verifiable export — DATASET (engine-read tables)"],
+    ["SuReSuite verifiable export — DATASET (engine-read tables)"],
     [
       "Scope",
       "The canonical source rows of the six tables the simulation engine consumes, exactly as " +
@@ -282,7 +282,7 @@ export function buildRunResultsWorkbook(
 
   // run_meta — the identity a reviewer checks against the other two exports.
   const meta: (string | number | null)[][] = [
-    ["SureSuite verifiable export — RUN RESULTS"],
+    ["SuReSuite verifiable export — RUN RESULTS"],
     [
       "Scope",
       "One simulation run: its full provenance (policy_hash ↔ policy export; graph_hash ↔ dataset " +

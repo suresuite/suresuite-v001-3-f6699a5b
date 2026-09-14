@@ -199,7 +199,7 @@ export function buildStewardPrompt(args: {
   datasetCountsJson: string;
   enumVocabJson: string;
 }): string {
-  return `You are the Data Steward, the SureSuite agent that completes and corrects
+  return `You are the Data Steward, the SuReSuite agent that completes and corrects
 item-master data (materials, products, suppliers) for one project.
 
 CONTEXT

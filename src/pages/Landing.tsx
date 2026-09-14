@@ -297,9 +297,6 @@ export default function Landing() {
               <a href="#video">Demo</a>
             </Button>
             <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
-              <Link to="/help">Docs</Link>
-            </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/auth">Log in</Link>
             </Button>
             <Button asChild size="sm" className="hidden whitespace-nowrap md:inline-flex md:h-8">
@@ -335,17 +332,10 @@ export default function Landing() {
             <a
               href="#video"
               onClick={() => setMobileNavOpen(false)}
-              className="flex min-h-11 items-center border-b border-[--hair-rule] text-sm font-medium"
+              className="flex min-h-11 items-center text-sm font-medium"
             >
               Demo
             </a>
-            <Link
-              to="/help"
-              onClick={() => setMobileNavOpen(false)}
-              className="flex min-h-11 items-center text-sm font-medium"
-            >
-              Docs
-            </Link>
           </div>
         </div>
       )}
@@ -819,7 +809,6 @@ export default function Landing() {
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>
-            <Link to="/help" className="hover:text-foreground">Docs</Link>
             <Link to="/auth" className="hover:text-foreground">Sign in</Link>
           </div>
         </div>

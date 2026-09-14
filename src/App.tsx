@@ -43,8 +43,6 @@ const Profile = lazy(() => import('./pages/Profile'));
 const DeveloperApi = lazy(() => import('./pages/DeveloperApi'));
 const Forbidden = lazy(() => import('./pages/Forbidden'));
 const NotFound = lazy(() => import('./pages/NotFound'));
-const DocsLayout = lazy(() => import('@/components/docs/DocsLayout'));
-const HelpPage = lazy(() => import('./pages/help/HelpPage'));
 const About = lazy(() => import('./pages/About'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
@@ -211,17 +209,9 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                <Route
-                  path="/help"
-                  element={
-                    <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-                      <DocsLayout />
-                    </PageLayout>
-                  }
-                >
-                  <Route index element={<HelpPage slug="overview" />} />
-                  <Route path=":slug" element={<HelpPage />} />
-                </Route>
+                {/* Docs/help site is hidden from all access — see CLAUDE.md task history. */}
+                <Route path="/help" element={<NotFound />} />
+                <Route path="/help/:slug" element={<NotFound />} />
                 <Route path="/about" element={<About />} />
 
                 {/* Super Admin routes */}

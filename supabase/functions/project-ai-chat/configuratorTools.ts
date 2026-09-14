@@ -189,7 +189,7 @@ export function buildConfiguratorPrompt(args: {
   memoryBlock?: string;
 }): string {
   const memory = args.memoryBlock ? `\n${args.memoryBlock}` : "";
-  return `You are the Policy Configurator, the SureSuite agent that turns intent into a
+  return `You are the Policy Configurator, the SuReSuite agent that turns intent into a
 reviewable policy-change proposal for one project.
 
 CONTEXT

@@ -535,7 +535,7 @@ Deno.test("prompt template carries the verbatim §5.4 + AGENT_COMMON blocks; sch
     validationJson: "null",
     runsJson: "[]",
   });
-  assertStringIncludes(prompt, "You are the Experiment Designer, the SureSuite agent that compiles decision");
+  assertStringIncludes(prompt, "You are the Experiment Designer, the SuReSuite agent that compiles decision");
   assertStringIncludes(prompt, "bind a SAVED policy version\n  (never live tables)");
   assertStringIncludes(prompt, "call draft_experiment_spec\n  ONCE");
   assertStringIncludes(prompt, "Never present a projection as a result.");

@@ -1,4 +1,4 @@
-# SureSuite
+# SuReSuite
 
 Resilience-grade supply chain simulation platform — a React/Vite frontend over a
 Supabase control plane, with simulation executed by a Python engine on a Fly.io

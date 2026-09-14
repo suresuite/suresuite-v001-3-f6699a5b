@@ -224,7 +224,7 @@ function printPayloads(projectId) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log(`SureSuite minimal example seed — ${DRY_RUN ? "DRY RUN" : "LIVE"}`);
+  console.log(`SuReSuite minimal example seed — ${DRY_RUN ? "DRY RUN" : "LIVE"}`);
   console.log(`  ${SUPABASE_URL}`);
 
   const errors = validate();

@@ -16,7 +16,7 @@ An interdisciplinary topic fails a literature review in three specific ways, and
 
 ## How to use it
 
-1. Paste the prompt below into a fresh session, filling the bracketed fields in **SCOPE** and **DISCIPLINE MAP** (a worked example for the SureSuite paper follows the prompt).
+1. Paste the prompt below into a fresh session, filling the bracketed fields in **SCOPE** and **DISCIPLINE MAP** (a worked example for the SuReSuite paper follows the prompt).
 2. Run it **one stage at a time**, inspecting output before continuing. A hallucination in Stage 1 contaminates everything downstream.
 3. **Verify every citation yourself.** The prompt forbids unverifiable references, but verification is your job. A fabricated DOI ends a paper's credibility — and in CS-adjacent work the risk is higher, because plausible-looking arXiv IDs and conference names are easy to generate. *(The same discipline the paper argues for: the model proposes, the human authorizes.)*
 

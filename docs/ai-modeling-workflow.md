@@ -1,7 +1,7 @@
 # The AI Supply-Chain Modeler — collaboration workflow
 
 > How a user and an AI modeling agent build a simulation project together on
-> SureSuite. The mechanical substrate is `docs/project-onboarding-guide.md`
+> SuReSuite. The mechanical substrate is `docs/project-onboarding-guide.md`
 > (what must exist and in what order); this document designs the *interaction*:
 > what the AI asks, what it validates, what it produces, and where human
 > judgment is irreplaceable. Proven once end-to-end on Project TRON - ver2
