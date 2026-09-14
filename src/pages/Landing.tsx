@@ -275,7 +275,7 @@ export default function Landing() {
     <div className="min-h-dvh flex flex-col overflow-x-hidden bg-background text-foreground">
       {/* Top bar */}
       <header className="sticky top-0 z-40 border-b border-[--hair-rule] bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:px-6">
+        <div className="mx-auto flex h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] items-center justify-between px-5 md:h-16 md:px-6">
           <Link to="/" className="flex items-center">
             <img
               src="/logo-mark.png"
@@ -321,7 +321,7 @@ export default function Landing() {
       {/* Mobile nav drawer */}
       {mobileNavOpen && (
         <div className="sticky top-14 z-30 border-b border-border bg-background/95 backdrop-blur md:hidden">
-          <div className="mx-auto flex max-w-6xl flex-col px-5">
+          <div className="mx-auto flex max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-col px-5">
             <Link
               to="/about"
               onClick={() => setMobileNavOpen(false)}
@@ -344,7 +344,7 @@ export default function Landing() {
         {/* Hero */}
         <section className="relative overflow-hidden border-b border-[--hair-rule]">
           <HeroRipple />
-          <div className="relative mx-auto max-w-6xl px-5 pt-[clamp(48px,11vw,80px)] pb-[clamp(40px,10vw,96px)] md:px-6">
+          <div className="relative mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 pt-[clamp(48px,11vw,80px)] pb-[clamp(40px,10vw,96px)] md:px-6">
             {/* Eyebrow */}
             <span className="inline-flex items-center rounded-sm border border-border bg-card px-3 py-1.5">
               <span className="mr-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#BF2330]" />
@@ -361,12 +361,12 @@ export default function Landing() {
                   fluid now — 30px at 320, 36px at 430, the 60px desktop
                   literal from 706px up, where the `md:` term takes over. */}
               <h1 className="text-[length:clamp(30px,8.5vw,60px)] font-semibold leading-[1.08] tracking-[-0.024em] text-balance
-                             md:text-6xl md:leading-[1.03] md:tracking-tight">
+                             md:text-[clamp(60px,4.4vw,76px)] md:leading-[1.03] md:tracking-tight">
                 Design supply chains that survive{' '}
                 <span className="font-serif italic font-medium">the next shock.</span>
               </h1>
               <p className="mt-5 max-w-xl text-[length:clamp(15px,4vw,18px)] leading-[1.62] text-muted-foreground text-pretty
-                            md:mt-7 md:text-lg md:leading-relaxed">
+                            md:mt-7 md:text-[clamp(18px,1.25vw,21px)] md:leading-relaxed">
                 Build a digital twin of your network, run rigorous experiments, and pick
                 the strategy that holds up under pressure
                 <span className="hidden md:inline"> — from data import to
@@ -433,7 +433,7 @@ export default function Landing() {
 
         {/* Deep network AI — the 3D model, three lenses */}
         <section className="border-b border-[--hair-rule] bg-black text-white">
-          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="grid items-stretch gap-10 md:gap-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
               {/* Left: copy + lenses */}
               <div className="max-w-md">
@@ -507,7 +507,7 @@ export default function Landing() {
 
         {/* See SuReSuite in two minutes — intro video */}
         <section id="video" className="border-b border-[--hair-rule]">
-          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>Introduction</span>
               <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">
@@ -533,7 +533,7 @@ export default function Landing() {
 
         {/* Technical Architecture */}
         {/* <section className="border-t border-[--hair-rule]">
-          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>01 / 02 — Architecture</span>
               <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">
@@ -719,7 +719,7 @@ export default function Landing() {
                 'radial-gradient(ellipse 50% 80% at 80% 50%, rgba(191,35,48,0.18), transparent 70%)',
             }}
           />
-          <div className="relative mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+          <div className="relative mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
@@ -745,7 +745,7 @@ export default function Landing() {
 
         {/* Roadmap */}
         {/* <section className="border-t border-[--hair-rule]">
-          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-2xl">
               <span className={KICKER}>02 / 02 — Roadmap</span>
               <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">Roadmap</h2>
@@ -776,7 +776,7 @@ export default function Landing() {
 
         {/* Funding & attribution — content KEPT VERBATIM */}
         <section className="border-t border-[--hair-rule] bg-black text-white">
-          <div className="mx-auto max-w-6xl px-5 py-[clamp(40px,10vw,64px)] md:px-6">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(40px,10vw,64px)] md:px-6">
             <div className="grid grid-cols-1 gap-y-10 md:grid-cols-12 md:gap-x-6 items-start">
               <div className="md:col-span-4">
                 <img src="/logo3.png" alt="Digital SC Lab" className="h-auto max-h-12 w-auto max-w-full mb-4" />
@@ -805,7 +805,7 @@ export default function Landing() {
       <footer className="border-t border-[--hair-rule]">
         {/* v2 §5.6: no tab bar here, but the home indicator is still there —
             the last band adds the inset to its padding. */}
-        <div className="pb-safe mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 text-xs text-muted-foreground md:px-6 md:py-0">
+        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 text-xs text-muted-foreground md:px-6 md:py-0">
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>

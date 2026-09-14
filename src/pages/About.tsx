@@ -127,7 +127,7 @@ function FundingStrip() {
     <div className="relative border-t border-border bg-border">
       {/* hairline grid: the divider IS the 1px gap, so it turns horizontal when
           the two columns stack instead of leaving a stray left border */}
-      <div className="mx-auto grid max-w-6xl grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))] gap-px bg-border-strong">
+      <div className="mx-auto grid max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))] gap-px bg-border-strong">
         {/* Home — HWR / lab identity */}
         <div className="bg-border px-6 py-8">
           <span className={KICKER}>Home</span>
@@ -260,7 +260,7 @@ export default function About() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top bar — same as Landing */}
       <header className="sticky top-0 z-40 border-b border-[--hair-rule] bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:h-16 md:px-6">
+        <div className="mx-auto flex h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] items-center justify-between px-5 md:h-16 md:px-6">
           <Link to="/" className="flex items-center">
             <img
               src="/logo-mark.png"
@@ -310,19 +310,19 @@ export default function About() {
             />
             <HeroLattice />
           </div>
-          <div className="relative mx-auto max-w-6xl px-5 pt-12 pb-9 md:px-6 md:pt-20 md:pb-24">
+          <div className="relative mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 pt-12 pb-9 md:px-6 md:pt-20 md:pb-24">
             <span className="inline-flex items-center gap-2 whitespace-nowrap rounded border border-border bg-card px-3 py-1.5">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
               <span className={KICKER}>About us</span>
             </span>
 
             <h1 className="mt-9 max-w-[20ch] text-[length:clamp(30px,8.5vw,60px)] leading-[1.08] tracking-[-0.024em] text-balance font-semibold
-                           md:text-[clamp(36px,5vw,60px)] md:leading-[1.03] md:tracking-[-0.022em]">
+                           md:text-[clamp(36px,5vw,76px)] md:leading-[1.03] md:tracking-[-0.022em]">
               Built inside a research lab,{' '}
               <span className="font-serif font-medium italic">shipped as a product.</span>
             </h1>
             <p className="mt-5 max-w-xl text-[length:clamp(15px,4vw,18px)] leading-[1.62] text-muted-foreground text-pretty
-                          md:mt-7 md:text-lg md:leading-relaxed">
+                          md:mt-7 md:text-[clamp(18px,1.25vw,21px)] md:leading-relaxed">
               SuReSuite is built at the Digital-AI Supply Chain Lab at HWR Berlin — the group
               behind the ripple-effect and supply chain viability research. The same small team
               writes the science, the engine, and the interface.
@@ -334,7 +334,7 @@ export default function About() {
 
         {/* Key people */}
         <section id="people" className="border-b border-[--hair-rule]">
-          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-[600px]">
               <span
                 className="inline-flex items-center gap-[7px] whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em]"
@@ -387,7 +387,7 @@ export default function About() {
 
         {/* Contributors */}
         <section className="bg-secondary">
-          <div className="mx-auto max-w-6xl px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
             <div className="max-w-[600px]">
               <span className={`${KICKER} whitespace-nowrap`}>Contributors</span>
               <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold leading-[1.14] tracking-[-0.022em]">
@@ -424,7 +424,7 @@ export default function About() {
 
       {/* Slim footer — same as Landing */}
       <footer className="border-t border-[--hair-rule]">
-        <div className="pb-safe mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
+        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-4">
             <Link to="/#video" className="hover:text-foreground md:hidden">

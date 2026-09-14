@@ -99,7 +99,7 @@ const AuthHeroStrip = () => {
     <div
       onMouseEnter={stop}
       onMouseLeave={start}
-      className="relative hidden min-w-[340px] flex-1 flex-col justify-between overflow-hidden bg-black px-[clamp(32px,4.2vw,60px)] pb-9 pt-10 text-white md:flex"
+      className="relative hidden min-w-[340px] flex-1 flex-col overflow-hidden bg-black px-[clamp(32px,4.2vw,88px)] pb-9 pt-10 text-white md:flex"
     >
       <div
         aria-hidden
@@ -118,8 +118,8 @@ const AuthHeroStrip = () => {
         <span className="h-px flex-1 bg-white/[0.14]" />
       </div>
 
-      <div className="relative flex flex-col gap-[26px] py-8">
-        <div className="grid max-w-[520px]">
+      <div className="relative my-auto flex flex-col gap-[26px] py-8">
+        <div className="grid max-w-[clamp(520px,44vw,720px)]">
           {SLIDES.map((slide, i) => (
             <div
               key={slide.kicker}
@@ -135,7 +135,7 @@ const AuthHeroStrip = () => {
                 <h2 className="m-0 text-pretty text-[clamp(26px,2.9vw,34px)] font-semibold leading-[1.09] tracking-[-0.024em] text-white">
                   {slide.headLead} <span className="font-serif italic font-medium">{slide.headAccent}</span>
                 </h2>
-                <p className="mt-4 max-w-[460px] text-pretty text-[14.5px] leading-[1.6] text-white/[0.62]">
+                <p className="mt-4 max-w-[min(100%,620px)] text-pretty text-[14.5px] leading-[1.6] text-white/[0.62]">
                   {slide.body}
                 </p>
               </div>
@@ -157,7 +157,7 @@ const AuthHeroStrip = () => {
           ))}
         </div>
 
-        <div className="flex max-w-[520px] items-center gap-[18px]">
+        <div className="flex max-w-[clamp(520px,44vw,720px)] items-center gap-[18px]">
           <span className="font-mono text-[10px] tabular-nums tracking-[0.18em] text-white/40">
             {pad(active + 1)} / {pad(SLIDES.length)}
           </span>
