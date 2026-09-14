@@ -100,7 +100,7 @@ export function SuggestedActions({ projectId, threadId, threadMode, onPick, disa
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 pb-2" aria-label="Suggested actions">
+    <div className="flex flex-wrap gap-1.5 pb-1.5" aria-label="Suggested actions">
       {suggestions.map((s) => (
         <button
           key={s.rule}
@@ -108,7 +108,7 @@ export function SuggestedActions({ projectId, threadId, threadMode, onPick, disa
           disabled={disabled}
           title={s.reason}
           onClick={() => pick(s)}
-          className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-surface-elevated px-2.5 py-1 text-[12px] text-muted-foreground transition hover:border-strong hover:text-foreground disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-surface-elevated px-[9px] py-[3px] text-[11.5px] text-muted-foreground transition hover:border-strong hover:text-foreground disabled:opacity-50"
         >
           <Lightbulb className="h-3 w-3 shrink-0" />
           {s.label}

@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/hooks/useProjectChat";
-import { ActivityGroup, AgentDivider, MessagePart } from "./MessageParts";
+import { ActivityGroup, AgentDivider, MessagePart, MetaRow } from "./MessageParts";
 import { ProposalCard } from "@/components/chat/ProposalCard";
 import { MobileProse } from "@/components/mobile";
 import { useProseLines } from "@/hooks/useViewport";
@@ -36,6 +36,14 @@ interface MessageStreamProps {
   /** Wear the mobile skin (v2 §4C) in the parts this stream renders itself —
    *  today that is the proposal card. Desktop passes nothing. */
   skin?: boolean;
+  /**
+   * Fold the grounding chip and the activity accordion into one MetaRow
+   * (v1b space pass). Opt-in rather than default: the phone tree has the
+   * vertical budget for two blocks and no 28px chrome band to pay for, so it
+   * keeps the stacked pair and this stream stays one implementation of the
+   * nine part kinds either way.
+   */
+  mergedMeta?: boolean;
 }
 
 export function MessageStream({
@@ -48,6 +56,7 @@ export function MessageStream({
   containerClassName,
   userBubbleClassName,
   skin = false,
+  mergedMeta = false,
 }: MessageStreamProps) {
   const streamRef = useRef<HTMLDivElement | null>(null);
   const proseLines = useProseLines();
@@ -77,6 +86,11 @@ export function MessageStream({
               </div>
             );
           }
+          // The merged row owns the evidence part, so it must not also render
+          // as a standalone chip further up the stack.
+          const parts = m.parts ?? [];
+          const evidence = mergedMeta ? parts.find((p) => p.kind === "evidence") : undefined;
+          const bodyParts = evidence ? parts.filter((p) => p !== evidence) : parts;
           return (
             <div key={m.id}>
               {m.content &&
@@ -90,7 +104,7 @@ export function MessageStream({
                     {m.content}
                   </div>
                 ))}
-              {(m.parts ?? []).map((part, i) => {
+              {bodyParts.map((part, i) => {
                 // Proposals render via ProposalCard in the app (they need
                 // the proposals hook for approve/apply state).
                 if (part.kind === "proposal") {
@@ -116,7 +130,11 @@ export function MessageStream({
                   />
                 );
               })}
-              {m.toolCalls && m.toolCalls.length > 0 && <ActivityGroup toolCalls={m.toolCalls} />}
+              {mergedMeta ? (
+                <MetaRow toolCalls={m.toolCalls ?? []} evidence={evidence?.data} />
+              ) : (
+                m.toolCalls && m.toolCalls.length > 0 && <ActivityGroup toolCalls={m.toolCalls} />
+              )}
             </div>
           );
         })}

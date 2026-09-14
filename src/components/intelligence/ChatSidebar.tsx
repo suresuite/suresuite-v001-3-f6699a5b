@@ -151,7 +151,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
   /* ── collapsed rail ─────────────────────────────────────────────────── */
   if (collapsed) {
     return (
-      <aside className="flex flex-col items-center gap-2 overflow-hidden border-r border-[--hair-border] bg-[#fcfcfc] py-2.5">
+      <aside className="flex flex-col items-center gap-2 overflow-hidden bg-[#fcfcfc] py-2.5">
         <button
           type="button"
           onClick={onExpand}
@@ -364,7 +364,12 @@ export function ChatSidebar(props: ChatSidebarProps) {
 
   /* ── expanded sidebar ───────────────────────────────────────────────── */
   return (
-    <aside className="flex max-h-full min-h-0 flex-col overflow-hidden border-r border-[--hair-border] bg-[#fcfcfc]">
+    /* No border-r on either aside. The 5px resize handle beside it carries the
+       panel's ONE vertical rule (ProjectIntelligence). A border here put a
+       second 1px rule 5px from the first, and two hairlines that close read as
+       one thick smudged line — the duplicate-hairline defect the v1b pass
+       fixes. Put it back and the double line comes back with it. */
+    <aside className="flex max-h-full min-h-0 flex-col overflow-hidden bg-[#fcfcfc]">
       {/* header — shrink-0 */}
       <div className="flex shrink-0 flex-col gap-2 border-b border-[--hair-divider] py-2.5 pl-2.5 pr-3">
         <div className="flex items-center gap-1.5">

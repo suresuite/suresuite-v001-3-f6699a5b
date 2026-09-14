@@ -12,6 +12,17 @@ import { cn } from "@/lib/utils";
 /* ── shared class consts ─────────────────────────────────────────────── */
 
 export const SURFACE = "rounded-sm border border-[--hair-border] bg-background";
+
+/**
+ * The conversation's reading column (v1b space pass). 740px was set when the
+ * panel carried two stacked chrome bands and a narrower workspace; with the
+ * bands merged and the rail's duplicate rule gone, the same measure reads as
+ * a column stranded in whitespace. 880 is the value the workspace stream and
+ * the composer both centre on — change it here, not at the call sites, or the
+ * composer stops lining up with the turns above it.
+ */
+export const READING_WIDTH = 880;
+export const READING_COL = "mx-auto max-w-[880px]";
 export const KX = "font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground";
 export const KX_TIGHT = "font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground";
 /**
@@ -128,27 +139,52 @@ export function Segmented<T extends string>({
   onChange,
   size = "md",
   className,
+  ariaLabel,
 }: {
   value: T;
-  options: Array<{ value: T; label: string; disabled?: boolean; title?: string }>;
+  options: Array<{ value: T; label: string; icon?: React.ReactNode; disabled?: boolean; title?: string }>;
   onChange: (v: T) => void;
-  size?: "sm" | "md";
+  /**
+   * "icon" is the compact icon pair (20x22, 4px/2px radii) the chrome band's
+   * window controls wear. It pairs with the 11px chips beside it rather than
+   * with the 5px text segments, which is why the outer padding drops to 2px —
+   * a text-sized control in that band would be the tallest thing in a 28px row.
+   * An icon item ALWAYS carries its label as aria-label + title: the glyph is
+   * the only visible content, so the label is the control's whole name.
+   */
+  size?: "icon" | "sm" | "md";
   className?: string;
+  ariaLabel?: string;
 }) {
+  const icon = size === "icon";
   return (
-    <div className={cn("inline-flex rounded-sm border border-[--zinc-border] p-[3px]", className)}>
+    <div
+      role={ariaLabel ? "group" : undefined}
+      aria-label={ariaLabel}
+      className={cn(
+        "inline-flex rounded-sm border border-[--zinc-border] bg-background",
+        icon ? "p-[2px]" : "p-[3px]",
+        className,
+      )}
+    >
       {options.map((o) => {
         const active = o.value === value;
         return (
           <button
             key={o.value}
             type="button"
-            title={o.title}
+            title={icon ? (o.title ?? o.label) : o.title}
+            aria-label={icon ? o.label : undefined}
+            aria-pressed={icon ? active : undefined}
             disabled={o.disabled}
             onClick={() => !o.disabled && onChange(o.value)}
             className={cn(
               "rounded-[2px] transition-colors",
-              size === "sm" ? "px-[7px] py-[2px] text-[10.5px]" : "px-[15px] py-[7px] text-[12px]",
+              icon
+                ? "flex h-[22px] w-5 items-center justify-center"
+                : size === "sm"
+                  ? "px-[7px] py-[2px] text-[10.5px]"
+                  : "px-[15px] py-[7px] text-[12px]",
               o.disabled
                 ? "cursor-not-allowed text-[#c9c9c9]"
                 : active
@@ -156,7 +192,7 @@ export function Segmented<T extends string>({
                   : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {o.label}
+            {icon ? o.icon : o.label}
           </button>
         );
       })}
@@ -240,16 +276,25 @@ export function PanelHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <button type="button" onClick={onToggle} className={cn(KX_TIGHT, "flex items-center gap-1 py-0.5")} style={{ color }}>
+    // min-w-0 on the disclosure: in a 200px rail the label is what gives way,
+    // never the Project/All toggle or the + button the panel exists to offer.
+    // The trailing control carries its own `ml-auto shrink-0` — it is the
+    // caller's node, so the caller is where that belongs.
+    <div className="flex min-w-0 items-center gap-1.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(KX_TIGHT, "flex min-w-0 items-center gap-1 whitespace-nowrap py-0.5")}
+        style={{ color }}
+      >
         <span
           className="inline-block transition-transform"
           style={{ color: "#c4c4c4", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
         >
           ›
         </span>
-        {label}
-        <span className="ml-1 rounded-sm bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal text-muted-foreground">
+        <span className="min-w-0 truncate">{label}</span>
+        <span className="ml-1 shrink-0 rounded-sm bg-[#f0f0f0] px-[5px] font-sans text-[10px] normal-case tracking-normal text-muted-foreground">
           {count}
         </span>
       </button>
