@@ -1,4 +1,4 @@
-# SureSuite Public API & Access Control — Design Plan
+# SuReSuite Public API & Access Control — Design Plan
 
 | | |
 |---|---|
@@ -12,7 +12,7 @@
 
 ## 0. Reading guide
 
-This plan answers one question: **how does SureSuite become software other systems can drive through an API — without opening a hole an attacker can walk through?**
+This plan answers one question: **how does SuReSuite become software other systems can drive through an API — without opening a hole an attacker can walk through?**
 
 It is written in the blueprint's own idiom: *"X already exists as Y — we complete and generalize it."* Almost every mechanism the API needs is already in the repository in embryo — tenancy (`organizations` / `organization_members`), a rate-limit shape (`ai_budgets.rpm/rpd`), an audit pattern (`admin_audit_logs` + `log_admin_action`), a validated command schema (`sim-command`'s Zod `CommandSchema`), a validation gate (§8.2 of the blueprint), and a Redis substrate for token buckets (Upstash). The work is to **assemble these behind one authenticated, authorized, rate-limited gateway** — not to invent a parallel stack.
 
@@ -337,7 +337,7 @@ Conventions: cursor pagination (`5–10` items/page, matching the GitHub-MCP gui
 Runs are asynchronous (the Fly worker is the sole result writer, A11). Three delivery options, cheapest first:
 
 1. **Polling** — `GET /v1/runs/{id}` until `status ∈ {succeeded, failed, cancelled}`. Always available; document a backoff.
-2. **Webhooks** — the caller registers an HTTPS URL; the platform POSTs `run.succeeded` / `run.failed` events, **HMAC-signed** with a per-endpoint secret (`X-SureSuite-Signature`), with retries + a replay-protection timestamp. A tiny `api-webhook-dispatch` worker (or a DB trigger on `simulation_runs` status change → enqueue) fans these out. Signing prevents forged callbacks; the secret is per-endpoint and rotatable.
+2. **Webhooks** — the caller registers an HTTPS URL; the platform POSTs `run.succeeded` / `run.failed` events, **HMAC-signed** with a per-endpoint secret (`X-SuReSuite-Signature`), with retries + a replay-protection timestamp. A tiny `api-webhook-dispatch` worker (or a DB trigger on `simulation_runs` status change → enqueue) fans these out. Signing prevents forged callbacks; the secret is per-endpoint and rotatable.
 3. **Realtime (advanced)** — issue a **short-lived, channel-scoped** Realtime token so a caller can subscribe to `sim:{project_id}` (the channel `sim-command` already broadcasts on). Never hand out the anon key for this — mint a scoped token.
 
 ---

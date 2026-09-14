@@ -8,7 +8,6 @@ import {
   Database,
   FlaskConical,
   Info,
-  HelpCircle,
   ChevronRight,
   Factory,
   Layers,
@@ -123,12 +122,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Info,
         label: "About",
         tooltip: "About",
-      },
-      {
-        to: "/help",
-        icon: HelpCircle,
-        label: "About & Help",
-        tooltip: "About & Help",
       },
     ],
   },
@@ -301,11 +294,6 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
               <DropdownMenuItem asChild>
                 <Link to="/profile">
                   <User className="mr-2 h-4 w-4" /> My Profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/help">
-                  <HelpCircle className="mr-2 h-4 w-4" /> Help
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

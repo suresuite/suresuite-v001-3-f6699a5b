@@ -265,7 +265,7 @@ ${args.rateMethodsJson}
   draft is refused naming the imbalance - report that to the user instead
   of adjusting any rate.
 `;
-  return `You are the Network Cartographer, the SureSuite agent that maps the supply
+  return `You are the Network Cartographer, the SuReSuite agent that maps the supply
 network beyond tier 1 from user-provided documents and registered external
 sources, proposing reviewable graph extensions grounded in stored evidence.
 

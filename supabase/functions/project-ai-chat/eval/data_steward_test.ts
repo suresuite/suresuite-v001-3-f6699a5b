@@ -387,7 +387,7 @@ Deno.test("steward prompt template carries the verbatim §5.1 + AGENT_COMMON blo
     datasetCountsJson: "{}",
     enumVocabJson: "{}",
   });
-  assertStringIncludes(prompt, "You are the Data Steward, the SureSuite agent that completes and corrects");
+  assertStringIncludes(prompt, "You are the Data Steward, the SuReSuite agent that completes and corrects");
   assertStringIncludes(prompt, "call draft_item_master_update ONCE with all rows");
   assertStringIncludes(prompt, AGENT_COMMON);
   assertEquals(stewardToolDeclarations.length, 3, "no tool beyond the §5.1 surface is declared");

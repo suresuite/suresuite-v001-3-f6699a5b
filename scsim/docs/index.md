@@ -55,7 +55,7 @@ Three higher-level entry points sit on top of `run_scenario`:
 | `scsim.core.engine.run_portfolio_study` | *What does each strategy buy me vs doing nothing (ΔR, ΔC, SLA)?* | [Synergy](synergy.md) |
 | `scsim.synergy.decompose` | *Do these strategies reinforce or cannibalize each other?* | [Synergy](synergy.md) |
 
-## How it fits the SureSuite stack
+## How it fits the SuReSuite stack
 
 ```
 Frontend (/simulation-lab, /policies)

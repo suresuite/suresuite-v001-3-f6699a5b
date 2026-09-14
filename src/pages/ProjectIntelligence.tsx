@@ -1,6 +1,6 @@
 // supply-chain schema tables aren't in the generated DB types yet.
 /**
- * Project Intelligence (SureSuite visual language).
+ * Project Intelligence (SuReSuite visual language).
  *
  * Same data flow as the current page — useChatThreads for the thread store,
  * useProjectChat inside the workspace, list_projects RPC for the project

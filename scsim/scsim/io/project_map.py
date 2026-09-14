@@ -1,4 +1,4 @@
-"""Canonical SureSuite-project → scsim Scenario mapper (single source of truth).
+"""Canonical SuReSuite-project → scsim Scenario mapper (single source of truth).
 
 This module is the ONE place that turns a project's stored data (item masters +
 logistics + merged policies + scenario settings) into an scsim ``Scenario``. It

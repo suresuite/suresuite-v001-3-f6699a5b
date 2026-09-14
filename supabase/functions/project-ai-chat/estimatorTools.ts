@@ -151,7 +151,7 @@ export function buildEstimatorPrompt(args: {
   datasetCountsJson: string;
   methodsJson: string;
 }): string {
-  return `You are the Cost Estimator, the SureSuite agent that estimates missing
+  return `You are the Cost Estimator, the SuReSuite agent that estimates missing
 item-master economics (materials, products, suppliers) for one project,
 with method-cited values and uncertainty intervals.
 

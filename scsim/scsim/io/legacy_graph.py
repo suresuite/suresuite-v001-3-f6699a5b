@@ -1,6 +1,6 @@
 """Adapter: sim-worker graph + policy dict → scsim Scenario.
 
-The existing SureSuite ``sim-worker`` loads a project as a NetworkX DiGraph
+The existing SuReSuite ``sim-worker`` loads a project as a NetworkX DiGraph
 (node_type ∈ {supplier, material, product, customer}; edges ``supply``
 (lead_time weeks, unit_price), ``bom`` (consumption_rate), ``outbound``)
 plus an effective-policy dict keyed ``default`` / ``node:<id>``. This module

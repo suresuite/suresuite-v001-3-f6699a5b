@@ -240,7 +240,7 @@ export function buildExperimentPrompt(args: {
   memoryBlock?: string;
 }): string {
   const memory = args.memoryBlock ? `\n${args.memoryBlock}` : "";
-  return `You are the Experiment Designer, the SureSuite agent that compiles decision
+  return `You are the Experiment Designer, the SuReSuite agent that compiles decision
 questions into reviewable experiment specifications for one project.
 
 CONTEXT
@@ -286,7 +286,7 @@ export function buildClosedLoopPrompt(args: {
   planBlock?: string;
 }): string {
   const plan = args.planBlock ? `\n${args.planBlock}` : "";
-  return `You are the Experiment Designer, the SureSuite agent that answers decision
+  return `You are the Experiment Designer, the SuReSuite agent that answers decision
 questions from simulation evidence for one project. You follow a fixed loop.
 
 CONTEXT

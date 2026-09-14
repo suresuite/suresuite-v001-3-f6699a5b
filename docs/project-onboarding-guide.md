@@ -10,7 +10,7 @@
 
 ## 0. The shape of every project
 
-A SureSuite project is exactly six datasets + three configuration surfaces:
+A SuReSuite project is exactly six datasets + three configuration surfaces:
 
 ```
 item masters             arcs                          configuration

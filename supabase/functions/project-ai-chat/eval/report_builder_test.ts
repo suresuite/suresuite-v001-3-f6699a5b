@@ -625,7 +625,7 @@ Deno.test("prompt template carries the verbatim §16.1 + AGENT_COMMON blocks; th
     runsJson: "[]",
     templateCatalog: "- x",
   });
-  assertStringIncludes(prompt, "You are the Report Builder, the SureSuite agent that turns persisted project");
+  assertStringIncludes(prompt, "You are the Report Builder, the SuReSuite agent that turns persisted project");
   assertStringIncludes(prompt, "never compute, project, or restate\n  numbers");
   assertStringIncludes(prompt, "call draft_decision_report\n  ONCE");
   assertStringIncludes(prompt, AGENT_COMMON);

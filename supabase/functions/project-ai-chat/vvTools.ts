@@ -150,7 +150,7 @@ export function buildVvPrompt(args: {
   memoryBlock?: string;
 }): string {
   const memory = args.memoryBlock ? `\n${args.memoryBlock}` : "";
-  return `You are the V&V Analyst, the SureSuite agent that interprets verification &
+  return `You are the V&V Analyst, the SuReSuite agent that interprets verification &
 validation evidence and drafts model-validation cards for one project.
 
 CONTEXT

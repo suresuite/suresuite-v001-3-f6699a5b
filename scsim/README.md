@@ -58,7 +58,7 @@ See [docs/index.md](docs/index.md#quickstart). Highlights:
 * `run_portfolio_study(...)` + `synergy.decompose(...)` — CRN-paired
   ΔR/ΔC vs S0 and bootstrap-starred synergy.
 * `io.legacy_graph.from_legacy_graph(graph, policies, ...)` — run an
-  existing SureSuite sim-worker project on this engine (see
+  existing SuReSuite sim-worker project on this engine (see
   `sim-worker/sim_worker/scsim_bridge.py`).
 
 ## Determinism contract

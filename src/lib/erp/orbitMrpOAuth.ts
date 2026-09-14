@@ -1,4 +1,4 @@
-// OAuth 2.1 + PKCE client for connecting a SureSuite project to an orbit-mrp
+// OAuth 2.1 + PKCE client for connecting a SuReSuite project to an orbit-mrp
 // company, per docs/design/erp-mrp-integration-plan.md §6b/§6c.
 //
 // This deliberately does NOT hardcode orbit-mrp's authorize/token endpoints:
@@ -60,7 +60,7 @@ export async function startOrbitMrpConnect(orbitMrpBaseUrl: string, projectId: s
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        client_name: "SureSuite ERP connector",
+        client_name: "SuReSuite ERP connector",
         redirect_uris: [redirectUri],
         grant_types: ["authorization_code"],
         response_types: ["code"],

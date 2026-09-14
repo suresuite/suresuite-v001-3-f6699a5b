@@ -23,7 +23,7 @@ merged. Do not run two phases in one session.
 ## Phase 1 — *Act*: agents can run simulations; interaction modes ship
 
 ```
-Implement Phase 1 of the SureSuite AI-agent v1.2 plan (ai-agents.md §9.8):
+Implement Phase 1 of the SuReSuite AI-agent v1.2 plan (ai-agents.md §9.8):
 Stage 4 (Experiment Designer, single-run subset) plus the §15 interaction
 modes and §17.3 suggested-actions v0. Stages 0–3 and workstream M0–M2 are
 already merged — build on them, do not redo or refactor them.
@@ -126,7 +126,7 @@ ACCEPTANCE (verify each, show evidence):
 ## Phase 2 — *Read*: sidebar organization and the readability grammar
 
 ```
-Implement Phase 2 of the SureSuite AI-agent v1.2 plan (ai-agents.md §9.8):
+Implement Phase 2 of the SuReSuite AI-agent v1.2 plan (ai-agents.md §9.8):
 sidebar v2 (collapsible sections, multi-select bulk actions) and the §17.2
 readability grammar, plus §17.4 memory guidance. Phase 1 is merged — the
 grammar must handle its experiment cards and mode notices. This phase changes
@@ -206,7 +206,7 @@ ACCEPTANCE (verify each, show evidence):
 ## Phase 3 — *Deliver*: reports, the file workspace, retention
 
 ```
-Implement Phase 3 of the SureSuite AI-agent v1.2 plan (ai-agents.md §9.8):
+Implement Phase 3 of the SuReSuite AI-agent v1.2 plan (ai-agents.md §9.8):
 agent B6 Report Builder (decision_report), the deterministic report-render
 path (XLSX/PDF), and the §16.2 file workspace with retention and admin
 visibility. Phases 1–2 are merged — the two-proposal disruption-brief flow
@@ -323,7 +323,7 @@ Anything scheduled/background stays out of all four (§18.4 unmet).
 ### Phase 4a — B7 Cost Estimator
 
 ```
-Implement Phase 4a of the SureSuite AI-agent plan: B7 Cost Estimator
+Implement Phase 4a of the SuReSuite AI-agent plan: B7 Cost Estimator
 (ai-agents.md §18.1, v1.5 — Q26 resolved). v1.2 Phases 1–3 and v1.4 H1–H4
 are merged prerequisites — build on them, do not refactor them.
 
@@ -402,7 +402,7 @@ ACCEPTANCE (verify each, show evidence):
 ### Phase 4b — B8 Network Cartographer v1 (firm-level)
 
 ```
-Implement Phase 4b of the SureSuite AI-agent plan: B8 Network Cartographer
+Implement Phase 4b of the SuReSuite AI-agent plan: B8 Network Cartographer
 v1, firm-level mapping (ai-agents.md §18.2 + §18.5, v1.5 — Q27 resolved).
 Phase 4a (B7) is a merged prerequisite.
 
@@ -481,7 +481,7 @@ ACCEPTANCE (verify each, show evidence):
 ### Phase 4c — B8 Network Cartographer v2 (product-level input–output model)
 
 ```
-Implement Phase 4c of the SureSuite AI-agent plan: B8 v2 — product-level
+Implement Phase 4c of the SuReSuite AI-agent plan: B8 v2 — product-level
 decomposition with estimated consumption rates (ai-agents.md §18.2 "v2",
 v1.5). Phases 4a (B7) and 4b (B8 v1) are merged prerequisites.
 
@@ -536,7 +536,7 @@ back-test table (estimated vs. actual rates) attached to the PR.
 ### Phase 4d — B9 Disruption Sentinel v1 (on-demand)
 
 ```
-Implement Phase 4d of the SureSuite AI-agent plan: B9 Disruption Sentinel
+Implement Phase 4d of the SuReSuite AI-agent plan: B9 Disruption Sentinel
 v1, on-demand "assess this event" (ai-agents.md §18.3, v1.5 — Q28
 resolved). Phases 4a–4c are merged prerequisites. Scheduled watching is
 OUT of scope (§18.4 unmet) — v1 assesses events the user brings or that
@@ -609,7 +609,7 @@ one session. v1.2 Phases 1–3 are merged prerequisites for all of them.
 ## Phase H1 — *Ground*: every answer grounded or refused
 
 ```
-Implement Phase H1 of the SureSuite AI-agent v1.4 plan (ai-agents.md §24.3):
+Implement Phase H1 of the SuReSuite AI-agent v1.4 plan (ai-agents.md §24.3):
 the §19.3 coverage read tools, the §22 verifiable-evidence contract (hardened
 persona prompt, citations resolver, pre-send verifier, honest templates), and
 the §7.7 entity-fabrication gate. v1.2 Phases 1-3 are merged — build on them,
@@ -710,7 +710,7 @@ ACCEPTANCE (verify each, show evidence):
 ## Phase H2 — *Reuse*: the cache answers before compute
 
 ```
-Implement Phase H2 of the SureSuite AI-agent v1.4 plan (ai-agents.md §24.3):
+Implement Phase H2 of the SuReSuite AI-agent v1.4 plan (ai-agents.md §24.3):
 the §20.2 cache-first read (find_completed_run + the cache_hit draft guard),
 the §6.6 router v2 signals, and the §20.3 single-turn closed-loop branches.
 H1 is merged — cited replies already flow through the verifier.
@@ -800,7 +800,7 @@ ACCEPTANCE (verify each, show evidence):
 ## Phase H3 — *Plan*: the loop spans approvals and runs visibly
 
 ```
-Implement Phase H3 of the SureSuite AI-agent v1.4 plan (ai-agents.md §24.3):
+Implement Phase H3 of the SuReSuite AI-agent v1.4 plan (ai-agents.md §24.3):
 the §21 harness — update_task_plan, the chat_plans store, the PlanCard
 checklist, resume-on-approval and resume-on-run-completion, and the §21.5
 turn budgets. H1-H2 are merged: the closed loop already answers hits and
@@ -896,7 +896,7 @@ ACCEPTANCE (verify each, show evidence):
 ## Phase H4 — *Prove*: per-model quality published and enforced
 
 ```
-Implement Phase H4 of the SureSuite AI-agent v1.4 plan (ai-agents.md §24.3):
+Implement Phase H4 of the SuReSuite AI-agent v1.4 plan (ai-agents.md §24.3):
 the §23 per-model capability matrix — store, --matrix writer, picker hints,
 and the below-target honest template. H1-H3 are merged: the matrix scores
 capabilities that now exist (coverage, fabrication, loop, plans).

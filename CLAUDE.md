@@ -1,4 +1,4 @@
-# SureSuite — session guidance
+# SuReSuite — session guidance
 
 ## Governing document — read before platform work
 

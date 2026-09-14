@@ -1,5 +1,5 @@
 /**
- * Project Intelligence — shared UI atoms (SureSuite visual language).
+ * Project Intelligence — shared UI atoms (SuReSuite visual language).
  *
  * Same shape as handoff/admin/adminUi.tsx and handoff/DeveloperApi.tsx:
  * class consts first, then the tiny primitives every panel reuses.

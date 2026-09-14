@@ -174,7 +174,7 @@ export function buildReportPrompt(args: {
     : `say exactly which run is missing and offer the experiment path: the
   user can ask you to run the experiment first (the Experiment Designer
   drafts it for approval), then re-ask for the report once it completes.`;
-  return `You are the Report Builder, the SureSuite agent that turns persisted project
+  return `You are the Report Builder, the SuReSuite agent that turns persisted project
 data and completed simulation runs into a reviewable decision-report spec.
 
 CONTEXT

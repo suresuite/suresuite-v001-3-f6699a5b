@@ -1,7 +1,7 @@
-# SureSuite Public API (v1) — Reference & Quickstart
+# SuReSuite Public API (v1) — Reference & Quickstart
 
 The public API lets external systems — scripts, notebooks, CI jobs, partner
-services — drive SureSuite programmatically: manage input data, configure
+services — drive SuReSuite programmatically: manage input data, configure
 policies, dispatch simulation runs, and retrieve results.
 
 - **Design doc:** `docs/design/public-api-and-access-control.md` (G15)

@@ -444,7 +444,7 @@ Deno.test("CLOSED_LOOP_ENABLED off ⇒ the v1 tool surface, the v1 prompt, and N
     const fixture = await loadFixture("cl-01-cache-hit");
     const h = makeCtx(fixture);
     const context = await buildExperimentContext(h.ctx, { utterance: fixture.utterance });
-    assertStringIncludes(context, "You are the Experiment Designer, the SureSuite agent that compiles decision");
+    assertStringIncludes(context, "You are the Experiment Designer, the SuReSuite agent that compiles decision");
     assert(!context.includes("THE LOOP"), "the §20.4 prompt never leaks with the flag off");
     // v1 has no guard: drafting on a hit state files the card (dispatch's own
     // G17 check still protects the apply — reuse at apply, §13.6 rule 4).
@@ -468,7 +468,7 @@ Deno.test("CLOSED_LOOP_ENABLED on ⇒ the §20.4 verbatim prompt supersedes §5.
     const fixture = await loadFixture("cl-01-cache-hit");
     const h = makeCtx(fixture);
     const context = await buildExperimentContext(h.ctx, { utterance: fixture.utterance });
-    assertStringIncludes(context, "You are the Experiment Designer, the SureSuite agent that answers decision\nquestions from simulation evidence for one project. You follow a fixed loop.");
+    assertStringIncludes(context, "You are the Experiment Designer, the SuReSuite agent that answers decision\nquestions from simulation evidence for one project. You follow a fixed loop.");
     assertStringIncludes(context, "THE LOOP — follow these steps IN ORDER, one at a time:");
     assertStringIncludes(context, "3. CHECK THE CACHE. Call find_completed_run for the scenario + policy\n   version BEFORE drafting anything.");
     assertStringIncludes(context, "- HIT: do NOT draft a proposal.");

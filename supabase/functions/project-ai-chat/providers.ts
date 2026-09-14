@@ -34,7 +34,7 @@ export const MODEL_REGISTRY: Record<string, ModelSpec> = {
 /** The model served when a caller names none. Must stay a provider this
  * deployment actually has quota for: an unfunded default fails EVERY
  * model-less turn (chat, the §7.7 coverage judge, cartographer estimates)
- * with the provider's own rate-limit error, not a SureSuite one. */
+ * with the provider's own rate-limit error, not a SuReSuite one. */
 export const DEFAULT_MODEL_ID = "gpt-5";
 
 export function resolveModel(id: string | undefined | null): ModelSpec {

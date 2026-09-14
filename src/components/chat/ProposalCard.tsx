@@ -13,7 +13,7 @@ import { useProposal, type Proposal } from "@/hooks/useProposals";
  *
  * This is the CONTAINER: it resolves the proposal by id (live status via the
  * realtime publication) and owns the approve / reject / retry-apply actions.
- * The visuals are delegated to the presentational `ProposalCardView` (SureSuite
+ * The visuals are delegated to the presentational `ProposalCardView` (SuReSuite
  * visual language) — the card never renders numbers that aren't in the resolved
  * payload/applied_result (no client-side recomputation). Every existing call
  * site (`MessageBubble`, `ChatWorkspace`) keeps passing `{ proposalId }`.

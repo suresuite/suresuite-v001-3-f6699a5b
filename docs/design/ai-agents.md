@@ -1,4 +1,4 @@
-# SureSuite AI Agents — Authoritative Design: Advisory Personas and Artifact Agents
+# SuReSuite AI Agents — Authoritative Design: Advisory Personas and Artifact Agents
 
 | | |
 |---|---|
@@ -54,7 +54,7 @@
 
 ### 1.1 What "production-grade agents" means here
 
-SureSuite's product is *credible simulation-backed decisions*: a validated model (blueprint §9.5), reproducible runs (three-hash provenance, §8.4), and policies whose configured form is exactly what executes (registry law, §6.2). An AI layer is production-grade only if it strengthens that chain. Concretely:
+SuReSuite's product is *credible simulation-backed decisions*: a validated model (blueprint §9.5), reproducible runs (three-hash provenance, §8.4), and policies whose configured form is exactly what executes (registry law, §6.2). An AI layer is production-grade only if it strengthens that chain. Concretely:
 
 1. **Grounded** — every factual claim traceable to a project artifact (a table row, a registry entry, a persisted run), never to model priors.
 2. **Gated** — every mutation flows through the same RPCs and validation gates a human's edit flows through (`bulk_upsert_*`, `snapshot_policy`, the `grading.ts` manifest, the `dispatch.ts` run gate).
@@ -722,7 +722,7 @@ No other tool is declared. The Steward cannot read policies, runs, or validation
 **System-prompt template (verbatim).**
 
 ```
-You are the Data Steward, the SureSuite agent that completes and corrects
+You are the Data Steward, the SuReSuite agent that completes and corrects
 item-master data (materials, products, suppliers) for one project.
 
 CONTEXT
@@ -832,7 +832,7 @@ The resulting `payload` is `{schema_version: 1, rows: [...]}`; `provenance` is `
 **System-prompt template (verbatim).**
 
 ```
-You are the Policy Configurator, the SureSuite agent that turns intent into a
+You are the Policy Configurator, the SuReSuite agent that turns intent into a
 reviewable policy-change proposal for one project.
 
 CONTEXT
@@ -961,7 +961,7 @@ TASK
 **System-prompt template (verbatim).**
 
 ```
-You are the V&V Analyst, the SureSuite agent that interprets verification &
+You are the V&V Analyst, the SuReSuite agent that interprets verification &
 validation evidence and drafts model-validation cards for one project.
 
 CONTEXT
@@ -1042,7 +1042,7 @@ The tool handler — not the model — assembles `payload.computed` by reading t
 **System-prompt template (verbatim).**
 
 ```
-You are the Experiment Designer, the SureSuite agent that compiles decision
+You are the Experiment Designer, the SuReSuite agent that compiles decision
 questions into reviewable experiment specifications for one project.
 
 CONTEXT
@@ -1136,7 +1136,7 @@ TASK
 **System-prompt template (verbatim).**
 
 ```
-You are the Explainer, the SureSuite agent that answers "why did the model do
+You are the Explainer, the SuReSuite agent that answers "why did the model do
 that?" from recorded decision traces for one project.
 
 CONTEXT
@@ -2148,7 +2148,7 @@ No other tool is declared. The Estimator cannot read policies, runs, or validati
 **System-prompt template (verbatim).**
 
 ```
-You are the Cost Estimator, the SureSuite agent that estimates missing
+You are the Cost Estimator, the SuReSuite agent that estimates missing
 item-master economics (materials, products, suppliers) for one project,
 with method-cited values and uncertainty intervals.
 
@@ -2254,10 +2254,10 @@ Estimates missing simulation parameters — unit costs, holding/backorder costs,
 
 Maps the network beyond tier 1 — tier-2/3/4 suppliers — from user-provided documents and external sources, proposing graph extensions the user reviews. New substrate: an `external_evidence` table (source, url/document ref, confidence, retrieved_at, content hash) — **external data never enters grounding directly**; the agent cites evidence rows, and the §8 threat model gains an external-content-injection row (T11: evidence text is data, never instructions — the mm-07/ds-08 discipline generalized).
 
-**Method (Q27 resolved): the AlMahri et al. (2026) KG-LLM pipeline run on SureSuite's substrate**, with the paper's own declared limitations (static graph, no quantities, direct DB writes) closed by what the platform already has (versioned datasets, estimators, the proposal fabric):
+**Method (Q27 resolved): the AlMahri et al. (2026) KG-LLM pipeline run on SuReSuite's substrate**, with the paper's own declared limitations (static graph, no quantities, direct DB writes) closed by what the platform already has (versioned datasets, estimators, the proposal fabric):
 
 1. **Source screening** — only §18.5-registered sources with role `extraction` are read; the paper's "source reputation and domain screening" becomes a registry lookup, not a per-run judgment call.
-2. **Zero-shot NER** — the paper's structured prompt tasks T1–T8 (entity definitions + ≥3 examples per type) over the ontology `Company · Location · Material · Product · Person`; SureSuite node roles (supplier / plant / customer) are overlaid at proposal time, not asserted by the LLM.
+2. **Zero-shot NER** — the paper's structured prompt tasks T1–T8 (entity definitions + ≥3 examples per type) over the ontology `Company · Location · Material · Product · Person`; SuReSuite node roles (supplier / plant / customer) are overlaid at proposal time, not asserted by the LLM.
 3. **Zero-shot RE** — prompt tasks T9–T16: `SuppliesTo · Produces · LocatedIn` (+ `OwnedBy` from registry/ownership data), with the paper's linguistic-variant expansion.
 4. **Entity disambiguation** — the paper's LLM disambiguation pass, anchored on canonical identifiers where they exist: the GLEIF LEI database (free, global legal-entity records incl. parent relations) is the disambiguation backbone; resolved evidence rows carry the LEI.
 5. **Multi-source verification** — a triple integrates only at **≥3 independent credible sources** (DEFAULT per Q27, user-configurable); below threshold it persists as `corroborated` (2) or `provisional` (1) and renders visually provisional per the Q27 confidence vocabulary.
@@ -2305,7 +2305,7 @@ No other tool is declared. The Cartographer cannot read policies, runs, validati
 **System-prompt template (verbatim).**
 
 ```
-You are the Network Cartographer, the SureSuite agent that maps the supply
+You are the Network Cartographer, the SuReSuite agent that maps the supply
 network beyond tier 1 from user-provided documents and registered external
 sources, proposing reviewable graph extensions grounded in stored evidence.
 
@@ -2687,7 +2687,7 @@ No other tool is declared. The Sentinel cannot read policies, the grader, or val
 **System-prompt template (verbatim).**
 
 ```
-You are the Disruption Sentinel, the SureSuite agent that assesses disruption
+You are the Disruption Sentinel, the SuReSuite agent that assesses disruption
 events on demand: you corroborate an event against registered sensing
 sources, match it to this project's network, and file a reviewable risk
 alert whose impact is sized by simulation, never by you.
@@ -2998,7 +2998,7 @@ Multi-part asks (router `mixed`, or a decision question that implies data/policy
 Written for the weakest enabled model (law 7): one decision per numbered rule, no meta-reasoning required, every branch named, all facts arriving in CONTEXT or tool results. Inputs: the §5.4 grounding context (`buildExperimentContext` — scenarios ≤ 16 KB, policy versions ≤ 8 KB, validation cards + hashes ≤ 8 KB, recent runs ≤ 24 KB) plus the `PLAN` block (§21.3) when a plan exists. Output contract: tool calls per the ordered discipline below + a ≤ 6-sentence report; every factual sentence cited per §22. Deterministic gates: the §20.2 handler-side cache-hit guard; the §5.4 hard gates unchanged; the §22.3 verifier on the reply; the §21.5 budgets.
 
 ```
-You are the Experiment Designer, the SureSuite agent that answers decision
+You are the Experiment Designer, the SuReSuite agent that answers decision
 questions from simulation evidence for one project. You follow a fixed loop.
 
 CONTEXT

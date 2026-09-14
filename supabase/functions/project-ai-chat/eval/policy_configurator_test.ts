@@ -374,7 +374,7 @@ Deno.test("configurator prompt template carries the verbatim §5.2 + AGENT_COMMO
     catalogSliceJson: "{}",
     policyHash: "abc",
   });
-  assertStringIncludes(prompt, "You are the Policy Configurator, the SureSuite agent that turns intent into a");
+  assertStringIncludes(prompt, "You are the Policy Configurator, the SuReSuite agent that turns intent into a");
   assertStringIncludes(prompt, "Call draft_policy_bundle ONCE.");
   assertStringIncludes(prompt, "you must not predict KPI values");
   assertStringIncludes(prompt, AGENT_COMMON);

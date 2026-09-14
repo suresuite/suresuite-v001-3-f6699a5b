@@ -1,4 +1,4 @@
-# SureSuite — Supply Chain Policy Library & Simulation Logic (authoritative specification)
+# SuReSuite — Supply Chain Policy Library & Simulation Logic (authoritative specification)
 
 | | |
 |---|---|

@@ -80,7 +80,7 @@ class OrbitMrpAuthError extends Error {
   }
 }
 
-// ── Field mapping: orbit-mrp's products/bom shape -> SureSuite's staged
+// ── Field mapping: orbit-mrp's products/bom shape -> SuReSuite's staged
 //    shape, tracking what mapped cleanly vs. what had to be defaulted or
 //    couldn't be mapped at all (feeds erp_sync_runs' mapping report, which
 //    the UI's Sync Mapping Report renders — plan §6c.1). ────────────────────
@@ -140,7 +140,7 @@ async function reverifyLink(
 ): Promise<{ ok: true; client: OrbitMrpClient } | { ok: false; reason: string }> {
   const { data: hasAccess } = await admin.rpc("has_project_access", { p_project_id: link.project_id });
   if (!hasAccess) {
-    return { ok: false, reason: "linking user no longer has access to the SureSuite project" };
+    return { ok: false, reason: "linking user no longer has access to the SuReSuite project" };
   }
 
   const token = await admin.rpc("get_erp_oauth_token", { p_ref: link.external_oauth_token_ref });
@@ -178,7 +178,7 @@ async function revokeLink(admin: ReturnType<typeof createClient>, linkId: string
 /** list_companies: populates the "Connect a data source" picker with only
  *  what the *user's own* fresh OAuth token proves they can see — never a
  *  hand-typed company id (plan §6b rule 2). Called right after the OAuth
- *  redirect back into SureSuite, before any project_erp_links row exists. */
+ *  redirect back into SuReSuite, before any project_erp_links row exists. */
 async function actionListCompanies(userToken: string) {
   const orbitBaseUrl = Deno.env.get("ORBIT_MRP_BASE_URL") ?? "";
   const client = new OrbitMrpClient(orbitBaseUrl, userToken);
@@ -215,7 +215,7 @@ async function actionLink(
 
   // RLS on project_erp_links requires has_project_access(project_id) for the
   // *inserting* role; using supabaseWithUserAuth here means the insert fails
-  // closed if this user isn't actually authorized on the SureSuite side.
+  // closed if this user isn't actually authorized on the SuReSuite side.
   const { data: link, error } = await supabaseWithUserAuth
     .from("project_erp_links")
     .insert({

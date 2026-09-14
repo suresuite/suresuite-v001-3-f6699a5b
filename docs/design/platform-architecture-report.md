@@ -1,4 +1,4 @@
-# SureSuite: An Open, Policy-Driven Platform for Supply Chain Simulation and Decision Support — Architecture Report
+# SuReSuite: An Open, Policy-Driven Platform for Supply Chain Simulation and Decision Support — Architecture Report
 
 | | |
 |---|---|
@@ -17,7 +17,7 @@ Commercial supply chain simulation suites such as anyLogistix give practitioners
 surface for configuring networks, policies, and experiments, but they are closed: engines are
 not inspectable, policy libraries are not extensible without leaving the GUI paradigm, model
 provenance is not content-addressed, and verification and validation (V&V) are left to user
-discipline. We present **SureSuite**, an open, web-based simulation platform whose central
+discipline. We present **SuReSuite**, an open, web-based simulation platform whose central
 abstraction is the *policy*: every operational decision in the modeled supply chain is an
 explicit, replaceable plugin with a declared parameter schema, phase residency, feasibility
 rules, and cost contribution. A single registry export generates the configuration forms,
@@ -48,7 +48,7 @@ inventory rules, sourcing structures, capacity buffers, disruption responses —
 interactions among these decisions defeat closed-form analysis. The tooling landscape forces a
 choice: commercial suites (anyLogistix, Supply Chain Guru) offer complete input surfaces and
 turnkey experiments but closed engines and fixed policy libraries; academic codes offer
-transparency and extensibility but no product surface a planner can use. SureSuite is built on
+transparency and extensibility but no product surface a planner can use. SuReSuite is built on
 the claim that this trade-off is architectural, not essential: if the policy catalog, its
 parameter schemas, and its data requirements are one machine-readable artifact exported by the
 engine, then the no-code configuration experience *and* research-grade extensibility come from
@@ -57,7 +57,7 @@ the same source.
 The second motivation is methodological. Textbook practice demands verification, face
 validation, warm-up determination, replication justification, and statistical validation
 before a model informs decisions (Law 2015; Sargent 2013; Robinson 2014). Commercial tools
-provide replications; they do not operationalize the discipline. SureSuite packages the full
+provide replications; they do not operationalize the discipline. SuReSuite packages the full
 V&V sequence as a guided pipeline whose outcome is a persisted, provenance-bound artifact that
 downstream experiments inherit.
 
@@ -160,7 +160,7 @@ OM reviewer should read first.*
 
 ### 3.1 The modeled world
 
-SureSuite models a three-echelon supply chain: **suppliers** deliver **materials** to a single
+SuReSuite models a three-echelon supply chain: **suppliers** deliver **materials** to a single
 focal **plant**, which produces **products** consumed by **customers**; a bill of materials
 links the two sides. Products are served **make-to-order** (produce against orders, backlog
 the rest) or **make-to-stock** (serve from a finished-goods buffer replenished to a target) —
@@ -544,7 +544,7 @@ declarations (blueprint §7). The thick pink path is the one interaction that is
 rather than parameterized: finite supplier capacity (P-S.5) congests the ship queue, and that
 congestion *is* an endogenous lead-time extension — no lead-time parameter is edited, the
 delay arises from the mechanism. A reviewer should conclude that policy composition in
-SureSuite is a machine-checked property, which is exactly what a closed engine cannot expose.
+SuReSuite is a machine-checked property, which is exactly what a closed engine cannot expose.
 
 ### 4.3 The policy layer and the single source of truth
 
@@ -970,7 +970,7 @@ stage of `/policies`.*
 ### 7.1 Definitions and stance
 
 Following Sargent (2013): **verification** asks whether the model is built right;
-**validation** asks whether it is the right model for the intended questions. SureSuite's
+**validation** asks whether it is the right model for the intended questions. SuReSuite's
 stance: both must be *product mechanics with persistent outcomes*, not analyst folklore.
 Every step below runs on persisted engine output — never browser-synthesized previews — and
 the pipeline's verdict governs downstream use.
@@ -1133,7 +1133,7 @@ advantage lies, and what is conceded — each stated so it can be tested.*
 ### 9.1 Parity requirements (necessary, not sufficient)
 
 The commercial baseline experience — structured input tables, per-node policy selection with
-parameter forms, experiment wizards, KPI dashboards — is table stakes. SureSuite reaches it
+parameter forms, experiment wizards, KPI dashboards — is table stakes. SuReSuite reaches it
 *structurally*: the input surface from the data manager + item masters + data map ✅; the
 policy-selection experience from registry-generated forms 🧭(B0 — the rail is built, the
 switch is scheduled); experiment packaging from the typed-experiment layer 🧭(C). Parity
@@ -1364,7 +1364,7 @@ series length; engine-migration drift (mitigated: parity characterization + gold
 
 ## 13. Conclusion
 
-SureSuite demonstrates that the commercial-grade configuration experience and research-grade
+SuReSuite demonstrates that the commercial-grade configuration experience and research-grade
 openness are the same artifact viewed from two sides, provided the policy catalog is a single
 machine-readable source of truth exported by the engine. Its architecture is defended not by
 taste but by receipts: each structural rule traces to a failure mode it eliminates, several
