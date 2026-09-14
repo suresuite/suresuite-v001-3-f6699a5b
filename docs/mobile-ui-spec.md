@@ -433,7 +433,7 @@ most common way to make one of these tables look wrong.
 ### 4.4 Sheet shell
 
 ```jsx
-<div className="fixed inset-0 z-40 flex flex-col justify-end bg-foreground/30">
+<div className="fixed inset-0 z-[45] flex flex-col justify-end bg-foreground/30">
   <button aria-label="Close" onClick={close} className="flex-1" />
   <div className="flex max-h-[76%] shrink-0 flex-col rounded-t-xl border-t border-border
                   bg-background landscape:max-h-full landscape:rounded-none">
@@ -458,6 +458,27 @@ most common way to make one of these tables look wrong.
 
 The header is the drag handle (drag down past 90px dismisses). Closing must also clear
 any sheet the parent screen owns, so navigating away can't leave a scrim behind.
+
+**The shell renders in a portal on `<body>`, at `z-45`.** Both halves are load-bearing:
+
+| Layer | z |
+|---|---|
+| Tab bar (`MobileNav`) | 50 |
+| **Sheet** | **45** |
+| Pinned `<MobileActionBar>`, sticky `<PageHeader>` | 40 |
+
+A sheet left in its caller's tree is trapped inside that caller's stacking context —
+the project chip's sheet is a child of the `sticky z-40` header — so its own z-index
+cannot lift it over an action bar that shares the header's layer and comes later in
+the document. That is what put the Lab's "Save version & run" bar on top of the
+open project list: the last rows were cut off mid-row and every tap and swipe aimed
+at them landed on the bar instead. 45 keeps the sheet clear of the action bar while
+leaving the tab bar above it, which is what lets the panel stop short of the bar
+rather than cover it.
+
+The scrollport carries `data-sheet-scroll` so a caller can scroll its own rows — open
+a long list at the current row, say — by addressing that element instead of calling
+`scrollIntoView`, which walks every scrollable ancestor.
 
 ### 4.5 `StatCard` / KPI tile
 

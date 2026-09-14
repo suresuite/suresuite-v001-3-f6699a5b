@@ -54,10 +54,22 @@ export function ProjectChip({
   // only tick that says which one that is. The sheet opens at the current
   // project instead, so a long list starts where the user already is and
   // scrolls both ways from there.
+  //
+  // Scrolling the sheet's own scrollport by hand rather than calling
+  // `scrollIntoView`, which walks every scrollable ancestor: the only thing
+  // keeping it from taking the page behind the sheet along with the rows is
+  // the body lock MobileSheet happens to hold while it is open. Addressing
+  // the scrollport directly makes the centring a property of this list.
   React.useEffect(() => {
     if (!open) return;
-    const el = rowsRef.current?.querySelector('[data-selected="true"]');
-    el?.scrollIntoView({ block: 'center' });
+    const row = rowsRef.current?.querySelector<HTMLElement>('[data-selected="true"]');
+    const scroller = rowsRef.current?.closest<HTMLElement>('[data-sheet-scroll]');
+    if (!row || !scroller) return;
+    const delta =
+      row.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top -
+      (scroller.clientHeight - row.offsetHeight) / 2;
+    scroller.scrollTop += delta;
   }, [open]);
 
   const openSheet = () => {
@@ -118,7 +130,10 @@ export function ProjectChip({
             />
           </div>
         )}
-        <div ref={rowsRef}>
+        {/* The last row has to be as easy to hit as the first. `pb-2` keeps it
+            off the panel's bottom edge, where a thumb lands half on the row
+            and half on the home-indicator band beneath it. */}
+        <div ref={rowsRef} className="pb-2">
           {matches.map((p) => (
             <MobileSheetRow
               key={p.id}
