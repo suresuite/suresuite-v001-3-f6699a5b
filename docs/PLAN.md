@@ -2981,6 +2981,23 @@ naming every table it touches that was absent, so the next reader of a `db push`
 learns this database's real shape in one line instead of one aborted statement at a
 time.
 
+**OUTCOME: APPLIED.** `db push` run `35030451085` on `b4cd26c` finished clean —
+`20260915000004` is live in the production database. Four deploys: `min(uuid)`,
+`network_summary`, `tier2_suppliers`, then success. Two notes for whoever reads
+this next:
+
+  - **Production received it from the FEATURE BRANCH, not from `main`.**
+    `supabase-migrations.yml` has no branch filter, so every push touching
+    `supabase/migrations/**` deploys. Production is therefore AHEAD of `main`
+    until the PR merges, and the merge's own `db push` will skip the migration as
+    already applied. Nothing is wrong with the result; it is the ordering that is
+    worth knowing, and it is the same property that makes D31 fixable and makes an
+    unreviewed branch deployable. Both belong to the same decision.
+  - **The applied version is the file at `b4cd26c`.** A later edit to
+    `20260915000004` will NOT reach production — `db push` keys on the version, and
+    that version is now recorded as applied. Any further change to this migration's
+    behaviour needs a NEW migration file.
+
 Handoff to next WP:
   - **WP 2.4 inherits D31**, and it is a better fit there than anywhere else: that
     package already owns the gate changes (R5, R6, R7). A fourth — execute each new
