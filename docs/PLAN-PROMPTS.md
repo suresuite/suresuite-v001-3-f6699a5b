@@ -109,7 +109,9 @@ recording the counts in §16. Those numbers are the baseline every later phase i
 measured against — this is the most valuable thing this WP produces.
 ```
 
-### WP 0.3 — Documentation consolidation · PARTLY DONE (`719f59b`)
+### WP 0.3 — Documentation consolidation ✅ DONE (`719f59b` + the Phase 0 finish)
+
+*(Kept for the record. §16's WP 0.3 entries record what landed — both halves.)*
 
 ```
 Finish WP 0.3 from docs/PLAN.md. The archive half is DONE —

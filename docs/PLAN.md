@@ -721,13 +721,25 @@ normalization, over `grading.ts`'s table) and
 `src/components/network/RiskDataNotice.tsx`, one component used by both pages.
 **The §15 baseline was NOT captured — no database access. See §16.**
 
-### WP 0.3 — Documentation consolidation ✅ *(done — `719f59b`)*
+### WP 0.3 — Documentation consolidation ✅ *(done — `719f59b` + WP 0.3 finish)*
 
 Archived `docBodies.tsx` + `HelpPage.tsx` to `docs/archive/legacy-help-site/` with a
 README recording D21/D22 and what is worth mining. `docs/data/` established as the
-single archive. **Remaining:** move `docs/data-simulation-mapping.md` and
-`docs/simulation-data-lifecycle.md` in with status banners and tombstones, and add
-the `docs/data/` rule to `CLAUDE.md`.
+single archive.
+
+**Finished in Phase 0.** The two top-level data docs moved under `docs/data/` with
+status banners, tombstones left at both old paths (≈ two dozen code comments still
+cite them), and `CLAUDE.md` gained the plan-authority rule and the §2.1 invariants.
+
+| Now at | Status | Was |
+|---|---|---|
+| `docs/data/field-mapping.md` | AUTHORED | `docs/data-simulation-mapping.md` |
+| `docs/data/lifecycle.md` | AUTHORED | `docs/simulation-data-lifecycle.md` |
+| `docs/data/tables/*.md` | GENERATED | — *(lands in WP 1.4)* |
+
+**Every page under `docs/data/` opens with a status banner** — GENERATED, AUTHORED, or
+DEPRECATED naming its successor. A reader must not have to guess whether to edit a page
+or its generator; that guess is how D22 happened.
 
 ---
 
@@ -1391,6 +1403,65 @@ Handoff to next WP:
   real deploy is the first true typecheck.
 - `runETLLogic` now returns `warnings: string[]`. Callers that spread its result should
   expect it.
+
+### WP 0.3 — Documentation consolidation, finished · 2026-09-15
+
+*(The archive half is the earlier entry above, `719f59b`. This is the remainder.)*
+
+Preconditions held? **yes — the earlier entry's handoff was accurate.** Re-verified,
+not assumed: `/help` and `/help/:slug` still route to `NotFound` (`App.tsx:213-214`);
+`DocsLayout.tsx` still imports `@/components/docs/registry` and `registry.ts` is still
+in `src/components/docs/`; `docBodies.tsx` (157 kB) is archived, not deleted, and was
+not touched here — mining it stays WP 5.2a's.
+
+Exit checks passed? **yes.** `check:docs` passes. `npm test` 40/40. `npm run lint` is
+red only at its pre-existing baseline (see the WP 0.1 entry). Content moved verbatim —
+`git mv`, so the moves show as renames and the history follows the file; the only new
+prose is the banners and the README index.
+
+What landed:
+- `docs/data-simulation-mapping.md` → `docs/data/field-mapping.md` (AUTHORED)
+- `docs/simulation-data-lifecycle.md` → `docs/data/lifecycle.md` (AUTHORED)
+- Tombstones at both old paths (DEPRECATED → naming the successor)
+- `CLAUDE.md`: a "The plan" section (PLAN.md is the single plan; §4 is the only
+  authority for data-layer `file:line` evidence; `check:docs` enforces it; every WP
+  ends with a gap check and a §16 entry) and the §2.1 invariants table
+
+Discovered:
+- **Tombstones are load-bearing, not politeness.** 27 files cite the old paths —
+  `project_map.py`, `datamap.py`, `graph_cache.py`, `item_master.sql`,
+  `20260712000001_product_demand_bounds.sql`, `columnSpecs.ts`, `dataMap.ts`,
+  `paramMeta.ts`, `estimators.ts`, `useStageRows.tsx`, `DataMapGrid.tsx`, six design
+  docs and the archived `docBodies.tsx`. Rewriting 27 files was not this WP's scope and
+  would have buried the doc move in an unreviewable diff. → affects **WP 5.1**: its
+  lineage work updates the citations and only then may the stubs go. Recorded in both
+  stubs so nobody deletes them early.
+- **Deviation from the brief, deliberate.** It said to leave `docs/data/README.md`
+  alone. Its first line read *"generated table reference … **Do not edit anything
+  here**"*, which became false the moment two AUTHORED pages landed beside the
+  generated ones — a doc lying about its own directory, in the directory this plan
+  created to end exactly that. Rewrote its index to carry a Status column; the section
+  pointing at the plan is untouched.
+- `App.tsx:212` carried `see CLAUDE.md task history` — CLAUDE.md has no task history and
+  never did. Fixed in place to name the archive and WP 5.2a. Small, but it is the same
+  failure as D21/D22 (a reference outliving its referent) in a code comment, and this
+  WP is where it gets caught.
+- **§2.1's invariant IDs `G1`–`G4` collide with the blueprint's gap IDs `G1`–`G18`.**
+  Copying the table into `CLAUDE.md` put both numbering schemes on one page, where
+  "G4" means "governance invariant" in one table and "no data-entry surface for the
+  economics" in the other. Disambiguated with a note under the table rather than
+  renumbering, which would invalidate every existing citation. → affects **WP 1.4**
+  (which promotes the invariants to CI gates): pick gate names, not bare `G` numbers.
+
+Handoff to next WP:
+- Every page under `docs/data/` opens with a status banner. WP 1.4's generator must
+  emit a **GENERATED** banner on each `tables/*.md`, or the directory goes back to
+  being a guess.
+- The tombstones stay until WP 5.1 updates the 27 citations. Do not delete them to
+  tidy up; check `grep -rl data-simulation-mapping` first.
+- `CLAUDE.md` now states the `check:docs` rule, so a future session has no excuse for
+  citing `file:line` outside §4. When `check:docs` fails on a *derived* file, the fix
+  is to update §4 first and the derived file second — never the other way round.
 
 ---
 

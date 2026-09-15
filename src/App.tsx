@@ -209,7 +209,10 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                {/* Docs/help site is hidden from all access — see CLAUDE.md task history. */}
+                {/* Docs/help site is hidden from all access. The legacy site is archived at
+                    docs/archive/legacy-help-site/; its replacement and these two routes are
+                    restored by WP 5.2a (docs/PLAN.md §6). The previous comment pointed at a
+                    "CLAUDE.md task history" that does not exist. */}
                 <Route path="/help" element={<NotFound />} />
                 <Route path="/help/:slug" element={<NotFound />} />
                 <Route path="/about" element={<About />} />
