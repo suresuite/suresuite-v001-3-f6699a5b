@@ -19914,7 +19914,7 @@
         "src/hooks/useAuth.tsx:82",
         "src/pages/admin/AdminAudit.tsx:40",
         "src/pages/admin/AdminDashboard.tsx:39",
-        "src/pages/admin/AdminUsage.tsx:49",
+        "src/pages/admin/AdminUsage.tsx:50",
         "supabase/functions/agent-apply/decisionReportApply.ts:69",
         "supabase/functions/agent-apply/index.ts:333",
         "supabase/functions/combine-project/index.ts:29",
@@ -19928,6 +19928,7 @@
     {
       "table": "product_code_map",
       "referenced_at": [
+        "src/lib/policies/__tests__/loudFailure.test.ts:36",
         "supabase/functions/combine-project/index.ts:132"
       ],
       "note": "read by code; created by no migration"
@@ -19936,8 +19937,8 @@
       "table": "risk_data",
       "referenced_at": [
         "src/components/network/RiskDataNotice.tsx:5",
-        "src/pages/FirmLevelNetwork.tsx:288",
-        "src/pages/ProductLevelNetwork.tsx:487"
+        "src/pages/FirmLevelNetwork.tsx:300",
+        "src/pages/ProductLevelNetwork.tsx:499"
       ],
       "note": "read by code; created by no migration"
     }

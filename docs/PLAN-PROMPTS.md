@@ -19,8 +19,12 @@ them — but **treat them as leads, not facts**: re-check anything you rely on.
 
 ```
 You are implementing ONE work package from docs/PLAN.md
-on branch claude/busy-lovelace-5hxsh6 (PR #187). Read §1 of that plan first —
+on a fresh branch off the latest default. Read §1 of that plan first —
 it defines the work-package lifecycle. Follow it exactly.
+
+Before anything else, read the PHASE BOUNDARY entry at the end of §16. It
+records what the Phase 0-1 review found true, what it found merely claimed,
+and what the next package inherits.
 
 Non-negotiables:
 
@@ -35,8 +39,8 @@ Non-negotiables:
    and your Handoff note to §16 Drift Log in the SAME commit as the code.
 5. If a finding changes a later WP, EDIT that WP in the plan, same commit. The
    plan and the code move together (CLAUDE.md).
-6. Commit as: Phase N / WP N.M / <blueprint ref>: <title>. Push to the branch;
-   it updates PR #187.
+6. Commit as: Phase N / WP N.M / <blueprint ref>: <title>. Push to your branch
+   and open a PR for it.
 
 Read docs/design/next-gen-platform-design.md §2.3 and §8.1–8.4 before touching
 the simulation platform, per CLAUDE.md.
@@ -85,7 +89,7 @@ Already verified (re-check before relying on it):
   — the error is swallowed and the table exists in NO migration. The mapped
   branch at :158-163 is therefore dead code today. Make the failure loud;
   deciding whether to add the table or delete the branch is WP 1.4, not this one.
-· risk_data is read at ProductLevelNetwork.tsx:487 and FirmLevelNetwork.tsx:288
+· risk_data is read at ProductLevelNetwork.tsx:499 and FirmLevelNetwork.tsx:300
   with quoted column names ("RISK CLASS") and has no migration either.
 
 Conversion changes weighted magnitudes. supply_chain_data.weighted is
@@ -225,7 +229,35 @@ You must DECIDE the orphans in this WP, not defer them:
 Set the natural-key rule to WARN, not error — WP 3.3 makes it passable. Leave a
 dated TODO so WP 2.4 can flip it.
 
-Add the invariants table from §2.1 of the plan to CLAUDE.md in this commit.
+Add the invariants table from §2.1 of the plan to CLAUDE.md in this commit. Use
+gate NAMES, not bare G numbers — §2.1's G1-G4 collide with the blueprint's gap IDs.
+
+WIDENED BY THE PHASE 0-1 BOUNDARY REVIEW (§16, findings F1 and F4):
+
+· The problem is not one missing gate. NO CI JOB RUNS ANY OF THEM. Twelve
+  workflows exist; none invokes npm test, check:docs, or any contract:* command,
+  and npm run lint is not in CI either. So wire SIX commands into the new job,
+  not one: contract:introspect -- --check, contract:validate,
+  contract:units -- --check, contract:verify, check:docs, npm test.
+· contract:verify EXITS 1 TODAY on the orphan check — it finds three orphans,
+  not two. Your step 3 is what makes it green. Reconcile the orphans in this
+  same package or the phase ends with a gate that is red on arrival, which is
+  exactly what made lint unreadable.
+· approved_users is the THIRD orphan and the one that matters: it is the
+  authentication table, it predates the migration history, and a fresh database
+  cannot be built from supabase/migrations/ alone until you reconstruct its
+  CREATE TABLE from the ALTERs the history does carry. Do NOT drop or recreate
+  it in place.
+· build/schema.introspected.json was committed STALE and drifted within a day
+  of WP 1.1 landing, because nothing runs --check on it. It is the cheapest
+  gate in the phase.
+· Budget this as a FULL session. It is now the largest package in Phase 1, not
+  the smallest. Do not attempt a second package alongside it.
+
+Do not treat a green local run as done. The gap check is to open a throwaway PR,
+add a scratch column to a migration on it, and confirm CI goes RED. The boundary
+review already proved the scratch column fails contract:validate locally — that
+proves the rule, not the wiring, and the wiring is the whole package.
 ```
 
 ---
@@ -363,7 +395,7 @@ full stage→diff→promote cycle BEFORE renaming anything.
 Implement WP 3.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· UploadWizard.tsx:476-477 and :497-523 parse with split(','). Confirmed behaviour:
+· UploadWizard.tsx:501-502 and :497-523 parse with split(','). Confirmed behaviour:
   – a quoted comma shifts EVERY subsequent column left by one
   – BOM is stripped (U+FEFF is ES WhiteSpace, so .trim() removes it) — accidental
   – CRLF survives (the per-field .trim() removes \r)
@@ -375,7 +407,7 @@ Already verified (re-check before relying on it):
 · ingest-bom-multi-level/index.ts:42-44 already does the right thing:
   (x ?? '').toString().trim() || null. Copy that pattern to the other two — do not
   invent a third.
-· The standard upload button IS gated on errors.length === 0 (UploadWizard.tsx:1833),
+· The standard upload button IS gated on errors.length === 0 (UploadWizard.tsx:1863),
   so validateData errors do block. The problem is what it fails to catch, not the gate.
 
 Delete the client-side parse. Do not leave it behind a flag — two parsers is the
@@ -491,7 +523,7 @@ Already verified (re-check before relying on it):
   analysis in everything but name — give it analysis_kind 'combine_etl'.
 · Each currently has its own storage convention and its own (or no) invalidation.
 · calculate-node-prominence is auto-invoked after deep-tier uploads
-  (UploadWizard.tsx:1280-1307) — that call site must keep working.
+  (UploadWizard.tsx:1309-1336) — that call site must keep working.
 · auto_calculate_network_metrics_on_completion (20250925164454:78) fires on the
   projects.completed transition. Check whether it still should.
 
@@ -542,7 +574,7 @@ Already verified (re-check before relying on it):
 · Per-page reads confirmed by the audit are listed in §4 of the plan and
   in the plan's defect table — use them to validate your analyser's output, not to
   replace it.
-· Some pages read tables directly with no RPC (ProcessLevelNetwork.tsx:1110-1111).
+· Some pages read tables directly with no RPC (ProcessLevelNetwork.tsx:1104-1105).
   The lineage must record what the code does, not what it should do.
 
 Seed by static analysis, then CONFIRM by hand. An unconfirmed lineage entry is
