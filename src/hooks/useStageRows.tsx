@@ -172,6 +172,23 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           return undefined;
         };
 
+        // A routing DECISION the project data's own shape determines (how many
+        // suppliers a material has; which firm ships the most volume). Nobody
+        // uploads a `primary_source` column, but this is not a default either —
+        // the data decided it. Tracking it as project-backed is what makes it
+        // survive the prefill: `applyPrefill` persists only `__from_data`
+        // fields, and the pre-dispatch validator (verification.ts:110,144)
+        // reads `primary_source` / `sourcing_firm` from the saved override
+        // bundle, never from the row.
+        const markFromData = <T,>(
+          prov: { __from_data: Record<string, true> },
+          field: string,
+          value: T,
+        ): T => {
+          if (value !== undefined && value !== null) prov.__from_data[field] = true;
+          return value;
+        };
+
         // Determine which BOM nodes are raw materials (= leaf level, never a parent).
         const isParent = new Set<string>();
         for (const r of bom) if (r.higher_level_component_id) isParent.add(String(r.higher_level_component_id));
@@ -274,23 +291,27 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               enrich.unit_price,
               impute(inPriceByMaterial, String(material), inPriceGlobal),
             );
+            const primary_source = markFromData(
+              prov,
+              "primary_source",
+              count === 1 ? true : isSuggested,
+            );
             seen.set(key, {
               key,
               supplier_id: supplier,
               material_id: material,
               // Real uploaded data where available, else smart-average imputed.
               material_price,
-              // D1/D16: nothing else is written here. Constants the upload never
-              // carried (safety stock, MOQ, ordering cost, an "unlimited"
-              // capacity, a lead-time distribution) used to be stamped onto the
-              // row, where they were indistinguishable from uploaded values —
-              // they rendered with the green "From project data" dot and the
-              // auto-seed froze them as overrides, silently beating the engine's
-              // own defaults (safety_stock_days = 0 vs. project_map.py's 7).
-              // The bundle default is the honest source for an unuploaded field.
+              // NOTE (D1/D16): no constants are written here. A row carries a
+              // field ONLY when the project data says something about it —
+              // anything else is supplied live by the policy bundle default or
+              // `columnSpecs.defaultWhenMissing`, and is never persisted as an
+              // override. Writing `safety_stock_days: 0` here silently
+              // overrode the engine's own 7-day default (project_map.py:783)
+              // and made the constant indistinguishable from uploaded data.
               // Single source → auto-lock. Multi-source → auto-enable the
               // suggested supplier, leave the rest off (user can still change).
-              primary_source: count === 1 ? true : isSuggested,
+              primary_source,
               __suggested_primary: isSuggested,
               __needs_primary: count > 1,
               __lane_count: count,
@@ -406,12 +427,15 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               key,
               item_id: focal,
               product_id: prod,
+              // NOTE (D1/D16): the same rule as the supplier stage — no
+              // constants. `capacity_machine_per_day`, `capacity_labor_per_day`,
+              // `production_cost_per_unit` and `lead_time_distribution` were
+              // written here and read by nothing: the plant column spec
+              // declares none of them, so they never rendered and never
+              // reached the engine. Defaults come from the policy bundle.
               // Real signal: median inbound lead time of feeding components,
               // else smart-average imputed.
               production_lead_time_mean_days,
-              // D16: machine/labor capacity, production cost and the lead-time
-              // distribution are NOT in any upload — writing them here made the
-              // grid claim they were. The bundle default answers for them now.
               __components_count: componentsByProduct.get(prod) ?? 0,
               __demand_per_day: demand,
               __from_data: prov.__from_data,
@@ -462,15 +486,28 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             const firms = meta?.firms ?? [];
             const suggestedFirm = meta?.firm ?? "";
             const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
+            // Both firm-routing fields are decided by the uploaded outbound
+            // volumes (highest volume wins), so they are tracked as
+            // project-backed — see `markFromData`.
+            const sourcing_firm = markFromData(
+              prov,
+              "sourcing_firm",
+              suggestedFirm || undefined,
+            );
+            const primary_source = markFromData(
+              prov,
+              "primary_source",
+              suggestedFirm ? true : undefined,
+            );
             seen.set(key, {
               key,
               customer_id: customer,
               product_id: product,
               // Prefill the suggested sourcing firm; single firm → only option.
-              sourcing_firm: suggestedFirm || undefined,
+              sourcing_firm,
               // Single firm → lock primary. Multi-firm → auto-enable the
               // suggested firm (user can still change).
-              primary_source: suggestedFirm ? true : undefined,
+              primary_source,
               __suggested_primary: !!suggestedFirm,
               __needs_primary: firms.length > 1,
               __lane_count: firms.length,

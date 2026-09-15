@@ -46,6 +46,7 @@ import {
   masterValueFor as masterValueForShared,
   derivedValueFor as derivedValueForShared,
   getEffectiveValue as getEffectiveValueShared,
+  isPrefillPersistable,
 } from "@/lib/policies/resolveEffective";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
@@ -765,6 +766,11 @@ export function StagePolicyTable({
   // Confirm dialog for "Apply prefill" (writes a lot of rows at once).
   const [confirmPrefill, setConfirmPrefill] = useState(false);
   const [applying, setApplying] = useState(false);
+  /** A prefill has run for the current (project, stage) — see `dataBannerState`. */
+  const [prefillSettled, setPrefillSettled] = useState(false);
+  useEffect(() => {
+    setPrefillSettled(false);
+  }, [projectId, stageKey]);
 
   // Bulk reset: delete every saved override targeting a row in this stage.
   // Clears stale values frozen by the old auto-seed (e.g. 0-prices) so the
@@ -812,19 +818,19 @@ export function StagePolicyTable({
    * supplier / primary are skipped so we never lock in bad data.
    */
   const applyPrefill = async (opts: { silent?: boolean } = {}) => {
-    // Arm the in-flight flag BEFORE the row loop, not just around the write:
-    // the auto-seed effect below re-evaluates on every `dataRows` identity
-    // change, and an un-armed async gap let it fire a second time.
+    // Armed BEFORE the row loop, not after it: the auto-seed effect below
+    // re-runs on every `dataRows` identity change, and with the flag raised
+    // only at the upsert it had an open window to re-enter and seed twice.
     setApplying(true);
     try {
-      await buildAndApplyPrefill(opts);
+      await runPrefill(opts);
     } finally {
       setApplying(false);
       setConfirmPrefill(false);
     }
   };
 
-  const buildAndApplyPrefill = async (opts: { silent?: boolean }) => {
+  const runPrefill = async ({ silent = false }: { silent?: boolean }) => {
     const toUpsert: OverrideRow[] = [];
     let written = 0;
     let skipped = 0;
@@ -853,12 +859,11 @@ export function StagePolicyTable({
           })
         )
           continue;
-        // D1: persist only what the row can source — an unsaved edit, an
-        // uploaded value, or this stage's own routing decision. Imputed
-        // averages are estimates to verify (freezing them poisoned projects
-        // before) and an unuploaded field must keep resolving to the ENGINE's
-        // default, not to a constant we froze on its behalf.
-        if (!isPrefillable(r, col.field, drafts[rowKey]?.[col.field])) continue;
+        // D1 — persist ONLY what the project data or the user actually says;
+        // never a value that would come from a default. Imputed averages stay
+        // excluded. The rule is `isPrefillPersistable`, unit-tested.
+        if (!isPrefillPersistable(r, col.field, (drafts[rowKey] ?? {})[col.field]))
+          continue;
         // draft → project-data prefill → effective default
         const v = getEffective(rowKey, r, col.field, col.family);
         if (v === undefined || v === null) continue;
@@ -875,48 +880,58 @@ export function StagePolicyTable({
       if (touched) written++;
     }
     if (toUpsert.length === 0) {
-      if (!opts.silent) toast.info("Nothing to persist", TOAST);
+      // Nothing the uploaded data can answer for this stage's columns. Say so
+      // in the banner rather than leaving "uploaded data not applied" standing
+      // over a stage where there is nothing left to apply.
+      setPrefillSettled(true);
+      if (!silent) toast.info("Nothing to persist", TOAST);
       return;
     }
     await bulkUpsertOverrides(toUpsert);
     setDrafts({});
-    if (!opts.silent) {
+    setPrefillSettled(true);
+    if (!silent)
       toast.success(
         `Persisted prefill for ${written} line(s)` + (skipped > 0 ? ` · ${skipped} skipped` : ""),
         TOAST,
       );
-    }
   };
 
   // Auto-seed: project data loaded for the first time with no existing overrides.
-  const autoSeedMarkerRef = useRef<string | null>(null);
+  // The marker is a SET, not one slot: holding a single `${projectId}::${stageKey}`
+  // meant a supplier → plant → supplier tab round trip overwrote the supplier
+  // marker with the plant one, so returning to supplier re-seeded it.
+  const autoSeededRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const marker = `${projectId}::${stageKey}`;
-    if (autoSeedMarkerRef.current === marker) return;
+    if (autoSeededRef.current.has(marker)) return;
     if (loading || applying || dataRows.length === 0) return;
     if (!hasRealProjectData || hasOverridesForStage) return;
-    autoSeedMarkerRef.current = marker;
-    // Awaited (inside a void'd async IIFE) so a failure cannot leave `applying`
-    // stuck true and so the seed is a single settled action, not a floating
-    // promise racing the next render.
-    void (async () => {
-      try {
-        await applyPrefill({ silent: true });
-      } catch (err) {
-        console.warn("[StagePolicyTable] auto-seed failed", err);
-        autoSeedMarkerRef.current = null;
-      }
-    })();
+    autoSeededRef.current.add(marker);
+    // An effect body cannot await; it does not need to. `applyPrefill` raises
+    // `applying` synchronously before it touches a row, and this effect's own
+    // guard reads it, so the whole write is covered. The seed is silent — the
+    // user did not ask for it, so it does not toast.
+    void applyPrefill({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, applying, dataRows, hasRealProjectData, hasOverridesForStage]);
 
   // Banner state: derived from project data presence + override existence.
-  const dataBannerState = useMemo((): "no_data" | "seeding" | "seeded" | "pending" => {
+  const dataBannerState = useMemo(():
+    | "no_data"
+    | "seeding"
+    | "seeded"
+    | "none_applicable"
+    | "pending" => {
     if (!hasRealProjectData) return "no_data";
     if (applying) return "seeding";
     if (hasOverridesForStage) return "seeded";
+    // Prefill has run and the uploaded data had nothing to say about any of
+    // this stage's columns. "Not applied" would be a standing instruction to
+    // press a button that does nothing.
+    if (prefillSettled) return "none_applicable";
     return "pending";
-  }, [hasRealProjectData, applying, hasOverridesForStage]);
+  }, [hasRealProjectData, applying, hasOverridesForStage, prefillSettled]);
 
   /** Reset one row: drop drafts + delete all saved overrides on that row. */
   const resetRow = async (rowKey: string) => {
@@ -1216,9 +1231,14 @@ export function StagePolicyTable({
           // WP 6.2. Until then, every change here changes BOTH.
           const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
           const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
-          const decidedMap = (r.__decided ?? {}) as Record<string, true>;
           const imputed = !edited && !col.master && imputedMap[col.field] === true;
-          // D16: presence on the row is NOT provenance — only `__from_data` is.
+          // D16 — `__from_data` is the ONLY evidence that a value came from the
+          // project. The old fallback ("untracked but the row carries a value")
+          // green-dotted every hardcoded constant useStageRows wrote onto the
+          // row as "From project data". A field that is neither tracked nor
+          // master-backed resolves to `default`, never `data`.
+          // NOTE: duplicated verbatim in resolveEffective.ts:resolveCell —
+          // the two must stay in lockstep until WP 6.2 de-duplicates them.
           const fromData =
             !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
           const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
@@ -1443,6 +1463,11 @@ export function StagePolicyTable({
         )}
         {dataBannerState === "seeding" && (
           <span className="font-mono text-[10.5px] text-muted-foreground">seeding from project data…</span>
+        )}
+        {dataBannerState === "none_applicable" && (
+          <span className="font-mono text-[10.5px] text-muted-foreground">
+            uploaded data says nothing about these columns — bundle defaults
+          </span>
         )}
         {dataBannerState === "no_data" && !loading && (
           <span className="font-mono text-[10.5px] text-muted-foreground">no uploaded data — bundle defaults</span>

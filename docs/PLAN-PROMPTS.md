@@ -51,9 +51,11 @@ the simulation platform, per CLAUDE.md.
 *(Kept for the record. The evidence below describes the state BEFORE the fix; §16's
 WP 0.1 entry records what actually landed, including D23/D24 and the new
 `suggested` provenance state.)*
+### WP 0.1 — Kill the silent policy override ✅ done
 
-```
-Implement WP 0.1 from docs/PLAN.md.
+Shipped. The prompt is retired rather than cached: every line:number it carried is
+now stale, and the record of what was found lives in `docs/PLAN.md` §16 (drift log),
+with the closed defects marked in §4 and the surviving locations in §4.1.
 
 Already verified (re-check before relying on it):
 · useStageRows.tsx:277-306 writes hardcoded constants onto every supplier row.
@@ -75,6 +77,12 @@ Decide and record: whether to drop the constants from the row entirely (my
 recommendation — let columnSpecs.defaultWhenMissing supply them) or tag them as
 non-data. Justify whichever you pick in the commit message.
 ```
+Two things it settled that later packages rely on:
+· the constants were **dropped**, not tagged — tagging needs a second registry of
+  "not data", which is the parallel source of truth I1 forbids;
+· `__from_data` now also carries the routing decisions the data's shape makes
+  (`primary_source`, `sourcing_firm`), because the pre-dispatch validator reads
+  those from the saved override bundle, not from the row.
 
 ### WP 0.2 — Unit conversion + orphan-table honesty ✅ DONE
 
@@ -123,9 +131,10 @@ Remaining:
   docs/simulation-data-lifecycle.md → docs/data/lifecycle.md, each with a status
   banner (GENERATED / AUTHORED / DEPRECATED → superseded by X).
 · Leave a tombstone stub at every old path.
-· Write docs/data/README.md as the index.
-· Add to CLAUDE.md: docs/data/ is the single archive for data facts; no data fact
-  is authored in more than one place.
+· Add to CLAUDE.md: docs/PLAN.md is the single plan and the only authority for
+  data-layer file:line evidence (§4); npm run check:docs enforces it. Add the §2.1
+  invariants table too.
+· docs/data/README.md already exists and points at the plan — leave it.
 
 Preserve content verbatim. The only new prose is the banners and the index.
 Do NOT touch the archived files — mining them is WP 5.2a's job.
@@ -405,7 +414,7 @@ Already verified (re-check before relying on it):
   and report counts BEFORE deduplicating, and again after.
 · Duplicates distort sourcing_ratio (combine-project:277 — the duplicate appears in
   both numerator and denominator), the smart-average imputation basis
-  (useStageRows.tsx:125-131), and the grading reducers. Dedup will therefore CHANGE
+  (useStageRows.tsx:120-130), and the grading reducers. Dedup will therefore CHANGE
   numbers. That is the D5 damage being undone — record the before/after in §16 so
   nobody later mistakes it for a regression.
 · Normalization at promotion (invariant I3) is the point of this WP. After it, no
@@ -697,6 +706,11 @@ Already verified (re-check before relying on it):
 · Substitutions to document exhaustively: resolveField's `> 0` test
   (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
   defaultWhenMissing (columnSpecs.ts:132-171), the effectivePolicy bundle,
+  columnSpecs.ts:119-178 declares the columns; useStageRows.tsx:208-348 builds the
+  rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
+· Substitutions to document exhaustively: resolveField's `> 0` test
+  (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
+  defaultWhenMissing (columnSpecs.ts:133-168), the effectivePolicy bundle,
   liveDefault = derivedVal ?? 0 (resolveEffective.ts:135), grading.ts's reducers,
   and ENGINE_DEFAULT_PRICE.
 · supabase/functions/_shared/grading.ts is pinned to project_map.py by
@@ -731,8 +745,14 @@ Already verified (re-check before relying on it):
   no master row. Fix here or record as a separate finding.
 
 De-duplicate StagePolicyTable.tsx:1192-1254 against resolveEffective.ts's
+De-duplicate StagePolicyTable.tsx:1206-1265 against resolveEffective.ts's
 resolveCell in this WP — it has been carried in lockstep since WP 0.1 and this is
 where that debt is paid.
+
+The WP 0.1 gap check added three more divergences to this package: the dead
+defaultWhenMissing table, seven bundle fields stored and hashed but shown and read
+by nothing, and the plant stage's discarded production_lead_time_mean_days. They
+are stated in PLAN.md §13 WP 6.2 with their evidence in §16 — read both.
 ```
 
 ### WP 6.3 — Provenance vocabulary and researcher export
