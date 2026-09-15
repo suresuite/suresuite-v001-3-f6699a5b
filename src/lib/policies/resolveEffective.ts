@@ -143,16 +143,16 @@ export function resolveCell(args: {
   const edited = draft !== undefined;
   const fromDataMap = (row.__from_data ?? {}) as Record<string, true>;
   const imputedMap = (row.__imputed ?? {}) as Record<string, true>;
-  const tracked = col.field in fromDataMap || col.field in imputedMap;
   const imputed = !edited && !col.master && imputedMap[col.field] === true;
+  // D16 — `__from_data` is the ONLY evidence that a value came from the
+  // project. The old fallback ("untracked but the row carries a value")
+  // green-dotted every hardcoded constant useStageRows wrote onto the row as
+  // "From project data". A field that is neither tracked nor master-backed
+  // resolves to `default`, never `data`.
+  // NOTE: duplicated verbatim in StagePolicyTable.tsx's cell renderer — the
+  // two must stay in lockstep until WP 6.2 de-duplicates them.
   const fromData =
-    !edited &&
-    !imputed &&
-    (col.master
-      ? masterSet
-      : tracked
-        ? fromDataMap[col.field] === true
-        : row[col.field] !== undefined && row[col.field] !== null);
+    !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
   const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
   const fromOverride =
     !edited &&
@@ -178,4 +178,35 @@ export function resolveCell(args: {
             : "default";
 
   return { value: cellValue ?? liveDefault, provenance };
+}
+
+/**
+ * May the prefill persist this row×field as a saved override? (D1)
+ *
+ * The prefill's job is to freeze what the **project data** says, plus whatever
+ * the user has typed. It is not a default-materializer: a field the data is
+ * silent about must keep resolving live through the policy bundle, so that the
+ * engine's own default still applies and a later change to that default still
+ * reaches the project. Persisting a default instead froze a decision nobody
+ * made — `safety_stock_days` went in as `0` while both the bundle
+ * (`schemas.ts`) and the engine (`project_map.py:783`) say 7.
+ *
+ * `__from_data` is therefore the whole allow-list. It carries both the values
+ * read off an uploaded column and the routing decisions the data's own shape
+ * determines (`primary_source`, `sourcing_firm` — `useStageRows::markFromData`),
+ * which the pre-dispatch validator reads from the saved bundle.
+ *
+ * Imputed averages are excluded even when edited: they are estimates to verify,
+ * and silently freezing them has poisoned projects before.
+ */
+export function isPrefillPersistable(
+  row: Record<string, unknown>,
+  field: string,
+  draft?: unknown,
+): boolean {
+  const imputed = (row.__imputed ?? {}) as Record<string, true>;
+  if (imputed[field] === true) return false;
+  if (draft !== undefined) return true;
+  const fromData = (row.__from_data ?? {}) as Record<string, true>;
+  return fromData[field] === true;
 }
