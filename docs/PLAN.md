@@ -2108,7 +2108,7 @@ Handoff to WP 1.4:
   run all four plus its own drift comparison, so there is one command to name in CI
   and in CONTRIBUTING.
 
-### WP 1.4 — Generator, drift gate, orphan reconciliation · 2026-09-15 · `<commit>`
+### WP 1.4 — Generator, drift gate, orphan reconciliation · 2026-09-15 · `6c67c29`
 
 **There is no PHASE BOUNDARY entry in this section, and this package was told to
 read one.** §16 ended at WP 1.3. The brief's own summary of what that entry
