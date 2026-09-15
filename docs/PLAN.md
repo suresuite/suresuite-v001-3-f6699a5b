@@ -205,7 +205,10 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:420-425` | WP 6.2 |
 | D25 | `combine-project`'s core reads (`outbound_logistics`, `inbound_logistics`, both BOM tables) destructured only `{ data }` — the same swallow as D3 but on the ETL's own inputs, so a failed read produced a half-empty graph and reported success. Found by WP 0.2 while fixing D3 | `combine-project/index.ts:52-64,169-174,207-220` | WP 0.2 ✅ |
 | D26 | **Two copies of the D1 prefill rule.** `5c7129f` merged two independent WP 0.1 implementations: `resolveEffective.ts:isPrefillPersistable` (imported and called at `StagePolicyTable.tsx:865`) and `prefillSelect.ts:prefillSourceFor` (imported at `StagePolicyTable.tsx:53` and never called). Both are unit-tested, so both stay green while only one runs — an I1 violation, and the next edit to "the rule" has even odds of landing on the dead one. Found by the WP 1.1 precondition check | `resolveEffective.ts:214`, `prefillSelect.ts:33`, `StagePolicyTable.tsx:53,865` | WP 6.2 |
-| **D27** | **The uuid org plane and the text org plane diverge on every project insert.** `set_project_defaults()` stamps `NEW.organization` (text) and never `NEW.organization_id`, so the one-time backfill in `20260709000002` is the only thing that ever set the uuid. Every project created since has `organization_id IS NULL` — visible through RLS, which compares text, and invisible to the public `/v1` API, which authorizes by uuid (`p.organization_id = p_org_id`). D13 records that two identities exist; this records that they already disagree, and that the disagreement grows by one row per project. Found after WP 1.4 while sizing WP 2.1 | `20250820170403_…sql:58-84`; `20260711000001_api_access_control.sql:401,415` | WP 2.1 |
+| **D27** | **The uuid org plane and the text org plane diverge on every project insert.** `set_project_defaults()` stamps `NEW.organization` (text) and never `NEW.organization_id`, so the one-time backfill in `20260709000002` is the only thing that ever set the uuid. Every project created since has `organization_id IS NULL` — visible through RLS, which compares text, and invisible to the public `/v1` API, which authorizes by uuid (`p.organization_id = p_org_id`). D13 records that two identities exist; this records that they already disagree, and that the disagreement grows by one row per project. Found after WP 1.4 while sizing WP 2.1 | `20250820170403_…sql:58-84`; `20260711000001_api_access_control.sql:401,415` | WP 2.1 ✅ |
+| **D28** | **Every policy in the schema is PERMISSIVE, so the deny-all policies do not deny.** Postgres ORs permissive policies, and no migration anywhere declares `RESTRICTIVE`. `approved_users` — the authentication table, holding `password_hash` — carries `"Users can check their own login credentials"` `FOR SELECT USING (true)` alongside `"No direct access - use RPCs"` `FOR ALL TO authenticated, anon USING (false)`; the second was clearly meant to supersede the first and instead ORs with it. Whether it is reachable depends on the table GRANTs Supabase applies outside `supabase/migrations/`, which a static replay cannot see — §15 settles it, and it is the reason §15 now gates a security decision and not just a count. Recorded by WP 2.1's gap check, which needed the `approved_users` policy list to author its sidecar; both later prompts cite "D28" as though §4 already held it | `20250815225910_…sql`; `20250826015711_…sql` (policies on `approved_users`) | WP 2.4 |
+| D29 | **Two organizations may share a display name, and the text branch then admits one to the other.** `organizations.name` is NOT UNIQUE (only `slug` is), so `organization = get_current_user_org()` matches across tenants whenever two names collide. This is PRE-EXISTING — it is what the text-only comparison always did — and WP 2.1 deliberately preserved it rather than reading the uuid first, because a uuid-first rule DENIES where the old one granted and a package whose job is to stop revoking access must not add a new way to revoke it. It closes when the text branch is removed, which needs §15 to confirm the uuid backfill at 100 %. The chosen semantics are pinned by a truth-table case in `orgIdentity.test.ts` so the flip is deliberate. Found by WP 2.1's gap check | `org_is_current_user_org` in `20260915000004_org_identity_dual_read.sql`; `organizations.name` has no UNIQUE constraint | WP 2.4 |
+| D30 | **Six policies are created twice with no `DROP` between them, which Postgres rejects.** `20250913085427` creates the `view`/`modify` pair on `simulation_cache`, `simulation_jobs` and `simulation_performance_metrics`; `20250914113723` creates all six again, verbatim apart from `public.` qualification, and neither file drops them first. `CREATE POLICY` on an existing name raises 42710, so one of two things is true and a STATIC REPLAY CANNOT SAY WHICH: either the earlier migration did not take effect, or the later one errored and the rest of its statements never ran. The introspector recorded both copies without complaint — 150 policy entries for 144 distinct names — which is how it stayed invisible. WP 2.1's migration makes the END STATE deterministic (it drops and recreates all 59 it touches, and the duplicate entries collapse), but it does not settle which branch is true, and a fresh `supabase db push` is what would. Found by WP 2.1's gap check, from the introspected artifact's own policy count | `20250913085427_…sql:134`; `20250914113723_…sql:155` | WP 2.4 |
 
 ### 4.1 Code map — the data layer
 
@@ -996,20 +999,48 @@ read a table is worse than no page.
 
 ## 9. Phase 2 — Governance consolidation
 
-### WP 2.1 — One organization identity *(D13)*
+### WP 2.1 — One organization identity ✅ *(D13, D27 — done `20260915000004`)*
 
-Backfill `approved_users.organization_id`; add `projects.organization_id uuid`; add
-`get_current_user_org_id()`; migrate every text comparison; dual-read during
-transition; fix the `organizations` RLS which self-bridges by name/slug string match;
-retire or document `user_plant_access`.
+Done. `get_current_user_org_id(_user_id uuid)` alongside the text function;
+`set_project_defaults()` stamps `organization_id` (D27); the backfill re-run for
+what the trigger never stamped; the `organizations` self-bridge now matches on
+`id` first; and every live comparison routed through ONE predicate,
+`org_is_current_user_org(uuid, text)`. The text branch is deliberately kept — see
+the handoff in §16.
 
-**Inventory first:** `grep -rn "get_current_user_org()" supabase/ | wc -l` — it sizes
-the WP.
-**Exit** — renaming an org changes nothing about access (write this test first) ·
-`organization_id` non-null for 100 % of rows · no new text comparison.
-**Gap check** — grep for survivors including edge functions and the public API.
+**The inventory line above was the wrong instrument and is kept as a warning.**
+`grep -c` over `supabase/migrations/` returns 221, but a migration directory is an
+append-only log: policies are dropped and recreated across many files, functions
+are `CREATE OR REPLACE`d repeatedly, three migrations rolled back, and one
+`DROP TABLE … CASCADE` took a table's policies with it. Replaying the log
+(`scripts/data-contract/live-sql.mjs`) gives the figure that sizes the work:
+**122 calls in 102 live objects**. The other 100 are superseded definitions no
+database runs.
+
+`user_plant_access` needed neither retiring nor documenting: it was dropped with
+`plants` by `20250820172632 CASCADE`, and its surviving references are all in
+migrations that either post-date the drop's CASCADE or never ran (§16 WP 1.1).
+
+**Exit** — all met except the one no session can reach: renaming an org changes
+nothing about access (test written first, red before / green after, every
+assertion mutation-tested) · the trigger stamps on fresh insert · no text
+comparison outside the predicate, enforced by a test rather than asserted.
+**`organization_id` non-null for 100 % of rows is NOT verified** — it needs the
+database (§15), and the backfill deliberately leaves ambiguous matches NULL.
+**Gap check** — found the survivors the `get_current_user_org()` grep structurally
+could not: two edge functions authorizing on the org STRING in TypeScript, running
+as the service role with RLS bypassed. Fixed here; see §16.
 
 ### WP 2.2 — Project membership and the resolver *(D14)*
+
+**Precondition, satisfied:** WP 2.1 is done and its four sidecars
+(`approved_users`, `organizations`, `organization_members`, `projects`) exist;
+their `coverage.yaml` deferral is removed. Two things WP 2.1 measured that this
+package needs: `organization_members.org_role` is READ BY NOTHING today — no
+policy and no RPC consults it, so an org `admin` holds no more than a `member`
+— and `organizations.status = 'suspended'` is likewise enforced nowhere. Both
+are recorded in their sidecars. Extending the resolver is where they stop being
+decoration.
 
 `project_members(project_id, user_id, project_role, granted_by, expires_at,
 rationale)` with `owner | editor | analyst | viewer`; backfill `modeler_id` → owner.
@@ -1037,6 +1068,14 @@ intact.
 **Gap check** — inventory every write path to T2/T3/T4 and tick whether it audits.
 
 ### WP 2.4 — Contract-generated RLS tests
+
+**D28 and D29 now exist in §4.** They did not when the Phase 2 prompts were
+written, which cited "D28" as though §4 already held it; WP 2.1's gap check
+authored both. D28 is this package's stated finding — permissive policies OR, so
+the `approved_users` deny-all does not deny — and D29 is the narrower one WP 2.1
+created knowingly: `organizations.name` is not unique, so the dual read's text
+branch admits one tenant to another on a name collision. Removing that branch is
+what closes D29, and it is gated on §15, like everything else here.
 
 Generate role × table × operation assertions from each table's `governance` block;
 run against a seeded project with one user per role. **Tests must exercise the RPC
@@ -2674,6 +2713,143 @@ Handoff to WP 2.1 (and Phase 2):
   `npm run contract:introspect` and commit the artifact. This is a real cost of
   recording where each table is referenced; the alternative — not recording it —
   is how the three orphans stayed invisible.
+
+### WP 2.1 — One organization identity · 2026-09-15 · `20260915000004`
+
+Preconditions held? **no — two of the prompt's own references do not exist.**
+Exit checks passed? yes, except the one no work-package session can reach (below).
+
+**The §16 entry the prompt told me to read first is not in §16.** Every Phase 2
+prompt opens "Read `docs/PLAN.md` §16's PHASE 2 READINESS entry once before
+starting." There is no such entry, and `git log -S` finds it in no ancestor commit
+either — it was never written. What exists is `c33d668`, which recorded the same
+measurements in §4 (D27) and in the derived `PLAN-PROMPTS.md`, and put the rest in
+its commit message. A commit message is not a document: it is not on the path the
+prompt names, `check:docs` does not police it, and the next session cannot find it
+without knowing the SHA. **This is R7's case made twice over** — §16 has now lost
+entries to a silent merge twice AND had one never written at all, and the
+append-only checker WP 2.4 is to write catches the first failure but not the
+second. Noted for WP 2.4: the rule it writes should also be the reason a package
+without a §16 entry cannot be called finished.
+
+**"D28" likewise did not exist.** WP 2.2 and WP 2.4 both say "READ D28 IN §4";
+§4 ended at D27. The finding it describes is real — I confirmed it from the
+introspected policy list while authoring the `approved_users` sidecar — so this
+package authored the row rather than leaving two later packages pointing at
+nothing. D29 is new and is this package's own (below).
+
+Discovered:
+  - **The number that sized this WP was the wrong number, by 2x.** "221
+    `get_current_user_org()` call sites, migrate them all" counts a directory that
+    is an append-only LOG, not a schema. Policies are dropped and recreated across
+    many files; functions are `CREATE OR REPLACE`d a dozen times; three migrations
+    rolled back entirely; one `DROP TABLE … CASCADE` took a table's policies with
+    it. Replaying it the way `introspect.mjs` replays DDL gives **122 calls in 102
+    live objects** out of 222 textual occurrences. Rewriting the other 100 would
+    have changed nothing in any database and doubled the diff.
+    → the replay is now `scripts/data-contract/live-sql.mjs`, shared by the
+    migration that was generated from it and by the test that gates it
+    → affects any later package that sizes SQL work by grep. Recorded here rather
+      than as a defect: it is a method error, not a code one.
+  - **The gap check found survivors in the one plane the grep could not see.**
+    `supabase/functions/combine-project/index.ts` and `delete-project/index.ts`
+    both authorized with `user.organization !== project.organization` — the org
+    STRING, compared in TypeScript. `grep get_current_user_org()` returns zero in
+    `supabase/functions/`, which is what the prompt measured and reported as "the
+    package is entirely SQL"; the DEFECT was there all along under a different
+    spelling. Both run with the SERVICE ROLE, which bypasses RLS, so that
+    comparison was the entire authorization on the ETL and project-delete paths.
+    → fixed in this package: one shared rule, `_shared/orgIdentity.ts`
+    → affects WP 2.4: a contract-generated RLS test suite asserts what the
+      DATABASE enforces, and these two paths are not reached by any policy. The
+      service-role plane needs its own assertions or it is a hole in the exit gate.
+  - **D28** — every policy in the schema is PERMISSIVE and they therefore OR, so
+    the `approved_users` deny-all does not deny. Found while authoring that
+    sidecar. → §4, assigned WP 2.4 (which already owns the RESTRICTIVE decision).
+  - **D29** — `organizations.name` is not UNIQUE, so the dual read's text branch
+    admits one tenant to another whenever two display names collide. This package
+    PRESERVED that rather than fixing it, deliberately: reading the uuid first
+    would deny where the old text-only rule granted, and a package whose purpose
+    is to stop revoking access must not introduce a new way to revoke it. The
+    semantics are pinned by a truth-table case in `orgIdentity.test.ts`.
+    → §4, assigned WP 2.4, gated on §15 like the rest of it.
+  - `organization_members.org_role` is read by NOTHING — no policy, no RPC. An
+    org `admin` holds exactly what a `member` does. Same for
+    `organizations.status = 'suspended'`, which no access path consults.
+    → both recorded in their sidecars → WP 2.2's precondition block, edited in
+      this commit.
+  - **D30** — six policies are created twice with no `DROP` between them. The
+    introspected artifact carried 150 policy entries for 144 distinct names and
+    nothing flagged it; this package noticed only because its own DROP-then-CREATE
+    collapsed the duplicates and the count moved. `CREATE POLICY` on an existing
+    name is an error in Postgres, so either the earlier migration did not take
+    effect or the later one failed partway — and no static replay can say which.
+    → §4, assigned WP 2.4, which is the package that stands a database up.
+    → also for WP 2.4: the introspector should probably REPORT a duplicate
+      `CREATE POLICY` the way it reports `shadowed` and `unparsed`. It records
+      what it read faithfully and drew no conclusion, which is the right default
+      and, here, one finding short.
+  - Nine `set_*_defaults` triggers stamp a text `organization` onto tables that
+    have no `organization_id` column. Their RLS does not read it — it joins to
+    `projects` — so the column is write-only decoration today. Left alone: giving
+    those tables a uuid org is a schema change and belongs with the tier work.
+
+Baseline numbers (measured from the code; NOT from the database):
+  - `get_current_user_org()` in `supabase/migrations/`: 221 → 226 matching LINES,
+    222 → 227 occurrences. (The two differ because one line carries two calls —
+    worth stating, since "221" was itself a line count being read as a call count.)
+    All 5 added are in the new migration: one comment, one in the predicate's own
+    text branch, one in `set_project_defaults`, two in the rewritten self-bridge.
+  - LIVE `get_current_user_org()` calls: **122 before → 16 after.** The 16, in
+    full: 2 in the `organizations` self-bridge (its text fallback, kept beside the
+    new `id` branch), 1 in `get_current_user_org` itself, 1 in
+    `org_is_current_user_org`'s text branch, and 12 across the ten `set_*_defaults`
+    stampers — nine of which stamp tables that have no `organization_id` column,
+    the tenth being `set_project_defaults`, which now stamps both planes.
+    Live objects still naming it: 102 → 13.
+  - Live comparisons of a project's org text OUTSIDE the one predicate: **78 → 0**,
+    enforced by a test, not asserted.
+  - Policies redefined: 59. Functions redefined: 35 (32 rewritten + 3 authored).
+  - Text-org comparisons in TypeScript: 2 → 0.
+  - Sidecars: 13 → 17 tables described, 60 → 56 deferred.
+  - `contract:check` green (same 4 pre-existing R5 warnings) · 92 tests green
+    (79 before + 13 new) · `check:docs` green · the four files this package adds
+    or edits are lint-clean, against a repo baseline of 339 pre-existing errors.
+
+**Still unverified, and it is the same one every Phase 2 package carries:**
+`organization_id` non-null for 100 % of rows is a §15 question. No session can
+reach the database. The backfill re-run here matches on `name` OR `slug` and
+leaves an AMBIGUOUS match NULL rather than resolving it to a guess, so some rows
+are expected to remain NULL by design — which is precisely why the text branch
+stays and why "100 %" is the wrong exit phrasing for it. What this package can
+say from the code alone is that the *mechanism* that created the divergence is
+closed: the trigger now stamps, so the gap no longer grows by one row per insert.
+
+Handoff to next WP:
+  - **`capabilities_for_user()`'s explicit `_user_id` is intact and now has a
+    sibling.** `get_current_user_org_id(_user_id uuid)` takes the user the same
+    way and reads no session GUC. WP 2.2 extends the resolver; both functions are
+    safe to call from it without depending on a pooled connection's `app.current_user_id`.
+  - **The dual read is ONE function, in two languages.** SQL:
+    `org_is_current_user_org(uuid, text)`. TypeScript: `_shared/orgIdentity.ts`.
+    They are written to match statement for statement and a test asserts they
+    agree on a seven-row truth table. When §15 confirms the backfill, the text
+    branch is removed from those two bodies — not from 107 call sites. Do not
+    reintroduce an inline `OR` at a call site; that is what this package spent
+    itself undoing.
+  - **`projects` is tier G, and that is load-bearing for WP 2.4.** It holds no
+    measured quantity; it is the SCOPE every other table joins to in order to
+    authorize. Changing one comparison on `projects` meant redefining 58 policies
+    on 24 other tables. A generated RLS test suite should expect that fan-out.
+  - **`projects.natural_key_unique` is `(modeler_id, plant_name, name)` and the
+    grain implies `(organization_id, name)`.** The declared key is the weaker one:
+    two modellers in one org may each hold a project of the same name for the same
+    plant. Recorded in the sidecar as `natural_key_intended`; it is an input to
+    WP 3.3, not a WP 2.x concern.
+  - For WP 2.4 specifically: `R5` cannot flip in Phase 2 (WP 3.3 lands the
+    constraints, and it has not run) — that was already the plan's expectation and
+    this package found nothing to change it. `R7` should be written to cover a
+    MISSING entry as well as a deleted one; see the top of this entry for why.
 
 ---
 

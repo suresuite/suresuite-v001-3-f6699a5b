@@ -1,0 +1,280 @@
+# AUTHORED — the data contract's sidecar for `approved_users`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+table: approved_users
+tier: G
+schema_name: public
+grain: >-
+  One person who may sign in. This is the authentication table: the product does
+  not use Supabase Auth for its own users, so a row here IS an account —
+  credential, role, tenant and profile in one.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: approved_users_pkey
+  - source: column UNIQUE
+    columns: [email]
+    name: approved_users_email_key
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies
+    and they contradict each other: "Users can check their own login credentials"
+    is `FOR SELECT USING (true)`, and "No direct access - use RPCs" is `FOR ALL TO
+    authenticated, anon USING (false)`. Postgres policies are PERMISSIVE unless
+    declared RESTRICTIVE, and permissive policies are OR'd — so the deny-all does
+    not deny anything, and the intended rule ("no direct access") is not the
+    enforced one. Whether that is reachable depends on the table GRANTs Supabase
+    applies outside `supabase/migrations/`, which no static replay can see and
+    which PLAN.md §15 is the way to settle. Recorded as D28 and assigned to
+    WP 2.4, which owns the RESTRICTIVE-policy decision for the whole schema; it
+    is named here because a reader of this page must not take `rls_enabled: true`
+    for "reads are restricted".
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user's identity, and the value every other governance table joins on —
+      `organization_members.user_id`, `projects.modeler_id`, the `_user_id`
+      argument of `capabilities_for_user()` and of `get_current_user_org_id()`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The person's name as entered when the account was approved.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  email:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The sign-in address, UNIQUE. Also a second identity path: the fallback
+      branch of `get_current_user_org()` and `get_current_approved_user()` locate
+      the row by `auth.jwt() ->> 'email'` when the session GUC is unset.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: unique}
+    surfaces: []
+    resolution: null
+  password_hash:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The bcrypt hash of the account's password. A credential, and the reason the
+      contradiction recorded in `governance.note` above is a security finding
+      rather than an untidiness.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: never accepted from a client}
+    surfaces: []
+    resolution: null
+  role:
+    type: public.app_role
+    unit: null
+    unit_source: none
+    meaning: >-
+      The account's global role — `admin`, `modeler`, `user` or `super_admin`.
+      GLOBAL, not per-project and not per-organization: it is the left-most input
+      to `capabilities_for_user()`'s role -> org -> user merge, and `super_admin`
+      short-circuits that merge to grant everything.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: an account is created without a role
+        value: "'user' — the least of the four"
+        provenance: default
+        visible_as: the column default; the admin user list renders the resulting role verbatim
+    ingest: {csv_header: null, required: false, validate: one of the app_role enum values}
+    surfaces: []
+    resolution: null
+  organization:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user's tenant, as a string. This is the value `get_current_user_org()`
+      returns, and it was the left-hand side of every access comparison in the
+      schema until WP 2.1.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: an account is created without an organization
+        value: "'default_org'"
+        provenance: default
+        visible_as: >-
+          nowhere — and that is the defect. The string is a real tenant name to
+          every comparison that reads it, so accounts that fall to the default
+          share one tenant with each other without any surface saying so.
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Half of D13. A displayable, editable, non-unique string used as a join key.
+      It is kept, not dropped: `organization_id` is nullable and the rows D27 left
+      unstamped have nothing else to authorize on. Every live comparison now goes
+      through `org_is_current_user_org(uuid, text)`, so when §15 confirms the
+      backfill at 100 % the text branch is removed from one function body rather
+      than from 107 call sites.
+  organization_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user's tenant, by uuid — the same organization `organization` names, and
+      the plane that survives a rename. What `get_current_user_org_id(_user_id)`
+      returns.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NULLABLE, and rows are genuinely NULL here. It was added and backfilled once
+      by `20260709000002`; WP 2.1 re-ran the backfill matching on `name` OR `slug`
+      and leaving ambiguous matches alone rather than picking one. A row whose
+      text org matches no organization — `'default_org'`, or a tenant renamed and
+      re-typed — stays NULL and keeps working on the text branch. How many is a
+      §15 question; no work-package session can reach the database.
+  display_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The name the user chose for themselves, overriding `name` in the UI.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  avatar_url:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: URL of the user's profile image, if they uploaded one.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  phone:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: Contact number. Not used for authentication or for any second factor.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  password_changed_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the password was last set. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  password_expires_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the current password stops being accepted — `now() + 90 days` at the
+      time the row was written.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: no expiry is supplied
+        value: 90 days after the row is written
+        provenance: default
+        visible_as: the column default; the account pages render the resulting date
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  force_password_change:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the user must set a new password before continuing. Set when an
+      administrator resets an account.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  is_active:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the account may sign in. Checked at login; it is not consulted by
+      any RLS policy, so deactivating a user does not by itself revoke a session
+      already holding a set `app.current_user_id`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the account was approved. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was last modified. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  The table WP 1.4 found existed in production but in no migration — the
+  authentication table, untracked for a year, discovered by the orphan rule
+  (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh
+  database, and the parts of that file which are reconstruction rather than
+  evidence are marked as such in it. This sidecar describes the table as the
+  migrations now define it.
