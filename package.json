@@ -14,7 +14,9 @@
     "audit:ui": "node scripts/audit-adaptive-ui.mjs",
     "audit:bundle": "node scripts/audit-bundle-size.mjs",
     "verify:mobile": "node scripts/audit-adaptive-ui.mjs",
-    "check:docs": "node scripts/check-docs-single-source.mjs"
+    "check:docs": "node scripts/check-docs-single-source.mjs",
+    "contract:introspect": "node scripts/data-contract/introspect.mjs",
+    "contract:verify": "node scripts/data-contract/verify-introspection.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.5",

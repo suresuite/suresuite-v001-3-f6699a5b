@@ -48,6 +48,15 @@ __pycache__/
 .pytest_cache/
 build/
 
+# ...except the repo-root build/, where the data contract emits its generated
+# artifacts. They are COMMITTED on purpose: `npm run contract:check` compares the
+# committed copy against a fresh introspection, so an uncommitted artifact is a
+# gate that can never fail (Phase 1 / WP 1.1).
+!/build/
+/build/*
+!/build/schema.introspected.json
+!/build/data-contract.generated.json
+
 # Deploy secrets — single source of truth, NEVER commit (see scripts/deploy.env.example)
 scripts/deploy.env
 deploy.env

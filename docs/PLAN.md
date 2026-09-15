@@ -607,9 +607,11 @@ engine registry (already rendering), and ~35 hand-written narrative.
 
 **Internal-only tables** — documented in `docs/data/tables/*.md` for the team but not
 in the user manual: `simulation_job_magnitudes`, `api_idempotency`, `ai_chat_events`,
-`ai_model_capabilities`, `ai_providers`, `user_plant_access` *(vestigial)*,
-`policy_presets` *(if unexposed)*, `for`/`tier` *(parse artefacts of the introspector —
-confirm in WP 1.1)*.
+`ai_model_capabilities`, `ai_providers`,
+`policy_presets` *(if unexposed)*. ~~`user_plant_access` *(vestigial)*~~ and
+~~`for`/`tier`~~ are struck: WP 1.1 confirmed `user_plant_access` was **dropped**
+(`20250820172632`, with `plants`) and that `for`/`tier` were parse artefacts — the
+replay yields 71 tables and neither name is among them.
 
 ### 6.4 Rules for every page
 
@@ -760,9 +762,11 @@ or its generator; that guess is how D22 happened.
 
 ## 8. Phase 1 — The contract and its gate
 
-### WP 1.1 — Schema introspector
+### WP 1.1 — Schema introspector ✅ *(done)*
 
-**Preconditions** — Phase 0 complete.
+**Preconditions** — Phase 0 complete. *(Did not hold on arrival: merge `5c7129f` had
+dropped two §16 entries, broken `check:docs`, and left `resolveCell` referencing an
+undefined binding. Repaired first — see §16's precondition entry.)*
 **Files** — `scripts/data-contract/introspect.mjs` · `package.json`
 
 **Steps** — parse `supabase/migrations/*.sql` in filename order into an effective
@@ -783,6 +787,15 @@ unique constraint beyond `id` (confirms D5) · `weighted` is `numeric(16,6)` ·
 
 **Gap check** — diff against `\dt` on the live DB if reachable; a table present live
 but not in migrations is a second orphan class.
+
+**Delivered** — `scripts/data-contract/sql-lex.mjs` (statement splitter: dollar
+quoting, nested block comments, quoted identifiers), `introspect.mjs` (the replay),
+`verify-introspection.mjs` (these exit checks, re-runnable), `npm run
+contract:introspect` / `contract:verify`. **First-wins is not the whole rule** — a
+migration runs in one transaction, so the rule is *first SUCCESSFUL* wins, and three
+files here aborted. The introspector resolves that from the migrations themselves
+rather than by assertion; §16 has the mechanism. Seven of eight exit checks pass;
+the eighth found a **third orphan**, `approved_users`.
 
 ### WP 1.2 — Sidecar schema and the first twelve tables
 
@@ -855,6 +868,17 @@ key. Divergence is a parity break; fix before closing.
    delete the dead branch (deletion recommended — it has never executed).
    `risk_data`: real migration with `source`, `vintage`, `licence`, `refreshed_at`,
    columns renamed.
+   **`approved_users` — the third orphan, found by WP 1.1.** It is not a dead branch:
+   it is the authentication table. `useAuth.tsx` and four admin pages read it, 24
+   migration statements ALTER it, index it and add policies to it, and the very first
+   migration in the history (`20250815225910`) opens by dropping one of its policies —
+   so it predates the migration history and was created outside it. Reconstruct its
+   `CREATE TABLE` from the ALTERs the history does carry and land it as a
+   `CREATE TABLE IF NOT EXISTS`, so a fresh database can be built from
+   `supabase/migrations/` alone. Do NOT drop or recreate it in place.
+   `check.mjs` must fail on any future table in this class (§8 WP 1.4 step 2's
+   "a code-referenced table has no migration" already covers it — make sure
+   `approved_users` is what proves the rule fires).
 4. Wire into CI. The job must run `contract:check`, `check:docs` and `npm test`
    **directly, not through `npm run lint`** — `lint` is red at baseline (342 errors),
    so a gate hidden behind it is a gate nobody reads. Merge `5c7129f` took
@@ -1615,6 +1639,117 @@ Handoff to WP 1.1:
   against the live DB; expect to record that as not-run, not to skip it silently.
 - `npm ci` is required before `npm test` in a fresh container; `node_modules` is not
   present at clone time.
+
+### WP 1.1 — Schema introspector · 2026-09-15 · `<this commit>`
+
+Preconditions held? **no.** "Phase 0 complete" was true of the code and false of the
+record; see the precondition entry above. Repaired before starting.
+
+Exit checks passed? **seven of eight.** `npm run contract:verify` is the re-runnable
+form; the eighth is a finding, not a failure to hide.
+
+| Check | Result |
+|---|---|
+| four lane tables, three masters, `supply_chain_data`, `dataset_versions`, governance | ✓ 71 tables |
+| `inbound_logistics` has no unique key beyond `id` (D5) | ✓ `column PRIMARY KEY(id)` only |
+| `supply_chain_data.weighted` is `numeric(16,6)` | ✓ |
+| orphans are exactly `product_code_map` + `risk_data` | ✗ **three** — see below |
+| every DDL statement was read (introspector's own gate) | ✓ 0 unparsed |
+
+**The hard part was harder than the brief.** The brief says `CREATE TABLE IF NOT
+EXISTS` makes the FIRST definition win, so the lane tables carry `plant_id uuid`
+(`20250820145017`) rather than `plant_name text` (`20250820145837`). Modelled that
+way, the introspector produced a schema **nothing in the repo can write to**: every
+`INSERT INTO public.inbound_logistics (…)` in the migration history names
+`plant_name`, `ingest-inbound-logistics/index.ts:44` sends `plant_name`, and no
+statement anywhere writes `plant_id`. `outbound_logistics` is the same story with
+`expected_lead_time` against the first definition's `lead_time`.
+
+The rule is not first-wins. **It is first-SUCCESSFUL-wins**, and a migration is one
+transaction: if any statement raises, the file rolls back and every `CREATE TABLE` in
+it is undone. `20250820145017` and its byte-identical retry `20250820145155` open
+with
+
+    ALTER TABLE public.approved_users
+      ALTER COLUMN role TYPE public.app_role USING (...),
+      ALTER COLUMN role SET DEFAULT 'user'::public.app_role;
+
+against a column that already carries a text default — which Postgres rejects
+("default for column cannot be cast automatically"). The proof that this is what
+happened is in the repo: `20250820145652` is the next migration and it opens by
+dropping that default first. It is the fix-up, so the two before it aborted. It in
+turn declares `projects.plant_id`, which every later `INSERT INTO public.projects`
+contradicts, so it aborted too.
+
+Rather than hard-code that conclusion, the introspector **asks the migrations**: for
+each shadowed `CREATE TABLE`, it compares both definitions against every
+`INSERT INTO <table> (cols)` in the history. When the shadowed definition is
+corroborated by all of them and the replayed one is contradicted by none, the file
+that would have won is marked aborted and the replay is re-run without it — iterated
+to a fixed point, because excluding a file promotes its retry. Mixed or absent
+evidence adopts nothing and leaves the divergence open: a guess is worse than a
+question. Result: **3 aborted migrations, 288 applied**, and lane tables that match
+what the code writes.
+
+Baseline numbers:
+- 71 tables · 6 views · 4 enums · 231 functions · 8 shadowed definitions ·
+  3 aborted migrations · 3 orphans · 1 phantom table · **0 unparsed statements**.
+- 291 migration files on disk.
+
+Discovered:
+- **`approved_users` is a third orphan, and a different class from the other two.**
+  Not a dead branch — the authentication table. 24 migration statements ALTER it,
+  index it and add policies to it; `useAuth.tsx:82` and four admin pages read it;
+  and the FIRST migration in the history (`20250815225910`) opens by dropping one of
+  its policies. It was created outside `supabase/migrations/`, so the history cannot
+  build a working database. → affects **WP 1.4** → plan edited (step 3 now names it
+  and says reconstruct-from-ALTERs, not recreate).
+- **`user_plant_access` and `plants` do not exist** — both dropped by
+  `20250820172632`, along with `sim_scenarios` (`20260609000021`). §6.3 listed
+  `user_plant_access` as an internal-only table to document. → §6.3 edited.
+- **`for` and `tier` are confirmed parse artefacts**, as §6.3 suspected: neither
+  appears among the 71 tables. → §6.3 edited, the entry struck rather than deleted.
+- **`simulation_jobs` has an unresolved shadowed definition** (`20250914113723`
+  would add `job_id`, `plant_name`, `current_stage`). No `INSERT` in the migrations
+  names those columns, so the resolver correctly declined to adopt it and left it
+  open. Not a simulation-path table, so not WP 1.2's twelve. → **WP 1.4** should
+  decide it when `check.mjs` starts failing on undocumented columns.
+- **`storage.from('avatars')` is not an orphan table.** The first cut of the orphan
+  scan reported `avatars`, `workspace` and `secrets`, because `supabase.storage`
+  sits on the line *above* `.from('avatars')` in `Profile.tsx`. Buckets and other
+  schemas (`vault.secrets`, `storage.objects`) are now excluded by scanning the 120
+  characters before each match across the whole file rather than line by line. Worth
+  knowing: a line-local test of a `.from()` chain is wrong in this codebase.
+- **The introspector has no authored input and must keep it that way.** Everything
+  above is derived; the abort resolution is the one place where a hand-written
+  "these migrations failed" list would have been easier and would have rotted. WP
+  1.2's sidecars are the first authored layer — keep the boundary.
+
+Gap check against the live DB: **not run — no database reachable.** Unchanged since
+WP 0.2's entry: no `SUPABASE_*` / `DATABASE_URL` / `POSTGRES_*` in the environment.
+So the second orphan class the brief anticipated (a table live but absent from
+migrations) could not be enumerated from `\dt`. What it could be enumerated from is
+the migrations' own internal contradictions, which is how `approved_users` surfaced —
+but that catches only tables the migrations *mention*. A table that is live and
+mentioned nowhere remains invisible to this WP.
+
+Handoff to WP 1.2:
+- **Read the lane tables' columns from `build/schema.introspected.json`, not from
+  `20250820145837`, and not from the first `CREATE TABLE` you grep.** The artifact is
+  the only place the abort resolution is applied. `inbound_logistics` is
+  (`id`, `project_id`, `plant_name`, `supplier_id`, `material_id`, `volume`,
+  `time_unit`, `lead_time`, `unit_price`, `created_at`, `updated_at`) — 11 columns,
+  no `lead_time_unit` (that is WP 1.3's to add), and `outbound_logistics` says
+  `expected_lead_time`, not `lead_time`.
+- `natural_key_unique` is already computed per table, from all five sources (table
+  and column `PRIMARY KEY`, table and column `UNIQUE`, unique indexes incl. partial).
+  Copy it into the sidecars; do not re-derive it. It confirms the brief: the four
+  lane tables have only `id`; `materials` / `products` / `suppliers` have composite
+  primary keys.
+- `build/` is git-ignored as a Python artifact directory. `.gitignore` now carries a
+  narrow un-ignore for the two contract artifacts. If WP 1.4 emits anything else
+  under `build/`, it must be added there too or the gate compares against nothing.
+- `npm ci` before `npm test` in a fresh container.
 
 ---
 
