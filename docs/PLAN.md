@@ -617,8 +617,14 @@ The largest feature. The catalog already renders from the registry.
 
 ---
 
-**Total: ~78 pages**, opening with the architecture,, of which ~30 are generated from the data contract, ~12 from the
-engine registry (already rendering), and ~35 hand-written narrative.
+**Total: 80 pages**, opening with the architecture, of which ~30 are generated from
+the data contract, ~12 from the engine registry (already rendering), and ~35
+hand-written narrative.
+
+*(Counted in WP 5.2a, which built the tree from this section page by page; it said
+"~78" and the per-section counts above sum to 80. §12's table said "~77", a third
+number. The tree in `src/components/docs/registry.ts` is now the enumeration, and
+`registry.test.ts` asserts it carries all fifteen sections.)*
 
 **Internal-only tables** — documented in `docs/data/tables/*.md` for the team but not
 in the user manual: `simulation_job_magnitudes`, `api_idempotency`, `ai_chat_events`,
@@ -675,8 +681,15 @@ Why first: a prospective customer, a researcher and a new modeller all ask the s
 opening question — *how is this thing put together, and can I trust it?* Answering
 that before the reference section is what separates a manual from a data dictionary.
 
-WP 5.2a moves the figure SVGs into the repo so the docs have no external dependency
-and the diagrams version with the code they describe.
+**The figures are authored in-repo as inline SVG** — `src/components/docs/figures.tsx`.
+*(Corrected in WP 5.2a; this paragraph said "WP 5.2a moves the figure SVGs into the
+repo".)* There was nothing to move: the repository contained **zero** SVG files, and
+the figures that sentence refers to live in an artifact this repository does not
+have. Linking to them would have created exactly the external dependency the
+requirement forbids, so WP 5.2a drew them instead. The requirement itself — no
+external dependency, versioned with the code they describe — is met more strictly
+this way than by a copied binary: a diagram cannot drift from the architecture
+without the drift appearing in a reviewable diff.
 
 ### 6.6 What survived the archive
 
@@ -1071,6 +1084,29 @@ intact.
 
 ### WP 2.4 — Contract-generated RLS tests
 
+**`data-contract.yml` does not run on a PR opened by an app token.** *(WP 5.2a.)*
+The `pull_request:` trigger carries no path filter and still did not fire when
+PR #201 was opened; GitHub does not raise `pull_request` workflow events for a PR
+created with a GitHub App installation token. Every earlier PR got its run from a
+later *push*, not from being opened — so a PR opened and merged without further
+pushes reaches `main` with the contract gate never having run. This package
+dispatched the workflow by hand to get a green run on its head SHA, which is a
+workaround, not a gate. **Make the `data contract` check required for merge** (a
+required check that never ran blocks, which is the behaviour wanted here), or open
+PRs with a token whose events trigger workflows. Until then, "no run" must not be
+read as "passed".
+
+**R7 must catch a §16 entry that was NEVER WRITTEN, not only one that was
+deleted.** *(WP 5.2a.)* §16 has now lost entries to a silent merge twice and had
+one never written at all — and "PHASE 2 READINESS", the entry that was never
+written, has now cost two separate packages (2.1 and 5.2a) the time to go looking
+for it. A checker built on `git log` proves the second case impossible to detect:
+history cannot show the absence of a document nobody committed. So R7 is two rules,
+not one — every `### WP` / `### PHASE` heading present in any ancestor is still
+present in HEAD, **and** every work package marked done in §7–§13 has a `### WP`
+entry in §16. The second is what makes "a package without a §16 entry is not
+finished" enforceable.
+
 **D28 and D29 now exist in §4.** They did not when the Phase 2 prompts were
 written, which cited "D28" as though §4 already held it; WP 2.1's gap check
 authored both. D28 is this package's stated finding — permissive policies OR, so
@@ -1280,13 +1316,14 @@ explicitly marked as reading no project data.
 
 ### WP 5.2 — The manual (§6.3)
 
-~77 pages. Sequenced so every sub-package ships a coherent, usable section rather
-than a scattering of stubs.
+80 pages. Sequenced so every sub-package ships a coherent, usable section rather
+than a scattering of stubs. *(Was "~77"; §6.3's own per-section counts sum to 80 and
+its footer said "~78". Enumerated and reconciled in WP 5.2a — see §16.)*
 
 | Sub | Ships | Pages | Depends on |
 |---|---|---|---|
-| **5.2a** | Shell + **Overview & architecture** + Getting started. Un-hide `/docs` (`App.tsx:212-214`), rewrite `registry.ts` for the 15-section tree, move the figure SVGs into the repo | ~10 | nothing |
-| **5.2b** | **Input tables** — the reference section, the core of the manual. **Closes D21** | 11 + 2 | WP 1.2, 1.3 |
+| **5.2a** ✅ | Shell + **Overview & architecture** + Getting started. Manual restored at `/docs` (`/help` redirects), `registry.ts` rewritten as the full 15-section tree, figures authored as inline SVG | 10 | nothing |
+| **5.2b** | **Input tables** — the reference section, the core of the manual. **Closes D21** | 11 + 1 | WP 1.2, 1.3 |
 | **5.2c** | Policies + Verification | 12 | WP 1.2; catalog already renders |
 | **5.2d** | Experiments, scenarios, results, statistics | 12 | WP 4.4 |
 | **5.2e** | Networks + Project Intelligence | 9 | WP 5.1 lineage |
@@ -1296,11 +1333,31 @@ than a scattering of stubs.
 
 **5.2a is shippable before Phase 1 and is now the most valuable single package in
 the plan.** It ships the architecture section — the answer to *how is this built and
-can I trust it* — plus Getting started and the full nav tree. None of it needs the
-contract. Everything after it is a drop-in.
+can I trust it* — plus Getting started and the full nav tree. Everything after it is
+a drop-in: a later package writes a body and flips one page's `status` to `"live"`,
+and the nav, pager and search already know about it.
+
+*(WP 5.2a correction: "None of it needs the contract" was wrong in one place. §6.3
+marks "The data model at a glance" **G**, so that page IS generated — the contract
+generator now emits `src/components/docs/generated/dataModel.generated.ts` and the
+page renders it. The rest of the package needs nothing.)*
+
+**Its exit gate is `src/components/docs/__tests__/registry.test.ts`**, which asserts
+what the tree promises: fifteen sections, no duplicate or shadowed slug, a body for
+every live page, an owing work package named on every planned one, and every
+`table:` cross-reference present in the schema. A later package that renames a table
+without moving its page fails it.
 
 **5.2b is the one that matters.** It is the section anyLogistix users would
 recognize, and the section SuReSuite has never had.
+
+*(WP 5.2a measured its shape while building the tree: §6.3 section 3 lists **11
+table pages + 1** ("Units and time periods"), not "11 + 2" — corrected above. Four
+of the eleven have no sidecar and cannot be generated: `node_list`,
+`network_nodes`, `network_edges` (deferred to WP 4.2) and
+`multi_tier_supply_chain` (WP 3.1). They are in the tree as planned pages owed by
+5.2b; **5.2b must reassign those four to the package that can ship them and correct
+its own row** — see §16.)*
 
 **Exit** — no table or field list is hand-written in `src/` · mobile and desktop read
 one payload · every generated page carries its provenance footer · every route in
@@ -1348,6 +1405,16 @@ lockstep since WP 0.1; this is where that debt is paid.
   (real median, else imputed) and **no plant column spec declares it**, so the one
   project-backed signal the plant stage has never reaches the user or the overrides.
   Either give it a column or stop computing it.
+
+**Added by the WP 5.2a gap check** — `projects.bom_level` is read against **two
+spellings and constrained by neither**. The contract says `single` or `multi` and
+the column defaults to `'single'` with no CHECK; `DataManager.tsx` and
+`ProjectCard.tsx` test `=== 'multi_level'` while `UploadWizard.tsx` and
+`ProjectDataViewer.tsx` test `=== 'single'`, and `useItemMasters.tsx` carries a
+comment reading "'single' or 'multi'/'multi_level'" — the ambiguity documented
+rather than resolved. A project stored as `multi` is read as not-multi-level by the
+two files testing for `multi_level`, which silently selects the wrong BOM table.
+Pick one spelling, add the CHECK, migrate any rows holding the other.
 
 ### WP 6.3 — Provenance vocabulary, value chain, reproducibility record
 Complete the A1 vocabulary. Ship **A2** the value-chain popover (source file → row →
@@ -2853,166 +2920,180 @@ Handoff to next WP:
     this package found nothing to change it. `R7` should be written to cover a
     MISSING entry as well as a deleted one; see the top of this entry for why.
 
-### WP 2.1 follow-up — the migration that never ran · 2026-09-15 · `20260915000004`
+### WP 5.2a — The manual's spine: shell, architecture, getting started · 2026-09-15
 
-Preconditions held? n/a — a defect repair on the package's own merged commit.
-Exit checks passed? yes, and three of them are now VERIFIED AGAINST A RUNNING
-POSTGRES rather than argued from the code.
+Preconditions held? **mostly — one was false, one was unknowable from the brief.**
+Exit checks passed? **all five.**
 
-**What happened.** PR #198 merged; the post-merge `db push` — the first thing that
-ever executed `20260915000004` — failed at statement 3:
+**The §16 entry this package's brief told me to read does not exist — again.** The
+brief opened "read §16's WP 1.4 entry and its PHASE 2 READINESS entry". There is no
+PHASE 2 READINESS entry. WP 2.1's own entry, three screens above this one, records
+the identical discovery about the identical missing entry, and `git log -S` still
+finds it in no ancestor. **That is now the second package to lose budget to the same
+phantom.** WP 2.1 noted it for WP 2.4's append-only checker; this package adds the
+missing half — the checker catches an entry that was *deleted*, and both incidents
+were an entry that was *never written*. **The rule WP 2.4 writes must be that a
+package without a §16 entry cannot be called finished, keyed off the WP table in
+§7–§13 rather than off git history**, because history cannot prove the absence of a
+document nobody wrote. Plan edited at WP 2.4.
 
-```
-ERROR: function min(uuid) does not exist (SQLSTATE 42883)
-```
+**One brief claim was false, one was true and misleading.**
+- FALSE: *"None of 5.2a needs the contract"* (§12). §6.3 marks "The data model at a
+  glance" **G**. The page is generated, so the package needed the contract after
+  all — see below.
+- TRUE BUT MISLEADING: *"There are no SVGs in the repo — zero, repo-wide."* Correct,
+  and I confirmed it (`git ls-files | grep -c '\.svg$'` → 0). The misleading part is
+  the framing of it as a blocker with two options, one of which was "the figures are
+  supplied to you". Nobody can supply them to a session; the choice was never live.
 
-The backfill picked the single matching org with `min(o.id)`, and Postgres has no
-`min()` aggregate for uuid. `(array_agg(DISTINCT o.id))[1]` is the fix, and it is
-also the better statement of intent: the `HAVING count(DISTINCT o.id) = 1` above
-guarantees exactly one element, so the subscript is exact rather than a choice
-among candidates. The migration runs in a transaction, so it rolled back whole —
-production kept the old definitions and nothing landed partially.
+**THE BLOCKER §6.5 NAMED, AND WHAT WAS DONE ABOUT IT.** §6.5 said this package
+"moves the figure SVGs into the repo so the docs have no external dependency".
+There was nothing to move. The figures are authored as inline SVG in
+`src/components/docs/figures.tsx` — three diagrams (the tier journey, the seven-hop
+data flow, the system boundary), drawn with Tailwind token classes so one drawing
+serves both themes. This satisfies the requirement more strictly than a copied
+binary would: a diagram cannot drift from the architecture without the drift showing
+in a reviewable diff. **§6.5 is edited to say so**, because a plan that still asks a
+future session to "move the SVGs" sends it looking for files that do not exist.
 
-**The finding is not the typo, it is that nothing could have caught it (D31).**
-`contract:check` replays migrations STATICALLY: it parses DDL and never executes
-SQL. `npm test` never touches a database. So a run-time-only error passes every
-gate this repo has and surfaces on the production deploy. Every migration in this
-repository has reached production as its own first execution.
+**/docs OR /help — SETTLED: `/docs`, with `/help` redirecting.** §6 names `/docs`
+throughout and §12 says "un-hide `/docs`"; the code had `/help`, and the chrome's own
+header already read "Docs". So the plan won. `/help` → `/docs` and `/help/:slug` →
+its successor page, both `replace` so the old address does not accumulate in history.
+Twenty-one legacy slugs are mapped in `src/components/docs/legacySlugs.ts`; the rest
+land on the front page rather than on an arbitrary guess, and `registry.test.ts`
+asserts every target is a real page, so the map cannot rot into redirects to nowhere.
 
-**That is now cheaply fixable, and this entry is the proof of route.** A
-work-package session HAS PostgreSQL 16 (`/usr/lib/postgresql/16`), which no prior
-entry had noticed. What makes it usable is that the contract already knows the
-schema:
+Discovered:
+  - **`public/docs/` ALREADY SERVES THREE FILES AT THE PATH THE MANUAL NOW OCCUPIES**
+    — `csv-upload-guide.md`, `location-dataset-guide.md`, `nexus-node.md`, and
+    `UploadWizard.tsx` links at least the first of them. Nobody had looked: the
+    decision to mount at `/docs` was being taken on the strength of §6's wording
+    alone. **Verified harmless, not assumed harmless:** built the app, served
+    `dist/`, and requested all three — a static file wins over the SPA fallback and
+    still returns its own content (`/docs/csv-upload-guide.md` → 200, the markdown).
+    Every file there ends in `.md` and the slug grammar forbids a dot, so no slug can
+    ever collide. **`registry.test.ts` asserts it against the real directory
+    listing**, because "they all happen to end in .md" is a fact about today.
+    → the one real risk is a host configured to rewrite `/docs/*` to `index.html`
+      unconditionally, which would break the three guides. Recorded here so whoever
+      configures hosting knows the constraint exists.
+  - **`bom_level` is compared against two different spellings, and has no CHECK
+    constraint to settle which is right.** The contract says `single` or `multi`;
+    `DataManager.tsx` and `ProjectCard.tsx` test `=== 'multi_level'` while
+    `UploadWizard.tsx`, `ProjectDataViewer.tsx` and the rest test `=== 'single'`.
+    `useItemMasters.tsx` has a comment reading "'single' or 'multi'/'multi_level'",
+    which is the confusion written down rather than resolved. The column's default is
+    `'single'` and nothing constrains it, so both spellings can coexist in one table,
+    and a project stored as `multi` would be read as not-multi-level by the two files
+    that test for `multi_level`. **Not in §4 and belongs to no WP.** In scope for
+    **WP 6.2** (fix the divergences) — a CHECK constraint plus one spelling. Recorded,
+    not fixed: it is a data-plane defect and this is a documentation package. The
+    Projects page describes the field in reader's terms ("single-level or
+    multi-level") and deliberately asserts no stored spelling.
+  - **The archived help site's README points at a document that was deleted.** Its
+    status banner reads "superseded by `docs/data/USER-DOCS-PLAN.md`" and its §"Why it
+    was archived" cites the same path; WP 0.3 folded that file into this plan and
+    removed it. The README is the file §6.6 sends every later package to for mining,
+    so the dead pointer was on the path of 5.2b, 5.2c and 5.2h. Repointed to
+    `docs/PLAN.md` §6.1. One line, and it is the same defect class as D21.
+  - **THREE PAGE TOTALS, ALL DIFFERENT, NONE OF THEM RIGHT.** §6.3's footer said
+    "~78 pages", §12's table said "~77", and §6.3's own per-section counts sum to
+    **80**. Nobody had added up the section that lists the pages. Both corrected;
+    `src/components/docs/registry.ts` is now the enumeration and the test asserts the
+    fifteen sections are all present.
+  - **§12's "5.2b ships 11 + 2" is arithmetic, and it is wrong.** §6.3 section 3
+    lists eleven table pages plus one written page ("Units and time periods") — 11 + 1.
+    Corrected. Four of the eleven cannot be generated (no sidecar): `node_list`,
+    `network_nodes`, `network_edges` and `multi_tier_supply_chain`. They are in the
+    tree as 5.2b's, because §12 assigns them there today; **5.2b reassigns them and
+    corrects its own row**, which is what its brief already tells it to do. This
+    package did not pre-empt that decision.
+  - **The mobile default was wrong in the chrome this package inherited.**
+    `DocsLayout` opened with `navOpen = true`, and the aside is `lg:block` — so on a
+    phone the reader landed on a fifteen-section table of contents with the page
+    itself below the fold. Found by rendering it, not by reading it. Now closed below
+    `lg`, and a tap on a nav link closes it. Desktop is byte-identical in behaviour.
 
-```
-initdb -D /tmp/pg/data -U postgres --auth=trust     # must run as a non-root user
-pg_ctl -D /tmp/pg/data -o '-k /tmp/pg/run -p 5433 -c listen_addresses=' start
-#   socket dir must be SHORT — Postgres caps the path at 107 bytes
-# schema: CREATE TABLE for all 73 tables + 4 enums, generated from
-#   build/schema.introspected.json (columns and types only — no constraints needed)
-# shims:  roles anon/authenticated/service_role; schema auth with jwt()/uid()/role();
-#         stubs for the 6 functions a migration CALLS but does not define
-psql -d v --single-transaction -v ON_ERROR_STOP=1 -f supabase/migrations/<new>.sql
-```
-
-Applying `20260915000004` that way reproduced the `min(uuid)` failure exactly, and
-the fixed file applies clean: **59 policies, 87 functions, no error.**
-
-A FULL fresh replay of all 296 migrations does NOT work and should not be
-attempted as a gate: 92 of them fail on a clean database (42 on `relation does not
-exist`, 9 on return-type changes, 8 on unavailable extensions). Production was
-built incrementally with `migration repair`, so the file set has never been
-applicable from empty. That is worth knowing on its own — **this repo cannot
-currently stand up a database from its own migrations** — and it is why the
-artifact-generated schema, not a replay, is the practical base.
-
-Verified on that database, with seeded rows (NOT production data):
-  - **D13, demonstrated and closed.** Org `Acme` renamed to `Acme Corp` the way
-    `admin_update_organization` does it (name only). A user approved into the org
-    after the rename gets text `Acme Corp`; the project still says `Acme`.
-    `p.organization = get_current_user_org()` → **false** — the defect, reproduced.
-    `org_is_current_user_org(p.organization_id, p.organization)` → **true**.
-  - **D27, closed at the trigger.** A project inserted after the fix comes out with
-    `organization_id` stamped, not NULL.
-  - **No widening.** A user in a different org gets false on all three projects.
-  - **The backfill's ambiguity rule works as written.** Two organizations both named
-    `Initech` (legal — `name` is not unique, D29): the user and project carrying that
-    string were left NULL rather than resolved to one of them, while the
-    unambiguous `Acme` rows resolved.
-
-Baseline numbers:
-  - `20260915000004` applied to a real Postgres: 59 policies, 87 functions, exit 0.
-  - Fresh replay of the full migration set: 204 applied, **92 failed**.
-  - `contract:check` green · 92 tests green · `check:docs` green.
-
-**Still unverified, and unchanged:** how many PRODUCTION rows have
-`organization_id IS NULL`. That is §15 and it needs the real database. What this
-entry adds is that the MECHANISM is no longer argued from reading code — it is
-executed. The ambiguity rule means some rows are expected to stay NULL by design,
-so "100 %" remains the wrong exit phrasing for it.
-
-**IT TOOK FOUR DEPLOYS, AND THE THIRD FINDING IS ABOUT THE PROCESS.**
-Three separate things were wrong, and only the first was a coding mistake:
-`min(uuid)`, then `network_summary` absent, then `tier2_suppliers` absent at
-statement 118. Each cost a full deploy because each aborted at the FIRST thing it
-hit. The preflight added after the second was supposed to end that and did not —
-it RAISEd a NOTICE, and the Supabase CLI's `db push` log keeps ERROR lines and
-drops notices, so the report was invisible in the one place it was needed.
-Changing it to RAISE EXCEPTION named all three missing tables in a single message:
-`{network_summary, tier2_suppliers, tier3_suppliers}`.
-
-**The lesson is not "add a preflight", it is that a diagnostic which cannot reach
-the reader is not a diagnostic.** Where the only execution is a deploy (D31), the
-deploy's ERROR line is the entire feedback channel, and anything that needs to be
-seen has to fail.
-
-**A SECOND `db push` FOUND A SECOND THING, AND IT IS THE MORE INTERESTING ONE.**
-With the aggregate fixed the migration reached statement 59 and aborted on
-`relation "public.network_summary" does not exist`. The table is created by
-`20250904105527` beside `network_nodes` and `network_edges`; the other two are in
-production and it is not. That is D32, and it is `risk_data` inverted — WP 1.4
-found a table production had that no migration created; this is one the migrations
-create that production lacks. The introspector is not wrong in either case: it
-reports what the files say, and no static replay can know what a database
-actually contains.
-
-**The first fix for it was wrong and this repo's own gate said so.** Skipping the
-four policies where the table is absent meant putting them through `EXECUTE`, which
-the introspector cannot read — so `network_summary` would have shown the OLD text
-comparison in the contract for ever, and its RLS would have joined the
-indeterminate set (7 tables to 8, 32 dynamic entries to 40). That is precisely how
-the item masters became `rls.determinate: false`.
-`orgIdentity.test.ts`'s "no live policy compares a project's org text outside the
-predicate" failed on all four, which is the assertion doing exactly the job it was
-written for — a fix that buys a green deploy by blinding the contract is the thing
-it exists to refuse.
-
-Adopting the table instead closes the divergence rather than encoding it:
-`CREATE TABLE IF NOT EXISTS`, copied verbatim from the original migration, a no-op
-wherever the table is already there, and nothing in `src/` or `supabase/functions/`
-reads it so adoption cannot change behaviour. All 59 policies stay static and
-introspector-visible; `dynamic` is back to 32 and the indeterminate set back to 7.
-
-Verified three ways on the local Postgres: **all present** — applies, 59 policies;
-**production's shape**, all three dropped — applies, adopts them, 59 policies; and
-**one unexpected table dropped** (`node_list`) — fails at statement 0 naming it,
-which is the preflight doing its job for the case nobody has met yet. The file now opens with a preflight that RAISEs a NOTICE
-naming every table it touches that was absent, so the next reader of a `db push` log
-learns this database's real shape in one line instead of one aborted statement at a
-time.
-
-**OUTCOME: APPLIED.** `db push` run `35030451085` on `b4cd26c` finished clean —
-`20260915000004` is live in the production database. Four deploys: `min(uuid)`,
-`network_summary`, `tier2_suppliers`, then success. Two notes for whoever reads
-this next:
-
-  - **Production received it from the FEATURE BRANCH, not from `main`.**
-    `supabase-migrations.yml` has no branch filter, so every push touching
-    `supabase/migrations/**` deploys. Production is therefore AHEAD of `main`
-    until the PR merges, and the merge's own `db push` will skip the migration as
-    already applied. Nothing is wrong with the result; it is the ordering that is
-    worth knowing, and it is the same property that makes D31 fixable and makes an
-    unreviewed branch deployable. Both belong to the same decision.
-  - **The applied version is the file at `b4cd26c`.** A later edit to
-    `20260915000004` will NOT reach production — `db push` keys on the version, and
-    that version is now recorded as applied. Any further change to this migration's
-    behaviour needs a NEW migration file.
+Verification — what was actually run, not what was intended:
+  - `npm run contract:check` green (4 R5 warnings, the D5 natural keys, unchanged
+    from `main`). `npm test` 115 passed, up from 92: 23 new in `registry.test.ts`.
+  - **The new gate was proved to bite.** Marking a planned page with no work package
+    and pointing a page at `network_nodez` fails two named tests; reverted.
+  - `npm run build` clean. `dist/` served and driven in Chromium: all fifteen
+    sections render, ten live pages return their own `h1`, an unknown slug renders
+    the manual's own not-found rather than the app's, `/help` and `/help/overview`
+    both land on the right page, **zero console errors**, and **zero horizontal
+    overflow at 390px**.
+  - `npm run audit:ui`: 8 violations, the same 8 as `main` (F2, from PR #190). The
+    violation list is byte-identical; only the scanned-file count moves, 333 → 350.
+    **Zero added.**
+  - `npx eslint src/components/docs src/App.tsx`: clean, no warnings. The one warning
+    it did raise (a constant exported from a component file) was fixed by splitting
+    `legacySlugs.ts` out of `legacyRedirects.tsx`, not suppressed.
+  - **`data-contract.yml` DID NOT RUN WHEN THE PULL REQUEST WAS OPENED, and that is
+    not a property of this PR.** The workflow has `pull_request:` with no path
+    filter — WP 1.4 chose that deliberately — and it still did not fire. The cause
+    is GitHub's own recursion guard: **a pull request OPENED with a GitHub App
+    installation token does not trigger `pull_request` workflows.** Earlier PRs look
+    unaffected only because each got a later *push*, and it was the push that raised
+    the `pull_request` event. A PR that is opened and then merged without further
+    pushes gets **no data-contract run at all** — the plan's central gate, silently
+    absent on exactly the PRs it exists to guard. WP 1.4 proved the gate fires
+    (PR #195); nobody had checked that it fires on an agent-opened PR.
+    → worked around here by dispatching it: `workflow_dispatch` is declared, and run
+      <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35032282729>
+      is green on all eleven steps for `ee50cad`.
+    → **the real fix is a repo-level one and belongs to WP 2.4**, which already owns
+      the CI gates: either require the `data contract` check for merge, or open PRs
+      with a token whose events trigger workflows. Plan edited at WP 2.4.
+    → **for every later package: do not read "no data-contract run" as "the gate
+      passed".** Check that the run exists for your head SHA, and dispatch it if it
+      does not.
+  - `npm run lint` as a whole is **red on `main` and equally red here** — 453
+    problems, 339 errors, 114 warnings, byte-identical counts on both sides (measured
+    by stashing). It is red because of `eslint .` across the pre-existing codebase,
+    not because of `audit:ui`. `data-contract.yml` already says so in its header and
+    invokes each command directly for that reason, so nothing in CI depends on it.
+    Stated rather than quietly dropped: this package cannot turn it green and did not
+    try.
 
 Handoff to next WP:
-  - **WP 2.4 inherits D31**, and it is a better fit there than anywhere else: that
-    package already owns the gate changes (R5, R6, R7). A fourth — execute each new
-    migration against an artifact-generated schema — is the one that would have
-    caught this, and the commands above are known to work.
-  - **WP 2.4 should also know the 92-failure number.** A package that plans to
-    "run against a seeded project with one user per role" cannot get that project by
-    replaying the migrations; it needs the same artifact-generated base.
-  - **Tables OUTSIDE the 25 this file touches may diverge the same way — UNKNOWN.**
-    Three of 25 were missing; there is no reason to think the other 48 tables are
-    better off, and nothing checks them. §15 is the real
-    answer and WP 2.4 needs it before it generates tests per table.
-  - D30 is NOT settled by this. The duplicate-policy question needs the real
-    remote's history, and the local base is generated from the artifact rather than
-    replayed, so it never reaches the two conflicting `CREATE POLICY` files.
+  - **The tree is complete and the gate is written. Adding a page is two lines.**
+    Write the body in `src/components/docs/bodies/`, add it to `DOC_BODIES`, and flip
+    that page's `status` from `planned` to `live` in `registry.ts`. Nav, breadcrumb,
+    pager, search and the stub all follow. Do not add a route; `/docs/:slug` is one
+    route for all eighty pages.
+  - **`registry.test.ts` will fail you for the right reasons.** A body with no
+    registry entry, a live page with no body, a body left behind on a page still
+    marked planned, a duplicate slug, a `related:` pointing at nothing, a `table:`
+    the schema does not have. Read its failure message before assuming it is wrong.
+  - **The generator now emits into `src/`.** `contract:generate` writes
+    `src/components/docs/generated/dataModel.generated.ts` alongside
+    `docs/data/tables/*.md`, gated by the same `contract:generate -- --check`. Any
+    package that changes a sidecar or a migration must regenerate and commit it, the
+    same as the markdown pages. It carries `CONTRACT_VERSION` and `ENGINE_VERSION`,
+    which is what `Provenance` in `prose.tsx` renders — **use that component rather
+    than writing a footer, and never put a date in a generated page** (§6.4).
+  - **For 5.2h specifically: the number is 17 and 56, not 13 and 60.** Its brief says
+    "13 link to a page, 60 name their owing WP". `contract:check` R1 reports **17
+    described, 56 deferred, 73 in the schema** — WP 2.1 added four sidecars after that
+    brief was written. Do not hard-code either number: `COUNTS` in
+    `dataModel.generated.ts` already holds all three, and "All tables" should read
+    them the way "The data model at a glance" does.
+  - **For 5.2b: the input-table templates are not named after their tables.**
+    `public/template/` holds `inbound_logistic.csv` and `outbound_logistic.csv` —
+    singular, where the tables are plural. Take the filename from
+    `UploadWizard.tsx`'s `templateTypes[].templateFile` rather than deriving it from
+    the table name, or four of the seven "download the template" links will 404.
+  - **`prose.tsx` is the page vocabulary; extend it rather than styling in a body.**
+    `PageTitle`, `Section` (renders the `h3` the rail tracks, with an explicit `id`
+    because the id is the deep link and must not follow the wording), `P`, `Key`,
+    `Bullets`, `Callout` (`note` / `limit` / `law`), `Steps`, `Defs`, `Figure`,
+    `DocLink`, `AppLink`, `Term`, `Provenance`.
+  - **The UI audit's `lg:` rule exempts `DocsLayout` and nothing else under
+    `docs/`.** A page body that reaches for `lg:` adds a violation and fails the
+    zero-added check. `md:` is the product's one breakpoint; the bodies use it only.
 
 ---
 
@@ -3025,7 +3106,7 @@ Handoff to next WP:
 | 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ready |
 | 3 | 3.1 – 3.4 | one ingestion contract | 4 | — |
 | 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | — |
-| 5 | 5.1 – 5.3 | lineage + the 77-page manual | 6 | — |
+| 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | 5.2a ✅ done — manual live at `/docs`, tree complete, sections 1–2 written |
 | 6 | 6.1 – 6.3 | policy contract, researcher grade | — | — |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
 

@@ -1,16 +1,18 @@
 # Legacy help site — ARCHIVED
 
-> **Status:** DEPRECATED — superseded by `docs/data/USER-DOCS-PLAN.md`
+> **Status:** DEPRECATED — superseded by `docs/PLAN.md` §6
 > **Archived:** Phase 0 / WP 0.3
 > **Do not revive.** Mine for narrative content only.
 
-These files powered the old `/help` documentation site. `/help` and `/help/:slug`
-have routed to `NotFound` (`src/App.tsx:212-214`) since before this archive, so
-nothing in here is reachable by users.
+These files powered the old `/help` documentation site. Those routes rendered
+`NotFound` from before this archive until WP 5.2a, which published the replacement
+manual at `/docs` and turned `/help` into a redirect to it. Nothing in this
+directory has ever been reachable since the archive, and nothing in it is rendered
+now.
 
 ## Why it was archived
 
-Full analysis in `docs/data/USER-DOCS-PLAN.md` §1. The short version:
+Full analysis in `docs/PLAN.md` §6.1. The short version:
 
 1. **It documented names the user never sees.** One quantity, three names —
    the user types `sell_price`, it is stored as `sell_price`, the engine calls it

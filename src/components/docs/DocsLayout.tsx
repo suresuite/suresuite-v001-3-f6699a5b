@@ -1,10 +1,16 @@
-// Dedicated, full-screen documentation chrome for the /help docs site — modelled
+// Dedicated, full-screen documentation chrome for the /docs manual — modelled
 // on a classic three-pane docs layout: top bar (search · theme · font-size),
 // collapsible left nav tree, center content (breadcrumb + Outlet + prev/next),
 // and a right "On this page" + "Related" rail. No app shell.
+//
+// Page bodies arrive through <Outlet/>; `registry.ts` owns the site map and
+// `DocPage.tsx` resolves a slug to a body or to a stub. WP 5.2a restored the
+// routes, moved the manual to /docs (PLAN.md §6 names it that throughout; the
+// old address still redirects so no existing link breaks) and taught the nav
+// and the search to show a page that is planned but not yet written.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,7 +117,7 @@ function DocsSearch() {
   const results = useMemo(() => searchPages(q), [q]);
 
   function go(slug: string) {
-    navigate(`/help/${slug}`);
+    navigate(`/docs/${slug}`);
     setQ("");
     setOpen(false);
   }
@@ -165,7 +171,14 @@ function DocsSearch() {
                       go(r.slug);
                     }}
                   >
-                    <div className="text-sm font-medium">{r.title}</div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="min-w-0 text-sm font-medium">{r.title}</span>
+                      {r.status === "planned" && (
+                        <span className="shrink-0 w-24 text-right text-[10px] text-muted-foreground">
+                          WP {r.wp}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {r.group}
                       {r.summary ? ` · ${r.summary}` : ""}
@@ -181,13 +194,20 @@ function DocsSearch() {
   );
 }
 
-function NavTree({ activeSlug }: { activeSlug: string }) {
+function NavTree({ activeSlug, onNavigate }: { activeSlug: string; onNavigate: () => void }) {
+  // Fifteen sections and eighty pages do not fit on a screen, so only the
+  // section you are reading opens by default. `collapsed` holds the reader's
+  // own overrides on top of that, which is why it is keyed by group and starts
+  // empty rather than being seeded with fourteen `true`s.
+  // Falls back to 1 so an unknown slug still shows an open section rather than
+  // fifteen closed ones — the reader who mistyped a URL needs the nav most.
+  const activeSection = getPage(activeSlug)?.section ?? 1;
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   return (
     <nav className="text-sm">
       <ul className="space-y-4">
         {DOC_GROUPS.map((g) => {
-          const isCollapsed = collapsed[g.group];
+          const isCollapsed = collapsed[g.group] ?? g.section !== activeSection;
           return (
             <li key={g.group}>
               <button
@@ -203,7 +223,8 @@ function NavTree({ activeSlug }: { activeSlug: string }) {
                     !isCollapsed && "rotate-90",
                   )}
                 />
-                {g.group}
+                <span className="tabular-nums">{g.section}</span>
+                <span className="min-w-0 text-left">{g.group}</span>
               </button>
               {!isCollapsed && (
                 <ul className="mt-1.5 space-y-0.5">
@@ -212,15 +233,26 @@ function NavTree({ activeSlug }: { activeSlug: string }) {
                     return (
                       <li key={p.slug}>
                         <Link
-                          to={`/help/${p.slug}`}
+                          to={`/docs/${p.slug}`}
+                          onClick={onNavigate}
                           className={cn(
-                            "block rounded-sm border-l-2 pl-3 pr-2 py-1 transition-colors",
+                            "flex items-baseline gap-2 rounded-sm border-l-2 pl-3 pr-2 py-1 transition-colors",
                             active
                               ? "border-l-primary bg-primary/5 text-foreground font-medium"
                               : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
                           )}
                         >
-                          {p.title}
+                          <span className="min-w-0">{p.title}</span>
+                          {p.status === "planned" && (
+                            // Not a dead link and not a hidden one: the page is
+                            // owed, and by whom.
+                            <span
+                              className="shrink-0 w-10 text-right text-[10px] tabular-nums text-muted-foreground/70"
+                              title={`Not written yet — work package ${p.wp}`}
+                            >
+                              {p.wp}
+                            </span>
+                          )}
                         </Link>
                       </li>
                     );
@@ -236,15 +268,21 @@ function NavTree({ activeSlug }: { activeSlug: string }) {
 }
 
 export default function DocsLayout() {
-  const params = useParams();
   const location = useLocation();
-  const slug = params.slug ?? DEFAULT_SLUG;
+  // Read from the path, not from useParams: this is the PARENT of the
+  // `:slug` route, and a parent match does not carry its child's params.
+  // DocPage — the child — reads the param the ordinary way.
+  const slug = location.pathname.replace(/^\/docs\/?/, "").split("/")[0] || DEFAULT_SLUG;
   const page = getPage(slug);
   const contentRef = useRef<HTMLDivElement>(null);
   const { headings, activeId } = useHeadings(contentRef, slug);
   const { prev, next } = prevNext(slug);
 
-  const [navOpen, setNavOpen] = useState(true);
+  // Closed by default. The aside is `lg:block`, so this state only governs
+  // phone and tablet — where an open tree pushes the page itself below the
+  // fold and the reader lands on a table of contents instead of on the thing
+  // they followed a link to.
+  const [navOpen, setNavOpen] = useState(false);
   const [fontStep, setFontStep] = useState(1);
 
   useEffect(() => {
@@ -281,7 +319,7 @@ export default function DocsLayout() {
         >
           {navOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
         </Button>
-        <Link to="/help" className="flex items-center gap-2 text-sm font-semibold shrink-0">
+        <Link to="/docs" className="flex items-center gap-2 text-sm font-semibold shrink-0">
           <BookText className="h-4 w-4 text-primary" />
           <span className="hidden sm:inline">Docs</span>
         </Link>
@@ -302,7 +340,7 @@ export default function DocsLayout() {
           )}
         >
           <div className="lg:sticky lg:top-[4.5rem] lg:max-h-[calc(100vh-5rem)] lg:overflow-auto">
-            <NavTree activeSlug={slug} />
+            <NavTree activeSlug={slug} onNavigate={() => setNavOpen(false)} />
           </div>
         </aside>
 
@@ -313,7 +351,7 @@ export default function DocsLayout() {
               the group is already the doc's own section head. Desktop keeps
               it — this is additive below `md`, not a deletion. */}
           <nav className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-            <Link to="/help" className="hover:text-foreground">Home</Link>
+            <Link to="/docs" className="hover:text-foreground">Home</Link>
             {page && (
               <>
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -334,7 +372,7 @@ export default function DocsLayout() {
           <div className="pb-safe mt-12 grid grid-cols-1 gap-3 border-t border-[--hair-rule] pt-6 sm:grid-cols-2">
             {prev ? (
               <Link
-                to={`/help/${prev.slug}`}
+                to={`/docs/${prev.slug}`}
                 className="group rounded-md border p-3 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -345,7 +383,7 @@ export default function DocsLayout() {
             ) : <span />}
             {next ? (
               <Link
-                to={`/help/${next.slug}`}
+                to={`/docs/${next.slug}`}
                 className="group rounded-md border p-3 text-right hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
@@ -392,7 +430,7 @@ export default function DocsLayout() {
                 <ul className="space-y-1.5">
                   {related.map((r) => (
                     <li key={r.slug}>
-                      <Link to={`/help/${r.slug}`} className="text-primary hover:underline">
+                      <Link to={`/docs/${r.slug}`} className="text-primary hover:underline">
                         {r.title}
                       </Link>
                     </li>
