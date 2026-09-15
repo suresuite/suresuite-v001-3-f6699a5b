@@ -1,0 +1,578 @@
+#!/usr/bin/env node
+// Build the data contract and render the pages it owns (Phase 1 / WP 1.4).
+//
+//   npm run contract:generate            # (re)write the contract + docs/data/tables/*.md
+//   npm run contract:generate -- --check # CI gate: fail (exit 1) on drift
+//
+// THE MERGE. PLAN.md §2.2 names four sources; three of them exist today and this
+// script joins them:
+//
+//   build/schema.introspected.json   what the schema IS      (WP 1.1, replayed)
+//   supabase/contract/*.yaml         what the columns MEAN   (WP 1.2/1.3, authored)
+//   src/lib/policies/registry.generated.json
+//                                    what the engine READS and what it falls back
+//                                    to when a value is missing (imported)
+//
+// The fourth — static analysis of which page touches each field — is `surfaces[]`
+// and lands in WP 5.1. It is empty here, not absent, which is the difference
+// between "not yet recorded" and "nothing renders it".
+//
+// THE GATE PATTERN is `scsim/scripts/gen_docs.py --check`'s, deliberately: render
+// into memory, compare against what is committed, and fail naming the files that
+// differ. It does NOT rewrite in CI. A generator that silently regenerates proves
+// only that it ran.
+//
+// THE REGISTRY BRIDGE CONVENTION is `scripts/check_registry_bridge.mjs`'s: the
+// engine's snapshot is read, never re-stated, and a reference it does not
+// recognise is an error rather than a silently dropped row. `base_data_requirements`
+// is keyed `table.column`, so a requirement naming a column the contract does not
+// have means one of the two moved — reported, not ignored.
+//
+// WHAT IT EMITS
+//   build/data-contract.generated.json   the contract (COMMITTED — see .gitignore)
+//   docs/data/tables/<table>.md          one page per covered table, GENERATED banner
+
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { join, dirname, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import { load } from "js-yaml";
+
+export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const INTROSPECTED = join(ROOT, "build", "schema.introspected.json");
+const SIDECARS = join(ROOT, "supabase", "contract");
+const REGISTRY = join(ROOT, "src", "lib", "policies", "registry.generated.json");
+export const CONTRACT_OUT = join(ROOT, "build", "data-contract.generated.json");
+export const PAGES_DIR = join(ROOT, "docs", "data", "tables");
+
+const TIER_NAMES = {
+  "0": "landing — raw bytes as received",
+  "1": "staging — parsed, diffed, unpromoted",
+  "2": "canonical — the only tier humans edit",
+  "2-O": "observations — append-only, bitemporal (reserved)",
+  "3": "derived — a pure function of tier 2",
+  "4": "decisions — policies, overrides, scenarios",
+  "5": "results — pinned to dataset + policy + engine version",
+  G: "governance — identity, capability, delegation, audit",
+  reference: "project-independent, versioned by vintage rather than by project",
+};
+
+// ───────────────────────────────────────────────────────────────────── the merge
+
+/** Read the three sources. Throws rather than degrading: a contract built from
+ *  two of three sources is a contract that is wrong about the third. */
+export function readSources() {
+  for (const [path, what] of [
+    [INTROSPECTED, "run `npm run contract:introspect`"],
+    [REGISTRY, "regenerate it from the engine (`scsim/scripts/gen_frontend_registry.py`)"],
+  ]) {
+    if (!existsSync(path)) throw new Error(`${relative(ROOT, path)} is missing — ${what}.`);
+  }
+  const introspected = JSON.parse(readFileSync(INTROSPECTED, "utf8"));
+  const registry = JSON.parse(readFileSync(REGISTRY, "utf8"));
+  const sidecars = new Map();
+  for (const file of readdirSync(SIDECARS).filter((f) => f.endsWith(".contract.yaml")).sort()) {
+    const doc = load(readFileSync(join(SIDECARS, file), "utf8"));
+    sidecars.set(doc.table, { doc, file: `supabase/contract/${file}` });
+  }
+  return { introspected, registry, sidecars };
+}
+
+/** `base_data_requirements`, indexed by the `table.column` key the engine uses. */
+function engineRequirements(registry, problems) {
+  const byField = new Map();
+  for (const req of registry.base_data_requirements ?? []) {
+    if (byField.has(req.field)) problems.push(`registry: two base_data_requirements for "${req.field}"`);
+    byField.set(req.field, req);
+  }
+  return byField;
+}
+
+/** The engine's fallback chain as one readable sentence, from `fallback_spec`.
+ *  I6: a fallback absent from the contract may not exist in code — so the chain
+ *  is rendered from the engine's own data, never paraphrased by hand. */
+function fallbackChain(req) {
+  const steps = (req.fallback_spec ?? []).map((s) =>
+    s.reducer ? `${s.reducer} (${s.grade})` : `constant ${s.constant} (${s.grade})`,
+  );
+  return steps.length ? steps.join(" → ") : "none — the absence is the value";
+}
+
+export function buildContract({ introspected, registry, sidecars }) {
+  const problems = [];
+  const requirements = engineRequirements(registry, problems);
+  const byName = new Map(introspected.tables.map((t) => [t.name, t]));
+  const usedRequirements = new Set();
+
+  const tables = {};
+  for (const [name, { doc, file }] of [...sidecars.entries()].sort()) {
+    const t = byName.get(name);
+    if (!t) {
+      // `contract:validate` already fails on this; the generator must not paper
+      // over it by emitting a page for a table that does not exist.
+      problems.push(`${file}: describes "${name}", which exists in no migration`);
+      continue;
+    }
+    const columns = t.columns.map((c) => {
+      const f = doc.fields[c.name];
+      if (!f) {
+        problems.push(`${file}: column "${c.name}" has no field entry`);
+        return null;
+      }
+      const key = `${name}.${c.name}`;
+      const req = requirements.get(key);
+      if (req) usedRequirements.add(key);
+      return {
+        name: c.name,
+        // schema half — introspected, never authored
+        type: c.type,
+        nullable: c.nullable,
+        default: c.default,
+        primary_key: c.primary_key,
+        unique: c.unique,
+        references: c.references,
+        added_by: c.added_by,
+        // meaning half — authored, never introspected
+        unit: f.unit,
+        unit_source: f.unit_source,
+        unit_column: f.unit_column ?? null,
+        meaning: f.meaning,
+        grain: f.grain,
+        engine: f.engine,
+        substitutions: f.substitutions,
+        ingest: f.ingest,
+        surfaces: f.surfaces,
+        resolution: f.resolution ?? null,
+        note: f.note ?? null,
+        // engine half — imported from the registry snapshot
+        engine_requirement: req
+          ? { level: req.level, reason: req.reason, fallback: req.fallback, chain: fallbackChain(req) }
+          : null,
+      };
+    }).filter(Boolean);
+
+    tables[name] = {
+      table: name,
+      schema_name: doc.schema_name ?? "public",
+      tier: doc.tier,
+      tier_name: TIER_NAMES[doc.tier] ?? "unknown tier",
+      grain: doc.grain,
+      owner: doc.owner,
+      created_by: t.created_by,
+      sidecar: file,
+      natural_key_unique: t.natural_key_unique,
+      natural_key_intended: doc.natural_key_intended ?? null,
+      // `rls_enabled` is the introspected value, never the sidecar's — and it is
+      // NULL, not false, when a dynamic-SQL migration leaves the question open.
+      governance: {
+        ...doc.governance,
+        rls_enabled: t.rls.determinate === false ? null : t.rls.enabled,
+      },
+      rls: t.rls,
+      // CHECK constraints are surfaced deliberately (WP 1.3's handoff): a
+      // constraint that rejects a user's upload belongs on the page the user
+      // reads, not only in the migration that added it.
+      constraints: t.constraints,
+      indexes: t.indexes,
+      columns,
+      note: doc.note ?? null,
+    };
+  }
+
+  for (const [field] of requirements) {
+    if (usedRequirements.has(field)) continue;
+    const [table] = field.split(".");
+    // Only a covered table can be checked; an uncovered one is the coverage
+    // manifest's business, not this one's.
+    if (sidecars.has(table)) {
+      problems.push(
+        `registry: base_data_requirements names "${field}", which the contract has no column for — ` +
+        "the engine and the schema disagree about a field the engine calls required",
+      );
+    }
+  }
+
+  const payload = {
+    $generator: "scripts/data-contract/generate.mjs",
+    $doc:
+      "The data contract: the introspected schema merged with the authored sidecars and the " +
+      "engine registry snapshot. Generated — do not edit; `npm run contract:check` fails on drift.",
+    engine_version: registry.engine_version,
+    sources: {
+      introspected: {
+        generator: introspected.$generator,
+        migrations_found: introspected.migrations_found,
+        migrations_applied: introspected.migrations_applied,
+        last_migration: introspected.last_migration,
+      },
+      sidecars: sidecars.size,
+      registry: { engine_version: registry.engine_version, policies: registry.policies.length },
+    },
+    counts: {
+      tables_in_schema: introspected.tables.length,
+      tables_covered: Object.keys(tables).length,
+      columns_covered: Object.values(tables).reduce((n, t) => n + t.columns.length, 0),
+      check_constraints: Object.values(tables)
+        .reduce((n, t) => n + t.constraints.filter((c) => c.kind === "CHECK").length, 0),
+      engine_requirements: usedRequirements.size,
+      orphans: introspected.orphans.length,
+      phantom_tables: introspected.phantom_tables.length,
+    },
+    tables,
+    orphans: introspected.orphans,
+    phantom_tables: introspected.phantom_tables,
+  };
+  // Content address over everything else, so a page can name the contract it came
+  // from without embedding a wall-clock date — a date makes a committed generated
+  // file differ from itself tomorrow, which is a drift gate that cries wolf daily.
+  payload.contract_version = createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 12);
+  return { payload, problems };
+}
+
+// ────────────────────────────────────────────────────────────────── the renderer
+
+const esc = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/\n+/g, " ").trim();
+// A code span cannot contain a backtick, and authored prose legitimately does:
+// `inbound_logistics.volume`'s unit is literally "units per `time_unit`". Strip
+// them inside spans only — stripping them everywhere would flatten the prose.
+const tick = (s) => `\`${esc(s).replace(/`/g, "")}\``;
+const code = (s) => (s === null || s === undefined || s === "" ? "—" : tick(s));
+const prose = (s) => (s ? esc(s) : "—");
+
+function banner(table) {
+  return (
+    `<!-- GENERATED by scripts/data-contract/generate.mjs from ` +
+    `${table.sidecar} + build/schema.introspected.json + the engine registry. ` +
+    `Do not edit by hand: \`npm run contract:check\` fails on drift. -->\n\n`
+  );
+}
+
+function renderGovernance(t) {
+  const out = [`## Governance\n`];
+  out.push(`| | |`, `|---|---|`);
+  out.push(`| Read capability | ${t.governance.read ? code(t.governance.read) : "any project member"} |`);
+  out.push(`| Write capability | ${t.governance.write ? code(t.governance.write) : "**no user-facing write path**"} |`);
+  out.push(`| Minimum project role | ${code(t.governance.min_project_role)} |`);
+  out.push(`| Tier transitions audited | ${t.governance.audited ? "yes" : "**no** — invariant `audit-actor` is not met here yet"} |`);
+  const indeterminate = t.rls.determinate === false;
+  out.push(
+    `| Row-level security | ${indeterminate ? "**cannot be determined from the migrations**" : t.rls.enabled ? "enabled" : "**DISABLED**"} |`,
+  );
+  out.push("");
+  if (t.governance.note) out.push(prose(t.governance.note), "");
+  if (indeterminate) {
+    out.push(
+      "> **The migrations do not settle whether RLS is on here.**",
+      `> ${(t.rls.indeterminate_from ?? []).map((m) => `\`${esc(m)}\``).join(", ")} sets it with`,
+      "> **dynamic SQL** — `EXECUTE format(...)`, assembled at run time — which a static replay",
+      "> of the migration history cannot evaluate. The honest answer is *unknown*, and this",
+      "> page will not round it to *off*: a security review that starts from an invented",
+      "> \"unprotected\" is as wrong as one that starts from an invented \"protected\".",
+      "> Only reading the live database answers it (PLAN.md §15).",
+      "",
+    );
+  } else if (!t.rls.enabled) {
+    out.push(
+      "> **RLS is off on this table.** Every row is readable by anyone who can reach the",
+      "> database, whatever the capability column above says. The capability is what the",
+      "> platform intends; RLS is what the database enforces, and here they differ.",
+      "",
+    );
+  }
+  if (t.rls.enabled && !indeterminate && t.rls.policies.length === 0) {
+    out.push(
+      "> **RLS is on and this table has no policy.** That is deny-all for every role except",
+      "> `service_role`, which bypasses RLS. If a page reads this table directly and gets zero",
+      "> rows, this is why.",
+      "",
+    );
+  }
+  if (t.rls.policies.length) {
+    out.push(`<details><summary>${t.rls.policies.length} RLS ${t.rls.policies.length === 1 ? "policy" : "policies"}</summary>\n`);
+    out.push(`| Policy | Command | Roles | Added by |`, `|---|---|---|---|`);
+    for (const p of t.rls.policies) {
+      out.push(`| ${esc(p.name)} | ${esc(p.command)} | ${p.roles.length ? p.roles.map(esc).join(", ") : "all"} | ${code(p.added_by)} |`);
+    }
+    out.push("", "</details>", "");
+  }
+  return out;
+}
+
+function renderKeys(t) {
+  const out = [`## Uniqueness\n`];
+  if (t.natural_key_unique.length === 0) {
+    out.push("None. Nothing in the database stops a duplicate row.", "");
+  } else {
+    out.push(`| Columns | Source | Constraint |`, `|---|---|---|`);
+    for (const k of t.natural_key_unique) {
+      out.push(`| ${k.columns.map((c) => `\`${c}\``).join(" + ")} | ${esc(k.source)} | ${code(k.name)} |`);
+    }
+    out.push("");
+  }
+  if (t.natural_key_intended) {
+    out.push(
+      `**Intended natural key:** ${t.natural_key_intended.map((c) => `\`${c}\``).join(" + ")} — the key this`,
+      `table's grain implies and the database does NOT enforce today. A statement about`,
+      `what is missing, never a claim about what is there.`,
+      "",
+    );
+  }
+  return out;
+}
+
+function renderConstraints(t) {
+  // Everything except the implicit primary key, which the uniqueness block above
+  // already states. A CHECK is the only thing on this page that can reject a
+  // user's upload outright, so it leads.
+  const checks = t.constraints.filter((c) => c.kind === "CHECK");
+  const others = t.constraints.filter((c) => c.kind !== "CHECK" && !c.implicit);
+  if (!checks.length && !others.length) return [];
+  const out = [`## Constraints\n`];
+  if (checks.length) {
+    out.push(
+      "These reject the row outright. A value that fails one of them does not arrive",
+      "partially or get corrected — the write fails.",
+      "",
+      `| Constraint | Rule | Added by |`,
+      `|---|---|---|`,
+    );
+    for (const c of checks) out.push(`| ${code(c.name)} | \`${esc(c.definition)}\` | ${code(c.added_by)} |`);
+    out.push("");
+  }
+  if (others.length) {
+    out.push(`| Constraint | Kind | Definition |`, `|---|---|---|`);
+    for (const c of others) out.push(`| ${code(c.name)} | ${esc(c.kind)} | \`${esc(c.definition)}\` |`);
+    out.push("");
+  }
+  return out;
+}
+
+function renderColumnSummary(t) {
+  const out = [
+    `## Columns\n`,
+    `\`CSV header\` is the name the **user types**, which is not always the column name —`,
+    `that gap is defect D21. A dash means the column has no CSV origin.`,
+    "",
+    `| Column | CSV header | Type | Unit | Required in CSV | Meaning |`,
+    `|---|---|---|---|---|---|`,
+  ];
+  for (const c of t.columns) {
+    const unit =
+      c.unit_source === "column" ? `${tick(c.unit)} *(from ${tick(c.unit_column)})*`
+      : c.unit ? tick(c.unit)
+      : "—";
+    out.push(
+      `| \`${c.name}\`${c.primary_key ? " 🔑" : ""} | ${code(c.ingest.csv_header)} | \`${esc(c.type)}\` | ${unit} | ` +
+      `${c.ingest.csv_header ? (c.ingest.required ? "**yes**" : "no") : "—"} | ${prose(c.meaning)} |`,
+    );
+  }
+  out.push("");
+  return out;
+}
+
+function renderColumnDetail(t) {
+  const out = [`## Each column in full\n`];
+  for (const c of t.columns) {
+    out.push(`### \`${c.name}\`\n`);
+    out.push(prose(c.meaning), "");
+    const rows = [
+      ["Type", `\`${esc(c.type)}\`${c.nullable ? "" : ", `NOT NULL`"}${c.default ? `, default \`${esc(c.default)}\`` : ""}`],
+      ["Grain", code(c.grain)],
+      ["Unit", c.unit
+        ? `${tick(c.unit)} — ${esc(c.unit_source)}${c.unit_column ? `, named by ${tick(c.unit_column)}` : ""}`
+        : c.unit_source === "none" ? "dimensionless" : `none recorded (${esc(c.unit_source)})`],
+      ["Added by", code(c.added_by)],
+    ];
+    if (c.references) {
+      rows.push(["References", `\`${esc(c.references.table)}(${c.references.columns.join(", ")})\`${c.references.on_delete ? ` ON DELETE ${esc(c.references.on_delete)}` : ""}`]);
+    }
+    rows.push(["Read by the engine", c.engine.consumed_by ? `\`${esc(c.engine.consumed_by)}\`` : "**not traced**"]);
+    if (c.engine.transform) rows.push(["Transform", prose(c.engine.transform)]);
+    if (c.engine.missing_default) rows.push(["When NULL, the engine uses", prose(c.engine.missing_default)]);
+    rows.push(["Validated at ingest", prose(c.ingest.validate)]);
+    rows.push(["Rendered at", c.surfaces.length ? c.surfaces.map((s) => `\`${esc(s)}\``).join(", ") : "*not yet recorded (WP 5.1)*"]);
+    out.push(`| | |`, `|---|---|`, ...rows.map(([k, v]) => `| ${k} | ${v} |`), "");
+
+    if (c.engine_requirement) {
+      const r = c.engine_requirement;
+      out.push(
+        `**The engine calls this \`${esc(r.level)}\`.** ${prose(r.reason)}`,
+        "",
+        `Fallback chain, from the engine's own registry: ${r.chain}.`,
+        "",
+      );
+    }
+    if (c.substitutions.length) {
+      out.push(
+        `**Substitutions** — every point where a value you did not supply can stand in`,
+        `for one you did.`,
+        "",
+        `| When | The value used | Shown as | Visible where |`,
+        `|---|---|---|---|`,
+      );
+      for (const s of c.substitutions) {
+        out.push(`| ${prose(s.when)} | ${prose(s.value)} | \`${esc(s.provenance)}\` | ${prose(s.visible_as)} |`);
+      }
+      out.push("");
+    }
+    if (c.resolution) {
+      const r = c.resolution;
+      out.push(
+        `**Resolution** — how a value is decided when more than one source could supply one.`,
+        "",
+        `| | |`, `|---|---|`,
+        `| Default mode | \`${esc(r.default_mode)}\` |`,
+        `| Assertable by | ${r.assertable_by.length ? r.assertable_by.map((x) => `\`${esc(x)}\``).join(", ") : "—"} |`,
+        `| Estimable from | ${r.estimable_from.length ? r.estimable_from.map((x) => `\`${esc(x)}\``).join(", ") : "**never** — this value may not be estimated"} |`,
+        `| Hybrid (centre / spread) | ${r.hybrid ? `\`${esc(r.hybrid.centre)}\` / \`${esc(r.hybrid.spread)}\`` : "**none** — the engine has no variability field for this quantity"} |`,
+        `| On conflict | \`${esc(r.on_conflict)}\` |`,
+        "",
+      );
+      if (r.note) out.push(prose(r.note), "");
+    }
+    if (c.note) out.push(`> ${prose(c.note)}`, "");
+  }
+  return out;
+}
+
+function renderIndexes(t) {
+  if (!t.indexes.length) return [];
+  const out = [`## Indexes\n`, `| Index | Columns | Unique | Added by |`, `|---|---|---|---|`];
+  for (const i of t.indexes) {
+    out.push(`| ${code(i.name)} | ${i.columns.map((c) => `\`${c}\``).join(", ")} | ${i.unique ? "yes" : "no"} | ${code(i.added_by)} |`);
+  }
+  out.push("");
+  return out;
+}
+
+export function renderPage(t, contract) {
+  const out = [];
+  out.push(banner(t).trimEnd(), "");
+  out.push(`# \`${t.table}\`\n`);
+  out.push(
+    `> **GENERATED** — rendered from the data contract. Edit [\`${t.sidecar}\`](../../../${t.sidecar})`,
+    `> for what the columns mean, or the migrations for what the schema is. Do not edit`,
+    `> this page: \`npm run contract:check\` fails when it differs from what the contract`,
+    `> generates.`,
+    "",
+  );
+  out.push(`**Tier ${t.tier}** — ${TIER_NAMES[t.tier] ?? "unknown tier"} · owned by \`${t.owner}\` · \`${t.schema_name}.${t.table}\``, "");
+  out.push(`**One row is** ${prose(t.grain)}`, "");
+  if (t.note) out.push(prose(t.note), "");
+  out.push(...renderKeys(t));
+  out.push(...renderConstraints(t));
+  out.push(...renderGovernance(t));
+  out.push(...renderColumnSummary(t));
+  out.push(...renderColumnDetail(t));
+  out.push(...renderIndexes(t));
+  out.push("---", "");
+  out.push(
+    `*Generated from data contract \`${contract.contract_version}\`, engine \`${contract.engine_version}\`,`,
+    `sidecar \`${t.sidecar}\`, table created by \`${t.created_by}\`. No wall-clock date: a generated`,
+    `page that differs from itself tomorrow cannot be drift-gated.*`,
+    "",
+  );
+  return out.join("\n");
+}
+
+export function renderIndexPage(contract) {
+  const tables = Object.values(contract.tables);
+  const out = [];
+  out.push(
+    `<!-- GENERATED by scripts/data-contract/generate.mjs. Do not edit by hand: ` +
+    `\`npm run contract:check\` fails on drift. -->`,
+    "",
+    `# Table reference\n`,
+    `> **GENERATED** — one page per table the data contract covers. Edit the sidecars in`,
+    `> \`supabase/contract/\`, not these pages.`,
+    "",
+    `${tables.length} of ${contract.counts.tables_in_schema} tables are covered,`,
+    `${contract.counts.columns_covered} columns in all. A table that is not here is listed`,
+    `with its reason in [\`scripts/data-contract/coverage.yaml\`](../../../scripts/data-contract/coverage.yaml);`,
+    `\`npm run contract:check\` fails on a table that is in neither.`,
+    "",
+    `| Table | Tier | Owner | Columns | One row is |`,
+    `|---|---|---|---|---|`,
+  );
+  for (const t of tables) {
+    out.push(`| [\`${t.table}\`](${t.table}.md) | ${t.tier} | \`${t.owner}\` | ${t.columns.length} | ${prose(t.grain)} |`);
+  }
+  out.push("", "---", "");
+  out.push(`*Generated from data contract \`${contract.contract_version}\`, engine \`${contract.engine_version}\`.*`, "");
+  return out.join("\n");
+}
+
+/** Every file this generator owns, path → content. */
+export function renderAll(contract) {
+  const files = new Map();
+  files.set(join(PAGES_DIR, "README.md"), renderIndexPage(contract));
+  for (const t of Object.values(contract.tables)) {
+    files.set(join(PAGES_DIR, `${t.table}.md`), renderPage(t, contract));
+  }
+  files.set(CONTRACT_OUT, JSON.stringify(contract, null, 2) + "\n");
+  return files;
+}
+
+// ──────────────────────────────────────────────────────────────────────── main
+
+export function generate() {
+  const { payload, problems } = buildContract(readSources());
+  return { contract: payload, files: renderAll(payload), problems };
+}
+
+function main() {
+  const checking = process.argv.includes("--check");
+  const { contract, files, problems } = generate();
+
+  if (problems.length) {
+    console.error("THE CONTRACT DOES NOT BUILD — the schema, the sidecars and the engine disagree:\n");
+    for (const p of problems) console.error(`  ✗ ${p}`);
+    console.error("\nFix the sidecar or the migration. Do not relax the generator.");
+    return 1;
+  }
+
+  if (checking) {
+    const drifted = [];
+    for (const [path, content] of files) {
+      if (!existsSync(path) || readFileSync(path, "utf8") !== content) drifted.push(relative(ROOT, path));
+    }
+    // A committed page for a table that is no longer covered is drift too: it
+    // documents something the contract has stopped describing.
+    const owned = new Set([...files.keys()]);
+    for (const f of existsSync(PAGES_DIR) ? readdirSync(PAGES_DIR) : []) {
+      if (f.endsWith(".md") && !owned.has(join(PAGES_DIR, f))) drifted.push(`${relative(ROOT, join(PAGES_DIR, f))} (orphaned page)`);
+    }
+    if (drifted.length) {
+      console.error(
+        `CONTRACT DRIFT: ${drifted.length} file(s) differ from what the contract generates —\n` +
+        drifted.map((d) => `  ${d}`).join("\n") +
+        "\n\nRun `npm run contract:generate` and commit.",
+      );
+      return 1;
+    }
+    console.log(
+      `✓ the contract and its ${files.size - 1} pages match the schema, the sidecars and engine ` +
+      `${contract.engine_version} (contract ${contract.contract_version})`,
+    );
+    return 0;
+  }
+
+  mkdirSync(PAGES_DIR, { recursive: true });
+  // Remove pages for tables the contract no longer covers, so deleting a sidecar
+  // deletes its page rather than leaving a document with no source.
+  const owned = new Set([...files.keys()]);
+  for (const f of readdirSync(PAGES_DIR)) {
+    const p = join(PAGES_DIR, f);
+    if (f.endsWith(".md") && !owned.has(p)) { rmSync(p); console.log(`  removed ${relative(ROOT, p)} — no longer covered`); }
+  }
+  for (const [path, content] of files) writeFileSync(path, content);
+  console.log(
+    `✓ contract ${contract.contract_version} — ${contract.counts.tables_covered} tables, ` +
+    `${contract.counts.columns_covered} columns, ${contract.counts.check_constraints} CHECK constraints, ` +
+    `${contract.counts.engine_requirements} engine requirements\n` +
+    `  ${relative(ROOT, CONTRACT_OUT)} + ${files.size - 1} pages under ${relative(ROOT, PAGES_DIR)}/`,
+  );
+  return 0;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) process.exit(main());

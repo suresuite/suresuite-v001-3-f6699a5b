@@ -14,6 +14,12 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "bom_single_level_pkey"
+# The key the grain implies and the database does NOT enforce (D5). WP 3.3 lands
+# it as a constraint. Added in WP 1.4, when `contract:check`'s R5 warning named
+# this table as tier 2 with nothing but a surrogate key and no stated intent —
+# "no natural key" and "a natural key nobody wrote down" look identical until one
+# of them is written down.
+natural_key_intended: [project_id, plant_name, product_id, material_id]
 
 governance:
   read: null

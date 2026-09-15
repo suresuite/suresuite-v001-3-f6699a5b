@@ -1,0 +1,141 @@
+# AUTHORED — which tables the data contract covers, and why the rest do not yet.
+#
+# Phase 1 / WP 1.4. `npm run contract:check` requires EVERY table in
+# build/schema.introspected.json to be in exactly one of two places:
+#
+#   · it has a sidecar in supabase/contract/ — then the contract describes every
+#     one of its columns, and a page is generated for it; or
+#   · it is listed below, with the work package that will author it and why it
+#     waits.
+#
+# A table in neither fails the gate. That is the whole point: a new table added
+# to a migration cannot slip into the schema undocumented and unnoticed, which is
+# how `approved_users` — the AUTHENTICATION table — came to exist in no migration
+# at all for a year (PLAN.md §4, §16 WP 1.4).
+#
+# Deferring is a commitment, not an excuse. Every entry names a work package that
+# already exists in PLAN.md; if a package is renumbered or dropped, this file
+# moves with it in the same commit.
+
+deferred:
+  - wp: "2.1"
+    why: >-
+      Identity. D13 — two org identities joined by string comparison — is
+      resolved here, and `approved_users.organization` (text) versus
+      `organization_id` (uuid) is the pair that resolves it. Authoring their
+      meaning before that decision would document a shape about to change, and
+      the contract would then be the thing arguing against the fix.
+      `approved_users` in particular: WP 1.4 gave it a CREATE TABLE
+      (`20250815000000_approved_users_base.sql`) so a fresh database can be
+      built, but reconstructing a schema is not the same as being able to say
+      what each column MEANS, and the parts that are inference rather than
+      evidence are marked as such in that file.
+    tables: [approved_users, organizations, organization_members, projects]
+
+  - wp: "2.2"
+    why: >-
+      Capability and delegation. `min_project_role` is already a required sidecar
+      field pointing at `project_members.project_role`, and `project_members`
+      does not exist yet — these tables are the vocabulary it will be built from,
+      so they are authored with it, not before it.
+    tables: [capabilities, org_capabilities, role_capabilities, user_capabilities, user_ai_permissions]
+
+  - wp: "2.3"
+    why: >-
+      The data-plane audit (D15). Audit today covers the admin plane only;
+      `audited: false` on all thirteen covered sidecars is the honest record of
+      that. This table changes shape when the audit reaches tier transitions.
+    tables: [admin_audit_logs]
+
+  - wp: "3.1"
+    why: >-
+      The other inbound datasets. WP 3.1 generalizes `ingest_*` and WP 3.2 moves
+      the parse server-side; these tables land on the same ingestion contract as
+      the four lane tables, and their sidecars are written against that contract
+      rather than against the bespoke paths each has today.
+    tables:
+      - multi_tier_supply_chain
+      - tier2_suppliers
+      - tier3_suppliers
+      - erp_staged_products
+      - erp_staged_bom_versions
+      - erp_staged_bom_lines
+      - erp_sync_runs
+      - project_erp_links
+
+  - wp: "4.2"
+    why: >-
+      Analysis output. D19 — results smeared onto entity columns with no identity
+      or version — is exactly what these tables are, and WP 4.2 moves them into
+      `analysis_results`. Documenting the smear as though it were the design
+      would make the contract an argument for keeping it.
+    tables: [network_nodes, network_edges, network_summary, node_list, model_validations, external_evidence]
+
+  - wp: "4.4"
+    why: >-
+      Runs and results (tier 5). Invariant `result-binding` is the claim these
+      tables have to satisfy — every result binds dataset + policy + scenario +
+      engine version — and WP 4.1/4.4 are where the binding is completed and the
+      staleness rules land.
+      NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED
+      shadowed definition (`20250914113723` re-declares what `20250913085427`
+      created, and the two disagree about `job_id`). The introspector records the
+      disagreement rather than picking a winner. Resolve it BEFORE writing the
+      sidecar — a field entry for a column whose type depends on which CREATE
+      TABLE won is a guess with a schema around it.
+    tables:
+      - simulation_runs
+      - simulation_results
+      - run_replications
+      - run_item_series
+      - simulation_jobs
+      - simulation_job_magnitudes
+      - simulation_cache
+      - simulation_performance_metrics
+      - experiments
+
+  - wp: "6.1"
+    why: >-
+      Decisions (tier 4) beyond the two policy tables the contract already
+      covers. WP 6.1 pins the resolution chains and WP 6.2 fixes the divergences
+      (D17, D18, D23, D24, D26); the scenario and disruption tables are the
+      surface those chains resolve against.
+    tables:
+      - policy_versions
+      - policy_presets
+      - scenarios
+      - scenario_templates
+      - disruption_scenarios
+      - disruption_scenario_profiles
+      - disruption_scenario_targets
+      - disruption_scenario_effects
+      - disruption_scenario_settings
+      - recovery_playbooks
+
+  - wp: "5.2"
+    why: >-
+      Outside the data spine. These are the AI and public-API control planes:
+      they carry no simulation input, no engine-read field and no user-uploaded
+      value, so a data-contract sidecar would describe machinery rather than the
+      user's data. PLAN.md §6.3 documents them in the manual's sections 14 and
+      15 instead, and lists several of them explicitly as internal-only. If one
+      ever starts carrying a value a simulation reads, it moves into the contract
+      — that is the test, not the table's age.
+    tables:
+      - ai_budgets
+      - ai_chat_events
+      - ai_model_capabilities
+      - ai_models
+      - ai_providers
+      - ai_usage_logs
+      - api_idempotency
+      - api_keys
+      - api_rate_limits
+      - api_request_logs
+      - chat_folders
+      - chat_messages
+      - chat_plans
+      - chat_threads
+      - project_memory
+      - proposals
+      - user_files

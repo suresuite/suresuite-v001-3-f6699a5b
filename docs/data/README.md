@@ -6,9 +6,12 @@ DEPRECATED (superseded — the banner names by what). Read the banner before edi
 
 | Page | Status | |
 |---|---|---|
-| `tables/*.md` | GENERATED | one page per table — columns, types, units, substitutions, lineage. Rendered from `data-contract.generated.json` by `npm run contract:generate`; `npm run contract:check` fails if a page differs from what the contract generates. **Do not edit.** *(empty until WP 1.4)* |
+| [`tables/`](tables/) | GENERATED | one page per covered table — columns, CSV headers, units, CHECK constraints, governance, substitutions, resolution, and the engine's own fallback chains. Rendered from `build/data-contract.generated.json` by `npm run contract:generate`; `npm run contract:check` fails if a page differs from what the contract generates. **Do not edit** — edit the sidecar in `supabase/contract/`. A table with no page is either deferred in `scripts/data-contract/coverage.yaml` or a gate failure; there is no third state. |
 | `field-mapping.md` | AUTHORED | how stored project data becomes a simulation run — the hand-maintained half of the contract, kept in step with `project_map.py` and `datamap.py` until WP 1.2–1.4 generate it |
 | `lifecycle.md` | AUTHORED | where each piece of project state lives and how long it survives |
+
+`tables/README.md` is the index: which tables are covered, and how many of the
+schema's are not yet. Landed in WP 1.4 with the generator and its gate.
 
 The two authored pages moved here from the top level in WP 0.3; tombstones remain at
 `docs/data-simulation-mapping.md` and `docs/simulation-data-lifecycle.md` because

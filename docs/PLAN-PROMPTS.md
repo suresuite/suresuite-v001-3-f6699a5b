@@ -89,8 +89,9 @@ Already verified (re-check before relying on it):
   — the error is swallowed and the table exists in NO migration. The mapped
   branch at :158-163 is therefore dead code today. Make the failure loud;
   deciding whether to add the table or delete the branch is WP 1.4, not this one.
-· risk_data is read at ProductLevelNetwork.tsx:499 and FirmLevelNetwork.tsx:300
-  with quoted column names ("RISK CLASS") and has no migration either.
+· risk_data is read at ProductLevelNetwork.tsx:500 and FirmLevelNetwork.tsx:301
+  and had no migration either. WP 1.4 gave it one (20260915000003_risk_data.sql)
+  and renamed the quoted columns; the line numbers above are post-WP-1.4.
 
 Conversion changes weighted magnitudes. supply_chain_data.weighted is
 numeric(16,6) (set by migration 20250816031317) — confirm no overflow for the
@@ -203,10 +204,13 @@ load-bearing line of this WP. It is what stops a future estimator fitting a
 distribution to an engineering fact.
 ```
 
-### WP 1.4 — Generator, drift gate, orphan reconciliation
+### WP 1.4 — Generator, drift gate, orphan reconciliation ✅ *(done)*
 
 ```
 Implement WP 1.4 from docs/PLAN.md.
+
+DONE. All three orphans reconciled, the gate is wired, and the prompt below is
+kept as the record of what was asked. See PLAN.md §16 for what it found.
 
 Already verified (re-check before relying on it):
 · scsim/scripts/gen_docs.py --check is the exact gate pattern to copy, including
@@ -733,7 +737,8 @@ them — the list is this WP's most valuable output and feeds WP 6.2.
 Implement WP 6.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· D17: ensure_item_masters (item_master.sql:85-89) inserts supplier rows with
+· D17: ensure_item_masters (item_master.sql:91-96 builds materials; the supplier
+  insert is at :85-89) inserts supplier rows with
   capacity_per_week NULL = UNLIMITED. masterValueFor returns undefined for null,
   derivedValueFor has no suppliers branch, so liveDefault = derivedVal ?? 0 renders
   "0" with provenance "default" — whose colour is null, so NO dot at all. The grid

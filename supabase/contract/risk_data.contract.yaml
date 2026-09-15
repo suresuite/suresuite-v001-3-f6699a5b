@@ -1,0 +1,187 @@
+# AUTHORED — the data contract's sidecar for `risk_data`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: risk_data
+tier: reference
+schema_name: public
+grain: >-
+  One country's current risk class, as one named publisher graded it in one
+  named edition. NOT project-scoped: two projects sourcing from the same country
+  see the same row, which is the point — a per-project copy drifts.
+owner: reference-data
+
+# One live vintage per country. Superseding a vintage is an UPSERT, not an insert.
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: risk_data_pkey
+  - source: table UNIQUE
+    columns: [country]
+    name: risk_data_country_key
+# The key the grain would imply if history were retained. It is not: the pages
+# build a country -> risk_class map, so two vintages of one country would make
+# the rendered colour depend on row order. Bitemporal reference data is tier 2-O
+# and Phase 7+ (PLAN.md §2, §14).
+natural_key_intended: [country, vintage]
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write: null` is literal: no page, edge function or upload path writes this
+    table. It is loaded by an operator through the service role, which bypasses
+    RLS — so the ABSENCE of an INSERT/UPDATE/DELETE policy is the write rule, not
+    an omission. Read is open to `authenticated` and `anon` because the risk
+    shading renders on the public network pages.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: Surrogate row identifier. Carries no meaning and joins to nothing.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  country:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The country the risk class applies to, spelled as the network pages spell
+      it — `upper(btrim(...))`, matching the last comma-separated segment of a
+      node's `location_text`. A CHECK enforces the spelling so the unique index
+      and the page lookup cannot disagree about whether 'Vietnam' and 'VIETNAM'
+      are one country.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: must equal upper(btrim(country)) — CHECK risk_data_country_normalized
+    surfaces: []
+    resolution: null
+  risk_class:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The publisher's risk grade for the country, in the five-value vocabulary
+      the map renders — Very Low, Low, Medium, High, Very High. An ordinal label,
+      not a score: it may be compared for order and never averaged.
+    grain: level
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions:
+      - when: no row exists for the node's country
+        value: the map renders the node grey and labels it "Unknown"
+        provenance: default
+        visible_as: RiskDataNotice — the page says the dimension is missing rather than shading it away
+    ingest:
+      csv_header: null
+      required: false
+      validate: one of Very Low / Low / Medium / High / Very High — CHECK risk_data_risk_class_known
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine, and that is correct: country risk shades the
+      network map, it is not a simulation input. `scsim` has no country concept —
+      disruption targets are suppliers, plants and lanes (blueprint §2.3 G11). A
+      later package that wants country risk to DRIVE anything must add it to the
+      engine first, not read this column from the mapper.
+      'Unknown' is deliberately not a storable value: it is what the absence of a
+      row looks like, and storing it would turn "we have no figure" into a figure
+      (§5 T1; the same over-claim as D17).
+  source:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who published the figure — the named index or provider. NOT NULL because a
+      country-risk grade with no named origin is an assertion the product cannot
+      defend, and its only output is a colour a reader will take for fact.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  vintage:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The edition the figure is from, as the publisher labels it (e.g. "2025-H1").
+      This is the table's version axis: reference data is versioned by vintage,
+      not by project (PLAN.md §2).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  licence:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The licence the row is held under. NOT NULL, and the reason is specific:
+      country-risk indices are mostly commercial, so a row whose licence is
+      unrecorded is a row nobody can tell you may republish — including in an
+      export (§5 T4).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  refreshed_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When this row was last written from the source. Freshness, not row age.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was first inserted. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was last modified. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  The second of WP 1.4's three orphans (D4). Two network pages read it and no
+  migration created it, so the read failed and every node rendered "Unknown" with
+  nothing on screen to say a dimension was missing. Kept rather than deleted, and
+  given the four provenance columns the reference tier requires:
+  `20260915000003_risk_data.sql` says why in full.

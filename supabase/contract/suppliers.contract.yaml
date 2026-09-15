@@ -20,15 +20,26 @@ governance:
   write: "data_editing"
   min_project_role: editor
   audited: false
-  rls_enabled: false
+  # `rls_enabled` is DELIBERATELY ABSENT, and that is the finding. See the note.
   note: >-
     `write` names the capability that exists today. WP 2.2 splits `data_editing`
     into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row
-    becomes `data_edit_inputs` then, and all twelve sidecars change together.
-    SEPARATELY AND MORE URGENTLY: rls_enabled is FALSE on all three item
-    masters. No migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on
-    them, so the per-project isolation every other tier-2 table has does not
-    exist here. Found by WP 1.2; it is WP 2.4's to fix and WP 2.2's to test.
+    becomes `data_edit_inputs` then, and all thirteen sidecars change together.
+    SEPARATELY — AND THIS REPLACES WHAT WP 1.2 WROTE HERE, WHICH WAS WRONG: this
+    sidecar used to assert `rls_enabled: false` and say "no migration ever runs
+    ALTER TABLE ... ENABLE ROW LEVEL SECURITY on them". One does.
+    `20260614000001_item_master.sql:57-66` enables RLS and creates two policies
+    (`%s_auth_all`, `%s_anon_read`) on each of the three masters — but through
+    `EXECUTE format(...)` inside a `FOREACH` over an array of table names, which
+    a static replay of the migrations cannot evaluate. The introspector recorded
+    the absence as `enabled: false`, WP 1.2 read that as fact, and the contract
+    was one generated page away from telling a user their item masters were
+    unprotected. WP 1.4 fixed the mechanism, not the guess: the introspector now
+    records dynamic DDL (`dynamic_ddl`) and marks the tables it touches
+    `rls.determinate: false`, the validator refuses to let a sidecar assert an
+    RLS state the migrations do not settle, and the generated page says the state
+    is indeterminate and names the migration. The ONLY way to know is to read the
+    live database — PLAN.md §15, still unrun. WP 2.4's security review owns it.
 
 fields:
   project_id:

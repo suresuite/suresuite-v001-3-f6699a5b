@@ -50,7 +50,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     // --- FETCH CORE DATASETS UP FRONT ---
     
     // Fetch Outbound / Inbound. Both reads used to destructure only `{ data }`,
-    // the same swallow as `product_code_map` below (D3) but on the ETL's CORE
+    // the same swallow as the `product_code_map` read D3 removed, but on the CORE
     // inputs: a failed read left the lane empty and the run reported success,
     // so the user got a graph missing half its arcs with nothing to explain it.
     // An empty lane is legitimate; a FAILED read is not, and the two must not
@@ -114,39 +114,30 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     let inboundTierInserts = [];  
     let bomDataMulti = null; 
 
-    // Product mapping.
+    // Product mapping — DELETED in Phase 1 / WP 1.4 (D3 closed).
     //
-    // D3 — `product_code_map` exists in NO migration, and this read destructured
-    // only `{ data }`, so the "relation does not exist" error was thrown away and
-    // `productMapping` silently stayed empty. The mapped branch below (the one
-    // that translates an outbound product code into a BOM material code) has
-    // therefore never executed in production, and nothing said so: a project that
-    // genuinely needs the mapping produced a BOM weighted by the WRONG product's
-    // demand, or by zero, and looked healthy.
+    // `product_code_map` was read here to translate an outbound product code into
+    // a BOM material code. The table exists in NO migration and never did, and
+    // until WP 0.2 this read destructured only `{ data }`, so the "relation does
+    // not exist" error was thrown away and the mapping stayed empty. The mapped
+    // branch below has therefore NEVER EXECUTED — not once, in production or
+    // anywhere else.
     //
-    // This WP makes the failure loud and nothing more. Whether the table should
-    // be created or the branch deleted is WP 1.4's orphan reconciliation — that
-    // decision needs the contract, and guessing it here would just bury the
-    // question again.
-    const { data: productCodeMap, error: productCodeMapError } = await supabase
-      .from('product_code_map').select('*').eq('project_id', project_id);
-    const productMapping = new Map<string, string>();
-    if (productCodeMapError) {
-      console.error(
-        `[combine-project] product_code_map unavailable for project ${project_id} — ` +
-        `continuing with an EMPTY product mapping, so any outbound product code that ` +
-        `differs from its BOM material code will not be joined (D3): ` +
-        `${productCodeMapError.message ?? productCodeMapError}`,
-      );
-      warnings.push(
-        'product_code_map could not be read; outbound product codes were not translated ' +
-        'to BOM material codes. BOM demand is weighted only where the two codes match.',
-      );
-    } else if (productCodeMap) {
-      for (const mapping of productCodeMap) {
-        productMapping.set(`${mapping.plant_name}::${mapping.outbound_product_code}`, mapping.bom_material_code);
-      }
-    }
+    // WP 1.4's orphan reconciliation deleted it rather than writing the migration.
+    // Creating the table would have meant inventing a feature: there is no upload
+    // path for it, no UI that writes it, no template column, and no record of what
+    // the two codes were supposed to mean to each other. A table whose only client
+    // is an unreachable branch is a guess about a requirement, and the joined
+    // behaviour it would switch on has never been observed by anyone.
+    //
+    // The unmapped path — `productDemandByPlant` keyed by the BOM's own
+    // `product_id` — is what every project has always run. It is now the only
+    // path, and it is written out rather than selected at runtime by a Map that
+    // is always empty.
+    //
+    // If a project genuinely needs outbound codes to differ from BOM codes, that
+    // is an ingestion-contract question (a declared alias column on an uploaded
+    // table, Phase 3), not a silent lookup table. PLAN.md §4 D3 records this.
     
     if (projectData.bom_level === 'single') {
       const { data: bomData, error: bomError } = await supabase.from('bom_single_level').select('*').eq('project_id', project_id);
@@ -158,11 +149,8 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
       if (bomData && bomData.length > 0) {
         const bomInserts = bomData.map(row => {
           const mappedKey = `${row.plant_name}::${row.product_id}`;
-          const mappedProduct = productMapping.get(mappedKey);
-          let productDemand = mappedProduct 
-            ? (productDemandByPlant.get(`${row.plant_name}::${mappedProduct}`) || 0)
-            : (productDemandByPlant.get(mappedKey) || 0);
-          
+          const productDemand = productDemandByPlant.get(mappedKey) || 0;
+
           const weighted = productDemand * (row.consumption_rate || 0);
           const materialKey = `${row.plant_name}::${row.material_id}`;
           materialDemand.set(materialKey, (materialDemand.get(materialKey) || 0) + weighted);

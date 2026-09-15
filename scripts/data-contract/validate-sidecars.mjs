@@ -109,8 +109,22 @@ for (const file of files) {
     problems.push(`${label}: natural_key_unique is ${claimed}; the migrations say ${actual}`);
   }
 
-  // rls_enabled likewise.
-  if (doc.governance.rls_enabled !== undefined && doc.governance.rls_enabled !== table.rls.enabled) {
+  // rls_enabled likewise — with one case the first version of this check got
+  // wrong. When a migration sets RLS through `EXECUTE format(...)` the replay
+  // cannot evaluate it, and the introspected `enabled: false` means "the
+  // migrations do not say", not "off". The three item masters are exactly that
+  // (`20260614000001_item_master.sql`), and the sidecars asserted `false` from
+  // it for a whole package. A sidecar may not assert what the schema does not
+  // settle; the generated page says so instead.
+  if (table.rls.determinate === false) {
+    if (doc.governance.rls_enabled !== undefined) {
+      problems.push(
+        `${label}: governance.rls_enabled is ${doc.governance.rls_enabled}, but ${doc.table}'s RLS is set by ` +
+        `dynamic SQL in ${(table.rls.indeterminate_from ?? []).join(", ")} — the migrations do not settle it. ` +
+        "Remove the field and say so in governance.note; only the live database can answer (PLAN.md §15).",
+      );
+    }
+  } else if (doc.governance.rls_enabled !== undefined && doc.governance.rls_enabled !== table.rls.enabled) {
     problems.push(`${label}: governance.rls_enabled is ${doc.governance.rls_enabled}; the migrations say ${table.rls.enabled}`);
   }
 

@@ -16,6 +16,10 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "bom_multi_level_pkey"
+# The key the grain implies and the database does NOT enforce (D5); WP 3.3 lands
+# it. `level` is part of it: the same material can be consumed by the same parent
+# at two depths of a deep BOM, and the two lines are different facts.
+natural_key_intended: [project_id, plant_name, material_id, higher_level_component_id, level]
 
 governance:
   read: null

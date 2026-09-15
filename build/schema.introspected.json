@@ -1,19 +1,21 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 293,
-  "migrations_applied": 290,
-  "first_migration": "20250815225910_9dd177a0-dca5-45b4-a8d0-5860164eeddb.sql",
-  "last_migration": "20260915000002_lead_time_unit.sql",
+  "migrations_found": 295,
+  "migrations_applied": 292,
+  "first_migration": "20250815000000_approved_users_base.sql",
+  "last_migration": "20260915000003_risk_data.sql",
   "counts": {
-    "tables": 71,
+    "tables": 73,
     "views": 6,
     "enums": 4,
     "functions": 230,
     "shadowed_definitions": 8,
-    "phantom_tables": 1,
+    "phantom_tables": 0,
     "unparsed_statements": 0,
-    "orphans": 3,
+    "dynamic_ddl_statements": 23,
+    "rls_indeterminate_tables": 7,
+    "orphans": 0,
     "aborted_migrations": 3
   },
   "tables": [
@@ -195,7 +197,8 @@
             "with_check": "public.current_is_super_admin()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -379,7 +382,8 @@
             "with_check": "scope = 'user' AND scope_id = public.get_current_user_id()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -667,7 +671,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260715000002_agent_telemetry.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -809,7 +814,8 @@
       "rls": {
         "enabled": true,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -1018,7 +1024,8 @@
             "with_check": "public.current_is_super_admin()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -1172,7 +1179,8 @@
             "with_check": "public.current_is_super_admin()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -1485,7 +1493,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -1575,7 +1584,8 @@
       "rls": {
         "enabled": true,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -1861,7 +1871,8 @@
       "rls": {
         "enabled": true,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -2031,7 +2042,8 @@
             "with_check": "public.current_is_super_admin()",
             "added_by": "20260711000001_api_access_control.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -2291,7 +2303,8 @@
             "with_check": "public.current_is_super_admin()",
             "added_by": "20260711000001_api_access_control.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -2302,6 +2315,290 @@
             "id"
           ],
           "name": "api_request_logs_pkey"
+        }
+      ]
+    },
+    {
+      "name": "approved_users",
+      "schema": "public",
+      "created_by": "20250815000000_approved_users_base.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "email",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": true,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "password_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "role",
+          "quoted": false,
+          "type": "public.app_role",
+          "type_raw": "public.app_role",
+          "nullable": false,
+          "default": "'user'::public.app_role",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "retyped_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "organization",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql"
+        },
+        {
+          "name": "display_name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+        },
+        {
+          "name": "avatar_url",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+        },
+        {
+          "name": "phone",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+        },
+        {
+          "name": "password_changed_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+        },
+        {
+          "name": "password_expires_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "(now() + interval '90 days')",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+        },
+        {
+          "name": "force_password_change",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+        },
+        {
+          "name": "is_active",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": "true",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+        },
+        {
+          "name": "organization_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "approved_users_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "approved_users_email_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "email"
+          ],
+          "definition": "UNIQUE (email)",
+          "implicit": true,
+          "added_by": "20250815000000_approved_users_base.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_approved_users_organization",
+          "unique": false,
+          "columns": [
+            "organization"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Users can check their own login credentials",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20250815225910_9dd177a0-dca5-45b4-a8d0-5860164eeddb.sql"
+          },
+          {
+            "name": "No direct access - use RPCs",
+            "command": "ALL",
+            "roles": [
+              "authenticated",
+              "anon"
+            ],
+            "using": "false",
+            "with_check": "false",
+            "added_by": "20250826015711_453735a3-da4a-499f-824e-8683893c6654.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Authentication and identity. Reconstructed in Phase 1 / WP 1.4 from the ALTERs ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "approved_users_pkey"
+        },
+        {
+          "source": "column UNIQUE",
+          "columns": [
+            "email"
+          ],
+          "name": "approved_users_email_key"
         }
       ]
     },
@@ -2499,7 +2796,8 @@
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -2695,7 +2993,8 @@
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -2832,7 +3131,8 @@
             "with_check": "public.current_is_super_admin()",
             "added_by": "20260711000002_unified_access_control.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -2947,7 +3247,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260717000001_chat_store.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -3165,7 +3466,8 @@
             "with_check": "EXISTS (SELECT 1 FROM public.chat_threads t WHERE t.id = chat_messages.thread_id AND t.user_id = public.get_current_user_id())",
             "added_by": "20260717000001_chat_store.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -3396,7 +3698,8 @@
             "with_check": "true",
             "added_by": "20260726000001_chat_plans.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -3630,7 +3933,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260717000001_chat_store.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -3803,7 +4107,8 @@
             "with_check": "true",
             "added_by": "20260703000001_dataset_versions.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -3992,7 +4297,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
             "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -4233,7 +4539,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
             "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -4420,7 +4727,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
             "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -4629,7 +4937,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
             "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -4850,7 +5159,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -5041,7 +5351,11 @@
       "rls": {
         "enabled": true,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": false,
+        "indeterminate_from": [
+          "20260829120000_erp_connector_phase1_2.sql"
+        ]
       },
       "replica_identity": null,
       "comment": null,
@@ -5220,7 +5534,11 @@
       "rls": {
         "enabled": true,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": false,
+        "indeterminate_from": [
+          "20260829120000_erp_connector_phase1_2.sql"
+        ]
       },
       "replica_identity": null,
       "comment": null,
@@ -5483,7 +5801,11 @@
       "rls": {
         "enabled": true,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": false,
+        "indeterminate_from": [
+          "20260829120000_erp_connector_phase1_2.sql"
+        ]
       },
       "replica_identity": null,
       "comment": null,
@@ -5788,7 +6110,8 @@
             "with_check": "EXISTS (SELECT 1 FROM public.project_erp_links l WHERE l.id = link_id AND public.has_project_access(l.project_id))",
             "added_by": "20260829120000_erp_connector_phase1_2.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": "Audit trail + Sync Mapping Report source for every connector sync, manual ",
@@ -5978,7 +6301,8 @@
             "with_check": "true",
             "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -6165,7 +6489,8 @@
             "with_check": "true",
             "added_by": "20260727000001_network_cartographer.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -6426,7 +6751,8 @@
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -6636,7 +6962,11 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": false,
+        "indeterminate_from": [
+          "20260614000001_item_master.sql"
+        ]
       },
       "replica_identity": null,
       "comment": null,
@@ -7027,7 +7357,8 @@
             "with_check": "true",
             "added_by": "20260710000001_model_validations.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -7225,7 +7556,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -7485,7 +7817,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -7921,7 +8254,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -8122,7 +8456,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -8446,7 +8781,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
             "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -8579,7 +8915,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.organization_members m WHERE m.org_id = org_capabilities.org_id AND m.user_id = public.get_current_user_id() )",
             "added_by": "20260711000002_unified_access_control.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -8715,7 +9052,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -8888,7 +9226,8 @@
             "with_check": "name = public.get_current_user_org() OR slug = public.get_current_user_org()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -9127,7 +9466,8 @@
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -9401,7 +9741,8 @@
             "with_check": "true",
             "added_by": "20260609040000_consolidated_safe.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -9637,7 +9978,8 @@
             "with_check": "true",
             "added_by": "20260609040000_consolidated_safe.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -9858,7 +10200,8 @@
             "with_check": "true",
             "added_by": "20260609040000_consolidated_safe.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -10111,7 +10454,8 @@
             "with_check": "true",
             "added_by": "20260612000001_policy_version_snapshots.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -10345,7 +10689,11 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": false,
+        "indeterminate_from": [
+          "20260614000001_item_master.sql"
+        ]
       },
       "replica_identity": null,
       "comment": null,
@@ -10607,6 +10955,10 @@
             "with_check": "public.has_project_access(project_id)",
             "added_by": "20260829120000_erp_connector_phase1_2.sql"
           }
+        ],
+        "determinate": false,
+        "indeterminate_from": [
+          "20260829120000_erp_connector_phase1_2.sql"
         ]
       },
       "replica_identity": null,
@@ -10803,7 +11155,8 @@
             "with_check": "true",
             "added_by": "20260717000003_project_memory.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -11135,7 +11488,8 @@
             "with_check": "organization = public.get_current_user_org() AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
             "added_by": "20250820172815_4d16f36b-bba3-43c4-b6e4-6ef4ec9314cd.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -11596,7 +11950,8 @@
             "with_check": "true",
             "added_by": "20260715000001_agent_proposals.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -11823,7 +12178,8 @@
             "with_check": "is_system = false AND created_by = auth.uid()",
             "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -11834,6 +12190,204 @@
             "id"
           ],
           "name": "recovery_playbooks_pkey"
+        }
+      ]
+    },
+    {
+      "name": "risk_data",
+      "schema": "public",
+      "created_by": "20260915000003_risk_data.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "country",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "risk_class",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "source",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "vintage",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "licence",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "refreshed_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000003_risk_data.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "risk_data_country_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "country"
+          ],
+          "definition": "UNIQUE (country)",
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "risk_data_country_normalized",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (country = upper(btrim(country)))",
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "risk_data_risk_class_known",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (risk_class IN ('Very Low', 'Low', 'Medium', 'High', 'Very High'))",
+          "added_by": "20260915000003_risk_data.sql"
+        },
+        {
+          "name": "risk_data_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260915000003_risk_data.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_risk_data_vintage",
+          "unique": false,
+          "columns": [
+            "vintage"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260915000003_risk_data.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "risk_data_read",
+            "command": "SELECT",
+            "roles": [
+              "authenticated",
+              "anon"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260915000003_risk_data.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Country-risk reference data (PLAN.md §2 reference tier, D4). Project-independent ",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "country"
+          ],
+          "name": "risk_data_country_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "risk_data_pkey"
         }
       ]
     },
@@ -11942,7 +12496,8 @@
             "with_check": "public.current_is_super_admin()",
             "added_by": "20260711000002_unified_access_control.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -12119,7 +12674,8 @@
             "with_check": "true",
             "added_by": "20260720000001_run_item_series.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -12374,7 +12930,8 @@
             "with_check": "true",
             "added_by": "20260707000002_run_replications_anon_write.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -12627,7 +13184,8 @@
             "with_check": "is_system = true",
             "added_by": "20260609040000_consolidated_safe.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -12990,7 +13548,8 @@
             "with_check": "true",
             "added_by": "20260610000002_scenarios_anon_grants.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -13275,7 +13834,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
             "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -13524,7 +14084,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1) = 'admin' ) )",
             "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -13830,6 +14391,30 @@
           "unique": false,
           "references": null,
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+        },
+        {
+          "name": "job_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "TEXT",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250914113757_40b93edc-1f10-4dda-a32e-d35f851ebf20.sql"
+        },
+        {
+          "name": "current_stage",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "TEXT",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250914113757_40b93edc-1f10-4dda-a32e-d35f851ebf20.sql"
         }
       ],
       "constraints": [
@@ -13842,6 +14427,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+        },
+        {
+          "name": "simulation_jobs_job_id_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "job_id"
+          ],
+          "definition": "UNIQUE (job_id)",
+          "added_by": "20250914113757_40b93edc-1f10-4dda-a32e-d35f851ebf20.sql"
         }
       ],
       "indexes": [
@@ -13945,7 +14539,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
             "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -13956,6 +14551,13 @@
             "id"
           ],
           "name": "simulation_jobs_pkey"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "job_id"
+          ],
+          "name": "simulation_jobs_job_id_key"
         }
       ]
     },
@@ -14194,7 +14796,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
             "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -14414,7 +15017,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -14816,7 +15420,8 @@
             "with_check": "true",
             "added_by": "20260706000001_sim_runs_anon_grants.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": "FULL",
       "comment": null,
@@ -14978,7 +15583,11 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": []
+        "policies": [],
+        "determinate": false,
+        "indeterminate_from": [
+          "20260614000001_item_master.sql"
+        ]
       },
       "replica_identity": null,
       "comment": null,
@@ -15434,7 +16043,8 @@
             "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
             "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -15747,7 +16357,41 @@
       "rls": {
         "enabled": true,
         "forced": false,
-        "policies": []
+        "policies": [
+          {
+            "name": "Supply chain data multi-tier: project access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() )",
+            "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
+          },
+          {
+            "name": "Supply chain data multi-tier: project access insert",
+            "command": "INSERT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
+          },
+          {
+            "name": "Supply chain data multi-tier: project access update",
+            "command": "UPDATE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
+          },
+          {
+            "name": "Supply chain data multi-tier: project access delete",
+            "command": "DELETE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data_multi_tier.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
+          }
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -15956,7 +16600,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -16165,7 +16810,8 @@
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
             "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -16332,7 +16978,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260709000002_super_admin_phase1.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -16457,7 +17104,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260711000002_unified_access_control.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -16705,7 +17353,8 @@
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260723000001_reports_and_file_workspace.sql"
           }
-        ]
+        ],
+        "determinate": true
       },
       "replica_identity": null,
       "comment": null,
@@ -19907,117 +20556,239 @@
       "note": "NO-OP: identical re-declaration"
     }
   ],
-  "orphans": [
+  "orphans": [],
+  "phantom_tables": [],
+  "unparsed": [],
+  "dynamic_ddl": [
     {
-      "table": "approved_users",
-      "referenced_at": [
-        "src/hooks/useAuth.tsx:82",
-        "src/pages/admin/AdminAudit.tsx:40",
-        "src/pages/admin/AdminDashboard.tsx:39",
-        "src/pages/admin/AdminUsage.tsx:50",
-        "supabase/functions/agent-apply/decisionReportApply.ts:69",
-        "supabase/functions/agent-apply/index.ts:333",
-        "supabase/functions/combine-project/index.ts:29",
-        "supabase/functions/delete-project/index.ts:64",
-        "supabase/functions/project-ai-chat/index.ts:259",
-        "supabase/functions/project-ai-chat/index.ts:410",
-        "supabase/functions/report-render/index.ts:166"
+      "migration": "20260609010118_e03bff33-fd91-4376-8a39-06a9950e15d3.sql",
+      "statement": "BEGIN FOREACH t IN ARRAY ARRAY['policy_defaults','policy_overrides','policy_presets','recovery_playbooks','scenarios','experiments','simulation_runs','run_replications'] LOOP EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', t)",
+      "mentions": [
+        "experiments",
+        "policy_defaults",
+        "policy_overrides",
+        "policy_presets",
+        "recovery_playbooks",
+        "run_replications",
+        "scenarios",
+        "simulation_runs"
       ],
-      "note": "read by code; created by no migration"
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
-      "table": "product_code_map",
-      "referenced_at": [
-        "src/lib/policies/__tests__/loudFailure.test.ts:36",
-        "supabase/functions/combine-project/index.ts:132"
-      ],
-      "note": "read by code; created by no migration"
+      "migration": "20260609010118_e03bff33-fd91-4376-8a39-06a9950e15d3.sql",
+      "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
-      "table": "risk_data",
-      "referenced_at": [
-        "src/components/network/RiskDataNotice.tsx:5",
-        "src/pages/FirmLevelNetwork.tsx:300",
-        "src/pages/ProductLevelNetwork.tsx:499"
+      "migration": "20260609040000_consolidated_safe.sql",
+      "statement": "BEGIN FOREACH t IN ARRAY ARRAY[ 'policy_defaults','policy_overrides','policy_presets', 'recovery_playbooks','scenarios','experiments', 'simulation_runs','run_replications' ] LOOP EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', t)",
+      "mentions": [
+        "experiments",
+        "policy_defaults",
+        "policy_overrides",
+        "policy_presets",
+        "recovery_playbooks",
+        "run_replications",
+        "scenarios",
+        "simulation_runs"
       ],
-      "note": "read by code; created by no migration"
-    }
-  ],
-  "phantom_tables": [
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
     {
-      "table": "approved_users",
-      "note": "migrations ALTER / index / add policies to this table but no migration CREATEs it",
-      "referenced_by": [
-        {
-          "migration": "20250815225910_9dd177a0-dca5-45b4-a8d0-5860164eeddb.sql",
-          "statement": "CREATE POLICY \"Users can check their own login credentials\" ON public.approved_users FOR SELECT USING (true)"
-        },
-        {
-          "migration": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
-          "statement": "ALTER COLUMN role DROP DEFAULT"
-        },
-        {
-          "migration": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
-          "statement": "ALTER COLUMN role TYPE public.app_role USING ( CASE WHEN role = 'admin' THEN 'admin'::public.app_role WHEN role = 'modeler' THEN 'modeler'::public.app_role ELSE"
-        },
-        {
-          "migration": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
-          "statement": "ALTER COLUMN role SET DEFAULT 'user'::public.app_role"
-        },
-        {
-          "migration": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS organization text NOT NULL DEFAULT 'default_org'"
-        },
-        {
-          "migration": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql",
-          "statement": "CREATE INDEX IF NOT EXISTS idx_approved_users_organization ON public.approved_users(organization)"
-        },
-        {
-          "migration": "20250820163957_9922db42-30d5-42ac-984e-71cca446fdde.sql",
-          "statement": "ENABLE ROW LEVEL SECURITY"
-        },
-        {
-          "migration": "20250826015629_1f7e7b79-174e-45ac-bb52-21cbf97da25f.sql",
-          "statement": "ENABLE ROW LEVEL SECURITY"
-        },
-        {
-          "migration": "20250826015711_453735a3-da4a-499f-824e-8683893c6654.sql",
-          "statement": "CREATE POLICY \"No direct access - use RPCs\" ON public.approved_users FOR ALL TO authenticated, anon USING (false) WITH CHECK (false)"
-        },
-        {
-          "migration": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS display_name text"
-        },
-        {
-          "migration": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS avatar_url text"
-        },
-        {
-          "migration": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS phone text"
-        },
-        {
-          "migration": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS password_changed_at timestamptz NOT NULL DEFAULT now()"
-        },
-        {
-          "migration": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS password_expires_at timestamptz NOT NULL DEFAULT (now() + interval '90 days')"
-        },
-        {
-          "migration": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS force_password_change boolean NOT NULL DEFAULT false"
-        },
-        {
-          "migration": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true"
-        },
-        {
-          "migration": "20260709000002_super_admin_phase1.sql",
-          "statement": "ADD COLUMN IF NOT EXISTS organization_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL"
-        }
-      ]
+      "migration": "20260609040000_consolidated_safe.sql",
+      "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260614000001_item_master.sql",
+      "statement": "BEGIN FOREACH t IN ARRAY ARRAY['materials','products','suppliers'] LOOP EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t)",
+      "mentions": [
+        "materials",
+        "products",
+        "suppliers"
+      ],
+      "touches_rls": true,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260614000001_item_master.sql",
+      "statement": "EXECUTE format($f$ DROP POLICY IF EXISTS \"%1$s_auth_all\" ON public.%1$s; CREATE POLICY \"%1$s_auth_all\" ON public.%1$s FOR ALL TO authenticated USING (true) WITH CHECK (true); DROP POLICY IF EXISTS \"%1$s_anon_read\" ON public.%1$s; CREATE POLICY \"%1$s_anon_read\" ON public.%1$s FOR SELECT TO anon USING (true); $f$, t)",
+      "mentions": [],
+      "touches_rls": true,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260614000001_item_master.sql",
+      "statement": "EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated;', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260614000001_item_master.sql",
+      "statement": "EXECUTE format('GRANT SELECT ON public.%I TO anon;', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260614000001_item_master.sql",
+      "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role;', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260614000001_item_master.sql",
+      "statement": "EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL;', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260709000002_super_admin_phase1.sql",
+      "statement": "BEGIN FOREACH t IN ARRAY ARRAY['organizations','ai_providers','ai_models','user_ai_permissions','ai_budgets'] LOOP EXECUTE format( 'DROP TRIGGER IF EXISTS trg_%1$s_updated_at ON public.%1$s; CREATE TRIGGER trg_%1$s_updated_at BEFORE UPDATE ON public.%1$s FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();', t)",
+      "mentions": [
+        "ai_budgets",
+        "ai_models",
+        "ai_providers",
+        "organizations",
+        "update_updated_at_column",
+        "user_ai_permissions"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260711000002_unified_access_control.sql",
+      "statement": "BEGIN FOREACH t IN ARRAY ARRAY['capabilities','role_capabilities','org_capabilities','user_capabilities'] LOOP EXECUTE format( 'DROP TRIGGER IF EXISTS trg_%1$s_updated_at ON public.%1$s; CREATE TRIGGER trg_%1$s_updated_at BEFORE UPDATE ON public.%1$s FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();', t)",
+      "mentions": [
+        "capabilities",
+        "org_capabilities",
+        "role_capabilities",
+        "update_updated_at_column",
+        "user_capabilities"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260712100000_arc_write_performance.sql",
+      "statement": "BEGIN FOR t, legacy_trigger IN SELECT * FROM (VALUES ('bom_single_level', 'bom_sl_completion'), ('bom_multi_level', 'bom_ml_completion'), ('inbound_logistics', 'inbound_completion'), ('outbound_logistics', 'outbound_completion'), ('multi_tier_supply_chain', 'multi_tier_completion') ) AS v(tbl, trg) LOOP EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger, t)",
+      "mentions": [
+        "bom_ml_completion",
+        "bom_multi_level",
+        "bom_single_level",
+        "bom_sl_completion",
+        "inbound_completion",
+        "inbound_logistics",
+        "multi_tier_completion",
+        "multi_tier_supply_chain",
+        "outbound_completion",
+        "outbound_logistics"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260712100000_arc_write_performance.sql",
+      "statement": "EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger || '_ins', t)",
+      "mentions": [
+        "_ins"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260712100000_arc_write_performance.sql",
+      "statement": "EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger || '_upd', t)",
+      "mentions": [
+        "_upd"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260712100000_arc_write_performance.sql",
+      "statement": "EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger || '_del', t)",
+      "mentions": [
+        "_del"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260712100000_arc_write_performance.sql",
+      "statement": "EXECUTE format( 'CREATE TRIGGER %I AFTER INSERT ON public.%I ' 'REFERENCING NEW TABLE AS affected ' 'FOR EACH STATEMENT EXECUTE FUNCTION public.update_project_completion_stmt()', legacy_trigger || '_ins', t)",
+      "mentions": [
+        "_ins",
+        "update_project_completion_stmt"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260712100000_arc_write_performance.sql",
+      "statement": "EXECUTE format( 'CREATE TRIGGER %I AFTER UPDATE ON public.%I ' 'REFERENCING NEW TABLE AS affected ' 'FOR EACH STATEMENT EXECUTE FUNCTION public.update_project_completion_stmt()', legacy_trigger || '_upd', t)",
+      "mentions": [
+        "_upd",
+        "update_project_completion_stmt"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260712100000_arc_write_performance.sql",
+      "statement": "EXECUTE format( 'CREATE TRIGGER %I AFTER DELETE ON public.%I ' 'REFERENCING OLD TABLE AS affected ' 'FOR EACH STATEMENT EXECUTE FUNCTION public.update_project_completion_stmt()', legacy_trigger || '_del', t)",
+      "mentions": [
+        "_del",
+        "update_project_completion_stmt"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260723000001_reports_and_file_workspace.sql",
+      "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('workspace', 'workspace', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
+      "mentions": [
+        "workspace"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260829120000_erp_connector_phase1_2.sql",
+      "statement": "BEGIN FOREACH t IN ARRAY ARRAY['erp_staged_products','erp_staged_bom_versions','erp_staged_bom_lines'] LOOP EXECUTE format($f$ CREATE POLICY \"%1$s: project access\" ON public.%1$s FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.project_erp_links l WHERE l.id = link_id AND public.has_project_access(l.project_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.project_erp_links l WHERE l.id =",
+      "mentions": [
+        "erp_staged_bom_lines",
+        "erp_staged_bom_versions",
+        "erp_staged_products",
+        "has_project_access",
+        "project_erp_links"
+      ],
+      "touches_rls": true,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260829120000_erp_connector_phase1_2.sql",
+      "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role;', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260829120000_erp_connector_phase1_2.sql",
+      "statement": "EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated;', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     }
-  ],
-  "unparsed": []
+  ]
 }

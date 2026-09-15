@@ -182,9 +182,10 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
   const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'network' | 'map'>('network');
   const [countryRiskMap, setCountryRiskMap] = useState<Record<string, string>>({});
-  // D4: `risk_data` has no migration, so this read normally fails. The page
-  // used to warn to the console and render an unshaded graph as if nothing
-  // were missing; now it says so on screen (RiskDataNotice).
+  // D4: `risk_data` gained its migration in WP 1.4, so the read now succeeds
+  // against a real table — but an EMPTY one until an operator loads a vintage.
+  // The page used to warn to the console and render an unshaded graph as if
+  // nothing were missing; it says so on screen instead (RiskDataNotice).
   const [riskDataError, setRiskDataError] = useState<string | null>(null);
   // networkSummary state removed - no longer needed
   const [networkNodes, setNetworkNodes] = useState<NetworkNode[]>([]);
@@ -297,7 +298,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                 p_user_email: user.email,
                 p_plant_name: null
               }),
-              supabase.from('risk_data').select('COUNTRY, "RISK CLASS"')
+              supabase.from('risk_data').select('country, risk_class')
             ]);
 
             if (nodesError) throw nodesError;
@@ -315,13 +316,12 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             } else if (riskData) {
               const riskMap: Record<string, string> = {};
               riskData.forEach(row => {
-                // Bracket notation: the table's columns are quoted and
-                // upper-case ("RISK CLASS"), which is itself part of D4.
-                const countryVal = row['COUNTRY'] || row['country']; 
-                const riskVal = row['RISK CLASS'] || row['risk class'] || row['risk_class'];
-
-                if (countryVal) {
-                  riskMap[countryVal.trim().toUpperCase()] = riskVal;
+                // WP 1.4 gave the table a migration and snake_case columns. The
+                // `upper(btrim(country))` CHECK means the stored spelling already
+                // matches this lookup; normalizing again is belt and braces, not
+                // a second opinion about what a country name is.
+                if (row.country) {
+                  riskMap[row.country.trim().toUpperCase()] = row.risk_class;
                 }
               });
               setRiskDataError(Object.keys(riskMap).length === 0 ? 'The risk_data table returned no rows.' : null);
