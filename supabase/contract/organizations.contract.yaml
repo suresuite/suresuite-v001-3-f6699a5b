@@ -1,0 +1,178 @@
+# AUTHORED — the data contract's sidecar for `organizations`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+table: organizations
+tier: G
+schema_name: public
+grain: >-
+  One tenant. Every project, every dataset and every simulation result in the
+  product belongs to exactly one of these rows, and the boundary between two of
+  them is the boundary the whole access layer is built to hold.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: organizations_pkey
+  - source: column UNIQUE
+    columns: [slug]
+    name: organizations_slug_key
+# `slug` is unique and `name` is NOT. That asymmetry is the whole of D13: the
+# column the access layer compared against for a year is the one that may
+# collide and may be edited, and the one that may not is the one nothing read.
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: true
+  rls_enabled: true
+  note: >-
+    `write: super_admin` is enforced, not aspirational: every mutation goes
+    through `admin_create_organization` / `admin_update_organization` /
+    `admin_set_org_status`, each of which opens with `_assert_super_admin` and
+    closes with `log_admin_action`. This is one of the few tables where
+    `audited: true` is literally true today — WP 2.3 is what makes the claim
+    general. Read is open to any member of the org via the self-bridge policy
+    below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name`
+    or `slug`, so renaming an organization revoked its own members' read on the
+    row that had just been renamed. It now bridges on `id` first.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization's identity. This is the value that must travel — it is
+      what `projects.organization_id`, `approved_users.organization_id` and the
+      public /v1 API's `p_org_id` all mean. Not displayable, and that is the
+      property that makes it safe as a join key (§2.1 `uuid-identity`).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization's display name, as an administrator typed it. EDITABLE and
+      NOT UNIQUE — two organizations may legitimately share one. It is a label
+      for humans and it is never an identity.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty after btrim — admin_update_organization}
+    surfaces: []
+    resolution: null
+    note: >-
+      D13's join key. `admin_update_organization` updates this column and nothing
+      else: no trigger, no cascade, and no second UPDATE reaching
+      `approved_users.organization` or `projects.organization`. So a rename
+      leaves those two text copies holding the OLD string, and the next user
+      approved into the organization carries the NEW one — at which point a
+      text comparison between them can never match again. WP 2.1 routes every
+      such comparison through `org_is_current_user_org(uuid, text)`.
+  slug:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      A URL-safe form of the name, `lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))`
+      at the moment the row was seeded. UNIQUE, and deliberately NOT recomputed on
+      rename — so after a rename it is a record of what the organization used to
+      be called, which is what makes it usable to match rows written before it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: unique}
+    surfaces: []
+    resolution: null
+  owner_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The approved user who owns the tenant. Advisory today — nothing in RLS or
+      any RPC reads it; ownership is expressed through
+      `organization_members.org_role = 'owner'`. Two places holding the same fact
+      is an I1 violation waiting to diverge; WP 2.2 owns the resolution.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  status:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the tenant is live — `active` or `suspended`, CHECK-constrained to
+      those two. Set through `admin_set_org_status`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: one of active / suspended}
+    surfaces: []
+    resolution: null
+    note: >-
+      SUSPENSION IS NOT ENFORCED IN THE DATA LAYER. No policy and no RPC consults
+      this column before granting access — a suspended organization's members
+      read and write exactly as before. It is a label the admin pages render.
+      Recorded here rather than left to be discovered, per §5 T1; the enforcement
+      belongs with WP 2.2's resolver, which is where a capability decision is
+      made once instead of inevery policy.
+  settings:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      Per-tenant configuration, free-form. No key of it is read by any migration,
+      edge function or page today; it is a forward-declared extension point.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the organization was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was last modified. Server-stamped by DEFAULT only — no trigger
+      maintains it, and `admin_update_organization` does not set it, so a renamed
+      organization still shows its creation time here.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per
+  DISTINCT `approved_users.organization` string. That seeding is why the uuid
+  plane and the text plane started out agreeing, and why nothing has kept them
+  agreeing since: the seed ran once, `set_project_defaults()` never stamped the
+  uuid (D27), and `admin_update_organization` renames without propagating. WP 2.1
+  fixed the trigger, backfilled what it could match unambiguously, and routed
+  every live comparison through one predicate. It deliberately did NOT re-seed
+  this table from distinct strings: after a rename, a user carrying the new name
+  slugifies to a slug no row holds, and seeding would split one organization into
+  two.

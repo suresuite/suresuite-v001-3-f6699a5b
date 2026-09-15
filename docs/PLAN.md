@@ -182,7 +182,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D1 | Auto-seed persists `safety_stock_days = 0`, overriding the engine's 7-day default | was `useStageRows.tsx:288` + `StagePolicyTable.tsx:844,887`; `project_map.py:783` | WP 0.1 ✅ *(`isPrefillPersistable`)* |
 | D2 | `combine-project` never converts `volume` by `time_unit` | was `combine-project/index.ts:60,68,268,275` + `:115,:234-235,:310,:318` — **eight** read sites, not seven | WP 0.2 ✅ |
 | D3 | `product_code_map` queried but exists in no migration; error swallowed | was `combine-project/index.ts:131-145`; the decision is recorded at `combine-project/index.ts:117-140` | WP 1.4 ✅ *(branch DELETED — it had never executed; no upload path, no writer, no template column ever existed for the table)* |
-| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(real migration `20260915000003_risk_data.sql`: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted. No `project_id` — deliberately: country risk is a property of the world)* |
+| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names. **It is not absent — it exists untracked in production**, which a static replay cannot distinguish from absent (CI proved it; §16 WP 1.4) | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(`20260915000003_risk_data.sql` both CREATEs on a fresh database and ADOPTS the untracked one: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted, CHECKs `NOT VALID` on the adopted rows. No `project_id` — deliberately: country risk is a property of the world)* |
 | D5 | No natural-key uniqueness on any lane table → re-upload duplicates | `20250820145837_…sql` | WP 3.3 |
 | D6 | CSV parse is `split(',')` — not quote-safe | `UploadWizard.tsx:502,523` | WP 3.2 |
 | D7 | Required-field validation misses `null` (blank numerics pass) | `UploadWizard.tsx:384` vs `:530-531` | WP 3.2 |
@@ -205,6 +205,12 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:420-425` | WP 6.2 |
 | D25 | `combine-project`'s core reads (`outbound_logistics`, `inbound_logistics`, both BOM tables) destructured only `{ data }` — the same swallow as D3 but on the ETL's own inputs, so a failed read produced a half-empty graph and reported success. Found by WP 0.2 while fixing D3 | `combine-project/index.ts:52-64,169-174,207-220` | WP 0.2 ✅ |
 | D26 | **Two copies of the D1 prefill rule.** `5c7129f` merged two independent WP 0.1 implementations: `resolveEffective.ts:isPrefillPersistable` (imported and called at `StagePolicyTable.tsx:865`) and `prefillSelect.ts:prefillSourceFor` (imported at `StagePolicyTable.tsx:53` and never called). Both are unit-tested, so both stay green while only one runs — an I1 violation, and the next edit to "the rule" has even odds of landing on the dead one. Found by the WP 1.1 precondition check | `resolveEffective.ts:214`, `prefillSelect.ts:33`, `StagePolicyTable.tsx:53,865` | WP 6.2 |
+| **D27** | **The uuid org plane and the text org plane diverge on every project insert.** `set_project_defaults()` stamps `NEW.organization` (text) and never `NEW.organization_id`, so the one-time backfill in `20260709000002` is the only thing that ever set the uuid. Every project created since has `organization_id IS NULL` — visible through RLS, which compares text, and invisible to the public `/v1` API, which authorizes by uuid (`p.organization_id = p_org_id`). D13 records that two identities exist; this records that they already disagree, and that the disagreement grows by one row per project. Found after WP 1.4 while sizing WP 2.1 | `20250820170403_…sql:58-84`; `20260711000001_api_access_control.sql:401,415` | WP 2.1 ✅ |
+| **D28** | **Every policy in the schema is PERMISSIVE, so the deny-all policies do not deny.** Postgres ORs permissive policies, and no migration anywhere declares `RESTRICTIVE`. `approved_users` — the authentication table, holding `password_hash` — carries `"Users can check their own login credentials"` `FOR SELECT USING (true)` alongside `"No direct access - use RPCs"` `FOR ALL TO authenticated, anon USING (false)`; the second was clearly meant to supersede the first and instead ORs with it. Whether it is reachable depends on the table GRANTs Supabase applies outside `supabase/migrations/`, which a static replay cannot see — §15 settles it, and it is the reason §15 now gates a security decision and not just a count. Recorded by WP 2.1's gap check, which needed the `approved_users` policy list to author its sidecar; both later prompts cite "D28" as though §4 already held it | `20250815225910_…sql`; `20250826015711_…sql` (policies on `approved_users`) | WP 2.4 |
+| D29 | **Two organizations may share a display name, and the text branch then admits one to the other.** `organizations.name` is NOT UNIQUE (only `slug` is), so `organization = get_current_user_org()` matches across tenants whenever two names collide. This is PRE-EXISTING — it is what the text-only comparison always did — and WP 2.1 deliberately preserved it rather than reading the uuid first, because a uuid-first rule DENIES where the old one granted and a package whose job is to stop revoking access must not add a new way to revoke it. It closes when the text branch is removed, which needs §15 to confirm the uuid backfill at 100 %. The chosen semantics are pinned by a truth-table case in `orgIdentity.test.ts` so the flip is deliberate. Found by WP 2.1's gap check | `org_is_current_user_org` in `20260915000004_org_identity_dual_read.sql`; `organizations.name` has no UNIQUE constraint | WP 2.4 |
+| D30 | **Six policies are created twice with no `DROP` between them, which Postgres rejects.** `20250913085427` creates the `view`/`modify` pair on `simulation_cache`, `simulation_jobs` and `simulation_performance_metrics`; `20250914113723` creates all six again, verbatim apart from `public.` qualification, and neither file drops them first. `CREATE POLICY` on an existing name raises 42710, so one of two things is true and a STATIC REPLAY CANNOT SAY WHICH: either the earlier migration did not take effect, or the later one errored and the rest of its statements never ran. The introspector recorded both copies without complaint — 150 policy entries for 144 distinct names — which is how it stayed invisible. WP 2.1's migration makes the END STATE deterministic (it drops and recreates all 59 it touches, and the duplicate entries collapse), but it does not settle which branch is true, and a fresh `supabase db push` is what would. Found by WP 2.1's gap check, from the introspected artifact's own policy count | `20250913085427_…sql:134`; `20250914113723_…sql:155` | WP 2.4 |
+| D31 | **A migration's first execution is the production deploy.** `supabase-migrations.yml` has no branch filter and runs `supabase db push --include-all` against the live project on any push touching `supabase/migrations/**`; nothing anywhere else ever executes a migration. `contract:check` REPLAYS migrations statically — it parses DDL, it does not run SQL — so an error that only exists at run time passes every gate in the repo and fails in production. WP 2.1 proved it: `min(o.id)` on a uuid is `42883 function min(uuid) does not exist`, invisible to the introspector, invisible to `npm test`, and caught only by the post-merge `db push`. The migration rolled back, so nothing partial landed — this time. The route to closing it is cheap and now known to work: PostgreSQL 16 is available in a work-package session, and a schema generated from `build/schema.introspected.json` (73 tables) plus ~6 function stubs is faithful enough to execute a migration against. §16's WP 2.1 follow-up entry records the exact commands. Found by WP 2.1's own broken migration | `supabase-migrations.yml` (no `branches:` filter); `scripts/data-contract/introspect.mjs` is a static replay by design | WP 2.4 |
+| D32 | **Three tables are created by migrations and do not exist in the production database** — `network_summary`, `tier2_suppliers` and `tier3_suppliers`. `20250904105527` creates `network_summary` beside `network_nodes` and `network_edges` — those two are in production and it is not — and `20250903080405` creates the tier2/tier3 pair. No migration drops any of them. `UploadWizard.tsx` WRITES the tier2/tier3 pair, so the deep-tier upload has been writing to tables that are not there. `risk_data` (D4) inverted: WP 1.4 found a table in production that no migration creates, and this is a table the migrations create that production lacks. A static replay cannot see either — the introspector faithfully reports what the files say, which is why both classes need an executed migration or §15 to surface. Found when the second `db push` of `20260915000004` aborted at statement 59: `DROP POLICY IF EXISTS` still requires the TABLE to exist, the `IF EXISTS` being about the policy. Closed by adopting it — `CREATE TABLE IF NOT EXISTS`, copied verbatim from the original, a no-op wherever the table already is, and read by nothing in `src/` or `supabase/functions/` so adoption changes no behaviour. Learning the set cost three deploys — one table per aborted statement — because the first preflight RAISEd a NOTICE and the Supabase CLI's `db push` log keeps ERROR lines and drops notices. Raising an EXCEPTION instead named all three at once. **Whether tables OUTSIDE the 25 this migration touches also diverge is unknown and is a §15 question** | `20250904105527_…sql:47-60`; `20260915000004_org_identity_dual_read.sql` §0 preflight | WP 2.1 ✅ |
 
 ### 4.1 Code map — the data layer
 
@@ -269,7 +275,7 @@ only in `PROMPTS.md` or in a session transcript.
 | `20260703000001_dataset_versions.sql:70-138` | `_build_dataset_snapshot` (D11) |
 | `20260711000002_unified_access_control.sql:169` | `capabilities_for_user` — the resolver |
 | `item_master.sql:91-96` | `ensure_item_masters` builds `materials`; unions `bom_single_level` only |
-| `ProcessLevelNetwork.tsx:1104-1105` | direct `.from()` reads, no RPC, no pagination |
+| `ProcessLevelNetwork.tsx:1104-1105` | direct `supabase.from('bom_multi_level')` / `from('supply_chain_data_multi_tier')` reads, no RPC, no pagination |
 
 ---
 
@@ -995,20 +1001,48 @@ read a table is worse than no page.
 
 ## 9. Phase 2 — Governance consolidation
 
-### WP 2.1 — One organization identity *(D13)*
+### WP 2.1 — One organization identity ✅ *(D13, D27 — done `20260915000004`)*
 
-Backfill `approved_users.organization_id`; add `projects.organization_id uuid`; add
-`get_current_user_org_id()`; migrate every text comparison; dual-read during
-transition; fix the `organizations` RLS which self-bridges by name/slug string match;
-retire or document `user_plant_access`.
+Done. `get_current_user_org_id(_user_id uuid)` alongside the text function;
+`set_project_defaults()` stamps `organization_id` (D27); the backfill re-run for
+what the trigger never stamped; the `organizations` self-bridge now matches on
+`id` first; and every live comparison routed through ONE predicate,
+`org_is_current_user_org(uuid, text)`. The text branch is deliberately kept — see
+the handoff in §16.
 
-**Inventory first:** `grep -rn "get_current_user_org()" supabase/ | wc -l` — it sizes
-the WP.
-**Exit** — renaming an org changes nothing about access (write this test first) ·
-`organization_id` non-null for 100 % of rows · no new text comparison.
-**Gap check** — grep for survivors including edge functions and the public API.
+**The inventory line above was the wrong instrument and is kept as a warning.**
+`grep -c` over `supabase/migrations/` returns 221, but a migration directory is an
+append-only log: policies are dropped and recreated across many files, functions
+are `CREATE OR REPLACE`d repeatedly, three migrations rolled back, and one
+`DROP TABLE … CASCADE` took a table's policies with it. Replaying the log
+(`scripts/data-contract/live-sql.mjs`) gives the figure that sizes the work:
+**122 calls in 102 live objects**. The other 100 are superseded definitions no
+database runs.
+
+`user_plant_access` needed neither retiring nor documenting: it was dropped with
+`plants` by `20250820172632 CASCADE`, and its surviving references are all in
+migrations that either post-date the drop's CASCADE or never ran (§16 WP 1.1).
+
+**Exit** — all met except the one no session can reach: renaming an org changes
+nothing about access (test written first, red before / green after, every
+assertion mutation-tested) · the trigger stamps on fresh insert · no text
+comparison outside the predicate, enforced by a test rather than asserted.
+**`organization_id` non-null for 100 % of rows is NOT verified** — it needs the
+database (§15), and the backfill deliberately leaves ambiguous matches NULL.
+**Gap check** — found the survivors the `get_current_user_org()` grep structurally
+could not: two edge functions authorizing on the org STRING in TypeScript, running
+as the service role with RLS bypassed. Fixed here; see §16.
 
 ### WP 2.2 — Project membership and the resolver *(D14)*
+
+**Precondition, satisfied:** WP 2.1 is done and its four sidecars
+(`approved_users`, `organizations`, `organization_members`, `projects`) exist;
+their `coverage.yaml` deferral is removed. Two things WP 2.1 measured that this
+package needs: `organization_members.org_role` is READ BY NOTHING today — no
+policy and no RPC consults it, so an org `admin` holds no more than a `member`
+— and `organizations.status = 'suspended'` is likewise enforced nowhere. Both
+are recorded in their sidecars. Extending the resolver is where they stop being
+decoration.
 
 `project_members(project_id, user_id, project_role, granted_by, expires_at,
 rationale)` with `owner | editor | analyst | viewer`; backfill `modeler_id` → owner.
@@ -1037,12 +1071,21 @@ intact.
 
 ### WP 2.4 — Contract-generated RLS tests
 
+**D28 and D29 now exist in §4.** They did not when the Phase 2 prompts were
+written, which cited "D28" as though §4 already held it; WP 2.1's gap check
+authored both. D28 is this package's stated finding — permissive policies OR, so
+the `approved_users` deny-all does not deny — and D29 is the narrower one WP 2.1
+created knowingly: `organizations.name` is not unique, so the dual read's text
+branch admits one tenant to another on a name collision. Removing that branch is
+what closes D29, and it is gated on §15, like everything else here.
+
 Generate role × table × operation assertions from each table's `governance` block;
 run against a seeded project with one user per role. **Tests must exercise the RPC
 path**, not only `.from()` — the lane tables' RLS is known not to survive PostgREST
 pooling under this app's custom auth (see `projectLanes.ts` header).
 
-**Two rules of `contract:check` flip here** *(both set up by WP 1.4)*:
+**Three rules of `contract:check` change here.** Two flip from warn to error; the
+third does not exist yet and should:
 
 1. **`natural-key` (R5) becomes a failure.** It warns today on all four lane
    tables. WP 3.3 lands the constraints that make it passable; do not flip it
@@ -1062,11 +1105,33 @@ pooling under this app's custom auth (see `projectLanes.ts` header).
    (all three verified correct by hand), 20 with no usable anchor and 19 sharing
    a row.
 
+3. **NEW — `§16 is append-only` (R7).** §16 has now lost entries to a silent
+   `git merge` **twice in one phase**: `5c7129f` dropped two (see the Phase 1
+   precondition entry) and the merge during WP 1.4 dropped the PHASE BOUNDARY
+   entry itself. Neither produced a conflict, because both sides had appended at
+   the same place and the ort strategy simply kept one. The rule is a dozen lines
+   of `git log`: every `### WP …` / `### PHASE …` heading present in any ancestor
+   commit must still be present in `HEAD`, struck-through-with-a-pointer being the
+   only permitted way to retire one (§16's own preamble already says so). It is
+   assigned here rather than written in WP 1.4 on purpose — a checker written at
+   the end of a package, against a defect that same package caused, is a checker
+   nobody has thought about for more than ten minutes.
+
 **Gap check** — this one is a security review: a real policy broader than the
-contract claims is a finding to fix **in this WP**. **RLS is OFF on all three
-item masters** (`materials`, `products`, `suppliers`) — recorded in the sidecars
-and rendered as a callout on each generated page since WP 1.4. It is not WP 1.4's
-to fix (WP 2.2 needs `project_members` first) and it is squarely this one's.
+contract claims is a finding to fix **in this WP**.
+
+**Start by discarding the inherited claim that RLS is off on the three item
+masters.** It is not a fact about the schema; it is an artifact of a statement the
+introspector silently dropped (§16 WP 1.4). `20260614000001_item_master.sql`
+enables RLS and creates two policies on each of `materials`, `products` and
+`suppliers` through `EXECUTE format(...)` inside a `FOREACH`, which no static
+replay can evaluate. Since WP 1.4 the contract records those three as
+`rls.determinate: false`, the validator refuses to let a sidecar assert either
+answer, and each generated page says so and names the migration. The honest state
+is **undetermined in both directions**, and only §15 against the live database
+settles it — §16 records the route, which is that CI can reach the database even
+though a work-package session cannot. Settle it here, then make the generated
+tests assert the answer rather than skip the question.
 
 ---
 
@@ -2135,15 +2200,220 @@ Handoff to WP 1.4:
   run all four plus its own drift comparison, so there is one command to name in CI
   and in CONTRIBUTING.
 
+### PHASE BOUNDARY — Phases 0 and 1 reviewed · 2026-09-15
+
+Not a work package. An audit of the seven packages 0.1–1.4 against the code, run
+before Phase 2 opens, because WP 2.1 changes organization identity across the whole
+schema and must not start on an unverified base.
+
+**Verdict: NO-GO for Phase 2.** WP 1.4 has not been written. Phase 1's exit is its
+gate, and there is no gate.
+
+#### What landed
+
+Six of seven packages landed a commit and each has a §16 entry: WP 0.1 (`4ec6fa6`),
+WP 0.2 (`c07ac98`), WP 0.3 (`719f59b` + `183a43c`), the Phase 1 precondition repair
+(`54c80ce`), WP 1.1 (`1f77451`), WP 1.2 (`2f8b5c1`), WP 1.3 (`d716d90`). All are
+merged to `main` at `6dd0188`. No §16 entry claims a package that has no commit —
+the log's coverage is honest.
+
+Gates, measured at `6dd0188`:
+
+| Gate | Result |
+|---|---|
+| `npm test` | ✓ 78 tests, 8 files (65 before this review) |
+| `npx tsc --noEmit` | ✓ clean — the two pre-existing failures named in WP 0.2's entry are gone |
+| `npm run check:docs` | ✓ (after this review's fixes; it was red on a stale citation — see below) |
+| `npm run contract:introspect` | ✓ 71 tables, 0 unparsed |
+| `npm run contract:validate` | ✓ 12 sidecars, 146 columns |
+| `npm run contract:units -- --check` | ✓ SQL matches `grading.ts::UNIT_DAYS` |
+| `npm run contract:verify` | ✗ 1 of 9 — `orphans are exactly product_code_map + risk_data` finds three (`approved_users`). Known, WP 1.4's to close |
+| `npm run contract:check` | **does not exist** — WP 1.4 |
+| `npx eslint .` | ✗ 454 problems (340 errors) — the documented baseline, not this phase's |
+| `npm run audit:ui` | ✗ **8 violations above baseline** — a regression from PR #190, not this plan's. See findings |
+
+**The three Phase 0 Criticals were mutation-tested, not read.** Each fix was reverted
+in the working tree and the suite re-run:
+
+| Critical | Revert | Result |
+|---|---|---|
+| D1 — silent policy override | `isPrefillPersistable` → `return true` | 2 tests fail ✓ |
+| D2 — unconverted volumes | `weeklyVolume` → raw `v` | 5 tests fail ✓ |
+| D3/D4 — swallowed read failures | — | **no test existed** ✗ |
+| D10 — three unit tables | `quarter: 91.3125` → `7.0` | 4 tests fail + `contract:units` fails ✓ |
+
+#### Fixed in this review
+
+1. **D3/D4/D25 had no regression test.** WP 0.2's §16 entry marks the exit check
+   "✅ Both pages show `RiskDataNotice`" beside two checks that became unit tests.
+   It was true of the code and pinned by nothing — the one Phase 0 Critical a later
+   edit could silently undo. Added `src/lib/policies/__tests__/loudFailure.test.ts`
+   (13 assertions, source-level, following `unitTableParity.test.ts`'s precedent
+   since this repo has no DOM tooling). Every branch was mutation-tested: restoring
+   the `{ data }`-only destructure on `product_code_map`, on a core lane read, or
+   dropping the `setRiskDataError` call each turns it red.
+2. **Ten stale `file:line` citations in §4 and §4.1**, the section CLAUDE.md names
+   as the *only* authority for data-layer evidence. Phase 1's own work caused most
+   of them: WP 1.3 added `lead_time_unit` to `UploadWizard.tsx` and shifted every
+   citation below it (D6, D7, and four §4.1 rows) without editing §4, which the
+   plan's own rule requires in the same commit. PR #190 shifted the two D4 page
+   citations and one §4.1 row. Corrected, along with the copies in
+   `PLAN-PROMPTS.md`. Note what this means: the precondition entry's handoff said
+   *"do not trust a `file:line` in §4.1 you have not re-checked"* — that warning
+   came true inside the same phase that wrote it.
+3. **`build/schema.introspected.json` was committed stale.** Regenerating it on a
+   clean tree changes three orphan `referenced_at` citations. Nothing noticed
+   because `contract:introspect -- --check` runs in no CI job. Regenerated.
+4. **WP 1.1's baseline numbers struck and corrected** (above): 231 functions
+   included 50 malformed signatures from a defective `argType`. `d716d90` fixed it
+   and did not say so.
+
+#### What is now true
+
+- The twelve sidecars **do** carry `governance {read, write, min_project_role,
+  audited}` per table, plus `rls_enabled` checked against the migrations. Phase 2's
+  WP 2.4 dependency is satisfied — that is not what blocks Phase 2.
+- One `UNIT_DAYS`, three languages, pinned by a test that re-reads all three from
+  disk. `rateToWeekly(v,'quarter')` agrees across TS, SQL and Python.
+- 146 columns described; every CSV-origin field records its `ingest.csv_header`,
+  checked against `public/template/`, not against memory.
+- Adding an undocumented column to a migration **does** fail `contract:validate` —
+  verified by adding a scratch column to `inbound_logistics` and watching it fail.
+  It fails *locally*. It fails nothing in CI.
+
+#### What the plan still assumes and nobody has verified
+
+- **The §15 baseline has never been run.** Three sessions have now recorded "no
+  database reachable"; this one confirms it again (no `SUPABASE_*`, `DATABASE_URL`
+  or `POSTGRES_*` in the environment). Every §15 query is unrun. **Phase 0's
+  headline claim — that WP 0.2 fixed `sourcing_ratio` on real data — rests on a
+  unit test and an argument, not on a measurement**, and Phase 3 has no "before"
+  count for D5, D6, D7 or D8 to measure its fix against. This is now four phases of
+  compounding. It is the single largest unverified assumption in the plan.
+- **Auto-seed firing at most once per `(project, stage)` across a tab round trip**
+  is still verified by reading only. The `Set` marker and the synchronous
+  `applying` flag are both correct in the code; no test covers the round trip
+  because the repo has no DOM tooling.
+- **A CSV with `lead_time_unit=day` has never round-tripped through a database.**
+  Every link is asserted in `leadTimeUnit.test.ts`; no hop between links is.
+- **The edge functions have never been typechecked.** Deno is not available here,
+  so `combine-project` and `_shared/` pass eslint and `tsc` only as the frontend
+  sees them.
+
+#### Findings — recorded, not fixed here
+
+- **F1 — no CI job runs `npm test`, `check:docs`, or any `contract:*` gate.** Of
+  twelve workflows in `.github/workflows/`, none invokes them, and `npm run lint`
+  (which would carry `check:docs`) is not in CI either and is red at baseline
+  anyway. So *every gate Phase 1 built is unwired*, not just the one WP 1.4 owes.
+  The precondition entry drew the lesson from one merge silently un-doing
+  `check:docs`; the same hole has now let the introspected artifact drift and ten
+  citations rot, in the same phase. → **WP 1.4 step 4**, which already says to wire
+  the job directly rather than behind `lint`. Widen it: the job must also run
+  `contract:introspect -- --check`, `contract:validate`, `contract:units -- --check`
+  and `contract:verify`, per WP 1.3's handoff.
+- **F2 — `npm run audit:ui` is red on `main` with 8 violations above baseline**, all
+  `h-9`/`h-8` controls with no 44px mobile floor, introduced by PR #190 across
+  `DataManager`, `FirmLevelNetwork`, `InteractiveNetworkSpace`, `ProcessLevelNetwork`,
+  `ProductLevelNetwork`, `ProjectPolicies`, `SimulationLab`. The `ui-audit` workflow
+  **is** wired, so `main` has a failing check. Outside this plan's scope — recorded
+  here because a red gate next to a green one teaches everybody to ignore both.
+- **F3 — §4's citations have no gate, and they rot within one phase.** `check:docs`
+  enforces *where* evidence lives, never *whether it is true*. Ten of 64 citations
+  were wrong today. The plan already assigns the fix to WP 1.4 ("until WP 1.4's gate
+  covers §4 itself"); this entry is the evidence for how fast it degrades without
+  one. A checker is cheap — resolve each `file:line` and assert the line still holds
+  a token from its own description.
+- **F4 — `contract:verify` exits 1 and would redden CI the moment it is wired.** The
+  failing check is the orphan count, which WP 1.4 closes by reconciling
+  `approved_users`. Wire the job and reconcile the orphans in the same package, or
+  Phase 1 ends with a gate that is red on arrival — the exact condition that made
+  `lint` unreadable.
+- **F5 — `simulation_jobs` still has an unresolved shadowed definition**, as WP 1.1
+  recorded. Untouched.
+
+#### What Phase 2 inherits
+
+1. **No contract, no generator, no `docs/data/tables/*.md`, no drift gate, no CI.**
+   WP 1.4 is entirely unstarted — not partially done.
+2. **Three orphans, none reconciled.** `product_code_map`, `risk_data`,
+   `approved_users`. `approved_users` is the authentication table WP 2.2 will build
+   `project_members` beside; a fresh database still cannot be built from
+   `supabase/migrations/` alone.
+3. **RLS is OFF on all three item masters** (`materials`, `products`, `suppliers`) —
+   the tables holding cost, sell price, capacity and reliability. Recorded in each
+   sidecar's `governance.rls_enabled`. WP 2.4's generated tests must fail on this
+   rather than skip it.
+4. **No §15 baseline**, per above.
+5. **D26's two live copies of the D1 prefill rule**, one unreachable; and the two
+   copies of `resolveCell`. Both assigned to WP 6.2. Nothing before it may edit one
+   copy alone.
+
+#### GO / NO-GO
+
+**NO-GO.** Against the four conditions set for opening Phase 2:
+
+| Condition | State |
+|---|---|
+| `contract:check` green AND running in CI | ✗ the script does not exist; no gate runs in CI at all (F1) |
+| both orphan tables resolved, not deferred | ✗ three orphans, none resolved |
+| natural-key rule at WARN with a dated TODO for WP 2.4 | ✗ `check.mjs` does not exist. The rule lives in the sidecars as `natural_key_intended` — data, not a gate |
+| Phase 0's three Criticals have regression tests that fail without the fix | ✓ **now** — D3/D4 got its test in this review; D1 and D2 were already pinned |
+
+Three of four fail, and they fail for one reason: **WP 1.4 was never written.** The
+correct next action is WP 1.4 as specified in §8, widened by F1 and F4. Phase 2 opens
+when `contract:check` is green in CI and the three orphans are reconciled — not before.
+
+Handoff to WP 1.4:
+- `contract:verify` is red on the orphan check today. Do not weaken it; reconcile
+  `approved_users` per §8 step 3 and let the check go green on its own terms.
+- Wire **five** commands into the job, not one: `contract:introspect -- --check`,
+  `contract:validate`, `contract:units -- --check`, `contract:verify`, `npm test`,
+  plus `check:docs`. Each already fails correctly on drift; none is wired.
+- The committed `build/schema.introspected.json` drifted within a day of landing.
+  `--check` on it is the cheapest gate in the phase.
+- `docs/data/tables/*.md` must open with a GENERATED banner (WP 0.3's handoff).
+- When you add the §2.1 invariants to `CLAUDE.md`, use gate names, not bare `G`
+  numbers — they collide with the blueprint's gap IDs (WP 0.3's finding).
+
 ### WP 1.4 — Generator, drift gate, orphan reconciliation · 2026-09-15 · `6c67c29`
 
-**There is no PHASE BOUNDARY entry in this section, and this package was told to
-read one.** §16 ended at WP 1.3. The brief's own summary of what that entry
-contained (the §15 baseline unrun, F2 `audit:ui`, F3's stale citations, the
-`simulation_jobs` shadow, RLS on the item masters) is carried below, verified
-where it was verifiable — and the RLS item turned out to be **wrong**, which is
-the argument for the rule the brief and this package both restate: a claim that
-lives only in a handoff is a claim with no gate.
+**The PHASE BOUNDARY entry was not in §16 when this package started, and it is
+above this one now because THIS PACKAGE'S MERGE DROPPED IT.** Both halves matter.
+
+At the start of the session §16 ended at WP 1.3: the boundary review (`6ddb92a`)
+was still in flight on another branch, so its entry, its ten citation fixes and
+its `loudFailure.test.ts` did not exist here. WP 1.4 was therefore written against
+the brief's summary of a document it could not read. That is survivable and this
+entry says where it mattered.
+
+What is not survivable is the second half. `6ddb92a` merged to `main` and into
+this branch while WP 1.4 was being written, and **`git merge` auto-resolved
+`docs/PLAN.md` with no conflict and silently discarded `### PHASE BOUNDARY` from
+§16** — both sides had appended a new entry at the same place, and the ort
+strategy kept one. Every other heading survived; only that one vanished. This is
+the *exact* failure the Phase 1 precondition entry documents about merge
+`5c7129f`, which dropped two §16 entries and broke `resolveCell` without failing
+anything, and it has now happened twice in one phase, to the document whose whole
+purpose is to be the thing that does not get lost. Restored above, verbatim from
+`6ddb92a`.
+→ **This is a gap `contract:check` should close and does not.** R6 reads §4; it
+reads nothing in §16. A rule that every `### WP` / `### PHASE` heading present in
+any ancestor commit is still present in `HEAD` is a dozen lines of `git log` and
+would have caught both incidents. It is NOT added here — a checker written at the
+end of a package, against a defect that package caused, is a checker nobody has
+thought about for more than ten minutes. → assigned to **WP 2.4**, which already
+owns the gates this package could not close; plan edited.
+
+**One of the boundary review's inherited facts is WRONG, and this package proved
+it: "RLS is OFF on all three item masters" (its §"What Phase 2 inherits" item 3).**
+It is not off; it is UNDETERMINED, and the migrations cannot settle it. The
+mechanism is below under the item-master finding. The boundary review read it in
+good faith from the sidecars, which read it in good faith from the introspected
+artifact, which recorded it because it had silently dropped the statement that
+sets it. Three documents agreed and none of them knew. That is what a claim with
+no gate looks like at the end of its second hop — and it is the argument for the
+rule the boundary review, the brief and this package all restate.
 
 Preconditions held? **no, in one measurable way.** `npm run contract:introspect --
 --check` was RED on arrival. WP 1.3's handoff said "two new migrations mean the
@@ -2172,8 +2442,39 @@ Exit checks passed? **all four.**
   → `introspect --check` fails (stale artifact). WITH the artifact regenerated →
   `contract:validate` and `contract:generate --check` both fail on `column
   "scratch_column" has no field entry`. The second is the one that matters: it is
-  the coverage rule, not the freshness rule. CI run URL for the throwaway PR:
-  `<ci-url>`.
+  the coverage rule, not the freshness rule.
+  **And it is proved in CI, not only locally** — throwaway PR #195, run
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/34995780231>:
+  step 5 *"Introspected schema matches the migrations"* **passed** (the artifact
+  was regenerated on purpose, so the freshness rule could not be what failed) and
+  step 6 *"Sidecars validate against the schema"* **failed** on `column
+  "scratch_column" has no field entry`. A gate that is not wired is not a gate;
+  this one is wired. **The whole job green**, all eleven steps, on
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35023287328>.
+- ✅ **The `risk_data` migration applies to the LIVE database**, not only to a
+  replay —
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35023145717>,
+  `Applying migration 20260915000003_risk_data.sql... Finished supabase db push.`
+  The adoption block ran against the untracked production table, and the renames,
+  the provenance columns, the `NOT VALID` CHECKs and the unique constraint all
+  landed. This is the first exit check in Phase 1 verified against a database
+  rather than against an argument.
+
+**The gate found its own package's blind spot within two hours of existing, and it
+found it on `main`.** PR #194 merged at a commit where
+`build/schema.introspected.json` was stale, and
+<https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35009405228>
+went red on `main` with `SCHEMA DRIFT`. The cause is the merge described at the top
+of this entry: `6ddb92a` brought in `loudFailure.test.ts`, which contains a literal
+`.from('product_code_map')`, and the introspector scans application code for
+exactly that — so the committed artifact's orphan list changed under a commit that
+touched no migration. Fixed in the follow-up (PR #196), and worth stating plainly
+rather than tidying away: **this is the gate working.** The same drift happened
+before WP 1.4 — the boundary entry's point 3, "committed stale; nothing noticed
+because `contract:introspect -- --check` runs in no CI job" — and nothing said so
+for a day. It is also the sharpest available argument for the no-path-filter
+decision above: a filter on `supabase/migrations/**` would have skipped that run
+entirely.
 
 **THE ITEM MASTERS ARE NOT KNOWN TO HAVE RLS OFF. WP 1.2 SAID THEY WERE, AND IT
 WAS WRONG.** The three sidecars asserted `rls_enabled: false` with the note "No
@@ -2294,16 +2595,74 @@ Discovered:
   red job on main and still **not this package's** — `data-contract.yml` does not
   run `audit:ui`, and nothing here touches the adaptive-UI baseline.
 
-Baseline numbers (if run): **NOT RUN — a fifth consecutive session, and this time
-with a reason rather than an absence.** No Supabase credentials exist in the
-environment (`.env.production` carries three `VITE_*` feature flags and nothing
-else), and the hardcoded anon key cannot be used either: the egress proxy
-**denies CONNECT to `wckdrutwkytwcomrlpib.supabase.co:443` by organization
-policy**. This is no longer "no database was reachable"; it is "this class of
-session cannot reach one, and will not be able to next time either." §15 needs a
-run from somewhere with network access to the project, and until it does, every
-statement in this plan about ROW COUNTS is unverified — including, now, the only
-way to settle whether RLS is on for the three item masters.
+**`risk_data` IS NOT ABSENT. IT EXISTS IN PRODUCTION, UNTRACKED — and CI is how
+we know.** The first version of `20260915000003_risk_data.sql` was a plain
+`CREATE TABLE IF NOT EXISTS`, on the reasonable-sounding premise that a table no
+migration creates is a table that does not exist. `supabase-migrations.yml`
+disproved it in one line on the first push
+(<https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/34995665498>):
+
+```
+Applying migration 20260915000003_risk_data.sql...
+ERROR: column "source" of relation "public.risk_data" does not exist
+At statement: 2
+```
+
+Statement 1 was the CREATE; `IF NOT EXISTS` made it a **no-op**, because the
+table is already there with the spreadsheet-header columns the pages read. It is
+the same class as `approved_users`, and **the introspector cannot tell the two
+apart**: "no migration creates this table" is true of a table that does not exist
+AND of a table nobody wrote a migration for. WP 1.1's orphan list is therefore a
+list of *untracked-or-absent*, and reading it as *absent* is what this package did
+until CI said otherwise.
+
+The migration now does both jobs and labels them: CREATE for a fresh database, and
+an `EXECUTE`-guarded adoption for the untracked one — renames the quoted columns,
+adds the provenance columns, and marks the pre-contract rows
+`source: 'unrecorded (loaded before the reference-tier contract)'` rather than
+inventing a publisher for them. The new CHECKs land `NOT VALID` on adopted rows:
+enforced for every future write, never retroactively asserted about rows nobody
+has looked at. The UNIQUE is wrapped in an exception handler that WARNs rather
+than blocking every later migration behind a data question. `EXECUTE` is used
+deliberately, not stylistically — a guarded `IF … THEN ALTER TABLE … RENAME
+COLUMN` is unwrapped by the DO descent and applied UNCONDITIONALLY by the replay,
+where the legacy column does not exist, so the artifact would be wrong about the
+very schema the file defines. Opacity to the replay is now RECORDED
+(`dynamic_ddl`) rather than silently dropped, which is what makes that an
+acceptable trade rather than a hiding place.
+→ affects **WP 2.1 and WP 3.1**: any table on their deferred lists may also exist
+untracked. Plan edited (§4 D4).
+
+**`supabase-migrations.yml` marks new `2025*` migrations APPLIED without running
+them.** Its repair step runs `supabase migration repair --status applied` over
+every file matching `^(2025|20260527|20260607|20260609)`, so
+`20250815000000_approved_users_base.sql` was stamped applied and never executed
+against production. That is CORRECT here — the table exists, the file is
+`IF NOT EXISTS`, and running it would be a no-op — and it is a trap for anyone
+who later assumes a migration with a 2025 timestamp has run. A fresh database
+built from `supabase/migrations/` does execute it, which is the whole point of
+the file.
+
+Baseline numbers (if run): **NOT RUN — a fifth consecutive session. But the reason
+the four before this one recorded is now known to be too strong.** No Supabase
+credentials exist in this environment (`.env.production` carries three `VITE_*`
+feature flags and nothing else) and the egress proxy **denies CONNECT to
+`wckdrutwkytwcomrlpib.supabase.co:443` by organization policy**, so no
+work-package SESSION can reach the database. **CI can.**
+`supabase-migrations.yml` links to the project and runs `supabase db push` against
+it on every push, with `SUPABASE_ACCESS_TOKEN` and the database password in
+Actions secrets — which is how the `risk_data` finding above surfaced at all. So
+§15 is not blocked on access; it is blocked on nobody having written the job.
+→ **A `workflow_dispatch` job that runs §15's queries and uploads the counts as an
+artifact is the route**, and it is a decision for someone with authority over the
+data rather than for a session: §15's output is row counts and sample identifiers
+from a live project, and a public Actions log is not where those belong. Recorded
+so the next package stops repeating "no database is reachable" — the accurate
+statement is "no session is; CI is; and the job that would use it has not been
+written."
+
+Until it is, every statement in this plan about ROW COUNTS is unverified —
+including the only way to settle whether RLS is on for the three item masters.
 
 Handoff to WP 2.1 (and Phase 2):
 - **`npm run contract:check` is the one command.** It is green at the end of this
@@ -2321,98 +2680,339 @@ Handoff to WP 2.1 (and Phase 2):
 - **The invariants have names now** (`single-source`, `natural-key`, `audit-actor`,
   `uuid-identity`, …) and `CLAUDE.md` carries them with where each is enforced
   today. Cite the name. `G1`–`G4` still mean two different things on one page.
+- **The boundary review's `loudFailure.test.ts` asserted the thing this package was
+  told to delete.** Its D3 block required `.from('product_code_map')` to still
+  exist and to destructure `error` — WP 1.4's step 3 deletes that read. The two
+  are not in conflict about anything real: the review pinned the fix that was
+  there, and this package removed what the fix was protecting. Replaced, not
+  dropped, and mutation-tested to the same standard the review set — the block now
+  asserts the table is read by NO application code (`combine-project`,
+  `delete-project`, both pages), that `productMapping` is gone with it, and that
+  the ETL still carries the recorded reason, since a deletion with no record is an
+  invitation to re-add it. Each assertion was verified by undoing what it guards:
+  re-adding the read, re-adding the Map, and stripping the comment each turn it
+  red. The test names the table by assembling the string, because a test asserting
+  a read is GONE must not itself look like the read to the introspector's scanner —
+  which it did, and R4 caught it.
+- **The review's ten citation fixes and this package's four overlapped, and the
+  merge kept the wrong one once.** `ProcessLevelNetwork.tsx:1110-1111` survived in
+  §4.1 while `PLAN-PROMPTS.md` carried the review's corrected `:1104-1105`;
+  `check:docs` caught the disagreement (that is exactly what it is for) and the
+  file confirms the review was right. **R6 could not have caught it** — 1110-1111
+  is in bounds, and the row's only token is `.from()`, which the anchor filter
+  discards as pathish. It is a clean example of the gap between what R6 gates and
+  what R6 reports, and it is the case WP 2.4's flip has to handle.
+- **An orphan is "untracked OR absent", never just "absent".** `risk_data` was read
+  as absent by WP 0.2, by this package's first draft, and by the introspector
+  itself, and it exists. Before writing a migration for a table on the deferred
+  list, assume it may already be there and make the file adopt as well as create.
+- **`data-contract.yml` did not run on PR #194**, the PR that introduces it, and
+  did run on PR #195, whose base branch already carries it. Once #194 is on `main`
+  every later PR gets the gate; until then the proof is #195's run. Do not read
+  #194's short check list as the gate passing.
 - **`contract:introspect -- --check` is sensitive to application-code line
   numbers.** If you move code in `src/` or `supabase/functions/`, run
   `npm run contract:introspect` and commit the artifact. This is a real cost of
   recording where each table is referenced; the alternative — not recording it —
   is how the three orphans stayed invisible.
 
-### Phase 1 close — reconciling PR #193 against PR #194 · 2026-09-15
+### WP 2.1 — One organization identity · 2026-09-15 · `20260915000004`
 
-Not a work package. Phase 1's completion criterion is "`npm run contract:check` is
-green and running in CI". On `e4b0f4a` it was **red**, and so was `npm test` and
-`npm run check:docs`. All three traced to one cause, and it is the same cause as
-the precondition entry at the top of this phase: **two pull requests that were each
-correct on their own branch, merged into a main where they contradict each other.**
+Preconditions held? **no — two of the prompt's own references do not exist.**
+Exit checks passed? yes, except the one no work-package session can reach (below).
 
-- **#193** (`6ddb92a`, the Phase 0-1 boundary review) added
-  `src/lib/policies/__tests__/loudFailure.test.ts`, whose D3 block asserted that
-  the ETL still reads `product_code_map` and captures its error — WP 0.2's fix,
-  correctly pinned because "a Critical whose fix nothing pins is a Critical that
-  comes back".
-- **#194** (`6c67c29`, WP 1.4) **deleted that read**, which was WP 1.4's assigned
-  orphan decision and the right one: the branch had never executed.
+**The §16 entry the prompt told me to read first is not in §16.** Every Phase 2
+prompt opens "Read `docs/PLAN.md` §16's PHASE 2 READINESS entry once before
+starting." There is no such entry, and `git log -S` finds it in no ancestor commit
+either — it was never written. What exists is `c33d668`, which recorded the same
+measurements in §4 (D27) and in the derived `PLAN-PROMPTS.md`, and put the rest in
+its commit message. A commit message is not a document: it is not on the path the
+prompt names, `check:docs` does not police it, and the next session cannot find it
+without knowing the SHA. **This is R7's case made twice over** — §16 has now lost
+entries to a silent merge twice AND had one never written at all, and the
+append-only checker WP 2.4 is to write catches the first failure but not the
+second. Noted for WP 2.4: the rule it writes should also be the reason a package
+without a §16 entry cannot be called finished.
 
-Neither PR was wrong. Merged together they gave main a test asserting the presence
-of code another commit had removed on purpose.
-
-Three failures, one collision:
-
-| Symptom | Mechanism |
-|---|---|
-| `npm test` 2 failed / 78 | the D3 block asserts a read WP 1.4 deleted |
-| `contract:check` red | the same test file's string `'product_code_map'` made the introspector report the table as an orphan again, so the committed artifact no longer matched a fresh replay |
-| `check:docs` red | unrelated to the above — §4.1 cited `ProcessLevelNetwork.tsx:1110-1111`, which is `if (bomErr) throw bomErr;`. The direct `.from()` reads are at `:1104-1105`, which is what `PLAN-PROMPTS.md` said. **The derived file was right and §4 was stale** |
-
-Fixed here:
-1. **The D3 guard is inverted, not deleted.** It now asserts that the read is gone,
-   that `productMapping` and `productCodeMapError` are gone, that the direct join
-   is what runs, that no migration names the table, and that no sidecar describes
-   it. Deleting the block would have left the deletion unguarded, and resurrecting
-   the dead branch is exactly as silent as the original swallow: a `productMapping`
-   that is always empty looks like a mapping that simply found nothing.
-2. **A test is no longer a consumer.** The introspector's orphan scan skipped its
-   own source but not test files, so a test asserting a table's ABSENCE created
-   that table as an orphan — and the better the regression guard, the louder the
-   false positive. `__tests__/`, `*.test.*`, `*.spec.*` and `tests/` are now
-   excluded, with the reasoning in the code. Orphan detection asks whether running
-   code reads a table no migration creates; a source-level assertion about running
-   code is not running code.
-3. **§4.1's `ProcessLevelNetwork` citation corrected** to `:1104-1105`.
+**"D28" likewise did not exist.** WP 2.2 and WP 2.4 both say "READ D28 IN §4";
+§4 ended at D27. The finding it describes is real — I confirmed it from the
+introspected policy list while authoring the `approved_users` sidecar — so this
+package authored the row rather than leaving two later packages pointing at
+nothing. D29 is new and is this package's own (below).
 
 Discovered:
-- **This is the third time in this phase that a merge, not a commit, broke main**
-  (`5c7129f` at the precondition, `e4b0f4a` here). Every individual package was
-  validated before it was pushed; what nobody validates is the *combination*, and
-  the combination is what ships. The new `data-contract.yml` runs on every
-  `pull_request` AND on `push: [main]` — the second trigger is the one that would
-  have caught both of these, because it tests the merged result rather than the
-  branch. Worth stating plainly: **a PR-only CI gate cannot catch a semantic merge
-  conflict**, because by construction neither branch is red.
-- **A source-level regression guard has a failure mode that a behavioural test does
-  not**: it can be made false by a legitimate fix to the thing it guards, and it
-  says so in a way that looks like a bug. `loudFailure.test.ts` is still the right
-  shape for this repo (no DOM tooling), but a guard of this kind should assert the
-  DECISION, not the implementation — which is what the rewritten D3 block does and
-  the original did not.
-- `check:docs` proved its worth in the opposite direction from the one it was built
-  for: the gate exists to stop a derived file drifting from §4, and it caught §4
-  drifting from reality while the derived file stayed correct.
+  - **The number that sized this WP was the wrong number, by 2x.** "221
+    `get_current_user_org()` call sites, migrate them all" counts a directory that
+    is an append-only LOG, not a schema. Policies are dropped and recreated across
+    many files; functions are `CREATE OR REPLACE`d a dozen times; three migrations
+    rolled back entirely; one `DROP TABLE … CASCADE` took a table's policies with
+    it. Replaying it the way `introspect.mjs` replays DDL gives **122 calls in 102
+    live objects** out of 222 textual occurrences. Rewriting the other 100 would
+    have changed nothing in any database and doubled the diff.
+    → the replay is now `scripts/data-contract/live-sql.mjs`, shared by the
+    migration that was generated from it and by the test that gates it
+    → affects any later package that sizes SQL work by grep. Recorded here rather
+      than as a defect: it is a method error, not a code one.
+  - **The gap check found survivors in the one plane the grep could not see.**
+    `supabase/functions/combine-project/index.ts` and `delete-project/index.ts`
+    both authorized with `user.organization !== project.organization` — the org
+    STRING, compared in TypeScript. `grep get_current_user_org()` returns zero in
+    `supabase/functions/`, which is what the prompt measured and reported as "the
+    package is entirely SQL"; the DEFECT was there all along under a different
+    spelling. Both run with the SERVICE ROLE, which bypasses RLS, so that
+    comparison was the entire authorization on the ETL and project-delete paths.
+    → fixed in this package: one shared rule, `_shared/orgIdentity.ts`
+    → affects WP 2.4: a contract-generated RLS test suite asserts what the
+      DATABASE enforces, and these two paths are not reached by any policy. The
+      service-role plane needs its own assertions or it is a hole in the exit gate.
+  - **D28** — every policy in the schema is PERMISSIVE and they therefore OR, so
+    the `approved_users` deny-all does not deny. Found while authoring that
+    sidecar. → §4, assigned WP 2.4 (which already owns the RESTRICTIVE decision).
+  - **D29** — `organizations.name` is not UNIQUE, so the dual read's text branch
+    admits one tenant to another whenever two display names collide. This package
+    PRESERVED that rather than fixing it, deliberately: reading the uuid first
+    would deny where the old text-only rule granted, and a package whose purpose
+    is to stop revoking access must not introduce a new way to revoke it. The
+    semantics are pinned by a truth-table case in `orgIdentity.test.ts`.
+    → §4, assigned WP 2.4, gated on §15 like the rest of it.
+  - `organization_members.org_role` is read by NOTHING — no policy, no RPC. An
+    org `admin` holds exactly what a `member` does. Same for
+    `organizations.status = 'suspended'`, which no access path consults.
+    → both recorded in their sidecars → WP 2.2's precondition block, edited in
+      this commit.
+  - **D30** — six policies are created twice with no `DROP` between them. The
+    introspected artifact carried 150 policy entries for 144 distinct names and
+    nothing flagged it; this package noticed only because its own DROP-then-CREATE
+    collapsed the duplicates and the count moved. `CREATE POLICY` on an existing
+    name is an error in Postgres, so either the earlier migration did not take
+    effect or the later one failed partway — and no static replay can say which.
+    → §4, assigned WP 2.4, which is the package that stands a database up.
+    → also for WP 2.4: the introspector should probably REPORT a duplicate
+      `CREATE POLICY` the way it reports `shadowed` and `unparsed`. It records
+      what it read faithfully and drew no conclusion, which is the right default
+      and, here, one finding short.
+  - Nine `set_*_defaults` triggers stamp a text `organization` onto tables that
+    have no `organization_id` column. Their RLS does not read it — it joins to
+    `projects` — so the column is write-only decoration today. Left alone: giving
+    those tables a uuid org is a schema change and belongs with the tier work.
 
-Phase 1 exit, verified on this commit:
-- `npm run contract:check` — **green**, and running in CI (`.github/workflows/data-contract.yml`,
-  no path filter, each gate its own named step, none behind `npm run lint`).
-- Both orphan tables resolved, plus the third this phase found: `product_code_map`
-  deleted, `risk_data` created as reference-tier with provenance, `approved_users`
-  reconstructed so `supabase/migrations/` can build a working database alone.
-  `contract:verify` reports **0 orphans, 0 phantom tables**.
-- Exactly one `UNIT_DAYS`: TypeScript canonical, Python mirrored, SQL generated,
-  all three compared key for key on every test run.
-- `lead_time_unit` exists end to end — column, CHECK, template, wizard, sanitizer,
-  worker projection, engine.
-- Every simulation-path field records the CSV header its user types, enforced
-  against `public/template/*.csv` rather than asserted.
-- §16 carries an entry for each of the four work packages, plus the precondition
-  repair and this reconciliation.
+Baseline numbers (measured from the code; NOT from the database):
+  - `get_current_user_org()` in `supabase/migrations/`: 221 → 226 matching LINES,
+    222 → 227 occurrences. (The two differ because one line carries two calls —
+    worth stating, since "221" was itself a line count being read as a call count.)
+    All 5 added are in the new migration: one comment, one in the predicate's own
+    text branch, one in `set_project_defaults`, two in the rewritten self-bridge.
+  - LIVE `get_current_user_org()` calls: **122 before → 16 after.** The 16, in
+    full: 2 in the `organizations` self-bridge (its text fallback, kept beside the
+    new `id` branch), 1 in `get_current_user_org` itself, 1 in
+    `org_is_current_user_org`'s text branch, and 12 across the ten `set_*_defaults`
+    stampers — nine of which stamp tables that have no `organization_id` column,
+    the tenth being `set_project_defaults`, which now stamps both planes.
+    Live objects still naming it: 102 → 13.
+  - Live comparisons of a project's org text OUTSIDE the one predicate: **78 → 0**,
+    enforced by a test, not asserted.
+  - Policies redefined: 59. Functions redefined: 35 (32 rewritten + 3 authored).
+  - Text-org comparisons in TypeScript: 2 → 0.
+  - Sidecars: 13 → 17 tables described, 60 → 56 deferred.
+  - `contract:check` green (same 4 pre-existing R5 warnings) · 92 tests green
+    (79 before + 13 new) · `check:docs` green · the four files this package adds
+    or edits are lint-clean, against a repo baseline of 339 pre-existing errors.
 
-Still open, and named rather than hidden:
-- **The §15 baseline has never been run.** No database has been reachable from any
-  session in Phase 0 or Phase 1. Every "we improved X" from here to Phase 6 is
-  unmeasured until someone with access runs §15 and appends the counts.
-- **`contract:check` warns on four tier-2 tables with no natural key** (D5). That is
-  WP 3.3's, and the warning is dated to flip to an error in WP 2.4.
-- **RLS is off on the three item masters** — found in WP 1.2, assigned to WP 2.2/2.4.
-- **D26**: two live copies of the D1 prefill rule, only one reachable. WP 6.2.
+**Still unverified, and it is the same one every Phase 2 package carries:**
+`organization_id` non-null for 100 % of rows is a §15 question. No session can
+reach the database. The backfill re-run here matches on `name` OR `slug` and
+leaves an AMBIGUOUS match NULL rather than resolving it to a guess, so some rows
+are expected to remain NULL by design — which is precisely why the text branch
+stays and why "100 %" is the wrong exit phrasing for it. What this package can
+say from the code alone is that the *mechanism* that created the divergence is
+closed: the trigger now stamps, so the gap no longer grows by one row per insert.
+
+Handoff to next WP:
+  - **`capabilities_for_user()`'s explicit `_user_id` is intact and now has a
+    sibling.** `get_current_user_org_id(_user_id uuid)` takes the user the same
+    way and reads no session GUC. WP 2.2 extends the resolver; both functions are
+    safe to call from it without depending on a pooled connection's `app.current_user_id`.
+  - **The dual read is ONE function, in two languages.** SQL:
+    `org_is_current_user_org(uuid, text)`. TypeScript: `_shared/orgIdentity.ts`.
+    They are written to match statement for statement and a test asserts they
+    agree on a seven-row truth table. When §15 confirms the backfill, the text
+    branch is removed from those two bodies — not from 107 call sites. Do not
+    reintroduce an inline `OR` at a call site; that is what this package spent
+    itself undoing.
+  - **`projects` is tier G, and that is load-bearing for WP 2.4.** It holds no
+    measured quantity; it is the SCOPE every other table joins to in order to
+    authorize. Changing one comparison on `projects` meant redefining 58 policies
+    on 24 other tables. A generated RLS test suite should expect that fan-out.
+  - **`projects.natural_key_unique` is `(modeler_id, plant_name, name)` and the
+    grain implies `(organization_id, name)`.** The declared key is the weaker one:
+    two modellers in one org may each hold a project of the same name for the same
+    plant. Recorded in the sidecar as `natural_key_intended`; it is an input to
+    WP 3.3, not a WP 2.x concern.
+  - For WP 2.4 specifically: `R5` cannot flip in Phase 2 (WP 3.3 lands the
+    constraints, and it has not run) — that was already the plan's expectation and
+    this package found nothing to change it. `R7` should be written to cover a
+    MISSING entry as well as a deleted one; see the top of this entry for why.
+
+### WP 2.1 follow-up — the migration that never ran · 2026-09-15 · `20260915000004`
+
+Preconditions held? n/a — a defect repair on the package's own merged commit.
+Exit checks passed? yes, and three of them are now VERIFIED AGAINST A RUNNING
+POSTGRES rather than argued from the code.
+
+**What happened.** PR #198 merged; the post-merge `db push` — the first thing that
+ever executed `20260915000004` — failed at statement 3:
+
+```
+ERROR: function min(uuid) does not exist (SQLSTATE 42883)
+```
+
+The backfill picked the single matching org with `min(o.id)`, and Postgres has no
+`min()` aggregate for uuid. `(array_agg(DISTINCT o.id))[1]` is the fix, and it is
+also the better statement of intent: the `HAVING count(DISTINCT o.id) = 1` above
+guarantees exactly one element, so the subscript is exact rather than a choice
+among candidates. The migration runs in a transaction, so it rolled back whole —
+production kept the old definitions and nothing landed partially.
+
+**The finding is not the typo, it is that nothing could have caught it (D31).**
+`contract:check` replays migrations STATICALLY: it parses DDL and never executes
+SQL. `npm test` never touches a database. So a run-time-only error passes every
+gate this repo has and surfaces on the production deploy. Every migration in this
+repository has reached production as its own first execution.
+
+**That is now cheaply fixable, and this entry is the proof of route.** A
+work-package session HAS PostgreSQL 16 (`/usr/lib/postgresql/16`), which no prior
+entry had noticed. What makes it usable is that the contract already knows the
+schema:
+
+```
+initdb -D /tmp/pg/data -U postgres --auth=trust     # must run as a non-root user
+pg_ctl -D /tmp/pg/data -o '-k /tmp/pg/run -p 5433 -c listen_addresses=' start
+#   socket dir must be SHORT — Postgres caps the path at 107 bytes
+# schema: CREATE TABLE for all 73 tables + 4 enums, generated from
+#   build/schema.introspected.json (columns and types only — no constraints needed)
+# shims:  roles anon/authenticated/service_role; schema auth with jwt()/uid()/role();
+#         stubs for the 6 functions a migration CALLS but does not define
+psql -d v --single-transaction -v ON_ERROR_STOP=1 -f supabase/migrations/<new>.sql
+```
+
+Applying `20260915000004` that way reproduced the `min(uuid)` failure exactly, and
+the fixed file applies clean: **59 policies, 87 functions, no error.**
+
+A FULL fresh replay of all 296 migrations does NOT work and should not be
+attempted as a gate: 92 of them fail on a clean database (42 on `relation does not
+exist`, 9 on return-type changes, 8 on unavailable extensions). Production was
+built incrementally with `migration repair`, so the file set has never been
+applicable from empty. That is worth knowing on its own — **this repo cannot
+currently stand up a database from its own migrations** — and it is why the
+artifact-generated schema, not a replay, is the practical base.
+
+Verified on that database, with seeded rows (NOT production data):
+  - **D13, demonstrated and closed.** Org `Acme` renamed to `Acme Corp` the way
+    `admin_update_organization` does it (name only). A user approved into the org
+    after the rename gets text `Acme Corp`; the project still says `Acme`.
+    `p.organization = get_current_user_org()` → **false** — the defect, reproduced.
+    `org_is_current_user_org(p.organization_id, p.organization)` → **true**.
+  - **D27, closed at the trigger.** A project inserted after the fix comes out with
+    `organization_id` stamped, not NULL.
+  - **No widening.** A user in a different org gets false on all three projects.
+  - **The backfill's ambiguity rule works as written.** Two organizations both named
+    `Initech` (legal — `name` is not unique, D29): the user and project carrying that
+    string were left NULL rather than resolved to one of them, while the
+    unambiguous `Acme` rows resolved.
+
+Baseline numbers:
+  - `20260915000004` applied to a real Postgres: 59 policies, 87 functions, exit 0.
+  - Fresh replay of the full migration set: 204 applied, **92 failed**.
+  - `contract:check` green · 92 tests green · `check:docs` green.
+
+**Still unverified, and unchanged:** how many PRODUCTION rows have
+`organization_id IS NULL`. That is §15 and it needs the real database. What this
+entry adds is that the MECHANISM is no longer argued from reading code — it is
+executed. The ambiguity rule means some rows are expected to stay NULL by design,
+so "100 %" remains the wrong exit phrasing for it.
+
+**IT TOOK FOUR DEPLOYS, AND THE THIRD FINDING IS ABOUT THE PROCESS.**
+Three separate things were wrong, and only the first was a coding mistake:
+`min(uuid)`, then `network_summary` absent, then `tier2_suppliers` absent at
+statement 118. Each cost a full deploy because each aborted at the FIRST thing it
+hit. The preflight added after the second was supposed to end that and did not —
+it RAISEd a NOTICE, and the Supabase CLI's `db push` log keeps ERROR lines and
+drops notices, so the report was invisible in the one place it was needed.
+Changing it to RAISE EXCEPTION named all three missing tables in a single message:
+`{network_summary, tier2_suppliers, tier3_suppliers}`.
+
+**The lesson is not "add a preflight", it is that a diagnostic which cannot reach
+the reader is not a diagnostic.** Where the only execution is a deploy (D31), the
+deploy's ERROR line is the entire feedback channel, and anything that needs to be
+seen has to fail.
+
+**A SECOND `db push` FOUND A SECOND THING, AND IT IS THE MORE INTERESTING ONE.**
+With the aggregate fixed the migration reached statement 59 and aborted on
+`relation "public.network_summary" does not exist`. The table is created by
+`20250904105527` beside `network_nodes` and `network_edges`; the other two are in
+production and it is not. That is D32, and it is `risk_data` inverted — WP 1.4
+found a table production had that no migration created; this is one the migrations
+create that production lacks. The introspector is not wrong in either case: it
+reports what the files say, and no static replay can know what a database
+actually contains.
+
+**The first fix for it was wrong and this repo's own gate said so.** Skipping the
+four policies where the table is absent meant putting them through `EXECUTE`, which
+the introspector cannot read — so `network_summary` would have shown the OLD text
+comparison in the contract for ever, and its RLS would have joined the
+indeterminate set (7 tables to 8, 32 dynamic entries to 40). That is precisely how
+the item masters became `rls.determinate: false`.
+`orgIdentity.test.ts`'s "no live policy compares a project's org text outside the
+predicate" failed on all four, which is the assertion doing exactly the job it was
+written for — a fix that buys a green deploy by blinding the contract is the thing
+it exists to refuse.
+
+Adopting the table instead closes the divergence rather than encoding it:
+`CREATE TABLE IF NOT EXISTS`, copied verbatim from the original migration, a no-op
+wherever the table is already there, and nothing in `src/` or `supabase/functions/`
+reads it so adoption cannot change behaviour. All 59 policies stay static and
+introspector-visible; `dynamic` is back to 32 and the indeterminate set back to 7.
+
+Verified three ways on the local Postgres: **all present** — applies, 59 policies;
+**production's shape**, all three dropped — applies, adopts them, 59 policies; and
+**one unexpected table dropped** (`node_list`) — fails at statement 0 naming it,
+which is the preflight doing its job for the case nobody has met yet. The file now opens with a preflight that RAISEs a NOTICE
+naming every table it touches that was absent, so the next reader of a `db push` log
+learns this database's real shape in one line instead of one aborted statement at a
+time.
+
+**OUTCOME: APPLIED.** `db push` run `35030451085` on `b4cd26c` finished clean —
+`20260915000004` is live in the production database. Four deploys: `min(uuid)`,
+`network_summary`, `tier2_suppliers`, then success. Two notes for whoever reads
+this next:
+
+  - **Production received it from the FEATURE BRANCH, not from `main`.**
+    `supabase-migrations.yml` has no branch filter, so every push touching
+    `supabase/migrations/**` deploys. Production is therefore AHEAD of `main`
+    until the PR merges, and the merge's own `db push` will skip the migration as
+    already applied. Nothing is wrong with the result; it is the ordering that is
+    worth knowing, and it is the same property that makes D31 fixable and makes an
+    unreviewed branch deployable. Both belong to the same decision.
+  - **The applied version is the file at `b4cd26c`.** A later edit to
+    `20260915000004` will NOT reach production — `db push` keys on the version, and
+    that version is now recorded as applied. Any further change to this migration's
+    behaviour needs a NEW migration file.
+
+Handoff to next WP:
+  - **WP 2.4 inherits D31**, and it is a better fit there than anywhere else: that
+    package already owns the gate changes (R5, R6, R7). A fourth — execute each new
+    migration against an artifact-generated schema — is the one that would have
+    caught this, and the commands above are known to work.
+  - **WP 2.4 should also know the 92-failure number.** A package that plans to
+    "run against a seeded project with one user per role" cannot get that project by
+    replaying the migrations; it needs the same artifact-generated base.
+  - **Tables OUTSIDE the 25 this file touches may diverge the same way — UNKNOWN.**
+    Three of 25 were missing; there is no reason to think the other 48 tables are
+    better off, and nothing checks them. §15 is the real
+    answer and WP 2.4 needs it before it generates tests per table.
+  - D30 is NOT settled by this. The duplicate-policy question needs the real
+    remote's history, and the local base is generated from the artifact rather than
+    replayed, so it never reaches the two conflicting `CREATE POLICY` files.
 
 ---
 
@@ -2421,8 +3021,8 @@ Still open, and named rather than hidden:
 | Phase | WPs | Focus | Blocks | Status |
 |---|---|---|---|---|
 | 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
-| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ⛔ 1.1–1.3 done; **1.4 not started** |
-| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | blocked |
+| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ✅ done — `contract:check` green, six commands wired in `data-contract.yml`, three orphans reconciled |
+| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ready |
 | 3 | 3.1 – 3.4 | one ingestion contract | 4 | — |
 | 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | — |
 | 5 | 5.1 – 5.3 | lineage + the 77-page manual | 6 | — |
@@ -2437,7 +3037,15 @@ in Phase 1, not the smallest: it carries its own scope (generator, drift gate, t
 orphan reconciliations, `CLAUDE.md`) plus the CI wiring for **six** commands that no
 workflow runs today (§16 F1) and the orphan fix that `contract:verify` needs to stop
 being red (F4). Budget it as a full session with no headroom for a second package.
-Phase 2 does not start until it is green in CI.
+Phase 2 does not start until it is green in CI. **It is** — `contract:check` passes,
+the six commands run on every pull request, and the gate's teeth are proved by a
+throwaway PR that made CI red on an undescribed column (§16 WP 1.4). The four
+NO-GO conditions the boundary review set are all met; Phase 2 is open.
+
+One inherited fact it set is **not** met and cannot be, and WP 2.4 should read the
+WP 1.4 entry before it plans: "RLS is OFF on all three item masters" is not a fact
+about the schema, it is an artifact of a statement the introspector dropped. The
+honest state is *undetermined*, and only §15 against the live database settles it.
 
 **Out of order by design:** WP 5.2a (P1, P5, un-hide `/docs`) needs nothing and can
 ship at any time. It is the cheapest user-visible improvement in the plan.

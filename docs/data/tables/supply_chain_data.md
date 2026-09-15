@@ -40,10 +40,10 @@ Written by the `combine-project` edge function, never by a page. Invariant I2: p
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
-| Supply chain data: project access view | SELECT | all | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
-| Supply chain data: project access insert | INSERT | all | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
-| Supply chain data: project access update | UPDATE | all | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
-| Supply chain data: project access delete | DELETE | all | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
+| Supply chain data: project access delete | DELETE | all | `20260915000004_org_identity_dual_read.sql` |
+| Supply chain data: project access insert | INSERT | all | `20260915000004_org_identity_dual_read.sql` |
+| Supply chain data: project access update | UPDATE | all | `20260915000004_org_identity_dual_read.sql` |
+| Supply chain data: project access view | SELECT | all | `20260915000004_org_identity_dual_read.sql` |
 
 </details>
 
@@ -405,6 +405,6 @@ Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow.
 
 ---
 
-*Generated from data contract `ac6104c8fbc9`, engine `0.2.3`,
+*Generated from data contract `19b8f6b68a11`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

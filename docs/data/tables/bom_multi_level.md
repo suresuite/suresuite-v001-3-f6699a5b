@@ -37,10 +37,10 @@ what is missing, never a claim about what is there.
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
-| BOM Multi: organization access | SELECT | all | `20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql` |
-| BOM Multi: modifiers only | ALL | all | `20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql` |
 | bom_multi_level_auth_read | SELECT | authenticated | `20260705000001_open_logistics_reads.sql` |
 | bom_multi_level_anon_read | SELECT | anon | `20260705000001_open_logistics_reads.sql` |
+| BOM Multi: modifiers only | ALL | all | `20260915000004_org_identity_dual_read.sql` |
+| BOM Multi: organization access | SELECT | all | `20260915000004_org_identity_dual_read.sql` |
 
 </details>
 
@@ -243,6 +243,6 @@ When the row last changed. Server-set.
 
 ---
 
-*Generated from data contract `ac6104c8fbc9`, engine `0.2.3`,
+*Generated from data contract `19b8f6b68a11`, engine `0.2.3`,
 sidecar `supabase/contract/bom_multi_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

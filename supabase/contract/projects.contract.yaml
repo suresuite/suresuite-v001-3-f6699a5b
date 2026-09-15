@@ -1,0 +1,350 @@
+# AUTHORED — the data contract's sidecar for `projects`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+table: projects
+tier: G
+schema_name: public
+grain: >-
+  One modelling project: a named supply chain, owned by one modeller, belonging
+  to one organization. It is the scope every other project-scoped table hangs
+  off `project_id`, and it is the row almost every RLS policy in the schema
+  reaches through to decide whether the caller may see anything at all.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: projects_pkey
+  - source: UNIQUE constraint
+    columns: [modeler_id, plant_name, name]
+    name: uq_modeler_project
+natural_key_intended: [organization_id, name]
+
+governance:
+  read: null
+  write: data_editing
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    Tier G rather than a data tier: `projects` holds no measured quantity. It is
+    the SCOPE, and its access rules are the ones every other table inherits by
+    joining to it — which is why WP 2.1 had to redefine 58 policies on 24 other
+    tables to change one comparison. Read is org-wide (any member of the owning
+    organization sees every project in it); write is restricted to the project's
+    own modeller or a global `admin`. There is no project-level role between
+    those two — a member cannot be given read on one project and not another,
+    which is `subtractive-delegation` (§2.1 G3) having nowhere to attach.
+    WP 2.2's `project_members` is where `min_project_role: editor` above stops
+    being a forward declaration. `audited: false`: project creation and deletion
+    write no audit row (WP 2.3).
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project's identity, and the `project_id` foreign key of every
+      project-scoped table in the schema.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The project's title, as the modeller typed it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  modeler_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The approved user who owns the project. Stamped by `set_project_defaults()`
+      from the calling user when not supplied, and it is the second half of every
+      write policy: org match AND (modeller is caller OR caller is admin).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: a project is inserted without a modeler_id
+        value: the calling user, via get_current_user_id()
+        provenance: default
+        visible_as: the project lists render the resulting owner
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT a declared foreign key to `approved_users` — it is a bare uuid. WP 2.2
+      backfills it into `project_members` as the project's `owner`, which is
+      where the reference becomes real.
+  modeler_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owner's name, denormalized at insert. A display convenience, and stale
+      the moment the user renames themselves; `modeler_id` is the fact.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning organization, as a string, copied from the creating user at
+      insert. NOT NULL with a default, so it always holds something.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: a project is inserted with no user context to copy from
+        value: "'default_org'"
+        provenance: default
+        visible_as: >-
+          nowhere. The string authorizes like any other tenant name, so a project
+          that fell to the default is readable by every other account that also
+          fell to it.
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      The other half of D13, and the right-hand side of 73 of the 122 live org
+      comparisons WP 2.1 rewrote. Nothing updates it when the organization is
+      renamed — `admin_update_organization` touches `organizations.name` only —
+      so after a rename this column holds the old name indefinitely.
+  organization_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning organization by uuid. This is what the public /v1 API authorizes
+      on (`api_can_access_project`: `p.organization_id = p_org_id`), and it is the
+      plane that survives a rename.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      D27 lived here. `set_project_defaults()` stamped `NEW.organization` and
+      never this column, so the one-time backfill in `20260709000002` was the only
+      thing that had ever set it and every project created afterwards was NULL —
+      visible through RLS, which compared text, and invisible to /v1, which
+      compares this. WP 2.1 fixed the trigger first and then backfilled, because
+      a backfill in front of a trigger that does not stamp rots at the next
+      insert. Still NULLABLE: rows whose text org matches no organization row, or
+      matches two, were deliberately left alone rather than resolved to a guess,
+      and the dual read keeps them reachable. The count is a §15 question.
+  plant_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The name of the plant this project models. Part of the
+      `(modeler_id, plant_name, name)` unique constraint, and the join key the
+      lane and BOM tables carry as their own `plant_name`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  plant_latitude:
+    type: numeric
+    unit: degrees
+    unit_source: fixed
+    meaning: The plant's latitude in decimal degrees, WGS 84, for the network map.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine, and correctly so: `scsim` has no geography.
+      Coordinates place a node on the map; they do not affect a simulated
+      quantity. A later package wanting distance to DRIVE anything must add the
+      concept to the engine first.
+  plant_longitude:
+    type: numeric
+    unit: degrees
+    unit_source: fixed
+    meaning: The plant's longitude in decimal degrees, WGS 84, for the network map.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: As `plant_latitude` — rendered, never simulated.
+  plant_location_text:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The plant's location as typed, e.g. "Hanoi, Vietnam". The last
+      comma-separated segment, uppercased and trimmed, is what the map matches
+      against `risk_data.country`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  supply_chain_model:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the chain is modelled as `Make-To-Stock` or `Make-To-Order`,
+      CHECK-constrained to those two.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: not supplied at insert
+        value: "'Make-To-Order'"
+        provenance: default
+        visible_as: the project settings page renders the resulting mode
+    ingest: {csv_header: null, required: false, validate: one of Make-To-Stock / Make-To-Order}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into `scsim` from this column. The engine's make-to-stock versus
+      make-to-order behaviour comes from the policy set, not from a project flag;
+      this is the label the pages branch on when deciding which forms to show.
+  bom_level:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which bill-of-materials shape the project uses — `single` or `multi`. It
+      decides which of `bom_single_level` / `bom_multi_level` is read, and every
+      dataset RPC branches on it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: not supplied at insert
+        value: "'single'"
+        provenance: default
+        visible_as: the data manager renders the single-level BOM uploader
+    ingest: {csv_header: null, required: false, validate: single or multi}
+    surfaces: []
+    resolution: null
+  deep_tier_enabled:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the project models tier-2 and tier-3 suppliers as well as its
+      direct ones. Gates the deep-tier tables and the multi-tier network pages.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  data_type:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the project's data was uploaded and curated by a user
+      (`curated`) or generated for demonstration (`synthetic`).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: not supplied at insert
+        value: "'curated'"
+        provenance: default
+        visible_as: >-
+          nothing distinguishes the two in an export today. A synthetic project
+          whose flag defaulted to 'curated' is indistinguishable from a real one
+          downstream — the §5 T3 blind spot this column exists to prevent, not
+          yet closed.
+    ingest: {csv_header: null, required: false, validate: curated or synthetic}
+    surfaces: []
+    resolution: null
+  simulation_start:
+    type: date
+    unit: null
+    unit_source: none
+    meaning: First day of the horizon the project simulates.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into `scsim` from this column: the worker takes the horizon from
+      the run request, not from the project row. The two can disagree, and
+      nothing today reconciles them — recorded rather than implied (§5 T1).
+  simulation_end:
+    type: date
+    unit: null
+    unit_source: none
+    meaning: Last day of the horizon the project simulates.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: As `simulation_start` — the run request is what the engine actually reads.
+  completed:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the project has the datasets it needs to simulate. Maintained by
+      `update_project_completion_status()`, not set by hand.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the project was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the project row was last modified. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  `natural_key_intended` is `(organization_id, name)` and the declared constraint
+  is `(modeler_id, plant_name, name)` — they are different claims, and the
+  declared one is the weaker: two modellers in one organization may each hold a
+  project called the same thing for the same plant. Changing it is not WP 2.1's
+  to do; `natural-key` (§2.1 I4) lands in WP 3.3 and this row is one of its
+  inputs. Recorded here so the gap has an owner rather than being noticed again
+  in a quarter.

@@ -1,19 +1,19 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 295,
-  "migrations_applied": 292,
+  "migrations_found": 296,
+  "migrations_applied": 293,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260915000003_risk_data.sql",
+  "last_migration": "20260915000004_org_identity_dual_read.sql",
   "counts": {
     "tables": 73,
     "views": 6,
     "enums": 4,
-    "functions": 230,
-    "shadowed_definitions": 8,
+    "functions": 232,
+    "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 23,
+    "dynamic_ddl_statements": 32,
     "rls_indeterminate_tables": 7,
     "orphans": 0,
     "aborted_migrations": 3
@@ -2761,22 +2761,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "BOM Multi: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "BOM Multi: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "bom_multi_level_auth_read",
             "command": "SELECT",
             "roles": [
@@ -2795,6 +2779,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "BOM Multi: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "BOM Multi: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -2958,22 +2958,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "BOM Single: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "BOM Single: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "bom_single_level_auth_read",
             "command": "SELECT",
             "roles": [
@@ -2992,6 +2976,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "BOM Single: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "BOM Single: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -4285,17 +4285,17 @@
             "name": "Scenario effects: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Scenario effects: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -4527,17 +4527,17 @@
             "name": "Scenario profiles: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Scenario profiles: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -4715,17 +4715,17 @@
             "name": "Scenario settings: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Scenario settings: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -4925,17 +4925,17 @@
             "name": "Scenario targets: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Scenario targets: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
-            "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -5147,17 +5147,17 @@
             "name": "Disruption scenarios: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Disruption scenarios: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -6716,22 +6716,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "Inbound: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "Inbound: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "inbound_logistics_auth_read",
             "command": "SELECT",
             "roles": [
@@ -6750,6 +6734,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "Inbound: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Inbound: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -7541,20 +7541,20 @@
         "forced": false,
         "policies": [
           {
-            "name": "Multi-tier: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "Multi-tier: modifiers only",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Multi-tier: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -7786,36 +7786,36 @@
         "forced": false,
         "policies": [
           {
-            "name": "Network edges: project access view",
-            "command": "SELECT",
+            "name": "Network edges: project access delete",
+            "command": "DELETE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Network edges: project access insert",
             "command": "INSERT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Network edges: project access update",
             "command": "UPDATE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
-            "name": "Network edges: project access delete",
-            "command": "DELETE",
+            "name": "Network edges: project access view",
+            "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -8223,36 +8223,36 @@
         "forced": false,
         "policies": [
           {
-            "name": "Network nodes: project access view",
-            "command": "SELECT",
+            "name": "Network nodes: project access delete",
+            "command": "DELETE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Network nodes: project access insert",
             "command": "INSERT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Network nodes: project access update",
             "command": "UPDATE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
-            "name": "Network nodes: project access delete",
-            "command": "DELETE",
+            "name": "Network nodes: project access view",
+            "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -8425,36 +8425,36 @@
         "forced": false,
         "policies": [
           {
-            "name": "Network summary: project access view",
-            "command": "SELECT",
+            "name": "Network summary: project access delete",
+            "command": "DELETE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Network summary: project access insert",
             "command": "INSERT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Network summary: project access update",
             "command": "UPDATE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
-            "name": "Network summary: project access delete",
-            "command": "DELETE",
+            "name": "Network summary: project access view",
+            "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -8750,36 +8750,36 @@
         "forced": false,
         "policies": [
           {
-            "name": "Node list: project access view",
-            "command": "SELECT",
+            "name": "Node list: project access delete",
+            "command": "DELETE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Node list: project access insert",
             "command": "INSERT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
-            "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Node list: project access update",
             "command": "UPDATE",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
-            "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
-            "name": "Node list: project access delete",
-            "command": "DELETE",
+            "name": "Node list: project access view",
+            "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
-            "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -9222,9 +9222,9 @@
             "name": "orgs: members read own",
             "command": "SELECT",
             "roles": [],
-            "using": "name = public.get_current_user_org() OR slug = public.get_current_user_org()",
-            "with_check": "name = public.get_current_user_org() OR slug = public.get_current_user_org()",
-            "added_by": "20260709000002_super_admin_phase1.sql"
+            "using": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
+            "with_check": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -9431,22 +9431,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "Outbound: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "Outbound: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "outbound_logistics_auth_read",
             "command": "SELECT",
             "roles": [
@@ -9465,6 +9449,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "Outbound: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Outbound: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -11457,36 +11457,36 @@
         "forced": false,
         "policies": [
           {
-            "name": "Projects: org-wide view",
-            "command": "SELECT",
-            "roles": [],
-            "using": "organization = public.get_current_user_org()",
-            "with_check": "organization = public.get_current_user_org()",
-            "added_by": "20250820172815_4d16f36b-bba3-43c4-b6e4-6ef4ec9314cd.sql"
-          },
-          {
             "name": "Projects: org create by modeler or admin",
             "command": "INSERT",
             "roles": [],
-            "using": "organization = public.get_current_user_org() AND ( ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'modeler' AND modeler_id = public.get_current_user_id() ) OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
-            "with_check": "organization = public.get_current_user_org() AND ( ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'modeler' AND modeler_id = public.get_current_user_id() ) OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
-            "added_by": "20250820172815_4d16f36b-bba3-43c4-b6e4-6ef4ec9314cd.sql"
-          },
-          {
-            "name": "Projects: org update by owner or admin",
-            "command": "UPDATE",
-            "roles": [],
-            "using": "organization = public.get_current_user_org() AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "organization = public.get_current_user_org() AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250820172815_4d16f36b-bba3-43c4-b6e4-6ef4ec9314cd.sql"
+            "using": "public.org_is_current_user_org(organization_id, organization) AND ( ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'modeler' AND modeler_id = public.get_current_user_id() ) OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "with_check": "public.org_is_current_user_org(organization_id, organization) AND ( ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'modeler' AND modeler_id = public.get_current_user_id() ) OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Projects: org delete by owner or admin",
             "command": "DELETE",
             "roles": [],
-            "using": "organization = public.get_current_user_org() AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "organization = public.get_current_user_org() AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250820172815_4d16f36b-bba3-43c4-b6e4-6ef4ec9314cd.sql"
+            "using": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "with_check": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Projects: org update by owner or admin",
+            "command": "UPDATE",
+            "roles": [],
+            "using": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "with_check": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Projects: org-wide view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.org_is_current_user_org(organization_id, organization)",
+            "with_check": "public.org_is_current_user_org(organization_id, organization)",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -13803,36 +13803,20 @@
         "forced": false,
         "policies": [
           {
-            "name": "Simulation cache: project access view",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
-          },
-          {
             "name": "Simulation cache: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT user_role FROM get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT user_role FROM get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Simulation cache: project access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
-          },
-          {
-            "name": "Simulation cache: project access modify",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_cache.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -14069,20 +14053,20 @@
         "forced": false,
         "policies": [
           {
-            "name": "Simulation job magnitudes: project access view",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
-          },
-          {
             "name": "Simulation job magnitudes: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1) = 'admin' ) )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND p.organization = public.get_current_user_org() AND ( p.modeler_id = public.get_current_user_id() OR (SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1) = 'admin' ) )",
-            "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR (SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR (SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Simulation job magnitudes: project access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_job_magnitudes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -14508,36 +14492,20 @@
         "forced": false,
         "policies": [
           {
-            "name": "Simulation jobs: project access view",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
-          },
-          {
             "name": "Simulation jobs: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT user_role FROM get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT user_role FROM get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Simulation jobs: project access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
-          },
-          {
-            "name": "Simulation jobs: project access modify",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_jobs.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -14765,36 +14733,20 @@
         "forced": false,
         "policies": [
           {
-            "name": "Simulation metrics: project access view",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
-          },
-          {
             "name": "Simulation metrics: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT user_role FROM get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT user_role FROM get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Simulation metrics: project access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
-          },
-          {
-            "name": "Simulation metrics: project access modify",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
-            "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_performance_metrics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -15005,17 +14957,17 @@
             "name": "Simulation results: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Simulation results: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = simulation_results.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -16012,36 +15964,36 @@
         "forced": false,
         "policies": [
           {
-            "name": "Supply chain data: project access view",
-            "command": "SELECT",
+            "name": "Supply chain data: project access delete",
+            "command": "DELETE",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Supply chain data: project access insert",
             "command": "INSERT",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Supply chain data: project access update",
             "command": "UPDATE",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
-            "name": "Supply chain data: project access delete",
-            "command": "DELETE",
+            "name": "Supply chain data: project access view",
+            "command": "SELECT",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -16588,17 +16540,17 @@
             "name": "Tier2: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Tier2: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -16798,17 +16750,17 @@
             "name": "Tier3: organization access view",
             "command": "SELECT",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Tier3: project access modify",
             "command": "ALL",
             "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -17869,7 +17821,7 @@
       "returns": "boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20260613230000_ai_project_access_check.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "api_can_access_project",
@@ -18096,7 +18048,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908102149_8ab9ad65-e14e-465d-a4d1-fb7d9e12c697.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_bom_single_level",
@@ -18109,7 +18061,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908102149_8ab9ad65-e14e-465d-a4d1-fb7d9e12c697.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_inbound_logistics",
@@ -18122,7 +18074,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908102149_8ab9ad65-e14e-465d-a4d1-fb7d9e12c697.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_multi_tier_supply_chain",
@@ -18135,7 +18087,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908102149_8ab9ad65-e14e-465d-a4d1-fb7d9e12c697.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_network_edges",
@@ -18150,7 +18102,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250904112621_dfba6c03-18a7-41f8-8dbb-19bbf779cbf3.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_network_nodes",
@@ -18165,7 +18117,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250906103551_dc086257-e06d-4773-b6b9-319f3fca0377.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_network_summary",
@@ -18193,7 +18145,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908102149_8ab9ad65-e14e-465d-a4d1-fb7d9e12c697.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_tier2_suppliers",
@@ -18207,7 +18159,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_insert_tier3_suppliers",
@@ -18221,7 +18173,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "bulk_move_chat_threads",
@@ -18375,7 +18327,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250909001129_166ed3a8-6a0b-4e41-b7d8-61253b580b45.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "create_agent_proposal",
@@ -18524,7 +18476,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250826191238_e9a4a501-4fb6-4e0a-975d-5e433f0393c1.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "create_project",
@@ -18649,7 +18601,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250902085644_c6efbe05-6403-4179-96d3-40719d941d32.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "create_user_file",
@@ -18713,7 +18665,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250828010045_8bb58e91-920e-4552-b6d4-d8becb54c649.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "delete_chat_folder",
@@ -18750,7 +18702,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250828012709_22291de6-9e9a-453f-a162-8426150e5706.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "delete_policy_override",
@@ -18789,7 +18741,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250822011858_34c5791f-6b76-432d-b39a-9c2cf0137737.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "delete_project",
@@ -18802,7 +18754,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908072021_6573560f-3368-42c3-bd1b-aa1cdbd6fab3.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "delete_simulation_result",
@@ -18815,7 +18767,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250903060130_4615629d-ee1f-4d8a-a092-82d4553536b4.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "delete_simulation_results_batch",
@@ -18828,7 +18780,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250903060130_4615629d-ee1f-4d8a-a092-82d4553536b4.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "delete_user_file",
@@ -18950,6 +18902,17 @@
       "defined_by": "20250820170403_a64f741a-c7b6-487d-9467-701e97492d9d.sql"
     },
     {
+      "name": "get_current_user_org_id",
+      "signature": "get_current_user_org_id(uuid)",
+      "args": [
+        "_user_id uuid"
+      ],
+      "returns": "uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
+    },
+    {
       "name": "get_current_user_org",
       "signature": "get_current_user_org()",
       "args": [],
@@ -18969,7 +18932,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250906121716_810a3945-fca7-4d30-8f5a-bffbea1b8c54.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "get_disruption_scenarios",
@@ -19053,7 +19016,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, from_location text, to_location text, level integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, data_source text, data_source_group text, path_root text, uploaded_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250909234823_b1d7bbf8-7eda-4b95-86c1-40a6eb344d89.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "get_my_capabilities",
@@ -19240,7 +19203,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250924125123_3044ad0d-78b2-41c3-9916-74e4037e7a9d.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "get_project_dataset_status",
@@ -19253,7 +19216,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908071335_91c854e8-e566-4019-98f3-35a8318a582f.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "get_project_dataset_status",
@@ -19277,7 +19240,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250822011858_34c5791f-6b76-432d-b39a-9c2cf0137737.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "get_role_access",
@@ -19302,7 +19265,7 @@
       "returns": "TABLE( simulation_id uuid, scenario_id uuid, scenario_name text, scenario_description text, scenario_effects jsonb, status text, started_at timestamp with time zone, completed_at timestamp with time zone, metrics jsonb )",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250916104522_c50d3b72-2d7e-4062-b4f4-7cbaf3a4b690.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "get_self_profile",
@@ -19324,7 +19287,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, status text, scenario_ids uuid[], started_at timestamptz, completed_at timestamptz, metrics jsonb, result_data jsonb, created_by uuid, organization text, created_at timestamptz, updated_at timestamptz )",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250902090712_a3359fe6-599a-4911-babc-2de26e22be50.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "get_supply_chain_data_multi_tier",
@@ -19573,7 +19536,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250820175710_6a691ced-c936-440f-a101-67861d562557.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "list_user_files",
@@ -19649,6 +19612,18 @@
       "defined_by": "20250830232755_57126f90-ac86-4211-982f-d7a6fb93822f.sql"
     },
     {
+      "name": "org_is_current_user_org",
+      "signature": "org_is_current_user_org(uuid, text)",
+      "args": [
+        "_org_id uuid",
+        "_org_name text"
+      ],
+      "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
+    },
+    {
       "name": "prune_ai_chat_events",
       "signature": "prune_ai_chat_events(integer)",
       "args": [
@@ -19683,7 +19658,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "recompute_project_completion",
@@ -19910,7 +19885,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250902084844_ff8cea1a-81b3-47ef-a7da-5213dd8e364b.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "set_current_user_context",
@@ -19980,7 +19955,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250820170403_a64f741a-c7b6-487d-9467-701e97492d9d.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "set_scenario_child_defaults",
@@ -20185,7 +20160,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250908153141_4ef28b34-ee8e-49e9-a2aa-46934f071f74.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "update_project_completion_stmt",
@@ -20312,7 +20287,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250902172441_7cc05b17-e657-4f4d-9ae6-931c9b7d2b14.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "update_simulation_job_timing",
@@ -20344,7 +20319,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20250830233951_af7697fc-77e4-4a72-b41b-fd93e99fd931.sql"
+      "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
       "name": "upsert_chat_plan",
@@ -20550,6 +20525,33 @@
       "table": "scenario_templates",
       "migration": "20260609040000_consolidated_safe.sql",
       "created_by": "20260609000022_scenario_templates.sql",
+      "if_not_exists": true,
+      "differs": false,
+      "diff": [],
+      "note": "NO-OP: identical re-declaration"
+    },
+    {
+      "table": "network_summary",
+      "migration": "20260915000004_org_identity_dual_read.sql",
+      "created_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+      "if_not_exists": true,
+      "differs": false,
+      "diff": [],
+      "note": "NO-OP: identical re-declaration"
+    },
+    {
+      "table": "tier2_suppliers",
+      "migration": "20260915000004_org_identity_dual_read.sql",
+      "created_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+      "if_not_exists": true,
+      "differs": false,
+      "diff": [],
+      "note": "NO-OP: identical re-declaration"
+    },
+    {
+      "table": "tier3_suppliers",
+      "migration": "20260915000004_org_identity_dual_read.sql",
+      "created_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
       "if_not_exists": true,
       "differs": false,
       "diff": [],
@@ -20787,6 +20789,95 @@
       "migration": "20260829120000_erp_connector_phase1_2.sql",
       "statement": "EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated;', t)",
       "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF has_legacy_country THEN EXECUTE 'ALTER TABLE public.risk_data RENAME COLUMN \"COUNTRY\" TO country'",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF has_legacy_class THEN EXECUTE 'ALTER TABLE public.risk_data RENAME COLUMN \"RISK CLASS\" TO risk_class'",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "EXECUTE 'ALTER TABLE public.risk_data ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid(), ADD COLUMN IF NOT EXISTS source text, ADD COLUMN IF NOT EXISTS vintage text, ADD COLUMN IF NOT EXISTS licence text, ADD COLUMN IF NOT EXISTS refreshed_at timestamptz NOT NULL DEFAULT now(), ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(), ADD COLUMN IF NOT EXISTS updated_at time",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "EXECUTE $sql$ UPDATE public.risk_data SET source = COALESCE(source, 'unrecorded (loaded before the reference-tier contract)'), vintage = COALESCE(vintage, 'unrecorded'), licence = COALESCE(licence, 'unrecorded — do not republish until this is established'), id = COALESCE(id, gen_random_uuid()) WHERE source IS NULL OR vintage IS NULL OR licence IS NULL OR id IS NULL $sql$",
+      "mentions": [
+        "risk_data",
+        "unrecorded"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "EXECUTE 'ALTER TABLE public.risk_data ALTER COLUMN id SET NOT NULL, ALTER COLUMN source SET NOT NULL, ALTER COLUMN vintage SET NOT NULL, ALTER COLUMN licence SET NOT NULL'",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND contype = 'p') THEN EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_pkey PRIMARY KEY (id)'",
+      "mentions": [
+        "p",
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND conname = 'risk_data_country_normalized') THEN EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_country_normalized CHECK (country = upper(btrim(country))) NOT VALID'",
+      "mentions": [
+        "risk_data",
+        "risk_data_country_normalized"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND conname = 'risk_data_risk_class_known') THEN EXECUTE $sql$ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_risk_class_known CHECK (risk_class IN ('Very Low', 'Low', 'Medium', 'High', 'Very High')) NOT VALID$sql$",
+      "mentions": [
+        "high",
+        "low",
+        "medium",
+        "risk_data",
+        "risk_data_risk_class_known"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND conname = 'risk_data_country_key') THEN BEGIN EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_country_key UNIQUE (country)'",
+      "mentions": [
+        "risk_data",
+        "risk_data_country_key"
+      ],
       "touches_rls": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     }

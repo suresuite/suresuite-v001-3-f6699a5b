@@ -276,19 +276,33 @@ Implement WP 2.1 from docs/PLAN.md.
 Already verified (re-check before relying on it):
 · TWO org identities coexist. Legacy: approved_users.organization TEXT and
   projects.organization TEXT DEFAULT 'default_org', compared by string equality
-  via get_current_user_org() (defined twice — 20250820163748 and 20250820165722;
-  the later one wins). Modern: organizations(id uuid, name, slug) +
+  via get_current_user_org(). Modern: organizations(id uuid, name, slug) +
   organization_members + approved_users.organization_id, added by
   20260709000002_super_admin_phase1.sql.
+· get_current_user_org() is defined THREE times — 20250820163748 (LANGUAGE sql),
+  20250820165722 (plpgsql), 20250820170403 (plpgsql, reads a session GUC for the
+  user id). The LAST wins: 20250820170403. (Corrected after WP 1.4; this block
+  said "defined twice" and named the wrong winner.)
 · The bridge is fragile by construction: the RLS on `organizations` itself reads
   USING (name = get_current_user_org() OR slug = get_current_user_org()).
 · Renaming an organization therefore revokes access to its own projects. Write a
   failing test for this FIRST — it is the proof the WP works.
-· user_plant_access is a third, vestigial mechanism keyed on plant TEXT, still
-  referenced in 20250820145017 RLS policies.
+· projects.organization_id AND approved_users.organization_id ALREADY EXIST, both
+  uuid REFERENCES organizations(id) ON DELETE SET NULL, both added and backfilled
+  by 20260709000002. §9's "add projects.organization_id uuid" is already done.
+  What is NOT done is keeping it true — see D27.
+· D27: set_project_defaults() stamps NEW.organization and never NEW.organization_id,
+  so every project created since that backfill has organization_id NULL and is
+  invisible to the public /v1 API while visible through RLS. Fix the trigger, or any
+  backfill you write rots the same way.
+· user_plant_access was DROPPED, with plants, by 20250820172632 CASCADE. (Corrected
+  after WP 1.4; this block called it a live "third mechanism ... still referenced in
+  20250820145017 RLS policies" — but 20250820145017 is one of the three ABORTED
+  migrations, so that reference never took effect. §6.3 struck it at WP 1.1.)
 
-Inventory before editing: grep -rn "get_current_user_org()" supabase/ | wc -l.
-Report the number; it sizes the WP.
+Inventory before editing: grep -rn "get_current_user_org()" supabase/migrations/ | wc -l.
+Report the number; it sizes the WP. Measured at main 41de279: 221 in migrations,
+0 in supabase/functions/, 0 in src/ — the package is entirely SQL.
 
 Dual-read (uuid OR text) during transition. Do NOT remove the text branch in this
 WP — that is a follow-up migration once the backfill is verified at 100%.
