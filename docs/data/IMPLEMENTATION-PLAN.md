@@ -6,7 +6,8 @@
 > **Execution:** `docs/data/PROMPTS.md` — one prompt per work package
 > **Blueprint refs:** `docs/design/next-gen-platform-design.md` §2.3 G4–G6 · §8.1–8.4 · Phase A
 
-**This is the single plan.** Architecture, defects, transparency standard, user
+**This is the single plan** — enforced, not asserted: `npm run check:docs` fails if
+any data-layer fact lives outside §4. Architecture, defects, transparency standard, user
 documentation and the work packages live here and nowhere else. `PROMPTS.md` is
 execution mechanics only and cites this document by section and defect ID; it
 restates nothing.
@@ -23,7 +24,7 @@ duplicated facts stated here, which is the defect this plan exists to end.)*
 | 1 | How to use this document |
 | 2 | The architecture — the spine |
 | 3 | What already exists, and is good |
-| 4 | Confirmed defects |
+| 4 | Confirmed defects · 4.1 Code map |
 | 5 | The transparency standard |
 | 6 | The documentation plan |
 | 7 | Phase 0 — Stabilize and consolidate |
@@ -163,8 +164,9 @@ author's conscience.
 
 ## 4. Confirmed defects
 
-Found by reading code, not docs. **This is the only place file:line evidence is
-recorded.** Everything else cites the D-number.
+Found by reading code, not docs. **§4 is the only authority for data-layer
+file:line evidence** — defects here, load-bearing locations in §4.1. Everything
+else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 
 | ID | Defect | Evidence | Closed by |
 |---|---|---|---|
@@ -190,6 +192,66 @@ recorded.** Everything else cites the D-number.
 | D20 | `projectLanes` fallback truncates at 10 000 rows silently | `projectLanes.ts:30-33` | WP 3.1 |
 | **D21** | **User docs name fields the user never sees.** `products.csv` says `sell_price`/`demand_mean`/`demand_distribution`; the engine says `unit_price`/`demand_mode`/`demand_model`; the legacy docs showed the engine's names | `public/template/products.csv`; `item_master.sql:28-32`; `network.py:145,151,154` | WP 5.2b |
 | D22 | Legacy docs hand-copied the Pydantic models while `gen_docs.py` already renders them from the registry | archived `docBodies.tsx` `SIM_PARAM_GROUPS` | WP 0.3 *(done)* |
+
+### 4.1 Code map — the data layer
+
+The defect table above records what is **wrong**. This records where the data layer
+**is** — the load-bearing locations every work package needs and would otherwise
+rediscover. Together they make §4 the complete authority: no data-layer fact lives
+only in `PROMPTS.md` or in a session transcript.
+
+**Ingestion**
+
+| Location | What is there |
+|---|---|
+| `UploadWizard.tsx:476-477` | `content.trim().split('\n')` — the parse (D6) |
+| `UploadWizard.tsx:497-523` | the row loop; blanks and garbage become `null` (D7) |
+| `UploadWizard.tsx:1833` | the upload gate — `file && errors.length === 0` |
+| `UploadWizard.tsx:1280-1307` | auto-invokes node prominence after deep-tier uploads |
+| `ingest-inbound-logistics/index.ts:37-46` | the sanitizer allow-list; no trim (D8) |
+| `ingest-bom-multi-level/index.ts:42-44` | **the correct trim/empty pattern** — copy this one |
+| `combine-project/index.ts:96-102,110-113` | the dead `product_code_map` branch (D3) |
+
+**Units and the engine boundary**
+
+| Location | What is there |
+|---|---|
+| `grading.ts:113-135` | `UNIT_DAYS` + `rateToWeekly` — **canonical**, mirrors `project_map.py` |
+| `grading.ts:159` | `cheapestInboundCost` floors a ≤0 price to 1.0 before the min |
+| `effectiveEconomics.ts:43-50` | `ratePerDay`, delegates to the shared table |
+| `item_master.sql:138-141` | the third, divergent unit `CASE` in `sc_nodes` (D10) |
+| `project_map.py:418-429` | lead time → weeks, `round`, `clamp(1,51)`, default 2 |
+| `engine.py:294` | `if dist != DETERMINISTIC && cv > 0` — deterministic skips sampling |
+| `enums.py:60` | `LeadTimeDist.EMPIRICAL`, reserved for the data-import path (M7) |
+
+**The policy grid chain**
+
+| Location | What is there |
+|---|---|
+| `useStageRows.tsx:191-325` | the supplier stage — where rows are built |
+| `useStageRows.tsx:164` | `resolveField`'s `> 0` test |
+| `useStageRows.tsx:125-131` | the smart-average imputation basis |
+| `useStageRows.tsx:283-288` | the hardcoded row constants (D1, D16) |
+| `columnSpecs.ts:119-178` | the supplier column spec |
+| `columnSpecs.ts:132-168` | `defaultWhenMissing` values |
+| `columnSpecs.ts:350` | `material_price` fit metadata, `keep: true` (D18) |
+| `resolveEffective.ts:82` | `dataRow[field]` is checked **before** the override bundle |
+| `resolveEffective.ts:124-180` | `resolveCell` — the canonical provenance logic |
+| `StagePolicyTable.tsx:1170-1225` | a **verbatim copy** of it (de-dup in WP 6.2) |
+| `StagePolicyTable.tsx:887` | `applyPrefill()` called un-awaited; guard armed at `:865` |
+| `policyGridUi.tsx:15-35` | the provenance vocabulary; `default` has colour `null` |
+| `policyGridUi.tsx:49` | `ProvenanceLegend` — must gain any new state |
+
+**Versioning, governance, network**
+
+| Location | What is there |
+|---|---|
+| `20260703000001_dataset_versions.sql:70-138` | `_build_dataset_snapshot` (D11) |
+| `20260711000002_unified_access_control.sql:169` | `capabilities_for_user` — the resolver |
+| `item_master.sql:85-89` | `ensure_item_masters`; unions `bom_single_level` only |
+| `ProcessLevelNetwork.tsx:1110-1111` | direct `.from()` reads, no RPC, no pagination |
+
+---
 
 ---
 
