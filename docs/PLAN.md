@@ -839,7 +839,7 @@ type or natural key that disagrees with the migrations, an untraced field with n
 note, and **a CSV template header no field records** — D21 enforced rather than
 asserted.
 
-### WP 1.3 — One unit table, `lead_time_unit`, resolution modes *(D9, D10)*
+### WP 1.3 — One unit table, `lead_time_unit`, resolution modes ✅ *(D9, D10 — done)*
 
 **Preconditions** — WP 1.2 sidecars exist.
 
@@ -849,6 +849,12 @@ asserted.
    — `quarter` currently falls to `ELSE` and is 13× wrong.
 2. **`lead_time_unit`** — add the column, the sanitizer allow-list entry, the CSV
    header and the sidecar. `NULL` = weeks, matching `project_map.py:420`.
+   **Four places, not three** — the worker's PostgREST projection names its columns
+   explicitly, so the column and the three writers are not enough on their own; the
+   engine reads `None` forever until `datamap.py`'s `select` names it too.
+   The wizard entry goes in a NEW `optionalHeaders`, never in `expectedHeaders`,
+   which is the required-column gate: adding an optional column there rejects every
+   CSV that predates it.
 3. **Resolution block** per engine-consumed field: `default_mode`, `assertable_by[]`,
    `estimable_from[]`, `hybrid {centre, spread}`, `on_conflict`, `threshold_pct`.
    The engine already supports hybrid: `SupplierLink` separates `lead_time_weeks`
@@ -867,6 +873,16 @@ asserted.
 
 **Gap check** — re-verify the TS table against `project_map.py` `_UNIT_DAYS` key for
 key. Divergence is a parity break; fix before closing.
+
+**Delivered** — `scripts/data-contract/gen-unit-sql.mjs` renders
+`20260915000001_one_unit_table.sql` from `grading.ts::UNIT_DAYS` under
+`npm run contract:units -- --check`, so SQL generates the table instead of
+restating it; `20260915000002_lead_time_unit.sql` adds the column with a CHECK that
+only admits units `public.unit_days()` knows; `unitTableParity.test.ts` re-reads
+all three sources from disk and compares them key for key, and asserts that no
+fourth declaration exists; `leadTimeUnit.test.ts` asserts every link of the D9
+chain. Resolution blocks on 26 engine-consumed fields, with `estimable_from: []`
+and `hybrid: null` pinned by name in `contract:validate`.
 
 ### WP 1.4 — Generator, drift gate, orphan reconciliation
 
@@ -1783,8 +1799,13 @@ claims.**
 - every CSV-origin field records its `csv_header` — checked against the seven
   templates in `public/template/`, not against my memory of them. Negative-tested:
   blanking `suppliers.reliability_score`'s header fails the run.
-- `inbound_logistics.lead_time` records `unit: weeks`, `unit_source: fixed` — pinned
-  by name in the validator, because it is the field WP 1.3 is about to change.
+- `inbound_logistics.lead_time` records `unit: weeks`, `unit_source: fixed`.
+  **Correction, made in WP 1.3:** this entry said the check was "pinned by name in
+  the validator". It was not — the edit that would have added it matched nothing
+  and failed silently, so the claim was true of the sidecar and false of the gate
+  for one package. The pin exists now (`PINNED` in `validate-sidecars.mjs`) and
+  covers ten fields, including this one at its post-WP-1.3 value. The process
+  lesson is in WP 1.3's entry.
 
 | tier | tables | columns |
 |---|---|---|
@@ -1879,6 +1900,120 @@ Handoff to WP 1.3:
 - Adding a column to a migration now fails `contract:validate` until its sidecar
   entry exists. That is the intended direction of the gate, but it means WP 1.3's
   `lead_time_unit` migration and its sidecar entry must land together.
+
+### WP 1.3 — One unit table, `lead_time_unit`, resolution modes · 2026-09-15 · `<this commit>`
+
+Preconditions held? **yes, with one correction and one addition.**
+- `grading.ts::UNIT_DAYS` is canonical and `effectiveEconomics.ts::ratePerDay`
+  still delegates to it (`sharedUnitDays`) — confirmed by reading, and now by test.
+- The `sc_nodes` SQL `CASE` has **three** ILIKE branches, not four: `%day%`,
+  `%month%`, `%year%`. The consequence the brief names is exactly right and if
+  anything understated — `quarter` AND `quarterly` both fall to `ELSE`, and so does
+  anything spelled `wk`, `mo`, `yr` or `annual`.
+- The brief did not mention it, but the branches that DO hit disagree with the
+  canonical table in the fourth significant figure: the SQL divides by `4.345` and
+  `52.18` where `30.4375/7 = 4.348214…` and `365.25/7 = 52.178571…`.
+- The price aggregate at the same site weights by RAW volume and falls back to
+  `MAX(unit_price)`, unlike `demandWeightedSellPrice`, which weights by WEEKLY
+  volume, skips rows with no price, and has no fallback. Both confirmed.
+
+Exit checks passed? **two of three; the third could not be run and is not weakened.**
+- ✅ **One `UNIT_DAYS`.** One TypeScript declaration, one Python mirror, and SQL now
+  *generated* from the TypeScript. `unitTableParity.test.ts` re-reads all three
+  from disk, compares them key for key, and asserts that the four other files that
+  use the vocabulary import it rather than restating it. A fifth declaration fails
+  the suite.
+- ✅ **`rateToWeekly(v, 'quarter')` agrees across TS, SQL and Python** — pinned at
+  1300/quarter → 99.65777/week in all three, with the size of the old error
+  (13.0446x) asserted alongside it so the test says what it is for.
+- ⚠️ **A CSV with `lead_time_unit=day` round-tripping to the DB — NOT RUN.** No
+  Supabase project is reachable from this environment (unchanged since WP 0.2).
+  Verified link by link instead, in `leadTimeUnit.test.ts`: the column and its
+  CHECK, the wizard's optional header, the template, the ingest sanitizer's
+  blank-to-NULL normalization, the worker's projection, the engine's conversion,
+  and the contract entry. Every link is asserted; the hop between them is not.
+
+**The brief said three places to fix together. There are four.** The worker's
+PostgREST projection names its columns explicitly
+(`"supplier_id,material_id,unit_price,lead_time,time_unit,volume"`), so the column,
+the wizard and the sanitizer together would still have left the engine reading
+`None` forever — PostgREST returns only what the `select` names. This is the kind
+of fix that looks done and is not, because every layer reports success.
+
+**`expectedHeaders` was the wrong place for the wizard entry, and putting it there
+would have been a regression.** That list is the required-column gate: every entry
+must be present and non-empty in every row (`UploadWizard.tsx` validateData). Adding
+an optional column to it rejects every inbound CSV anyone has ever uploaded. A new
+`optionalHeaders` field carries it instead, and the interface says why.
+
+Discovered:
+- **Blank is not NULL, and the CHECK would have caught it in production.** The CSV
+  parser turns an empty cell into `''`, and `''` is not nullish, so
+  `r.lead_time_unit ?? null` would have written an empty string, which
+  `public.unit_days('')` does not recognise and the CHECK rejects. Normalized at
+  both ends — the parser writes `null`, the ingest boundary trims, lowercases and
+  maps `''` to `null`. The same class of bug is D7 (blank numerics passing
+  required-field validation) one layer down.
+- **`materials.lead_time_dist` and `lead_time_cv` are the SPREAD of a hybrid whose
+  CENTRE lives on a different table.** The engine's own split is
+  `SupplierLink.lead_time_weeks` (from `inbound_logistics`) against
+  `lead_time_dist` / `lead_time_cv` (from `materials`), so the two halves of one
+  resolution live in different uploads. Recorded as such. It also means a CV set on
+  a material whose links are all deterministic is silently inert —
+  `core/engine.py` tests both conditions.
+- **`LeadTimeDist.EMPIRICAL` is the value an estimator would write.** It exists in
+  the enum, `ITEM_MASTER_ENUMS` in the wizard does not offer it, and WP 1.3 records
+  it as reserved for the data-import path (M7) rather than removing it. This is the
+  shape the whole `resolution` block is for: a value the engine can consume that no
+  human should be asked to assert.
+- **Price has no variability field, and that is now written down four times** —
+  `materials.cost`, `products.sell_price`, and both `unit_price` columns carry
+  `resolution.hybrid: null` with a note saying it is a statement about the ENGINE,
+  not about the world, pointing at §14's RFC. Pinned by name so a later package
+  cannot quietly invent one in the contract before the engine has one.
+- **`estimable_from: []` is now enforced, not just written.** `consumption_rate`
+  (both BOM tables), `moq` and `capacity_per_week` are pinned in
+  `contract:validate`; negative-tested by setting `materials.moq` to
+  `[observed_order_sizes]`, which fails the run. `products.production_capacity`
+  carries the same rule and the same reasoning: output is bounded by demand, so a
+  capacity fitted from output can never explain a shortage, which is the only
+  question it exists to answer.
+- **`demand_mean` is the one field of the twelve whose `default_mode` is `hybrid`**,
+  and it should be: demand is the one quantity here that is genuinely observed
+  rather than specified. `on_conflict: assertion_wins`, because a stated forecast is
+  a decision about the future and history is not.
+- **A silent no-op edit made WP 1.2's §16 entry wrong for a package.** The change
+  that was meant to pin the `lead_time` exit check matched nothing and failed
+  quietly, so §16 claimed a gate that did not exist. Corrected above, and the pin
+  now covers ten fields. The lesson is small and general: an edit that asserts its
+  own match cannot fail silently, and every plan-editing script in this phase now
+  does. The reason it mattered is the reason the phase exists — a claim in a
+  document that no gate enforces is exactly D21 and D22.
+
+Gap check — the TS table against `project_map.py::_UNIT_DAYS`, key for key: **22
+keys, identical, no divergence.** It is no longer a manual comparison: the first
+test in `unitTableParity.test.ts` performs it on every run, and the third does the
+same for the generated SQL.
+
+Handoff to WP 1.4:
+- **`contract:units -- --check` must be in the CI job.** It is the only thing
+  stopping SQL and TypeScript diverging again, and it fails on drift rather than
+  regenerating — a generator that silently rewrites in CI proves nothing.
+- The generated migration is `20260915000001_one_unit_table.sql`. If a later
+  package changes `UNIT_DAYS`, regenerating **edits an existing migration file**
+  rather than adding one. That is correct for a `CREATE OR REPLACE` migration that
+  has not been deployed; it will NOT be correct once it has. Whoever deploys first
+  should switch the generator's output to a new timestamped file and leave the old
+  one alone — the check compares generated text to committed text either way.
+- Two new migrations mean the introspected artifact changed; `contract:introspect
+  -- --check` already covers it, and `check.mjs` should run both gates.
+- `inbound_logistics` now has a CHECK constraint, the first in the twelve. WP 1.4's
+  checker should surface CHECKs in the generated markdown — a constraint that
+  rejects a user's upload belongs on the page the user reads.
+- Four npm scripts exist now: `contract:introspect`, `contract:verify`,
+  `contract:validate`, `contract:units`. WP 1.4 adds `contract:check`, which should
+  run all four plus its own drift comparison, so there is one command to name in CI
+  and in CONTRIBUTING.
 
 ---
 

@@ -91,7 +91,16 @@ fields:
       required: false
       validate: null
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        A label. Recorded for completeness: every engine-consumed field carries a
+        resolution block, including the ones where the answer is trivial.
   cost:
     type: "numeric"
     unit: "currency per unit of material"
@@ -115,7 +124,25 @@ fields:
       required: false
       validate: "numeric > 0"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        hybrid is NULL because scsim has nowhere to put a spread: cost and
+        unit_price are bare floats on Material and Product, with no distribution,
+        no CV and no sampling path anywhere in the engine. Recording `hybrid:
+        null` here is a statement about the ENGINE, not about the world — prices
+        obviously vary. Giving them a spread is an engine change on the scsim
+        track; see the RFC in PLAN.md §14. Do not invent one in this contract: a
+        contract that describes a capability the engine does not have is how a
+        fallback ends up in code with no contract entry, which is what I6 forbids
+        in the other direction. estimable_from is empty for a second reason: the
+        value already has a derivation — the cheapest inbound arc — and that is a
+        substitution the user can see and trace, not an estimate.
   holding_cost_pct:
     type: "numeric"
     unit: "fraction of unit value per year"
@@ -138,7 +165,17 @@ fields:
       required: false
       validate: "numeric in [0, 1]"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form, policy_grid]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        A financial policy parameter, not an observation: it is what the business
+        decides holding stock costs it. Falls back to the project's inventory
+        bundle, which is a policy default and is visible as one.
   moq:
     type: "numeric"
     unit: "units of material"
@@ -162,7 +199,23 @@ fields:
       required: false
       validate: "numeric >= 0"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        estimable_from is EMPTY and that is a positive statement, not an omission.
+        This is an engineering or commercial fact that someone knows exactly — it
+        is written on a drawing, in a contract, or on a machine's nameplate.
+        Fitting a distribution to it would produce a number with error bars around
+        something that has no error, and the error bars would be believed. A
+        future estimator reading this contract must refuse this field. A minimum
+        order quantity is a term the supplier states. Inferring it from observed
+        order sizes learns the ordering policy, not the constraint — and then the
+        simulation optimises against its own past behaviour.
   initial_on_hand:
     type: "numeric"
     unit: "units of material"
@@ -180,7 +233,17 @@ fields:
       required: false
       validate: "numeric >= 0"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: [observations.stock_counts (Phase 7+)]
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        Opening stock is a measurement — someone counted it — so it is the one
+        master economic field where an observations tier could legitimately supply
+        it. Nothing does today.
   lead_time_dist:
     type: "text"
     unit: null
@@ -204,7 +267,20 @@ fields:
       required: false
       validate: "one of the LeadTimeDist enum values; `empirical` is reserved for the data-import path (M7) and is not selectable yet"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: [observations.receipts (Phase 7+)]
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        The SPREAD half of lead_time's hybrid; the centre is
+        inbound_logistics.lead_time. LeadTimeDist.EMPIRICAL exists in the enum and
+        is RESERVED for the data-import path (M7) — it is the value an estimator
+        would write, which is why it is not offered in the UI today.
+        `deterministic` is the default and means the lead time is exactly what the
+        arc says.
   lead_time_cv:
     type: "numeric"
     unit: "coefficient of variation (dimensionless)"
@@ -228,7 +304,17 @@ fields:
       required: false
       validate: "numeric >= 0"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: [observations.receipts (Phase 7+)]
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        The magnitude of lead_time's spread. Read only when lead_time_dist is not
+        deterministic: core/engine.py tests both, so a CV on a deterministic link
+        is silently inert. Zero and NULL are the same thing here.
   updated_at:
     type: "timestamp with time zone"
     unit: null

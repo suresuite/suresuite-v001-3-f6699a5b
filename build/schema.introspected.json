@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 291,
-  "migrations_applied": 288,
+  "migrations_found": 293,
+  "migrations_applied": 290,
   "first_migration": "20250815225910_9dd177a0-dca5-45b4-a8d0-5860164eeddb.sql",
-  "last_migration": "20260905000001_grant_ga_agent_capabilities.sql",
+  "last_migration": "20260915000002_lead_time_unit.sql",
   "counts": {
     "tables": 71,
     "views": 6,
     "enums": 4,
-    "functions": 231,
+    "functions": 230,
     "shadowed_definitions": 8,
     "phantom_tables": 1,
     "unparsed_statements": 0,
@@ -6331,6 +6331,18 @@
           "unique": false,
           "references": null,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "lead_time_unit",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000002_lead_time_unit.sql"
         }
       ],
       "constraints": [
@@ -6343,6 +6355,13 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "inbound_logistics_lead_time_unit_known",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL)",
+          "added_by": "20260915000002_lead_time_unit.sql"
         }
       ],
       "indexes": [
@@ -16718,7 +16737,7 @@
       "materialized": false
     },
     "sc_nodes": {
-      "defined_by": "20260614000001_item_master.sql",
+      "defined_by": "20260915000001_one_unit_table.sql",
       "materialized": false
     },
     "simulation_result_scenarios": {
@@ -16785,7 +16804,7 @@
     },
     {
       "name": "_api_key_management_org",
-      "signature": "_api_key_management_org(uuid, )",
+      "signature": "_api_key_management_org(uuid, uuid)",
       "args": [
         "p_user_id uuid",
         "p_org_id uuid DEFAULT NULL"
@@ -16896,7 +16915,7 @@
     },
     {
       "name": "admin_copy_project",
-      "signature": "admin_copy_project(uuid, text, uuid, text, , )",
+      "signature": "admin_copy_project(uuid, text, uuid, text, uuid, uuid)",
       "args": [
         "p_actor_id uuid",
         "p_actor_email text",
@@ -17112,7 +17131,7 @@
     },
     {
       "name": "admin_transfer_project",
-      "signature": "admin_transfer_project(uuid, text, uuid, uuid, )",
+      "signature": "admin_transfer_project(uuid, text, uuid, uuid, uuid)",
       "args": [
         "p_actor_id uuid",
         "p_actor_email text",
@@ -17176,7 +17195,7 @@
     },
     {
       "name": "advance_chat_plan_step",
-      "signature": "advance_chat_plan_step(uuid, text, text, uuid, , )",
+      "signature": "advance_chat_plan_step(uuid, text, text, uuid, text, uuid)",
       "args": [
         "p_plan_id uuid",
         "p_step_id text",
@@ -17240,7 +17259,7 @@
     },
     {
       "name": "append_chat_message",
-      "signature": "append_chat_message(uuid, uuid, text, text, , , , , )",
+      "signature": "append_chat_message(uuid, uuid, text, text, jsonb, jsonb, uuid, text, timestamptz)",
       "args": [
         "p_user_id uuid",
         "p_thread_id uuid",
@@ -17259,7 +17278,7 @@
     },
     {
       "name": "apply_policy_bundle",
-      "signature": "apply_policy_bundle(uuid, , , , , , , , )",
+      "signature": "apply_policy_bundle(uuid, jsonb, jsonb, text, uuid, text, uuid, text, text)",
       "args": [
         "p_project_id uuid",
         "p_defaults jsonb DEFAULT '{}'::jsonb",
@@ -17557,7 +17576,7 @@
     },
     {
       "name": "bulk_move_chat_threads",
-      "signature": "bulk_move_chat_threads(uuid[], uuid, )",
+      "signature": "bulk_move_chat_threads(uuid[], uuid, uuid)",
       "args": [
         "p_thread_ids uuid[]",
         "p_folder_id uuid",
@@ -17570,7 +17589,7 @@
     },
     {
       "name": "bulk_set_thread_flags",
-      "signature": "bulk_set_thread_flags(uuid[], boolean, boolean, )",
+      "signature": "bulk_set_thread_flags(uuid[], boolean, boolean, uuid)",
       "args": [
         "p_thread_ids uuid[]",
         "p_pinned boolean",
@@ -17711,7 +17730,7 @@
     },
     {
       "name": "create_agent_proposal",
-      "signature": "create_agent_proposal(uuid, text, text, text, jsonb, jsonb, text, jsonb, text, , , , , , )",
+      "signature": "create_agent_proposal(uuid, text, text, text, jsonb, jsonb, text, jsonb, text, text, text, text, uuid, text, text)",
       "args": [
         "p_project_id uuid",
         "p_agent_id text",
@@ -17736,7 +17755,7 @@
     },
     {
       "name": "create_api_key",
-      "signature": "create_api_key(uuid, text, text, text[], , , , )",
+      "signature": "create_api_key(uuid, text, text, text[], text, uuid[], timestamptz, uuid)",
       "args": [
         "p_user_id uuid",
         "p_user_email text",
@@ -17754,7 +17773,7 @@
     },
     {
       "name": "create_chat_folder",
-      "signature": "create_chat_folder(uuid, text, )",
+      "signature": "create_chat_folder(uuid, text, integer)",
       "args": [
         "p_user_id uuid",
         "p_name text",
@@ -17776,7 +17795,7 @@
     },
     {
       "name": "create_disruption_scenario_v2",
-      "signature": "create_disruption_scenario_v2(uuid, text, text, , , , , , , uuid, text)",
+      "signature": "create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)",
       "args": [
         "p_project_id uuid",
         "p_plant_name text",
@@ -17797,7 +17816,7 @@
     },
     {
       "name": "create_disruption_scenario_v2",
-      "signature": "create_disruption_scenario_v2(uuid, text, text, uuid, text, , , , , , , , )",
+      "signature": "create_disruption_scenario_v2(uuid, text, text, uuid, text, disruption_status, text, text[], jsonb, jsonb, jsonb, date, date)",
       "args": [
         "p_project_id uuid",
         "p_plant_name text",
@@ -17820,7 +17839,7 @@
     },
     {
       "name": "create_disruption_scenario_v2",
-      "signature": "create_disruption_scenario_v2(uuid, text, text, uuid, text, , , , , , )",
+      "signature": "create_disruption_scenario_v2(uuid, text, text, uuid, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb)",
       "args": [
         "p_project_id uuid",
         "p_plant_name text",
@@ -17860,7 +17879,27 @@
     },
     {
       "name": "create_project",
-      "signature": "create_project(text, text, text, text, uuid, text, text, , , )",
+      "signature": "create_project(text, text, text, text, uuid, text, text, date, date, boolean)",
+      "args": [
+        "p_name text",
+        "p_plant text",
+        "p_model text",
+        "p_bom_level text",
+        "p_user_id uuid",
+        "p_user_email text",
+        "p_user_name text",
+        "p_simulation_start date DEFAULT NULL::date",
+        "p_simulation_end date DEFAULT NULL::date",
+        "p_deep_tier_enabled boolean DEFAULT false"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20250923105656_9e8bac4c-e86d-470c-8d9c-4081bea56395.sql"
+    },
+    {
+      "name": "create_project",
+      "signature": "create_project(text, text, text, text, uuid, text, text, date, date, text)",
       "args": [
         "p_name text",
         "p_plant text",
@@ -17880,7 +17919,7 @@
     },
     {
       "name": "create_project",
-      "signature": "create_project(text, text, text, text, uuid, text, text, , )",
+      "signature": "create_project(text, text, text, text, uuid, text, text, date, date)",
       "args": [
         "p_name text",
         "p_plant text",
@@ -17947,7 +17986,7 @@
     },
     {
       "name": "create_simulation_result",
-      "signature": "create_simulation_result(uuid, uuid, text, text, uuid[], , , )",
+      "signature": "create_simulation_result(uuid, uuid, text, text, uuid[], text, timestamptz, jsonb)",
       "args": [
         "p_project_id uuid",
         "p_user_id uuid",
@@ -17965,7 +18004,7 @@
     },
     {
       "name": "create_user_file",
-      "signature": "create_user_file(uuid, text, text, text, bigint, , , , , )",
+      "signature": "create_user_file(uuid, text, text, text, bigint, uuid, uuid, uuid, timestamptz, uuid)",
       "args": [
         "p_user_id uuid",
         "p_kind text",
@@ -18162,6 +18201,19 @@
       "security_definer": true,
       "volatility": "STABLE",
       "defined_by": "20260829120000_erp_connector_phase1_2.sql"
+    },
+    {
+      "name": "duration_to_weeks",
+      "signature": "duration_to_weeks(numeric, text, numeric)",
+      "args": [
+        "value numeric",
+        "unit text",
+        "default_days numeric DEFAULT 7"
+      ],
+      "returns": "numeric LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "defined_by": "20260915000001_one_unit_table.sql"
     },
     {
       "name": "ensure_dataset_plant_matches_project",
@@ -18387,21 +18439,7 @@
     },
     {
       "name": "get_network_edges",
-      "signature": "get_network_edges(uuid, , uuid, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_plant_name text DEFAULT NULL",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "TABLE( id uuid, project_id uuid, plant_name text, src_uid text, dst_uid text, relation_type text, relative_revenue numeric, relative_revenue_percentage numeric, depth integer, direction text, uploaded_by uuid, created_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
-      "security_definer": true,
-      "volatility": null,
-      "defined_by": "20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql"
-    },
-    {
-      "name": "get_network_edges",
-      "signature": "get_network_edges(uuid, uuid, text, )",
+      "signature": "get_network_edges(uuid, uuid, text, text)",
       "args": [
         "p_project_id uuid",
         "p_user_id uuid",
@@ -18439,21 +18477,7 @@
     },
     {
       "name": "get_network_nodes",
-      "signature": "get_network_nodes(uuid, , uuid, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_plant_name text DEFAULT NULL",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "TABLE( id uuid, project_id uuid, plant_name text, uid text, name text, industry text, website text, traded_as text, number_of_employees integer, revenue numeric, depth integer, lat numeric, long numeric, is_seed boolean, uploaded_by uuid, created_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone, country text )",
-      "security_definer": true,
-      "volatility": null,
-      "defined_by": "20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql"
-    },
-    {
-      "name": "get_network_nodes",
-      "signature": "get_network_nodes(uuid, uuid, text, )",
+      "signature": "get_network_nodes(uuid, uuid, text, text)",
       "args": [
         "p_project_id uuid",
         "p_user_id uuid",
@@ -18467,21 +18491,7 @@
     },
     {
       "name": "get_network_summary",
-      "signature": "get_network_summary(uuid, , uuid, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_plant_name text DEFAULT NULL",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "TABLE( id uuid, project_id uuid, plant_name text, nodes_count integer, edges_count integer, tiers_data jsonb, uploaded_by uuid, created_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
-      "security_definer": true,
-      "volatility": null,
-      "defined_by": "20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql"
-    },
-    {
-      "name": "get_network_summary",
-      "signature": "get_network_summary(uuid, uuid, text, )",
+      "signature": "get_network_summary(uuid, uuid, text, text)",
       "args": [
         "p_project_id uuid",
         "p_user_id uuid",
@@ -18669,7 +18679,7 @@
     },
     {
       "name": "get_supply_chain_data_multi_tier",
-      "signature": "get_supply_chain_data_multi_tier(uuid, uuid, text, , )",
+      "signature": "get_supply_chain_data_multi_tier(uuid, uuid, text, integer, integer)",
       "args": [
         "p_project_id uuid",
         "p_user_id uuid",
@@ -18748,7 +18758,7 @@
     },
     {
       "name": "http_post",
-      "signature": "http_post(text, , , )",
+      "signature": "http_post(text, jsonb, jsonb, integer)",
       "args": [
         "url text",
         "headers jsonb DEFAULT NULL",
@@ -18794,7 +18804,7 @@
     },
     {
       "name": "list_agent_proposals",
-      "signature": "list_agent_proposals(uuid, )",
+      "signature": "list_agent_proposals(uuid, text)",
       "args": [
         "p_project_id uuid",
         "p_status text DEFAULT NULL"
@@ -18918,7 +18928,7 @@
     },
     {
       "name": "list_user_files",
-      "signature": "list_user_files(uuid, )",
+      "signature": "list_user_files(uuid, uuid)",
       "args": [
         "p_user_id uuid",
         "p_project_id uuid DEFAULT NULL"
@@ -18969,7 +18979,7 @@
     },
     {
       "name": "move_chat_thread",
-      "signature": "move_chat_thread(uuid, uuid, )",
+      "signature": "move_chat_thread(uuid, uuid, uuid)",
       "args": [
         "p_thread_id uuid",
         "p_folder_id uuid",
@@ -18991,7 +19001,7 @@
     },
     {
       "name": "prune_ai_chat_events",
-      "signature": "prune_ai_chat_events()",
+      "signature": "prune_ai_chat_events(integer)",
       "args": [
         "p_retention_days integer DEFAULT 180"
       ],
@@ -18999,6 +19009,19 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260715000002_agent_telemetry.sql"
+    },
+    {
+      "name": "rate_to_weekly",
+      "signature": "rate_to_weekly(numeric, text, numeric)",
+      "args": [
+        "value numeric",
+        "unit text",
+        "default_days numeric DEFAULT 7"
+      ],
+      "returns": "numeric LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "defined_by": "20260915000001_one_unit_table.sql"
     },
     {
       "name": "rebuild_node_list",
@@ -19026,7 +19049,7 @@
     },
     {
       "name": "record_chat_ui_event",
-      "signature": "record_chat_ui_event(text, , , , )",
+      "signature": "record_chat_ui_event(text, uuid, uuid, text, jsonb)",
       "args": [
         "p_kind text",
         "p_user_id uuid DEFAULT NULL",
@@ -19041,7 +19064,7 @@
     },
     {
       "name": "record_external_evidence",
-      "signature": "record_external_evidence(uuid, text, text, text, numeric, jsonb, )",
+      "signature": "record_external_evidence(uuid, text, text, text, numeric, jsonb, text)",
       "args": [
         "p_project_id uuid",
         "p_source_id text",
@@ -19058,7 +19081,7 @@
     },
     {
       "name": "record_model_validation",
-      "signature": "record_model_validation(uuid, uuid, uuid, uuid, integer, text, integer, , , , , , , , )",
+      "signature": "record_model_validation(uuid, uuid, uuid, uuid, integer, text, integer, jsonb, jsonb, jsonb, text, text, uuid, uuid, text)",
       "args": [
         "p_project_id uuid",
         "p_policy_version_id uuid",
@@ -19083,7 +19106,7 @@
     },
     {
       "name": "record_proposal_viewed",
-      "signature": "record_proposal_viewed(uuid, )",
+      "signature": "record_proposal_viewed(uuid, uuid)",
       "args": [
         "p_proposal_id uuid",
         "p_user_id uuid DEFAULT NULL"
@@ -19117,7 +19140,7 @@
     },
     {
       "name": "review_agent_proposal",
-      "signature": "review_agent_proposal(uuid, text, , , )",
+      "signature": "review_agent_proposal(uuid, text, uuid, text, text)",
       "args": [
         "p_proposal_id uuid",
         "p_action text",
@@ -19156,7 +19179,7 @@
     },
     {
       "name": "rotate_api_key",
-      "signature": "rotate_api_key(uuid, text, uuid, )",
+      "signature": "rotate_api_key(uuid, text, uuid, integer)",
       "args": [
         "p_user_id uuid",
         "p_user_email text",
@@ -19170,7 +19193,7 @@
     },
     {
       "name": "save_policy_defaults",
-      "signature": "save_policy_defaults(uuid, text, jsonb, , , )",
+      "signature": "save_policy_defaults(uuid, text, jsonb, text, text, timestamptz)",
       "args": [
         "p_project_id uuid",
         "p_family text",
@@ -19186,7 +19209,7 @@
     },
     {
       "name": "save_project_memory",
-      "signature": "save_project_memory(uuid, text, text, , , , )",
+      "signature": "save_project_memory(uuid, text, text, jsonb, uuid, uuid, jsonb)",
       "args": [
         "p_project_id uuid",
         "p_kind text",
@@ -19214,7 +19237,7 @@
     },
     {
       "name": "search_chat_messages",
-      "signature": "search_chat_messages(uuid, text, )",
+      "signature": "search_chat_messages(uuid, text, uuid)",
       "args": [
         "p_user_id uuid",
         "p_query text",
@@ -19227,7 +19250,7 @@
     },
     {
       "name": "seed_synthetic_simulation_data",
-      "signature": "seed_synthetic_simulation_data(uuid, uuid, text, , )",
+      "signature": "seed_synthetic_simulation_data(uuid, uuid, text, integer, integer)",
       "args": [
         "p_project_id uuid",
         "p_user_id uuid",
@@ -19357,7 +19380,7 @@
     },
     {
       "name": "set_thread_flags",
-      "signature": "set_thread_flags(uuid, boolean, boolean, )",
+      "signature": "set_thread_flags(uuid, boolean, boolean, uuid)",
       "args": [
         "p_thread_id uuid",
         "p_pinned boolean",
@@ -19371,7 +19394,7 @@
     },
     {
       "name": "set_thread_summary",
-      "signature": "set_thread_summary(uuid, uuid, text, )",
+      "signature": "set_thread_summary(uuid, uuid, text, integer)",
       "args": [
         "p_thread_id uuid",
         "p_user_id uuid",
@@ -19396,7 +19419,7 @@
     },
     {
       "name": "snapshot_dataset",
-      "signature": "snapshot_dataset(uuid, , , )",
+      "signature": "snapshot_dataset(uuid, text, uuid, text)",
       "args": [
         "p_project_id uuid",
         "p_label text DEFAULT NULL",
@@ -19410,7 +19433,7 @@
     },
     {
       "name": "snapshot_policy",
-      "signature": "snapshot_policy(uuid, , , , , , )",
+      "signature": "snapshot_policy(uuid, text, uuid, text, text, uuid, text)",
       "args": [
         "p_project_id uuid",
         "p_label text DEFAULT NULL",
@@ -19426,34 +19449,6 @@
       "defined_by": "20260711000005_policy_version_notes_delete.sql"
     },
     {
-      "name": "snapshot_policy",
-      "signature": "snapshot_policy(uuid, , , , , )",
-      "args": [
-        "p_project_id uuid",
-        "p_label text DEFAULT NULL",
-        "p_user_id uuid DEFAULT NULL",
-        "p_user_email text DEFAULT NULL",
-        "p_user_name text DEFAULT NULL",
-        "p_parent_version_id uuid DEFAULT NULL"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "defined_by": "20260613000001_fix_snapshot_created_by.sql"
-    },
-    {
-      "name": "snapshot_policy",
-      "signature": "snapshot_policy(uuid, )",
-      "args": [
-        "p_project_id uuid",
-        "p_label text DEFAULT NULL"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "defined_by": "20260609000002_policy_versions.sql"
-    },
-    {
       "name": "supersede_agent_proposal",
       "signature": "supersede_agent_proposal(uuid, uuid)",
       "args": [
@@ -19467,7 +19462,7 @@
     },
     {
       "name": "sweep_expired_files",
-      "signature": "sweep_expired_files()",
+      "signature": "sweep_expired_files(uuid)",
       "args": [
         "p_user_id uuid DEFAULT NULL"
       ],
@@ -19486,8 +19481,19 @@
       "defined_by": "20260609040000_consolidated_safe.sql"
     },
     {
+      "name": "unit_days",
+      "signature": "unit_days(text)",
+      "args": [
+        "unit text"
+      ],
+      "returns": "numeric LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "defined_by": "20260915000001_one_unit_table.sql"
+    },
+    {
       "name": "update_own_profile",
-      "signature": "update_own_profile(, , )",
+      "signature": "update_own_profile(text, text, text)",
       "args": [
         "p_display_name text DEFAULT NULL",
         "p_phone text DEFAULT NULL",
@@ -19543,7 +19549,27 @@
     },
     {
       "name": "update_project",
-      "signature": "update_project(uuid, text, text, text, text, uuid, text, , , )",
+      "signature": "update_project(uuid, text, text, text, text, uuid, text, date, date, boolean)",
+      "args": [
+        "p_project_id uuid",
+        "p_name text",
+        "p_plant text",
+        "p_model text",
+        "p_bom_level text",
+        "p_user_id uuid",
+        "p_user_email text",
+        "p_simulation_start date DEFAULT NULL::date",
+        "p_simulation_end date DEFAULT NULL::date",
+        "p_deep_tier_enabled boolean DEFAULT false"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20250906113204_aa42c052-0d52-4c76-a6d1-806beb3af9cc.sql"
+    },
+    {
+      "name": "update_project",
+      "signature": "update_project(uuid, text, text, text, text, uuid, text, date, date, text)",
       "args": [
         "p_project_id uuid",
         "p_name text",
@@ -19563,7 +19589,7 @@
     },
     {
       "name": "update_project",
-      "signature": "update_project(uuid, text, text, text, text, uuid, text, , )",
+      "signature": "update_project(uuid, text, text, text, text, uuid, text, date, date)",
       "args": [
         "p_project_id uuid",
         "p_name text",
@@ -19685,7 +19711,7 @@
     },
     {
       "name": "upsert_chat_thread",
-      "signature": "upsert_chat_thread(uuid, , , , , , , , )",
+      "signature": "upsert_chat_thread(uuid, uuid, text, uuid, boolean, text, uuid, boolean, text)",
       "args": [
         "p_user_id uuid",
         "p_id uuid DEFAULT NULL",
@@ -19701,24 +19727,6 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260721000001_chat_modes_and_ui_events.sql"
-    },
-    {
-      "name": "upsert_chat_thread",
-      "signature": "upsert_chat_thread(uuid, , , , , , , )",
-      "args": [
-        "p_user_id uuid",
-        "p_id uuid DEFAULT NULL",
-        "p_title text DEFAULT NULL",
-        "p_project_id uuid DEFAULT NULL",
-        "p_set_project boolean DEFAULT false",
-        "p_persona_id text DEFAULT NULL",
-        "p_folder_id uuid DEFAULT NULL",
-        "p_set_folder boolean DEFAULT false"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "defined_by": "20260717000001_chat_store.sql"
     },
     {
       "name": "validate_disruption_effect",

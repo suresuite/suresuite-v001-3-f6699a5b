@@ -556,7 +556,8 @@ function tablesClaimedBy(files, name) {
   return [...out].sort();
 }
 
-const argType = (a) => squash(a).replace(/\bDEFAULT\b.*$/i, "").split(/\s+/).slice(-1)[0].toLowerCase();
+const argType = (a) =>
+  squash(a).replace(/\bDEFAULT\b.*$/i, "").trim().split(/\s+/).filter(Boolean).slice(-1)[0]?.toLowerCase() ?? "";
 
 function readPolicyName(s, from) {
   const id = readQualifiedName(s, from);

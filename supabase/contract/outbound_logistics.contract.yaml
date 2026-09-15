@@ -145,7 +145,17 @@ fields:
       required: true
       validate: "numeric >= 0; blank becomes NULL, not 0 (D7)"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        Volume is what the user's own systems recorded. It is not estimated; it is
+        the thing other quantities are estimated FROM — demand_mean names it in
+        estimable_from.
   time_unit:
     type: "text"
     unit: null
@@ -168,7 +178,16 @@ fields:
       required: false
       validate: "one of day/week/month/quarter/year and their -ly spellings"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        A unit is never estimated. Unrecognised or blank is read on a 7-day basis,
+        i.e. as already weekly (grading.ts::rateToWeekly).
   expected_lead_time:
     type: "numeric"
     unit: "weeks"
@@ -215,7 +234,23 @@ fields:
       required: true
       validate: "numeric > 0"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        hybrid is NULL because scsim has nowhere to put a spread: cost and
+        unit_price are bare floats on Material and Product, with no distribution,
+        no CV and no sampling path anywhere in the engine. Recording `hybrid:
+        null` here is a statement about the ENGINE, not about the world — prices
+        obviously vary. Giving them a spread is an engine change on the scsim
+        track; see the RFC in PLAN.md §14. Do not invent one in this contract: a
+        contract that describes a capability the engine does not have is how a
+        fallback ends up in code with no contract entry, which is what I6 forbids
+        in the other direction.
     note: >-
       The user types `unit_price`; the engine field it feeds is `sell_price` on
       the product, and inside scsim it is `unit_price` again on the product model.

@@ -125,7 +125,15 @@ fields:
       required: true
       validate: "integer >= 1"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        Depth in the BOM tree is structure, not measurement.
   higher_level_component_id:
     type: "text"
     unit: null
@@ -167,7 +175,23 @@ fields:
       required: true
       validate: "numeric > 0"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        estimable_from is EMPTY and that is a positive statement, not an omission.
+        This is an engineering or commercial fact that someone knows exactly — it
+        is written on a drawing, in a contract, or on a machine's nameplate.
+        Fitting a distribution to it would produce a number with error bars around
+        something that has no error, and the error bars would be believed. A
+        future estimator reading this contract must refuse this field. Same rule
+        as bom_single_level.consumption_rate, and more important here: multi-level
+        rates multiply down the tree, so an estimate at level 3 propagates into
+        every product above it.
   created_at:
     type: "timestamp with time zone"
     unit: null

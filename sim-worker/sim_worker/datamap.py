@@ -221,7 +221,13 @@ async def load_project_data(
         suppliers=await rows("suppliers"),
         materials=await rows("materials"),
         products=await rows("products"),
-        inbound=await rows("inbound_logistics", "supplier_id,material_id,unit_price,lead_time,time_unit,volume"),
+        # D9: `lead_time_unit` must be SELECTed or the column below reads None
+        # forever — PostgREST returns only what the projection names, so
+        # adding the column to the table is not enough on its own.
+        inbound=await rows(
+            "inbound_logistics",
+            "supplier_id,material_id,unit_price,lead_time,lead_time_unit,time_unit,volume",
+        ),
         bom=bom,
         outbound=await rows("outbound_logistics", "product_id,customer_id,unit_price,volume,time_unit"),
         policies=policies,

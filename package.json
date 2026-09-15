@@ -17,7 +17,8 @@
     "check:docs": "node scripts/check-docs-single-source.mjs",
     "contract:introspect": "node scripts/data-contract/introspect.mjs",
     "contract:verify": "node scripts/data-contract/verify-introspection.mjs",
-    "contract:validate": "node scripts/data-contract/validate-sidecars.mjs"
+    "contract:validate": "node scripts/data-contract/validate-sidecars.mjs",
+    "contract:units": "node scripts/data-contract/gen-unit-sql.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.5",

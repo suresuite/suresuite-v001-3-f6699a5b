@@ -38,6 +38,11 @@ serve(async (req) => {
       supplier_id: r.supplier_id ?? null,
       material_id: r.material_id ?? null,
       lead_time: r.lead_time ?? null,
+      // D9: `lead_time_unit` is what the lead time is quoted in; `time_unit` is
+      // what `volume` is quoted over. The engine has always read the first
+      // (project_map.py::_map_supply) and this allow-list used to drop it, so the
+      // value never reached the database and every lead time was read as weeks.
+      lead_time_unit: (r.lead_time_unit ?? '') === '' ? null : String(r.lead_time_unit).trim().toLowerCase(),
       time_unit: r.time_unit ?? null,
       volume: r.volume ?? null,
       unit_price: r.unit_price ?? null,

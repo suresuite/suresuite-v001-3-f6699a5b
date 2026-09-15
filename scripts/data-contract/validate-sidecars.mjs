@@ -150,6 +150,40 @@ for (const file of files) {
   summary.push({ table: doc.table, tier: doc.tier, fields: described.size, csvHeaders });
 }
 
+// Pinned by name, because these are the fields the plan's exit checks name and
+// the ones later packages change. A pin that only exists in a session transcript
+// is not a pin — WP 1.2's §16 entry claimed this one existed a package early.
+const PINNED = [
+  // WP 1.3 (D9): was `fixed` and fixed by OMISSION — the engine read a unit no
+  // column supplied. `weeks` stays because that is what NULL still means.
+  ["inbound_logistics", "lead_time", { unit: "weeks", unit_source: "column", unit_column: "lead_time_unit" }],
+  ["inbound_logistics", "lead_time_unit", { unit: null, unit_source: "none" }],
+  // WP 1.3 step 4 — the load-bearing line. An estimator that fits a distribution
+  // to an engineering fact produces a number with error bars around something
+  // that has none, and the error bars get believed.
+  ["bom_single_level", "consumption_rate", { estimable_from: [] }],
+  ["bom_multi_level", "consumption_rate", { estimable_from: [] }],
+  ["materials", "moq", { estimable_from: [] }],
+  ["suppliers", "capacity_per_week", { estimable_from: [] }],
+  // WP 1.3 step 5 — price has no variability field anywhere in scsim. Recording
+  // a hybrid here would describe a capability the engine does not have.
+  ["materials", "cost", { hybrid: null }],
+  ["products", "sell_price", { hybrid: null }],
+  ["inbound_logistics", "unit_price", { hybrid: null }],
+  ["outbound_logistics", "unit_price", { hybrid: null }],
+];
+for (const [table, fieldName, expected] of PINNED) {
+  const doc = docs.get(table);
+  const f = doc?.fields?.[fieldName];
+  if (!f) { problems.push(`pinned: ${table}.${fieldName} has no field entry`); continue; }
+  for (const [key, want] of Object.entries(expected)) {
+    const got = key === "hybrid" || key === "estimable_from" ? f.resolution?.[key] : f[key];
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      problems.push(`pinned: ${table}.${fieldName}.${key} is ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+    }
+  }
+}
+
 console.log("WP 1.2 — sidecar validation\n");
 for (const s of summary) {
   console.log(`  ✓ ${s.table.padEnd(30)} tier ${String(s.tier).padEnd(4)} ${String(s.fields).padStart(2)} fields  ${s.csvHeaders} CSV headers`);

@@ -118,7 +118,17 @@ fields:
     substitutions: []
     ingest: {csv_header: volume, required: true, validate: "numeric >= 0; blank becomes NULL, not 0 (D7)"}
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        Volume is what the user's own systems recorded. It is not estimated; it is
+        the thing other quantities are estimated FROM — demand_mean names it in
+        estimable_from.
   time_unit:
     type: text
     unit: null
@@ -138,11 +148,21 @@ fields:
         visible_as: null
     ingest: {csv_header: time_unit, required: false, validate: one of day/week/month/quarter/year and their -ly spellings}
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        A unit is never estimated. Unrecognised or blank is read on a 7-day basis,
+        i.e. as already weekly (grading.ts::rateToWeekly).
   lead_time:
     type: numeric
     unit: weeks
-    unit_source: fixed
+    unit_source: column
+    unit_column: lead_time_unit
     meaning: >-
       How long this supplier takes to deliver this material. The contract fixes the
       unit at WEEKS; `time_unit` does not apply to it and never has.
@@ -158,12 +178,74 @@ fields:
         visible_as: MappingWarning on the run's mapping report
     ingest: {csv_header: lead_time, required: true, validate: numeric > 0}
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: [observations.receipts (Phase 7+)]
+      hybrid:
+        centre: "inbound_logistics.lead_time"
+        spread: "materials.lead_time_dist + materials.lead_time_cv"
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        The engine already supports this split and has since scsim was written:
+        SupplierLink carries lead_time_weeks (the CENTRE) separately from
+        lead_time_dist and lead_time_cv (the SPREAD), and core/engine.py samples
+        only when the distribution is not DETERMINISTIC and the CV is above zero.
+        So deterministic is not a degenerate case bolted on — it is the default
+        path, and it skips sampling entirely. default_mode is `asserted` for the
+        same reason: the user states the lead time, and the spread is opt-in.
+        estimable_from names the observations tier that does not exist yet (tier
+        2-O, reserved in WP 1.2) rather than leaving the door open to estimating
+        this from whatever happens to be lying around.
     note: >-
-      `unit_source: fixed` is the whole point of D9. The engine already reads a
-      `lead_time_unit` (project_map.py::_map_supply) that no column supplies, so
-      today the unit is fixed by omission rather than by contract. WP 1.3 adds the
-      column and this becomes unit_source `column`.
+      Was `unit_source: fixed` until WP 1.3, and fixed by OMISSION rather than by
+      contract: the engine read a `lead_time_unit` that no column supplied, so
+      every lead time was taken as weeks whatever the user meant. The column now
+      exists and `unit` stays `weeks` because that is what NULL still means.
+  lead_time_unit:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The period `lead_time` is quoted in — day, week, month, quarter or year.
+      Blank means WEEKS, which is what the engine assumed before this column
+      existed. Distinct from `time_unit`, which is the period `volume` is quoted
+      over and has never applied to the lead time.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_map_supply -> _duration_to_weeks(arc.lead_time, arc.lead_time_unit)"
+      transform: "looked up in the one unit table; an unknown value falls to a 7-day basis"
+      missing_default: "weeks"
+    substitutions:
+      - when: "NULL or blank"
+        value: "weeks"
+        provenance: contract
+        visible_as: null
+    ingest:
+      csv_header: lead_time_unit
+      required: false
+      validate: "one of the units public.unit_days() knows — enforced by the column's CHECK constraint"
+    surfaces: []
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        A unit is never estimated. NULL means weeks, matching
+        project_map.py::_duration_to_weeks, and the column's CHECK constraint only
+        admits units public.unit_days() knows.
+    note: >-
+      Added by WP 1.3 (D9). The engine had read this field since the scsim bridge
+      was written; no column supplied it, so `r.get("lead_time_unit")` returned
+      None on every row and a lead time entered in days was read as weeks — seven
+      times too long, with no warning, because nothing in the chain knew a unit was
+      expected. This is also the first use of the `contract` provenance state
+      reserved in WP 1.2: the weeks default is supplied by this document, not
+      guessed by code.
   unit_price:
     type: numeric
     unit: currency per unit of material
@@ -185,7 +267,23 @@ fields:
         visible_as: the effective-economics badge in /policies
     ingest: {csv_header: unit_price, required: true, validate: numeric > 0}
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        hybrid is NULL because scsim has nowhere to put a spread: cost and
+        unit_price are bare floats on Material and Product, with no distribution,
+        no CV and no sampling path anywhere in the engine. Recording `hybrid:
+        null` here is a statement about the ENGINE, not about the world — prices
+        obviously vary. Giving them a spread is an engine change on the scsim
+        track; see the RFC in PLAN.md §14. Do not invent one in this contract: a
+        contract that describes a capability the engine does not have is how a
+        fallback ends up in code with no contract entry, which is what I6 forbids
+        in the other direction.
     note: >-
       The user types `unit_price` and the engine calls it `cost`. Both names are
       recorded because the manual must lead with the one the user typed (D21).

@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+// The ONE unit table (PLAN.md §4 D10, invariant I3). Never restate it here.
+import { unitDays } from '../../supabase/functions/_shared/grading.ts';
 
 const SMALL_TXT = 'text-[11px] leading-tight';
 const CELL_PAD = 'py-1 px-2';       // compact body cells
@@ -105,6 +107,12 @@ interface TemplateType {
   templateFile: string;
   guideFile: string;
   expectedHeaders: string[];
+  /**
+   * Columns the parser keeps and the template offers but does NOT require.
+   * `expectedHeaders` is the required-column gate — a column added there rejects
+   * every file that predates it — so an optional column belongs here instead.
+   */
+  optionalHeaders?: string[];
   category: string;
 }
 
@@ -192,6 +200,12 @@ const UploadWizard = ({
         'lead_time',
         'unit_price',
       ],
+      // D9: `lead_time_unit` is OPTIONAL and therefore not in expectedHeaders —
+      // that list is the required-column gate, and putting it there would reject
+      // every CSV anyone has ever uploaded. Blank means weeks, which is what the
+      // engine has always assumed (project_map.py::_duration_to_weeks); supplying
+      // it is how a lead time quoted in days stops being read as weeks.
+      optionalHeaders: ['lead_time_unit'],
       category: 'inbound',
     },
     {
@@ -371,6 +385,17 @@ const UploadWizard = ({
         }
       });
 
+      // D9/D10: the unit must be one the ONE unit table knows. The list is not
+      // restated here — `unitDays` is the canonical table's own lookup, so this
+      // check cannot drift from the engine or from the column's CHECK constraint.
+      const leadUnit = (row as Record<string, unknown>).lead_time_unit;
+      if (leadUnit != null && leadUnit !== '' && unitDays(String(leadUnit)) === undefined) {
+        errors.push(
+          `Row ${index + 2}: Invalid lead_time_unit "${leadUnit}" — use day, week, ` +
+          `month, quarter or year. Leave it blank to mean weeks.`
+        );
+      }
+
       if (template.category === 'item-master') {
         Object.entries(ITEM_MASTER_ENUMS).forEach(([field, allowed]) => {
           const value = (row as Record<string, unknown>)[field];
@@ -511,6 +536,11 @@ const UploadWizard = ({
             row[header] = ['true', '1', 'yes'].includes(String(value).toLowerCase());
           } else if (header === 'higher_level_component_id' && value === '') {
             // Convert empty higher_level_component_id to null for root components
+            row[header] = null;
+          } else if (header === 'lead_time_unit' && value === '') {
+            // D9: blank means weeks, and NULL is how that is spelled. An empty
+            // string would fail the column's CHECK, which asks unit_days() to
+            // recognise the value.
             row[header] = null;
           } else {
             row[header] = value;

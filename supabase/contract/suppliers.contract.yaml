@@ -89,7 +89,15 @@ fields:
       required: false
       validate: null
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        A label. See materials.name.
   capacity_per_week:
     type: "numeric"
     unit: "units per week"
@@ -113,7 +121,25 @@ fields:
       required: false
       validate: "numeric > 0 when present"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        estimable_from is EMPTY and that is a positive statement, not an omission.
+        This is an engineering or commercial fact that someone knows exactly — it
+        is written on a drawing, in a contract, or on a machine's nameplate.
+        Fitting a distribution to it would produce a number with error bars around
+        something that has no error, and the error bars would be believed. A
+        future estimator reading this contract must refuse this field. Capacity is
+        what the supplier CAN ship, not what they HAVE shipped. Estimating it from
+        delivery history caps it at observed demand, so a capacity constraint
+        fitted this way can never bind and can never explain a shortage — which is
+        precisely the question it exists to answer. NULL continues to mean
+        unlimited; that is an assertion too.
     note: >-
       D17 lives here. NULL means unlimited, but the grid's liveDefault is
       `derivedVal ?? 0`, so an unlimited supplier renders as a capacity of ZERO
@@ -143,7 +169,18 @@ fields:
       required: false
       validate: "numeric in (0, 1]"
     surfaces: []
-    resolution: null
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload, item_master_form]
+      estimable_from: [observations.receipts (Phase 7+)]
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        Reliability is the second field that an observations tier could honestly
+        supply: on-time delivery is counted, not decided. Defaults to 1.0 — a
+        perfect supplier — which is a strong assumption stated quietly, and the
+        column's own DEFAULT rather than the engine's.
   updated_at:
     type: "timestamp with time zone"
     unit: null
