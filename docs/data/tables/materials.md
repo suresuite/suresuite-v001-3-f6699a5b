@@ -418,6 +418,6 @@ When the external system last confirmed this row.
 
 ---
 
-*Generated from data contract `ac6104c8fbc9`, engine `0.2.3`,
+*Generated from data contract `7468a2c78304`, engine `0.2.3`,
 sidecar `supabase/contract/materials.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -182,7 +182,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D1 | Auto-seed persists `safety_stock_days = 0`, overriding the engine's 7-day default | was `useStageRows.tsx:288` + `StagePolicyTable.tsx:844,887`; `project_map.py:783` | WP 0.1 ✅ *(`isPrefillPersistable`)* |
 | D2 | `combine-project` never converts `volume` by `time_unit` | was `combine-project/index.ts:60,68,268,275` + `:115,:234-235,:310,:318` — **eight** read sites, not seven | WP 0.2 ✅ |
 | D3 | `product_code_map` queried but exists in no migration; error swallowed | was `combine-project/index.ts:131-145`; the decision is recorded at `combine-project/index.ts:117-140` | WP 1.4 ✅ *(branch DELETED — it had never executed; no upload path, no writer, no template column ever existed for the table)* |
-| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(real migration `20260915000003_risk_data.sql`: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted. No `project_id` — deliberately: country risk is a property of the world)* |
+| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names. **It is not absent — it exists untracked in production**, which a static replay cannot distinguish from absent (CI proved it; §16 WP 1.4) | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(`20260915000003_risk_data.sql` both CREATEs on a fresh database and ADOPTS the untracked one: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted, CHECKs `NOT VALID` on the adopted rows. No `project_id` — deliberately: country risk is a property of the world)* |
 | D5 | No natural-key uniqueness on any lane table → re-upload duplicates | `20250820145837_…sql` | WP 3.3 |
 | D6 | CSV parse is `split(',')` — not quote-safe | `UploadWizard.tsx:502,523` | WP 3.2 |
 | D7 | Required-field validation misses `null` (blank numerics pass) | `UploadWizard.tsx:384` vs `:530-531` | WP 3.2 |
@@ -269,7 +269,7 @@ only in `PROMPTS.md` or in a session transcript.
 | `20260703000001_dataset_versions.sql:70-138` | `_build_dataset_snapshot` (D11) |
 | `20260711000002_unified_access_control.sql:169` | `capabilities_for_user` — the resolver |
 | `item_master.sql:91-96` | `ensure_item_masters` builds `materials`; unions `bom_single_level` only |
-| `ProcessLevelNetwork.tsx:1110-1111` | direct `.from()` reads, no RPC, no pagination |
+| `ProcessLevelNetwork.tsx:1104-1105` | direct `supabase.from('bom_multi_level')` / `from('supply_chain_data_multi_tier')` reads, no RPC, no pagination |
 
 ---
 
@@ -1042,7 +1042,8 @@ run against a seeded project with one user per role. **Tests must exercise the R
 path**, not only `.from()` — the lane tables' RLS is known not to survive PostgREST
 pooling under this app's custom auth (see `projectLanes.ts` header).
 
-**Two rules of `contract:check` flip here** *(both set up by WP 1.4)*:
+**Three rules of `contract:check` change here.** Two flip from warn to error; the
+third does not exist yet and should:
 
 1. **`natural-key` (R5) becomes a failure.** It warns today on all four lane
    tables. WP 3.3 lands the constraints that make it passable; do not flip it
@@ -1062,11 +1063,33 @@ pooling under this app's custom auth (see `projectLanes.ts` header).
    (all three verified correct by hand), 20 with no usable anchor and 19 sharing
    a row.
 
+3. **NEW — `§16 is append-only` (R7).** §16 has now lost entries to a silent
+   `git merge` **twice in one phase**: `5c7129f` dropped two (see the Phase 1
+   precondition entry) and the merge during WP 1.4 dropped the PHASE BOUNDARY
+   entry itself. Neither produced a conflict, because both sides had appended at
+   the same place and the ort strategy simply kept one. The rule is a dozen lines
+   of `git log`: every `### WP …` / `### PHASE …` heading present in any ancestor
+   commit must still be present in `HEAD`, struck-through-with-a-pointer being the
+   only permitted way to retire one (§16's own preamble already says so). It is
+   assigned here rather than written in WP 1.4 on purpose — a checker written at
+   the end of a package, against a defect that same package caused, is a checker
+   nobody has thought about for more than ten minutes.
+
 **Gap check** — this one is a security review: a real policy broader than the
-contract claims is a finding to fix **in this WP**. **RLS is OFF on all three
-item masters** (`materials`, `products`, `suppliers`) — recorded in the sidecars
-and rendered as a callout on each generated page since WP 1.4. It is not WP 1.4's
-to fix (WP 2.2 needs `project_members` first) and it is squarely this one's.
+contract claims is a finding to fix **in this WP**.
+
+**Start by discarding the inherited claim that RLS is off on the three item
+masters.** It is not a fact about the schema; it is an artifact of a statement the
+introspector silently dropped (§16 WP 1.4). `20260614000001_item_master.sql`
+enables RLS and creates two policies on each of `materials`, `products` and
+`suppliers` through `EXECUTE format(...)` inside a `FOREACH`, which no static
+replay can evaluate. Since WP 1.4 the contract records those three as
+`rls.determinate: false`, the validator refuses to let a sidecar assert either
+answer, and each generated page says so and names the migration. The honest state
+is **undetermined in both directions**, and only §15 against the live database
+settles it — §16 records the route, which is that CI can reach the database even
+though a work-package session cannot. Settle it here, then make the generated
+tests assert the answer rather than skip the question.
 
 ---
 
@@ -2135,15 +2158,220 @@ Handoff to WP 1.4:
   run all four plus its own drift comparison, so there is one command to name in CI
   and in CONTRIBUTING.
 
+### PHASE BOUNDARY — Phases 0 and 1 reviewed · 2026-09-15
+
+Not a work package. An audit of the seven packages 0.1–1.4 against the code, run
+before Phase 2 opens, because WP 2.1 changes organization identity across the whole
+schema and must not start on an unverified base.
+
+**Verdict: NO-GO for Phase 2.** WP 1.4 has not been written. Phase 1's exit is its
+gate, and there is no gate.
+
+#### What landed
+
+Six of seven packages landed a commit and each has a §16 entry: WP 0.1 (`4ec6fa6`),
+WP 0.2 (`c07ac98`), WP 0.3 (`719f59b` + `183a43c`), the Phase 1 precondition repair
+(`54c80ce`), WP 1.1 (`1f77451`), WP 1.2 (`2f8b5c1`), WP 1.3 (`d716d90`). All are
+merged to `main` at `6dd0188`. No §16 entry claims a package that has no commit —
+the log's coverage is honest.
+
+Gates, measured at `6dd0188`:
+
+| Gate | Result |
+|---|---|
+| `npm test` | ✓ 78 tests, 8 files (65 before this review) |
+| `npx tsc --noEmit` | ✓ clean — the two pre-existing failures named in WP 0.2's entry are gone |
+| `npm run check:docs` | ✓ (after this review's fixes; it was red on a stale citation — see below) |
+| `npm run contract:introspect` | ✓ 71 tables, 0 unparsed |
+| `npm run contract:validate` | ✓ 12 sidecars, 146 columns |
+| `npm run contract:units -- --check` | ✓ SQL matches `grading.ts::UNIT_DAYS` |
+| `npm run contract:verify` | ✗ 1 of 9 — `orphans are exactly product_code_map + risk_data` finds three (`approved_users`). Known, WP 1.4's to close |
+| `npm run contract:check` | **does not exist** — WP 1.4 |
+| `npx eslint .` | ✗ 454 problems (340 errors) — the documented baseline, not this phase's |
+| `npm run audit:ui` | ✗ **8 violations above baseline** — a regression from PR #190, not this plan's. See findings |
+
+**The three Phase 0 Criticals were mutation-tested, not read.** Each fix was reverted
+in the working tree and the suite re-run:
+
+| Critical | Revert | Result |
+|---|---|---|
+| D1 — silent policy override | `isPrefillPersistable` → `return true` | 2 tests fail ✓ |
+| D2 — unconverted volumes | `weeklyVolume` → raw `v` | 5 tests fail ✓ |
+| D3/D4 — swallowed read failures | — | **no test existed** ✗ |
+| D10 — three unit tables | `quarter: 91.3125` → `7.0` | 4 tests fail + `contract:units` fails ✓ |
+
+#### Fixed in this review
+
+1. **D3/D4/D25 had no regression test.** WP 0.2's §16 entry marks the exit check
+   "✅ Both pages show `RiskDataNotice`" beside two checks that became unit tests.
+   It was true of the code and pinned by nothing — the one Phase 0 Critical a later
+   edit could silently undo. Added `src/lib/policies/__tests__/loudFailure.test.ts`
+   (13 assertions, source-level, following `unitTableParity.test.ts`'s precedent
+   since this repo has no DOM tooling). Every branch was mutation-tested: restoring
+   the `{ data }`-only destructure on `product_code_map`, on a core lane read, or
+   dropping the `setRiskDataError` call each turns it red.
+2. **Ten stale `file:line` citations in §4 and §4.1**, the section CLAUDE.md names
+   as the *only* authority for data-layer evidence. Phase 1's own work caused most
+   of them: WP 1.3 added `lead_time_unit` to `UploadWizard.tsx` and shifted every
+   citation below it (D6, D7, and four §4.1 rows) without editing §4, which the
+   plan's own rule requires in the same commit. PR #190 shifted the two D4 page
+   citations and one §4.1 row. Corrected, along with the copies in
+   `PLAN-PROMPTS.md`. Note what this means: the precondition entry's handoff said
+   *"do not trust a `file:line` in §4.1 you have not re-checked"* — that warning
+   came true inside the same phase that wrote it.
+3. **`build/schema.introspected.json` was committed stale.** Regenerating it on a
+   clean tree changes three orphan `referenced_at` citations. Nothing noticed
+   because `contract:introspect -- --check` runs in no CI job. Regenerated.
+4. **WP 1.1's baseline numbers struck and corrected** (above): 231 functions
+   included 50 malformed signatures from a defective `argType`. `d716d90` fixed it
+   and did not say so.
+
+#### What is now true
+
+- The twelve sidecars **do** carry `governance {read, write, min_project_role,
+  audited}` per table, plus `rls_enabled` checked against the migrations. Phase 2's
+  WP 2.4 dependency is satisfied — that is not what blocks Phase 2.
+- One `UNIT_DAYS`, three languages, pinned by a test that re-reads all three from
+  disk. `rateToWeekly(v,'quarter')` agrees across TS, SQL and Python.
+- 146 columns described; every CSV-origin field records its `ingest.csv_header`,
+  checked against `public/template/`, not against memory.
+- Adding an undocumented column to a migration **does** fail `contract:validate` —
+  verified by adding a scratch column to `inbound_logistics` and watching it fail.
+  It fails *locally*. It fails nothing in CI.
+
+#### What the plan still assumes and nobody has verified
+
+- **The §15 baseline has never been run.** Three sessions have now recorded "no
+  database reachable"; this one confirms it again (no `SUPABASE_*`, `DATABASE_URL`
+  or `POSTGRES_*` in the environment). Every §15 query is unrun. **Phase 0's
+  headline claim — that WP 0.2 fixed `sourcing_ratio` on real data — rests on a
+  unit test and an argument, not on a measurement**, and Phase 3 has no "before"
+  count for D5, D6, D7 or D8 to measure its fix against. This is now four phases of
+  compounding. It is the single largest unverified assumption in the plan.
+- **Auto-seed firing at most once per `(project, stage)` across a tab round trip**
+  is still verified by reading only. The `Set` marker and the synchronous
+  `applying` flag are both correct in the code; no test covers the round trip
+  because the repo has no DOM tooling.
+- **A CSV with `lead_time_unit=day` has never round-tripped through a database.**
+  Every link is asserted in `leadTimeUnit.test.ts`; no hop between links is.
+- **The edge functions have never been typechecked.** Deno is not available here,
+  so `combine-project` and `_shared/` pass eslint and `tsc` only as the frontend
+  sees them.
+
+#### Findings — recorded, not fixed here
+
+- **F1 — no CI job runs `npm test`, `check:docs`, or any `contract:*` gate.** Of
+  twelve workflows in `.github/workflows/`, none invokes them, and `npm run lint`
+  (which would carry `check:docs`) is not in CI either and is red at baseline
+  anyway. So *every gate Phase 1 built is unwired*, not just the one WP 1.4 owes.
+  The precondition entry drew the lesson from one merge silently un-doing
+  `check:docs`; the same hole has now let the introspected artifact drift and ten
+  citations rot, in the same phase. → **WP 1.4 step 4**, which already says to wire
+  the job directly rather than behind `lint`. Widen it: the job must also run
+  `contract:introspect -- --check`, `contract:validate`, `contract:units -- --check`
+  and `contract:verify`, per WP 1.3's handoff.
+- **F2 — `npm run audit:ui` is red on `main` with 8 violations above baseline**, all
+  `h-9`/`h-8` controls with no 44px mobile floor, introduced by PR #190 across
+  `DataManager`, `FirmLevelNetwork`, `InteractiveNetworkSpace`, `ProcessLevelNetwork`,
+  `ProductLevelNetwork`, `ProjectPolicies`, `SimulationLab`. The `ui-audit` workflow
+  **is** wired, so `main` has a failing check. Outside this plan's scope — recorded
+  here because a red gate next to a green one teaches everybody to ignore both.
+- **F3 — §4's citations have no gate, and they rot within one phase.** `check:docs`
+  enforces *where* evidence lives, never *whether it is true*. Ten of 64 citations
+  were wrong today. The plan already assigns the fix to WP 1.4 ("until WP 1.4's gate
+  covers §4 itself"); this entry is the evidence for how fast it degrades without
+  one. A checker is cheap — resolve each `file:line` and assert the line still holds
+  a token from its own description.
+- **F4 — `contract:verify` exits 1 and would redden CI the moment it is wired.** The
+  failing check is the orphan count, which WP 1.4 closes by reconciling
+  `approved_users`. Wire the job and reconcile the orphans in the same package, or
+  Phase 1 ends with a gate that is red on arrival — the exact condition that made
+  `lint` unreadable.
+- **F5 — `simulation_jobs` still has an unresolved shadowed definition**, as WP 1.1
+  recorded. Untouched.
+
+#### What Phase 2 inherits
+
+1. **No contract, no generator, no `docs/data/tables/*.md`, no drift gate, no CI.**
+   WP 1.4 is entirely unstarted — not partially done.
+2. **Three orphans, none reconciled.** `product_code_map`, `risk_data`,
+   `approved_users`. `approved_users` is the authentication table WP 2.2 will build
+   `project_members` beside; a fresh database still cannot be built from
+   `supabase/migrations/` alone.
+3. **RLS is OFF on all three item masters** (`materials`, `products`, `suppliers`) —
+   the tables holding cost, sell price, capacity and reliability. Recorded in each
+   sidecar's `governance.rls_enabled`. WP 2.4's generated tests must fail on this
+   rather than skip it.
+4. **No §15 baseline**, per above.
+5. **D26's two live copies of the D1 prefill rule**, one unreachable; and the two
+   copies of `resolveCell`. Both assigned to WP 6.2. Nothing before it may edit one
+   copy alone.
+
+#### GO / NO-GO
+
+**NO-GO.** Against the four conditions set for opening Phase 2:
+
+| Condition | State |
+|---|---|
+| `contract:check` green AND running in CI | ✗ the script does not exist; no gate runs in CI at all (F1) |
+| both orphan tables resolved, not deferred | ✗ three orphans, none resolved |
+| natural-key rule at WARN with a dated TODO for WP 2.4 | ✗ `check.mjs` does not exist. The rule lives in the sidecars as `natural_key_intended` — data, not a gate |
+| Phase 0's three Criticals have regression tests that fail without the fix | ✓ **now** — D3/D4 got its test in this review; D1 and D2 were already pinned |
+
+Three of four fail, and they fail for one reason: **WP 1.4 was never written.** The
+correct next action is WP 1.4 as specified in §8, widened by F1 and F4. Phase 2 opens
+when `contract:check` is green in CI and the three orphans are reconciled — not before.
+
+Handoff to WP 1.4:
+- `contract:verify` is red on the orphan check today. Do not weaken it; reconcile
+  `approved_users` per §8 step 3 and let the check go green on its own terms.
+- Wire **five** commands into the job, not one: `contract:introspect -- --check`,
+  `contract:validate`, `contract:units -- --check`, `contract:verify`, `npm test`,
+  plus `check:docs`. Each already fails correctly on drift; none is wired.
+- The committed `build/schema.introspected.json` drifted within a day of landing.
+  `--check` on it is the cheapest gate in the phase.
+- `docs/data/tables/*.md` must open with a GENERATED banner (WP 0.3's handoff).
+- When you add the §2.1 invariants to `CLAUDE.md`, use gate names, not bare `G`
+  numbers — they collide with the blueprint's gap IDs (WP 0.3's finding).
+
 ### WP 1.4 — Generator, drift gate, orphan reconciliation · 2026-09-15 · `6c67c29`
 
-**There is no PHASE BOUNDARY entry in this section, and this package was told to
-read one.** §16 ended at WP 1.3. The brief's own summary of what that entry
-contained (the §15 baseline unrun, F2 `audit:ui`, F3's stale citations, the
-`simulation_jobs` shadow, RLS on the item masters) is carried below, verified
-where it was verifiable — and the RLS item turned out to be **wrong**, which is
-the argument for the rule the brief and this package both restate: a claim that
-lives only in a handoff is a claim with no gate.
+**The PHASE BOUNDARY entry was not in §16 when this package started, and it is
+above this one now because THIS PACKAGE'S MERGE DROPPED IT.** Both halves matter.
+
+At the start of the session §16 ended at WP 1.3: the boundary review (`6ddb92a`)
+was still in flight on another branch, so its entry, its ten citation fixes and
+its `loudFailure.test.ts` did not exist here. WP 1.4 was therefore written against
+the brief's summary of a document it could not read. That is survivable and this
+entry says where it mattered.
+
+What is not survivable is the second half. `6ddb92a` merged to `main` and into
+this branch while WP 1.4 was being written, and **`git merge` auto-resolved
+`docs/PLAN.md` with no conflict and silently discarded `### PHASE BOUNDARY` from
+§16** — both sides had appended a new entry at the same place, and the ort
+strategy kept one. Every other heading survived; only that one vanished. This is
+the *exact* failure the Phase 1 precondition entry documents about merge
+`5c7129f`, which dropped two §16 entries and broke `resolveCell` without failing
+anything, and it has now happened twice in one phase, to the document whose whole
+purpose is to be the thing that does not get lost. Restored above, verbatim from
+`6ddb92a`.
+→ **This is a gap `contract:check` should close and does not.** R6 reads §4; it
+reads nothing in §16. A rule that every `### WP` / `### PHASE` heading present in
+any ancestor commit is still present in `HEAD` is a dozen lines of `git log` and
+would have caught both incidents. It is NOT added here — a checker written at the
+end of a package, against a defect that package caused, is a checker nobody has
+thought about for more than ten minutes. → assigned to **WP 2.4**, which already
+owns the gates this package could not close; plan edited.
+
+**One of the boundary review's inherited facts is WRONG, and this package proved
+it: "RLS is OFF on all three item masters" (its §"What Phase 2 inherits" item 3).**
+It is not off; it is UNDETERMINED, and the migrations cannot settle it. The
+mechanism is below under the item-master finding. The boundary review read it in
+good faith from the sidecars, which read it in good faith from the introspected
+artifact, which recorded it because it had silently dropped the statement that
+sets it. Three documents agreed and none of them knew. That is what a claim with
+no gate looks like at the end of its second hop — and it is the argument for the
+rule the boundary review, the brief and this package all restate.
 
 Preconditions held? **no, in one measurable way.** `npm run contract:introspect --
 --check` was RED on arrival. WP 1.3's handoff said "two new migrations mean the
@@ -2172,8 +2400,39 @@ Exit checks passed? **all four.**
   → `introspect --check` fails (stale artifact). WITH the artifact regenerated →
   `contract:validate` and `contract:generate --check` both fail on `column
   "scratch_column" has no field entry`. The second is the one that matters: it is
-  the coverage rule, not the freshness rule. CI run URL for the throwaway PR:
-  `<ci-url>`.
+  the coverage rule, not the freshness rule.
+  **And it is proved in CI, not only locally** — throwaway PR #195, run
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/34995780231>:
+  step 5 *"Introspected schema matches the migrations"* **passed** (the artifact
+  was regenerated on purpose, so the freshness rule could not be what failed) and
+  step 6 *"Sidecars validate against the schema"* **failed** on `column
+  "scratch_column" has no field entry`. A gate that is not wired is not a gate;
+  this one is wired. **The whole job green**, all eleven steps, on
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35023287328>.
+- ✅ **The `risk_data` migration applies to the LIVE database**, not only to a
+  replay —
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35023145717>,
+  `Applying migration 20260915000003_risk_data.sql... Finished supabase db push.`
+  The adoption block ran against the untracked production table, and the renames,
+  the provenance columns, the `NOT VALID` CHECKs and the unique constraint all
+  landed. This is the first exit check in Phase 1 verified against a database
+  rather than against an argument.
+
+**The gate found its own package's blind spot within two hours of existing, and it
+found it on `main`.** PR #194 merged at a commit where
+`build/schema.introspected.json` was stale, and
+<https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35009405228>
+went red on `main` with `SCHEMA DRIFT`. The cause is the merge described at the top
+of this entry: `6ddb92a` brought in `loudFailure.test.ts`, which contains a literal
+`.from('product_code_map')`, and the introspector scans application code for
+exactly that — so the committed artifact's orphan list changed under a commit that
+touched no migration. Fixed in the follow-up (PR #196), and worth stating plainly
+rather than tidying away: **this is the gate working.** The same drift happened
+before WP 1.4 — the boundary entry's point 3, "committed stale; nothing noticed
+because `contract:introspect -- --check` runs in no CI job" — and nothing said so
+for a day. It is also the sharpest available argument for the no-path-filter
+decision above: a filter on `supabase/migrations/**` would have skipped that run
+entirely.
 
 **THE ITEM MASTERS ARE NOT KNOWN TO HAVE RLS OFF. WP 1.2 SAID THEY WERE, AND IT
 WAS WRONG.** The three sidecars asserted `rls_enabled: false` with the note "No
@@ -2294,16 +2553,74 @@ Discovered:
   red job on main and still **not this package's** — `data-contract.yml` does not
   run `audit:ui`, and nothing here touches the adaptive-UI baseline.
 
-Baseline numbers (if run): **NOT RUN — a fifth consecutive session, and this time
-with a reason rather than an absence.** No Supabase credentials exist in the
-environment (`.env.production` carries three `VITE_*` feature flags and nothing
-else), and the hardcoded anon key cannot be used either: the egress proxy
-**denies CONNECT to `wckdrutwkytwcomrlpib.supabase.co:443` by organization
-policy**. This is no longer "no database was reachable"; it is "this class of
-session cannot reach one, and will not be able to next time either." §15 needs a
-run from somewhere with network access to the project, and until it does, every
-statement in this plan about ROW COUNTS is unverified — including, now, the only
-way to settle whether RLS is on for the three item masters.
+**`risk_data` IS NOT ABSENT. IT EXISTS IN PRODUCTION, UNTRACKED — and CI is how
+we know.** The first version of `20260915000003_risk_data.sql` was a plain
+`CREATE TABLE IF NOT EXISTS`, on the reasonable-sounding premise that a table no
+migration creates is a table that does not exist. `supabase-migrations.yml`
+disproved it in one line on the first push
+(<https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/34995665498>):
+
+```
+Applying migration 20260915000003_risk_data.sql...
+ERROR: column "source" of relation "public.risk_data" does not exist
+At statement: 2
+```
+
+Statement 1 was the CREATE; `IF NOT EXISTS` made it a **no-op**, because the
+table is already there with the spreadsheet-header columns the pages read. It is
+the same class as `approved_users`, and **the introspector cannot tell the two
+apart**: "no migration creates this table" is true of a table that does not exist
+AND of a table nobody wrote a migration for. WP 1.1's orphan list is therefore a
+list of *untracked-or-absent*, and reading it as *absent* is what this package did
+until CI said otherwise.
+
+The migration now does both jobs and labels them: CREATE for a fresh database, and
+an `EXECUTE`-guarded adoption for the untracked one — renames the quoted columns,
+adds the provenance columns, and marks the pre-contract rows
+`source: 'unrecorded (loaded before the reference-tier contract)'` rather than
+inventing a publisher for them. The new CHECKs land `NOT VALID` on adopted rows:
+enforced for every future write, never retroactively asserted about rows nobody
+has looked at. The UNIQUE is wrapped in an exception handler that WARNs rather
+than blocking every later migration behind a data question. `EXECUTE` is used
+deliberately, not stylistically — a guarded `IF … THEN ALTER TABLE … RENAME
+COLUMN` is unwrapped by the DO descent and applied UNCONDITIONALLY by the replay,
+where the legacy column does not exist, so the artifact would be wrong about the
+very schema the file defines. Opacity to the replay is now RECORDED
+(`dynamic_ddl`) rather than silently dropped, which is what makes that an
+acceptable trade rather than a hiding place.
+→ affects **WP 2.1 and WP 3.1**: any table on their deferred lists may also exist
+untracked. Plan edited (§4 D4).
+
+**`supabase-migrations.yml` marks new `2025*` migrations APPLIED without running
+them.** Its repair step runs `supabase migration repair --status applied` over
+every file matching `^(2025|20260527|20260607|20260609)`, so
+`20250815000000_approved_users_base.sql` was stamped applied and never executed
+against production. That is CORRECT here — the table exists, the file is
+`IF NOT EXISTS`, and running it would be a no-op — and it is a trap for anyone
+who later assumes a migration with a 2025 timestamp has run. A fresh database
+built from `supabase/migrations/` does execute it, which is the whole point of
+the file.
+
+Baseline numbers (if run): **NOT RUN — a fifth consecutive session. But the reason
+the four before this one recorded is now known to be too strong.** No Supabase
+credentials exist in this environment (`.env.production` carries three `VITE_*`
+feature flags and nothing else) and the egress proxy **denies CONNECT to
+`wckdrutwkytwcomrlpib.supabase.co:443` by organization policy**, so no
+work-package SESSION can reach the database. **CI can.**
+`supabase-migrations.yml` links to the project and runs `supabase db push` against
+it on every push, with `SUPABASE_ACCESS_TOKEN` and the database password in
+Actions secrets — which is how the `risk_data` finding above surfaced at all. So
+§15 is not blocked on access; it is blocked on nobody having written the job.
+→ **A `workflow_dispatch` job that runs §15's queries and uploads the counts as an
+artifact is the route**, and it is a decision for someone with authority over the
+data rather than for a session: §15's output is row counts and sample identifiers
+from a live project, and a public Actions log is not where those belong. Recorded
+so the next package stops repeating "no database is reachable" — the accurate
+statement is "no session is; CI is; and the job that would use it has not been
+written."
+
+Until it is, every statement in this plan about ROW COUNTS is unverified —
+including the only way to settle whether RLS is on for the three item masters.
 
 Handoff to WP 2.1 (and Phase 2):
 - **`npm run contract:check` is the one command.** It is green at the end of this
@@ -2321,6 +2638,36 @@ Handoff to WP 2.1 (and Phase 2):
 - **The invariants have names now** (`single-source`, `natural-key`, `audit-actor`,
   `uuid-identity`, …) and `CLAUDE.md` carries them with where each is enforced
   today. Cite the name. `G1`–`G4` still mean two different things on one page.
+- **The boundary review's `loudFailure.test.ts` asserted the thing this package was
+  told to delete.** Its D3 block required `.from('product_code_map')` to still
+  exist and to destructure `error` — WP 1.4's step 3 deletes that read. The two
+  are not in conflict about anything real: the review pinned the fix that was
+  there, and this package removed what the fix was protecting. Replaced, not
+  dropped, and mutation-tested to the same standard the review set — the block now
+  asserts the table is read by NO application code (`combine-project`,
+  `delete-project`, both pages), that `productMapping` is gone with it, and that
+  the ETL still carries the recorded reason, since a deletion with no record is an
+  invitation to re-add it. Each assertion was verified by undoing what it guards:
+  re-adding the read, re-adding the Map, and stripping the comment each turn it
+  red. The test names the table by assembling the string, because a test asserting
+  a read is GONE must not itself look like the read to the introspector's scanner —
+  which it did, and R4 caught it.
+- **The review's ten citation fixes and this package's four overlapped, and the
+  merge kept the wrong one once.** `ProcessLevelNetwork.tsx:1110-1111` survived in
+  §4.1 while `PLAN-PROMPTS.md` carried the review's corrected `:1104-1105`;
+  `check:docs` caught the disagreement (that is exactly what it is for) and the
+  file confirms the review was right. **R6 could not have caught it** — 1110-1111
+  is in bounds, and the row's only token is `.from()`, which the anchor filter
+  discards as pathish. It is a clean example of the gap between what R6 gates and
+  what R6 reports, and it is the case WP 2.4's flip has to handle.
+- **An orphan is "untracked OR absent", never just "absent".** `risk_data` was read
+  as absent by WP 0.2, by this package's first draft, and by the introspector
+  itself, and it exists. Before writing a migration for a table on the deferred
+  list, assume it may already be there and make the file adopt as well as create.
+- **`data-contract.yml` did not run on PR #194**, the PR that introduces it, and
+  did run on PR #195, whose base branch already carries it. Once #194 is on `main`
+  every later PR gets the gate; until then the proof is #195's run. Do not read
+  #194's short check list as the gate passing.
 - **`contract:introspect -- --check` is sensitive to application-code line
   numbers.** If you move code in `src/` or `supabase/functions/`, run
   `npm run contract:introspect` and commit the artifact. This is a real cost of
@@ -2334,8 +2681,8 @@ Handoff to WP 2.1 (and Phase 2):
 | Phase | WPs | Focus | Blocks | Status |
 |---|---|---|---|---|
 | 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
-| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ⛔ 1.1–1.3 done; **1.4 not started** |
-| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | blocked |
+| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ✅ done — `contract:check` green, six commands wired in `data-contract.yml`, three orphans reconciled |
+| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ready |
 | 3 | 3.1 – 3.4 | one ingestion contract | 4 | — |
 | 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | — |
 | 5 | 5.1 – 5.3 | lineage + the 77-page manual | 6 | — |
@@ -2350,7 +2697,15 @@ in Phase 1, not the smallest: it carries its own scope (generator, drift gate, t
 orphan reconciliations, `CLAUDE.md`) plus the CI wiring for **six** commands that no
 workflow runs today (§16 F1) and the orphan fix that `contract:verify` needs to stop
 being red (F4). Budget it as a full session with no headroom for a second package.
-Phase 2 does not start until it is green in CI.
+Phase 2 does not start until it is green in CI. **It is** — `contract:check` passes,
+the six commands run on every pull request, and the gate's teeth are proved by a
+throwaway PR that made CI red on an undescribed column (§16 WP 1.4). The four
+NO-GO conditions the boundary review set are all met; Phase 2 is open.
+
+One inherited fact it set is **not** met and cannot be, and WP 2.4 should read the
+WP 1.4 entry before it plans: "RLS is OFF on all three item masters" is not a fact
+about the schema, it is an artifact of a statement the introspector dropped. The
+honest state is *undetermined*, and only §15 against the live database settles it.
 
 **Out of order by design:** WP 5.2a (P1, P5, un-hide `/docs`) needs nothing and can
 ship at any time. It is the cheapest user-visible improvement in the plan.

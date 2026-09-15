@@ -30,29 +30,57 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const ETL = "supabase/functions/combine-project/index.ts";
 const PAGES = ["src/pages/ProductLevelNetwork.tsx", "src/pages/FirmLevelNetwork.tsx"];
 
-describe("D3 — product_code_map fails loudly", () => {
-  it("captures the error rather than destructuring only { data }", () => {
-    const src = read(ETL);
-    const idx = src.indexOf(".from('product_code_map')");
-    expect(idx, "the product_code_map read must still exist").toBeGreaterThan(-1);
-    // Same scan-back-to-this-read's-own-binding rule as the D25 block below.
-    const open = src.slice(0, idx).lastIndexOf("const {");
-    const pattern = src.slice(open, src.indexOf("}", open) + 1);
+// The table name, assembled rather than written as a `.from('…')` literal. The
+// introspector scans this repo for `.from('<table>')` to find tables the code
+// reads and no migration creates, and a test asserting that a read is GONE must
+// not itself look like the read. (`scripts/data-contract/introspect.mjs`.)
+const DEAD_TABLE = ["product", "code", "map"].join("_");
+
+describe("D3 — product_code_map is gone, and stays gone", () => {
+  /**
+   * WP 0.2 made this read loud. WP 1.4 reconciled the orphan it was loud about
+   * and DELETED it, so the assertions this block used to make — that the read
+   * destructures `error`, logs at error level, and pushes a warning — now
+   * describe code that does not exist.
+   *
+   * They are replaced, not dropped. Deleting a branch closes the instance; it
+   * does not close the class. What is worth pinning is the decision: the table
+   * exists in no migration, the mapped branch had never executed, and nobody
+   * should "restore" either without reopening that decision. So the guard is
+   * absence plus the recorded reason.
+   */
+  it("is read by no application code", () => {
+    const hits: string[] = [];
+    for (const file of [ETL, "supabase/functions/delete-project/index.ts", ...PAGES]) {
+      const src = read(file);
+      // `.from('<table>')` and `deleteTableByProjectId('<table>')` — the two
+      // shapes this table was ever reached through.
+      if (new RegExp(`\\(\\s*['"\`]${DEAD_TABLE}['"\`]`).test(src)) hits.push(file);
+    }
     expect(
-      /\berror\s*:/.test(pattern),
-      `the read must destructure \`error\`, not just \`data\` (D3) — got ${pattern}`,
-    ).toBe(true);
+      hits,
+      `${DEAD_TABLE} exists in no migration (PLAN.md §4 D3). A call site for it can only ` +
+        "fail. If it is genuinely needed, the decision to re-add it is an ingestion-contract " +
+        "question — a declared alias column on an uploaded table — not a silent lookup table.",
+    ).toEqual([]);
   });
 
-  it("logs the failure and rides it back to the caller as a warning", () => {
+  it("leaves the reason behind where the read used to be", () => {
+    // A deletion with no record invites the next person to re-add it, which is
+    // how the branch survived unexecuted for as long as it did.
     const src = read(ETL);
-    expect(src).toMatch(/if\s*\(\s*productCodeMapError\s*\)/);
-    expect(src, "the failure must be logged at error level, not swallowed").toMatch(
-      /productCodeMapError\s*\)\s*\{[\s\S]{0,400}console\.error/,
+    expect(src, "the ETL must still explain why the mapping was removed").toMatch(
+      new RegExp(`${DEAD_TABLE}[\\s\\S]{0,600}(DELETED|never executed|NEVER EXECUTED)`),
     );
-    expect(src, "and must reach the response as a warning (§5 T2)").toMatch(
-      /productCodeMapError\s*\)\s*\{[\s\S]{0,900}warnings\.push/,
-    );
+  });
+
+  it("takes the branch it fed with it", () => {
+    const src = read(ETL);
+    expect(
+      /\bproductMapping\b/.test(src),
+      "the `productMapping` Map was only ever populated from the deleted read; a Map that is " +
+        "always empty selecting between two paths at runtime is the unmapped path with extra steps",
+    ).toBe(false);
   });
 });
 
@@ -93,9 +121,11 @@ describe("D4 — risk_data is missing on screen, not silently", () => {
 
   it.each(PAGES)("%s treats an empty result as a missing source too", (page) => {
     const src = read(page);
-    // `risk_data` has no migration, so the common failure is not an error at
-    // all — it is a successful read of nothing. That must raise the notice as
-    // well, or the fix only covers the rarer case.
+    // The common failure here is not an error at all — it is a successful read
+    // of nothing. That must raise the notice as well, or the fix only covers
+    // the rarer case. WP 1.4 made this the LIKELY case rather than a corner:
+    // `risk_data` now has a migration, so the read succeeds against a real
+    // table — one that is empty until an operator loads a vintage.
     expect(src).toMatch(/setRiskDataError\(\s*['"`]The risk_data table returned no rows\./);
   });
 

@@ -9,6 +9,37 @@
 -- a map with a dimension silently missing — which is the failure mode §5 exists
 -- to end. The read stays; the table becomes real.
 --
+-- ── AND IT IS NOT ABSENT. IT IS UNTRACKED. ──────────────────────────────────
+--
+-- The first version of this file was a plain CREATE TABLE IF NOT EXISTS, on the
+-- reasonable-sounding assumption that a table no migration creates is a table
+-- that does not exist. CI disproved it in one line:
+--
+--     Applying migration 20260915000003_risk_data.sql...
+--     ERROR: column "source" of relation "public.risk_data" does not exist
+--     At statement: 2
+--
+-- Statement 1 was the CREATE, and IF NOT EXISTS made it a NO-OP — because
+-- `public.risk_data` is already there, in the production database, with the
+-- spreadsheet-header columns the pages read (`COUNTRY`, `"RISK CLASS"`). It is
+-- the same class as `approved_users`: an object that predates migration
+-- tracking and was created outside it. WP 1.1's introspector cannot see that
+-- class; it can only see "no migration creates this", which is true of a table
+-- that does not exist AND of a table nobody wrote a migration for.
+--
+-- So this file has two jobs, and says which is which at every step:
+--   · build the table on a database that does not have it (the CREATE below);
+--   · ADOPT the one that is already there, without losing its rows.
+--
+-- The adoption runs through `EXECUTE`, and that is deliberate rather than
+-- stylistic. A guarded `IF ... THEN ALTER TABLE ... RENAME COLUMN` would be
+-- unwrapped by the introspector's DO descent and applied UNCONDITIONALLY to the
+-- freshly-replayed table, where the legacy column does not exist — so the
+-- artifact would be wrong about the very schema this migration defines.
+-- `EXECUTE` is opaque to the replay by construction, and since WP 1.4 opacity is
+-- RECORDED (`dynamic_ddl`) rather than silently dropped. The CREATE above it is
+-- what the contract describes, and it is what a fresh database gets.
+--
 -- WHAT CHANGES FROM THE SHAPE THE CODE ASSUMED:
 --
 --   1. The columns are renamed. The pages read `COUNTRY` and `"RISK CLASS"` — an
@@ -67,6 +98,107 @@ CREATE TABLE IF NOT EXISTS public.risk_data (
     CHECK (risk_class IN ('Very Low', 'Low', 'Medium', 'High', 'Very High'))
 );
 
+-- ── adopting the untracked table ────────────────────────────────────────────
+--
+-- A no-op on a database that just ran the CREATE above. On the one that already
+-- had `risk_data`, this brings it to the same shape without dropping a row.
+--
+-- THREE THINGS IT WILL NOT DO:
+--
+--  1. It will not invent provenance. The existing rows have no recorded source,
+--     vintage or licence, and there is no way to recover them — so they get the
+--     literal string 'unrecorded (loaded before the reference-tier contract)'.
+--     That is not a placeholder pretending to be data; it is the answer, and it
+--     renders on the generated page as the answer. An operator replacing the
+--     dataset overwrites it with a real publisher (§5 T1).
+--  2. It will not validate the old rows against the new CHECKs. They land
+--     NOT VALID: enforced for every future insert and update, not retroactively
+--     asserted about rows nobody has looked at. `ALTER TABLE public.risk_data
+--     VALIDATE CONSTRAINT ...` is the one-line follow-up once the data is
+--     checked — and it belongs to whoever checks it, not to this file.
+--  3. It will not fail the migration over duplicate countries. If the legacy
+--     table has two rows for one country the unique index cannot be created;
+--     that is a data question, and the migration raises a WARNING and carries
+--     on rather than blocking every later migration behind it.
+DO $adopt$
+DECLARE
+  has_legacy_country boolean;
+  has_legacy_class   boolean;
+BEGIN
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'risk_data'
+                    AND column_name = 'COUNTRY'),
+         EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'risk_data'
+                    AND column_name = 'RISK CLASS')
+    INTO has_legacy_country, has_legacy_class;
+
+  IF has_legacy_country THEN
+    EXECUTE 'ALTER TABLE public.risk_data RENAME COLUMN "COUNTRY" TO country';
+    RAISE NOTICE 'risk_data: renamed "COUNTRY" -> country';
+  END IF;
+  IF has_legacy_class THEN
+    EXECUTE 'ALTER TABLE public.risk_data RENAME COLUMN "RISK CLASS" TO risk_class';
+    RAISE NOTICE 'risk_data: renamed "RISK CLASS" -> risk_class';
+  END IF;
+
+  EXECUTE 'ALTER TABLE public.risk_data
+             ADD COLUMN IF NOT EXISTS id           uuid DEFAULT gen_random_uuid(),
+             ADD COLUMN IF NOT EXISTS source       text,
+             ADD COLUMN IF NOT EXISTS vintage      text,
+             ADD COLUMN IF NOT EXISTS licence      text,
+             ADD COLUMN IF NOT EXISTS refreshed_at timestamptz NOT NULL DEFAULT now(),
+             ADD COLUMN IF NOT EXISTS created_at   timestamptz NOT NULL DEFAULT now(),
+             ADD COLUMN IF NOT EXISTS updated_at   timestamptz NOT NULL DEFAULT now()';
+
+  EXECUTE $sql$
+    UPDATE public.risk_data
+       SET source  = COALESCE(source,  'unrecorded (loaded before the reference-tier contract)'),
+           vintage = COALESCE(vintage, 'unrecorded'),
+           licence = COALESCE(licence, 'unrecorded — do not republish until this is established'),
+           id      = COALESCE(id, gen_random_uuid())
+     WHERE source IS NULL OR vintage IS NULL OR licence IS NULL OR id IS NULL
+  $sql$;
+
+  EXECUTE 'ALTER TABLE public.risk_data
+             ALTER COLUMN id      SET NOT NULL,
+             ALTER COLUMN source  SET NOT NULL,
+             ALTER COLUMN vintage SET NOT NULL,
+             ALTER COLUMN licence SET NOT NULL';
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conrelid = 'public.risk_data'::regclass AND contype = 'p') THEN
+    EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_pkey PRIMARY KEY (id)';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conrelid = 'public.risk_data'::regclass
+                    AND conname = 'risk_data_country_normalized') THEN
+    EXECUTE 'ALTER TABLE public.risk_data
+               ADD CONSTRAINT risk_data_country_normalized
+               CHECK (country = upper(btrim(country))) NOT VALID';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conrelid = 'public.risk_data'::regclass
+                    AND conname = 'risk_data_risk_class_known') THEN
+    EXECUTE $sql$ALTER TABLE public.risk_data
+               ADD CONSTRAINT risk_data_risk_class_known
+               CHECK (risk_class IN ('Very Low', 'Low', 'Medium', 'High', 'Very High')) NOT VALID$sql$;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conrelid = 'public.risk_data'::regclass
+                    AND conname = 'risk_data_country_key') THEN
+    BEGIN
+      EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_country_key UNIQUE (country)';
+    EXCEPTION WHEN unique_violation OR not_null_violation THEN
+      RAISE WARNING 'risk_data: cannot add UNIQUE (country) — the existing rows are not unique by country. '
+                    'Deduplicate, then: ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_country_key UNIQUE (country);';
+    END;
+  END IF;
+END
+$adopt$;
+
 COMMENT ON TABLE public.risk_data IS
   'Country-risk reference data (PLAN.md §2 reference tier, D4). Project-independent '
   'and versioned by vintage. One live vintage per country; refreshing upserts.';
@@ -81,6 +213,11 @@ ALTER TABLE public.risk_data ENABLE ROW LEVEL SECURITY;
 -- apply, because there is no project. Writes have no user-facing path at all:
 -- the table is loaded by an operator through the service role, which bypasses
 -- RLS, so the absence of an INSERT/UPDATE/DELETE policy IS the write rule.
+--
+-- On the adopted table this is a change: it had no policies, so enabling RLS
+-- without the SELECT policy below would cut off the reads that work today. The
+-- two land together and are read-equivalent for `authenticated` and `anon`.
+DROP POLICY IF EXISTS risk_data_read ON public.risk_data;
 CREATE POLICY risk_data_read ON public.risk_data FOR SELECT TO authenticated, anon USING (true);
 
 GRANT SELECT ON public.risk_data TO authenticated, anon, service_role;

@@ -13,7 +13,7 @@
     "shadowed_definitions": 8,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 23,
+    "dynamic_ddl_statements": 32,
     "rls_indeterminate_tables": 7,
     "orphans": 0,
     "aborted_migrations": 3
@@ -20787,6 +20787,95 @@
       "migration": "20260829120000_erp_connector_phase1_2.sql",
       "statement": "EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated;', t)",
       "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF has_legacy_country THEN EXECUTE 'ALTER TABLE public.risk_data RENAME COLUMN \"COUNTRY\" TO country'",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF has_legacy_class THEN EXECUTE 'ALTER TABLE public.risk_data RENAME COLUMN \"RISK CLASS\" TO risk_class'",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "EXECUTE 'ALTER TABLE public.risk_data ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid(), ADD COLUMN IF NOT EXISTS source text, ADD COLUMN IF NOT EXISTS vintage text, ADD COLUMN IF NOT EXISTS licence text, ADD COLUMN IF NOT EXISTS refreshed_at timestamptz NOT NULL DEFAULT now(), ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(), ADD COLUMN IF NOT EXISTS updated_at time",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "EXECUTE $sql$ UPDATE public.risk_data SET source = COALESCE(source, 'unrecorded (loaded before the reference-tier contract)'), vintage = COALESCE(vintage, 'unrecorded'), licence = COALESCE(licence, 'unrecorded — do not republish until this is established'), id = COALESCE(id, gen_random_uuid()) WHERE source IS NULL OR vintage IS NULL OR licence IS NULL OR id IS NULL $sql$",
+      "mentions": [
+        "risk_data",
+        "unrecorded"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "EXECUTE 'ALTER TABLE public.risk_data ALTER COLUMN id SET NOT NULL, ALTER COLUMN source SET NOT NULL, ALTER COLUMN vintage SET NOT NULL, ALTER COLUMN licence SET NOT NULL'",
+      "mentions": [
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND contype = 'p') THEN EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_pkey PRIMARY KEY (id)'",
+      "mentions": [
+        "p",
+        "risk_data"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND conname = 'risk_data_country_normalized') THEN EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_country_normalized CHECK (country = upper(btrim(country))) NOT VALID'",
+      "mentions": [
+        "risk_data",
+        "risk_data_country_normalized"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND conname = 'risk_data_risk_class_known') THEN EXECUTE $sql$ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_risk_class_known CHECK (risk_class IN ('Very Low', 'Low', 'Medium', 'High', 'Very High')) NOT VALID$sql$",
+      "mentions": [
+        "high",
+        "low",
+        "medium",
+        "risk_data",
+        "risk_data_risk_class_known"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260915000003_risk_data.sql",
+      "statement": "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.risk_data'::regclass AND conname = 'risk_data_country_key') THEN BEGIN EXECUTE 'ALTER TABLE public.risk_data ADD CONSTRAINT risk_data_country_key UNIQUE (country)'",
+      "mentions": [
+        "risk_data",
+        "risk_data_country_key"
+      ],
       "touches_rls": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     }
