@@ -549,16 +549,14 @@ Gap check: every page in src/pages/ appears in at least one surfaces entry, or i
 explicitly marked as reading no project data.
 ```
 
-### WP 5.2a — Ship P1 + P5, un-hide /docs  ← no dependencies, do this early
+### WP 5.2a — Docs shell + Getting started  ← no dependencies, do this early
 
 ```
 Implement WP 5.2a from docs/data/IMPLEMENTATION-PLAN.md (§6.3, §12).
 
-Ship two hand-written pages and turn the docs site back on:
-· P1 "What happens to your data" — the journey in plain language, one diagram,
-  the five commitments (§5.3) in user language.
-· P5 "Where a number came from" — what the provenance dots mean, in the reader's
-  language, and how to trace a value back.
+Stand up the manual's shell and its first section (~7 pages):
+  Getting started · What SuReSuite is · Your first project · Projects ·
+  What happens to your data · Units and time periods · Uploading data
 
 Already verified (re-check before relying on it):
 · /help and /help/:slug route to NotFound at App.tsx:212-214. Reverting that is
@@ -566,59 +564,71 @@ Already verified (re-check before relying on it):
 · src/components/docs/DocsLayout.tsx (408 ln) is good chrome — nav, breadcrumbs,
   pager, search, responsive. Reuse it as-is; do not write a second shell.
 · src/components/docs/registry.ts has the right SHAPE (slug/title/summary/
-  keywords/related, grouped) and the wrong entries. Rewrite the entries; keep the
-  type. DocsLayout imports it, so it must stay at that path.
+  keywords/related, grouped) and the wrong entries. Rewrite the entries for the
+  14-section tree in §6.3; keep the type. DocsLayout imports it at that path.
 · The old bodies are at docs/archive/legacy-help-site/docBodies.tsx. Mine ONLY the
-  narrative listed in plan §6.6 (ACCURATE framing, planner workflow, use cases,
-  glossary, ST-1…ST-7). Do NOT revive the generated-duplicate sections.
+  narrative in plan §6.6 (ACCURATE framing, planner workflow, use cases, glossary,
+  ST-1…ST-7). Do NOT revive the generated-duplicate sections.
 
-Add the route group "Your data" SECOND in the nav, after Overview.
+Build the full 14-section nav tree now, with later sections stubbed as
+"coming with <section>" rather than hidden — a reader should see the shape of the
+manual from day one, and each later sub-package becomes a drop-in.
 
-Follow plan §6.1 Rules 1-5. In particular Rule 3: plain language first, notation
-in a collapsed block. These pages are read by a planner, not a modeller.
+"Units and time periods" is load-bearing: it is the page that settles that
+time_unit governs VOLUME only and lead_time is always weeks. Write it carefully.
+
+Follow §6.1 Rules 1-5 — especially Rule 3: plain language first, notation in a
+collapsed block. These pages are read by a planner, not a modeller.
 ```
 
-### WP 5.2b — Generate P2, P3, P4  (closes D21)
+### WP 5.2b — Input tables reference  (closes D21) ← the core of the manual
 
 ```
-Implement WP 5.2b from docs/data/IMPLEMENTATION-PLAN.md (§6.3).
+Implement WP 5.2b from docs/data/IMPLEMENTATION-PLAN.md (§6.3 section 2).
 
-Generate three pages from data-contract.generated.json:
-· P2 "The files you upload" — one card per dataset from the ingest block.
-· P3 "Field reference" — one entry per field at a stable URL.
-· P4 "When a value is missing" — every substitution in one table.
+Generate 11 table pages + 2 written ones, in the anyLogistix style: purpose,
+where to upload, template link, column-by-column reference, example, notes,
+related tables. This is the section SuReSuite has never had.
 
-This WP closes D21, the defect that killed the old docs. P3 MUST lead with
-ingest.csv_header — the name the user typed — and show the DB column and engine
-field only as an expandable "also called" aside. If you find yourself writing
-`unit_price` as a heading, you have reproduced the original defect.
+  Inbound Logistics · Outbound Logistics · BOM single · BOM multi · Materials ·
+  Products · Suppliers · Node List · Deep-Tier Nodes · Deep-Tier Edges ·
+  Multi-Tier Suppliers
 
-Two specifics the plan calls out and users get wrong today:
-· lead_time is WEEKS. Set it in capitals. The adjacent time_unit column describes
-  the VOLUME period only and does NOT apply to it.
+This WP closes D21, the defect that killed the old docs. Every column MUST lead
+with ingest.csv_header — the name the user typed. The DB column and engine field
+go in an expandable "Technical details" block. If you write `unit_price` as a
+column heading you have reproduced the original defect.
+
+Three specifics users get wrong today, all verified:
+· lead_time is WEEKS. Capitals. The adjacent time_unit column governs VOLUME only.
 · capacity_per_week blank means UNLIMITED, not zero.
+· sell_price / demand_mean / demand_distribution are the user's names; the engine
+  calls them unit_price / demand_mode / demand_model.
 
-Every entry needs an "If blank" line, sourced from substitutions. A field whose
-blank behaviour you cannot state is a finding — record it, do not guess.
+Every column needs an "If you leave it blank" line sourced from substitutions. A
+column whose blank behaviour you cannot state is a finding — record it in §16, do
+not guess.
 ```
 
-### WP 5.2c–e — P6, P7, P8
+### WP 5.2c–h — the remaining sections
 
 ```
-Implement WP 5.2<c|d|e> from docs/data/IMPLEMENTATION-PLAN.md (§6.3, §6.5).
+Implement WP 5.2<c|d|e|f|g|h> from docs/data/IMPLEMENTATION-PLAN.md (§6.3, §12).
 
-c · P6 "What we calculate for you" — the derived layer without jargon, plus the
-    freshness rule in one sentence. Needs WP 4.4.
-d · P7 "Who can see your data" — org, project, roles, export, deletion. Needs
-    WP 2.2, because before it the honest version of this page is uncomfortable and
-    the page must not claim otherwise.
-e · P8 "How your data is structured" — publish the spine (§6.5): the six tiers as
-    the user's journey, the eleven figures moved into the repo as SVG, the
-    invariants in plain language, and the known-limits block per T3.
+c · Policies + Verification (12 pages). The policy catalog and policy types already
+    render from the engine registry via gen_docs.py — link or embed, never re-type.
+d · Experiments, scenarios, results, statistics (12). Needs WP 4.4.
+e · Networks + Project Intelligence (9). Needs WP 5.1 lineage.
+f · Computed tables + Exports & reproducibility (7). Needs WP 4.1, 4.4.
+g · Connectors + Access & administration + Developer API (14). Needs WP 2.2, 3.1.
+h · Reference (5) — publish the spine per §6.5, the all-tables index, the glossary
+    and the known-limits page. Move the figure SVGs out of the published artifact
+    and into the repo so the docs have no external dependency.
 
-For P8 specifically: move the figure SVGs out of the published artifact and into
-the repo so the docs have no external dependency and the diagrams version with the
-code they describe.
+Replace the section's stubs from 5.2a; do not leave both.
+
+Gap check for every sub-package: diff §6.3 against the live schema and App.tsx. A
+table or route with no page and no internal-only justification is a finding.
 ```
 
 ### WP 5.3 — Pages read analysis_results; drop entity columns

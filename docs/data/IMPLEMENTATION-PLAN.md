@@ -346,42 +346,182 @@ Because both docs and data come from one contract, the docs are **complete by
 construction**: an undocumented field fails CI (WP 1.4), and a documented field that
 no longer exists fails too.
 
-### 6.3 The eight pages
+### 6.3 The manual — complete site map
 
-Route group **"Your data"**, placed second in the nav — after Overview, before
-anything written for modelers.
+Modelled on [anyLogistix Help](https://anylogistix.help/tables/tables.html), which
+documents ~48 tables one page each. SuReSuite has **~75 tables, 28 routes, 17 edge
+functions and 9 admin screens.** Everything below is enumerated from the code, not
+guessed.
 
-| | Page | What it carries | Source |
-|---|---|---|---|
-| **P1** | What happens to your data | The journey in plain language, one diagram. States T1–T5 in user language. The page a new user reads once and a buyer reads before signing. | written |
-| **P2** | The files you upload | One card per dataset: purpose, exact header row, three example rows, template download, which columns may be blank, link to each column in P3. Replaces the 34-line `csv-upload-guide.md`. | generated |
-| **P3** | **Field reference** | One entry per field at a stable URL. Leads with **the name the user typed**; unit in capitals where routinely misread; an **"if blank"** line; the three-name translation as an expandable aside. | generated |
-| **P4** | When a value is missing | Every substitution in one table, plain language, with the dot it produces. Turns *"the system did something I didn't ask for"* into *"the system did what it said it would."* | generated |
-| **P5** | Where a number came from | What the dots mean, in the reader's language; how to trace a value back. Deep-linked from the grid legend. | written |
-| **P6** | What we calculate for you | The derived layer without jargon — sourcing shares, network metrics, rankings: what each is, which uploads it comes from, how to tell if it is current. | generated |
-| **P7** | Who can see your data | Organization, project, roles, export, deletion. Written after Phase 2, because before then the honest version is uncomfortable. | written |
-| **P8** | **How your data is structured** | **The spine, published.** The six tiers as the user's journey, the eleven figures, the invariants in plain language, and the known limits. For modelers, researchers and prospective customers who want to see the engineering. | written + generated diagram |
+Legend — **W** written once · **G** generated from the contract · **G\*** generated
+from the engine registry (`gen_docs.py`, already exists)
 
-**P3 example** — the entry that has never existed:
+---
 
-```
-lead_time                                          inbound_logistics
+#### 1 · Getting started  *(4 pages · W)*
 
-  What it is   How long this supplier takes to deliver this material,
-               from order to arrival.
-  Unit         WEEKS.  Not days. The time_unit column next to it
-               describes the VOLUME period only — it does not apply here.
-  Required     Yes.
-  If blank     The simulation assumes 2 weeks and flags the row.
-  Example      2
-  Limits       Rounded to whole weeks, minimum 1, maximum 51.
+| Page | Content |
+|---|---|
+| What SuReSuite is | The tool in one page. Mined from the archived ACCURATE framing. |
+| Your first project | End-to-end: create → upload → verify → set policies → simulate → read results. |
+| Projects | `projects`, `plants` — the container. BOM level, plant name, simulation window, completion. |
+| What happens to your data | The journey + the five commitments (§5.3). |
 
-  Also called  inbound_logistics.lead_time  (stored)
-               SupplierLink.lead_time_weeks (simulation)          [expand]
-  Used on      Policies → Supplier stage, "Lead time" column       [open]
-```
+#### 2 · Input tables — *the data you provide*  *(11 pages · G)*
 
-### 6.4 Rules for all eight
+The reference section. One page per table: purpose, where to upload, template,
+column-by-column reference, example, notes, related tables.
+
+| Page | Table(s) | Columns |
+|---|---|---|
+| Inbound Logistics | `inbound_logistics` | supplier_id, material_id, volume, time_unit, lead_time, unit_price |
+| Outbound Logistics | `outbound_logistics` | customer_id, product_id, volume, time_unit, expected_lead_time, unit_price |
+| BOM — single level | `bom_single_level` | product_id, material_id, consumption_rate |
+| BOM — multi level | `bom_multi_level` | material_id, level, higher_level_component_id, consumption_rate |
+| Materials | `materials` | material_id, name, cost, holding_cost_pct, moq, initial_on_hand, lead_time_dist, lead_time_cv |
+| Products | `products` | product_id, name, sell_price, production_capacity, fulfillment_mode, demand_distribution, demand_mean, demand_cv, demand_min, demand_max |
+| Suppliers | `suppliers` | supplier_id, name, capacity_per_week, reliability_score |
+| Node List | `node_list` | node_id, description, location, longitude, latitude |
+| Deep-Tier Nodes | `network_nodes` | uid, depth, name, country, industry, website, employees, revenue, lat, long, is_seed |
+| Deep-Tier Edges | `network_edges` | src_uid, dst_uid, relation_type, relative_revenue, depth, direction |
+| Multi-Tier Suppliers | `multi_tier_supply_chain` | from_firm_id, to_firm_id, tier, relationship |
+
+Plus **Units and time periods** (W) — the one page that settles `time_unit` vs
+`lead_time`, and **Uploading data** (W) — the wizard, validation, what gets rejected.
+
+#### 3 · Computed tables — *what we build from your data*  *(4 pages · G)*
+
+| Page | Table(s) | Explains |
+|---|---|---|
+| Supply Chain Data | `supply_chain_data` | sourcing_ratio, weighted, material_consumption_rate — how shares are derived |
+| Multi-Tier Data | `supply_chain_data_multi_tier` | level, path_root — how tiers are expanded |
+| Network Summary | `network_summary`, `external_evidence` | cartographer output |
+| Dataset Versions | `dataset_versions` | graph_hash, snapshots, why a version changes |
+
+#### 4 · Policies  *(9 pages · G\* + W)*
+
+The largest feature. The catalog already renders from the registry.
+
+| Page | Source |
+|---|---|
+| How policies work — stages, scope, defaults vs overrides | W |
+| Supplier stage — every column | G |
+| Plant stage — every column | G |
+| Customer stage — every column | G |
+| Policy types — min/max, base stock, ROP-Q, periodic review | G\* |
+| The policy catalog — all 21, P-S/P-P/P-T/P-C/P-F/P-X | G\* |
+| Where a number came from — the provenance dots | W |
+| When a value is missing — every substitution | G |
+| Policy versions & presets — `policy_versions`, `policy_presets` | W |
+
+#### 5 · Verification  *(3 pages · W + G)*
+
+| Page | Covers |
+|---|---|
+| Verify your inputs | The grading findings: block / warn / info, and how to clear each |
+| Data Trust Report | Coverage, freshness, ingest history, known limits (A3) |
+| Model validation | `model_validations` |
+
+#### 6 · Experiments & scenarios  *(7 pages)*
+
+| Page | Table(s) |
+|---|---|
+| Simulation Lab — running an experiment | `simulation_runs`, `simulation_jobs` |
+| Scenarios | `scenarios`, `sim_scenarios`, `scenario_templates` |
+| Disruptions | `disruption_scenarios` + `_profiles` / `_settings` / `_targets` / `_effects` |
+| Recovery playbooks | `recovery_playbooks` |
+| Experiments & comparison | `experiments` |
+| Seeds, replications & confidence | G\* from the statistics reference |
+| Stress tests — ST-1…ST-7 | mined from the archive |
+
+#### 7 · Networks  *(5 pages · W)*
+
+| Page | Route |
+|---|---|
+| Product-Level Network | `/network/product-level` |
+| Process-Level Network | `/network/process-level` |
+| Firm-Level Network (deep tier) | `/network/firm-level` |
+| Interactive Network Space | `/network/interactive-space` |
+| Network science metrics | centrality, prominence, critical-node prediction — what each means and how it is computed |
+
+#### 8 · Project Intelligence  *(4 pages · W)*
+
+| Page | Table(s) |
+|---|---|
+| The AI assistant — what it can see and do | `chat_threads`, `chat_messages`, `chat_folders` |
+| Plans and proposals — review before apply | `chat_plans`, `proposals` |
+| Project memory | `project_memory` |
+| Models, budgets and limits | `ai_models`, `ai_budgets`, `ai_usage_logs`, `user_ai_permissions` |
+
+#### 9 · Connectors  *(3 pages · W)*
+
+| Page | Table(s) |
+|---|---|
+| Connecting an ERP / MRP system | `project_erp_links` |
+| Reviewing and applying a sync | `erp_sync_runs`, `erp_staged_*` |
+| CSV vs connector — which to use | — |
+
+#### 10 · Results & statistics  *(5 pages · G\*)*
+
+| Page | Table(s) |
+|---|---|
+| Reading your results | `simulation_runs`, `run_replications` |
+| KPIs & the Resilience Index | registry |
+| Per-item time series | `run_item_series` |
+| Performance & caching | `simulation_cache`, `simulation_performance_metrics` |
+| Reports & files | `user_files`, `report-render` |
+
+#### 11 · Exports & reproducibility  *(3 pages · W)*
+
+| Page | Covers |
+|---|---|
+| Verifiable exports | The three workbooks (A4) |
+| Reproducibility record | A5 |
+| Exporting and deleting your data | — |
+
+#### 12 · Access & administration  *(7 pages · W)*
+
+| Page | Table(s) / route |
+|---|---|
+| Organizations and members | `organizations`, `organization_members` |
+| Roles and capabilities | `capabilities`, `role_capabilities`, `org_capabilities`, `user_capabilities` |
+| Project access | `project_members` *(after WP 2.2)* |
+| Who can see your data | — |
+| Audit log | `admin_audit_logs` → `audit_logs` · `/admin/audit` |
+| Admin screens | `/admin/{users,roles,organizations,projects,models,usage}` |
+| Account & password | `/profile` |
+
+#### 13 · Developer API  *(4 pages · G + W)*
+
+| Page | Table(s) |
+|---|---|
+| Getting an API key | `api_keys` · `/developer` |
+| Endpoints & schemas | G from the contract |
+| Rate limits & idempotency | `api_rate_limits`, `api_idempotency` |
+| Request log | `api_request_logs` |
+
+#### 14 · Reference  *(5 pages)*
+
+| Page | Source |
+|---|---|
+| **How your data is structured** — the spine published (§6.5) | W + figures |
+| All tables — index of every table in the system | G |
+| Units & conventions | G |
+| Glossary | mined from the archive |
+| Known limits | W, per T3 |
+
+---
+
+**Total: ~77 pages**, of which ~30 are generated from the data contract, ~12 from the
+engine registry (already rendering), and ~35 hand-written narrative.
+
+**Internal-only tables** — documented in `docs/data/tables/*.md` for the team but not
+in the user manual: `simulation_job_magnitudes`, `api_idempotency`, `ai_chat_events`,
+`ai_model_capabilities`, `ai_providers`, `user_plant_access` *(vestigial)*,
+`policy_presets` *(if unexposed)*, `for`/`tier` *(parse artefacts of the introspector —
+confirm in WP 1.1)*.
+
+### 6.4 Rules for every page
 
 **Deep-linkable.** Every field has a stable URL. Grid column headers, the upload
 wizard and validation findings link into P3 at the exact field. Documentation the
@@ -409,7 +549,7 @@ The architecture is a selling point, not an internal secret. P8 publishes it:
 - the **known limits** block, per T3 — steady-state engine, `graph_hash` v1 scope,
   no price-volatility model
 
-The figures currently live in a published artifact. WP 5.2e moves their SVG into the
+The figures currently live in a published artifact. WP 5.2h moves their SVG into the
 repo so the docs site has no external dependency and the diagrams version with the
 code they describe.
 
@@ -774,22 +914,36 @@ trusted). Regenerate `docs/data/tables/*.md` with lineage.
 **Gap check** — every page in `src/pages/` appears in a `surfaces` entry, or is
 explicitly marked as reading no project data.
 
-### WP 5.2 — The eight pages (§6.3)
+### WP 5.2 — The manual (§6.3)
 
-| Sub | Ships | Depends on |
-|---|---|---|
-| **5.2a** | P1, P5 · un-hide `/docs` (`App.tsx:212-214`) · rewrite `registry.ts` entries | nothing |
-| **5.2b** | P2, P3, P4 — generated; **closes D21** | WP 1.2, 1.3 |
-| **5.2c** | P6 | WP 4.4 |
-| **5.2d** | P7 | WP 2.2 |
-| **5.2e** | P8 — publish the spine; move the figure SVGs into the repo | §6.5 |
+~77 pages. Sequenced so every sub-package ships a coherent, usable section rather
+than a scattering of stubs.
 
-**5.2a is shippable before Phase 1** and is the highest-value documentation work in
-the plan: P1 and P5 need no contract and are the two pages a new user most needs.
+| Sub | Ships | Pages | Depends on |
+|---|---|---|---|
+| **5.2a** | Shell + Getting started + Units. Un-hide `/docs` (`App.tsx:212-214`), rewrite `registry.ts` for the 14-section tree, reuse `DocsLayout` | ~7 | nothing |
+| **5.2b** | **Input tables** — the reference section, the core of the manual. **Closes D21** | 11 + 2 | WP 1.2, 1.3 |
+| **5.2c** | Policies + Verification | 12 | WP 1.2; catalog already renders |
+| **5.2d** | Experiments, scenarios, results, statistics | 12 | WP 4.4 |
+| **5.2e** | Networks + Project Intelligence | 9 | WP 5.1 lineage |
+| **5.2f** | Computed tables + Exports & reproducibility | 7 | WP 4.1, 4.4 |
+| **5.2g** | Connectors + Access & administration + Developer API | 14 | WP 2.2, 3.1 |
+| **5.2h** | Reference — the spine published (§6.5), all-tables index, glossary, known limits | 5 | §6.5 |
+
+**5.2a is shippable before Phase 1** — the shell, "What SuReSuite is", "Your first
+project", "Projects", "What happens to your data", "Units and time periods" and
+"Uploading data" need no contract. It is the cheapest user-visible work in the plan
+and it makes every later sub-package a drop-in.
+
+**5.2b is the one that matters.** It is the section anyLogistix users would
+recognize, and the section SuReSuite has never had.
 
 **Exit** — no table or field list is hand-written in `src/` · mobile and desktop read
-one payload · every generated page carries its provenance footer.
-**Gap check** — work the WP 0.3 duplicate list to zero.
+one payload · every generated page carries its provenance footer · every route in
+`App.tsx` and every user-facing table in §6.3 has a page or is listed as
+internal-only.
+**Gap check** — diff the §6.3 inventory against the live schema and `App.tsx`; a
+table or route with no page and no internal-only justification is a finding.
 
 ### WP 5.3 — Pages read `analysis_results`; drop entity columns
 Migrate readers one page per commit, comparing values before switching; drop entity
@@ -998,7 +1152,7 @@ Handoff to next WP:
 | 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) |
 | 3 | 3.1 – 3.4 | one ingestion contract | 4 |
 | 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 |
-| 5 | 5.1 – 5.3 | lineage + the eight published pages | 6 |
+| 5 | 5.1 – 5.3 | lineage + the 77-page manual | 6 |
 | 6 | 6.1 – 6.3 | policy contract, researcher grade | — |
 | 7+ | deferred | observations, estimation, backtesting | — |
 
