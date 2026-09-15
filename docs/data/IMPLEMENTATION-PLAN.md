@@ -2,8 +2,14 @@
 
 > **Status:** AUTHORED · approved architecture, not yet started
 > **Baseline:** commit `d3cfc9d`
-> **Figures:** https://claude.ai/artifact/KnJ1wB1ZSRc3Tq2YXRSBFs *(all 11 diagrams)*
+> **Figures:** https://claude.ai/artifact/4sXUGPiyCmpXGAfRp78mu1 *(all 11 diagrams)*
+> **Companions:** `docs/data/TRANSPARENCY.md` (the standard) · `docs/data/PROMPTS.md` (execution)
 > **Blueprint refs:** `docs/design/next-gen-platform-design.md` §2.3 G4–G6 · §8.1–8.4 · Phase A
+>
+> **Transparency is non-negotiable.** `TRANSPARENCY.md` defines the standard every
+> WP below is measured against: *every number on screen answers where it came from,
+> when it was computed, and what would change it — in one click.* Its §6 lists the
+> ~3.5 days of additional work, folded into the WPs rather than added as a phase.
 
 ---
 
@@ -416,6 +422,10 @@ project deny, user allow over org deny, expired grant. Record the truth table in
 3. Emit an audit row on every tier transition: ingest promote, ETL run, policy override
    write, dataset delete, analysis run *(the last lands in WP 4.2)*.
 4. `erp_sync_runs.applied_by_user_id` becomes one source among several, not the only one.
+5. **Transparency (T-§3):** make export a governed action. The `export` capability
+   already exists (`unified_access_control.sql:53`); a dataset workbook contains every
+   price on the network, so exporting must check it and write an audit row. Without
+   this, the verifiable export is an exfiltration path.
 
 **Exit checks**
 - Every Tier-2 write in a smoke run appears in `audit_logs`.
@@ -656,6 +666,11 @@ before Phase 5 drops the columns.
    Delete the three ad-hoc rules.
 3. A re-upload flags stale seeded overrides in the UI rather than silently keeping them.
 4. Freshness badge component: dataset version, hash prefix, computed-at, stale flag.
+5. **Transparency (T-rung 3):** assemble the Project Data Trust Report. Most of it
+   already exists inside `grading.ts` — this is assembly, not new computation:
+   coverage per engine-read field, blocking findings, neutral-constant substitutions,
+   derived values, per-table freshness, ingest history, and a **Known limits** block.
+   See `TRANSPARENCY.md` §2 for the exact shape. The limits block is not optional.
 
 **Exit checks**
 - Every network page states its version and freshness.
@@ -705,11 +720,19 @@ nowhere — mark read-only with a milestone badge or map it to `materials.cost`)
 `cheapestInboundCost` (floors ≤0 to 1.0) vs `resolveField` (imputes an average) divergence.
 Also de-duplicate `StagePolicyTable.tsx:1170-1225`, a verbatim copy of `resolveCell`.
 
-### WP 6.3 — Provenance vocabulary and researcher export
+### WP 6.3 — Provenance vocabulary, value chain, reproducibility record
 Complete the vocabulary: `data · master · contract · estimated · imputed · derived ·
-override · edited · default`. Add an export that emits, for a chosen project, every
-displayed value with its full chain. **Exit:** a researcher reproduces any number from the
-source file.
+override · edited · default`. Then ship the three transparency artifacts that depend on
+everything before them (`TRANSPARENCY.md` §2, rungs 2 / 3 / 5):
+**(a)** the **value chain popover** — click any cell, see source file → row → uploader →
+approver → unit → engine transform → substitutions applied → freshness → what would
+change it; **(b)** the **Trust Report** PDF/JSON export via `report-render`;
+**(c)** the **Reproducibility Record** — dataset, policy, scenario, engine and analysis
+versions plus declared limits, attachable to any exported figure.
+**Exit — the standard's acceptance test:** hand a stakeholder a number from the Supplier
+grid and a laptop; with no help and no app access beyond the export, they trace it to a
+row in a named file uploaded by a named person on a named date — or find the named rule
+that produced it in the absence of data.
 
 ---
 
