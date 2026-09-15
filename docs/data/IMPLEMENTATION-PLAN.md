@@ -358,16 +358,31 @@ from the engine registry (`gen_docs.py`, already exists)
 
 ---
 
-#### 1 · Getting started  *(4 pages · W)*
+#### 1 · Overview & architecture  *(7 pages · W + figures)*
+
+**The manual opens here.** A reader arriving at `/docs` sees how the software is
+designed before being asked to fill in anything. This section is the published
+spine — see §6.5.
 
 | Page | Content |
 |---|---|
-| What SuReSuite is | The tool in one page. Mined from the archived ACCURATE framing. |
+| What SuReSuite is | The tool in one page — what problem it solves, what it produces. Mined from the archived ACCURATE framing. |
+| **How SuReSuite is designed** | **The architecture.** The six tiers as the journey your data takes, the figures, and the three laws: external data never lands below staging; computed data is always rebuildable; every decision remembers the data it was made on. |
+| The data model at a glance | Every table in the system on one page, grouped by tier, each linking to its reference page. The map you keep open in another tab. **G** |
+| How your data flows | Upload → we check it → it becomes your data → we compute from it → you set policies → you simulate → results are stamped. One diagram, one paragraph per hop. |
+| What happens to your data | The five commitments (§5.3) in user language: we never change your numbers silently; substitutions are always marked; your data stays in your organization; export or delete any time. |
+| System boundary | What runs where — browser, Supabase, simulation worker, scsim engine — and what crosses each boundary. For IT and for anyone evaluating the tool. |
+| Known limits | Per T3. Steady-state engine, `graph_hash` v1 scope, no price-volatility model. Stated plainly, at the top of the manual, not buried. |
+
+#### 2 · Getting started  *(3 pages · W)*
+
+| Page | Content |
+|---|---|
 | Your first project | End-to-end: create → upload → verify → set policies → simulate → read results. |
 | Projects | `projects`, `plants` — the container. BOM level, plant name, simulation window, completion. |
-| What happens to your data | The journey + the five commitments (§5.3). |
+| Uploading data | The wizard, what is validated, what gets rejected and why. |
 
-#### 2 · Input tables — *the data you provide*  *(11 pages · G)*
+#### 3 · Input tables — *the data you provide*  *(12 pages · G)*
 
 The reference section. One page per table: purpose, where to upload, template,
 column-by-column reference, example, notes, related tables.
@@ -387,9 +402,9 @@ column-by-column reference, example, notes, related tables.
 | Multi-Tier Suppliers | `multi_tier_supply_chain` | from_firm_id, to_firm_id, tier, relationship |
 
 Plus **Units and time periods** (W) — the one page that settles `time_unit` vs
-`lead_time`, and **Uploading data** (W) — the wizard, validation, what gets rejected.
+`lead_time`. It belongs here, beside the tables it governs.
 
-#### 3 · Computed tables — *what we build from your data*  *(4 pages · G)*
+#### 4 · Computed tables — *what we build from your data*  *(4 pages · G)*
 
 | Page | Table(s) | Explains |
 |---|---|---|
@@ -398,7 +413,7 @@ Plus **Units and time periods** (W) — the one page that settles `time_unit` vs
 | Network Summary | `network_summary`, `external_evidence` | cartographer output |
 | Dataset Versions | `dataset_versions` | graph_hash, snapshots, why a version changes |
 
-#### 4 · Policies  *(9 pages · G\* + W)*
+#### 5 · Policies  *(9 pages · G\* + W)*
 
 The largest feature. The catalog already renders from the registry.
 
@@ -414,7 +429,7 @@ The largest feature. The catalog already renders from the registry.
 | When a value is missing — every substitution | G |
 | Policy versions & presets — `policy_versions`, `policy_presets` | W |
 
-#### 5 · Verification  *(3 pages · W + G)*
+#### 6 · Verification  *(3 pages · W + G)*
 
 | Page | Covers |
 |---|---|
@@ -422,7 +437,7 @@ The largest feature. The catalog already renders from the registry.
 | Data Trust Report | Coverage, freshness, ingest history, known limits (A3) |
 | Model validation | `model_validations` |
 
-#### 6 · Experiments & scenarios  *(7 pages)*
+#### 7 · Experiments & scenarios  *(7 pages)*
 
 | Page | Table(s) |
 |---|---|
@@ -434,7 +449,7 @@ The largest feature. The catalog already renders from the registry.
 | Seeds, replications & confidence | G\* from the statistics reference |
 | Stress tests — ST-1…ST-7 | mined from the archive |
 
-#### 7 · Networks  *(5 pages · W)*
+#### 8 · Networks  *(5 pages · W)*
 
 | Page | Route |
 |---|---|
@@ -444,7 +459,7 @@ The largest feature. The catalog already renders from the registry.
 | Interactive Network Space | `/network/interactive-space` |
 | Network science metrics | centrality, prominence, critical-node prediction — what each means and how it is computed |
 
-#### 8 · Project Intelligence  *(4 pages · W)*
+#### 9 · Project Intelligence  *(4 pages · W)*
 
 | Page | Table(s) |
 |---|---|
@@ -453,7 +468,7 @@ The largest feature. The catalog already renders from the registry.
 | Project memory | `project_memory` |
 | Models, budgets and limits | `ai_models`, `ai_budgets`, `ai_usage_logs`, `user_ai_permissions` |
 
-#### 9 · Connectors  *(3 pages · W)*
+#### 10 · Connectors  *(3 pages · W)*
 
 | Page | Table(s) |
 |---|---|
@@ -461,7 +476,7 @@ The largest feature. The catalog already renders from the registry.
 | Reviewing and applying a sync | `erp_sync_runs`, `erp_staged_*` |
 | CSV vs connector — which to use | — |
 
-#### 10 · Results & statistics  *(5 pages · G\*)*
+#### 11 · Results & statistics  *(5 pages · G\*)*
 
 | Page | Table(s) |
 |---|---|
@@ -471,7 +486,7 @@ The largest feature. The catalog already renders from the registry.
 | Performance & caching | `simulation_cache`, `simulation_performance_metrics` |
 | Reports & files | `user_files`, `report-render` |
 
-#### 11 · Exports & reproducibility  *(3 pages · W)*
+#### 12 · Exports & reproducibility  *(3 pages · W)*
 
 | Page | Covers |
 |---|---|
@@ -479,7 +494,7 @@ The largest feature. The catalog already renders from the registry.
 | Reproducibility record | A5 |
 | Exporting and deleting your data | — |
 
-#### 12 · Access & administration  *(7 pages · W)*
+#### 13 · Access & administration  *(7 pages · W)*
 
 | Page | Table(s) / route |
 |---|---|
@@ -491,7 +506,7 @@ The largest feature. The catalog already renders from the registry.
 | Admin screens | `/admin/{users,roles,organizations,projects,models,usage}` |
 | Account & password | `/profile` |
 
-#### 13 · Developer API  *(4 pages · G + W)*
+#### 14 · Developer API  *(4 pages · G + W)*
 
 | Page | Table(s) |
 |---|---|
@@ -500,19 +515,18 @@ The largest feature. The catalog already renders from the registry.
 | Rate limits & idempotency | `api_rate_limits`, `api_idempotency` |
 | Request log | `api_request_logs` |
 
-#### 14 · Reference  *(5 pages)*
+#### 15 · Reference  *(4 pages)*
 
 | Page | Source |
 |---|---|
-| **How your data is structured** — the spine published (§6.5) | W + figures |
-| All tables — index of every table in the system | G |
+| All tables — the detailed index, every column of every table | G |
 | Units & conventions | G |
 | Glossary | mined from the archive |
-| Known limits | W, per T3 |
+| Field index — every field, A–Z, linking to its table page | G |
 
 ---
 
-**Total: ~77 pages**, of which ~30 are generated from the data contract, ~12 from the
+**Total: ~78 pages**, opening with the architecture,, of which ~30 are generated from the data contract, ~12 from the
 engine registry (already rendering), and ~35 hand-written narrative.
 
 **Internal-only tables** — documented in `docs/data/tables/*.md` for the team but not
@@ -537,21 +551,29 @@ second content tree — that duplication is the defect this programme exists to 
 **Every generated page carries its provenance.** Footer: generated from contract
 version X, engine version Y, on date Z. The docs hold themselves to §5.
 
-### 6.5 Publishing the spine (P8)
+### 6.5 Publishing the spine — section 1
 
-The architecture is a selling point, not an internal secret. P8 publishes it:
+The architecture is a selling point, not an internal secret, and it is the first
+thing a reader should see. **"How SuReSuite is designed" is page 2 of the manual**,
+not an appendix.
 
-- the six tiers, as the user's journey rather than as a schema
-- the eleven figures, served from the repo rather than linked to a private artifact
-- the invariants (§2.1) restated in plain language — *"we never change your numbers
-  silently"* rather than *"I6: a fallback absent from the contract may not exist in
-  code"*
-- the **known limits** block, per T3 — steady-state engine, `graph_hash` v1 scope,
-  no price-volatility model
+What it carries:
 
-The figures currently live in a published artifact. WP 5.2h moves their SVG into the
-repo so the docs site has no external dependency and the diagrams version with the
-code they describe.
+- the six tiers, told as the journey a user's data takes rather than as a schema
+- the figures, served from the repo rather than a private artifact
+- the three laws in plain language — *external data never lands below staging;
+  computed data is always rebuildable; every decision remembers the data it was made
+  on*
+- the invariants (§2.1) restated for a reader: *"we never change your numbers
+  silently"*, not *"I6: a fallback absent from the contract may not exist in code"*
+- the **known limits** block (T3), on its own page in the same section
+
+Why first: a prospective customer, a researcher and a new modeller all ask the same
+opening question — *how is this thing put together, and can I trust it?* Answering
+that before the reference section is what separates a manual from a data dictionary.
+
+WP 5.2a moves the figure SVGs into the repo so the docs have no external dependency
+and the diagrams version with the code they describe.
 
 ### 6.6 What survived the archive
 
@@ -921,19 +943,19 @@ than a scattering of stubs.
 
 | Sub | Ships | Pages | Depends on |
 |---|---|---|---|
-| **5.2a** | Shell + Getting started + Units. Un-hide `/docs` (`App.tsx:212-214`), rewrite `registry.ts` for the 14-section tree, reuse `DocsLayout` | ~7 | nothing |
+| **5.2a** | Shell + **Overview & architecture** + Getting started. Un-hide `/docs` (`App.tsx:212-214`), rewrite `registry.ts` for the 15-section tree, move the figure SVGs into the repo | ~10 | nothing |
 | **5.2b** | **Input tables** — the reference section, the core of the manual. **Closes D21** | 11 + 2 | WP 1.2, 1.3 |
 | **5.2c** | Policies + Verification | 12 | WP 1.2; catalog already renders |
 | **5.2d** | Experiments, scenarios, results, statistics | 12 | WP 4.4 |
 | **5.2e** | Networks + Project Intelligence | 9 | WP 5.1 lineage |
 | **5.2f** | Computed tables + Exports & reproducibility | 7 | WP 4.1, 4.4 |
 | **5.2g** | Connectors + Access & administration + Developer API | 14 | WP 2.2, 3.1 |
-| **5.2h** | Reference — the spine published (§6.5), all-tables index, glossary, known limits | 5 | §6.5 |
+| **5.2h** | Reference — all-tables detail index, units, glossary, field index | 4 | WP 1.2 |
 
-**5.2a is shippable before Phase 1** — the shell, "What SuReSuite is", "Your first
-project", "Projects", "What happens to your data", "Units and time periods" and
-"Uploading data" need no contract. It is the cheapest user-visible work in the plan
-and it makes every later sub-package a drop-in.
+**5.2a is shippable before Phase 1 and is now the most valuable single package in
+the plan.** It ships the architecture section — the answer to *how is this built and
+can I trust it* — plus Getting started and the full nav tree. None of it needs the
+contract. Everything after it is a drop-in.
 
 **5.2b is the one that matters.** It is the section anyLogistix users would
 recognize, and the section SuReSuite has never had.

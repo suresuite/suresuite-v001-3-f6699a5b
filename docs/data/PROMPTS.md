@@ -549,14 +549,21 @@ Gap check: every page in src/pages/ appears in at least one surfaces entry, or i
 explicitly marked as reading no project data.
 ```
 
-### WP 5.2a — Docs shell + Getting started  ← no dependencies, do this early
+### WP 5.2a — Docs shell + Overview & architecture  ← no dependencies, highest value
 
 ```
-Implement WP 5.2a from docs/data/IMPLEMENTATION-PLAN.md (§6.3, §12).
+Implement WP 5.2a from docs/data/IMPLEMENTATION-PLAN.md (§6.3, §6.5, §12).
 
-Stand up the manual's shell and its first section (~7 pages):
-  Getting started · What SuReSuite is · Your first project · Projects ·
-  What happens to your data · Units and time periods · Uploading data
+Ship the manual's shell and its first two sections (~10 pages). The manual OPENS
+with the architecture — a reader must see how the software is designed before
+being asked to fill in anything.
+
+  1 Overview & architecture (7)
+      What SuReSuite is · How SuReSuite is designed · The data model at a glance ·
+      How your data flows · What happens to your data · System boundary ·
+      Known limits
+  2 Getting started (3)
+      Your first project · Projects · Uploading data
 
 Already verified (re-check before relying on it):
 · /help and /help/:slug route to NotFound at App.tsx:212-214. Reverting that is
@@ -564,21 +571,28 @@ Already verified (re-check before relying on it):
 · src/components/docs/DocsLayout.tsx (408 ln) is good chrome — nav, breadcrumbs,
   pager, search, responsive. Reuse it as-is; do not write a second shell.
 · src/components/docs/registry.ts has the right SHAPE (slug/title/summary/
-  keywords/related, grouped) and the wrong entries. Rewrite the entries for the
-  14-section tree in §6.3; keep the type. DocsLayout imports it at that path.
+  keywords/related, grouped) and the wrong entries. Rewrite for the 15-section
+  tree in §6.3; keep the type. DocsLayout imports it at that path.
 · The old bodies are at docs/archive/legacy-help-site/docBodies.tsx. Mine ONLY the
-  narrative in plan §6.6 (ACCURATE framing, planner workflow, use cases, glossary,
+  narrative in §6.6 (ACCURATE framing, planner workflow, use cases, glossary,
   ST-1…ST-7). Do NOT revive the generated-duplicate sections.
+· The 11 figures are in the published artifact listed in the plan header. Move
+  their SVG into the repo in this WP so the docs carry no external dependency.
 
-Build the full 14-section nav tree now, with later sections stubbed as
-"coming with <section>" rather than hidden — a reader should see the shape of the
-manual from day one, and each later sub-package becomes a drop-in.
+Build the full 15-section nav tree now, later sections stubbed as "coming with
+<section>" rather than hidden — a reader sees the shape of the manual from day one
+and every later sub-package becomes a drop-in.
 
-"Units and time periods" is load-bearing: it is the page that settles that
-time_unit governs VOLUME only and lead_time is always weeks. Write it carefully.
+Two pages carry disproportionate weight:
+· "How SuReSuite is designed" — the six tiers as the journey the user's data
+  takes, the three laws in plain language, the figures. Per §6.5 this answers the
+  opening question every reader has: how is this built, and can I trust it.
+· "Known limits" — T3. Steady-state engine, graph_hash v1 scope, no
+  price-volatility model. At the TOP of the manual, not buried.
 
 Follow §6.1 Rules 1-5 — especially Rule 3: plain language first, notation in a
-collapsed block. These pages are read by a planner, not a modeller.
+collapsed block. Invariants get restated for a reader ("we never change your
+numbers silently"), never quoted as I-numbers.
 ```
 
 ### WP 5.2b — Input tables reference  (closes D21) ← the core of the manual
@@ -621,9 +635,9 @@ d · Experiments, scenarios, results, statistics (12). Needs WP 4.4.
 e · Networks + Project Intelligence (9). Needs WP 5.1 lineage.
 f · Computed tables + Exports & reproducibility (7). Needs WP 4.1, 4.4.
 g · Connectors + Access & administration + Developer API (14). Needs WP 2.2, 3.1.
-h · Reference (5) — publish the spine per §6.5, the all-tables index, the glossary
-    and the known-limits page. Move the figure SVGs out of the published artifact
-    and into the repo so the docs have no external dependency.
+h · Reference (4) — the all-tables detail index, units & conventions, the
+    glossary, and an A-Z field index. The architecture and known-limits pages are
+    NOT here — they ship in 5.2a as section 1.
 
 Replace the section's stubs from 5.2a; do not leave both.
 
