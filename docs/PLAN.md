@@ -184,8 +184,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D3 | `product_code_map` queried but exists in no migration; error swallowed | was `combine-project/index.ts:131-145`; the decision is recorded at `combine-project/index.ts:117-140` | WP 1.4 ✅ *(branch DELETED — it had never executed; no upload path, no writer, no template column ever existed for the table)* |
 | D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names. **It is not absent — it exists untracked in production**, which a static replay cannot distinguish from absent (CI proved it; §16 WP 1.4) | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(`20260915000003_risk_data.sql` both CREATEs on a fresh database and ADOPTS the untracked one: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted, CHECKs `NOT VALID` on the adopted rows. No `project_id` — deliberately: country risk is a property of the world)* |
 | D5 | No natural-key uniqueness on any lane table → re-upload duplicates | `20250820145837_…sql` | WP 3.3 |
-| D6 | CSV parse is `split(',')` — not quote-safe | `UploadWizard.tsx:477,498` | WP 3.2 |
-| D7 | Required-field validation misses `null` (blank numerics pass) | `UploadWizard.tsx:369` vs `:505,508` | WP 3.2 |
+| D6 | CSV parse is `split(',')` — not quote-safe | `UploadWizard.tsx:502,523` | WP 3.2 |
+| D7 | Required-field validation misses `null` (blank numerics pass) | `UploadWizard.tsx:384` vs `:530-531` | WP 3.2 |
 | D8 | Inbound/outbound ids not trimmed or empty-checked (BOM-multi is) | `ingest-inbound-logistics/index.ts:38-39` | WP 3.2 |
 | D9 | `lead_time_unit` read by engine; no column, dropped by sanitizer | `project_map.py:420`; `datamap.py:126` | WP 1.3 |
 | D10 | Three competing unit tables disagree (`quarter` is 13× wrong in SQL) | `grading.ts:113`, `effectiveEconomics.ts:48`, `item_master.sql:138` | WP 1.3 |
@@ -217,10 +217,10 @@ only in `PROMPTS.md` or in a session transcript.
 
 | Location | What is there |
 |---|---|
-| `UploadWizard.tsx:476-477` | `content.trim().split('\n')` — the parse (D6) |
-| `UploadWizard.tsx:497-523` | the row loop; blanks and garbage become `null` (D7) |
-| `UploadWizard.tsx:1833` | the upload gate — `file && errors.length === 0` |
-| `UploadWizard.tsx:1280-1307` | auto-invokes node prominence after deep-tier uploads |
+| `UploadWizard.tsx:501-502` | `content.trim().split('\n')` — the parse (D6) |
+| `UploadWizard.tsx:522-548` | the row loop; blanks and garbage become `null` (D7) |
+| `UploadWizard.tsx:1863` | the upload gate — `file && errors.length === 0` |
+| `UploadWizard.tsx:1309-1336` | auto-invokes node prominence after deep-tier uploads |
 | `ingest-inbound-logistics/index.ts:37-46` | the sanitizer allow-list; no trim (D8) |
 | `ingest-bom-multi-level/index.ts:42-44` | **the correct trim/empty pattern** — copy this one |
 | `combine-project/index.ts:117-140` | where the `product_code_map` read WAS. Deleted in WP 1.4 with the branch it fed; the comment is the record of why, and of what a project that genuinely needs code translation should get instead (D3) |
@@ -939,17 +939,30 @@ for CI path filters.)*
    "a code-referenced table has no migration" already covers it — make sure
    `approved_users` is what proves the rule fires).
 4. Wire into CI. The job must run `contract:check`, `check:docs` and `npm test`
-   **directly, not through `npm run lint`** — `lint` is red at baseline (342 errors),
+   **directly, not through `npm run lint`** — `lint` is red at baseline (340 errors),
    so a gate hidden behind it is a gate nobody reads. Merge `5c7129f` took
    `check:docs` from green to 13 orphan citations and broke `resolveCell` at runtime
    without failing anything; see §16's precondition entry.
+   **Widened by the boundary review (F1).** The problem is not that one gate is
+   missing — it is that **no CI job runs any of them**. Of twelve workflows, none
+   invokes `npm test`, `check:docs` or any `contract:*` command. So the job runs all
+   six: `contract:introspect -- --check`, `contract:validate`,
+   `contract:units -- --check`, `contract:verify`, `check:docs`, `npm test` — with
+   `contract:check` composing the contract half, per WP 1.3's handoff. Evidence that
+   this is not theoretical: `build/schema.introspected.json` was committed stale and
+   ten §4 citations rotted, both within a day of the gates landing.
+   **`contract:verify` is red today (F4)** on the orphan count. Step 3 is what makes
+   it green — reconcile the orphans in this same package, or the phase ends with a
+   gate that is red on arrival, which is precisely what made `lint` unreadable.
 5. Add the §2.1 invariants and the §5.3 commitments to `CLAUDE.md`.
 
 **Exit checks** — `npm run contract:check` green · a scratch column makes it fail ·
 one page per covered table · no orphans remain.
 
 **Gap check** — open a throwaway PR to confirm the gate actually runs. A gate that is
-not wired is not a gate; record the CI run URL.
+not wired is not a gate; record the CI run URL. Add a scratch column to a migration
+on that PR and confirm CI goes red: the boundary review verified this fails
+`contract:validate` **locally**, which proves the rule and not the wiring.
 
 **Delivered** — `npm run contract:generate` merges the introspected schema, the
 thirteen sidecars and the engine registry into `build/data-contract.generated.json`
@@ -1818,9 +1831,23 @@ question. Result: **3 aborted migrations, 288 applied**, and lane tables that ma
 what the code writes.
 
 Baseline numbers:
-- 71 tables · 6 views · 4 enums · 231 functions · 8 shadowed definitions ·
-  3 aborted migrations · 3 orphans · 1 phantom table · **0 unparsed statements**.
-- 291 migration files on disk.
+- ~~71 tables · 6 views · 4 enums · 231 functions · 8 shadowed definitions ·
+  3 aborted migrations · 3 orphans · 1 phantom table · **0 unparsed statements**.~~
+- ~~291 migration files on disk.~~
+
+  **Struck by the Phase 0-1 boundary review** — see the PHASE BOUNDARY entry at the
+  end of this log. The function count was produced by a defective `argType`: every
+  argument carrying a `DEFAULT` clause lost its type, so **50 of the 231 signatures
+  were malformed** (`apply_policy_bundle(uuid, , , , , , , , )`), and one live
+  overload pair — `get_network_nodes` / `get_network_edges` / `get_network_summary`
+  — keyed wrongly, so `20250904125034`'s `DROP FUNCTION` could not be matched
+  against the overload it names. `d716d90` (WP 1.3) fixed `argType` **without
+  recording it in §16**; that silent repair is itself a finding. Corrected reading
+  at the boundary, on 293 migration files:
+- 71 tables · 6 views · 4 enums · **230 functions, 0 malformed signatures** ·
+  8 shadowed definitions · 3 aborted migrations · 3 orphans · 1 phantom table ·
+  **0 unparsed statements**.
+- 293 migration files on disk (291 + WP 1.3's two).
 
 Discovered:
 - **`approved_users` is a third orphan, and a different class from the other two.**
@@ -2376,19 +2403,26 @@ Handoff to WP 2.1 (and Phase 2):
 
 ## 17. Sequencing
 
-| Phase | WPs | Focus | Blocks |
-|---|---|---|---|
-| 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything |
-| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 |
-| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) |
-| 3 | 3.1 – 3.4 | one ingestion contract | 4 |
-| 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 |
-| 5 | 5.1 – 5.3 | lineage + the 77-page manual | 6 |
-| 6 | 6.1 – 6.3 | policy contract, researcher grade | — |
-| 7+ | deferred | observations, estimation, backtesting | — |
+| Phase | WPs | Focus | Blocks | Status |
+|---|---|---|---|---|
+| 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
+| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ⛔ 1.1–1.3 done; **1.4 not started** |
+| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | blocked |
+| 3 | 3.1 – 3.4 | one ingestion contract | 4 | — |
+| 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | — |
+| 5 | 5.1 – 5.3 | lineage + the 77-page manual | 6 | — |
+| 6 | 6.1 – 6.3 | policy contract, researcher grade | — | — |
+| 7+ | deferred | observations, estimation, backtesting | — | — |
 
 **26 work packages** (25 + the five 5.2 sub-packages counted as one).
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
+
+**Effort moved at the Phase 0-1 boundary review.** WP 1.4 is now the largest package
+in Phase 1, not the smallest: it carries its own scope (generator, drift gate, three
+orphan reconciliations, `CLAUDE.md`) plus the CI wiring for **six** commands that no
+workflow runs today (§16 F1) and the orphan fix that `contract:verify` needs to stop
+being red (F4). Budget it as a full session with no headroom for a second package.
+Phase 2 does not start until it is green in CI.
 
 **Out of order by design:** WP 5.2a (P1, P5, un-hide `/docs`) needs nothing and can
 ship at any time. It is the cheapest user-visible improvement in the plan.
