@@ -1901,7 +1901,7 @@ Handoff to WP 1.3:
   entry exists. That is the intended direction of the gate, but it means WP 1.3's
   `lead_time_unit` migration and its sidecar entry must land together.
 
-### WP 1.3 — One unit table, `lead_time_unit`, resolution modes · 2026-09-15 · `<this commit>`
+### WP 1.3 — One unit table, `lead_time_unit`, resolution modes · 2026-09-15 · `d716d90`
 
 Preconditions held? **yes, with one correction and one addition.**
 - `grading.ts::UNIT_DAYS` is canonical and `effectiveEconomics.ts::ratePerDay`
