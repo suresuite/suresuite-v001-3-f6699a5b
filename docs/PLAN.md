@@ -657,7 +657,7 @@ distributions. All already in `registry.generated.json` and rendered by
 
 ## 7. Phase 0 — Stabilize and consolidate
 
-### WP 0.1 — Kill the silent policy override ✅ *(D1, D16 — done `4e3fcd8`)*
+### WP 0.1 — Kill the silent policy override ✅ *(D1, D16 — done `4ec6fa6`)*
 
 **Preconditions** — branch off latest default. Verify D1 reproduces: open `/policies`
 on a project with inbound data, confirm `policy_overrides` gains rows with
@@ -1252,7 +1252,7 @@ Handoff to next WP:
   revive the generated-duplicate sections.
 ```
 
-### WP 0.1 — Kill the silent policy override · 2026-09-15 · `4e3fcd8`
+### WP 0.1 — Kill the silent policy override · 2026-09-15 · `4ec6fa6`
 
 Preconditions held? **partly — one did not.** The three constants the brief said had
 no `ColSpec` (`supplier_capacity_per_day`, `ordering_cost`, `lead_time_distribution`)
