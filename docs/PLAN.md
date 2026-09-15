@@ -211,6 +211,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D30 | **Six policies are created twice with no `DROP` between them, which Postgres rejects.** `20250913085427` creates the `view`/`modify` pair on `simulation_cache`, `simulation_jobs` and `simulation_performance_metrics`; `20250914113723` creates all six again, verbatim apart from `public.` qualification, and neither file drops them first. `CREATE POLICY` on an existing name raises 42710, so one of two things is true and a STATIC REPLAY CANNOT SAY WHICH: either the earlier migration did not take effect, or the later one errored and the rest of its statements never ran. The introspector recorded both copies without complaint — 150 policy entries for 144 distinct names — which is how it stayed invisible. WP 2.1's migration makes the END STATE deterministic (it drops and recreates all 59 it touches, and the duplicate entries collapse), but it does not settle which branch is true, and a fresh `supabase db push` is what would. Found by WP 2.1's gap check, from the introspected artifact's own policy count | `20250913085427_…sql:134`; `20250914113723_…sql:155` | WP 2.4 |
 | D31 | **A migration's first execution is the production deploy.** `supabase-migrations.yml` has no branch filter and runs `supabase db push --include-all` against the live project on any push touching `supabase/migrations/**`; nothing anywhere else ever executes a migration. `contract:check` REPLAYS migrations statically — it parses DDL, it does not run SQL — so an error that only exists at run time passes every gate in the repo and fails in production. WP 2.1 proved it: `min(o.id)` on a uuid is `42883 function min(uuid) does not exist`, invisible to the introspector, invisible to `npm test`, and caught only by the post-merge `db push`. The migration rolled back, so nothing partial landed — this time. The route to closing it is cheap and now known to work: PostgreSQL 16 is available in a work-package session, and a schema generated from `build/schema.introspected.json` (73 tables) plus ~6 function stubs is faithful enough to execute a migration against. §16's WP 2.1 follow-up entry records the exact commands. Found by WP 2.1's own broken migration | `supabase-migrations.yml` (no `branches:` filter); `scripts/data-contract/introspect.mjs` is a static replay by design | WP 2.4 |
 | D32 | **Three tables are created by migrations and do not exist in the production database** — `network_summary`, `tier2_suppliers` and `tier3_suppliers`. `20250904105527` creates `network_summary` beside `network_nodes` and `network_edges` — those two are in production and it is not — and `20250903080405` creates the tier2/tier3 pair. No migration drops any of them. `UploadWizard.tsx` WRITES the tier2/tier3 pair, so the deep-tier upload has been writing to tables that are not there. `risk_data` (D4) inverted: WP 1.4 found a table in production that no migration creates, and this is a table the migrations create that production lacks. A static replay cannot see either — the introspector faithfully reports what the files say, which is why both classes need an executed migration or §15 to surface. Found when the second `db push` of `20260915000004` aborted at statement 59: `DROP POLICY IF EXISTS` still requires the TABLE to exist, the `IF EXISTS` being about the policy. Closed by adopting it — `CREATE TABLE IF NOT EXISTS`, copied verbatim from the original, a no-op wherever the table already is, and read by nothing in `src/` or `supabase/functions/` so adoption changes no behaviour. Learning the set cost three deploys — one table per aborted statement — because the first preflight RAISEd a NOTICE and the Supabase CLI's `db push` log keeps ERROR lines and drops notices. Raising an EXCEPTION instead named all three at once. **Whether tables OUTSIDE the 25 this migration touches also diverge is unknown and is a §15 question** | `20250904105527_…sql:47-60`; `20260915000004_org_identity_dual_read.sql` §0 preflight | WP 2.1 ✅ |
+| D33 | **The capability catalog is hand-maintained in two languages.** `public.capabilities` holds the rows and `src/lib/capabilities.ts` holds the same keys as a union type, a list and a role-default map, because the client needs them without a round trip. Nothing checks that the two agree, and they have already drifted: the DB catalog has grown from 5 feature keys to ~20 across a dozen migrations, and the TS list learned of each one only when somebody remembered. A key present in the DB and absent from TS is a capability no client can ever be granted; the reverse is a permission screen offering a right that resolves to false. This is I1 — one fact authored twice — in the access layer. WP 2.2 asserts only its own two new keys agree. Generating one side from the other belongs with the contract's other generators | `supabase/migrations/20260711000002_unified_access_control.sql:36-53` (the seed); `src/lib/capabilities.ts` (`FeatureKey`, `FEATURE_CAPABILITIES`, the role-default map) | WP 2.4 |
+| D34 | **An empty AI allow-list means EVERYTHING, and no surface says so.** `user_ai_permissions.allowed_model_ids` is read as an allow-list only when non-empty: `capabilities_for_user()` sets `all_allowed` true when the array is empty OR the user has no row. That is deliberate — it preserves the behaviour every user had before the column existed — but it inverts how an allow-list reads, and nothing at the point of display states it (§5 T2). An administrator clearing the list to revoke model access grants all of it instead. Found by WP 2.2 while authoring the sidecar | `20260905000001_grant_ga_agent_capabilities.sql` (`v_all_models := … array_length(v_allowed_ids, 1) IS NULL`) | WP 2.3 |
 
 ### 4.1 Code map — the data layer
 
@@ -1033,7 +1035,7 @@ database (§15), and the backfill deliberately leaves ambiguous matches NULL.
 could not: two edge functions authorizing on the org STRING in TypeScript, running
 as the service role with RLS bypassed. Fixed here; see §16.
 
-### WP 2.2 — Project membership and the resolver *(D14)*
+### WP 2.2 — Project membership and the resolver ✅ *(D14 — done `20260915000005`)*
 
 **Precondition, satisfied:** WP 2.1 is done and its four sidecars
 (`approved_users`, `organizations`, `organization_members`, `projects`) exist;
@@ -1057,6 +1059,17 @@ grant exceeding the grantor's level is rejected.
 allow over org deny; expired grant) and record the truth table.
 
 ### WP 2.3 — Data-plane audit *(D15)*
+
+**Precondition, satisfied:** WP 2.2 is done. `project_members` exists and
+`capabilities_for_user(_user_id, _project_id)` resolves through it. Two things
+WP 2.2 measured that this package needs: **the governance plane it just built
+audits nothing** — `project_members` and `delegation_grants` both carry
+`audited: false`, and a privilege grant writing no audit row is exactly what
+`audit-actor` (§2.1 G4) exists to prevent — and **the audit seam is already
+narrow**: `grant_project_delegation()` and `revoke_project_delegation()` are
+SECURITY DEFINER, take the actor explicitly, and are the ONLY write path to
+either table, because neither table has a write policy (D28). There are exactly
+two writers to instrument, not a search. D34 is also assigned here.
 
 Generalize `admin_audit_logs` → `audit_logs` with `plane ∈ (admin, data, access)`,
 same column shape; migrate existing rows to `admin`; org admins read their own org's
@@ -3013,6 +3026,122 @@ Handoff to next WP:
   - D30 is NOT settled by this. The duplicate-policy question needs the real
     remote's history, and the local base is generated from the artifact rather than
     replayed, so it never reaches the two conflicting `CREATE POLICY` files.
+
+### WP 2.2 — Project membership and the resolver · 2026-09-15 · `20260915000005`
+
+Preconditions held? **partly — three of the prompt's measured claims are stale**, in
+the same way WP 2.1's were.
+Exit checks passed? yes, and all three were EXECUTED against a live PostgreSQL 16
+rather than argued from the code — the route D31 opened.
+
+**What was stale.**
+  - **`capabilities_for_user()` is defined TWICE and the prompt names the loser.**
+    `20260711000002:169` is the one it says to extend; `20260905000001:79` is later
+    and therefore the one the database runs. Exactly the WP 2.1 failure repeated —
+    a handoff naming a definition without checking whether a later migration
+    replaced it. The signature property the prompt rightly insists on (explicit
+    `_user_id`, no GUC) does hold in the winner, so the instruction was right and
+    its citation was wrong.
+  - **The capability catalog is not six keys, it is about twenty.** The prompt lists
+    `ai_chat, simulation_lab, project_intelligence, data_editing, export,
+    super_admin`. `20260711000002` seeds five features and twelve pages, and a dozen
+    later migrations add the agent, chat, memory and report keys. That mattered:
+    "split `data_editing`" is a change to a catalog with many more readers than six.
+  - **`super_admin` is not a capability key at all.** It is an `app_role` enum value.
+    The nearest capability is the `/admin` PAGE key. Asserting a grant on a
+    capability named `super_admin` would have written a row matching nothing.
+
+Discovered:
+  - **D33** — the capability catalog is hand-maintained in BOTH `public.capabilities`
+    and `src/lib/capabilities.ts`, and nothing checks they agree. The DB has grown
+    from 5 feature keys to ~20; the TS list learned each one by hand. A key in the DB
+    and not in TS is a right no client can be granted; the reverse offers a right
+    that resolves false. → §4, assigned WP 2.4.
+  - **D34** — `user_ai_permissions.allowed_model_ids` empty means EVERY model, not
+    none, and no surface says so. Clearing the list to revoke access grants all of
+    it. → §4, assigned WP 2.3.
+  - **`organization_members.org_role` is STILL read by nothing, and this package did
+    not change that.** WP 2.1 recorded it; WP 2.2 added the PROJECT layer, not the
+    org one, so an organization `admin` still holds exactly what a `member` does.
+    Saying so plainly because the obvious assumption after this package is that the
+    governance plane is now complete, and it is not.
+  - **The resolver knows which layer decided and throws it away.** A user told "you
+    cannot export" cannot learn whether that came from their role, their org, their
+    project role or an explicit user deny. §5 T1 asks every displayed value to
+    resolve to a source; this one resolves to a boolean. → recorded in the
+    `project_role_capabilities` sidecar; WP 2.4 renders governance and is the place.
+
+**D28 decided the enforcement point, and it is the design's load-bearing fact.**
+Every policy in this schema is PERMISSIVE and Postgres ORs them, so subtraction
+cannot be a policy: a "deny" added beside an "allow" denies nothing. Both new tables
+therefore carry a SELECT policy and **no write policy at all** — RLS denies writes by
+default, and `grant_project_delegation()` is the only way in. The absence of a policy
+IS the enforcement, which is unusual enough that both sidecars and the migration say
+so outright, and `projectMembership.test.ts` fails if either table gains a write
+policy. No RESTRICTIVE policy is introduced: taking that decision schema-wide is
+WP 2.4's to take once, not this package's to take twice.
+
+**Exit checks, executed (seeded rows on a local PostgreSQL 16, not production):**
+  - *A viewer on project A cannot read B* — `effective_project_role` returns `viewer`
+    on A and NULL on B; `is_member` true then false. The viewer also gets
+    `data_edit_inputs: false` on A where the owner gets true.
+  - *An expired grant stops granting* — an `analyst` delegation resolves while live,
+    and once `expires_at` passes the grantee resolves to NULL.
+  - *A grant exceeding the grantor's level is rejected* — a `viewer` granting
+    `editor` raises `42501 a grant may not exceed the grantor's own level
+    (editor > viewer)`; the same grantor at their own level succeeds. A delegation
+    with no `expires_at` is refused outright.
+
+**Gap check — the four-case truth table, also executed:**
+
+| # | Case | Result | Why |
+|---|---|---|---|
+| 1 | super admin, on a project they are NOT a member of | `export: true`, `project_role: owner` | short-circuits every layer, and `effective_project_role` reports `owner` everywhere so the two agree |
+| 2 | org DENY on `export`, user is `editor` on A, nothing on B | `true` on A, `false` on B | the project layer beats the org deny exactly where membership exists, and nowhere else |
+| 3 | user ALLOW over the same org DENY | `true` | the user layer is innermost; a per-person grant beats a tenant-wide denial |
+| 4 | that access held by a DELEGATION instead, then expired | `true` while live -> `false` once expired, `project_role` NULL | the project layer falls away and the org DENY reasserts itself |
+| — | `/profile` with an explicit user DENY | `true` | non-deniable, as it must be: the page you would use to fix your own permissions |
+
+Row 4 is the one worth keeping. The interesting property is not that the grant
+stops — it is that what it was MASKING comes back correctly. A delegation that
+expired into "no opinion" rather than into the org's denial would have left the
+grantee holding access nobody granted them.
+
+Baseline numbers:
+  - 3 tables added (`project_members`, `project_role_capabilities`, `delegation_grants`).
+  - 8 sidecars authored; coverage 17 -> **25 tables described**, 56 -> 51 deferred.
+  - `data_editing` -> `data_edit_inputs` + `data_edit_policies`, both SEEDED from the
+    old flag at every existing layer, so effective access on deploy day is identical
+    to the day before. `data_editing` is KEPT: eight call sites still name it.
+  - 92 -> **105 tests**; 9 mutations run against the new suite, 9 failures, restore green.
+  - `contract:check` green · `check:docs` green · `tsc` unchanged at 10 pre-existing errors.
+
+**Unverified:** the backfill's real coverage. `project_members` is seeded from
+`projects.modeler_id`, which is NOT a declared foreign key to `approved_users`, so
+the insert filters on the user existing. How many projects have a `modeler_id` with
+no matching account — and therefore end up with NO owner, visible only org-wide — is
+a §15 question. On the local database the filter behaved correctly; on production
+nobody has counted.
+
+Handoff to next WP:
+  - **WP 2.3 inherits a governance plane that audits nothing.** `project_members` and
+    `delegation_grants` both carry `audited: false`, and a privilege grant that writes
+    no audit row is precisely what `audit-actor` (§2.1 G4) exists to prevent. The
+    actor is already an explicit argument on both RPCs, so the emit point is a
+    one-line addition rather than a redesign.
+  - **`grant_project_delegation` and `revoke_project_delegation` are the audit seam.**
+    They are SECURITY DEFINER, they take the actor explicitly, and they are the only
+    write path to either table. WP 2.3 does not need to find the writers; there are
+    exactly two.
+  - **WP 2.4 should generate its RLS assertions per PROJECT ROLE, not just per
+    app_role.** `project_role_capabilities` is the table that says what each role may
+    do, and `effective_project_role()` is how a seeded user gets one. The four-case
+    table above is the shape those assertions should take.
+  - **The `data_editing` split is half-done on purpose.** The DB has all three keys;
+    `src/lib/capabilities.ts` knows all three; the eight call sites still ask for the
+    old one. Moving them is a UI change per call site, and the old key is removed only
+    when the last one has moved — the same discipline as WP 2.1's text org branch, and
+    for the same reason: removing it early revokes access from everyone still asking.
 
 ---
 

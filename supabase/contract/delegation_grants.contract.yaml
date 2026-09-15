@@ -1,0 +1,158 @@
+# AUTHORED — the data contract's sidecar for `delegation_grants`.
+table: delegation_grants
+tier: G
+schema_name: public
+grain: >-
+  One temporary, subtractive grant of project access from one person to another.
+  `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the
+  grantor holds, and it always ends.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: delegation_grants_pkey
+# Deliberately no unique constraint on (project_id, grantee): the same person may
+# legitimately hold two overlapping grants from different grantors, and
+# effective_project_role takes the highest live one.
+natural_key_intended: [id]
+
+governance:
+  read: null
+  write: null
+  min_project_role: owner
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write: null` again literal. SELECT is limited to the grantor, the grantee and
+    super admins; there is NO write policy, so RLS denies writes and
+    `grant_project_delegation()` / `revoke_project_delegation()` are the only way
+    in. That is forced rather than chosen: subtraction has to be CHECKED against
+    the grantor's own level, and a PERMISSIVE policy cannot subtract (D28) — it can
+    only add another OR'd way to say yes. `audited: false` is the uncomfortable
+    one: a privilege grant that writes no audit row is exactly what
+    `audit-actor` (§2.1 G4) exists to prevent, and WP 2.3 owns it. Recorded here
+    rather than left to be noticed.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: Surrogate identifier for the grant. What revoke takes.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The project the grant applies to. A delegation is never org-wide.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  grantor_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who gave it. Their effective project role at the moment of granting is the
+      ceiling on what the grant may contain.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: must differ from grantee — CHECK}
+    surfaces: []
+    resolution: null
+  grantee_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: Who received it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: must differ from grantor — CHECK}
+    surfaces: []
+    resolution: null
+  project_role:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The level granted. Rejected by the RPC if it outranks the grantor's own — the
+      subtractive rule, enforced in one place.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "one of owner / editor / analyst / viewer, and no higher than the grantor's own level"
+    surfaces: []
+    resolution: null
+  expires_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it stops granting. NOT NULL, and the RPC additionally refuses a time
+      already past. A delegation without an end is a membership, and the product
+      has a table for those.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: required and in the future}
+    surfaces: []
+    resolution: null
+  rationale:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Why the elevation exists. NOT NULL and non-empty, unlike on
+      `project_members`: a temporary grant of someone else's access is exactly the
+      thing a reviewer will later ask the reason for.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty after btrim}
+    surfaces: []
+    resolution: null
+  revoked_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was withdrawn early, if it was. Revocation SETS this rather than
+      deleting the row — who held what, and when, survives the withdrawal.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the grant was made. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  Expiry and revocation are both applied inside `effective_project_role()` rather
+  than by each caller, so "did you remember to check expires_at" is not a question
+  any future reader has to answer. Verified against a live PostgreSQL in WP 2.2:
+  a grant exceeding the grantor's level is rejected, one with no expiry is
+  rejected, and a grant whose expiry passes stops granting (PLAN.md §16).

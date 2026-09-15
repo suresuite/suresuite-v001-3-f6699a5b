@@ -1,0 +1,96 @@
+# AUTHORED — the data contract's sidecar for `org_capabilities`.
+table: org_capabilities
+tier: G
+schema_name: public
+grain: >-
+  One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default.
+owner: platform
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [org_id, capability_key]
+    name: null
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    One of the four layers `capabilities_for_user()` resolves, in the order
+    role -> org -> project -> user, most specific winning. `audited: false` and it
+    matters here more than on most tables: these rows ARE the permissions, and a
+    change to one currently leaves no record of who made it (§2.1 `audit-actor`,
+    WP 2.3).
+
+fields:
+  org_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      the organization the row grants for.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  capability_key:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The capability, naming a row in `capabilities`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: must exist in capabilities}
+    surfaces: []
+    resolution: null
+  allowed:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether this layer grants the capability. TRI-STATE in effect: a missing row
+      means "inherit from the next layer out", `false` means "deny here". They are
+      different answers and the resolver's COALESCE depends on the difference.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: no row exists at this layer
+        value: the next layer out decides; the chain ends in false
+        provenance: default
+        visible_as: capabilities_for_user returns the resolved boolean; which layer decided is not reported
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When it was last changed. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from
+  whatever `data_editing` already said, so effective access on the day of deploy
+  was identical to the day before. `data_editing` is deliberately still here: it
+  is removed when the last call site has moved to one of the new keys, not before.

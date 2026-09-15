@@ -1,0 +1,104 @@
+# AUTHORED — the data contract's sidecar for `project_role_capabilities`.
+table: project_role_capabilities
+tier: G
+schema_name: public
+grain: >-
+  What one project role may do — one row per (project_role, capability). The
+  project layer of the four-layer resolver, shaped exactly like
+  `role_capabilities` so all four layers read the same way.
+owner: platform
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [project_role, capability_key]
+    name: null
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Read is open to everyone (`USING (true)`): it is a static policy table with no
+    per-tenant content, and every client needs it to render what a role can do.
+    As with the other capability tables there is no write policy, so writes are
+    service-role only.
+
+fields:
+  project_role:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The project role the row grants for — owner, editor, analyst or viewer.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: one of owner / editor / analyst / viewer}
+    surfaces: []
+    resolution: null
+  capability_key:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The capability, FK to `capabilities.key`. CASCADEs, so retiring a capability
+      cannot leave grants pointing at nothing.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: must exist in capabilities}
+    surfaces: []
+    resolution: null
+  allowed:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether this role gets it. The layer is TRI-STATE in effect: a missing row
+      means "inherit from the org layer", `false` means "deny at the project
+      level". They are different answers and the resolver's COALESCE relies on it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: no row exists for this (project_role, capability)
+        value: the org layer's answer, then the role layer's, then false
+        provenance: default
+        visible_as: capabilities_for_user returns the resolved boolean; the layer that decided it is not currently reported
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      WHICH LAYER DECIDED IS NOT RETURNED, and that is a §5 T1 gap worth naming:
+      a user told "you cannot export" cannot learn whether that came from their
+      role, their org, their project role or an explicit user deny. The resolver
+      has the information and discards it. WP 2.4 renders governance and is the
+      place to fix it.
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the grant row was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When it was last changed. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  Seeded by WP 2.2 with the split that gives `analyst` its meaning: an analyst may
+  edit tier-4 decisions (`data_edit_policies`) and may NOT edit the tier-2 measured
+  inputs those decisions are judged against (`data_edit_inputs`). Before the split
+  one `data_editing` flag governed both, so the role could not exist.

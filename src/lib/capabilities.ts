@@ -54,6 +54,13 @@ export type FeatureKey =
   | 'simulation_lab'
   | 'project_intelligence'
   | 'data_editing'
+  // WP 2.2 (PLAN.md §9): `data_editing` governed BOTH tier-2 inputs and tier-4
+  // decisions, so an analyst who may retune a policy also had to be handed the
+  // right to rewrite the measured data the policy is judged against. These two
+  // split it. `data_editing` is KEPT until every call site has moved — the DB
+  // seeds both new keys from it, so nobody's access changed on deploy.
+  | 'data_edit_inputs'
+  | 'data_edit_policies'
   | 'export'
   // AI-agent capability keys (ai-agents.md §13.1; seeded in
   // 20260715000003_agent_capabilities.sql):
@@ -87,6 +94,8 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'simulation_lab', kind: 'feature', label: 'Run Simulations' },
   { key: 'project_intelligence', kind: 'feature', label: 'Project Intelligence' },
   { key: 'data_editing', kind: 'feature', label: 'Data Editing' },
+  { key: 'data_edit_inputs', kind: 'feature', label: 'Edit Input Data' },
+  { key: 'data_edit_policies', kind: 'feature', label: 'Edit Policies' },
   { key: 'export', kind: 'feature', label: 'Export' },
   { key: 'agent_proposals', kind: 'feature', label: 'Agent Proposals' },
   { key: 'agent_apply', kind: 'feature', label: 'Agent Apply' },
@@ -229,6 +238,10 @@ export function roleFallbackCapabilities(
     export: true,
     simulation_lab: powerRole,
     data_editing: powerRole,
+    // seeded FROM data_editing by 20260915000005, so these three agree by
+    // construction until a call site deliberately moves to one of the new keys.
+    data_edit_inputs: powerRole,
+    data_edit_policies: powerRole,
     // Mirrors the 20260715000003 / 20260717000001 role seeds (ai-agents.md
     // §13.1, §14.7): proposals follow ai_chat; apply is power-role; per-agent
     // keys and chat_history_sync are off until their stages GA.

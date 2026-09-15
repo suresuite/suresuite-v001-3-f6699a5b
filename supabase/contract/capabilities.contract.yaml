@@ -1,0 +1,120 @@
+# AUTHORED — the data contract's sidecar for `capabilities`.
+table: capabilities
+tier: G
+schema_name: public
+grain: >-
+  One thing a user may or may not be permitted to do — a page they may open or a
+  feature they may use. The CATALOG: it says what rights exist, never who holds
+  them. The four grant tables answer that.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [key]
+    name: capabilities_pkey
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Read is open — every client needs the catalog to render a permissions screen,
+    and the rows contain no tenant data. Writes are service-role only, and in
+    practice happen in migrations: a capability is introduced by the feature that
+    needs it, not by an administrator at runtime.
+
+fields:
+  key:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The capability's identity, and the string every grant table and every call
+      site names. Page keys are ROUTES (`/policies`); feature keys are snake_case
+      verbs (`data_edit_inputs`). The convention is not enforced by a CHECK.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: unique}
+    surfaces: []
+    resolution: null
+  kind:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      `page` or `feature`, CHECK-constrained. The resolver aggregates the two
+      separately and returns them under separate keys, so the distinction is
+      load-bearing rather than descriptive.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: page or feature}
+    surfaces: []
+    resolution: null
+  label:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The human name shown on permission screens.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  description:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: One sentence on what holding it lets you do. Nullable.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  sort_order:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: Display order on permission screens. Presentation only.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the capability was added to the catalog. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When its metadata last changed. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  THE CATALOG IS DUPLICATED IN TYPESCRIPT. `src/lib/capabilities.ts` carries the
+  same keys as a union type and a list, because the client needs them without a
+  round trip. Two hand-maintained copies of one fact is an I1 violation waiting to
+  drift — `projectMembership.test.ts` asserts the WP 2.2 keys agree, but nothing
+  checks the whole catalog, and the honest count is that the DB has grown keys the
+  TS list learned about only when someone noticed. Generating one from the other
+  is the fix and it belongs with the contract's other generators, not here.

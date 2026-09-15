@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-17 of 73 tables are covered,
-204 columns in all. A table that is not here is listed
+25 of 76 tables are covered,
+256 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -15,21 +15,29 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`approved_users`](approved_users.md) | G | `platform` | 16 | One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one. |
 | [`bom_multi_level`](bom_multi_level.md) | 2 | `data-ingestion` | 9 | One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5). |
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 8 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5). |
+| [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
 | [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 8 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
+| [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
 | [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 12 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5). |
 | [`materials`](materials.md) | 2 | `data-ingestion` | 14 | One material in one project: the economics the simulation reads for it. The precision path — the CSV lanes carry prices too, and where this row is silent the engine derives the value from them rather than treating it as missing. |
+| [`org_capabilities`](org_capabilities.md) | G | `platform` | 5 | One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default. |
 | [`organization_members`](organization_members.md) | G | `platform` | 5 | One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for. |
 | [`organizations`](organizations.md) | G | `platform` | 8 | One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold. |
 | [`outbound_logistics`](outbound_logistics.md) | 2 | `data-ingestion` | 11 | One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5). |
 | [`policy_defaults`](policy_defaults.md) | 4 | `policy-ui` | 15 | One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against. |
 | [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 9 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
 | [`products`](products.md) | 2 | `data-ingestion` | 16 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
+| [`project_members`](project_members.md) | G | `platform` | 8 | One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between "in the organization" (sees every project) and "not in it" (sees none). |
+| [`project_role_capabilities`](project_role_capabilities.md) | G | `platform` | 5 | What one project role may do — one row per (project_role, capability). The project layer of the four-layer resolver, shaped exactly like `role_capabilities` so all four layers read the same way. |
 | [`projects`](projects.md) | G | `platform` | 19 | One modelling project: a named supply chain, owned by one modeller, belonging to one organization. It is the scope every other project-scoped table hangs off `project_id`, and it is the row almost every RLS policy in the schema reaches through to decide whether the caller may see anything at all. |
 | [`risk_data`](risk_data.md) | reference | `reference-data` | 9 | One country's current risk class, as one named publisher graded it in one named edition. NOT project-scoped: two projects sourcing from the same country see the same row, which is the point — a per-project copy drifts. |
+| [`role_capabilities`](role_capabilities.md) | G | `platform` | 5 | One grant or denial, for one role and one capability. The OUTERMOST layer: what a role gets before any org, project or user says otherwise. |
 | [`suppliers`](suppliers.md) | 2 | `data-ingestion` | 10 | One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials. |
 | [`supply_chain_data`](supply_chain_data.md) | 3 | `etl` | 20 | One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild. |
 | [`supply_chain_data_multi_tier`](supply_chain_data_multi_tier.md) | 3 | `etl` | 15 | One edge of the DEEP supply graph — tier-2 and tier-3 suppliers behind the direct ones. Computed by the same ETL, read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4). |
+| [`user_ai_permissions`](user_ai_permissions.md) | G | `platform` | 8 | One user's AI entitlements — which models they may reach, which one they get by default, and how the request is shaped. One row per user, or none. |
+| [`user_capabilities`](user_capabilities.md) | G | `platform` | 5 | One grant or denial, for one user_id and one capability. The INNERMOST layer: an explicit per-person answer that beats every other. |
 
 ---
 
-*Generated from data contract `19b8f6b68a11`, engine `0.2.3`.*
+*Generated from data contract `91c378b2e0f8`, engine `0.2.3`.*

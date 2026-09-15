@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 296,
-  "migrations_applied": 293,
+  "migrations_found": 297,
+  "migrations_applied": 294,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260915000004_org_identity_dual_read.sql",
+  "last_migration": "20260915000005_project_membership_and_delegation.sql",
   "counts": {
-    "tables": 73,
+    "tables": 76,
     "views": 6,
     "enums": 4,
-    "functions": 232,
+    "functions": 237,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -4119,6 +4119,197 @@
             "id"
           ],
           "name": "dataset_versions_pkey"
+        }
+      ]
+    },
+    {
+      "name": "delegation_grants",
+      "schema": "public",
+      "created_by": "20260915000005_project_membership_and_delegation.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "grantor_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "grantee_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "project_role",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "expires_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "rationale",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "revoked_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": null,
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (grantor_user_id <> grantee_user_id)",
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "delegation_grants_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "delegation_grants_active_idx",
+          "unique": false,
+          "columns": [
+            "grantee_user_id",
+            "project_id"
+          ],
+          "predicate": "revoked_at IS NULL",
+          "partial": true,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "delegation_grants: read own",
+            "command": "SELECT",
+            "roles": [],
+            "using": "grantor_user_id = public.get_current_user_id() OR grantee_user_id = public.get_current_user_id() OR public.current_is_super_admin()",
+            "with_check": "grantor_user_id = public.get_current_user_id() OR grantee_user_id = public.get_current_user_id() OR public.current_is_super_admin()",
+            "added_by": "20260915000005_project_membership_and_delegation.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "delegation_grants_pkey"
         }
       ]
     },
@@ -10983,6 +11174,167 @@
       ]
     },
     {
+      "name": "project_members",
+      "schema": "public",
+      "created_by": "20260915000005_project_membership_and_delegation.sql",
+      "columns": [
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "project_role",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "granted_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "expires_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "rationale",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": null,
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "project_id",
+            "user_id"
+          ],
+          "definition": "PRIMARY KEY (project_id, user_id)",
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "project_members: read own and co-members",
+            "command": "SELECT",
+            "roles": [],
+            "using": "user_id = public.get_current_user_id() OR EXISTS (SELECT 1 FROM public.project_members m WHERE m.project_id = project_members.project_id AND m.user_id = public.get_current_user_id()) OR public.current_is_super_admin()",
+            "with_check": "user_id = public.get_current_user_id() OR EXISTS (SELECT 1 FROM public.project_members m WHERE m.project_id = project_members.project_id AND m.user_id = public.get_current_user_id()) OR public.current_is_super_admin()",
+            "added_by": "20260915000005_project_membership_and_delegation.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "One person's standing on one project. The PK is the natural key (§2.1 I4): a ",
+      "natural_key_unique": [
+        {
+          "source": "PRIMARY KEY constraint",
+          "columns": [
+            "project_id",
+            "user_id"
+          ],
+          "name": null
+        }
+      ]
+    },
+    {
       "name": "project_memory",
       "schema": "public",
       "created_by": "20260717000003_project_memory.sql",
@@ -11167,6 +11519,119 @@
             "id"
           ],
           "name": "project_memory_pkey"
+        }
+      ]
+    },
+    {
+      "name": "project_role_capabilities",
+      "schema": "public",
+      "created_by": "20260915000005_project_membership_and_delegation.sql",
+      "columns": [
+        {
+          "name": "project_role",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "capability_key",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "capabilities",
+            "columns": [
+              "key"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "allowed",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": null,
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "project_role",
+            "capability_key"
+          ],
+          "definition": "PRIMARY KEY (project_role, capability_key)",
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "project_role_capabilities: read all",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260915000005_project_membership_and_delegation.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "PRIMARY KEY constraint",
+          "columns": [
+            "project_role",
+            "capability_key"
+          ],
+          "name": null
         }
       ]
     },
@@ -18252,6 +18717,18 @@
     },
     {
       "name": "capabilities_for_user",
+      "signature": "capabilities_for_user(uuid, uuid)",
+      "args": [
+        "_user_id uuid",
+        "_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "defined_by": "20260915000005_project_membership_and_delegation.sql"
+    },
+    {
+      "name": "capabilities_for_user",
       "signature": "capabilities_for_user(uuid)",
       "args": [
         "_user_id uuid"
@@ -18817,6 +19294,18 @@
       "defined_by": "20260915000001_one_unit_table.sql"
     },
     {
+      "name": "effective_project_role",
+      "signature": "effective_project_role(uuid, uuid)",
+      "args": [
+        "_user_id uuid",
+        "_project_id uuid"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "defined_by": "20260915000005_project_membership_and_delegation.sql"
+    },
+    {
       "name": "ensure_dataset_plant_matches_project",
       "signature": "ensure_dataset_plant_matches_project()",
       "args": [],
@@ -19358,6 +19847,22 @@
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
+      "name": "grant_project_delegation",
+      "signature": "grant_project_delegation(uuid, uuid, uuid, text, timestamptz, text)",
+      "args": [
+        "_grantor_user_id uuid",
+        "_project_id uuid",
+        "_grantee_user_id uuid",
+        "_project_role text",
+        "_expires_at timestamptz",
+        "_rationale text"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260915000005_project_membership_and_delegation.sql"
+    },
+    {
       "name": "has_project_access",
       "signature": "has_project_access(uuid)",
       "args": [
@@ -19624,6 +20129,17 @@
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
+      "name": "project_role_rank",
+      "signature": "project_role_rank(text)",
+      "args": [
+        "_project_role text"
+      ],
+      "returns": "integer LANGUAGE sql IMMUTABLE AS",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "defined_by": "20260915000005_project_membership_and_delegation.sql"
+    },
+    {
       "name": "prune_ai_chat_events",
       "signature": "prune_ai_chat_events(integer)",
       "args": [
@@ -19800,6 +20316,18 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260710000001_model_validations.sql"
+    },
+    {
+      "name": "revoke_project_delegation",
+      "signature": "revoke_project_delegation(uuid, uuid)",
+      "args": [
+        "_actor_user_id uuid",
+        "_grant_id uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
       "name": "rotate_api_key",
