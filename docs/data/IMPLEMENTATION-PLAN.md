@@ -8,9 +8,9 @@
 
 **This is the single plan** — enforced, not asserted: `npm run check:docs` fails if
 any data-layer fact lives outside §4. Architecture, defects, transparency standard, user
-documentation and the work packages live here and nowhere else. `PROMPTS.md` is
-execution mechanics only and cites this document by section and defect ID; it
-restates nothing.
+documentation and the work packages live here and nowhere else. `PROMPTS.md` is a
+**derived view**: it caches §4 evidence so a cold session need not dig, and the gate
+forbids it holding any fact this document lacks.
 
 *(Supersedes `TRANSPARENCY.md` and `USER-DOCS-PLAN.md`, both folded in — they
 duplicated facts stated here, which is the defect this plan exists to end.)*
