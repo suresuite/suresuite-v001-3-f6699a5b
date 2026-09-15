@@ -41,6 +41,115 @@
 --     those tables a uuid org is a schema change, and it belongs with the tier
 --     work, not here. Recorded in §16.
 
+-- ── 0. preflight ─────────────────────────────────────────────────────────────
+-- Say up front which of the tables this file touches are absent. The migration
+-- log is the only place anyone sees this database's real shape (D31: a migration's
+-- first execution is the production deploy), so it should not have to be inferred
+-- one aborted statement at a time.
+DO $preflight$
+DECLARE missing text[];
+BEGIN
+  SELECT array_agg(t ORDER BY t) INTO missing
+    FROM unnest(ARRAY[
+      'approved_users','organizations','projects',
+      'bom_multi_level','bom_single_level','inbound_logistics','outbound_logistics',
+      'multi_tier_supply_chain','supply_chain_data','node_list',
+      'network_edges','network_nodes','network_summary',
+      'disruption_scenarios','disruption_scenario_effects','disruption_scenario_profiles',
+      'disruption_scenario_settings','disruption_scenario_targets',
+      'simulation_cache','simulation_jobs','simulation_job_magnitudes',
+      'simulation_performance_metrics','simulation_results',
+      'tier2_suppliers','tier3_suppliers'
+    ]) t
+   WHERE to_regclass('public.' || t) IS NULL
+     -- the three §0b adopts are expected to be absent; anything ELSE is news
+     AND t <> ALL (ARRAY['network_summary','tier2_suppliers','tier3_suppliers']);
+  IF missing IS NOT NULL THEN
+    -- EXCEPTION, not NOTICE. The Supabase CLI's `db push` log captures ERROR lines
+    -- and drops NOTICEs, so a notice here is invisible exactly where it is needed —
+    -- and the alternative is learning the set one aborted statement per deploy,
+    -- which is how D32 was found and then how `tier2_suppliers` was found after it.
+    -- Failing here names ALL of them at once, before anything has been attempted.
+    RAISE EXCEPTION 'this database is missing % table(s) that this migration needs: %. '
+                    'Adopt them (CREATE TABLE IF NOT EXISTS, verbatim from their '
+                    'original migration) the way network_summary is adopted below — '
+                    'see D32 and PLAN.md §16.', array_length(missing, 1), missing;
+  END IF;
+END
+$preflight$;
+
+-- ── 0b. adopt the tables this database is missing (D32) ──────────────────────
+-- The preflight above named three, and it took three deploys to learn the first
+-- two one at a time before it was made to name them all at once:
+--   network_summary                 — `20250904105527`, beside network_nodes/edges
+--   tier2_suppliers, tier3_suppliers — `20250903080405`
+-- All three are created by migrations, none is dropped by any migration, and none
+-- of them is in the production database. `risk_data` (D4) inverted, three times
+-- over. Each definition below is VERBATIM from its original migration and is the
+-- table's final shape — no later migration ALTERs any of them, which the contract
+-- confirms (every column's `added_by` is the creating migration).
+--
+-- `IF NOT EXISTS` makes every one a no-op wherever the table is already there, so
+-- this section is inert in any database built from the migrations. Adoption is the
+-- fix rather than skipping the policies: skipping means routing them through
+-- EXECUTE, which the introspector cannot read, and the contract would then show
+-- these tables on the OLD text comparison for ever — `orgIdentity.test.ts` caught
+-- that and refused it.
+--
+-- `UploadWizard.tsx` writes tier2_suppliers and tier3_suppliers, so in production
+-- the deep-tier upload has been writing to tables that do not exist. Adopting them
+-- does not "add a feature" — it restores the schema the code was already written
+-- against.
+
+CREATE TABLE IF NOT EXISTS public.network_summary (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL,
+  plant_name text NOT NULL,
+  organization text NOT NULL DEFAULT 'default_org',
+  created_by uuid,
+  uploaded_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  nodes_count integer,
+  edges_count integer,
+  tiers_data jsonb
+);
+ALTER TABLE public.network_summary ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.tier2_suppliers (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL,
+  plant_name text NOT NULL,
+  supplier_id text NOT NULL,
+  upstream_supplier_id text NOT NULL,
+  material_id text,
+  relationship_type text,
+  volume numeric,
+  unit_price numeric,
+  lead_time numeric,
+  time_unit text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE public.tier2_suppliers ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.tier3_suppliers (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL,
+  plant_name text NOT NULL,
+  supplier_id text NOT NULL,
+  upstream_supplier_id text NOT NULL,
+  material_id text,
+  relationship_type text,
+  volume numeric,
+  unit_price numeric,
+  lead_time numeric,
+  time_unit text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE public.tier3_suppliers ENABLE ROW LEVEL SECURITY;
+
 -- ── 1. the uuid resolver ─────────────────────────────────────────────────────
 -- `_user_id` is EXPLICIT, exactly as `capabilities_for_user()` takes it, and for
 -- the same reason: `get_current_user_org()` reads `current_setting('app.current_user_id')`,
@@ -117,6 +226,11 @@ $$;
 -- written before the rename carries the old name (slug matches) and one written
 -- after carries the new name (name matches).
 --
+-- `(array_agg(DISTINCT o.id))[1]` and not `min(o.id)`: Postgres has no `min()`
+-- aggregate for uuid, and `min(uuid)` is a 42883 at RUN time, not at parse time —
+-- it took the first real `db push` to surface it. The HAVING below guarantees the
+-- array has exactly one element, so the subscript is exact rather than a choice.
+--
 -- `count(DISTINCT o.id) = 1` is the point of the GROUP BY: `organizations.name`
 -- is NOT unique (only `slug` is), so a text org matching two organizations is
 -- ambiguous and is LEFT NULL rather than resolved to an arbitrary one. Rows this
@@ -127,7 +241,7 @@ $$;
 UPDATE public.approved_users au
    SET organization_id = m.org_id
   FROM (
-    SELECT u.id AS user_id, min(o.id) AS org_id
+    SELECT u.id AS user_id, (array_agg(DISTINCT o.id))[1] AS org_id
       FROM public.approved_users u
       JOIN public.organizations o
         ON o.name = u.organization
@@ -142,7 +256,7 @@ UPDATE public.approved_users au
 UPDATE public.projects p
    SET organization_id = m.org_id
   FROM (
-    SELECT pr.id AS project_id, min(o.id) AS org_id
+    SELECT pr.id AS project_id, (array_agg(DISTINCT o.id))[1] AS org_id
       FROM public.projects pr
       JOIN public.organizations o
         ON o.name = pr.organization
@@ -576,6 +690,7 @@ USING (EXISTS (
 ));
 
 DROP POLICY IF EXISTS "Network summary: project access delete" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access delete" 
 ON public.network_summary 
 FOR DELETE 
@@ -589,6 +704,7 @@ USING (EXISTS (
 ));
 
 DROP POLICY IF EXISTS "Network summary: project access insert" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access insert" 
 ON public.network_summary 
 FOR INSERT 
@@ -602,6 +718,7 @@ WITH CHECK (EXISTS (
 ));
 
 DROP POLICY IF EXISTS "Network summary: project access update" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access update" 
 ON public.network_summary 
 FOR UPDATE 
@@ -615,6 +732,7 @@ USING (EXISTS (
 ));
 
 DROP POLICY IF EXISTS "Network summary: project access view" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access view" 
 ON public.network_summary 
 FOR SELECT 
