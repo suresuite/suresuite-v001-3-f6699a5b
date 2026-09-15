@@ -1,0 +1,431 @@
+# AUTHORED — the data contract's sidecar for `supply_chain_data`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: supply_chain_data
+tier: "3"
+schema_name: public
+grain: >-
+  One edge of the project's computed supply graph: material flows from this
+  node to that one, carrying this weighted volume and this share of the
+  destination's sourcing. Derived from the four lane tables by the ETL and
+  always safe to drop and rebuild.
+owner: etl
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "supply_chain_data_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Written by the `combine-project` edge function, never by a page. Invariant
+    I2: pages never write tier 3. `write: null` is therefore a statement, not an
+    omission — there is no user-facing write path and there must not be one.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. Carries no meaning.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  from_location:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The upstream end of the edge — a supplier, a material, or the plant,
+      depending on which lane produced it.
+    grain: identifier
+    engine:
+      consumed_by: "network pages and the analyzers; not read by the engine mapping"
+      transform: "copied from the lane row's id column"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  to_location:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The downstream end of the edge.
+    grain: identifier
+    engine:
+      consumed_by: "network pages and the analyzers; not read by the engine mapping"
+      transform: "copied from the lane row's id column"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  plant_name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The focal plant this edge belongs to, by NAME — the join key G1 forbids.
+      Renamed from `plant` by 20250822025432, which is also when its incorrect
+      UNIQUE constraint stopped meaning one-row-per-plant.
+    grain: identifier
+    engine:
+      consumed_by: "network pages; per-plant filtering"
+      transform: "copied from the lane row"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  weighted:
+    type: "numeric(16,6)"
+    unit: "units per week"
+    unit_source: fixed
+    meaning: >-
+      The volume on this edge after unit normalization — always per WEEK, whatever
+      period the uploaded row quoted. This is where D2's fix lands: before it, a
+      supplier quoting 52 000 a year and one quoting 1 000 a week were summed as
+      52 000 and 1 000.
+    grain: rate
+    engine:
+      consumed_by: "the analyzers and the policy grid's volume basis; not the engine mapping"
+      transform: "weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts, over grading.ts's one unit table"
+      missing_default: "0"
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      numeric(16,6) since 20250816031317. Normalization SHRINKS every value quoted
+      coarser than a day and multiplies day-quoted rows by 7, so overflow needs a
+      pre-existing value above ~1.43e9 in a day-quoted project. Bounded by
+      analysis, not measurement — the §15 baseline has never been run.
+  material_consumption_rate:
+    type: "numeric(16,6)"
+    unit: "units of upstream per unit of downstream"
+    unit_source: derived
+    meaning: >-
+      How much of the upstream item one unit of the downstream item consumes,
+      carried through from the BOM.
+    grain: level
+    engine:
+      consumed_by: "the analyzers and the network pages; not the engine mapping"
+      transform: "copied from bom consumption_rate, multiplied down multi-level chains"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  sourcing_ratio:
+    type: "numeric(16,6)"
+    unit: "fraction of the destination's inbound flow"
+    unit_source: derived
+    meaning: >-
+      This edge's share of everything flowing into its destination. A share, so
+      the D2 unit error did not cancel: it decides which supplier the platform
+      calls primary.
+    grain: level
+    engine:
+      consumed_by: "the policy grid's primary-source suggestion; the analyzers"
+      transform: "volumeShare(weeklyVolume(row), weeklyVolumeTotalsBy(...)) in _shared/laneVolumes.ts"
+      missing_default: "0"
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the edge was first computed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the edge was last recomputed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  is_critical_node:
+    type: "boolean"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether an analyzer flagged this edge's node as critical. An analysis result
+      stored on an entity row — exactly the smearing D19 names.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT an engine input. It is analyzer output written onto a tier-3 entity row
+      with no identity, no version and no input hash (D19). WP 4.2 moves it to
+      `analysis_results`; WP 5.3 drops the column. Recorded here so the move has a
+      starting inventory.
+  critical_node_score:
+    type: "numeric(5,4)"
+    unit: "score in [0, 1]"
+    unit_source: fixed
+    meaning: >-
+      The score behind `is_critical_node`.
+    grain: level
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Analyzer output smeared onto the entity row (D19). See is_critical_node.
+  prediction_timestamp:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the criticality prediction was made. The closest thing this table has
+      to a version stamp, and it names no model and no input hash.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Analyzer output smeared onto the entity row (D19). See is_critical_node.
+  uploaded_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user whose upload produced this edge. Referenced by the RLS policies.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Governance, not a parameter. Read by this table's RLS policies, which grant
+      on `uploaded_by = get_current_user_id() AND organization =
+      get_current_user_org()`.
+  organization:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning organization, as a NAME with a `default_org` default. A
+      displayable string used as an authorization key — the second half of G1, and
+      the identity D13 says is compared by string.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Governance, not a parameter. WP 2.1 replaces it with an org uuid.
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this edge belongs to. NULLABLE here, unlike every lane table — a
+      row with no project is reachable only through the organization/uploader
+      policies.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::rows -> per-project fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  data_source:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which lane produced this edge — inbound, outbound or BOM.
+    grain: metadata
+    engine:
+      consumed_by: "the network pages, to colour and filter edges by origin"
+      transform: "set by the ETL per lane"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  data_source_group:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A coarser grouping of `data_source`, for filtering.
+    grain: metadata
+    engine:
+      consumed_by: "the network pages' filters"
+      transform: "set by the ETL per lane"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  is_zero_flow_filtered:
+    type: "boolean"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether this edge was hidden for carrying no flow in either direction.
+    grain: metadata
+    engine:
+      consumed_by: "the network pages, to exclude dead edges from the drawn graph"
+      transform: "set by the ETL"
+      missing_default: "false"
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  zero_flow_filter_applied_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the zero-flow filter last ran over this edge.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      ETL bookkeeping; not an engine input and not analyzer output.
+  zero_flow_filter_reason:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Why the edge was filtered. One value is used today:
+      zero_incoming_outgoing_flow.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      ETL bookkeeping; not an engine input and not analyzer output.

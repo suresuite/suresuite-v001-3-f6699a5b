@@ -143,6 +143,11 @@ export function resolveCell(args: {
   const edited = draft !== undefined;
   const fromDataMap = (row.__from_data ?? {}) as Record<string, true>;
   const imputedMap = (row.__imputed ?? {}) as Record<string, true>;
+  // The stage's own routing decisions (`primary_source`, `sourcing_firm`), written
+  // by `useStageRows::markFromData`. Read here so the `suggested` branch below has
+  // a map to test — it referenced `decidedMap` without one from `5c7129f` until the
+  // Phase 1 precondition check, and every cell render threw (D26's sibling).
+  const decidedMap = (row.__decided ?? {}) as Record<string, true>;
   const imputed = !edited && !col.master && imputedMap[col.field] === true;
   // D16 — `__from_data` is the ONLY evidence that a value came from the
   // project. The old fallback ("untracked but the row carries a value")

@@ -1231,6 +1231,8 @@ export function StagePolicyTable({
           // WP 6.2. Until then, every change here changes BOTH.
           const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
           const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
+          // Lockstep with resolveEffective.ts:resolveCell — see the note there.
+          const decidedMap = (r.__decided ?? {}) as Record<string, true>;
           const imputed = !edited && !col.master && imputedMap[col.field] === true;
           // D16 — `__from_data` is the ONLY evidence that a value came from the
           // project. The old fallback ("untracked but the row carries a value")

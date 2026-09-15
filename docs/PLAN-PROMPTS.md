@@ -48,41 +48,21 @@ the simulation platform, per CLAUDE.md.
 
 ### WP 0.1 — Kill the silent policy override ✅ DONE
 
-*(Kept for the record. The evidence below describes the state BEFORE the fix; §16's
-WP 0.1 entry records what actually landed, including D23/D24 and the new
-`suggested` provenance state.)*
-### WP 0.1 — Kill the silent policy override ✅ done
+*(Retired, not cached. Every `line:number` this prompt carried described the state
+BEFORE the fix and is now stale; `5c7129f` merged two independent implementations of
+it and spliced this block, which is how the stale numbers survived at all — see §16's
+WP 1.1 entry and D26. What was found lives in `docs/PLAN.md` §16, the closed defects
+are marked in §4, and the surviving locations are in §4.1. Cite those, not this.)*
 
-Shipped. The prompt is retired rather than cached: every line:number it carried is
-now stale, and the record of what was found lives in `docs/PLAN.md` §16 (drift log),
-with the closed defects marked in §4 and the surviving locations in §4.1.
-
-Already verified (re-check before relying on it):
-· useStageRows.tsx:277-306 writes hardcoded constants onto every supplier row.
-  Only safety_stock_days has a matching ColSpec and reaches the engine
-  (project_map.py:783 defaults it to 7.0 — we are persisting 0).
-  supplier_capacity_per_day, ordering_cost and lead_time_distribution have NO
-  matching ColSpec field; confirm and delete them rather than preserving them.
-· StagePolicyTable.tsx:814-827 calls applyPrefill() un-awaited, and setApplying(true)
-  only runs at :865 AFTER the row loop — so the `applying` guard is not armed
-  during the window the effect can re-enter.
-· The autoSeedMarkerRef marker is `${projectId}::${stageKey}`, so a
-  supplier→plant→supplier tab round trip re-enters for supplier.
-· The provenance logic at StagePolicyTable.tsx:1192-1254 is a VERBATIM copy of
-  resolveEffective.ts:124-185. Fix both branches identically. De-duplicating
-  them is WP 6.2's job — do not do it here, but note in §16 that they must stay
-  in lockstep until then.
-
-Decide and record: whether to drop the constants from the row entirely (my
-recommendation — let columnSpecs.defaultWhenMissing supply them) or tag them as
-non-data. Justify whichever you pick in the commit message.
-```
 Two things it settled that later packages rely on:
 · the constants were **dropped**, not tagged — tagging needs a second registry of
   "not data", which is the parallel source of truth I1 forbids;
 · `__from_data` now also carries the routing decisions the data's shape makes
   (`primary_source`, `sourcing_firm`), because the pre-dispatch validator reads
   those from the saved override bundle, not from the row.
+· the two provenance copies (§4.1: `resolveEffective.ts:103-193` and
+  `StagePolicyTable.tsx:1208-1276`) must stay in lockstep until WP 6.2 de-duplicates
+  them. So must the two prefill rules D26 left behind, until the same WP kills one.
 
 ### WP 0.2 — Unit conversion + orphan-table honesty ✅ DONE
 
@@ -414,7 +394,7 @@ Already verified (re-check before relying on it):
   and report counts BEFORE deduplicating, and again after.
 · Duplicates distort sourcing_ratio (combine-project:277 — the duplicate appears in
   both numerator and denominator), the smart-average imputation basis
-  (useStageRows.tsx:120-130), and the grading reducers. Dedup will therefore CHANGE
+  (useStageRows.tsx:120-131), and the grading reducers. Dedup will therefore CHANGE
   numbers. That is the D5 damage being undone — record the before/after in §16 so
   nobody later mistakes it for a regression.
 · Normalization at promotion (invariant I3) is the point of this WP. After it, no
@@ -701,16 +681,11 @@ Implement WP 6.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · The Supplier stage is the deepest chain and the right one to do first:
-  columnSpecs.ts:119-181 declares the columns; useStageRows.tsx:191-333 builds the
+  columnSpecs.ts:119-181 declares the columns; useStageRows.tsx:208-354 builds the
   rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
 · Substitutions to document exhaustively: resolveField's `> 0` test
   (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
   defaultWhenMissing (columnSpecs.ts:132-171), the effectivePolicy bundle,
-  columnSpecs.ts:119-178 declares the columns; useStageRows.tsx:208-348 builds the
-  rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
-· Substitutions to document exhaustively: resolveField's `> 0` test
-  (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
-  defaultWhenMissing (columnSpecs.ts:133-168), the effectivePolicy bundle,
   liveDefault = derivedVal ?? 0 (resolveEffective.ts:135), grading.ts's reducers,
   and ENGINE_DEFAULT_PRICE.
 · supabase/functions/_shared/grading.ts is pinned to project_map.py by
@@ -744,8 +719,7 @@ Already verified (re-check before relying on it):
 · ensure_item_masters unions bom_single_level ONLY — multi-level BOM materials get
   no master row. Fix here or record as a separate finding.
 
-De-duplicate StagePolicyTable.tsx:1192-1254 against resolveEffective.ts's
-De-duplicate StagePolicyTable.tsx:1206-1265 against resolveEffective.ts's
+De-duplicate StagePolicyTable.tsx:1208-1276 against resolveEffective.ts's
 resolveCell in this WP — it has been carried in lockstep since WP 0.1 and this is
 where that debt is paid.
 

@@ -1,0 +1,311 @@
+# AUTHORED — the data contract's sidecar for `supply_chain_data_multi_tier`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: supply_chain_data_multi_tier
+tier: "3"
+schema_name: public
+grain: >-
+  One edge of the DEEP supply graph — tier-2 and tier-3 suppliers behind the
+  direct ones. Computed by the same ETL, read by the network pages, and NOT
+  propagated into the simulation: the engine models a single focal plant with
+  three echelons (blueprint §2.4).
+owner: etl
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "supply_chain_data_multi_tier_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Written by the `combine-project` edge function, never by a page. Invariant
+    I2: pages never write tier 3. `write: null` is therefore a statement, not an
+    omission — there is no user-facing write path and there must not be one.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. Carries no meaning.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this edge belongs to. NOT NULL here, unlike supply_chain_data.
+    grain: identifier
+    engine:
+      consumed_by: "the network pages' per-project fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  plant_name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The focal plant this edge hangs off, by NAME — the join key G1 forbids.
+    grain: identifier
+    engine:
+      consumed_by: "the network pages; per-plant filtering"
+      transform: "copied from the lane row"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  data_source:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which deep-tier upload produced this edge.
+    grain: metadata
+    engine:
+      consumed_by: "the network pages' filters"
+      transform: "set by the ETL"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  from_location:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The upstream end of the edge — a tier-2 or tier-3 supplier.
+    grain: identifier
+    engine:
+      consumed_by: "the network pages"
+      transform: "copied from the deep-tier row"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  to_location:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The downstream end of the edge.
+    grain: identifier
+    engine:
+      consumed_by: "the network pages"
+      transform: "copied from the deep-tier row"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  material_consumption_rate:
+    type: "numeric"
+    unit: "units of upstream per unit of downstream"
+    unit_source: derived
+    meaning: >-
+      How much of the upstream item one unit of the downstream item consumes.
+    grain: level
+    engine:
+      consumed_by: "the network pages"
+      transform: "carried through from the deep-tier BOM"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  sourcing_ratio:
+    type: "numeric"
+    unit: "fraction of the destination's inbound flow"
+    unit_source: derived
+    meaning: >-
+      This edge's share of everything flowing into its destination. Its
+      denominator is the eighth raw-volume read D2 missed — a share computed over
+      unnormalized volumes until WP 0.2.
+    grain: level
+    engine:
+      consumed_by: "the network pages"
+      transform: "volumeShare over weekly-normalized volumes (_shared/laneVolumes.ts)"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  weighted:
+    type: "numeric"
+    unit: "units per week"
+    unit_source: fixed
+    meaning: >-
+      The volume on this edge, normalized to weeks. Unconstrained `numeric` here,
+      unlike supply_chain_data's numeric(16,6) — so the normalization carries no
+      overflow risk.
+    grain: rate
+    engine:
+      consumed_by: "the network pages"
+      transform: "weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  level:
+    type: "integer"
+    unit: "tiers upstream"
+    unit_source: fixed
+    meaning: >-
+      How many tiers upstream of the plant this edge sits. 2 is a supplier's
+      supplier.
+    grain: level
+    engine:
+      consumed_by: "the network pages' depth filter"
+      transform: "int()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  path_root:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The direct (tier-1) supplier this deep chain hangs off, so a deep edge can
+      be attributed to a supplier the plant actually buys from.
+    grain: identifier
+    engine:
+      consumed_by: "the network pages, to group deep edges under their tier-1 supplier"
+      transform: "set by the ETL while walking the chain"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  uploaded_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user whose upload produced this edge. Referenced by RLS.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Governance, not a parameter. See supply_chain_data.
+  organization:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning organization, as a NAME with a `default_org` default (G1, D13).
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Governance, not a parameter. WP 2.1 replaces it with an org uuid.
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the edge was first computed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the edge was last recomputed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null

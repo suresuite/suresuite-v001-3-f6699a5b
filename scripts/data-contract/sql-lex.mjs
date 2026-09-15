@@ -1,0 +1,200 @@
+// A small, dependency-free PostgreSQL lexer: enough to split a migration into
+// statements and to read identifiers without being fooled by the things that
+// make naive `split(';')` wrong.
+//
+// It handles the four ways Postgres hides a semicolon from you:
+//   · line comments     -- ...
+//   · block comments    /* ... */  (nested, per the Postgres spec)
+//   · string literals   '...'      ('' escapes a quote)
+//   · dollar quoting    $$ ... $$  /  $function$ ... $function$
+// and the one way it hides a keyword: "quoted identifiers", which may contain
+// spaces, dots and reserved words (`risk_data."RISK CLASS"`).
+//
+// Nothing here understands SQL semantics. That is introspect.mjs's job.
+
+/** Strip comments and split into statements on top-level semicolons. */
+export function splitStatements(sql) {
+  const out = [];
+  let buf = "";
+  let i = 0;
+  const n = sql.length;
+
+  while (i < n) {
+    const c = sql[i];
+    const two = sql.slice(i, i + 2);
+
+    if (two === "--") {
+      const nl = sql.indexOf("\n", i);
+      i = nl === -1 ? n : nl; // keep the newline; it is whitespace
+      continue;
+    }
+    if (two === "/*") {
+      let depth = 1;
+      i += 2;
+      while (i < n && depth > 0) {
+        if (sql.slice(i, i + 2) === "/*") { depth++; i += 2; }
+        else if (sql.slice(i, i + 2) === "*/") { depth--; i += 2; }
+        else i++;
+      }
+      buf += " ";
+      continue;
+    }
+    if (c === "'") {
+      const end = scanSingleQuoted(sql, i);
+      buf += sql.slice(i, end);
+      i = end;
+      continue;
+    }
+    if (c === '"') {
+      const end = scanDoubleQuoted(sql, i);
+      buf += sql.slice(i, end);
+      i = end;
+      continue;
+    }
+    const tag = dollarTagAt(sql, i);
+    if (tag) {
+      const close = sql.indexOf(tag, i + tag.length);
+      const end = close === -1 ? n : close + tag.length;
+      buf += sql.slice(i, end);
+      i = end;
+      continue;
+    }
+    if (c === ";") {
+      if (buf.trim()) out.push(buf.trim());
+      buf = "";
+      i++;
+      continue;
+    }
+    buf += c;
+    i++;
+  }
+  if (buf.trim()) out.push(buf.trim());
+  return out;
+}
+
+function scanSingleQuoted(s, i) {
+  i++; // opening '
+  while (i < s.length) {
+    if (s[i] === "'") {
+      if (s[i + 1] === "'") { i += 2; continue; } // '' — an escaped quote
+      return i + 1;
+    }
+    if (s[i] === "\\") { i += 2; continue; } // E'' style; harmless otherwise
+    i++;
+  }
+  return s.length;
+}
+
+function scanDoubleQuoted(s, i) {
+  i++; // opening "
+  while (i < s.length) {
+    if (s[i] === '"') {
+      if (s[i + 1] === '"') { i += 2; continue; }
+      return i + 1;
+    }
+    i++;
+  }
+  return s.length;
+}
+
+/** `$$` or `$tag$` starting at i, else null. */
+function dollarTagAt(s, i) {
+  if (s[i] !== "$") return null;
+  const m = /^\$[A-Za-z_][A-Za-z_0-9]*\$|^\$\$/.exec(s.slice(i));
+  return m ? m[0] : null;
+}
+
+/**
+ * Split a parenthesised body on its TOP-LEVEL commas.
+ * `numeric(16,6)` and `CHECK (a IN ('x,y'))` must not split.
+ */
+export function splitTopLevel(body, sep = ",") {
+  const parts = [];
+  let buf = "";
+  let depth = 0;
+  let i = 0;
+  while (i < body.length) {
+    const c = body[i];
+    if (c === "'") { const e = scanSingleQuoted(body, i); buf += body.slice(i, e); i = e; continue; }
+    if (c === '"') { const e = scanDoubleQuoted(body, i); buf += body.slice(i, e); i = e; continue; }
+    const tag = dollarTagAt(body, i);
+    if (tag) {
+      const close = body.indexOf(tag, i + tag.length);
+      const e = close === -1 ? body.length : close + tag.length;
+      buf += body.slice(i, e); i = e; continue;
+    }
+    if (c === "(") depth++;
+    if (c === ")") depth--;
+    if (c === sep && depth === 0) { parts.push(buf.trim()); buf = ""; i++; continue; }
+    buf += c;
+    i++;
+  }
+  if (buf.trim()) parts.push(buf.trim());
+  return parts;
+}
+
+/**
+ * The parenthesised body of the FIRST top-level `(...)` at or after `from`.
+ * Returns { body, start, end } or null.
+ */
+export function parenBody(s, from = 0) {
+  let i = s.indexOf("(", from);
+  if (i === -1) return null;
+  const start = i;
+  let depth = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === "'") { i = scanSingleQuoted(s, i); continue; }
+    if (c === '"') { i = scanDoubleQuoted(s, i); continue; }
+    const tag = dollarTagAt(s, i);
+    if (tag) {
+      const close = s.indexOf(tag, i + tag.length);
+      i = close === -1 ? s.length : close + tag.length;
+      continue;
+    }
+    if (c === "(") depth++;
+    else if (c === ")") {
+      depth--;
+      if (depth === 0) return { body: s.slice(start + 1, i), start, end: i };
+    }
+    i++;
+  }
+  return null;
+}
+
+/**
+ * Read a (possibly schema-qualified, possibly quoted) identifier at `from`.
+ * Returns { schema, name, raw, end } — `name` is the unquoted text, and
+ * `quoted` says whether it needed quoting (a name with a space always does).
+ */
+export function readQualifiedName(s, from = 0) {
+  let i = from;
+  while (i < s.length && /\s/.test(s[i])) i++;
+  const parts = [];
+  for (;;) {
+    if (s[i] === '"') {
+      const e = scanDoubleQuoted(s, i);
+      parts.push({ name: s.slice(i + 1, e - 1).replace(/""/g, '"'), quoted: true });
+      i = e;
+    } else {
+      const m = /^[A-Za-z_][A-Za-z_0-9$]*/.exec(s.slice(i));
+      if (!m) break;
+      parts.push({ name: m[0].toLowerCase(), quoted: false });
+      i += m[0].length;
+    }
+    if (s[i] === ".") { i++; continue; }
+    break;
+  }
+  if (parts.length === 0) return null;
+  const last = parts[parts.length - 1];
+  return {
+    schema: parts.length > 1 ? parts[parts.length - 2].name : null,
+    name: last.name,
+    quoted: last.quoted,
+    raw: s.slice(from, i).trim(),
+    end: i,
+  };
+}
+
+/** Collapse whitespace so a definition can be compared or printed on one line. */
+export const squash = (s) => s.replace(/\s+/g, " ").trim();
