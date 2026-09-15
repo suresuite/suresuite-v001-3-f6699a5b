@@ -16,7 +16,8 @@
     "verify:mobile": "node scripts/audit-adaptive-ui.mjs",
     "check:docs": "node scripts/check-docs-single-source.mjs",
     "contract:introspect": "node scripts/data-contract/introspect.mjs",
-    "contract:verify": "node scripts/data-contract/verify-introspection.mjs"
+    "contract:verify": "node scripts/data-contract/verify-introspection.mjs",
+    "contract:validate": "node scripts/data-contract/validate-sidecars.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.5",
@@ -90,11 +91,13 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
+    "ajv": "^8.20.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "js-yaml": "^4.3.2",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",

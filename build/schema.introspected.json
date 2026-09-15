@@ -149,7 +149,18 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "admin_audit_logs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_audit_created_at",
@@ -194,7 +205,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "admin_audit_logs_pkey"
         }
       ]
     },
@@ -335,6 +346,16 @@
           ],
           "definition": "UNIQUE(scope, scope_id, period)",
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "ai_budgets_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
       "indexes": [],
@@ -364,13 +385,6 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "scope",
@@ -378,6 +392,13 @@
             "period"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "ai_budgets_pkey"
         }
       ]
     },
@@ -575,6 +596,16 @@
       ],
       "constraints": [
         {
+          "name": "ai_chat_events_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260715000002_agent_telemetry.sql"
+        },
+        {
           "name": "ai_chat_events_event_kind_check",
           "kind": "CHECK",
           "columns": [],
@@ -646,7 +677,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "ai_chat_events_pkey"
         }
       ]
     },
@@ -762,6 +793,16 @@
           ],
           "definition": "UNIQUE (model_code, capability_id)",
           "added_by": "20260726000002_model_capability_matrix.sql"
+        },
+        {
+          "name": "ai_model_capabilities_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260726000002_model_capability_matrix.sql"
         }
       ],
       "indexes": [],
@@ -774,19 +815,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "model_code",
             "capability_id"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "ai_model_capabilities_pkey"
         }
       ]
     },
@@ -934,7 +975,28 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "ai_models_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "ai_models_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "code"
+          ],
+          "definition": "UNIQUE (code)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -966,14 +1028,14 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "ai_models_pkey"
         },
         {
           "source": "column UNIQUE",
           "columns": [
             "code"
           ],
-          "name": null
+          "name": "ai_models_code_key"
         }
       ]
     },
@@ -1067,7 +1129,28 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "ai_providers_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "ai_providers_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "code"
+          ],
+          "definition": "UNIQUE (code)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -1099,14 +1182,14 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "ai_providers_pkey"
         },
         {
           "source": "column UNIQUE",
           "columns": [
             "code"
           ],
-          "name": null
+          "name": "ai_providers_code_key"
         }
       ]
     },
@@ -1326,7 +1409,18 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "ai_usage_logs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_ai_usage_created_at",
@@ -1401,7 +1495,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "ai_usage_logs_pkey"
         }
       ]
     },
@@ -1487,7 +1581,7 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "PRIMARY KEY",
+          "source": "PRIMARY KEY constraint",
           "columns": [
             "api_key_id",
             "idempotency_key"
@@ -1730,7 +1824,28 @@
           "added_by": "20260711000001_api_access_control.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "api_keys_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260711000001_api_access_control.sql"
+        },
+        {
+          "name": "api_keys_key_prefix_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "key_prefix"
+          ],
+          "definition": "UNIQUE (key_prefix)",
+          "implicit": true,
+          "added_by": "20260711000001_api_access_control.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_api_keys_org",
@@ -1756,14 +1871,14 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "api_keys_pkey"
         },
         {
           "source": "column UNIQUE",
           "columns": [
             "key_prefix"
           ],
-          "name": null
+          "name": "api_keys_key_prefix_key"
         }
       ]
     },
@@ -1891,6 +2006,16 @@
           ],
           "definition": "UNIQUE (scope, scope_id)",
           "added_by": "20260711000001_api_access_control.sql"
+        },
+        {
+          "name": "api_rate_limits_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260711000001_api_access_control.sql"
         }
       ],
       "indexes": [],
@@ -1912,19 +2037,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "scope",
             "scope_id"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "api_rate_limits_pkey"
         }
       ]
     },
@@ -2108,7 +2233,18 @@
           "added_by": "20260711000001_api_access_control.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "api_request_logs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260711000001_api_access_control.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_api_logs_created",
@@ -2165,7 +2301,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "api_request_logs_pkey"
         }
       ]
     },
@@ -2289,7 +2425,18 @@
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "bom_multi_level_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_bom_multi_level_project_id",
@@ -2362,7 +2509,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "bom_multi_level_pkey"
         }
       ]
     },
@@ -2474,7 +2621,18 @@
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "bom_single_level_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_bom_single_level_project_id",
@@ -2547,7 +2705,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "bom_single_level_pkey"
         }
       ]
     },
@@ -2641,7 +2799,18 @@
           "added_by": "20260711000002_unified_access_control.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "capabilities_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "key"
+          ],
+          "definition": "PRIMARY KEY (key)",
+          "implicit": true,
+          "added_by": "20260711000002_unified_access_control.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -2673,7 +2842,7 @@
           "columns": [
             "key"
           ],
-          "name": null
+          "name": "capabilities_pkey"
         }
       ]
     },
@@ -2753,6 +2922,16 @@
           ],
           "definition": "UNIQUE (user_id, name)",
           "added_by": "20260717000001_chat_store.sql"
+        },
+        {
+          "name": "chat_folders_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260717000001_chat_store.sql"
         }
       ],
       "indexes": [],
@@ -2774,19 +2953,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "user_id",
             "name"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "chat_folders_pkey"
         }
       ]
     },
@@ -2950,6 +3129,16 @@
           ],
           "definition": "UNIQUE (thread_id, seq)",
           "added_by": "20260717000001_chat_store.sql"
+        },
+        {
+          "name": "chat_messages_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260717000001_chat_store.sql"
         }
       ],
       "indexes": [
@@ -2982,19 +3171,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "thread_id",
             "seq"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "chat_messages_pkey"
         }
       ]
     },
@@ -3166,7 +3355,18 @@
           "added_by": "20260726000001_chat_plans.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "chat_plans_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260726000001_chat_plans.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "chat_plans_thread",
@@ -3206,7 +3406,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "chat_plans_pkey"
         }
       ]
     },
@@ -3386,6 +3586,16 @@
       ],
       "constraints": [
         {
+          "name": "chat_threads_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260717000001_chat_store.sql"
+        },
+        {
           "name": "chat_threads_mode_check",
           "kind": "CHECK",
           "columns": [],
@@ -3430,7 +3640,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "chat_threads_pkey"
         }
       ]
     },
@@ -3542,7 +3752,18 @@
           "added_by": "20260703000001_dataset_versions.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "dataset_versions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260703000001_dataset_versions.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "dataset_versions_project_created",
@@ -3592,7 +3813,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "dataset_versions_pkey"
         }
       ]
     },
@@ -3716,7 +3937,18 @@
           "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "disruption_scenario_effects_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_dscenario_effects_profile_type",
@@ -3770,7 +4002,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "disruption_scenario_effects_pkey"
         }
       ]
     },
@@ -3938,6 +4170,16 @@
       ],
       "constraints": [
         {
+          "name": "disruption_scenario_profiles_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+        },
+        {
           "name": "disruption_scenario_profiles_project_id_fkey",
           "kind": "FOREIGN KEY",
           "columns": [
@@ -4001,7 +4243,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "disruption_scenario_profiles_pkey"
         }
       ]
     },
@@ -4123,6 +4365,16 @@
           ],
           "definition": "UNIQUE (profile_id, key)",
           "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+        },
+        {
+          "name": "disruption_scenario_settings_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
         }
       ],
       "indexes": [
@@ -4174,19 +4426,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "profile_id",
             "key"
           ],
           "name": "disruption_setting_unique"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "disruption_scenario_settings_pkey"
         }
       ]
     },
@@ -4322,7 +4574,18 @@
           "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "disruption_scenario_targets_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_dscenario_targets_profile_type",
@@ -4376,7 +4639,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "disruption_scenario_targets_pkey"
         }
       ]
     },
@@ -4554,7 +4817,18 @@
           "added_by": "20260609000003_disruption_bridge.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "disruption_scenarios_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -4586,7 +4860,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "disruption_scenarios_pkey"
         }
       ]
     },
@@ -4740,7 +5014,18 @@
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "erp_staged_bom_lines_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "erp_staged_bom_lines_sync_run_idx",
@@ -4766,7 +5051,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "erp_staged_bom_lines_pkey"
         }
       ]
     },
@@ -4908,7 +5193,18 @@
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "erp_staged_bom_versions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "erp_staged_bom_versions_sync_run_idx",
@@ -4934,7 +5230,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "erp_staged_bom_versions_pkey"
         }
       ]
     },
@@ -5160,7 +5456,18 @@
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "erp_staged_products_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "erp_staged_products_sync_run_idx",
@@ -5186,7 +5493,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "erp_staged_products_pkey"
         }
       ]
     },
@@ -5442,7 +5749,18 @@
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "erp_sync_runs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "erp_sync_runs_link_idx",
@@ -5480,7 +5798,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "erp_sync_runs_pkey"
         }
       ]
     },
@@ -5622,7 +5940,18 @@
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "experiments_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "experiments_project_idx",
@@ -5659,7 +5988,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "experiments_pkey"
         }
       ]
     },
@@ -5783,7 +6112,18 @@
           "added_by": "20260727000001_network_cartographer.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "external_evidence_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260727000001_network_cartographer.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "external_evidence_dedupe_uq",
@@ -5835,7 +6175,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "external_evidence_pkey"
         },
         {
           "source": "UNIQUE index",
@@ -5993,7 +6333,18 @@
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "inbound_logistics_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_inbound_logistics_project_id",
@@ -6066,7 +6417,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "inbound_logistics_pkey"
         }
       ]
     },
@@ -6272,7 +6623,7 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "PRIMARY KEY",
+          "source": "PRIMARY KEY constraint",
           "columns": [
             "project_id",
             "material_id"
@@ -6605,7 +6956,18 @@
           "added_by": "20260710000001_model_validations.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "model_validations_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "model_validations_active_triple_uq",
@@ -6656,7 +7018,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "model_validations_pkey"
         },
         {
           "source": "partial UNIQUE index",
@@ -6790,7 +7152,18 @@
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "multi_tier_supply_chain_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_multi_tier_supply_chain_project_id",
@@ -6843,7 +7216,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "multi_tier_supply_chain_pkey"
         }
       ]
     },
@@ -7033,7 +7406,18 @@
           "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "network_edges_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_network_edges_project_id",
@@ -7092,7 +7476,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "network_edges_pkey"
         }
       ]
     },
@@ -7438,7 +7822,18 @@
           "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "network_nodes_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_network_nodes_prominence",
@@ -7517,7 +7912,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "network_nodes_pkey"
         }
       ]
     },
@@ -7659,7 +8054,18 @@
           "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "network_summary_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -7707,7 +8113,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "network_summary_pkey"
         }
       ]
     },
@@ -7933,6 +8339,16 @@
           "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
         },
         {
+          "name": "node_list_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+        },
+        {
           "name": "fk_node_list_project",
           "kind": "FOREIGN KEY",
           "columns": [
@@ -8017,19 +8433,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "project_id",
             "node_id"
           ],
           "name": "node_list_unique_per_project"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "node_list_pkey"
         }
       ]
     },
@@ -8150,7 +8566,7 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "PRIMARY KEY",
+          "source": "PRIMARY KEY constraint",
           "columns": [
             "org_id",
             "capability_key"
@@ -8247,6 +8663,16 @@
           ],
           "definition": "UNIQUE(org_id, user_id)",
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organization_members_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
       "indexes": [],
@@ -8276,19 +8702,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "org_id",
             "user_id"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "organization_members_pkey"
         }
       ]
     },
@@ -8400,7 +8826,28 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "organizations_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organizations_slug_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "definition": "UNIQUE (slug)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -8432,14 +8879,14 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "organizations_pkey"
         },
         {
           "source": "column UNIQUE",
           "columns": [
             "slug"
           ],
-          "name": null
+          "name": "organizations_slug_key"
         }
       ]
     },
@@ -8587,7 +9034,18 @@
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "outbound_logistics_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_outbound_logistics_project_id",
@@ -8660,7 +9118,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "outbound_logistics_pkey"
         }
       ]
     },
@@ -8852,6 +9310,16 @@
       ],
       "constraints": [
         {
+          "name": "policy_defaults_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "PRIMARY KEY (project_id)",
+          "implicit": true,
+          "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
+        },
+        {
           "name": "policy_defaults_strategy_chk",
           "kind": "CHECK",
           "columns": [],
@@ -8924,7 +9392,7 @@
           "columns": [
             "project_id"
           ],
-          "name": null
+          "name": "policy_defaults_pkey"
         }
       ]
     },
@@ -9056,6 +9524,16 @@
           "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
         },
         {
+          "name": "policy_overrides_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
+        },
+        {
           "name": "policy_overrides_family_chk",
           "kind": "CHECK",
           "columns": [],
@@ -9146,13 +9624,6 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "project_id",
@@ -9161,6 +9632,13 @@
             "family"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "policy_overrides_pkey"
         }
       ]
     },
@@ -9294,6 +9772,16 @@
           ],
           "definition": "UNIQUE (slug, owner_id)",
           "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
+        },
+        {
+          "name": "policy_presets_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
         }
       ],
       "indexes": [],
@@ -9357,19 +9845,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "slug",
             "owner_id"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "policy_presets_pkey"
         }
       ]
     },
@@ -9553,7 +10041,18 @@
           "added_by": "20260711000005_policy_version_notes_delete.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "policy_versions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260609000002_policy_versions.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_policy_versions_project",
@@ -9603,7 +10102,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "policy_versions_pkey"
         }
       ]
     },
@@ -9833,7 +10332,7 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "PRIMARY KEY",
+          "source": "PRIMARY KEY constraint",
           "columns": [
             "project_id",
             "product_id"
@@ -10051,6 +10550,16 @@
           ],
           "definition": "UNIQUE (project_id, external_system, external_company_id)",
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "project_erp_links_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
         }
       ],
       "indexes": [
@@ -10085,13 +10594,6 @@
       "comment": "One authorized project<->external-ERP-company link. Created only when the ",
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "project_id",
@@ -10099,6 +10601,13 @@
             "external_company_id"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "project_erp_links_pkey"
         }
       ]
     },
@@ -10234,7 +10743,18 @@
           "added_by": "20260717000003_project_memory.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "project_memory_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260717000003_project_memory.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "project_memory_active",
@@ -10274,7 +10794,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "project_memory_pkey"
         }
       ]
     },
@@ -10527,6 +11047,16 @@
           "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql"
         },
         {
+          "name": "projects_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql"
+        },
+        {
           "name": "uq_modeler_project",
           "kind": "UNIQUE",
           "columns": [
@@ -10596,7 +11126,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "projects_pkey"
         },
         {
           "source": "UNIQUE constraint",
@@ -10965,6 +11495,16 @@
       ],
       "constraints": [
         {
+          "name": "proposals_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260715000001_agent_proposals.sql"
+        },
+        {
           "name": "proposals_agent_id_check",
           "kind": "CHECK",
           "columns": [],
@@ -11047,7 +11587,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "proposals_pkey"
         },
         {
           "source": "partial UNIQUE index",
@@ -11186,7 +11726,18 @@
           "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "recovery_playbooks_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "recovery_playbooks_project_idx",
@@ -11263,7 +11814,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "recovery_playbooks_pkey"
         }
       ]
     },
@@ -11378,7 +11929,7 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "PRIMARY KEY",
+          "source": "PRIMARY KEY constraint",
           "columns": [
             "role",
             "capability_key"
@@ -11489,7 +12040,18 @@
           "added_by": "20260720000001_run_item_series.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "run_item_series_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260720000001_run_item_series.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "run_item_series_run_kind_item_uq",
@@ -11548,7 +12110,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "run_item_series_pkey"
         },
         {
           "source": "UNIQUE index",
@@ -11723,7 +12285,18 @@
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "run_replications_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "rep_run_idx",
@@ -11792,7 +12365,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "run_replications_pkey"
         },
         {
           "source": "UNIQUE index",
@@ -11998,7 +12571,28 @@
           "added_by": "20260609000022_scenario_templates.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "scenario_templates_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260609000022_scenario_templates.sql"
+        },
+        {
+          "name": "scenario_templates_slug_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "definition": "UNIQUE (slug)",
+          "implicit": true,
+          "added_by": "20260609000022_scenario_templates.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -12024,14 +12618,14 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "scenario_templates_pkey"
         },
         {
           "source": "column UNIQUE",
           "columns": [
             "slug"
           ],
-          "name": null
+          "name": "scenario_templates_slug_key"
         }
       ]
     },
@@ -12329,7 +12923,18 @@
           "added_by": "20260710000001_model_validations.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "scenarios_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "scenarios_project_idx",
@@ -12376,7 +12981,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "scenarios_pkey"
         }
       ]
     },
@@ -12558,6 +13163,16 @@
           ],
           "definition": "UNIQUE(project_id, cache_key)",
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+        },
+        {
+          "name": "simulation_cache_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
         }
       ],
       "indexes": [
@@ -12647,19 +13262,19 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": null
-        },
-        {
           "source": "UNIQUE constraint",
           "columns": [
             "project_id",
             "cache_key"
           ],
           "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "simulation_cache_pkey"
         }
       ]
     },
@@ -12825,7 +13440,18 @@
           "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "simulation_job_magnitudes_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_simulation_job_magnitudes_job_id",
@@ -12889,7 +13515,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "simulation_job_magnitudes_pkey"
         }
       ]
     },
@@ -13187,7 +13813,18 @@
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "simulation_jobs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_simulation_jobs_project_status",
@@ -13299,7 +13936,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "simulation_jobs_pkey"
         }
       ]
     },
@@ -13489,7 +14126,18 @@
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "simulation_performance_metrics_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -13537,7 +14185,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "simulation_performance_metrics_pkey"
         }
       ]
     },
@@ -13703,7 +14351,18 @@
           "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "simulation_results_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_simulation_results_project_id",
@@ -13746,7 +14405,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "simulation_results_pkey"
         }
       ]
     },
@@ -14080,7 +14739,18 @@
           "added_by": "20260710000001_model_validations.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "simulation_runs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "sim_runs_scenario_idx",
@@ -14137,7 +14807,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "simulation_runs_pkey"
         }
       ]
     },
@@ -14295,7 +14965,7 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "PRIMARY KEY",
+          "source": "PRIMARY KEY constraint",
           "columns": [
             "project_id",
             "supplier_id"
@@ -14353,7 +15023,7 @@
           "nullable": false,
           "default": null,
           "primary_key": false,
-          "unique": true,
+          "unique": false,
           "references": null,
           "added_by": "20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql",
           "renamed_by": "20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql"
@@ -14562,6 +15232,16 @@
       ],
       "constraints": [
         {
+          "name": "supply_chain_data_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql"
+        },
+        {
           "name": "fk_supply_chain_data_project_id",
           "kind": "FOREIGN KEY",
           "columns": [
@@ -14745,14 +15425,7 @@
           "columns": [
             "id"
           ],
-          "name": null
-        },
-        {
-          "source": "column UNIQUE",
-          "columns": [
-            "plant_name"
-          ],
-          "name": null
+          "name": "supply_chain_data_pkey"
         }
       ]
     },
@@ -14942,7 +15615,18 @@
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "supply_chain_data_multi_tier_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "idx_scmt_project",
@@ -15054,7 +15738,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "supply_chain_data_multi_tier_pkey"
         }
       ]
     },
@@ -15220,7 +15904,18 @@
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "tier2_suppliers_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -15252,7 +15947,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "tier2_suppliers_pkey"
         }
       ]
     },
@@ -15418,7 +16113,18 @@
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "tier3_suppliers_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -15450,7 +16156,7 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "tier3_suppliers_pkey"
         }
       ]
     },
@@ -15574,7 +16280,18 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "user_ai_permissions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "user_id"
+          ],
+          "definition": "PRIMARY KEY (user_id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
       "indexes": [],
       "rls": {
         "enabled": true,
@@ -15606,7 +16323,7 @@
           "columns": [
             "user_id"
           ],
-          "name": null
+          "name": "user_ai_permissions_pkey"
         }
       ]
     },
@@ -15727,7 +16444,7 @@
       "comment": null,
       "natural_key_unique": [
         {
-          "source": "PRIMARY KEY",
+          "source": "PRIMARY KEY constraint",
           "columns": [
             "user_id",
             "capability_key"
@@ -15898,7 +16615,28 @@
           "added_by": "20260723000001_reports_and_file_workspace.sql"
         }
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "name": "user_files_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260723000001_reports_and_file_workspace.sql"
+        },
+        {
+          "name": "user_files_path_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "path"
+          ],
+          "definition": "UNIQUE (path)",
+          "implicit": true,
+          "added_by": "20260723000001_reports_and_file_workspace.sql"
+        }
+      ],
       "indexes": [
         {
           "name": "user_files_owner",
@@ -15958,14 +16696,14 @@
           "columns": [
             "id"
           ],
-          "name": null
+          "name": "user_files_pkey"
         },
         {
           "source": "column UNIQUE",
           "columns": [
             "path"
           ],
-          "name": null
+          "name": "user_files_path_key"
         }
       ]
     }

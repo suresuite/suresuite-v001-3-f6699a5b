@@ -1,0 +1,210 @@
+# AUTHORED — the data contract's sidecar for `policy_overrides`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: policy_overrides
+tier: "4"
+schema_name: public
+grain: >-
+  One patch against the project bundle, for one target: this supplier, this
+  material, this customer/product pair. The only tier-4 table with a real
+  natural key — (project, scope, target, family) is UNIQUE, so a target cannot
+  hold two conflicting patches for the same family.
+owner: policy-ui
+
+natural_key_unique:
+  - source: "UNIQUE constraint"
+    columns: [project_id, scope, target_key, family]
+    name: null
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "policy_overrides_pkey"
+
+governance:
+  read: null
+  write: "data_editing"
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write` names the capability that exists today. WP 2.2 splits `data_editing`
+    into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row
+    becomes `data_edit_policies` then.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. The natural key is the UNIQUE constraint, not
+      this.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this override belongs to.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_policies -> per-project override fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  scope:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What KIND of thing the override targets — a supplier, a material, a plant, a
+      customer/product pair. Decides how `target_key` is read.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_map_policies -> override routing"
+      transform: "matched against the stage the grid wrote it from"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "one of the stage scopes the policy grid emits"
+    surfaces: []
+    resolution: null
+  target_key:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WHICH thing, in the scope's own spelling — a supplier_id, a material_id, or
+      a composite like `customer::product`.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_policies -> the node the patch applies to"
+      transform: "parsed per scope"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "must name a row that exists; an override for a deleted entity is silently inert"
+    surfaces: []
+    resolution: null
+  family:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which policy family this patch belongs to — the same vocabulary as
+      policy_defaults' jsonb columns.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_map_policies -> which bundle key to patch"
+      transform: "matched against the bundle's family keys"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "one of sourcing / inventory / transport / fulfillment / production / recovery / demand"
+    surfaces: []
+    resolution: null
+  patch:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The fields this target overrides, and only those. A field absent from the
+      patch keeps the bundle's value — which is exactly why D1 mattered: writing a
+      field the user never supplied turned a default into a decision.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_map_policies -> merged over the family bundle"
+      transform: "shallow-merged over the project bundle's family object"
+      missing_default: "{} — nothing overridden"
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      What may be written here is one rule, `isPrefillPersistable`: an unsaved
+      edit or a value the project data actually said. Never a default. Not every
+      override the engine would honour is reachable from the grid — most per-node
+      fields fall back to project defaults in the mapping (blueprint G1).
+  updated_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who last wrote this patch.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Governance, not a parameter. WP 2.3 turns it into an audit row naming the
+      actor.
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the patch last changed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the patch was created. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null

@@ -1,0 +1,245 @@
+# AUTHORED — the data contract's sidecar for `suppliers`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: suppliers
+tier: "2"
+schema_name: public
+grain: >-
+  One supplier in one project: what the simulation needs to know about them
+  beyond the arcs that connect them to materials.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: "PRIMARY KEY constraint"
+    columns: [project_id, supplier_id]
+    name: null
+
+governance:
+  read: null
+  write: "data_editing"
+  min_project_role: editor
+  audited: false
+  rls_enabled: false
+  note: >-
+    `write` names the capability that exists today. WP 2.2 splits `data_editing`
+    into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row
+    becomes `data_edit_inputs` then, and all twelve sidecars change together.
+    SEPARATELY AND MORE URGENTLY: rls_enabled is FALSE on all three item
+    masters. No migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on
+    them, so the per-project isolation every other tier-2 table has does not
+    exist here. Found by WP 1.2; it is WP 2.4's to fix and WP 2.2's to test.
+
+fields:
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this supplier belongs to. Half of the primary key.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::rows -> per-project fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "set from the selected project, never from the CSV"
+    surfaces: []
+    resolution: null
+  supplier_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The supplier's code as the user's own systems spell it. Joins to every
+      inbound arc.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_suppliers -> Supplier.id"
+      transform: "str()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "supplier_id"
+      required: true
+      validate: "non-empty; unique within the project"
+    surfaces: []
+    resolution: null
+  name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A human-readable name for the supplier. Display only.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_map_suppliers -> Supplier.name"
+      transform: "str(name or supplier_id)"
+      missing_default: "the supplier_id itself"
+    substitutions:
+      - when: "NULL or blank"
+        value: "the supplier_id"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "name"
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  capacity_per_week:
+    type: "numeric"
+    unit: "units per week"
+    unit_source: fixed
+    meaning: >-
+      How much this supplier can ship per week, across everything they supply.
+      NULL means UNLIMITED — an infinite supplier, which is a deliberate modelling
+      choice and not a missing value.
+    grain: rate
+    engine:
+      consumed_by: "project_map.py::_map_supply -> per-supplier capacity"
+      transform: "passed through as None when NULL; None means no capacity constraint"
+      missing_default: "unlimited"
+    substitutions:
+      - when: "NULL"
+        value: "unlimited capacity"
+        provenance: default
+        visible_as: "the grid renders it as 0 with no dot — which is D17, and wrong"
+    ingest:
+      csv_header: "capacity_per_week"
+      required: false
+      validate: "numeric > 0 when present"
+    surfaces: []
+    resolution: null
+    note: >-
+      D17 lives here. NULL means unlimited, but the grid's liveDefault is
+      `derivedVal ?? 0`, so an unlimited supplier renders as a capacity of ZERO
+      with provenance `default` — whose colour is null, so there is no dot to
+      question. The grid states the opposite of what the model means. WP 6.2 fixes
+      it.
+  reliability_score:
+    type: "numeric"
+    unit: "fraction of orders delivered as promised"
+    unit_source: fixed
+    meaning: >-
+      How often this supplier delivers as promised, as a fraction. 0.98 means two
+      per cent of orders do not arrive as agreed. Defaults to 1.0 — a perfect
+      supplier.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_suppliers -> Supplier.reliability_score"
+      transform: "float(value or 1.0)"
+      missing_default: "1.0 (perfect reliability) — and the column is NOT NULL DEFAULT 1.0, so the default is the schema's, not the engine's"
+    substitutions:
+      - when: "the supplier has no master row at all"
+        value: "1.0, via a synthesised SupplierRow"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "reliability_score"
+      required: false
+      validate: "numeric in (0, 1]"
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row last changed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was inserted. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  source_system:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which external system this row came from, when it was synced rather than
+      uploaded. NULL for a hand-uploaded or hand-edited row.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine, and correctly so: it is provenance, not a
+      parameter. Read by the ERP connector (blueprint G18), which is the only
+      writer. Kept, not a deletion candidate.
+  source_external_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      This row's identifier in the external system, so a re-sync can match it.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine; ERP-connector provenance, as source_system.
+  source_synced_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the external system last confirmed this row.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine; ERP-connector provenance, as source_system.

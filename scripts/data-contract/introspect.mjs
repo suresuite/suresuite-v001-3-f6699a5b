@@ -183,7 +183,7 @@ function apply(schema, stmt, migration, guarded = false) {
       return note(schema, migration, s, "CREATE TABLE with no column list (AS SELECT / PARTITION OF)");
     }
     const existing = schema.table(id.name);
-    const parsed = parseBody(body.body, migration);
+    const parsed = parseBody(body.body, migration, id.name);
 
     if (existing) {
       // THE HARD PART. Under IF NOT EXISTS this statement is a NO-OP: the table
@@ -456,7 +456,16 @@ function applyAlter(schema, t, action, migration, whole) {
   }
   if ((m = /^DROP\s+CONSTRAINT\s+(?:IF\s+EXISTS\s+)?/i.exec(a))) {
     const id = readQualifiedName(a, m[0].length);
-    if (id) t.constraints = t.constraints.filter((c) => c.name !== id.name);
+    if (!id) return;
+    for (const gone of t.constraints.filter((c) => c.name === id.name)) {
+      // Clear the column flag the implicit constraint was lifted from, or
+      // `natural_key_unique` would keep reporting a key that no longer exists.
+      if (gone.implicit && gone.columns.length === 1) {
+        const col = t.columns.find((c) => c.name === gone.columns[0]);
+        if (col) { if (gone.kind === "UNIQUE") col.unique = false; else col.primary_key = false; }
+      }
+    }
+    t.constraints = t.constraints.filter((c) => c.name !== id.name);
     return;
   }
   if (/^ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(a)) { t.rls.enabled = true; return; }
@@ -483,7 +492,33 @@ function dropDependentFks(schema, gone, migration) {
   }
 }
 
-function parseBody(body, migration) {
+/**
+ * Postgres gives a column-level `UNIQUE` / `PRIMARY KEY` an implicit constraint
+ * name — `<table>_<column>_key` and `<table>_pkey` — and that name is how
+ * migrations drop it. `20250816002505` drops `supply_chain_data_plant_key`
+ * ("Allow multiple rows per plant by removing incorrect unique constraint"), so
+ * a model that keeps the uniqueness as a flag on the column never sees the drop
+ * and reports `supply_chain_data` as one-row-per-plant. Materialise these as
+ * named constraints at parse time and the DROP works on them like any other.
+ */
+function liftImplicitConstraints(table, columns, constraints, migration) {
+  for (const c of columns) {
+    if (c.primary_key && !constraints.some((k) => k.kind === "PRIMARY KEY")) {
+      constraints.push({
+        name: `${table}_pkey`, kind: "PRIMARY KEY", columns: [c.name],
+        definition: `PRIMARY KEY (${c.name})`, implicit: true, added_by: migration,
+      });
+    }
+    if (c.unique) {
+      constraints.push({
+        name: `${table}_${c.name}_key`, kind: "UNIQUE", columns: [c.name],
+        definition: `UNIQUE (${c.name})`, implicit: true, added_by: migration,
+      });
+    }
+  }
+}
+
+function parseBody(body, migration, table) {
   const columns = [];
   const constraints = [];
   for (const def of splitTopLevel(body)) {
@@ -495,6 +530,7 @@ function parseBody(body, migration) {
   // A table-level PRIMARY KEY makes its columns NOT NULL too.
   const pk = constraints.find((c) => c.kind === "PRIMARY KEY");
   if (pk) for (const c of columns) if (pk.columns.includes(c.name)) c.nullable = false;
+  liftImplicitConstraints(table, columns, constraints, migration);
   return { columns, constraints };
 }
 
@@ -809,12 +845,22 @@ function build() {
 /** Every uniqueness guarantee the table actually has, from any source. */
 function naturalKeys(t) {
   const keys = [];
-  const pk = t.constraints.find((c) => c.kind === "PRIMARY KEY");
-  if (pk) keys.push({ source: "PRIMARY KEY", columns: pk.columns, name: pk.name });
-  for (const c of t.columns) if (c.primary_key) keys.push({ source: "column PRIMARY KEY", columns: [c.name], name: null });
-  for (const c of t.constraints) if (c.kind === "UNIQUE") keys.push({ source: "UNIQUE constraint", columns: c.columns, name: c.name });
-  for (const c of t.columns) if (c.unique) keys.push({ source: "column UNIQUE", columns: [c.name], name: null });
-  for (const i of t.indexes) if (i.unique) keys.push({ source: i.partial ? "partial UNIQUE index" : "UNIQUE index", columns: i.columns, name: i.name, predicate: i.predicate ?? undefined });
+  for (const c of t.constraints) {
+    if (c.kind !== "PRIMARY KEY" && c.kind !== "UNIQUE") continue;
+    keys.push({
+      source: c.implicit ? `column ${c.kind}` : `${c.kind} constraint`,
+      columns: c.columns,
+      name: c.name,
+    });
+  }
+  for (const i of t.indexes) {
+    if (!i.unique) continue;
+    keys.push({
+      source: i.partial ? "partial UNIQUE index" : "UNIQUE index",
+      columns: i.columns, name: i.name,
+      ...(i.predicate ? { predicate: i.predicate } : {}),
+    });
+  }
   return keys;
 }
 

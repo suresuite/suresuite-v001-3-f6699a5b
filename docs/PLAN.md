@@ -797,10 +797,19 @@ files here aborted. The introspector resolves that from the migrations themselve
 rather than by assertion; §16 has the mechanism. Seven of eight exit checks pass;
 the eighth found a **third orphan**, `approved_users`.
 
-### WP 1.2 — Sidecar schema and the first twelve tables
+### WP 1.2 — Sidecar schema and the first twelve tables ✅ *(done)*
 
 **Preconditions** — WP 1.1 emits the introspected schema.
-**Files** — `supabase/migrations/*.contract.yaml` (~12) · `scripts/data-contract/contract.schema.json`
+**Files** — `supabase/contract/<table>.contract.yaml` (12) ·
+`scripts/data-contract/contract.schema.json` · `validate-sidecars.mjs`
+
+*(Location changed in the doing, from `supabase/migrations/*.contract.yaml`. The
+migrations directory holds 291 files that the Supabase CLI replays in filename
+order; dropping authored, non-replayable YAML in among them makes both harder to
+read and invites someone to assume a `.contract.yaml` is a migration. One directory,
+one kind of file. `supabase/contract/` sits beside it and the mapping is 1:1 with
+the table, which `supabase/migrations/*.contract.yaml` never could be — there is no
+one migration per table.)*
 
 **Steps**
 1. Define the sidecar JSON Schema. Per table: `tier`, `grain`, `natural_key_unique`,
@@ -821,6 +830,14 @@ a CSV origin records its `csv_header` · `inbound_logistics.lead_time` records
 
 **Gap check** — list fields with no `engine.consumed_by` and no UI surface as
 deletion candidates; do not delete.
+
+**Delivered** — the sidecar JSON Schema with its `$reserved` block (tier `2-O`, the
+`observations` schema name, provenance `estimated` / `contract`, field grain
+`rate` / `event`), twelve sidecars covering **146 columns**, and `npm run
+contract:validate`, which fails on an undescribed column, a described non-column, a
+type or natural key that disagrees with the migrations, an untraced field with no
+note, and **a CSV template header no field records** — D21 enforced rather than
+asserted.
 
 ### WP 1.3 — One unit table, `lead_time_unit`, resolution modes *(D9, D10)*
 
@@ -1750,6 +1767,118 @@ Handoff to WP 1.2:
   narrow un-ignore for the two contract artifacts. If WP 1.4 emits anything else
   under `build/`, it must be added there too or the gate compares against nothing.
 - `npm ci` before `npm test` in a fresh container.
+
+### WP 1.2 — Sidecar schema and the first twelve tables · 2026-09-15 · `<this commit>`
+
+Preconditions held? **yes.** WP 1.1's artifact was there and its handoff was
+accurate — reading the lane columns from `build/schema.introspected.json` rather than
+from `20250820145837` mattered exactly as predicted, because `outbound_logistics`
+says `expected_lead_time` and a sidecar claiming `lead_time` would have failed the
+coverage check.
+
+Exit checks passed? **yes, all four, and three of them are now gates rather than
+claims.**
+- twelve sidecars validate against `contract.schema.json` — `npm run contract:validate`
+- every column has an entry — **146 columns**, coverage checked both ways
+- every CSV-origin field records its `csv_header` — checked against the seven
+  templates in `public/template/`, not against my memory of them. Negative-tested:
+  blanking `suppliers.reliability_score`'s header fails the run.
+- `inbound_logistics.lead_time` records `unit: weeks`, `unit_source: fixed` — pinned
+  by name in the validator, because it is the field WP 1.3 is about to change.
+
+| tier | tables | columns |
+|---|---|---|
+| 2 | `inbound_logistics`, `outbound_logistics`, `bom_single_level`, `bom_multi_level`, `materials`, `products`, `suppliers` | 79 |
+| 3 | `supply_chain_data`, `supply_chain_data_multi_tier`, `dataset_versions` | 43 |
+| 4 | `policy_defaults`, `policy_overrides` | 24 |
+
+**Deviation, recorded here and in §8.** The sidecars live in `supabase/contract/`,
+not `supabase/migrations/*.contract.yaml`. There is no one migration per table, so
+the plan's path could never have been 1:1 with the thing it describes; and 291
+CLI-replayed `.sql` files is not a directory to hide twelve authored YAML files in.
+
+Discovered:
+- **RLS is OFF on all three item masters.** `materials`, `products` and `suppliers`
+  have no `ENABLE ROW LEVEL SECURITY` in any migration, while every lane table and
+  both `supply_chain_data` tables have it. The masters hold the economics — cost,
+  sell price, capacity, reliability — so the tables with the commercially sensitive
+  numbers are the ones without per-project isolation. Recorded in each sidecar's
+  `governance.rls_enabled` (which the validator checks against the migrations, so it
+  cannot drift). → affects **WP 2.4** (contract-generated RLS tests must fail on
+  this, not skip it) and **WP 2.2**. Not fixed here: enabling RLS without the
+  policies to go with it locks the masters out entirely, and the policies need WP
+  2.2's `project_members`.
+- **`outbound_logistics.expected_lead_time` is dead.** The user is asked for it —
+  it is in the template, in `UploadWizard`'s `expectedHeaders`, and NOT NULL-ish in
+  practice — and nothing reads it. `datamap.py`'s outbound projection selects
+  `product_id, customer_id, unit_price, volume, time_unit` and stops, so the column
+  never leaves the database. Recorded `consumed_by: null` with a note, per the rule
+  that an untraced field is never a guess. → **deletion candidate, not deleted.**
+  It is also the strongest argument for the surfaces block: WP 5.1 will say whether
+  anything renders it before WP 6.2 decides.
+- **D21 is wider than three fields.** The plan names `sell_price`/`unit_price`,
+  `demand_mean`/`demand_mode` and `demand_distribution`/`demand_model`. A fourth
+  pair is just as misleading: **`inbound_logistics.unit_price` is the engine's
+  `cost`**, and `outbound_logistics.unit_price` is the product's `sell_price` —
+  so `unit_price` in the user's CSV means two different engine fields depending on
+  which file it is in. Recorded on both fields. → affects **WP 5.2b**: P3 cannot
+  lead with a single "unit_price" entry.
+- **19 deletion candidates**, printed by `contract:validate` on every run so the
+  list cannot go stale. Nine are ERP provenance columns (`source_system`,
+  `source_external_id`, `source_synced_at` × 3 masters) which are correctly not
+  engine inputs and should be KEPT; three are the analyzer results smeared onto
+  `supply_chain_data` (D19), which WP 4.2/5.3 remove; the rest are display-only or
+  ETL bookkeeping. Only `expected_lead_time` is a genuine "asked for and never
+  used".
+- **`surfaces: []` is not yet evidence.** It is empty on all 146 fields because WP
+  5.1 fills it, so "no surface" currently means "not recorded", not "not rendered".
+  The validator says so in its own output rather than letting a future reader treat
+  the candidate list as a deletion list.
+- **WP 1.1's introspector was wrong about `supply_chain_data`, and authoring the
+  sidecar is what caught it.** Its `natural_key_unique` claimed a `UNIQUE
+  (plant_name)` — which would mean one arc per plant, which is absurd for an edge
+  table. The constraint is real in the original `CREATE TABLE`
+  (`plant TEXT NOT NULL UNIQUE`) and `20250816002505` drops it by its implicit name,
+  `supply_chain_data_plant_key`, with the comment "Allow multiple rows per plant by
+  removing incorrect unique constraint". The introspector kept column-level
+  uniqueness as a *flag on the column*, so `DROP CONSTRAINT` never reached it.
+  **Fixed here**: column-level `UNIQUE` / `PRIMARY KEY` are now lifted into named
+  constraints at parse time using Postgres's implicit naming, so a DROP works on
+  them like any other. This is a WP 1.1 defect found by WP 1.2 and fixed in place
+  rather than deferred — it is four lines, it is in the file this package depends
+  on, and a contract built on a wrong key is worse than no contract. The lesson
+  generalises: **writing down what a table means is a better test of an
+  introspector than any assertion about it.**
+- **`js-yaml` and `ajv` are now explicit devDependencies.** Both were already
+  present as transitive dependencies of `eslint`, and the gate would have worked
+  without declaring them — right up until an eslint upgrade moved them. A CI gate
+  resting on another package's dependency tree is not a gate.
+
+Handoff to WP 1.3:
+- **`resolution` is `null` on all 146 fields.** The schema slot exists and is
+  validated (`default_mode`, `assertable_by[]`, `estimable_from[]`,
+  `hybrid {centre, spread}`, `on_conflict`, `threshold_pct`); WP 1.3 fills it for
+  the engine-consumed fields. The schema's own description already carries the
+  load-bearing sentence about `estimable_from: []` so it cannot be filled in
+  carelessly.
+- **The three fields WP 1.3 must pin as never-estimable are already identified and
+  their sidecars say why in prose**: `bom_single_level.consumption_rate` and
+  `bom_multi_level.consumption_rate` ("an engineering fact about the product, not an
+  estimate"), `materials.moq` ("a commercial fact the supplier states, not something
+  to be inferred from order history"), `suppliers.capacity_per_week`. Turn the prose
+  into `estimable_from: []`.
+- **Price has no variability field, and the sidecars are consistent with that.**
+  `materials.cost`, `products.sell_price` and both `unit_price` columns record a
+  `missing_default` and substitutions but no spread. WP 1.3 records
+  `resolution.hybrid: null` pointing at §14's engine RFC; do not invent one.
+- `inbound_logistics.lead_time` carries a note saying its `unit_source: fixed` is
+  fixed *by omission* — the engine reads a `lead_time_unit` no column supplies.
+  When WP 1.3 adds the column, that field becomes `unit_source: column` with
+  `unit_column: lead_time_unit`, and the validator's pinned check must be updated in
+  the same commit or it will fail.
+- Adding a column to a migration now fails `contract:validate` until its sidecar
+  entry exists. That is the intended direction of the gate, but it means WP 1.3's
+  `lead_time_unit` migration and its sidecar entry must land together.
 
 ---
 

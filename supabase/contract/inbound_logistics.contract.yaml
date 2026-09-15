@@ -1,0 +1,213 @@
+# AUTHORED — the data contract's sidecar for `inbound_logistics`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: inbound_logistics
+tier: "2"
+schema_name: public
+grain: >-
+  One supply arc as the user uploaded it: this supplier can deliver this material
+  to this plant, at this price and lead time, in this volume. NOT deduplicated —
+  a second upload of the same row makes a second row (D5).
+owner: data-ingestion
+
+# Recorded truthfully. `id` is a surrogate; nothing stops a re-upload duplicating
+# every arc. That is D5, and WP 3.3 lands `natural_key_intended` as a constraint.
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: inbound_logistics_pkey
+natural_key_intended: [project_id, plant_name, supplier_id, material_id]
+
+governance:
+  read: null
+  write: data_editing
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write` names the capability that exists today. WP 2.2 splits `data_editing`
+    into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row
+    becomes `data_edit_inputs` then, and all twelve sidecars change together.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: Surrogate row identifier. Carries no meaning and joins to nothing.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The project this arc belongs to. Every read is scoped by it.
+    grain: identifier
+    engine:
+      consumed_by: datamap.py::rows -> per-project fetch
+      transform: filter, never read as a value
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "set from the selected project, never from the CSV"}
+    surfaces: []
+    resolution: null
+  plant_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The focal plant receiving the material, by NAME. A displayable string used as
+      a join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a uuid.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: the CSV omits it
+        value: the selected project's `projects.plant_name`
+        provenance: derived
+        visible_as: null
+    ingest: {csv_header: null, required: false, validate: must equal the project's plant_name — a trigger raises otherwise}
+    surfaces: []
+    resolution: null
+  supplier_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The supplier's code as the user's own systems spell it.
+    grain: identifier
+    engine:
+      consumed_by: project_map.py::_map_supply -> SupplierLink.supplier_id
+      transform: str(); no trimming (D8)
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: supplier_id, required: true, validate: non-empty after trim — NOT enforced today (D8)}
+    surfaces: []
+    resolution: null
+  material_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: The material's code as the user's own systems spell it. Joins to materials and the BOM.
+    grain: identifier
+    engine:
+      consumed_by: project_map.py::_map_supply -> SupplierLink.material_id
+      transform: str(); arcs whose material is not in the BOM are dropped
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: material_id, required: true, validate: non-empty after trim — NOT enforced today (D8)}
+    surfaces: []
+    resolution: null
+  volume:
+    type: numeric
+    unit: units per `time_unit`
+    unit_source: column
+    unit_column: time_unit
+    meaning: >-
+      How much of this material the user buys from this supplier over one
+      `time_unit`. A RATE, not a quantity — two rows are only comparable after
+      both are converted to the same period.
+    grain: rate
+    engine:
+      consumed_by: project_map.py::_map_supply -> supply-share weighting
+      transform: rateToWeekly(volume, time_unit) — normalized to weeks
+      missing_default: "0 (the arc carries no share)"
+    substitutions: []
+    ingest: {csv_header: volume, required: true, validate: "numeric >= 0; blank becomes NULL, not 0 (D7)"}
+    surfaces: []
+    resolution: null
+  time_unit:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The period `volume` is quoted over — day, week, month, quarter, year. It
+      describes the VOLUME only. It says nothing about `lead_time`.
+    grain: metadata
+    engine:
+      consumed_by: project_map.py::_duration_to_weeks (via UNIT_DAYS)
+      transform: looked up in the one unit table
+      missing_default: "weekly"
+    substitutions:
+      - when: blank or unrecognised
+        value: treated as weekly
+        provenance: default
+        visible_as: null
+    ingest: {csv_header: time_unit, required: false, validate: one of day/week/month/quarter/year and their -ly spellings}
+    surfaces: []
+    resolution: null
+  lead_time:
+    type: numeric
+    unit: weeks
+    unit_source: fixed
+    meaning: >-
+      How long this supplier takes to deliver this material. The contract fixes the
+      unit at WEEKS; `time_unit` does not apply to it and never has.
+    grain: level
+    engine:
+      consumed_by: project_map.py::_map_supply -> SupplierLink.lead_time_weeks
+      transform: _duration_to_weeks(lead_time, lead_time_unit), then round and clamp to [1, 51]
+      missing_default: "2 weeks, with a `warn` MappingWarning"
+    substitutions:
+      - when: the column is NULL or zero
+        value: 2 weeks
+        provenance: default
+        visible_as: MappingWarning on the run's mapping report
+    ingest: {csv_header: lead_time, required: true, validate: numeric > 0}
+    surfaces: []
+    resolution: null
+    note: >-
+      `unit_source: fixed` is the whole point of D9. The engine already reads a
+      `lead_time_unit` (project_map.py::_map_supply) that no column supplies, so
+      today the unit is fixed by omission rather than by contract. WP 1.3 adds the
+      column and this becomes unit_source `column`.
+  unit_price:
+    type: numeric
+    unit: currency per unit of material
+    unit_source: fixed
+    meaning: What one unit of this material costs from this supplier, delivered.
+    grain: level
+    engine:
+      consumed_by: project_map.py::_map_supply -> SupplierLink.cost
+      transform: float(); a value <= 0 is replaced, not rejected
+      missing_default: "1.0, with a `warn` MappingWarning"
+    substitutions:
+      - when: NULL, zero or negative
+        value: "1.0"
+        provenance: default
+        visible_as: MappingWarning on the run's mapping report
+      - when: "`materials.cost` is unset for this material"
+        value: this arc's price becomes the material's cost, via the cheapest inbound arc
+        provenance: derived
+        visible_as: the effective-economics badge in /policies
+    ingest: {csv_header: unit_price, required: true, validate: numeric > 0}
+    surfaces: []
+    resolution: null
+    note: >-
+      The user types `unit_price` and the engine calls it `cost`. Both names are
+      recorded because the manual must lead with the one the user typed (D21).
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was inserted. Server-set.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row last changed. Server-set.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

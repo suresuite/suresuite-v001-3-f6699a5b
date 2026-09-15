@@ -1,0 +1,258 @@
+# AUTHORED — the data contract's sidecar for `outbound_logistics`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: outbound_logistics
+tier: "2"
+schema_name: public
+grain: >-
+  One demand arc as the user uploaded it: this customer buys this product from
+  this plant, at this price and lead time, in this volume. NOT deduplicated —
+  a second upload of the same row makes a second row (D5).
+owner: data-ingestion
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "outbound_logistics_pkey"
+
+governance:
+  read: null
+  write: "data_editing"
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write` names the capability that exists today. WP 2.2 splits `data_editing`
+    into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row
+    becomes `data_edit_inputs` then, and all twelve sidecars change together.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. Carries no meaning and joins to nothing.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this row belongs to. Every read is scoped by it.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::rows -> per-project fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "set from the selected project, never from the CSV"
+    surfaces: []
+    resolution: null
+  plant_name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The focal plant this row belongs to, by NAME. A displayable string used as a
+      join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a
+      uuid.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions:
+      - when: "the CSV omits it"
+        value: "the selected project's `projects.plant_name`"
+        provenance: derived
+        visible_as: null
+    ingest:
+      csv_header: null
+      required: false
+      validate: "must equal the project's plant_name — a trigger raises otherwise"
+    surfaces: []
+    resolution: null
+  customer_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The customer's code as the user's own systems spell it.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_demand -> customer node id"
+      transform: "str(); no trimming (D8)"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "customer_id"
+      required: true
+      validate: "non-empty after trim — NOT enforced today (D8)"
+    surfaces: []
+    resolution: null
+  product_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The finished product's code as the user's own systems spell it. Joins to
+      products and the BOM.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_demand -> ProductRow lookup"
+      transform: "str()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "product_id"
+      required: true
+      validate: "non-empty after trim — NOT enforced today (D8)"
+    surfaces: []
+    resolution: null
+  volume:
+    type: "numeric"
+    unit: "units per `time_unit`"
+    unit_source: column
+    unit_column: time_unit
+    meaning: >-
+      How much of this product the customer takes over one `time_unit`. A RATE,
+      not a quantity — two rows are only comparable after both are converted to
+      the same period.
+    grain: rate
+    engine:
+      consumed_by: "project_map.py::_map_demand -> demand mode when `products.demand_mean` is unset"
+      transform: "rateToWeekly(volume, time_unit) — normalized to weeks"
+      missing_default: "0 (the arc carries no demand)"
+    substitutions: []
+    ingest:
+      csv_header: "volume"
+      required: true
+      validate: "numeric >= 0; blank becomes NULL, not 0 (D7)"
+    surfaces: []
+    resolution: null
+  time_unit:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The period `volume` is quoted over — day, week, month, quarter, year. It
+      describes the VOLUME only. It says nothing about `expected_lead_time`.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_duration_to_weeks (via UNIT_DAYS)"
+      transform: "looked up in the one unit table"
+      missing_default: "weekly"
+    substitutions:
+      - when: "blank or unrecognised"
+        value: "treated as weekly"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "time_unit"
+      required: false
+      validate: "one of day/week/month/quarter/year and their -ly spellings"
+    surfaces: []
+    resolution: null
+  expected_lead_time:
+    type: "numeric"
+    unit: "weeks"
+    unit_source: fixed
+    meaning: >-
+      How long the customer expects to wait for this product. The contract fixes
+      the unit at WEEKS; `time_unit` does not apply to it.
+    grain: level
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "expected_lead_time"
+      required: true
+      validate: "numeric > 0"
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED. `expected_lead_time` appears in no read in project_map.py or
+      datamap.py — datamap's outbound projection selects product_id, customer_id,
+      unit_price, volume, time_unit and nothing else, so the column never leaves
+      the database. Recorded as null rather than guessed. It is a deletion
+      candidate for this WP's gap check; do not delete it here.
+  unit_price:
+    type: "numeric"
+    unit: "currency per unit of product"
+    unit_source: fixed
+    meaning: >-
+      What the customer pays for one unit of this product.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset"
+      transform: "demand-weighted mean across this product's outbound arcs"
+      missing_default: "the engine's ENGINE_DEFAULT_PRICE"
+    substitutions:
+      - when: "`products.sell_price` is unset for this product"
+        value: "the demand-weighted mean of this product's outbound unit_price"
+        provenance: derived
+        visible_as: "the effective-economics badge in /policies"
+    ingest:
+      csv_header: "unit_price"
+      required: true
+      validate: "numeric > 0"
+    surfaces: []
+    resolution: null
+    note: >-
+      The user types `unit_price`; the engine field it feeds is `sell_price` on
+      the product, and inside scsim it is `unit_price` again on the product model.
+      The manual leads with the CSV header (D21).
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was inserted. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row last changed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null

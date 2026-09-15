@@ -1,0 +1,186 @@
+# AUTHORED — the data contract's sidecar for `bom_single_level`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: bom_single_level
+tier: "2"
+schema_name: public
+grain: >-
+  One product-to-material line of the bill of materials: making one unit of
+  this product consumes this much of this material. NOT deduplicated (D5).
+owner: data-ingestion
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "bom_single_level_pkey"
+
+governance:
+  read: null
+  write: "data_editing"
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write` names the capability that exists today. WP 2.2 splits `data_editing`
+    into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row
+    becomes `data_edit_inputs` then, and all twelve sidecars change together.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. Carries no meaning and joins to nothing.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this row belongs to. Every read is scoped by it.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::rows -> per-project fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "set from the selected project, never from the CSV"
+    surfaces: []
+    resolution: null
+  plant_name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The focal plant this row belongs to, by NAME. A displayable string used as a
+      join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a
+      uuid.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions:
+      - when: "the CSV omits it"
+        value: "the selected project's `projects.plant_name`"
+        provenance: derived
+        visible_as: null
+    ingest:
+      csv_header: null
+      required: false
+      validate: "must equal the project's plant_name — a trigger raises otherwise"
+    surfaces: []
+    resolution: null
+  product_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The finished product this line belongs to.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_bom -> BomArc.product_id"
+      transform: "str()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "product_id"
+      required: true
+      validate: "non-empty after trim — enforced here; ingest-bom-multi-level is the correct pattern"
+    surfaces: []
+    resolution: null
+  material_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The material consumed. Joins to materials and to the inbound arcs that
+      supply it.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_bom -> BomArc.material_id"
+      transform: "str()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "material_id"
+      required: true
+      validate: "non-empty after trim"
+    surfaces: []
+    resolution: null
+  consumption_rate:
+    type: "numeric"
+    unit: "units of material per unit of product"
+    unit_source: fixed
+    meaning: >-
+      How many units of the material one unit of the product consumes. An
+      engineering fact about the product, not an estimate — which is why WP 1.3
+      records it as never estimable.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_bom -> BomArc.consumption_rate"
+      transform: "float(); a falsy value becomes 1.0"
+      missing_default: "1.0"
+    substitutions:
+      - when: "NULL or zero"
+        value: "1.0"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "consumption_rate"
+      required: true
+      validate: "numeric > 0"
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was inserted. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row last changed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null

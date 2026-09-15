@@ -1,0 +1,330 @@
+# AUTHORED — the data contract's sidecar for `materials`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: materials
+tier: "2"
+schema_name: public
+grain: >-
+  One material in one project: the economics the simulation reads for it. The
+  precision path — the CSV lanes carry prices too, and where this row is
+  silent the engine derives the value from them rather than treating it as
+  missing.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: "PRIMARY KEY constraint"
+    columns: [project_id, material_id]
+    name: null
+
+governance:
+  read: null
+  write: "data_editing"
+  min_project_role: editor
+  audited: false
+  rls_enabled: false
+  note: >-
+    `write` names the capability that exists today. WP 2.2 splits `data_editing`
+    into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row
+    becomes `data_edit_inputs` then, and all twelve sidecars change together.
+    SEPARATELY AND MORE URGENTLY: rls_enabled is FALSE on all three item
+    masters. No migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on
+    them, so the per-project isolation every other tier-2 table has does not
+    exist here. Found by WP 1.2; it is WP 2.4's to fix and WP 2.2's to test.
+
+fields:
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this material belongs to. Half of the primary key.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::rows -> per-project fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "set from the selected project, never from the CSV"
+    surfaces: []
+    resolution: null
+  material_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The material's code as the user's own systems spell it. Joins to the BOM and
+      to every inbound arc that supplies it.
+    grain: identifier
+    engine:
+      consumed_by: "project_map.py::_map_materials -> MaterialRow.id"
+      transform: "str()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "material_id"
+      required: true
+      validate: "non-empty; unique within the project"
+    surfaces: []
+    resolution: null
+  name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A human-readable name for the material. Display only.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_map_materials -> Material.name"
+      transform: "str(name or material_id)"
+      missing_default: "the material_id itself"
+    substitutions:
+      - when: "NULL or blank"
+        value: "the material_id"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "name"
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  cost:
+    type: "numeric"
+    unit: "currency per unit of material"
+    unit_source: fixed
+    meaning: >-
+      What one unit of this material costs to buy. The master value; where it is
+      unset the engine uses the cheapest inbound arc instead, which is usually
+      what the user wants and is why leaving it blank is not an error.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_materials -> Material.cost"
+      transform: "float() when > 0"
+      missing_default: "the cheapest inbound unit_price for this material, floored at 1.0"
+    substitutions:
+      - when: "NULL or <= 0"
+        value: "the cheapest inbound arc's unit_price (grading.ts::cheapestInboundCost floors a <= 0 price to 1.0 first)"
+        provenance: derived
+        visible_as: "the effective-economics badge in /policies"
+    ingest:
+      csv_header: "cost"
+      required: false
+      validate: "numeric > 0"
+    surfaces: []
+    resolution: null
+  holding_cost_pct:
+    type: "numeric"
+    unit: "fraction of unit value per year"
+    unit_source: fixed
+    meaning: >-
+      The annual cost of holding one unit in stock, as a fraction of its value.
+      0.2 means holding a unit for a year costs a fifth of what the unit is worth.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_materials -> Material.holding_cost_rate"
+      transform: "falls back to the inventory policy bundle's holding_cost_pct when NULL"
+      missing_default: "the project's inventory policy bundle value (0.2 in the shipped default)"
+    substitutions:
+      - when: "NULL"
+        value: "the inventory bundle's holding_cost_pct"
+        provenance: default
+        visible_as: "the policy grid's provenance dot"
+    ingest:
+      csv_header: "holding_cost_pct"
+      required: false
+      validate: "numeric in [0, 1]"
+    surfaces: []
+    resolution: null
+  moq:
+    type: "numeric"
+    unit: "units of material"
+    unit_source: fixed
+    meaning: >-
+      Minimum order quantity: the smallest amount this material can be ordered in.
+      A commercial fact the supplier states, not something to be inferred from
+      order history.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_supply -> SupplierLink.moq"
+      transform: "float(moq) when truthy, else 0.0 — applied per (supplier, material) link"
+      missing_default: "0.0 (no minimum)"
+    substitutions:
+      - when: "NULL or zero"
+        value: "0.0 — no minimum applies"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "moq"
+      required: false
+      validate: "numeric >= 0"
+    surfaces: []
+    resolution: null
+  initial_on_hand:
+    type: "numeric"
+    unit: "units of material"
+    unit_source: fixed
+    meaning: >-
+      How much of this material is in stock when the simulation starts.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_materials -> Material.initial_on_hand"
+      transform: "float() when not None; None is passed through as None, not as zero"
+      missing_default: "the engine's own opening-stock rule"
+    substitutions: []
+    ingest:
+      csv_header: "initial_on_hand"
+      required: false
+      validate: "numeric >= 0"
+    surfaces: []
+    resolution: null
+  lead_time_dist:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The SHAPE of this material's delivery lead time — deterministic, or a named
+      distribution around the arc's lead time. `deterministic` means the lead time
+      is exactly what the arc says, every time.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_map_supply -> SupplierLink.lead_time_dist"
+      transform: "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC"
+      missing_default: "deterministic"
+    substitutions:
+      - when: "NULL or blank"
+        value: "deterministic"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "lead_time_dist"
+      required: false
+      validate: "one of the LeadTimeDist enum values; `empirical` is reserved for the data-import path (M7) and is not selectable yet"
+    surfaces: []
+    resolution: null
+  lead_time_cv:
+    type: "numeric"
+    unit: "coefficient of variation (dimensionless)"
+    unit_source: fixed
+    meaning: >-
+      How much the lead time varies, as a coefficient of variation. Read only when
+      `lead_time_dist` is not deterministic: the engine skips sampling entirely
+      when the distribution is deterministic or the CV is zero.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_map_supply -> SupplierLink.lead_time_cv"
+      transform: "float() when truthy, else 0.0"
+      missing_default: "0.0 — no variability, so no sampling"
+    substitutions:
+      - when: "NULL or zero"
+        value: "0.0"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "lead_time_cv"
+      required: false
+      validate: "numeric >= 0"
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row last changed. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was inserted. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  source_system:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which external system this row came from, when it was synced rather than
+      uploaded. NULL for a hand-uploaded or hand-edited row.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine, and correctly so: it is provenance, not a
+      parameter. Read by the ERP connector (blueprint G18), which is the only
+      writer. Kept, not a deletion candidate.
+  source_external_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      This row's identifier in the external system, so a re-sync can match it.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine; ERP-connector provenance, as source_system.
+  source_synced_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the external system last confirmed this row.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the engine; ERP-connector provenance, as source_system.

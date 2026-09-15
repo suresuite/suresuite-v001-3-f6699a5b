@@ -1,0 +1,192 @@
+# AUTHORED — the data contract's sidecar for `dataset_versions`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: dataset_versions
+tier: "3"
+schema_name: public
+grain: >-
+  One frozen snapshot of a project's tier-2 data, with the hash that
+  identifies it. The trust anchor: a run that names a dataset_version can be
+  reproduced, and one that does not cannot.
+owner: platform
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "dataset_versions_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Written by the `_build_dataset_snapshot` database function, never by a page.
+    The snapshot is a pure function of tier 2 and is always safe to rebuild.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate identifier for the version. Referenced by runs.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this snapshot is of.
+    grain: identifier
+    engine:
+      consumed_by: "sim-command -> run binding"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  label:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A human-chosen name for this version, so a user can say which one they mean.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Display only. Not read by the engine and deliberately not part of the hash —
+      renaming a version must not change its identity.
+  snapshot:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The frozen tier-2 rows themselves, as JSON. What the run actually ran
+      against, not a pointer to rows that may since have changed.
+    grain: metadata
+    engine:
+      consumed_by: "sim-command -> the dataset a run is pinned to"
+      transform: "built by _build_dataset_snapshot from the project's tier-2 tables"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Incomplete today: the snapshot hashes `bom_single_level` only, so a project
+      whose depth lives in `bom_multi_level` gets the same graph_hash before and
+      after a deep-tier change (D11). WP 4.1 completes and composes it.
+  graph_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The fingerprint of the snapshot. Two runs with the same graph_hash saw the
+      same world; two with different hashes did not.
+    grain: metadata
+    engine:
+      consumed_by: "sim-command and the run-identity reuse check -> simulation_runs.graph_hash"
+      transform: "hashed from the snapshot by _build_dataset_snapshot"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Inherits D11: it is a hash of an incomplete snapshot, so equal hashes do not
+      yet prove equal worlds. I8 depends on WP 4.1 closing that.
+  author_user_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who froze this version.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Governance, not a parameter — and the closest thing the data plane has to
+      the actor-naming audit row I-G4 requires. WP 2.3 generalises it.
+  author_email:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The author's email, denormalized so the version survives the user record.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Governance display. A displayable name stored beside the uuid — acceptable
+      here precisely because `author_user_id` is the join key and this is not
+      (G1).
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the version was frozen. Server-set.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
