@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
@@ -72,6 +72,12 @@ describe("D3 — product_code_map is gone, and stays gone", () => {
     expect(src, "the ETL must still explain why the mapping was removed").toMatch(
       new RegExp(`${DEAD_TABLE}[\\s\\S]{0,600}(DELETED|never executed|NEVER EXECUTED)`),
     );
+    expect(named, `product_code_map is referenced by ${named.join(", ")}`).toEqual([]);
+  });
+
+  it("and no sidecar describes it — the contract agrees the table does not exist", () => {
+    const sidecars = readdirSync(resolve(root, CONTRACT));
+    expect(sidecars).not.toContain("product_code_map.contract.yaml");
   });
 
   it("takes the branch it fed with it", () => {
