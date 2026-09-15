@@ -46,31 +46,18 @@ the simulation platform, per CLAUDE.md.
 
 ## Phase 0 — Stabilize and consolidate
 
-### WP 0.1 — Kill the silent policy override
+### WP 0.1 — Kill the silent policy override ✅ done
 
-```
-Implement WP 0.1 from docs/PLAN.md.
+Shipped. The prompt is retired rather than cached: every line:number it carried is
+now stale, and the record of what was found lives in `docs/PLAN.md` §16 (drift log),
+with the closed defects marked in §4 and the surviving locations in §4.1.
 
-Already verified (re-check before relying on it):
-· useStageRows.tsx:283-288 writes hardcoded constants onto every supplier row.
-  Only safety_stock_days has a matching ColSpec and reaches the engine
-  (project_map.py:783 defaults it to 7.0 — we are persisting 0).
-  supplier_capacity_per_day, ordering_cost and lead_time_distribution have NO
-  matching ColSpec field; confirm and delete them rather than preserving them.
-· StagePolicyTable.tsx:887 calls applyPrefill() un-awaited, and setApplying(true)
-  only runs at :865 AFTER the row loop — so the `applying` guard is not armed
-  during the window the effect can re-enter.
-· The autoSeedMarkerRef marker is `${projectId}::${stageKey}`, so a
-  supplier→plant→supplier tab round trip re-enters for supplier.
-· The provenance logic at StagePolicyTable.tsx:1170-1225 is a VERBATIM copy of
-  resolveEffective.ts:124-180. Fix both branches identically. De-duplicating
-  them is WP 6.2's job — do not do it here, but note in §16 that they must stay
-  in lockstep until then.
-
-Decide and record: whether to drop the constants from the row entirely (my
-recommendation — let columnSpecs.defaultWhenMissing supply them) or tag them as
-non-data. Justify whichever you pick in the commit message.
-```
+Two things it settled that later packages rely on:
+· the constants were **dropped**, not tagged — tagging needs a second registry of
+  "not data", which is the parallel source of truth I1 forbids;
+· `__from_data` now also carries the routing decisions the data's shape makes
+  (`primary_source`, `sourcing_firm`), because the pre-dispatch validator reads
+  those from the saved override bundle, not from the row.
 
 ### WP 0.2 — Unit conversion + orphan-table honesty
 
@@ -392,7 +379,7 @@ Already verified (re-check before relying on it):
   and report counts BEFORE deduplicating, and again after.
 · Duplicates distort sourcing_ratio (combine-project:277 — the duplicate appears in
   both numerator and denominator), the smart-average imputation basis
-  (useStageRows.tsx:125-131), and the grading reducers. Dedup will therefore CHANGE
+  (useStageRows.tsx:120-130), and the grading reducers. Dedup will therefore CHANGE
   numbers. That is the D5 damage being undone — record the before/after in §16 so
   nobody later mistakes it for a regression.
 · Normalization at promotion (invariant I3) is the point of this WP. After it, no
@@ -679,11 +666,11 @@ Implement WP 6.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · The Supplier stage is the deepest chain and the right one to do first:
-  columnSpecs.ts:119-178 declares the columns; useStageRows.tsx:191-325 builds the
+  columnSpecs.ts:119-178 declares the columns; useStageRows.tsx:208-348 builds the
   rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
 · Substitutions to document exhaustively: resolveField's `> 0` test
   (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
-  defaultWhenMissing (columnSpecs.ts:132-168), the effectivePolicy bundle,
+  defaultWhenMissing (columnSpecs.ts:133-168), the effectivePolicy bundle,
   liveDefault = derivedVal ?? 0 (resolveEffective.ts:135), grading.ts's reducers,
   and ENGINE_DEFAULT_PRICE.
 · supabase/functions/_shared/grading.ts is pinned to project_map.py by
@@ -715,9 +702,14 @@ Already verified (re-check before relying on it):
 · ensure_item_masters unions bom_single_level ONLY — multi-level BOM materials get
   no master row. Fix here or record as a separate finding.
 
-De-duplicate StagePolicyTable.tsx:1170-1225 against resolveEffective.ts's
+De-duplicate StagePolicyTable.tsx:1206-1265 against resolveEffective.ts's
 resolveCell in this WP — it has been carried in lockstep since WP 0.1 and this is
 where that debt is paid.
+
+The WP 0.1 gap check added three more divergences to this package: the dead
+defaultWhenMissing table, seven bundle fields stored and hashed but shown and read
+by nothing, and the plant stage's discarded production_lead_time_mean_days. They
+are stated in PLAN.md §13 WP 6.2 with their evidence in §16 — read both.
 ```
 
 ### WP 6.3 — Provenance vocabulary and researcher export
