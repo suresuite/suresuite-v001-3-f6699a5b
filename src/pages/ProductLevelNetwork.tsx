@@ -184,9 +184,10 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
   const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'network' | 'map'>('network');
   const [countryRiskMap, setCountryRiskMap] = useState<Record<string, string>>({});
-  // D4: `risk_data` has no migration, so this read normally fails. The page
-  // used to warn to the console and render an unshaded graph as if nothing
-  // were missing; now it says so on screen (RiskDataNotice).
+  // D4: `risk_data` gained its migration in WP 1.4, so the read now succeeds
+  // against a real table — but an EMPTY one until an operator loads a vintage.
+  // The page used to warn to the console and render an unshaded graph as if
+  // nothing were missing; it says so on screen instead (RiskDataNotice).
   const [riskDataError, setRiskDataError] = useState<string | null>(null);
   // Add state for metrics metadata
   const [metricsMetadata, setMetricsMetadata] = useState<{
@@ -496,7 +497,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
           p_user_id: user.id,
           p_user_email: user.email
         }),
-        supabase.from('risk_data').select('COUNTRY, "RISK CLASS"')
+        supabase.from('risk_data').select('country, risk_class')
       ]);
       
       if (scError) {
@@ -514,10 +515,10 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       } else if (riskData) {
         const riskMap: Record<string, string> = {};
         riskData.forEach(row => {
-          const countryVal = row['COUNTRY'] || row['country']; 
-          const riskVal = row['RISK CLASS'] || row['risk class'] || row['risk_class'];
-          if (countryVal) {
-            riskMap[countryVal.trim().toUpperCase()] = riskVal;
+          // WP 1.4: snake_case columns, and a CHECK that the stored country is
+          // already `upper(btrim(...))` — see 20260915000003_risk_data.sql.
+          if (row.country) {
+            riskMap[row.country.trim().toUpperCase()] = row.risk_class;
           }
         });
         setRiskDataError(Object.keys(riskMap).length === 0 ? 'The risk_data table returned no rows.' : null);

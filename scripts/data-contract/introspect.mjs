@@ -47,6 +47,7 @@ class Schema {
     this.unparsed = [];           // DDL this pass could not read — never silent
     this.dropped = [];            // tables dropped after creation
     this.phantom = new Map();     // referenced by DDL, created by no migration
+    this.dynamic = [];            // plpgsql this pass could not EVALUATE — see below
   }
 
   table(name) { return this.tables.get(name); }
@@ -160,12 +161,33 @@ function apply(schema, stmt, migration, guarded = false) {
   let doBlock = /^DO\s+(\$[A-Za-z_]*\$)/i.exec(s);
   if (doBlock) {
     const tag = doBlock[1];
-    const open = s.indexOf(tag);
-    const close = s.lastIndexOf(tag);
+    // Split the RAW body, not the squashed one. `squash` collapses newlines, and
+    // `splitStatements` strips `--` to end of LINE — so on squashed text a single
+    // `-- comment` inside a DO block eats every statement after it, silently.
+    // That is not hypothetical: `20250908191450` opens its block with
+    // `-- View policy`, and four `CREATE POLICY` statements on
+    // `supply_chain_data_multi_tier` vanished. The artifact then said the table
+    // had RLS on and no policy at all, which reads as deny-all.
+    const raw = String(stmt);
+    const open = raw.indexOf(tag);
+    const close = raw.lastIndexOf(tag);
     if (close > open) {
-      for (const inner of splitStatements(s.slice(open + tag.length, close))) {
+      for (const inner of splitStatements(raw.slice(open + tag.length, close))) {
         const ddl = unwrapPlpgsql(inner);
-        if (ddl) apply(schema, ddl, migration, true);
+        if (ddl) { apply(schema, ddl, migration, true); continue; }
+        // NOT silent. `unwrapPlpgsql` returning null used to drop the fragment,
+        // and the fragments it drops are not all control-flow noise: some are
+        // EXECUTE format(...) — DDL assembled at run time, which no static
+        // replay can evaluate. `20260614000001_item_master.sql` enables RLS and
+        // creates two policies each on `materials`, `products` and `suppliers`
+        // that way, inside a FOREACH over an array of table names. Dropping it
+        // made the artifact say RLS was OFF on all three item masters, and the
+        // generated pages then said so to the reader — a governance claim the
+        // migrations do not support in either direction.
+        //
+        // Recording it does not evaluate it. It marks the tables the block
+        // mentions as INDETERMINATE, which is the true answer (§5 T3).
+        noteDynamic(schema, migration, inner);
       }
     }
     return;
@@ -597,6 +619,31 @@ function unwrapPlpgsql(fragment) {
 /** `storage.objects`, `auth.users`, `vault.secrets` — governed elsewhere. */
 const foreignSchema = (id) => id.schema !== null && id.schema !== "public";
 
+/**
+ * A plpgsql fragment this pass could not read as DDL.
+ *
+ * Control flow (`END IF`, `END LOOP`, a bare `END`) is not interesting and is
+ * dropped. Anything containing EXECUTE is: it is DDL built at run time, and the
+ * only honest thing a static replay can say about the objects it touches is
+ * "unknown". Which objects those are is over-approximated deliberately — every
+ * string literal and every `public.<name>` in the fragment — because an
+ * over-broad "we cannot tell" is safe and a narrow one is a false claim.
+ */
+function noteDynamic(schema, migration, fragment) {
+  const s = squash(fragment);
+  if (!/\bEXECUTE\b/i.test(s)) return;   // ordinary control flow
+  const mentions = new Set();
+  for (const m of s.matchAll(/'([a-z_][a-z0-9_]*)'/gi)) mentions.add(m[1].toLowerCase());
+  for (const m of s.matchAll(/\bpublic\.([a-z_][a-z0-9_]*)/gi)) mentions.add(m[1].toLowerCase());
+  schema.dynamic.push({
+    migration,
+    statement: s.slice(0, 400),
+    mentions: [...mentions].sort(),
+    touches_rls: /ROW\s+LEVEL\s+SECURITY|\bPOLICY\b/i.test(s),
+    why: "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it",
+  });
+}
+
 function note(schema, migration, stmt, why) {
   const phantom = /^(?:ALTER TABLE|CREATE (?:UNIQUE )?INDEX|CREATE POLICY) on unknown table "(.+)"$/.exec(why);
   if (phantom) {
@@ -793,6 +840,23 @@ function build() {
 
   const tables = [...schema.tables.values()].sort((a, b) => a.name.localeCompare(b.name));
   const known = new Set(tables.map((t) => t.name));
+
+  // Mark every table whose RLS a dynamic block touched. `rls.determinate` is the
+  // field the contract reads: false means "the migrations do not say", which is
+  // a different statement from `enabled: false` and must never be rendered as it.
+  for (const t of tables) t.rls.determinate = true;
+  for (const d of schema.dynamic) {
+    if (!d.touches_rls) continue;
+    for (const name of d.mentions) {
+      const t = schema.tables.get(name);
+      if (!t) continue;
+      t.rls.determinate = false;
+      (t.rls.indeterminate_from ??= []).push(d.migration);
+    }
+  }
+  for (const t of tables) {
+    if (t.rls.indeterminate_from) t.rls.indeterminate_from = [...new Set(t.rls.indeterminate_from)].sort();
+  }
   for (const v of schema.views.keys()) known.add(v);
 
   const codeRefs = findCodeTableRefs();
@@ -816,6 +880,8 @@ function build() {
       shadowed_definitions: schema.shadowed.length,
       phantom_tables: schema.phantom.size,
       unparsed_statements: schema.unparsed.length,
+      dynamic_ddl_statements: schema.dynamic.length,
+      rls_indeterminate_tables: tables.filter((t) => t.rls.determinate === false).length,
       orphans: orphans.length,
       aborted_migrations: schema.aborted_migrations.length,
     },
@@ -840,6 +906,7 @@ function build() {
       }))
       .sort((a, b) => a.table.localeCompare(b.table)),
     unparsed: schema.unparsed,
+    dynamic_ddl: schema.dynamic,
   };
 }
 
@@ -885,5 +952,6 @@ console.log(
   `✓ ${relative(ROOT, OUT)} — ${result.counts.tables} tables, ${result.counts.functions} functions, ` +
   `${result.counts.shadowed_definitions} shadowed definitions, ${result.counts.aborted_migrations} aborted, ` +
   `${result.counts.orphans} orphans, ` +
-  `${result.counts.unparsed_statements} unparsed`,
+  `${result.counts.unparsed_statements} unparsed, ` +
+  `${result.counts.dynamic_ddl_statements} dynamic (${result.counts.rls_indeterminate_tables} tables' RLS indeterminate)`,
 );

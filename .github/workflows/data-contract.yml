@@ -1,0 +1,91 @@
+name: data contract
+
+# WHAT THIS FIXES. Twelve workflows existed in this repository before this one and
+# NONE of them ran `npm test`, `npm run check:docs`, or any `contract:*` command.
+# `npm run lint` was not in CI either — and it is red at baseline (342 eslint
+# errors), so the two gates hidden behind it (`audit:ui`, `check:docs`) were
+# unreadable even to someone who ran it locally.
+#
+# The consequence is in PLAN.md §16: merge `5c7129f` took `check:docs` from green
+# to thirteen orphan citations AND left `resolveCell` referencing an undefined
+# binding — every policy-grid cell threw at runtime, five unit tests were red on
+# the branch, and nothing failed. A gate that is not wired is not a gate.
+#
+# So each command below is invoked DIRECTLY, never through `npm run lint`. Steps
+# are separate and named so a red run names the gate that failed in the Actions
+# UI without anyone opening a log.
+#
+# NO PATH FILTER, deliberately. The introspected artifact records where in the
+# application code each table is referenced, so an edit to a page that touches no
+# migration can still make `contract:introspect -- --check` drift — it did, during
+# WP 1.4: PR #190's header work shifted three `file:line` references and left the
+# committed artifact stale. A filter on `supabase/migrations/**` would have let
+# that through and then failed the NEXT migration PR for a reason it did not
+# cause. `npm test` and `check:docs` have the same property.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── the six commands, each its own step ────────────────────────────────
+      #
+      # `contract:introspect -- --check` re-replays every migration and compares
+      # the result to the committed artifact. It does NOT rewrite it: a generator
+      # that regenerates in CI proves only that it ran.
+      - name: Introspected schema matches the migrations
+        run: npm run contract:introspect -- --check
+
+      # The sidecars against contract.schema.json AND against the introspected
+      # schema: an undescribed column, a described non-column, a type or natural
+      # key that disagrees with the migrations, an untraced field with no note,
+      # and a CSV template header no field records (D21).
+      - name: Sidecars validate against the schema
+        run: npm run contract:validate
+
+      # WP 1.3's handoff asked for this one by name. It is the only thing stopping
+      # the SQL unit table and grading.ts::UNIT_DAYS diverging again — `quarter`
+      # was 13x wrong in SQL for a year (D10).
+      - name: SQL unit table matches grading.ts::UNIT_DAYS
+        run: npm run contract:units -- --check
+
+      # WP 1.1's exit checks, including the orphan check — the one WP 1.4 turned
+      # from red to green by reconciling `approved_users`, `risk_data` and
+      # `product_code_map`. Reverting any of the three turns it red again.
+      - name: Schema exit checks (orphans, phantoms, D5)
+        run: npm run contract:verify
+
+      # PLAN.md §4 is the only authority for data-layer file:line evidence.
+      - name: Data-layer facts have exactly one source
+        run: npm run check:docs
+
+      - name: Unit tests
+        run: npm test
+
+      # ── and the composite ─────────────────────────────────────────────────
+      #
+      # `contract:check` re-runs the four contract gates above and adds WP 1.4's
+      # own rules: coverage (every table described or explicitly deferred), the
+      # generated-page drift comparison, the natural-key warning, and the §4
+      # citation resolver. It is duplicated work — about three seconds of node —
+      # and it is deliberate: the six steps above exist so the Actions UI names
+      # the exact gate that failed, and this one exists so a contributor has a
+      # SINGLE command that reproduces the whole job locally. Neither purpose is
+      # served by the other.
+      - name: Data contract holds (coverage, page drift, §4 citations)
+        run: npm run contract:check

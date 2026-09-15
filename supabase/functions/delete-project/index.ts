@@ -170,7 +170,10 @@ serve(async (req) => {
         await deleteTableByProjectId('bom_multi_level');
         await deleteTableByProjectId('bom_single_level');
         await deleteTableByProjectId('multi_tier_supply_chain');
-        await deleteTableByProjectId('product_code_map');
+        // `product_code_map` was deleted here in Phase 1 / WP 1.4 (D3): the table
+        // exists in no migration, so this call could only ever fail. A delete of a
+        // table that does not exist is not harmless bookkeeping — it is a line
+        // that makes the list look complete.
         await deleteTableByProjectId('supply_chain_data_multi_tier');
 
         // 7) Views and legacy tables (if present in older data)

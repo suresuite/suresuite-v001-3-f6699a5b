@@ -37,30 +37,69 @@ duplicating facts is the defect the plan exists to end.
   package, edit the plan in the SAME commit.
 - Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
 
-## The invariants (PLAN.md §2.1)
+## The invariants (PLAN.md §2.1) — by gate name
+
+**Every invariant has a NAME, and you cite the name.** The plan's `§2.1` table
+numbers four of them `G1`–`G4`, and the blueprint numbers eighteen *gaps* `G1`–`G18`;
+on one page "G4" means both "every tier transition writes an audit row" and "no
+data-entry surface for the economics". Names do not collide. `PLAN.md §2.1` remains
+the authority for the statements; this table adds what the plan cannot — **where
+each one is enforced today, and where it is still only a promise.**
 
 Each is meant to be a CI gate, not an aspiration — anything unenforced drifts within
-two months, which is the lesson of the two orphan tables (D3, D4). Gates land with
-their work packages; the rule holds from now.
+two months, which is the lesson of the two orphan tables (D3, D4, both closed in
+WP 1.4). Gates land with their work packages; the rule holds from now.
 
-| # | Invariant |
+| Gate name | §2.1 | Invariant | Enforced today by |
+|---|---|---|---|
+| `single-source` | I1 | Every data fact is authored exactly once; docs/validators/RLS generate from it | `check:docs` · `contract:check` R3 (page drift) |
+| `no-tier-skip` | I2 | No tier skipping — external data never lands below T1; pages never write T3 | **not yet** — WP 3.2 |
+| `normalize-at-promotion` | I3 | Units normalize at promotion into T2; nothing downstream converts | `contract:units -- --check` (one `UNIT_DAYS`); promotion itself WP 3.3 |
+| `natural-key` | I4 | Every canonical table has a natural-key unique constraint; ingestion upserts | `contract:check` R5 — **WARN only**; WP 3.3 lands the keys, WP 2.4 flips it to a failure |
+| `input-hash` | I5 | Every derived row carries the input hash it came from | **not yet** — WP 4.1 |
+| `declared-fallback` | I6 | A fallback absent from the contract may not exist in code | `contract:validate` (`engine.missing_default`) · `contract:generate` fails when the engine registry names a required field the contract has no column for |
+| `ingestion-contract` | I7 | A new source implements the ingestion contract; it never touches T2 schemas | **not yet** — WP 3.1 |
+| `result-binding` | I8 | Every result binds dataset + policy + scenario + engine version | **not yet** — WP 4.4 |
+| `uuid-identity` | G1 | Orgs/projects/users referenced by uuid; a displayable name is never a join key | **not yet** — WP 2.1 |
+| `declared-capability` | G2 | Every table declares read/write capability and minimum project role | `contract:validate` (`governance` is a required sidecar block) |
+| `subtractive-delegation` | G3 | Delegation is subtractive and expiring | **not yet** — WP 2.2 |
+| `audit-actor` | G4 | Every tier transition writes an audit row naming the actor | **not yet** — WP 2.3; `audited: false` on every sidecar is the honest record |
+| `table-covered` | — | Every table is described by a sidecar or deferred to a named work package | `contract:check` R1 (WP 1.4) |
+| `no-orphan-table` | — | No table the code reads is created by no migration; none is ALTERed without being created | `contract:check` R4 · `contract:verify` (WP 1.4) |
+
+## The transparency commitments (PLAN.md §5.3)
+
+Also named, for the same reason. These are what the invariants are *for*.
+
+| Commitment | Rule |
 |---|---|
-| I1 | Every data fact is authored exactly once; docs/validators/RLS generate from it |
-| I2 | No tier skipping — external data never lands below T1; pages never write T3 |
-| I3 | Units normalize at promotion into T2; nothing downstream converts |
-| I4 | Every canonical table has a natural-key unique constraint; ingestion upserts |
-| I5 | Every derived row carries the input hash it came from |
-| I6 | A fallback absent from the contract may not exist in code |
-| I7 | A new source implements the ingestion contract; it never touches T2 schemas |
-| I8 | Every result binds dataset + policy + scenario + engine version |
-| G1 | Orgs/projects/users referenced by uuid; a displayable name is never a join key |
-| G2 | Every table declares read/write capability and minimum project role |
-| G3 | Delegation is subtractive and expiring |
-| G4 | Every tier transition writes an audit row naming the actor |
-| T1–T5 | The transparency commitments — PLAN.md §5.3 |
+| **T1 · No number without a source** | Every displayed value resolves to data, a named substitution rule, or an explicit default. There is no fourth option. |
+| **T2 · Substitution is always visible** | At the point of display, not in a log. A fallback absent from the contract may not exist in code (`declared-fallback`). |
+| **T3 · We publish our own blind spots** | Every report and export states the known limits of its own computation. |
+| **T4 · Reproducible or not published** | Any figure leaving the system carries the dataset, policy, scenario and engine versions that produced it. |
+| **T5 · Transparency survives handover** | Generated and CI-gated, so it stays true when the people who built it have moved on. |
 
-`G1`–`G4` here are the plan's **governance** invariants and are unrelated to the
-blueprint's `G1`–`G18` gap numbers; the plan cites blueprint gaps as "blueprint G4".
+## The data-contract commands
+
+One command reproduces everything CI asserts about the data layer:
+
+```
+npm run contract:check
+```
+
+It runs `contract:introspect -- --check`, `contract:validate`, `contract:units -- --check`,
+`contract:verify` and `contract:generate -- --check`, then its own rules (R1 coverage,
+R4 orphans, R5 natural keys, R6 §4 citation resolution). `.github/workflows/data-contract.yml`
+runs the same set, plus `check:docs` and `npm test`, on every pull request.
+
+- **Added a table?** Author `supabase/contract/<table>.contract.yaml`, or defer it in
+  `scripts/data-contract/coverage.yaml` under the work package that will. A table in
+  neither fails `table-covered`.
+- **Changed a migration or a sidecar?** Run `npm run contract:generate` and commit
+  `build/data-contract.generated.json` and `docs/data/tables/*.md` with it. They are
+  committed on purpose: a gate that compares against an uncommitted artifact can never
+  fail.
+- **Never edit `docs/data/tables/*.md`.** They are generated. Edit the sidecar.
 
 ## Traceability convention
 

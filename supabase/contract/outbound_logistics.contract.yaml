@@ -15,6 +15,10 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "outbound_logistics_pkey"
+# The key the grain implies and the database does NOT enforce (D5); WP 3.3 lands
+# it. Mirrors `inbound_logistics`, with customer/product where that has
+# supplier/material.
+natural_key_intended: [project_id, plant_name, customer_id, product_id]
 
 governance:
   read: null
