@@ -61,7 +61,9 @@ BEGIN
       'simulation_performance_metrics','simulation_results',
       'tier2_suppliers','tier3_suppliers'
     ]) t
-   WHERE to_regclass('public.' || t) IS NULL;
+   WHERE to_regclass('public.' || t) IS NULL
+     -- the three §0b adopts are expected to be absent; anything ELSE is news
+     AND t <> ALL (ARRAY['network_summary','tier2_suppliers','tier3_suppliers']);
   IF missing IS NOT NULL THEN
     -- EXCEPTION, not NOTICE. The Supabase CLI's `db push` log captures ERROR lines
     -- and drops NOTICEs, so a notice here is invisible exactly where it is needed —
@@ -75,6 +77,78 @@ BEGIN
   END IF;
 END
 $preflight$;
+
+-- ── 0b. adopt the tables this database is missing (D32) ──────────────────────
+-- The preflight above named three, and it took three deploys to learn the first
+-- two one at a time before it was made to name them all at once:
+--   network_summary                 — `20250904105527`, beside network_nodes/edges
+--   tier2_suppliers, tier3_suppliers — `20250903080405`
+-- All three are created by migrations, none is dropped by any migration, and none
+-- of them is in the production database. `risk_data` (D4) inverted, three times
+-- over. Each definition below is VERBATIM from its original migration and is the
+-- table's final shape — no later migration ALTERs any of them, which the contract
+-- confirms (every column's `added_by` is the creating migration).
+--
+-- `IF NOT EXISTS` makes every one a no-op wherever the table is already there, so
+-- this section is inert in any database built from the migrations. Adoption is the
+-- fix rather than skipping the policies: skipping means routing them through
+-- EXECUTE, which the introspector cannot read, and the contract would then show
+-- these tables on the OLD text comparison for ever — `orgIdentity.test.ts` caught
+-- that and refused it.
+--
+-- `UploadWizard.tsx` writes tier2_suppliers and tier3_suppliers, so in production
+-- the deep-tier upload has been writing to tables that do not exist. Adopting them
+-- does not "add a feature" — it restores the schema the code was already written
+-- against.
+
+CREATE TABLE IF NOT EXISTS public.network_summary (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL,
+  plant_name text NOT NULL,
+  organization text NOT NULL DEFAULT 'default_org',
+  created_by uuid,
+  uploaded_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  nodes_count integer,
+  edges_count integer,
+  tiers_data jsonb
+);
+ALTER TABLE public.network_summary ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.tier2_suppliers (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL,
+  plant_name text NOT NULL,
+  supplier_id text NOT NULL,
+  upstream_supplier_id text NOT NULL,
+  material_id text,
+  relationship_type text,
+  volume numeric,
+  unit_price numeric,
+  lead_time numeric,
+  time_unit text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE public.tier2_suppliers ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.tier3_suppliers (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL,
+  plant_name text NOT NULL,
+  supplier_id text NOT NULL,
+  upstream_supplier_id text NOT NULL,
+  material_id text,
+  relationship_type text,
+  volume numeric,
+  unit_price numeric,
+  lead_time numeric,
+  time_unit text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE public.tier3_suppliers ENABLE ROW LEVEL SECURITY;
 
 -- ── 1. the uuid resolver ─────────────────────────────────────────────────────
 -- `_user_id` is EXPLICIT, exactly as `capabilities_for_user()` takes it, and for
@@ -614,39 +688,6 @@ USING (EXISTS (
   WHERE p.id = network_nodes.project_id 
   AND public.org_is_current_user_org(p.organization_id, p.organization)
 ));
-
--- `network_summary` EXISTS IN THE MIGRATIONS AND NOT IN THE PRODUCTION DATABASE.
--- `20250904105527` creates it beside `network_nodes` and `network_edges`; those two
--- are in production and this one is not, and no migration drops it. The first
--- `db push` of this file found it — `DROP POLICY IF EXISTS` still needs the TABLE
--- to exist (the IF EXISTS is about the policy), so statement 59 aborted the whole
--- migration. This is `risk_data` (D4) inverted: WP 1.4 found a table in production
--- that no migration creates; this is a table the migrations create that production
--- does not have. A static replay cannot see either.
---
--- ADOPTED, NOT GUARDED, and the difference matters. Skipping the four policies
--- where the table is absent was the first fix, and it cost more than it saved: the
--- statements have to go through EXECUTE, the introspector cannot read them, and the
--- contract then shows `network_summary` still on the TEXT comparison for ever.
--- `orgIdentity.test.ts` caught exactly that and refused it. Creating the table
--- instead closes the divergence rather than encoding it — the definition below is
--- copied verbatim from `20250904105527`, IF NOT EXISTS makes it a no-op everywhere
--- the table already is, and nothing in `src/` or `supabase/functions/` reads the
--- table, so adopting it cannot change any behaviour. Recorded as D32.
-CREATE TABLE IF NOT EXISTS public.network_summary (
-  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  project_id uuid NOT NULL,
-  plant_name text NOT NULL,
-  organization text NOT NULL DEFAULT 'default_org',
-  created_by uuid,
-  uploaded_by uuid,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  nodes_count integer,
-  edges_count integer,
-  tiers_data jsonb
-);
-ALTER TABLE public.network_summary ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Network summary: project access delete" ON public.network_summary;
 
