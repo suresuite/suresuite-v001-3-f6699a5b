@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { DIALOG_AS_SHEET } from '@/components/shared';
+import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
 import { Ban, Loader2, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -104,16 +104,22 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       title="Users"
       onRefresh={load}
       refreshLoading={loading}
-      actions={
-        <div className="flex items-center gap-2">
-          {/* §2.4/G3: the header's right slot is `shrink-0`, so a fixed 240px
-              search field cannot give width back to the title - at 390px it
-              took the row past the viewport. The clamp reaches 240px from
-              572px up, so the desktop width is unchanged. */}
-          <Input placeholder="Search name, email, org…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-[clamp(130px,42vw,240px)] rounded-sm md:min-h-0 md:w-60" />
-          <AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />
-        </div>
+      /* The handoff's slot order is search · refresh · Add user, so the two
+         are separate slots: `search` renders before the refresh button,
+         `actions` after it. */
+      search={
+        /* §2.4/G3: the header's right slot is `shrink-0`, so a fixed 240px
+           search field cannot give width back to the title - at 390px it took
+           the row past the viewport. The clamp reaches 240px from 572px up, so
+           the desktop width is unchanged. */
+        <Input
+          placeholder="Search name, email, org…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className={cn('h-8 min-h-11 w-[clamp(130px,42vw,240px)] rounded-sm md:w-60', HDR_SEARCH_INPUT)}
+        />
       }
+      actions={<AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />}
     >
       {isMobile ? (
         <AdminMobileList
@@ -266,7 +272,7 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
-        <Button size="sm" className="rounded-sm"><Plus className="mr-1.5 h-3.5 w-3.5" /> Add user</Button>
+        <Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add user</Button>
       </DialogTrigger>
       <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Add user</DialogTitle></DialogHeader>

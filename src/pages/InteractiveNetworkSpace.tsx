@@ -27,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import {
   RefreshCw,
   Network,
@@ -36,7 +37,14 @@ import {
   HelpCircle,
   Target,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER } from '@/components/shared';
+import {
+  PageLayout,
+  PageHeader,
+  ProjectSelector,
+  PAGE_GUTTER,
+  HDR_OUTLINE_BUTTON,
+  HDR_PROJECT_SELECT,
+} from '@/components/shared';
 
 const NODE_TYPE_COLORS: Record<string, string> = {
   supplier: '#2563eb',   // Blue - suppliers (leftmost)
@@ -826,9 +834,58 @@ Result: We return the induced subgraph (nodes + edges) matching your filters, la
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
-        <PageHeader 
-          title="Interactive Network Space" 
-          subtitle="Advanced network exploration with intelligent search and subgraph extraction"
+        {/* The three controls that sit in a "Controls" row under the search
+            card are the bar's right slot from `md` up (handoff, Interactive
+            Network Space row): Show Labels · Refresh · project select. Same
+            handlers, same conditions — only their home and their height
+            change, and the project select becomes the product-wide 200 × 36
+            box instead of this page's one-off <ProjectSelector>.
+
+            This page renders one tree at both widths and the handoff is
+            desktop-only, so the move is a `md:contents` / `md:hidden` pair:
+            above `md` these three are the header's slot and the Controls row
+            is gone; below it the row is exactly what it was and the header is
+            title-only. */}
+        <PageHeader
+          title="Interactive Network Space"
+          rightContent={
+            <span className="hidden md:contents">
+              <Button
+                onClick={() => setShowLabels(!showLabels)}
+                variant="outline"
+                size="sm"
+                className={cn('gap-2', HDR_OUTLINE_BUTTON)}
+              >
+                <Tag className="h-4 w-4" />
+                {showLabels ? 'Hide Labels' : 'Show Labels'}
+              </Button>
+              <Button
+                onClick={fetchData}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                className={cn('gap-2', HDR_OUTLINE_BUTTON)}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Select
+                value={globalSelectedProjectId || ''}
+                onValueChange={setGlobalSelectedProjectId}
+              >
+                <SelectTrigger className={cn('h-9', HDR_PROJECT_SELECT)}>
+                  <SelectValue placeholder="Select Project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </span>
+          }
         />
 
         <div className="flex gap-4 overflow-hidden">
@@ -892,8 +949,9 @@ Result: We return the induced subgraph (nodes + edges) matching your filters, la
               </CardContent>
             </Card>
 
-            {/* Controls */}
-            <div className="flex gap-2 items-center">
+            {/* Controls — below `md` only; above it these three live in the
+                page header (see PageHeader above). */}
+            <div className="flex items-center gap-2 md:hidden">
               <ProjectSelector
                 projects={projects}
                 selectedProjectId={globalSelectedProjectId}

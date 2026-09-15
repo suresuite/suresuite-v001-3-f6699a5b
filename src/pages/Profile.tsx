@@ -138,6 +138,10 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
+        {/* Title only on desktop — the handoff's bar has no subtitle element.
+            The prop stays because this page renders one tree at both widths and
+            PageHeader hides the line from `md` up; deleting it here would take
+            the phone's context line with it. */}
         <PageHeader title="My Profile" subtitle="Manage your account, contact info, and password." />
 
 

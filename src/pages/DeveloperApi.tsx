@@ -1132,12 +1132,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
       <div className={PAGE_GUTTER}>
-        <PageHeader
-          title="Developer API"
-          subtitle="Drive SuReSuite programmatically — API keys, scopes, and quickstarts for the /v1 gateway"
-          onRefresh={load}
-          refreshLoading={loading}
-        />
+        <PageHeader title="Developer API" onRefresh={load} refreshLoading={loading} />
 
         <Tabs defaultValue="keys" className="space-y-4">
           {/* Black-pill active tab (bg-foreground text-background), sharp corners */}

@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Eye, EyeOff, Loader2, Lock, ShieldCheck, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { HDR_OUTLINE_BUTTON } from '@/components/shared';
 import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -130,18 +131,21 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
   }, [data]);
 
   const title = data ? data.name || data.email || 'User access' : 'User access';
-  const subtitle = data ? (
-    <span className="inline-flex items-center gap-2">
+  /* The desktop header is title + right slot and nothing else, so this user's
+     identity line is the body's first band rather than a header subtitle. It
+     is the one thing on this screen that says WHICH user the capability
+     matrices below belong to, so it moves rather than being dropped. */
+  const identityLine = data ? (
+    <span className="inline-flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
       <span>{data.email}</span>
       <MonoChip>{data.role.replace('_', ' ')}</MonoChip>
       {data.is_super_admin && <span className="inline-flex items-center gap-1 rounded-sm bg-[#bf2330]/10 px-1.5 py-0.5 font-mono text-[10px] text-[#bf2330]"><ShieldCheck className="h-3 w-3" /> super admin</span>}
     </span>
-  ) : 'Loading…';
+  ) : null;
 
   return (
     <AdminLayout
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title={title}
-      subtitle={subtitle}
       /* The one admin screen with a real parent route, so it gets the header's
          own back affordance below `md` (spec §4.1) instead of a third text
          button competing with the title for a 390px row. The desktop Back
@@ -151,11 +155,11 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
       backLabel="Back to users"
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="rounded-sm" onClick={() => setPreview((p) => !p)}>
-            {preview ? <EyeOff className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}{preview ? 'Hide preview' : 'Preview as user'}
+          <Button variant="outline" size="sm" className={cn('gap-1 rounded-sm', HDR_OUTLINE_BUTTON)} onClick={() => setPreview((p) => !p)}>
+            {preview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{preview ? 'Hide preview' : 'Preview as user'}
           </Button>
           <span className="hidden md:contents">
-            <Button variant="outline" size="sm" className="rounded-sm" onClick={() => navigate('/admin/users')}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button>
+            <Button variant="outline" size="sm" className={cn('gap-1 rounded-sm', HDR_OUTLINE_BUTTON)} onClick={() => navigate('/admin/users')}><ArrowLeft className="h-4 w-4" />Back</Button>
           </span>
         </div>
       }
@@ -167,6 +171,7 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
       ) : !data ? null : (
         <div className={`grid gap-5 ${preview ? 'md:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
           <div className="space-y-4">
+            {identityLine && <div className="-mt-1">{identityLine}</div>}
             <Section title="Pages"><CapMatrix rows={pages} isSuper={isSuper} onSet={setOverride} /></Section>
             <Section title="Features"><CapMatrix rows={features} isSuper={isSuper} onSet={setOverride} /></Section>
 

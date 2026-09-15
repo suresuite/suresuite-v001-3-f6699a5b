@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PAGE_GUTTER_BLEED, PAGE_GUTTER_SKIN_BLEED } from './PageBody';
+import { HDR_ICON_BUTTON } from './headerControls';
 import { useCompactChrome } from '@/hooks/useViewport';
 
 // The app header, published as three class constants.
@@ -19,21 +20,82 @@ import { useCompactChrome } from '@/hooks/useViewport';
 // computes `overflow-y: auto`, making that wrapper a scroll container that
 // never scrolls, and a sticky child of a scrollport that does not move never
 // sticks. Change that class and every header in the product silently unpins.
+//
+// From `md` up the bar is the unified desktop header (handoff "Unified Desktop
+// Page Header"): flat `--background`, no tint and no backdrop-blur, and one
+// `--border` hairline underneath — nothing else. Below `md` the mobile chrome
+// is byte-identical to what it was; every desktop value is added as an `md:`
+// term rather than by replacing the mobile one.
 export const PAGE_HEADER_SHELL =
-  'sticky top-0 z-40 bg-header-background/95 backdrop-blur-md border-b border-header-border';
+  'sticky top-0 z-40 bg-header-background/95 backdrop-blur-md border-b border-header-border ' +
+  'md:bg-background md:backdrop-blur-none md:border-border';
 
 // ROW is the app gutter (PageBody's clamp, term for term) plus the header's
 // own vertical rhythm and the gap between back / title / actions.
+//
+// The desktop terms are the handoff's bar: 52px min-height (fluid — it grows
+// rather than clips when the right slot wraps), a 24px gutter, 8px of vertical
+// padding so a 36px control clears the 52px bar, and 12px between the title and
+// the slot.
 export const PAGE_HEADER_ROW =
-  'flex items-center gap-2 px-[clamp(0.75rem,4vw,1.125rem)] py-2.5 md:gap-4 md:px-8 md:py-3.5';
+  'flex items-center gap-2 px-[clamp(0.75rem,4vw,1.125rem)] py-2.5 ' +
+  'md:min-h-[52px] md:flex-wrap md:gap-3 md:px-6 md:py-2';
 
 // TITLE is the one page-title scale: --fs-page-title on mobile (spec 2.2),
 // the audit's 15px from `md` up.
 export const PAGE_HEADER_TITLE =
-  'text-[length:var(--fs-page-title)] md:text-[15px] font-semibold text-foreground leading-tight truncate';
+  'text-[length:var(--fs-page-title)] md:text-[15px] md:tracking-[-0.019em] font-semibold text-foreground leading-tight truncate';
+
+/**
+ * The header's refresh control, published so a page can place it where the
+ * handoff's slot order puts it: page-specific controls · refresh · project
+ * select · primary action last.
+ *
+ * `<PageHeader onRefresh>` renders this first in the slot, which is the right
+ * position on every page whose slot is refresh + project select. The five
+ * surfaces that ship controls BEFORE refresh (the three network lenses, admin
+ * Users, admin Projects) compose it themselves instead, so there is still one
+ * refresh button in the product rather than six near-copies of one.
+ *
+ * 36 × 36 from `md` up, the 44px touch target below it, `animate-spin` and
+ * `disabled` while the page's loading flag is true.
+ */
+export function HeaderRefreshButton({
+  onClick,
+  loading = false,
+  label = 'Refresh data',
+  className,
+}: {
+  onClick: () => void;
+  loading?: boolean;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <Button
+      onClick={onClick}
+      disabled={loading}
+      variant="outline"
+      size="icon"
+      className={cn('h-11 w-11', HDR_ICON_BUTTON, className)}
+      aria-label={label}
+      title={label}
+    >
+      <RefreshCw className={cn('h-3.5 w-3.5 md:h-4 md:w-4', loading && 'animate-spin')} />
+    </Button>
+  );
+}
 
 interface PageHeaderProps {
   title: string;
+  /**
+   * Mobile-only from the desktop header handoff on. The desktop bar is title +
+   * right slot and nothing else — no subtitle element, no meta line — so this
+   * renders `md:hidden`. The prop survives because two surfaces (Profile,
+   * Interactive Network Space) still render one tree at both widths and would
+   * otherwise lose their phone context line; every desktop-only call site has
+   * dropped it.
+   */
   subtitle?: React.ReactNode;
   rightContent?: React.ReactNode;
   onRefresh?: () => void;
@@ -132,14 +194,17 @@ export function PageHeader({
           >
             {title}
           </h1>
-          {/* The skin drops the subtitle below `md` rather than shrinking it:
-              a second line of chrome is a band the budget does not have (§4).
-              It is not deleted — desktop still renders it. */}
+          {/* The desktop bar has no subtitle element at all (handoff: "Header =
+              title + right slot, nothing else"), so this is `md:hidden`. The
+              skin drops it below `md` too rather than shrinking it — a second
+              line of chrome is a band the phone budget does not have (§4) —
+              which leaves it rendering on exactly one surface: an unconverted
+              page viewed on a phone. */}
           {subtitle && (
             <div
               className={cn(
-                'mt-0.5 truncate text-[12px] text-muted-foreground',
-                skin && 'hidden md:block',
+                'mt-0.5 truncate text-[12px] text-muted-foreground md:hidden',
+                skin && 'hidden',
               )}
             >
               {subtitle}
@@ -147,32 +212,29 @@ export function PageHeader({
           )}
         </div>
 
-        {/* Right slot: 44px touch floor below `md` (spec §0.3 amendment 2),
-            the audit's h-8 buttons / h-9 selects from `md` up (C3). The floor
-            is min-height/min-width so it can never shrink a control that is
-            already larger, and it is released at `md` rather than overridden.
-            Inputs and selects are covered too — the admin search fields live
-            here and a thumb has to hit them like anything else. */}
+        {/* Right slot: 44px touch floor below `md` (spec §0.3 amendment 2), the
+            handoff's one control height — 36px, 8px apart — from `md` up. The
+            floor is min-height/min-width so it can never shrink a control that
+            is already larger, and it is released at `md` rather than
+            overridden. Inputs and selects are covered too — the admin search
+            fields live here and a thumb has to hit them like anything else.
+
+            `md:flex-wrap` is what makes the 52px bar fluid rather than
+            clipping: a slot too wide for its row wraps and the bar grows,
+            which is why the height is a `min-h` and not an `h`. */}
         <div
           className={cn(
-            'flex items-center gap-1.5 shrink-0 md:gap-2',
+            'flex items-center gap-1.5 shrink-0 md:gap-2 md:flex-wrap md:justify-end',
             '[&_button]:min-h-11 [&_button]:min-w-11 [&_input]:min-h-11 [&_select]:min-h-11',
             'md:[&_button]:min-h-0 md:[&_button]:min-w-0 md:[&_input]:min-h-0 md:[&_select]:min-h-0',
           )}
         >
-          {onRefresh && (
-            <Button
-              onClick={onRefresh}
-              disabled={refreshLoading}
-              variant="outline"
-              size="icon"
-              className="h-11 w-11 md:h-8 md:w-8"
-              aria-label="Refresh data"
-              title="Refresh data"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshLoading ? 'animate-spin' : ''}`} />
-            </Button>
-          )}
+          {/* The bar's order is page controls · refresh · project select ·
+              primary action. Refresh renders first here, which is correct for
+              every page whose slot is refresh + project select. A page with
+              controls BEFORE refresh composes `HeaderRefreshButton` inside
+              `rightContent` instead of passing `onRefresh`. */}
+          {onRefresh && <HeaderRefreshButton onClick={onRefresh} loading={refreshLoading} />}
           {rightContent}
         </div>
       </div>

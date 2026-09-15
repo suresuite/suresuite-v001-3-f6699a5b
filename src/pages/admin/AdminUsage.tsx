@@ -8,10 +8,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { AdminMobileList, SURFACE, KX, TH, TD, ROW_HOVER, StatusDot, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters, type DotTone } from '@/components/admin/adminUi';
-import { TableBlock, FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
+import { TableBlock, FROZEN_CELL, FROZEN_CELL_ON_TINT, HDR_OUTLINE_BUTTON } from '@/components/shared';
 import { MobileSheet } from '@/components/shared/MobileSheet';
 import { M, MobileRow } from '@/components/mobile';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { cn } from '@/lib/utils';
 import { useRowBudget } from '@/hooks/useViewport';
 import { aggregateMatrixByModel, type ModelCapabilityRow, type ModelMatrixAggregate } from '@/lib/modelMatrix';
 
@@ -88,7 +89,8 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
   return (
     <AdminLayout
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="AI Usage" onRefresh={load} refreshLoading={loading}
-      actions={<Button variant="outline" size="sm" className="rounded-sm" onClick={exportCsv}>Export CSV</Button>}
+      /* Outline, not primary: an export is not a creation. */
+      actions={<Button variant="outline" size="sm" className={cn('rounded-sm', HDR_OUTLINE_BUTTON)} onClick={exportCsv}>Export CSV</Button>}
     >
       {isMobile ? (
         <AdminMobileList

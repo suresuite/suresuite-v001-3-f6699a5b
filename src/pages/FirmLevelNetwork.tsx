@@ -35,8 +35,20 @@ import {
   Map,
   Building2,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
+import {
+  PageLayout,
+  PageHeader,
+  HeaderRefreshButton,
+  PAGE_GUTTER,
+  PAGE_GUTTER_SKIN,
+  HDR_ICON_BUTTON,
+  HDR_ICON_BUTTON_ON,
+  HDR_OUTLINE_BUTTON,
+  HDR_PROJECT_SELECT,
+  HDR_SEARCH_INPUT,
+} from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { cn } from '@/lib/utils';
 import MLPrediction from '@/components/MLPrediction';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 // mapbox-gl and its CSS are ~200 kB gzipped and only reachable from here and
@@ -1173,11 +1185,12 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
       )}
       <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
         {!isMobile && (
+        /* Refresh is composed inside `rightContent` rather than passed as
+           `onRefresh`, because the handoff's slot order puts it after this
+           page's own graph controls and before the project select. Same
+           button, same handler — see HeaderRefreshButton. */
         <PageHeader
           title="Firm-Level Network Intelligence"
-          subtitle={`Deep-tier network of ${tierCounts['Tier 1']} Tier 1, ${tierCounts['Tier 2']} Tier 2, ${tierCounts['Tier 3']} Tier 3 suppliers, and ${tierCounts['Plant']} plant${tierCounts['Plant'] !== 1 ? 's' : ''}`}
-          onRefresh={fetchData}
-          refreshLoading={loading}
           rightContent={
             /* `gap-2` rather than `space-x-2`: `space-x-*` puts its margin on
                the DOM children, so it would land on the `md:contents` wrapper
@@ -1199,10 +1212,14 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   onClick={() => setDisruptionDialogOpen(true)}
                   variant="outline"
                   size="sm"
-                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  className={cn(
+                    'gap-1 text-orange-600 hover:bg-orange-50 hover:text-orange-700',
+                    HDR_OUTLINE_BUTTON,
+                    'md:text-[#ea580c] md:hover:text-[#ea580c]',
+                  )}
                 >
                   <AlertTriangle className="h-4 w-4" />
-                  <span className="hidden sm:inline ml-1">Add Disruption</span>
+                  <span className="hidden sm:inline">Add Disruption</span>
                 </Button>
               )}
               
@@ -1212,7 +1229,11 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   <input
                     autoFocus
                     type="text"
-                    className="h-9 min-h-11 md:min-h-0 pl-9 pr-3 border border-border rounded-md text-sm bg-background focus:outline-none w-full"
+                    className={cn(
+                      'h-9 min-h-11 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm focus:outline-none',
+                      HDR_SEARCH_INPUT,
+                      'md:pl-9',
+                    )}
                     placeholder="find a firm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -1222,8 +1243,11 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
               ) : (
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
+                  className={HDR_ICON_BUTTON}
                   onClick={() => setSearchOpen(true)}
+                  aria-label="Search"
+                  title="Search"
                 >
                   <Search className="h-4 w-4" />
                 </Button>
@@ -1231,36 +1255,49 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
               <Button
                 variant={showAnalytics ? 'default' : 'outline'}
-                size="sm"
+                size="icon"
+                className={cn(HDR_ICON_BUTTON, showAnalytics && HDR_ICON_BUTTON_ON)}
                 onClick={() => setShowAnalytics(!showAnalytics)}
+                aria-label="Analytics"
+                title="Analytics"
               >
                 <BarChart className="h-4 w-4" />
               </Button>
 
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
+                className={HDR_ICON_BUTTON}
                 onClick={recalculateProminence}
                 disabled={loading || recalculatingProminence || !globalSelectedProjectId}
+                aria-label="Recalculate prominence"
+                title="Recalculate prominence"
               >
                 <RotateCcw className={`h-4 w-4 ${recalculatingProminence ? 'animate-spin' : ''}`} />
               </Button>
 
               <Button
                 variant={viewMode === 'map' ? 'default' : 'outline'}
-                size="sm"
+                size="icon"
+                className={cn(HDR_ICON_BUTTON, viewMode === 'map' && HDR_ICON_BUTTON_ON)}
                 onClick={() => setViewMode(viewMode === 'network' ? 'map' : 'network')}
+                aria-label={viewMode === 'network' ? 'Map view' : 'Network view'}
+                title={viewMode === 'network' ? 'Map view' : 'Network view'}
               >
                 {viewMode === 'network' ? <Map className="h-4 w-4" /> : <Network className="h-4 w-4" />}
               </Button>
 
               </span>
 
+              <HeaderRefreshButton onClick={fetchData} loading={loading} />
+
               <Select value={globalSelectedProjectId || ''} onValueChange={setGlobalSelectedProjectId}>
                 {/* Case A select (spec 2.1 / parity plan G3): the vw term
                     exceeds 180px at every width from 768 up, so the clamp
-                    resolves to the desktop literal without an `md:`. */}
-                <SelectTrigger className="w-[clamp(120px,38vw,180px)] h-9">
+                    resolves to the desktop literal without an `md:`. The
+                    handoff raises that desktop literal to the product-wide
+                    200px project select. */}
+                <SelectTrigger className={cn('h-9 w-[clamp(120px,38vw,180px)]', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>

@@ -1,5 +1,16 @@
 export { PageLayout } from './PageLayout';
-export { PageHeader } from './PageHeader';
+export { PageHeader, HeaderRefreshButton } from './PageHeader';
+export {
+  HDR_ICON_BUTTON,
+  HDR_ICON_BUTTON_ON,
+  HDR_OUTLINE_BUTTON,
+  HDR_PRIMARY_BUTTON,
+  HDR_GHOST_BUTTON,
+  HDR_PROJECT_SELECT,
+  HDR_FILTER_SELECT,
+  HDR_SEARCH_INPUT,
+  HDR_SEGMENTED,
+} from './headerControls';
 export {
   PageBody,
   PAGE_GUTTER,

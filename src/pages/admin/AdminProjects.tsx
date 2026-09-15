@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ArrowRightLeft, Copy, Loader2, MoreHorizontal, Pencil, Settings2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DIALOG_AS_SHEET } from '@/components/shared';
+import { DIALOG_AS_SHEET, HDR_SEARCH_INPUT } from '@/components/shared';
 import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -93,8 +93,17 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Projects"
       onRefresh={load} refreshLoading={loading}
       /* Same fixed-width overflow as /admin/users: the clamp reaches the 256px
-         desktop width at 610px, so `md:w-64` is what actually renders there. */
-      actions={<Input placeholder="Search name, org, owner, plant…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-h-11 w-[clamp(130px,42vw,256px)] rounded-sm md:min-h-0 md:w-64" />}
+         desktop width at 610px, so `md:w-64` is what actually renders there.
+         `search` rather than `actions` so it lands before the refresh button,
+         which is the handoff's order for this section. */
+      search={
+        <Input
+          placeholder="Search name, org, owner, plant…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className={cn('h-8 min-h-11 w-[clamp(130px,42vw,256px)] rounded-sm md:w-64', HDR_SEARCH_INPUT)}
+        />
+      }
     >
       {isMobile ? (
         <AdminMobileList

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { HDR_PROJECT_SELECT, HDR_SEGMENTED } from "@/components/shared/headerControls";
 import { PAGE_GUTTER_SKIN } from "@/components/shared/PageBody";
 import {
   M,
@@ -13,6 +14,7 @@ import {
   ProjectChip,
 } from "@/components/mobile";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Segmented } from "@/components/intelligence/piUi";
@@ -29,11 +31,7 @@ import { FocusedStage } from "@/components/policies/FocusedStage";
 import { GuidePanel } from "@/components/policies/GuidePanel";
 import { VerifiableExportsSection } from "@/components/policies/VerifiableExportsSection";
 import { DataMapGrid } from "@/components/policies/DataMapGrid";
-import {
-  PolicySetupBar,
-  policyContextLine,
-  type PlanningUnit,
-} from "@/components/policies/PolicySetupBar";
+import { PolicySetupBar, type PlanningUnit } from "@/components/policies/PolicySetupBar";
 import {
   formatVersionWhen,
   PolicyHistorySheet,
@@ -273,23 +271,18 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
       )}
       <div className={PAGE_GUTTER_SKIN}>
         {!isMobile && (
+          /* Title + right slot, nothing else: the plant / model / BOM context
+             line the header used to carry is the body's own PolicySetupBar
+             concern, not the bar's. */
           <PageHeader
             title="Supply chain policies"
-            subtitle={policyContextLine({
-              plant: ctx?.plant_name || selectedProject?.plant_name || "—",
-              model: selectedProject?.supply_chain_model || "—",
-              bom: selectedProject?.bom_level || "—",
-              suppliers: ctx?.supplier_count ?? 0,
-              plants: ctx?.plant_count ?? 0,
-              customers: ctx?.customer_count ?? 0,
-              strategy: fulfillmentStrategy,
-            })}
             rightContent={
               <>
                 <Segmented<"stages" | "guide" | "datamap">
                   size="sm"
                   value={tab}
                   onChange={setTab}
+                  className={HDR_SEGMENTED}
                   options={[
                     { value: "stages", label: "Policies" },
                     { value: "guide", label: "Guide" },
@@ -300,7 +293,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                   value={projectId || ""}
                   onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
                 >
-                  <SelectTrigger className="h-8 w-[210px] gap-1.5">
+                  <SelectTrigger className={cn("h-8 w-[210px] gap-1.5", HDR_PROJECT_SELECT)}>
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>

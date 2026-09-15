@@ -4,6 +4,8 @@ import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { HDR_PROJECT_SELECT } from "@/components/shared/headerControls";
+import { cn } from "@/lib/utils";
 import { PAGE_GUTTER } from "@/components/shared/PageBody";
 import { toast } from "sonner";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -406,8 +408,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                 {/* §2.4/G3 Case A: the right slot is `shrink-0` beside a
                     truncating title, so a fixed 200px starves the title at
                     320px. 42vw exceeds 200px from 477px up, which pins the
-                    desktop literal without a second breakpoint. */}
-                <SelectTrigger className="w-[clamp(130px,42vw,200px)] h-9">
+                    desktop literal without a second breakpoint. The desktop
+                    header handoff makes that literal the product-wide project
+                    select — 200 × 36 with the `--border-strong` hairline. */}
+                <SelectTrigger className={cn('h-9 w-[clamp(130px,42vw,200px)]', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
