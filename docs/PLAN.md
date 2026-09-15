@@ -2407,7 +2407,32 @@ Exit checks passed? **all four.**
   was regenerated on purpose, so the freshness rule could not be what failed) and
   step 6 *"Sidecars validate against the schema"* **failed** on `column
   "scratch_column" has no field entry`. A gate that is not wired is not a gate;
-  this one is wired.
+  this one is wired. **The whole job green**, all eleven steps, on
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35023287328>.
+- ✅ **The `risk_data` migration applies to the LIVE database**, not only to a
+  replay —
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35023145717>,
+  `Applying migration 20260915000003_risk_data.sql... Finished supabase db push.`
+  The adoption block ran against the untracked production table, and the renames,
+  the provenance columns, the `NOT VALID` CHECKs and the unique constraint all
+  landed. This is the first exit check in Phase 1 verified against a database
+  rather than against an argument.
+
+**The gate found its own package's blind spot within two hours of existing, and it
+found it on `main`.** PR #194 merged at a commit where
+`build/schema.introspected.json` was stale, and
+<https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35009405228>
+went red on `main` with `SCHEMA DRIFT`. The cause is the merge described at the top
+of this entry: `6ddb92a` brought in `loudFailure.test.ts`, which contains a literal
+`.from('product_code_map')`, and the introspector scans application code for
+exactly that — so the committed artifact's orphan list changed under a commit that
+touched no migration. Fixed in the follow-up (PR #196), and worth stating plainly
+rather than tidying away: **this is the gate working.** The same drift happened
+before WP 1.4 — the boundary entry's point 3, "committed stale; nothing noticed
+because `contract:introspect -- --check` runs in no CI job" — and nothing said so
+for a day. It is also the sharpest available argument for the no-path-filter
+decision above: a filter on `supabase/migrations/**` would have skipped that run
+entirely.
 
 **THE ITEM MASTERS ARE NOT KNOWN TO HAVE RLS OFF. WP 1.2 SAID THEY WERE, AND IT
 WAS WRONG.** The three sidecars asserted `rls_enabled: false` with the note "No
