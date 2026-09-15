@@ -182,7 +182,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D1 | Auto-seed persists `safety_stock_days = 0`, overriding the engine's 7-day default | was `useStageRows.tsx:288` + `StagePolicyTable.tsx:844,887`; `project_map.py:783` | WP 0.1 ✅ *(`isPrefillPersistable`)* |
 | D2 | `combine-project` never converts `volume` by `time_unit` | was `combine-project/index.ts:60,68,268,275` + `:115,:234-235,:310,:318` — **eight** read sites, not seven | WP 0.2 ✅ |
 | D3 | `product_code_map` queried but exists in no migration; error swallowed | was `combine-project/index.ts:131-145`; the decision is recorded at `combine-project/index.ts:117-140` | WP 1.4 ✅ *(branch DELETED — it had never executed; no upload path, no writer, no template column ever existed for the table)* |
-| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(real migration `20260915000003_risk_data.sql`: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted. No `project_id` — deliberately: country risk is a property of the world)* |
+| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names. **It is not absent — it exists untracked in production**, which a static replay cannot distinguish from absent (CI proved it; §16 WP 1.4) | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(`20260915000003_risk_data.sql` both CREATEs on a fresh database and ADOPTS the untracked one: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted, CHECKs `NOT VALID` on the adopted rows. No `project_id` — deliberately: country risk is a property of the world)* |
 | D5 | No natural-key uniqueness on any lane table → re-upload duplicates | `20250820145837_…sql` | WP 3.3 |
 | D6 | CSV parse is `split(',')` — not quote-safe | `UploadWizard.tsx:477,498` | WP 3.2 |
 | D7 | Required-field validation misses `null` (blank numerics pass) | `UploadWizard.tsx:369` vs `:505,508` | WP 3.2 |
@@ -2145,8 +2145,14 @@ Exit checks passed? **all four.**
   → `introspect --check` fails (stale artifact). WITH the artifact regenerated →
   `contract:validate` and `contract:generate --check` both fail on `column
   "scratch_column" has no field entry`. The second is the one that matters: it is
-  the coverage rule, not the freshness rule. CI run URL for the throwaway PR:
-  `<ci-url>`.
+  the coverage rule, not the freshness rule.
+  **And it is proved in CI, not only locally** — throwaway PR #195, run
+  <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/34995780231>:
+  step 5 *"Introspected schema matches the migrations"* **passed** (the artifact
+  was regenerated on purpose, so the freshness rule could not be what failed) and
+  step 6 *"Sidecars validate against the schema"* **failed** on `column
+  "scratch_column" has no field entry`. A gate that is not wired is not a gate;
+  this one is wired.
 
 **THE ITEM MASTERS ARE NOT KNOWN TO HAVE RLS OFF. WP 1.2 SAID THEY WERE, AND IT
 WAS WRONG.** The three sidecars asserted `rls_enabled: false` with the note "No
@@ -2267,16 +2273,74 @@ Discovered:
   red job on main and still **not this package's** — `data-contract.yml` does not
   run `audit:ui`, and nothing here touches the adaptive-UI baseline.
 
-Baseline numbers (if run): **NOT RUN — a fifth consecutive session, and this time
-with a reason rather than an absence.** No Supabase credentials exist in the
-environment (`.env.production` carries three `VITE_*` feature flags and nothing
-else), and the hardcoded anon key cannot be used either: the egress proxy
-**denies CONNECT to `wckdrutwkytwcomrlpib.supabase.co:443` by organization
-policy**. This is no longer "no database was reachable"; it is "this class of
-session cannot reach one, and will not be able to next time either." §15 needs a
-run from somewhere with network access to the project, and until it does, every
-statement in this plan about ROW COUNTS is unverified — including, now, the only
-way to settle whether RLS is on for the three item masters.
+**`risk_data` IS NOT ABSENT. IT EXISTS IN PRODUCTION, UNTRACKED — and CI is how
+we know.** The first version of `20260915000003_risk_data.sql` was a plain
+`CREATE TABLE IF NOT EXISTS`, on the reasonable-sounding premise that a table no
+migration creates is a table that does not exist. `supabase-migrations.yml`
+disproved it in one line on the first push
+(<https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/34995665498>):
+
+```
+Applying migration 20260915000003_risk_data.sql...
+ERROR: column "source" of relation "public.risk_data" does not exist
+At statement: 2
+```
+
+Statement 1 was the CREATE; `IF NOT EXISTS` made it a **no-op**, because the
+table is already there with the spreadsheet-header columns the pages read. It is
+the same class as `approved_users`, and **the introspector cannot tell the two
+apart**: "no migration creates this table" is true of a table that does not exist
+AND of a table nobody wrote a migration for. WP 1.1's orphan list is therefore a
+list of *untracked-or-absent*, and reading it as *absent* is what this package did
+until CI said otherwise.
+
+The migration now does both jobs and labels them: CREATE for a fresh database, and
+an `EXECUTE`-guarded adoption for the untracked one — renames the quoted columns,
+adds the provenance columns, and marks the pre-contract rows
+`source: 'unrecorded (loaded before the reference-tier contract)'` rather than
+inventing a publisher for them. The new CHECKs land `NOT VALID` on adopted rows:
+enforced for every future write, never retroactively asserted about rows nobody
+has looked at. The UNIQUE is wrapped in an exception handler that WARNs rather
+than blocking every later migration behind a data question. `EXECUTE` is used
+deliberately, not stylistically — a guarded `IF … THEN ALTER TABLE … RENAME
+COLUMN` is unwrapped by the DO descent and applied UNCONDITIONALLY by the replay,
+where the legacy column does not exist, so the artifact would be wrong about the
+very schema the file defines. Opacity to the replay is now RECORDED
+(`dynamic_ddl`) rather than silently dropped, which is what makes that an
+acceptable trade rather than a hiding place.
+→ affects **WP 2.1 and WP 3.1**: any table on their deferred lists may also exist
+untracked. Plan edited (§4 D4).
+
+**`supabase-migrations.yml` marks new `2025*` migrations APPLIED without running
+them.** Its repair step runs `supabase migration repair --status applied` over
+every file matching `^(2025|20260527|20260607|20260609)`, so
+`20250815000000_approved_users_base.sql` was stamped applied and never executed
+against production. That is CORRECT here — the table exists, the file is
+`IF NOT EXISTS`, and running it would be a no-op — and it is a trap for anyone
+who later assumes a migration with a 2025 timestamp has run. A fresh database
+built from `supabase/migrations/` does execute it, which is the whole point of
+the file.
+
+Baseline numbers (if run): **NOT RUN — a fifth consecutive session. But the reason
+the four before this one recorded is now known to be too strong.** No Supabase
+credentials exist in this environment (`.env.production` carries three `VITE_*`
+feature flags and nothing else) and the egress proxy **denies CONNECT to
+`wckdrutwkytwcomrlpib.supabase.co:443` by organization policy**, so no
+work-package SESSION can reach the database. **CI can.**
+`supabase-migrations.yml` links to the project and runs `supabase db push` against
+it on every push, with `SUPABASE_ACCESS_TOKEN` and the database password in
+Actions secrets — which is how the `risk_data` finding above surfaced at all. So
+§15 is not blocked on access; it is blocked on nobody having written the job.
+→ **A `workflow_dispatch` job that runs §15's queries and uploads the counts as an
+artifact is the route**, and it is a decision for someone with authority over the
+data rather than for a session: §15's output is row counts and sample identifiers
+from a live project, and a public Actions log is not where those belong. Recorded
+so the next package stops repeating "no database is reachable" — the accurate
+statement is "no session is; CI is; and the job that would use it has not been
+written."
+
+Until it is, every statement in this plan about ROW COUNTS is unverified —
+including the only way to settle whether RLS is on for the three item masters.
 
 Handoff to WP 2.1 (and Phase 2):
 - **`npm run contract:check` is the one command.** It is green at the end of this
@@ -2294,6 +2358,14 @@ Handoff to WP 2.1 (and Phase 2):
 - **The invariants have names now** (`single-source`, `natural-key`, `audit-actor`,
   `uuid-identity`, …) and `CLAUDE.md` carries them with where each is enforced
   today. Cite the name. `G1`–`G4` still mean two different things on one page.
+- **An orphan is "untracked OR absent", never just "absent".** `risk_data` was read
+  as absent by WP 0.2, by this package's first draft, and by the introspector
+  itself, and it exists. Before writing a migration for a table on the deferred
+  list, assume it may already be there and make the file adopt as well as create.
+- **`data-contract.yml` did not run on PR #194**, the PR that introduces it, and
+  did run on PR #195, whose base branch already carries it. Once #194 is on `main`
+  every later PR gets the gate; until then the proof is #195's run. Do not read
+  #194's short check list as the gate passing.
 - **`contract:introspect -- --check` is sensitive to application-code line
   numbers.** If you move code in `src/` or `supabase/functions/`, run
   `npm run contract:introspect` and commit the artifact. This is a real cost of

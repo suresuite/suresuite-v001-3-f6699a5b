@@ -4968,7 +4968,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "The second of WP 1.4's three orphans (D4). Two network pages read it and no migration created it, so the read failed and every node rendered \"Unknown\" with nothing on screen to say a dimension was missing. Kept rather than deleted, and given the four provenance columns the reference tier requires: `20260915000003_risk_data.sql` says why in full."
+      "note": "The second of WP 1.4's three orphans (D4), and the one that turned out not to be an orphan at all. Two network pages read it and no migration created it — but the table EXISTS in the production database, untracked, with the spreadsheet-header columns `COUNTRY` and `\"RISK CLASS\"`. CI proved it: the first version of the migration was a plain `CREATE TABLE IF NOT EXISTS`, which no-opped, and the next statement failed on a column that was not there. Same class as `approved_users`: created outside migration tracking, invisible to a static replay, which can only tell you no migration creates a table and not whether one exists. `20260915000003_risk_data.sql` now both builds it on a fresh database and ADOPTS the one already there — renaming the quoted columns, adding the provenance columns, and marking the pre-contract rows `source: 'unrecorded (loaded before the reference-tier contract)'` rather than inventing a publisher for them. The new CHECKs land `NOT VALID` on the adopted table: enforced for every future write, not retroactively asserted about rows nobody has looked at."
     },
     "suppliers": {
       "table": "suppliers",
@@ -6849,5 +6849,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "ac6104c8fbc9"
+  "contract_version": "7468a2c78304"
 }
