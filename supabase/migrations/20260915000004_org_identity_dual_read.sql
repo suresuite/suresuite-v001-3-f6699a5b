@@ -63,7 +63,15 @@ BEGIN
     ]) t
    WHERE to_regclass('public.' || t) IS NULL;
   IF missing IS NOT NULL THEN
-    RAISE NOTICE 'tables this migration touches that were ABSENT before it ran: %', missing;
+    -- EXCEPTION, not NOTICE. The Supabase CLI's `db push` log captures ERROR lines
+    -- and drops NOTICEs, so a notice here is invisible exactly where it is needed —
+    -- and the alternative is learning the set one aborted statement per deploy,
+    -- which is how D32 was found and then how `tier2_suppliers` was found after it.
+    -- Failing here names ALL of them at once, before anything has been attempted.
+    RAISE EXCEPTION 'this database is missing % table(s) that this migration needs: %. '
+                    'Adopt them (CREATE TABLE IF NOT EXISTS, verbatim from their '
+                    'original migration) the way network_summary is adopted below — '
+                    'see D32 and PLAN.md §16.', array_length(missing, 1), missing;
   END IF;
 END
 $preflight$;
