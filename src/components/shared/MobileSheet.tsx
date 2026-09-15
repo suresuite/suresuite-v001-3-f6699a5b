@@ -166,7 +166,16 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
           {children}
         </div>
         {footer && (
-          <div className="flex shrink-0 gap-2 border-t border-[#ebebeb] px-3 py-2.5">{footer}</div>
+          // `shrink-0` keeps the bar at its height when the rows above are
+          // long — it is chrome, which is what §2.5 allows it on. The slot
+          // itself then gets the OTHER half of §2.5: a flex child holding
+          // caller-supplied content needs `min-w-0`, or a long button label
+          // inside it widens the bar instead of truncating.
+          <div className="flex shrink-0 border-t border-[#ebebeb] px-3 py-2.5">
+            <div className="flex min-w-0 flex-1 gap-2">
+              {footer}
+            </div>
+          </div>
         )}
       </div>
     </div>
