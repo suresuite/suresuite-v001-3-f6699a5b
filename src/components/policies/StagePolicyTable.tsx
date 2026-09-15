@@ -49,6 +49,7 @@ import {
 } from "@/lib/policies/resolveEffective";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
+import { isPrefillable } from "@/lib/policies/prefillSelect";
 import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
@@ -810,7 +811,20 @@ export function StagePolicyTable({
    * rows for every resolved row in the current stage. Rows still missing a
    * supplier / primary are skipped so we never lock in bad data.
    */
-  const applyPrefill = async () => {
+  const applyPrefill = async (opts: { silent?: boolean } = {}) => {
+    // Arm the in-flight flag BEFORE the row loop, not just around the write:
+    // the auto-seed effect below re-evaluates on every `dataRows` identity
+    // change, and an un-armed async gap let it fire a second time.
+    setApplying(true);
+    try {
+      await buildAndApplyPrefill(opts);
+    } finally {
+      setApplying(false);
+      setConfirmPrefill(false);
+    }
+  };
+
+  const buildAndApplyPrefill = async (opts: { silent?: boolean }) => {
     const toUpsert: OverrideRow[] = [];
     let written = 0;
     let skipped = 0;
@@ -839,9 +853,12 @@ export function StagePolicyTable({
           })
         )
           continue;
-        // Never persist imputed averages — they are estimates to verify,
-        // not data (silently freezing them poisoned projects before).
-        if ((r.__imputed as Record<string, true> | undefined)?.[col.field]) continue;
+        // D1: persist only what the row can source — an unsaved edit, an
+        // uploaded value, or this stage's own routing decision. Imputed
+        // averages are estimates to verify (freezing them poisoned projects
+        // before) and an unuploaded field must keep resolving to the ENGINE's
+        // default, not to a constant we froze on its behalf.
+        if (!isPrefillable(r, col.field, drafts[rowKey]?.[col.field])) continue;
         // draft → project-data prefill → effective default
         const v = getEffective(rowKey, r, col.field, col.family);
         if (v === undefined || v === null) continue;
@@ -858,21 +875,16 @@ export function StagePolicyTable({
       if (touched) written++;
     }
     if (toUpsert.length === 0) {
-      setConfirmPrefill(false);
-      toast.info("Nothing to persist", TOAST);
+      if (!opts.silent) toast.info("Nothing to persist", TOAST);
       return;
     }
-    setApplying(true);
-    try {
-      await bulkUpsertOverrides(toUpsert);
-      setDrafts({});
+    await bulkUpsertOverrides(toUpsert);
+    setDrafts({});
+    if (!opts.silent) {
       toast.success(
         `Persisted prefill for ${written} line(s)` + (skipped > 0 ? ` · ${skipped} skipped` : ""),
         TOAST,
       );
-    } finally {
-      setApplying(false);
-      setConfirmPrefill(false);
     }
   };
 
@@ -884,7 +896,17 @@ export function StagePolicyTable({
     if (loading || applying || dataRows.length === 0) return;
     if (!hasRealProjectData || hasOverridesForStage) return;
     autoSeedMarkerRef.current = marker;
-    applyPrefill();
+    // Awaited (inside a void'd async IIFE) so a failure cannot leave `applying`
+    // stuck true and so the seed is a single settled action, not a floating
+    // promise racing the next render.
+    void (async () => {
+      try {
+        await applyPrefill({ silent: true });
+      } catch (err) {
+        console.warn("[StagePolicyTable] auto-seed failed", err);
+        autoSeedMarkerRef.current = null;
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, applying, dataRows, hasRealProjectData, hasOverridesForStage]);
 
@@ -1189,18 +1211,16 @@ export function StagePolicyTable({
                 : getDefault(col.field, col.family);
           const edited = rowDraft[col.field] !== undefined;
           // Provenance maps emitted by useStageRows for project-backed fields.
+          // NOTE: this block is a verbatim mirror of resolveEffective.ts's
+          // `resolveCell` (the mobile list's resolver) — de-duplicating them is
+          // WP 6.2. Until then, every change here changes BOTH.
           const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
           const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
-          const tracked = col.field in fromDataMap || col.field in imputedMap;
+          const decidedMap = (r.__decided ?? {}) as Record<string, true>;
           const imputed = !edited && !col.master && imputedMap[col.field] === true;
+          // D16: presence on the row is NOT provenance — only `__from_data` is.
           const fromData =
-            !edited &&
-            !imputed &&
-            (col.master
-              ? masterSet
-              : tracked
-                ? fromDataMap[col.field] === true
-                : r[col.field] !== undefined && r[col.field] !== null);
+            !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
           const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
           const fromOverride =
             !edited &&
@@ -1210,6 +1230,13 @@ export function StagePolicyTable({
             overrides.some(
               (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
             );
+          const suggested =
+            !edited &&
+            !imputed &&
+            !fromData &&
+            !col.master &&
+            !fromOverride &&
+            decidedMap[col.field] === true;
           const prov: Provenance = edited
             ? "edited"
             : imputed
@@ -1222,7 +1249,9 @@ export function StagePolicyTable({
                   ? "derived"
                   : fromOverride
                     ? "override"
-                    : "default";
+                    : suggested
+                      ? "suggested"
+                      : "default";
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);

@@ -46,24 +46,28 @@ the simulation platform, per CLAUDE.md.
 
 ## Phase 0 — Stabilize and consolidate
 
-### WP 0.1 — Kill the silent policy override
+### WP 0.1 — Kill the silent policy override ✅ DONE
+
+*(Kept for the record. The evidence below describes the state BEFORE the fix; §16's
+WP 0.1 entry records what actually landed, including D23/D24 and the new
+`suggested` provenance state.)*
 
 ```
 Implement WP 0.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· useStageRows.tsx:283-288 writes hardcoded constants onto every supplier row.
+· useStageRows.tsx:277-306 writes hardcoded constants onto every supplier row.
   Only safety_stock_days has a matching ColSpec and reaches the engine
   (project_map.py:783 defaults it to 7.0 — we are persisting 0).
   supplier_capacity_per_day, ordering_cost and lead_time_distribution have NO
   matching ColSpec field; confirm and delete them rather than preserving them.
-· StagePolicyTable.tsx:887 calls applyPrefill() un-awaited, and setApplying(true)
+· StagePolicyTable.tsx:814-827 calls applyPrefill() un-awaited, and setApplying(true)
   only runs at :865 AFTER the row loop — so the `applying` guard is not armed
   during the window the effect can re-enter.
 · The autoSeedMarkerRef marker is `${projectId}::${stageKey}`, so a
   supplier→plant→supplier tab round trip re-enters for supplier.
-· The provenance logic at StagePolicyTable.tsx:1170-1225 is a VERBATIM copy of
-  resolveEffective.ts:124-180. Fix both branches identically. De-duplicating
+· The provenance logic at StagePolicyTable.tsx:1192-1254 is a VERBATIM copy of
+  resolveEffective.ts:124-185. Fix both branches identically. De-duplicating
   them is WP 6.2's job — do not do it here, but note in §16 that they must stay
   in lockstep until then.
 
@@ -678,11 +682,11 @@ Implement WP 6.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · The Supplier stage is the deepest chain and the right one to do first:
-  columnSpecs.ts:119-178 declares the columns; useStageRows.tsx:191-325 builds the
+  columnSpecs.ts:119-181 declares the columns; useStageRows.tsx:191-333 builds the
   rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
 · Substitutions to document exhaustively: resolveField's `> 0` test
   (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
-  defaultWhenMissing (columnSpecs.ts:132-168), the effectivePolicy bundle,
+  defaultWhenMissing (columnSpecs.ts:132-171), the effectivePolicy bundle,
   liveDefault = derivedVal ?? 0 (resolveEffective.ts:135), grading.ts's reducers,
   and ENGINE_DEFAULT_PRICE.
 · supabase/functions/_shared/grading.ts is pinned to project_map.py by
@@ -704,17 +708,19 @@ Already verified (re-check before relying on it):
   "0" with provenance "default" — whose colour is null, so NO dot at all. The grid
   states capacity is zero when the model means infinite.
 · D18: material_price is consumed NOWHERE in scsim/ or sim-worker/ — grep returns
-  nothing. It is COLUMN_FIT keep:true (columnSpecs.ts:350) while material_cost,
+  nothing. It is COLUMN_FIT keep:true (columnSpecs.ts:353) while material_cost,
   which the engine does read, carries prio:8 and folds away first.
 · The cheapestInboundCost / resolveField divergence: grading.ts:159 floors a <=0
   arc price to 1.0 before taking the min, while useStageRows.tsx:164 rejects the
   same 0 and imputes an average. One row can show Price 42.50 (imputed) and Cost
   1.00 (derived) for the same material.
-· D16 residual from WP 0.1: re-verify the tracked/untracked provenance branch.
+· D16 residual from WP 0.1: the untracked branch is GONE — provenance now reads
+  __from_data / __imputed / __decided and nothing else. What remains for 6.2 is
+  D23 (the row shadows a saved override) and D24. Carry `suggested` through.
 · ensure_item_masters unions bom_single_level ONLY — multi-level BOM materials get
   no master row. Fix here or record as a separate finding.
 
-De-duplicate StagePolicyTable.tsx:1170-1225 against resolveEffective.ts's
+De-duplicate StagePolicyTable.tsx:1192-1254 against resolveEffective.ts's
 resolveCell in this WP — it has been carried in lockstep since WP 0.1 and this is
 where that debt is paid.
 ```
@@ -725,11 +731,11 @@ where that debt is paid.
 Implement WP 6.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· Current vocabulary: policyGridUi.tsx:15-35 defines data | master | imputed |
+· Current vocabulary: policyGridUi.tsx:15-41 defines data | master | imputed |
   derived | override | edited | default. `default` has colour null, so it renders
   NO dot — decide deliberately whether that stays true for the new states.
 · Reserved in WP 1.2 and now to be used: `contract` and `estimated`.
-· ProvenanceLegend (policyGridUi.tsx:49) must gain the new states or it will
+· ProvenanceLegend (policyGridUi.tsx:54) must gain the new states or it will
   under-report.
 
 The export is the deliverable that makes this researcher-grade: for a chosen

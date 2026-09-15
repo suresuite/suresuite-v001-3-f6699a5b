@@ -164,7 +164,10 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("initial_on_hand", "inventory", {
         master: { table: "materials", field: "initial_on_hand", idFrom: "material_id" },
       }),
-      col("safety_stock_days", "inventory", { defaultWhenMissing: 0 }),
+      // 7 = the engine's own default (project_map.py) and the schema's (D1).
+      // A grid default that disagrees with the engine is a silent override
+      // waiting to happen — the three copies must read the same number.
+      col("safety_stock_days", "inventory", { defaultWhenMissing: 7 }),
       col("holding_cost_pct", "inventory", { defaultWhenMissing: 0.2 }),
 
       // Transport family: stored + versioned today, consumed when the P-T.x
@@ -214,7 +217,7 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
         visibleWhen: plantNeedsInventory,
         master: { table: "products", field: "initial_on_hand", idFrom: "product_id" },
       }),
-      col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0 }),
+      col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 7 }),
       col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
       col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
 

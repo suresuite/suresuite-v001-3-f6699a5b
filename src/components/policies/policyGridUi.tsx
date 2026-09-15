@@ -17,6 +17,7 @@ export type Provenance =
   | "master"    // from item master
   | "imputed"   // imputed project average — verify
   | "derived"   // derived fallback (≈)
+  | "suggested" // this stage's own routing suggestion, ranked from uploaded volumes
   | "override"  // saved override
   | "edited"    // unsaved edit
   | "default";  // bundle default
@@ -28,6 +29,10 @@ export const PROVENANCE: Record<Provenance, { color: string | null; title: strin
   derived: {
     color: LAYER.firm,
     title: "Derived fallback (≈) — the engine computes this from your inbound/outbound uploads",
+  },
+  suggested: {
+    color: LAYER.firm,
+    title: "Suggested by ranking your uploaded volumes — not an uploaded value; confirm it",
   },
   override: { color: LAYER.product, title: "Saved override" },
   edited: { color: "#111111", title: "Edited" },
@@ -50,7 +55,7 @@ export function ProvenanceLegend({ imputedLines }: { imputedLines?: number }) {
   const items: Array<[string, string]> = [
     ["from project data", LAYER.process],
     ["imputed average — verify", LAYER.brand],
-    ["derived fallback (≈)", LAYER.firm],
+    ["derived fallback (≈) · suggested", LAYER.firm],
     ["saved override", LAYER.product],
     ["edited", "#111111"],
   ];

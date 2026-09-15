@@ -170,7 +170,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 
 | ID | Defect | Evidence | Closed by |
 |---|---|---|---|
-| D1 | Auto-seed persists `safety_stock_days = 0`, overriding the engine's 7-day default | `useStageRows.tsx:288` + `StagePolicyTable.tsx:844,887`; `project_map.py:783` | WP 0.1 |
+| D1 | Auto-seed persists `safety_stock_days = 0`, overriding the engine's 7-day default | was `useStageRows.tsx:288` + `StagePolicyTable.tsx:844,887`; `project_map.py:783` | WP 0.1 ✅ |
 | D2 | `combine-project` never converts `volume` by `time_unit` | `combine-project/index.ts:60,68,268,274` (+ `:115,:234-235,:318`) | WP 0.2 |
 | D3 | `product_code_map` queried but exists in no migration; error swallowed | `combine-project/index.ts:96` | WP 0.2, 1.4 |
 | D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names | `ProductLevelNetwork.tsx:482`, `FirmLevelNetwork.tsx:283` | WP 0.2, 1.4 |
@@ -185,13 +185,15 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D13 | Two org identities joined by string comparison | `super_admin_phase1.sql:41`; `get_current_user_org()` | WP 2.1 |
 | D14 | No project-level delegation exists | no `project_members` table | WP 2.2 |
 | D15 | Audit covers admin plane only | `admin_audit_logs` | WP 2.3 |
-| D16 | Hardcoded constants render with "From project data" dot | `StagePolicyTable.tsx:1194-1203` | WP 0.1, 6.2 |
+| D16 | Hardcoded constants render with "From project data" dot | was `StagePolicyTable.tsx:1194-1203` | WP 0.1 ✅ (de-dup of the two copies remains 6.2) |
 | D17 | NULL `capacity_per_week` (= unlimited) renders as `0`, no dot | `resolveEffective.ts:135` | WP 6.2 |
 | D18 | `material_price` displayed prominently; consumed nowhere in the engine | `columnSpecs.ts:133,350` | WP 6.2 |
 | D19 | Analysis results smeared onto entity columns; no identity or version | `network_nodes.degree_centrality` | WP 4.2, 4.3 |
 | D20 | `projectLanes` fallback truncates at 10 000 rows silently | `projectLanes.ts:30-33` | WP 3.1 |
 | **D21** | **User docs name fields the user never sees.** `products.csv` says `sell_price`/`demand_mean`/`demand_distribution`; the engine says `unit_price`/`demand_mode`/`demand_model`; the legacy docs showed the engine's names | `public/template/products.csv`; `item_master.sql:28-32`; `network.py:145,151,154` | WP 5.2b |
 | D22 | Legacy docs hand-copied the Pydantic models while `gen_docs.py` already renders them from the registry | archived `docBodies.tsx` `SIM_PARAM_GROUPS` | WP 0.3 *(done)* |
+| **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check | `resolveEffective.ts:82`; `StagePolicyTable.tsx:694`; `schemas.ts:81` | WP 6.2 |
+| D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:398-404` | WP 6.2 |
 
 ### 4.1 Code map — the data layer
 
@@ -228,19 +230,20 @@ only in `PROMPTS.md` or in a session transcript.
 
 | Location | What is there |
 |---|---|
-| `useStageRows.tsx:191-325` | the supplier stage — where rows are built |
+| `useStageRows.tsx:191-333` | the supplier stage — where rows are built |
 | `useStageRows.tsx:164` | `resolveField`'s `> 0` test |
 | `useStageRows.tsx:125-131` | the smart-average imputation basis |
-| `useStageRows.tsx:283-288` | the hardcoded row constants (D1, D16) |
-| `columnSpecs.ts:119-178` | the supplier column spec |
-| `columnSpecs.ts:132-168` | `defaultWhenMissing` values |
-| `columnSpecs.ts:350` | `material_price` fit metadata, `keep: true` (D18) |
+| `useStageRows.tsx:277-306` | the supplier row literal. Since WP 0.1 it writes ONLY an uploaded price, the routing decision, and the three provenance maps — `__from_data` / `__imputed` / `__decided`. No constant is stamped on a row |
+| `columnSpecs.ts:119-181` | the supplier column spec |
+| `columnSpecs.ts:132-171` | `defaultWhenMissing` values. `safety_stock_days` is 7 since WP 0.1 — it must equal the schema's (`schemas.ts:121`) and the engine's (`project_map.py:783`) |
+| `columnSpecs.ts:353` | `material_price` fit metadata, `keep: true` (D18) |
 | `resolveEffective.ts:82` | `dataRow[field]` is checked **before** the override bundle |
-| `resolveEffective.ts:124-180` | `resolveCell` — the canonical provenance logic |
-| `StagePolicyTable.tsx:1170-1225` | a **verbatim copy** of it (de-dup in WP 6.2) |
-| `StagePolicyTable.tsx:887` | `applyPrefill()` called un-awaited; guard armed at `:865` |
-| `policyGridUi.tsx:15-35` | the provenance vocabulary; `default` has colour `null` |
-| `policyGridUi.tsx:49` | `ProvenanceLegend` — must gain any new state |
+| `resolveEffective.ts:124-185` | `resolveCell` — the canonical provenance logic |
+| `StagePolicyTable.tsx:1192-1254` | a **verbatim copy** of it (de-dup in WP 6.2) |
+| `StagePolicyTable.tsx:814-827` | `applyPrefill` — arms `applying` before the row loop, then delegates to `buildAndApplyPrefill`; awaited by the auto-seed at `:892-909` |
+| `prefillSelect.ts:36` | `prefillSourceFor` — the one rule for what the prefill may persist (edit / `__from_data` / `__decided`) |
+| `policyGridUi.tsx:15-41` | the provenance vocabulary; `default` has colour `null`, `suggested` added in WP 0.1 |
+| `policyGridUi.tsx:54` | `ProvenanceLegend` — must gain any new state |
 
 **Versioning, governance, network**
 
@@ -328,16 +331,19 @@ documentation that explains them.**
 
 | # | Artifact | Answers | State | WP |
 |---|---|---|---|---|
-| A1 | Provenance dot | *Is this real data?* | exists, partly lying (D16, D17) | 0.1, 6.2 |
+| A1 | Provenance dot | *Is this real data?* | D16 closed (WP 0.1); D17 open | 0.1 ✅, 6.2 |
 | A2 | Value-chain popover | *Where did THIS number come from?* | missing | 6.3 |
 | A3 | Project Data Trust Report | *Is this model built on good data?* | grading exists, unassembled | 4.4 |
 | A4 | Verifiable export | *Can I check this without your app?* | **exists, strong** | 3.3 extends it |
 | A5 | Reproducibility record | *Can I reproduce this in two years?* | missing | 6.3 |
 
 **A1 vocabulary** after the plan lands:
-`data · master · contract · estimated · imputed · derived · override · edited · default`.
-Two rules the current implementation breaks: no dot may claim more than it knows
-(D16), and a missing value must not render as a real one (D17).
+`data · master · contract · estimated · imputed · derived · suggested · override · edited ·
+default`. Two rules the current implementation breaks: no dot may claim more than it
+knows (D16 — **closed in WP 0.1**), and a missing value must not render as a real one
+(D17). `suggested` was added by WP 0.1: the stage's own routing choice, ranked from
+uploaded volumes, is neither uploaded data nor a bundle default, and calling it either
+is exactly the over-claim D16 is about.
 
 **A3 shape** — mostly assembly of what `grading.ts` already computes: coverage per
 engine-read field, blocking findings, neutral-constant substitutions, derived values,
@@ -654,7 +660,7 @@ distributions. All already in `registry.generated.json` and rendered by
 
 ## 7. Phase 0 — Stabilize and consolidate
 
-### WP 0.1 — Kill the silent policy override *(D1, D16)*
+### WP 0.1 — Kill the silent policy override ✅ *(D1, D16 — done)*
 
 **Preconditions** — branch off latest default. Verify D1 reproduces: open `/policies`
 on a project with inbound data, confirm `policy_overrides` gains rows with
@@ -680,9 +686,14 @@ produces **no** override for that field · auto-seed fires at most once per
 **Gap check** — grep every `col(` field in `columnSpecs.ts` against the object
 literals in `useStageRows.tsx`; record further collisions in §16.
 
+**Delivered** — `src/lib/policies/prefillSelect.ts` is the one rule for what the
+prefill may persist; `src/lib/policies/__tests__/policyPrefill.test.ts` is the
+regression suite. The provenance vocabulary gained `suggested` (§5.4).
+
 ### WP 0.2 — Unit conversion + orphan-table honesty *(D2, D3, D4)*
 
-**Preconditions** — WP 0.1 merged. Verify D2 with the §15 mixed-unit query.
+**Preconditions** — WP 0.1 landed (`prefillSelect.ts` exists; `useStageRows` writes
+no constants). Verify D2 with the §15 mixed-unit query.
 
 **Files** — `combine-project/index.ts` · `_shared/grading.ts` (import only) ·
 `ProductLevelNetwork.tsx` · `FirmLevelNetwork.tsx`
@@ -1223,7 +1234,65 @@ Handoff to next WP:
   revive the generated-duplicate sections.
 ```
 
-*(no further entries — Phase 0 not started)*
+### WP 0.1 — Kill the silent policy override · 2026-09-15
+
+Preconditions held? **yes, with one correction.** D1 reproduces exactly as described
+(`useStageRows.tsx:288` wrote `safety_stock_days: 0` onto every supplier row; the
+auto-seed then froze it as an override, beating `project_map.py:783`'s 7-day default).
+Verified by reading, not by running: this session has **no database access**, so the
+§15 `policy_overrides` query could not be run. The correction: the plan's step 2 —
+"skip any field not present in `row.__from_data`" — taken literally would have stopped
+the prefill persisting `primary_source` / `sourcing_firm`, which are NOT uploaded
+values, and the pre-run gate requires them to be persisted (blueprint G16,
+`verification.ts:110,144`). Auto-seeding would have left every project un-runnable.
+
+Exit checks passed? **yes.** `npm test` 30/30 green (15 new). No override is produced
+for an unuploaded `safety_stock_days`; the auto-seed arms its in-flight flag before the
+row loop and is awaited; the cell now reads 7 with no dot.
+`npm run lint` is **red at HEAD and equally red after** — 342 errors / 115 warnings
+before and after this WP (`@typescript-eslint/no-explicit-any` and friends, repo-wide),
+plus one pre-existing `audit:ui` violation (`MobileSheet.tsx:169`). `check:docs` passes.
+`tsc --noEmit` errors only in `App.tsx` and `useErpConnections.tsx`, both pre-existing.
+**Phase 0's "lint green" exit criterion cannot be met by Phase 0 work** — it is a
+repo-wide backlog, not a Phase 0 defect. Not weakened here; stated.
+
+Discovered:
+- **D23** — the row's own suggestion is read before the override bundle
+  (`resolveEffective.ts:82`), so a saved `primary_source` never survives a reload; and
+  `saveAll` drops an edit equal to the family default, so un-checking a primary is
+  never written. → affects **WP 6.2** → added to §4 as D23. **Severity note:** this is
+  user-visible today — a user who moves a primary supplier sees it revert. It is a
+  resolution-ORDER fix, which is exactly the de-dup WP 6.2 owns, so it is recorded
+  rather than fixed here.
+- **D24** — `production_lead_time_mean_days` is a median of *inbound* lead times but is
+  flagged `__from_data`. No grid column renders it, so no dot lies yet.
+  → affects **WP 6.2** → added to §4 as D24.
+- The provenance vocabulary needed a seventh state. A routing choice ranked from
+  uploaded volumes is neither `data` nor `default`; both are over-claims in opposite
+  directions. Added `suggested`, ranked below `override`. → affects **§5.4 A1**, edited
+  in this commit; **WP 6.2** must carry it through the de-dup.
+- `columnSpecs.ts` carried a THIRD safety-stock default (`defaultWhenMissing: 0`)
+  disagreeing with both `schemas.ts:121` and `project_map.py:783`. Dormant (the bundle
+  always supplies the field) but a D1 waiting to recur; set to 7 and pinned by a test.
+  → confirms **WP 1.3**'s premise that competing constant tables are the pattern, not
+  the exception (D10 is the same shape).
+
+Gap-check grep (every `col(` field vs. the `useStageRows` row literals): 29 column
+fields; the only remaining collisions are `primary_source`, `sourcing_firm` (intended —
+now `__decided` / `suggested`) and `material_price` (intended — tracked by
+`__from_data`). No further hidden constants.
+
+Baseline numbers (if run): **none — no database access from this session.** The §15
+queries are unrun; see WP 0.2's entry.
+
+Handoff to next WP:
+- `row.__decided` is a THIRD provenance map alongside `__from_data` / `__imputed`.
+  Anything that reads one must read all three (`resolveEffective.ts:144-167` and its
+  verbatim twin `StagePolicyTable.tsx:1215-1254`).
+- The prefill rule lives in ONE place, `prefillSelect.ts`. Do not re-inline it.
+- `applyPrefill` now takes `{ silent }`; the auto-seed passes it so a no-op seed does
+  not toast. `buildAndApplyPrefill` holds the loop; `applyPrefill` owns `applying`.
+- Lint is red at baseline. Measure your WP by *delta* (342/115), not by green.
 
 ---
 

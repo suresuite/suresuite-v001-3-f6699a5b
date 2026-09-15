@@ -143,16 +143,14 @@ export function resolveCell(args: {
   const edited = draft !== undefined;
   const fromDataMap = (row.__from_data ?? {}) as Record<string, true>;
   const imputedMap = (row.__imputed ?? {}) as Record<string, true>;
-  const tracked = col.field in fromDataMap || col.field in imputedMap;
+  const decidedMap = (row.__decided ?? {}) as Record<string, true>;
   const imputed = !edited && !col.master && imputedMap[col.field] === true;
-  const fromData =
-    !edited &&
-    !imputed &&
-    (col.master
-      ? masterSet
-      : tracked
-        ? fromDataMap[col.field] === true
-        : row[col.field] !== undefined && row[col.field] !== null);
+  // D16: a dot may not claim more than it knows. A non-master field counts as
+  // project data ONLY when the row loader said so (`__from_data`). It used to
+  // be enough for the field to be *present* on the row, which made every
+  // constant the loader stamped on (safety stock, MOQ, an "unlimited"
+  // capacity) render as "From project data".
+  const fromData = !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
   const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
   const fromOverride =
     !edited &&
@@ -162,6 +160,11 @@ export function resolveCell(args: {
     overrides.some(
       (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
     );
+  // A routing decision this stage derived from the uploaded volumes (primary
+  // source, sourcing firm). Ranked BELOW a saved override: once the user (or
+  // the prefill) has persisted a choice, the override is the truer answer.
+  const suggested =
+    !edited && !imputed && !fromData && !col.master && !fromOverride && decidedMap[col.field] === true;
 
   const provenance: Provenance = edited
     ? "edited"
@@ -175,7 +178,9 @@ export function resolveCell(args: {
           ? "derived"
           : fromOverride
             ? "override"
-            : "default";
+            : suggested
+              ? "suggested"
+              : "default";
 
   return { value: cellValue ?? liveDefault, provenance };
 }
