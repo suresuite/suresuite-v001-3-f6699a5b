@@ -1768,7 +1768,7 @@ Handoff to WP 1.2:
   under `build/`, it must be added there too or the gate compares against nothing.
 - `npm ci` before `npm test` in a fresh container.
 
-### WP 1.2 — Sidecar schema and the first twelve tables · 2026-09-15 · `<this commit>`
+### WP 1.2 — Sidecar schema and the first twelve tables · 2026-09-15 · `2f8b5c1`
 
 Preconditions held? **yes.** WP 1.1's artifact was there and its handoff was
 accurate — reading the lane columns from `build/schema.introspected.json` rather than
