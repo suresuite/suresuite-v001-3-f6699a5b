@@ -434,24 +434,3 @@ export function PolicySetupBar({
     </div>
   );
 }
-
-/** One muted line for <PageHeader subtitle>. */
-export function policyContextLine(ctx: {
-  plant: string;
-  model: string;
-  bom: string;
-  suppliers: number;
-  plants: number;
-  customers: number;
-  strategy: string;
-}) {
-  return [
-    `Plant ${ctx.plant}`,
-    `Model ${ctx.model}`,
-    `BOM ${ctx.bom}`,
-    `${ctx.suppliers} suppliers`,
-    `${ctx.plants} plants`,
-    `${ctx.customers} customers`,
-    `Strategy ${ctx.strategy}`,
-  ].join(" · ");
-}

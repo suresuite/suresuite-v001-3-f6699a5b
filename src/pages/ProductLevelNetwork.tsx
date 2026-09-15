@@ -34,8 +34,20 @@ import {
   AlertTriangle,
   Map as MapIcon,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
+import {
+  PageLayout,
+  PageHeader,
+  HeaderRefreshButton,
+  PAGE_GUTTER,
+  PAGE_GUTTER_SKIN,
+  HDR_GHOST_BUTTON,
+  HDR_ICON_BUTTON,
+  HDR_ICON_BUTTON_ON,
+  HDR_PROJECT_SELECT,
+  HDR_SEARCH_INPUT,
+} from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { cn } from '@/lib/utils';
 import MLPrediction from '@/components/MLPrediction';
 import SupplierVolumeChart, { SupplierVolumeDatum, aggregateSupplierVolumes } from '@/components/SupplierVolumeChart';
 import SupplierMaterialChart from '@/components/SupplierMaterialChart';
@@ -920,11 +932,13 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       )}
       <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
         {!isMobile && (
+        /* Refresh is composed inside `rightContent` rather than passed as
+           `onRefresh`, because the handoff's slot order puts it after this
+           page's own graph controls — including the metrics `Refresh` ghost,
+           which is a different control with a different handler — and before
+           the project select. Same button, same handler as before. */
         <PageHeader
           title="Product-level Network Intelligence"
-          subtitle={`Multipartile networks of ${groupCounts.A} supplier${groupCounts.A !== 1 ? 's' : ''}, ${groupCounts.B} material${groupCounts.B !== 1 ? 's' : ''}, ${groupCounts.C} product${groupCounts.C !== 1 ? 's' : ''}, ${groupCounts.D} customer${groupCounts.D !== 1 ? 's' : ''}`}
-          onRefresh={fetchData}
-          refreshLoading={loading}
           rightContent={
             /* `gap-2` rather than `space-x-2`: `space-x-*` puts its margin on
                the DOM children, so it would land on the `md:contents` wrapper
@@ -945,8 +959,14 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                   <Button
                     onClick={() => setDisruptionDialogOpen(true)}
                     variant="outline"
-                    size="sm"
-                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                    size="icon"
+                    className={cn(
+                      'text-orange-600 hover:bg-orange-50 hover:text-orange-700',
+                      HDR_ICON_BUTTON,
+                      'md:text-[#ea580c] md:hover:text-[#ea580c]',
+                    )}
+                    aria-label="Add Disruption"
+                    title="Add Disruption"
                   >
                     <AlertTriangle className="h-4 w-4" />
                   </Button>
@@ -959,7 +979,11 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                   <input
                     autoFocus
                     type="text"
-                    className="h-9 min-h-11 md:min-h-0 pl-9 pr-3 border border-border rounded-md text-sm bg-background focus:outline-none w-full"
+                    className={cn(
+                      'h-9 min-h-11 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm focus:outline-none',
+                      HDR_SEARCH_INPUT,
+                      'md:pl-9',
+                    )}
                     placeholder="find a node"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -969,8 +993,11 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
               ) : (
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
+                  className={HDR_ICON_BUTTON}
                   onClick={() => setSearchOpen(true)}
+                  aria-label="Search"
+                  title="Search"
                 >
                   <Search className="h-4 w-4" />
                 </Button>
@@ -978,36 +1005,50 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
               <Button
                 variant={showAnalytics ? 'default' : 'outline'}
-                size="sm"
+                size="icon"
+                className={cn(HDR_ICON_BUTTON, showAnalytics && HDR_ICON_BUTTON_ON)}
                 onClick={() => setShowAnalytics(!showAnalytics)}
+                aria-label="Analytics"
+                title="Analytics"
               >
                 <BarChart className="h-4 w-4" />
               </Button>
 
               <Button
                 variant={viewMode === 'map' ? 'default' : 'outline'}
-                size="sm"
+                size="icon"
+                className={cn(HDR_ICON_BUTTON, viewMode === 'map' && HDR_ICON_BUTTON_ON)}
                 onClick={() => setViewMode(viewMode === 'network' ? 'map' : 'network')}
+                aria-label={viewMode === 'network' ? 'Map view' : 'Network view'}
+                title={viewMode === 'network' ? 'Map view' : 'Network view'}
               >
                 {viewMode === 'network' ? <MapIcon className="h-4 w-4" /> : <Network className="h-4 w-4" />}
               </Button>
 
+              {/* The metrics refresh — a different control with a different
+                  handler from the page refresh beside it, which is why the
+                  handoff keeps both and only changes their heights. */}
               <Button
                 variant="ghost"
                 size="sm"
+                className={cn('gap-1', HDR_GHOST_BUTTON)}
                 onClick={handleRefreshMetrics}
                 disabled={networkMetricsLoading}
               >
-                <RotateCcw className="w-4 h-4 mr-1" />
+                <RotateCcw className="h-4 w-4" />
                 Refresh
               </Button>
               </span>
 
+              <HeaderRefreshButton onClick={fetchData} loading={loading} />
+
               <Select value={globalSelectedProjectId || ''} onValueChange={setGlobalSelectedProjectId}>
                 {/* Case A select (spec 2.1 / parity plan G3): the vw term
                     exceeds 180px at every width from 768 up, so the clamp
-                    resolves to the desktop literal without an `md:`. */}
-                <SelectTrigger className="w-[clamp(120px,38vw,180px)] h-9">
+                    resolves to the desktop literal without an `md:`. The
+                    handoff raises that desktop literal to the product-wide
+                    200px project select. */}
+                <SelectTrigger className={cn('h-9 w-[clamp(120px,38vw,180px)]', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>

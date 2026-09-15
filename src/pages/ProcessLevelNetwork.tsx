@@ -35,8 +35,21 @@ import {
   AlertTriangle,
   Tag,
 } from 'lucide-react';
-import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
+import {
+  PageLayout,
+  PageHeader,
+  HeaderRefreshButton,
+  PAGE_GUTTER,
+  PAGE_GUTTER_SKIN,
+  HDR_FILTER_SELECT,
+  HDR_ICON_BUTTON,
+  HDR_ICON_BUTTON_ON,
+  HDR_OUTLINE_BUTTON,
+  HDR_PROJECT_SELECT,
+  HDR_SEARCH_INPUT,
+} from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { cn } from '@/lib/utils';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
 import {
   LensChip,
@@ -1080,25 +1093,6 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
     };
   }, [allNodes, levelCounts, topFlowNodes]);
 
-  // Create summary for subtitle  
-  const nodeTypeCounts = Object.entries(nodes.reduce((acc, node) => {
-    const type = node.data?.nodeType || 'unknown';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>));
-  
-  const typeSummary = nodeTypeCounts
-    .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
-    .join(', ');
-    
-  const levelSummary = Object.keys(levelCounts).length > 0 
-    ? ` | BOM Levels: ${Object.keys(levelCounts).length - 3}`
-    : '';
-
-  const filterSummary = isLevel1FilterActive && selectedLevel1Node 
-    ? ` | Filtered by Level 1: ${selectedLevel1Node} (${reachableNodes.size} nodes)`
-    : '';
-
   // Diagnostics: check BOM level distribution and multi-tier presence (including level 0)
   const runDiagnostics = useCallback(async () => {
     if (!user || !globalSelectedProjectId) {
@@ -1178,11 +1172,12 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       )}
       <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
         {!isMobile && (
+        /* Refresh is composed inside `rightContent` rather than passed as
+           `onRefresh`, because the handoff's slot order puts it after this
+           page's own graph controls and before the project select. Same
+           button, same handler — see HeaderRefreshButton. */
         <PageHeader
           title="Process-level Network Intelligence"
-          subtitle={`Shop-floor dependencies networks: ${typeSummary}${levelSummary}${filterSummary}`}
-          onRefresh={fetchData}
-          refreshLoading={loading}
           rightContent={
             /* `gap-2` rather than `space-x-2`: `space-x-*` puts its margin on
                the DOM children, so it would land on the `md:contents` wrapper
@@ -1202,7 +1197,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               {level1Nodes.length > 0 && (
                 <>
               <Select value={selectedLevel1Node || 'all'} onValueChange={handleLevel1NodeSelect}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className={cn('h-9 w-[160px]', HDR_FILTER_SELECT)}>
                   <SelectValue placeholder="Level 1 Filter" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1220,7 +1215,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                       onClick={() => handleLevel1NodeSelect(null)}
                       variant="outline"
                       size="sm"
-                      className="text-muted-foreground hover:text-foreground"
+                      className={cn('text-muted-foreground hover:text-foreground', HDR_OUTLINE_BUTTON)}
                     >
                       Clear Filter
                     </Button>
@@ -1231,7 +1226,10 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               <Button
                 onClick={() => setShowLabels(!showLabels)}
                 variant={showLabels ? "default" : "outline"}
-                size="sm"
+                size="icon"
+                className={cn(HDR_ICON_BUTTON, showLabels && HDR_ICON_BUTTON_ON)}
+                aria-label={showLabels ? 'Hide labels' : 'Show labels'}
+                title={showLabels ? 'Hide labels' : 'Show labels'}
               >
                 <Tag className="h-4 w-4" />
               </Button>
@@ -1243,7 +1241,11 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                   <input
                     autoFocus
                     type="text"
-                    className="h-9 min-h-11 md:min-h-0 pl-9 pr-3 border border-border rounded-md text-sm bg-background focus:outline-none w-full"
+                    className={cn(
+                      'h-9 min-h-11 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm focus:outline-none',
+                      HDR_SEARCH_INPUT,
+                      'md:pl-9',
+                    )}
                     placeholder="find a component"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -1254,8 +1256,10 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                 <Button
                   onClick={() => setSearchOpen(true)}
                   variant="outline"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
+                  size="icon"
+                  className={cn('text-muted-foreground hover:text-foreground', HDR_ICON_BUTTON)}
+                  aria-label="Search"
+                  title="Search"
                 >
                   <Search className="h-4 w-4" />
                 </Button>
@@ -1263,8 +1267,11 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
               <Button
                 variant={showAnalytics ? 'default' : 'outline'}
-                size="sm"
+                size="icon"
+                className={cn(HDR_ICON_BUTTON, showAnalytics && HDR_ICON_BUTTON_ON)}
                 onClick={() => setShowAnalytics(!showAnalytics)}
+                aria-label="Analytics"
+                title="Analytics"
               >
                 <BarChart className="h-4 w-4" />
               </Button>
@@ -1274,20 +1281,28 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                   onClick={() => setDisruptionDialogOpen(true)}
                   variant="outline"
                   size="sm"
-                  className="text-orange-600 border-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                  className={cn(
+                    'gap-1 border-orange-600 text-orange-600 hover:bg-orange-50 hover:text-orange-700',
+                    HDR_OUTLINE_BUTTON,
+                    'md:border-border md:text-[#ea580c] md:hover:text-[#ea580c]',
+                  )}
                 >
                   <AlertTriangle className="h-4 w-4" />
-                  <span className="hidden sm:inline ml-1">Add Disruption</span>
+                  <span className="hidden sm:inline">Add Disruption</span>
                 </Button>
               )}
               
               </span>
 
+              <HeaderRefreshButton onClick={fetchData} loading={loading} />
+
               <Select value={globalSelectedProjectId || ''} onValueChange={setGlobalSelectedProjectId}>
                 {/* Case A select (spec 2.1 / parity plan G3): the vw term
                     exceeds 180px at every width from 768 up, so the clamp
-                    resolves to the desktop literal without an `md:`. */}
-                <SelectTrigger className="w-[clamp(120px,38vw,180px)] h-9">
+                    resolves to the desktop literal without an `md:`. The
+                    handoff raises that desktop literal to the product-wide
+                    200px project select. */}
+                <SelectTrigger className={cn('h-9 w-[clamp(120px,38vw,180px)]', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>

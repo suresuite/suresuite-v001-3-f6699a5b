@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, CheckCircle, AlertCircle, Trash2, Copy, Pencil, Factory, GitBranch, Layers, Eye, Upload, X, RefreshCw, Download } from 'lucide-react';
 import { format } from 'date-fns';
@@ -17,7 +16,15 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
-import { PageLayout, PageHeader, ProjectSelector, PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared';
+import {
+  PageLayout,
+  PageHeader,
+  PAGE_GUTTER,
+  PAGE_GUTTER_SKIN,
+  HDR_PRIMARY_BUTTON,
+  HDR_PROJECT_SELECT,
+} from '@/components/shared';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MobileSheet } from '@/components/shared/MobileSheet';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useRowBudget } from '@/hooks/useViewport';
@@ -1172,8 +1179,13 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   // Not a tab-bar root (isMobileRootRoute) — reached from More, so T2 hides
   // the tab bar here and the header's own back target is the only way out.
   const newProjectAction = canModify && (
-    <Button onClick={handleOpenCreateForm} disabled={isCreating} size="sm">
-      <Plus className="h-4 w-4 mr-2" />
+    <Button
+      onClick={handleOpenCreateForm}
+      disabled={isCreating}
+      size="sm"
+      className={cn('gap-2', HDR_PRIMARY_BUTTON)}
+    >
+      <Plus className="h-4 w-4" />
       New Project
     </Button>
   );
@@ -1197,25 +1209,32 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
       )}
       <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
         {!isMobile && (
+          /* The selected-project BADGE becomes the standard project select
+             (handoff, Project Manager row): the app now has one
+             project-context control instead of four, and this page's read-only
+             chip was the odd one out. Same selection, same store — it is the
+             `setGlobalSelectedProjectId` every other header already calls, so
+             the badge's bounded-width workaround goes with it: 200px is a
+             fixed width, not a name-shaped one. */
           <PageHeader
             title="Your Projects"
-            subtitle={canModify
-              ? 'Create and manage your supply chain projects'
-              : 'View available projects'}
             rightContent={
-              <div className="flex items-center space-x-2">
-                {selectedProject && (
-                  /* A project name is user data and arbitrarily long, and this
-                     sits in the header's `shrink-0` right slot - unbounded, it
-                     pushes the row past the viewport (§2.5). Bounded here, and
-                     truncated on the inner span because `truncate` on a flex
-                     container does not ellipsize its own text. */
-                  <Badge variant="secondary" className="max-w-[36vw] text-xs md:max-w-none">
-                    <span className="min-w-0 truncate" title={selectedProject.name}>
-                      {selectedProject.name}
-                    </span>
-                  </Badge>
-                )}
+              <div className="flex items-center gap-2">
+                <Select
+                  value={globalSelectedProjectId || ''}
+                  onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
+                >
+                  <SelectTrigger className={cn('h-9', HDR_PROJECT_SELECT)}>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id} className="min-h-11 md:min-h-0">
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {newProjectAction}
               </div>
             }

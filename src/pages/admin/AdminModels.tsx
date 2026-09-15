@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DIALOG_AS_SHEET } from '@/components/shared';
+import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON } from '@/components/shared';
 import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -82,7 +82,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
       onRefresh={load} refreshLoading={loading}
       actions={
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button size="sm" className="rounded-sm"><Plus className="mr-1.5 h-3.5 w-3.5" /> Add model</Button></DialogTrigger>
+          <DialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add model</Button></DialogTrigger>
           <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
             <DialogHeader><DialogTitle>Add AI model</DialogTitle></DialogHeader>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">

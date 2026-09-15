@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { OrgAccessDrawer } from '@/components/admin/OrgAccessDrawer';
-import { DIALOG_AS_SHEET } from '@/components/shared';
+import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON } from '@/components/shared';
 import { cn } from '@/lib/utils';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -188,7 +188,7 @@ function AddOrgDialog({ actorArgs, onCreated }: { actorArgs: () => any; onCreate
   };
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setName(''); setSlug(''); } }}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-sm"><Plus className="mr-1.5 h-3.5 w-3.5" /> Add organization</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add organization</Button></DialogTrigger>
       <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
         <DialogHeader><DialogTitle>Add organization</DialogTitle></DialogHeader>
         <div className="grid gap-3">

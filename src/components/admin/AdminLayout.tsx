@@ -16,7 +16,7 @@ import {
   RotateCw,
 } from 'lucide-react';
 import { PageLayout } from '@/components/shared/PageLayout';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { HeaderRefreshButton, PageHeader } from '@/components/shared/PageHeader';
 import { PAGE_GUTTER, PAGE_GUTTER_SKIN } from '@/components/shared/PageBody';
 import { MobileSheet } from '@/components/shared/MobileSheet';
 import { useIsMobile } from '@/hooks/use-is-mobile';
@@ -27,11 +27,17 @@ interface AdminLayoutProps {
   isCollapsed: boolean;
   setIsCollapsed: (v: boolean) => void;
   title: string;
-  /** Forwarded to PageHeader. Admin pages that carry a context line (user
-   *  access has email + role + super-admin) had nowhere to put it, so it was
-   *  computed and dropped on the floor. */
-  subtitle?: ReactNode;
   actions?: ReactNode;
+  /**
+   * The section's search field, if it has one. Separate from `actions` because
+   * the desktop header handoff fixes the slot order — page-specific controls ·
+   * refresh · project select · primary action last — and admin Users ships
+   * controls on BOTH sides of refresh (search · refresh · Add user). One
+   * `actions` node cannot be split around the refresh button; two named slots
+   * can. Below `md` the two render side by side in the same band under the
+   * header, exactly as `actions` alone did.
+   */
+  search?: ReactNode;
   onRefresh?: () => void;
   refreshLoading?: boolean;
   /** Forwarded to PageHeader's mobile back affordance (spec §4.1). Only the
@@ -56,8 +62,8 @@ export function AdminLayout({
   isCollapsed,
   setIsCollapsed,
   title,
-  subtitle,
   actions,
+  search,
   onRefresh,
   refreshLoading,
   onBack,
@@ -119,19 +125,30 @@ export function AdminLayout({
       )}
       <div className={isMobile ? PAGE_GUTTER_SKIN : PAGE_GUTTER}>
         {!isMobile && (
+          /* The right slot is composed here rather than through
+             `onRefresh`, because the handoff's order puts the section's search
+             field before the refresh button and its "Add x" action after it. */
           <PageHeader
             title={title}
-            subtitle={subtitle}
-            rightContent={actions}
-            onRefresh={onRefresh}
-            refreshLoading={refreshLoading}
+            rightContent={
+              <>
+                {search}
+                {onRefresh && (
+                  <HeaderRefreshButton onClick={onRefresh} loading={refreshLoading} />
+                )}
+                {actions}
+              </>
+            }
             onBack={onBack}
             backLabel={backLabel}
           />
         )}
 
-        {isMobile && actions && (
-          <div className="mb-[var(--m-gap)] flex flex-wrap items-center gap-2">{actions}</div>
+        {isMobile && (search || actions) && (
+          <div className="mb-[var(--m-gap)] flex flex-wrap items-center gap-2">
+            {search}
+            {actions}
+          </div>
         )}
 
         {/* Below `md` the eight sections are a row that names where you are
