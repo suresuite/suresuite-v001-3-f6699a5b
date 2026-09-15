@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
@@ -30,29 +30,58 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const ETL = "supabase/functions/combine-project/index.ts";
 const PAGES = ["src/pages/ProductLevelNetwork.tsx", "src/pages/FirmLevelNetwork.tsx"];
 
-describe("D3 — product_code_map fails loudly", () => {
-  it("captures the error rather than destructuring only { data }", () => {
+describe("D3 — product_code_map is gone, and stays gone", () => {
+  /**
+   * This block asserted the opposite until WP 1.4, and the change is a
+   * resolution rather than a retreat.
+   *
+   * WP 0.2 made the `product_code_map` read LOUD because the table exists in no
+   * migration and the read discarded its error, so the mapped branch silently
+   * never ran. That was the right fix for a defect nobody had yet decided how to
+   * close. WP 1.4's orphan reconciliation made the decision: the branch had never
+   * executed — no upload path, no writer, no template column — so it was deleted
+   * rather than given a table, and a schema invented for a join nobody has ever
+   * performed would have been the worse of the two.
+   *
+   * So the guard inverts. What needs pinning now is not "the error is captured"
+   * but "the dead branch has not come back", because resurrecting it is exactly
+   * as silent as the original swallow: a `productMapping` that is always empty
+   * looks like a mapping that simply found nothing.
+   *
+   * Two merged PRs disagreed about this for a while — one added the block above
+   * in its original form, the other deleted the code it asserted — and main was
+   * red until they were reconciled here. See PLAN.md §16.
+   */
+  const CONTRACT = "supabase/contract";
+
+  it("the ETL no longer reads the table", () => {
     const src = read(ETL);
-    const idx = src.indexOf(".from('product_code_map')");
-    expect(idx, "the product_code_map read must still exist").toBeGreaterThan(-1);
-    // Same scan-back-to-this-read's-own-binding rule as the D25 block below.
-    const open = src.slice(0, idx).lastIndexOf("const {");
-    const pattern = src.slice(open, src.indexOf("}", open) + 1);
     expect(
-      /\berror\s*:/.test(pattern),
-      `the read must destructure \`error\`, not just \`data\` (D3) — got ${pattern}`,
-    ).toBe(true);
+      src.includes(".from('product_code_map')"),
+      "the read was deleted in WP 1.4; restoring it needs a migration and a contract entry first",
+    ).toBe(false);
+    expect(src).not.toMatch(/\bproductMapping\b/);
+    expect(src).not.toMatch(/\bproductCodeMapError\b/);
   });
 
-  it("logs the failure and rides it back to the caller as a warning", () => {
+  it("the BOM weighting uses the direct join — the branch that always ran", () => {
     const src = read(ETL);
-    expect(src).toMatch(/if\s*\(\s*productCodeMapError\s*\)/);
-    expect(src, "the failure must be logged at error level, not swallowed").toMatch(
-      /productCodeMapError\s*\)\s*\{[\s\S]{0,400}console\.error/,
+    // With the mapping always empty, `productDemandByPlant.get(mappedKey)` was
+    // the only path ever taken. It is now the only path there is.
+    expect(src).toMatch(/productDemandByPlant\.get\(mappedKey\)/);
+  });
+
+  it("no migration creates it, so the deletion left nothing stranded", () => {
+    const migrations = resolve(root, "supabase/migrations");
+    const named = readdirSync(migrations).filter((f) =>
+      readFileSync(resolve(migrations, f), "utf8").includes("product_code_map"),
     );
-    expect(src, "and must reach the response as a warning (§5 T2)").toMatch(
-      /productCodeMapError\s*\)\s*\{[\s\S]{0,900}warnings\.push/,
-    );
+    expect(named, `product_code_map is referenced by ${named.join(", ")}`).toEqual([]);
+  });
+
+  it("and no sidecar describes it — the contract agrees the table does not exist", () => {
+    const sidecars = readdirSync(resolve(root, CONTRACT));
+    expect(sidecars).not.toContain("product_code_map.contract.yaml");
   });
 });
 

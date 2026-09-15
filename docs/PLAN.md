@@ -269,7 +269,7 @@ only in `PROMPTS.md` or in a session transcript.
 | `20260703000001_dataset_versions.sql:70-138` | `_build_dataset_snapshot` (D11) |
 | `20260711000002_unified_access_control.sql:169` | `capabilities_for_user` — the resolver |
 | `item_master.sql:91-96` | `ensure_item_masters` builds `materials`; unions `bom_single_level` only |
-| `ProcessLevelNetwork.tsx:1110-1111` | direct `.from()` reads, no RPC, no pagination |
+| `ProcessLevelNetwork.tsx:1104-1105` | direct `.from()` reads, no RPC, no pagination |
 
 ---
 
@@ -2326,6 +2326,93 @@ Handoff to WP 2.1 (and Phase 2):
   `npm run contract:introspect` and commit the artifact. This is a real cost of
   recording where each table is referenced; the alternative — not recording it —
   is how the three orphans stayed invisible.
+
+### Phase 1 close — reconciling PR #193 against PR #194 · 2026-09-15
+
+Not a work package. Phase 1's completion criterion is "`npm run contract:check` is
+green and running in CI". On `e4b0f4a` it was **red**, and so was `npm test` and
+`npm run check:docs`. All three traced to one cause, and it is the same cause as
+the precondition entry at the top of this phase: **two pull requests that were each
+correct on their own branch, merged into a main where they contradict each other.**
+
+- **#193** (`6ddb92a`, the Phase 0-1 boundary review) added
+  `src/lib/policies/__tests__/loudFailure.test.ts`, whose D3 block asserted that
+  the ETL still reads `product_code_map` and captures its error — WP 0.2's fix,
+  correctly pinned because "a Critical whose fix nothing pins is a Critical that
+  comes back".
+- **#194** (`6c67c29`, WP 1.4) **deleted that read**, which was WP 1.4's assigned
+  orphan decision and the right one: the branch had never executed.
+
+Neither PR was wrong. Merged together they gave main a test asserting the presence
+of code another commit had removed on purpose.
+
+Three failures, one collision:
+
+| Symptom | Mechanism |
+|---|---|
+| `npm test` 2 failed / 78 | the D3 block asserts a read WP 1.4 deleted |
+| `contract:check` red | the same test file's string `'product_code_map'` made the introspector report the table as an orphan again, so the committed artifact no longer matched a fresh replay |
+| `check:docs` red | unrelated to the above — §4.1 cited `ProcessLevelNetwork.tsx:1110-1111`, which is `if (bomErr) throw bomErr;`. The direct `.from()` reads are at `:1104-1105`, which is what `PLAN-PROMPTS.md` said. **The derived file was right and §4 was stale** |
+
+Fixed here:
+1. **The D3 guard is inverted, not deleted.** It now asserts that the read is gone,
+   that `productMapping` and `productCodeMapError` are gone, that the direct join
+   is what runs, that no migration names the table, and that no sidecar describes
+   it. Deleting the block would have left the deletion unguarded, and resurrecting
+   the dead branch is exactly as silent as the original swallow: a `productMapping`
+   that is always empty looks like a mapping that simply found nothing.
+2. **A test is no longer a consumer.** The introspector's orphan scan skipped its
+   own source but not test files, so a test asserting a table's ABSENCE created
+   that table as an orphan — and the better the regression guard, the louder the
+   false positive. `__tests__/`, `*.test.*`, `*.spec.*` and `tests/` are now
+   excluded, with the reasoning in the code. Orphan detection asks whether running
+   code reads a table no migration creates; a source-level assertion about running
+   code is not running code.
+3. **§4.1's `ProcessLevelNetwork` citation corrected** to `:1104-1105`.
+
+Discovered:
+- **This is the third time in this phase that a merge, not a commit, broke main**
+  (`5c7129f` at the precondition, `e4b0f4a` here). Every individual package was
+  validated before it was pushed; what nobody validates is the *combination*, and
+  the combination is what ships. The new `data-contract.yml` runs on every
+  `pull_request` AND on `push: [main]` — the second trigger is the one that would
+  have caught both of these, because it tests the merged result rather than the
+  branch. Worth stating plainly: **a PR-only CI gate cannot catch a semantic merge
+  conflict**, because by construction neither branch is red.
+- **A source-level regression guard has a failure mode that a behavioural test does
+  not**: it can be made false by a legitimate fix to the thing it guards, and it
+  says so in a way that looks like a bug. `loudFailure.test.ts` is still the right
+  shape for this repo (no DOM tooling), but a guard of this kind should assert the
+  DECISION, not the implementation — which is what the rewritten D3 block does and
+  the original did not.
+- `check:docs` proved its worth in the opposite direction from the one it was built
+  for: the gate exists to stop a derived file drifting from §4, and it caught §4
+  drifting from reality while the derived file stayed correct.
+
+Phase 1 exit, verified on this commit:
+- `npm run contract:check` — **green**, and running in CI (`.github/workflows/data-contract.yml`,
+  no path filter, each gate its own named step, none behind `npm run lint`).
+- Both orphan tables resolved, plus the third this phase found: `product_code_map`
+  deleted, `risk_data` created as reference-tier with provenance, `approved_users`
+  reconstructed so `supabase/migrations/` can build a working database alone.
+  `contract:verify` reports **0 orphans, 0 phantom tables**.
+- Exactly one `UNIT_DAYS`: TypeScript canonical, Python mirrored, SQL generated,
+  all three compared key for key on every test run.
+- `lead_time_unit` exists end to end — column, CHECK, template, wizard, sanitizer,
+  worker projection, engine.
+- Every simulation-path field records the CSV header its user types, enforced
+  against `public/template/*.csv` rather than asserted.
+- §16 carries an entry for each of the four work packages, plus the precondition
+  repair and this reconciliation.
+
+Still open, and named rather than hidden:
+- **The §15 baseline has never been run.** No database has been reachable from any
+  session in Phase 0 or Phase 1. Every "we improved X" from here to Phase 6 is
+  unmeasured until someone with access runs §15 and appends the counts.
+- **`contract:check` warns on four tier-2 tables with no natural key** (D5). That is
+  WP 3.3's, and the warning is dated to flip to an error in WP 2.4.
+- **RLS is off on the three item masters** — found in WP 1.2, assigned to WP 2.2/2.4.
+- **D26**: two live copies of the D1 prefill rule, only one reachable. WP 6.2.
 
 ---
 

@@ -746,6 +746,13 @@ function resolveShadowed(schema, writeSites) {
 const CODE_ROOTS = ["src", "supabase/functions", "sim-worker", "scsim", "scripts"];
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|py)$/;
 const SKIP_DIR = /node_modules|\.git|dist|build|__pycache__|\.venv|docs\/archive/;
+// A TEST is not a consumer. `loudFailure.test.ts` names `product_code_map` in a
+// string in order to assert that the ETL no longer reads it — so counting test
+// files here makes a table an orphan BECAUSE it was correctly removed, and the
+// better the regression guard, the louder the false positive. Orphan detection
+// asks "does running code read a table no migration creates?"; a source-level
+// assertion about running code is not running code.
+const TEST_FILE = /(^|\/)__tests__\/|\.(test|spec)\.(ts|tsx|js|jsx|mjs|py)$|(^|\/)tests?\//;
 
 function walkCode(dir, out = []) {
   if (!existsSync(dir) || SKIP_DIR.test(dir)) return out;
@@ -781,6 +788,7 @@ function findCodeTableRefs() {
   for (const root of CODE_ROOTS) {
     for (const file of walkCode(join(ROOT, root))) {
       if (file.includes(SELF)) continue; // this generator's own prose
+      if (TEST_FILE.test(relative(ROOT, file))) continue; // an assertion, not a consumer
       const text = readFileSync(file, "utf8");
       const lineAt = (idx) => text.slice(0, idx).split("\n").length;
       for (const re of patterns) {
