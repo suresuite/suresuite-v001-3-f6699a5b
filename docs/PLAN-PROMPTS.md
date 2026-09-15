@@ -1,6 +1,6 @@
 # Data Spine — Execution Prompts
 
-> **Companion to** `docs/data/IMPLEMENTATION-PLAN.md`
+> **Companion to** `docs/PLAN.md`
 > **Branch:** `claude/busy-lovelace-5hxsh6` · **PR:** #187
 > **Status:** AUTHORED
 
@@ -18,7 +18,7 @@ them — but **treat them as leads, not facts**: re-check anything you rely on.
 ## The preamble — paste before every WP prompt
 
 ```
-You are implementing ONE work package from docs/data/IMPLEMENTATION-PLAN.md
+You are implementing ONE work package from docs/PLAN.md
 on branch claude/busy-lovelace-5hxsh6 (PR #187). Read §1 of that plan first —
 it defines the work-package lifecycle. Follow it exactly.
 
@@ -49,7 +49,7 @@ the simulation platform, per CLAUDE.md.
 ### WP 0.1 — Kill the silent policy override
 
 ```
-Implement WP 0.1 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 0.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · useStageRows.tsx:283-288 writes hardcoded constants onto every supplier row.
@@ -75,7 +75,7 @@ non-data. Justify whichever you pick in the commit message.
 ### WP 0.2 — Unit conversion + orphan-table honesty
 
 ```
-Implement WP 0.2 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 0.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · combine-project/index.ts carries `// @ts-nocheck` and reads row.volume raw at
@@ -103,7 +103,7 @@ measured against — this is the most valuable thing this WP produces.
 ### WP 0.3 — Documentation consolidation · PARTLY DONE (`719f59b`)
 
 ```
-Finish WP 0.3 from docs/data/IMPLEMENTATION-PLAN.md. The archive half is DONE —
+Finish WP 0.3 from docs/PLAN.md. The archive half is DONE —
 docBodies.tsx and HelpPage.tsx are in docs/archive/legacy-help-site/ with a README.
 Read §16's WP 0.3 drift-log entry before starting.
 
@@ -127,7 +127,7 @@ Do NOT touch the archived files — mining them is WP 5.2a's job.
 ### WP 1.1 — Schema introspector
 
 ```
-Implement WP 1.1 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 1.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · There are 291 migrations. Order matters and is by filename.
@@ -151,7 +151,7 @@ Do not author any sidecar YAML in this WP. Introspection only.
 ### WP 1.2 — Sidecar schema and the first twelve tables
 
 ```
-Implement WP 1.2 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 1.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · scsim/scsim/io/registry_export.py + scsim/scripts/gen_docs.py are the pattern to
@@ -174,7 +174,7 @@ Author sidecars only. The generator and gate are WP 1.4.
 ### WP 1.3 — One unit table, lead_time_unit, resolution modes
 
 ```
-Implement WP 1.3 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 1.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · THREE unit conversions exist and disagree:
@@ -202,7 +202,7 @@ distribution to an engineering fact.
 ### WP 1.4 — Generator, drift gate, orphan reconciliation
 
 ```
-Implement WP 1.4 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 1.4 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · scsim/scripts/gen_docs.py --check is the exact gate pattern to copy, including
@@ -232,7 +232,7 @@ Add the invariants table from §2.1 of the plan to CLAUDE.md in this commit.
 ### WP 2.1 — One organization identity
 
 ```
-Implement WP 2.1 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 2.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · TWO org identities coexist. Legacy: approved_users.organization TEXT and
@@ -258,7 +258,7 @@ WP — that is a follow-up migration once the backfill is verified at 100%.
 ### WP 2.2 — Project membership and the resolver
 
 ```
-Implement WP 2.2 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 2.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · There is NO project_members table. Project access resolves to
@@ -284,7 +284,7 @@ over org deny, expired grant) into §16 as part of the gap check.
 ### WP 2.3 — Data-plane audit
 
 ```
-Implement WP 2.3 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 2.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · admin_audit_logs (20260709000002:239) already has the right shape: actor_user_id,
@@ -306,7 +306,7 @@ table and tick whether it audits. Un-audited paths become a WP 3.x addendum in �
 ### WP 2.4 — Contract-generated RLS tests
 
 ```
-Implement WP 2.4 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 2.4 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · RLS on the lane tables has a known history of not surviving PostgREST connection
@@ -333,7 +333,7 @@ Flip the natural-key rule in check.mjs from warn to error and confirm it now fai
 ### WP 3.1 — ingest_* generalization
 
 ```
-Implement WP 3.1 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 3.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · erp_staged_products / _bom_versions / _bom_lines and erp_sync_runs
@@ -357,7 +357,7 @@ full stage→diff→promote cycle BEFORE renaming anything.
 ### WP 3.2 — Server-side parse and Tier 0/1 landing for CSV
 
 ```
-Implement WP 3.2 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 3.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · UploadWizard.tsx:476-477 and :497-523 parse with split(','). Confirmed behaviour:
@@ -382,7 +382,7 @@ defect class this WP exists to end.
 ### WP 3.3 — Natural keys, upsert, normalization at promotion
 
 ```
-Implement WP 3.3 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 3.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · NO lane table has a natural-key unique index — only `id UUID PRIMARY KEY`
@@ -405,7 +405,7 @@ separately revertible.
 ### WP 3.4 — Diff, review, promote UI
 
 ```
-Implement WP 3.4 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 3.4 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · The MRP sync mapping report is the model to follow. erp_sync_runs carries
@@ -429,7 +429,7 @@ incomplete — record that in §16 rather than papering over it here.
 ### WP 4.1 — Complete and compose graph_hash
 
 ```
-Implement WP 4.1 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 4.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · _build_dataset_snapshot (20260703000001_dataset_versions.sql:70-138) hashes
@@ -453,7 +453,7 @@ exists to close.
 ### WP 4.2 — The analysis store
 
 ```
-Implement WP 4.2 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 4.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · There is NO network_metrics table. Centrality lives as COLUMNS on network_nodes
@@ -480,7 +480,7 @@ before closing the WP.
 ### WP 4.3 — Migrate the four analyzers (dual-write)
 
 ```
-Implement WP 4.3 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 4.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · Four analyzers: calculate-network-science-metrics, calculate-node-prominence,
@@ -504,7 +504,7 @@ semantics silently; investigate before Phase 5.
 ### WP 4.4 — Staleness and invalidation
 
 ```
-Implement WP 4.4 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 4.4 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · THREE ad-hoc staleness mechanisms exist and none consults graph_hash:
@@ -530,7 +530,7 @@ survivors in the gap check; any remaining timestamp comparison is a miss.
 ### WP 5.1 — Surfaces (lineage) block
 
 ```
-Implement WP 5.1 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 5.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · Data access is concentrated enough to analyse statically: src/hooks/useStageRows.tsx,
@@ -552,7 +552,7 @@ explicitly marked as reading no project data.
 ### WP 5.2a — Docs shell + Overview & architecture  ← no dependencies, highest value
 
 ```
-Implement WP 5.2a from docs/data/IMPLEMENTATION-PLAN.md (§6.3, §6.5, §12).
+Implement WP 5.2a from docs/PLAN.md (§6.3, §6.5, §12).
 
 Ship the manual's shell and its first two sections (~10 pages). The manual OPENS
 with the architecture — a reader must see how the software is designed before
@@ -598,7 +598,7 @@ numbers silently"), never quoted as I-numbers.
 ### WP 5.2b — Input tables reference  (closes D21) ← the core of the manual
 
 ```
-Implement WP 5.2b from docs/data/IMPLEMENTATION-PLAN.md (§6.3 section 2).
+Implement WP 5.2b from docs/PLAN.md (§6.3 section 2).
 
 Generate 11 table pages + 2 written ones, in the anyLogistix style: purpose,
 where to upload, template link, column-by-column reference, example, notes,
@@ -627,7 +627,7 @@ not guess.
 ### WP 5.2c–h — the remaining sections
 
 ```
-Implement WP 5.2<c|d|e|f|g|h> from docs/data/IMPLEMENTATION-PLAN.md (§6.3, §12).
+Implement WP 5.2<c|d|e|f|g|h> from docs/PLAN.md (§6.3, §12).
 
 c · Policies + Verification (12 pages). The policy catalog and policy types already
     render from the engine registry via gen_docs.py — link or embed, never re-type.
@@ -648,7 +648,7 @@ table or route with no page and no internal-only justification is a finding.
 ### WP 5.3 — Pages read analysis_results; drop entity columns
 
 ```
-Implement WP 5.3 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 5.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · Browser-side computation to remove: ProcessLevelNetwork reachability and level
@@ -674,7 +674,7 @@ fully rather than all pages partially, and hand off precisely.
 ### WP 6.1 — Resolution chains, documented and pinned
 
 ```
-Implement WP 6.1 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 6.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · The Supplier stage is the deepest chain and the right one to do first:
@@ -695,7 +695,7 @@ them — the list is this WP's most valuable output and feeds WP 6.2.
 ### WP 6.2 — Fix the divergences
 
 ```
-Implement WP 6.2 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 6.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · D17: ensure_item_masters (item_master.sql:85-89) inserts supplier rows with
@@ -722,7 +722,7 @@ where that debt is paid.
 ### WP 6.3 — Provenance vocabulary and researcher export
 
 ```
-Implement WP 6.3 from docs/data/IMPLEMENTATION-PLAN.md.
+Implement WP 6.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · Current vocabulary: policyGridUi.tsx:15-35 defines data | master | imputed |
@@ -748,7 +748,7 @@ reproduce any displayed number from the source file using only the export.
 ### Resume a WP that ran out of budget
 
 ```
-A previous session started WP <N.M> from docs/data/IMPLEMENTATION-PLAN.md and did
+A previous session started WP <N.M> from docs/PLAN.md and did
 not finish. Do NOT restart it.
 
 1. Read §16 Drift Log for the last entry and any partial handoff note.
@@ -765,7 +765,7 @@ If what landed contradicts the plan, the plan is wrong — fix the plan.
 ### Gap check only
 
 ```
-Do the GAP CHECK for WP <N.M> in docs/data/IMPLEMENTATION-PLAN.md. No new feature
+Do the GAP CHECK for WP <N.M> in docs/PLAN.md. No new feature
 work.
 
 · Re-read the previous WP's Handoff note in §16. Did reality match?
@@ -782,7 +782,7 @@ Commit as: Phase N / WP N.M: gap check.
 ### Phase boundary review
 
 ```
-Phase <N> of docs/data/IMPLEMENTATION-PLAN.md is complete. Before Phase <N+1>:
+Phase <N> of docs/PLAN.md is complete. Before Phase <N+1>:
 
 1. Read every §12 entry for this phase. Summarize what the plan got wrong.
 2. Re-run the full §11 verification SQL; compare against the Phase 0 baseline and

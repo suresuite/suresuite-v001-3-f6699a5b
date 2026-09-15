@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Single-source gate for DATA-LAYER facts (invariant I1).
 //
-// docs/data/IMPLEMENTATION-PLAN.md §4 is the only authority for file:line
+// docs/PLAN.md §4 is the only authority for file:line
 // evidence about the data chain — CSV parse, ingest, ETL, the policy grid, the
 // engine mapping and the migrations. Two rules:
 //
@@ -18,7 +18,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const PLAN = "docs/data/IMPLEMENTATION-PLAN.md";
+const PLAN = "docs/PLAN.md";
 
 /** Source files whose line numbers are data-layer facts the plan owns. */
 const DATA_LAYER = [
@@ -38,7 +38,7 @@ const isDataLayer = (f) => DATA_LAYER.some((n) => f.includes(n));
 /** file → { why, derived } — derived files must hold no fact the plan lacks. */
 const ALLOWED = new Map([
   [PLAN, { why: "the single source — §4 owns all data-layer evidence", derived: false }],
-  ["docs/data/PROMPTS.md", {
+  ["docs/PLAN-PROMPTS.md", {
     why: "derived view: caches §4 evidence so a cold session need not dig",
     derived: true,
   }],

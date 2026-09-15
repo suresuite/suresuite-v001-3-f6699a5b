@@ -3,7 +3,7 @@
 > **Status:** AUTHORED · approved architecture, not yet started
 > **Baseline:** commit `d3cfc9d`
 > **Figures:** https://claude.ai/artifact/4sXUGPiyCmpXGAfRp78mu1 *(11 diagrams)*
-> **Execution:** `docs/data/PROMPTS.md` — one prompt per work package
+> **Execution:** `docs/PLAN-PROMPTS.md` — one prompt per work package
 > **Blueprint refs:** `docs/design/next-gen-platform-design.md` §2.3 G4–G6 · §8.1–8.4 · Phase A
 
 **This is the single plan** — enforced, not asserted: `npm run check:docs` fails if
