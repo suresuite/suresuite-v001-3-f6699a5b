@@ -1,0 +1,138 @@
+# AUTHORED — the data contract's sidecar for `user_ai_permissions`.
+table: user_ai_permissions
+tier: G
+schema_name: public
+grain: >-
+  One user's AI entitlements — which models they may reach, which one they get by
+  default, and how the request is shaped. One row per user, or none.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [user_id]
+    name: user_ai_permissions_pkey
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Read by `capabilities_for_user()` into the `models` block of its result, which
+    is what the chat surfaces use to decide what to offer. Not part of the four
+    capability layers — a capability answers "may you", this answers "with what".
+
+fields:
+  user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The user these entitlements belong to. PK, so a user has at most one row.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  allowed_model_ids:
+    type: uuid[]
+    unit: null
+    unit_source: none
+    meaning: >-
+      The models this user may use, as `ai_models.id`. An allow-list, but read as
+      one only when it is non-empty.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: the array is empty, or the user has no row at all
+        value: every enabled model is allowed
+        provenance: default
+        visible_as: >-
+          nowhere, and it is worth stating plainly: EMPTY MEANS EVERYTHING here,
+          not nothing. The resolver sets `all_allowed` true when the array is empty
+          or absent, which preserves the behaviour that existed before the column
+          did. An administrator clearing the list to revoke access would grant all
+          of it instead.
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  default_model_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The model a new conversation starts on. Nullable — the app falls back to its own default.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  fallback_model_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The model used when the default is unavailable or over budget.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  temperature:
+    type: numeric(3,2)
+    unit: null
+    unit_source: none
+    meaning: >-
+      Per-user sampling temperature override. Dimensionless and NOT a physical
+      quantity — it is a model knob, recorded here so nobody mistakes it for one of
+      the platform's measured values.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  max_context_override:
+    type: integer
+    unit: tokens
+    unit_source: fixed
+    meaning: A per-user cap on context window size, in tokens. Nullable — the model's own limit applies.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the simulation engine and never will be: `scsim` has no
+      concept of a language model. This is an AI-plane setting that happens to live
+      in the governance tier.
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When it was last changed. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  The empty-array-means-everything rule in `allowed_model_ids` is the one thing a
+  reader of this table must not get wrong. It is deliberate — it preserves the
+  pre-column behaviour for every user who has no row — but it inverts the usual
+  reading of an allow-list, and nothing at the point of display says so (§5 T2).

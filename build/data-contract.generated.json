@@ -5,21 +5,21 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 296,
-      "migrations_applied": 293,
-      "last_migration": "20260915000004_org_identity_dual_read.sql"
+      "migrations_found": 297,
+      "migrations_applied": 294,
+      "last_migration": "20260915000005_project_membership_and_delegation.sql"
     },
-    "sidecars": 17,
+    "sidecars": 25,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 73,
-    "tables_covered": 17,
-    "columns_covered": 204,
-    "check_constraints": 6,
+    "tables_in_schema": 76,
+    "tables_covered": 25,
+    "columns_covered": 256,
+    "check_constraints": 7,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -1437,6 +1437,283 @@
       ],
       "note": null
     },
+    "capabilities": {
+      "table": "capabilities",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that.",
+      "owner": "platform",
+      "created_by": "20260711000002_unified_access_control.sql",
+      "sidecar": "supabase/contract/capabilities.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "key"
+          ],
+          "name": "capabilities_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "Read is open — every client needs the catalog to render a permissions screen, and the rows contain no tenant data. Writes are service-role only, and in practice happen in migrations: a capability is introduced by the feature that needs it, not by an administrator at runtime."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "capabilities: read",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260711000002_unified_access_control.sql"
+          },
+          {
+            "name": "capabilities: super write",
+            "command": "ALL",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260711000002_unified_access_control.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "capabilities_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "key"
+          ],
+          "definition": "PRIMARY KEY (key)",
+          "implicit": true,
+          "added_by": "20260711000002_unified_access_control.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "key",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The capability's identity, and the string every grant table and every call site names. Page keys are ROUTES (`/policies`); feature keys are snake_case verbs (`data_edit_inputs`). The convention is not enforced by a CHECK.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "unique"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "`page` or `feature`, CHECK-constrained. The resolver aggregates the two separately and returns them under separate keys, so the distinction is load-bearing rather than descriptive.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "page or feature"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The human name shown on permission screens.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "One sentence on what holding it lets you do. Nullable.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "100",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Display order on permission screens. Presentation only.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the capability was added to the catalog. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When its metadata last changed. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "THE CATALOG IS DUPLICATED IN TYPESCRIPT. `src/lib/capabilities.ts` carries the same keys as a union type and a list, because the client needs them without a round trip. Two hand-maintained copies of one fact is an I1 violation waiting to drift — `projectMembership.test.ts` asserts the WP 2.2 keys agree, but nothing checks the whole catalog, and the honest count is that the DB has grown keys the TS list learned about only when someone noticed. Generating one from the other is the fix and it belongs with the contract's other generators, not here."
+    },
     "dataset_versions": {
       "table": "dataset_versions",
       "schema_name": "public",
@@ -1767,6 +2044,374 @@
         }
       ],
       "note": null
+    },
+    "delegation_grants": {
+      "table": "delegation_grants",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends.",
+      "owner": "platform",
+      "created_by": "20260915000005_project_membership_and_delegation.sql",
+      "sidecar": "supabase/contract/delegation_grants.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "delegation_grants_pkey"
+        }
+      ],
+      "natural_key_intended": [
+        "id"
+      ],
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "owner",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "`write: null` again literal. SELECT is limited to the grantor, the grantee and super admins; there is NO write policy, so RLS denies writes and `grant_project_delegation()` / `revoke_project_delegation()` are the only way in. That is forced rather than chosen: subtraction has to be CHECKED against the grantor's own level, and a PERMISSIVE policy cannot subtract (D28) — it can only add another OR'd way to say yes. `audited: false` is the uncomfortable one: a privilege grant that writes no audit row is exactly what `audit-actor` (§2.1 G4) exists to prevent, and WP 2.3 owns it. Recorded here rather than left to be noticed."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "delegation_grants: read own",
+            "command": "SELECT",
+            "roles": [],
+            "using": "grantor_user_id = public.get_current_user_id() OR grantee_user_id = public.get_current_user_id() OR public.current_is_super_admin()",
+            "with_check": "grantor_user_id = public.get_current_user_id() OR grantee_user_id = public.get_current_user_id() OR public.current_is_super_admin()",
+            "added_by": "20260915000005_project_membership_and_delegation.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (grantor_user_id <> grantee_user_id)",
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "delegation_grants_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "delegation_grants_active_idx",
+          "unique": false,
+          "columns": [
+            "grantee_user_id",
+            "project_id"
+          ],
+          "predicate": "revoked_at IS NULL",
+          "partial": true,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Surrogate identifier for the grant. What revoke takes.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project the grant applies to. A delegation is never org-wide.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "grantor_user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Who gave it. Their effective project role at the moment of granting is the ceiling on what the grant may contain.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must differ from grantee — CHECK"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "grantee_user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Who received it.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must differ from grantor — CHECK"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_role",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The level granted. Rejected by the RPC if it outranks the grantor's own — the subtractive rule, enforced in one place.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of owner / editor / analyst / viewer, and no higher than the grantor's own level"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it stops granting. NOT NULL, and the RPC additionally refuses a time already past. A delegation without an end is a membership, and the product has a table for those.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "required and in the future"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "rationale",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Why the elevation exists. NOT NULL and non-empty, unlike on `project_members`: a temporary grant of someone else's access is exactly the thing a reviewer will later ask the reason for.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty after btrim"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it was withdrawn early, if it was. Revocation SETS this rather than deleting the row — who held what, and when, survives the withdrawal.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the grant was made. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "Expiry and revocation are both applied inside `effective_project_role()` rather than by each caller, so \"did you remember to check expires_at\" is not a question any future reader has to answer. Verified against a live PostgreSQL in WP 2.2: a grant exceeding the grantor's level is rejected, one with no expiry is rejected, and a grant whose expiry passes stops granting (PLAN.md §16)."
     },
     "inbound_logistics": {
       "table": "inbound_logistics",
@@ -2970,6 +3615,243 @@
         }
       ],
       "note": null
+    },
+    "org_capabilities": {
+      "table": "org_capabilities",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default.",
+      "owner": "platform",
+      "created_by": "20260711000002_unified_access_control.sql",
+      "sidecar": "supabase/contract/org_capabilities.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "PRIMARY KEY constraint",
+          "columns": [
+            "org_id",
+            "capability_key"
+          ],
+          "name": null
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "One of the four layers `capabilities_for_user()` resolves, in the order role -> org -> project -> user, most specific winning. `audited: false` and it matters here more than on most tables: these rows ARE the permissions, and a change to one currently leaves no record of who made it (§2.1 `audit-actor`, WP 2.3)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "org_caps: super full",
+            "command": "ALL",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260711000002_unified_access_control.sql"
+          },
+          {
+            "name": "org_caps: members read own",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.organization_members m WHERE m.org_id = org_capabilities.org_id AND m.user_id = public.get_current_user_id() )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.organization_members m WHERE m.org_id = org_capabilities.org_id AND m.user_id = public.get_current_user_id() )",
+            "added_by": "20260711000002_unified_access_control.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "org_id",
+            "capability_key"
+          ],
+          "definition": "PRIMARY KEY (org_id, capability_key)",
+          "added_by": "20260711000002_unified_access_control.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "org_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "the organization the row grants for.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "capability_key",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "capabilities",
+            "columns": [
+              "key"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The capability, naming a row in `capabilities`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must exist in capabilities"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "allowed",
+          "type": "boolean",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether this layer grants the capability. TRI-STATE in effect: a missing row means \"inherit from the next layer out\", `false` means \"deny here\". They are different answers and the resolver's COALESCE depends on the difference.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "no row exists at this layer",
+              "value": "the next layer out decides; the chain ends in false",
+              "provenance": "default",
+              "visible_as": "capabilities_for_user returns the resolved boolean; which layer decided is not reported"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it was last changed. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before."
     },
     "organization_members": {
       "table": "organization_members",
@@ -5776,6 +6658,554 @@
       ],
       "note": null
     },
+    "project_members": {
+      "table": "project_members",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between \"in the organization\" (sees every project) and \"not in it\" (sees none).",
+      "owner": "platform",
+      "created_by": "20260915000005_project_membership_and_delegation.sql",
+      "sidecar": "supabase/contract/project_members.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "PRIMARY KEY constraint",
+          "columns": [
+            "project_id",
+            "user_id"
+          ],
+          "name": null
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "owner",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "project_members: read own and co-members",
+            "command": "SELECT",
+            "roles": [],
+            "using": "user_id = public.get_current_user_id() OR EXISTS (SELECT 1 FROM public.project_members m WHERE m.project_id = project_members.project_id AND m.user_id = public.get_current_user_id()) OR public.current_is_super_admin()",
+            "with_check": "user_id = public.get_current_user_id() OR EXISTS (SELECT 1 FROM public.project_members m WHERE m.project_id = project_members.project_id AND m.user_id = public.get_current_user_id()) OR public.current_is_super_admin()",
+            "added_by": "20260915000005_project_membership_and_delegation.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "project_id",
+            "user_id"
+          ],
+          "definition": "PRIMARY KEY (project_id, user_id)",
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project the membership is on. CASCADEs when the project is deleted.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The approved user who holds it. CASCADEs when the account is deleted.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_role",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "What they may do here — `owner`, `editor`, `analyst` or `viewer`, CHECK-constrained and totally ordered by `project_role_rank()`. A PROJECT vocabulary, and deliberately not `organization_members.org_role` (owner|admin|member): they share the word \"owner\" and mean different things by it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of owner / editor / analyst / viewer"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "granted_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Who granted the membership. SET NULL rather than CASCADE on purpose — losing the granter's account must not silently delete the grant they made.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the membership lapses. NULL means standing — unlike `delegation_grants`, where an end date is mandatory. `effective_project_role()` applies the comparison so no caller can forget it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "rationale",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Why the person is on the project, in the granter's words. Optional here and REQUIRED on a delegation: a standing membership is usually self-evident from the project, a temporary elevation never is.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "a row is backfilled from projects.modeler_id",
+              "value": "'backfilled from projects.modeler_id by WP 2.2 — the de-facto owner'",
+              "provenance": "default",
+              "visible_as": "the stored rationale says so verbatim, so a reader can tell a backfilled row from a granted one"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the membership was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it was last changed. Server-stamped by DEFAULT only; no trigger maintains it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "Backfilled from `projects.modeler_id` — every project's modeler becomes its owner. That records a fact that already held rather than granting anything new: every write policy in the schema already reads `modeler_id` as the project's owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the backfill filters on the user existing; a project whose modeler row is gone gets no owner and is visible only to the organization, which is the honest outcome and a §15 question worth asking."
+    },
+    "project_role_capabilities": {
+      "table": "project_role_capabilities",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "What one project role may do — one row per (project_role, capability). The project layer of the four-layer resolver, shaped exactly like `role_capabilities` so all four layers read the same way.",
+      "owner": "platform",
+      "created_by": "20260915000005_project_membership_and_delegation.sql",
+      "sidecar": "supabase/contract/project_role_capabilities.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "PRIMARY KEY constraint",
+          "columns": [
+            "project_role",
+            "capability_key"
+          ],
+          "name": null
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "Read is open to everyone (`USING (true)`): it is a static policy table with no per-tenant content, and every client needs it to render what a role can do. As with the other capability tables there is no write policy, so writes are service-role only."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "project_role_capabilities: read all",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260915000005_project_membership_and_delegation.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "project_role",
+            "capability_key"
+          ],
+          "definition": "PRIMARY KEY (project_role, capability_key)",
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "project_role",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project role the row grants for — owner, editor, analyst or viewer.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of owner / editor / analyst / viewer"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "capability_key",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "capabilities",
+            "columns": [
+              "key"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The capability, FK to `capabilities.key`. CASCADEs, so retiring a capability cannot leave grants pointing at nothing.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must exist in capabilities"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "allowed",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether this role gets it. The layer is TRI-STATE in effect: a missing row means \"inherit from the org layer\", `false` means \"deny at the project level\". They are different answers and the resolver's COALESCE relies on it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "no row exists for this (project_role, capability)",
+              "value": "the org layer's answer, then the role layer's, then false",
+              "provenance": "default",
+              "visible_as": "capabilities_for_user returns the resolved boolean; the layer that decided it is not currently reported"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "WHICH LAYER DECIDED IS NOT RETURNED, and that is a §5 T1 gap worth naming: a user told \"you cannot export\" cannot learn whether that came from their role, their org, their project role or an explicit user deny. The resolver has the information and discards it. WP 2.4 renders governance and is the place to fix it.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the grant row was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000005_project_membership_and_delegation.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it was last changed. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "Seeded by WP 2.2 with the split that gives `analyst` its meaning: an analyst may edit tier-4 decisions (`data_edit_policies`) and may NOT edit the tier-2 measured inputs those decisions are judged against (`data_edit_inputs`). Before the split one `data_editing` flag governed both, so the role could not exist."
+    },
     "projects": {
       "table": "projects",
       "schema_name": "public",
@@ -6893,6 +8323,237 @@
         }
       ],
       "note": "The second of WP 1.4's three orphans (D4), and the one that turned out not to be an orphan at all. Two network pages read it and no migration created it — but the table EXISTS in the production database, untracked, with the spreadsheet-header columns `COUNTRY` and `\"RISK CLASS\"`. CI proved it: the first version of the migration was a plain `CREATE TABLE IF NOT EXISTS`, which no-opped, and the next statement failed on a column that was not there. Same class as `approved_users`: created outside migration tracking, invisible to a static replay, which can only tell you no migration creates a table and not whether one exists. `20260915000003_risk_data.sql` now both builds it on a fresh database and ADOPTS the one already there — renaming the quoted columns, adding the provenance columns, and marking the pre-contract rows `source: 'unrecorded (loaded before the reference-tier contract)'` rather than inventing a publisher for them. The new CHECKs land `NOT VALID` on the adopted table: enforced for every future write, not retroactively asserted about rows nobody has looked at."
+    },
+    "role_capabilities": {
+      "table": "role_capabilities",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One grant or denial, for one role and one capability. The OUTERMOST layer: what a role gets before any org, project or user says otherwise.",
+      "owner": "platform",
+      "created_by": "20260711000002_unified_access_control.sql",
+      "sidecar": "supabase/contract/role_capabilities.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "PRIMARY KEY constraint",
+          "columns": [
+            "role",
+            "capability_key"
+          ],
+          "name": null
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "One of the four layers `capabilities_for_user()` resolves, in the order role -> org -> project -> user, most specific winning. `audited: false` and it matters here more than on most tables: these rows ARE the permissions, and a change to one currently leaves no record of who made it (§2.1 `audit-actor`, WP 2.3)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "role_caps: read",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260711000002_unified_access_control.sql"
+          },
+          {
+            "name": "role_caps: super write",
+            "command": "ALL",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260711000002_unified_access_control.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "role",
+            "capability_key"
+          ],
+          "definition": "PRIMARY KEY (role, capability_key)",
+          "added_by": "20260711000002_unified_access_control.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "the global app_role the row grants for — super_admin, admin, modeler or user.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "capability_key",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "capabilities",
+            "columns": [
+              "key"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The capability, naming a row in `capabilities`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must exist in capabilities"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "allowed",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether this layer grants the capability. TRI-STATE in effect: a missing row means \"inherit from the next layer out\", `false` means \"deny here\". They are different answers and the resolver's COALESCE depends on the difference.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "no row exists at this layer",
+              "value": "the next layer out decides; the chain ends in false",
+              "provenance": "default",
+              "visible_as": "capabilities_for_user returns the resolved boolean; which layer decided is not reported"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it was last changed. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before."
     },
     "suppliers": {
       "table": "suppliers",
@@ -8769,9 +10430,578 @@
         }
       ],
       "note": null
+    },
+    "user_ai_permissions": {
+      "table": "user_ai_permissions",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One user's AI entitlements — which models they may reach, which one they get by default, and how the request is shaped. One row per user, or none.",
+      "owner": "platform",
+      "created_by": "20260709000002_super_admin_phase1.sql",
+      "sidecar": "supabase/contract/user_ai_permissions.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "user_id"
+          ],
+          "name": "user_ai_permissions_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "Read by `capabilities_for_user()` into the `models` block of its result, which is what the chat surfaces use to decide what to offer. Not part of the four capability layers — a capability answers \"may you\", this answers \"with what\"."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "uap: super full",
+            "command": "ALL",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260709000002_super_admin_phase1.sql"
+          },
+          {
+            "name": "uap: read own",
+            "command": "SELECT",
+            "roles": [],
+            "using": "user_id = public.get_current_user_id()",
+            "with_check": "user_id = public.get_current_user_id()",
+            "added_by": "20260709000002_super_admin_phase1.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "user_ai_permissions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "user_id"
+          ],
+          "definition": "PRIMARY KEY (user_id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The user these entitlements belong to. PK, so a user has at most one row.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "allowed_model_ids",
+          "type": "uuid[]",
+          "nullable": false,
+          "default": "'{}'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The models this user may use, as `ai_models.id`. An allow-list, but read as one only when it is non-empty.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "the array is empty, or the user has no row at all",
+              "value": "every enabled model is allowed",
+              "provenance": "default",
+              "visible_as": "nowhere, and it is worth stating plainly: EMPTY MEANS EVERYTHING here, not nothing. The resolver sets `all_allowed` true when the array is empty or absent, which preserves the behaviour that existed before the column did. An administrator clearing the list to revoke access would grant all of it instead."
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "default_model_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ai_models",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The model a new conversation starts on. Nullable — the app falls back to its own default.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fallback_model_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ai_models",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The model used when the default is unavailable or over budget.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "temperature",
+          "type": "numeric(3,2)",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Per-user sampling temperature override. Dimensionless and NOT a physical quantity — it is a model knob, recorded here so nobody mistakes it for one of the platform's measured values.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "max_context_override",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": "tokens",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "meaning": "A per-user cap on context window size, in tokens. Nullable — the model's own limit applies.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine and never will be: `scsim` has no concept of a language model. This is an AI-plane setting that happens to live in the governance tier.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it was last changed. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "The empty-array-means-everything rule in `allowed_model_ids` is the one thing a reader of this table must not get wrong. It is deliberate — it preserves the pre-column behaviour for every user who has no row — but it inverts the usual reading of an allow-list, and nothing at the point of display says so (§5 T2)."
+    },
+    "user_capabilities": {
+      "table": "user_capabilities",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One grant or denial, for one user_id and one capability. The INNERMOST layer: an explicit per-person answer that beats every other.",
+      "owner": "platform",
+      "created_by": "20260711000002_unified_access_control.sql",
+      "sidecar": "supabase/contract/user_capabilities.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "PRIMARY KEY constraint",
+          "columns": [
+            "user_id",
+            "capability_key"
+          ],
+          "name": null
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "One of the four layers `capabilities_for_user()` resolves, in the order role -> org -> project -> user, most specific winning. `audited: false` and it matters here more than on most tables: these rows ARE the permissions, and a change to one currently leaves no record of who made it (§2.1 `audit-actor`, WP 2.3)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "user_caps: super full",
+            "command": "ALL",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260711000002_unified_access_control.sql"
+          },
+          {
+            "name": "user_caps: read own",
+            "command": "SELECT",
+            "roles": [],
+            "using": "user_id = public.get_current_user_id()",
+            "with_check": "user_id = public.get_current_user_id()",
+            "added_by": "20260711000002_unified_access_control.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "user_id",
+            "capability_key"
+          ],
+          "definition": "PRIMARY KEY (user_id, capability_key)",
+          "added_by": "20260711000002_unified_access_control.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "the user the row grants for.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "capability_key",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "capabilities",
+            "columns": [
+              "key"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The capability, naming a row in `capabilities`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must exist in capabilities"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "allowed",
+          "type": "boolean",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether this layer grants the capability. TRI-STATE in effect: a missing row means \"inherit from the next layer out\", `false` means \"deny here\". They are different answers and the resolver's COALESCE depends on the difference.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "no row exists at this layer",
+              "value": "the next layer out decides; the chain ends in false",
+              "provenance": "default",
+              "visible_as": "capabilities_for_user returns the resolved boolean; which layer decided is not reported"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000002_unified_access_control.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it was last changed. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before."
     }
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "19b8f6b68a11"
+  "contract_version": "91c378b2e0f8"
 }

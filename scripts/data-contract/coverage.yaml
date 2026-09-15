@@ -18,14 +18,6 @@
 # moves with it in the same commit.
 
 deferred:
-  - wp: "2.2"
-    why: >-
-      Capability and delegation. `min_project_role` is already a required sidecar
-      field pointing at `project_members.project_role`, and `project_members`
-      does not exist yet — these tables are the vocabulary it will be built from,
-      so they are authored with it, not before it.
-    tables: [capabilities, org_capabilities, role_capabilities, user_capabilities, user_ai_permissions]
-
   - wp: "2.3"
     why: >-
       The data-plane audit (D15). Audit today covers the admin plane only;

@@ -1,0 +1,147 @@
+# AUTHORED — the data contract's sidecar for `project_members`.
+# Edit this file; do not edit docs/data/tables/*.md, which is generated from it.
+table: project_members
+tier: G
+schema_name: public
+grain: >-
+  One person's standing on one project. This is the level of access the platform
+  did not have until WP 2.2 — between "in the organization" (sees every project)
+  and "not in it" (sees none).
+owner: platform
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [project_id, user_id]
+    name: null
+
+governance:
+  read: null
+  write: null
+  min_project_role: owner
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write: null` is LITERAL and load-bearing. The table has a SELECT policy and
+    NO insert/update/delete policy, so RLS denies writes by default and the
+    SECURITY DEFINER RPCs are the only way in. That is not an oversight to be
+    tidied up later: D28 says every policy here is PERMISSIVE and permissive
+    policies OR, so a "deny writes" policy added beside anything else would deny
+    nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a
+    membership change writes no audit row; WP 2.3 is where that becomes true, and
+    this table is one of the reasons it matters.
+
+fields:
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The project the membership is on. CASCADEs when the project is deleted.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The approved user who holds it. CASCADEs when the account is deleted.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_role:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What they may do here — `owner`, `editor`, `analyst` or `viewer`,
+      CHECK-constrained and totally ordered by `project_role_rank()`. A PROJECT
+      vocabulary, and deliberately not `organization_members.org_role`
+      (owner|admin|member): they share the word "owner" and mean different things
+      by it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: one of owner / editor / analyst / viewer}
+    surfaces: []
+    resolution: null
+  granted_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who granted the membership. SET NULL rather than CASCADE on purpose — losing
+      the granter's account must not silently delete the grant they made.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  expires_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the membership lapses. NULL means standing — unlike `delegation_grants`,
+      where an end date is mandatory. `effective_project_role()` applies the
+      comparison so no caller can forget it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rationale:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Why the person is on the project, in the granter's words. Optional here and
+      REQUIRED on a delegation: a standing membership is usually self-evident from
+      the project, a temporary elevation never is.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: a row is backfilled from projects.modeler_id
+        value: "'backfilled from projects.modeler_id by WP 2.2 — the de-facto owner'"
+        provenance: default
+        visible_as: the stored rationale says so verbatim, so a reader can tell a backfilled row from a granted one
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the membership was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When it was last changed. Server-stamped by DEFAULT only; no trigger maintains it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  Backfilled from `projects.modeler_id` — every project's modeler becomes its
+  owner. That records a fact that already held rather than granting anything new:
+  every write policy in the schema already reads `modeler_id` as the project's
+  owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the
+  backfill filters on the user existing; a project whose modeler row is gone gets
+  no owner and is visible only to the organization, which is the honest outcome
+  and a §15 question worth asking.
