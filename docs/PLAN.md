@@ -1082,6 +1082,18 @@ intact.
 
 ### WP 2.4 — Contract-generated RLS tests
 
+**`data-contract.yml` does not run on a PR opened by an app token.** *(WP 5.2a.)*
+The `pull_request:` trigger carries no path filter and still did not fire when
+PR #201 was opened; GitHub does not raise `pull_request` workflow events for a PR
+created with a GitHub App installation token. Every earlier PR got its run from a
+later *push*, not from being opened — so a PR opened and merged without further
+pushes reaches `main` with the contract gate never having run. This package
+dispatched the workflow by hand to get a green run on its head SHA, which is a
+workaround, not a gate. **Make the `data contract` check required for merge** (a
+required check that never ran blocks, which is the behaviour wanted here), or open
+PRs with a token whose events trigger workflows. Until then, "no run" must not be
+read as "passed".
+
 **R7 must catch a §16 entry that was NEVER WRITTEN, not only one that was
 deleted.** *(WP 5.2a.)* §16 has now lost entries to a silent merge twice and had
 one never written at all — and "PHASE 2 READINESS", the entry that was never
@@ -3017,6 +3029,25 @@ Verification — what was actually run, not what was intended:
   - `npx eslint src/components/docs src/App.tsx`: clean, no warnings. The one warning
     it did raise (a constant exported from a component file) was fixed by splitting
     `legacySlugs.ts` out of `legacyRedirects.tsx`, not suppressed.
+  - **`data-contract.yml` DID NOT RUN WHEN THE PULL REQUEST WAS OPENED, and that is
+    not a property of this PR.** The workflow has `pull_request:` with no path
+    filter — WP 1.4 chose that deliberately — and it still did not fire. The cause
+    is GitHub's own recursion guard: **a pull request OPENED with a GitHub App
+    installation token does not trigger `pull_request` workflows.** Earlier PRs look
+    unaffected only because each got a later *push*, and it was the push that raised
+    the `pull_request` event. A PR that is opened and then merged without further
+    pushes gets **no data-contract run at all** — the plan's central gate, silently
+    absent on exactly the PRs it exists to guard. WP 1.4 proved the gate fires
+    (PR #195); nobody had checked that it fires on an agent-opened PR.
+    → worked around here by dispatching it: `workflow_dispatch` is declared, and run
+      <https://github.com/suresuite/suresuite-v001-3-f6699a5b/actions/runs/35032282729>
+      is green on all eleven steps for `ee50cad`.
+    → **the real fix is a repo-level one and belongs to WP 2.4**, which already owns
+      the CI gates: either require the `data contract` check for merge, or open PRs
+      with a token whose events trigger workflows. Plan edited at WP 2.4.
+    → **for every later package: do not read "no data-contract run" as "the gate
+      passed".** Check that the run exists for your head SHA, and dispatch it if it
+      does not.
   - `npm run lint` as a whole is **red on `main` and equally red here** — 453
     problems, 339 errors, 114 warnings, byte-identical counts on both sides (measured
     by stashing). It is red because of `eslint .` across the pre-existing codebase,
