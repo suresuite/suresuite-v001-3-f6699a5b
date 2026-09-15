@@ -41,6 +41,33 @@
 --     those tables a uuid org is a schema change, and it belongs with the tier
 --     work, not here. Recorded in §16.
 
+-- ── 0. preflight ─────────────────────────────────────────────────────────────
+-- Say up front which of the tables this file touches are absent. The migration
+-- log is the only place anyone sees this database's real shape (D31: a migration's
+-- first execution is the production deploy), so it should not have to be inferred
+-- one aborted statement at a time.
+DO $preflight$
+DECLARE missing text[];
+BEGIN
+  SELECT array_agg(t ORDER BY t) INTO missing
+    FROM unnest(ARRAY[
+      'approved_users','organizations','projects',
+      'bom_multi_level','bom_single_level','inbound_logistics','outbound_logistics',
+      'multi_tier_supply_chain','supply_chain_data','node_list',
+      'network_edges','network_nodes','network_summary',
+      'disruption_scenarios','disruption_scenario_effects','disruption_scenario_profiles',
+      'disruption_scenario_settings','disruption_scenario_targets',
+      'simulation_cache','simulation_jobs','simulation_job_magnitudes',
+      'simulation_performance_metrics','simulation_results',
+      'tier2_suppliers','tier3_suppliers'
+    ]) t
+   WHERE to_regclass('public.' || t) IS NULL;
+  IF missing IS NOT NULL THEN
+    RAISE NOTICE 'tables this migration touches that were ABSENT before it ran: %', missing;
+  END IF;
+END
+$preflight$;
+
 -- ── 1. the uuid resolver ─────────────────────────────────────────────────────
 -- `_user_id` is EXPLICIT, exactly as `capabilities_for_user()` takes it, and for
 -- the same reason: `get_current_user_org()` reads `current_setting('app.current_user_id')`,
@@ -580,7 +607,41 @@ USING (EXISTS (
   AND public.org_is_current_user_org(p.organization_id, p.organization)
 ));
 
+-- `network_summary` EXISTS IN THE MIGRATIONS AND NOT IN THE PRODUCTION DATABASE.
+-- `20250904105527` creates it beside `network_nodes` and `network_edges`; those two
+-- are in production and this one is not, and no migration drops it. The first
+-- `db push` of this file found it — `DROP POLICY IF EXISTS` still needs the TABLE
+-- to exist (the IF EXISTS is about the policy), so statement 59 aborted the whole
+-- migration. This is `risk_data` (D4) inverted: WP 1.4 found a table in production
+-- that no migration creates; this is a table the migrations create that production
+-- does not have. A static replay cannot see either.
+--
+-- ADOPTED, NOT GUARDED, and the difference matters. Skipping the four policies
+-- where the table is absent was the first fix, and it cost more than it saved: the
+-- statements have to go through EXECUTE, the introspector cannot read them, and the
+-- contract then shows `network_summary` still on the TEXT comparison for ever.
+-- `orgIdentity.test.ts` caught exactly that and refused it. Creating the table
+-- instead closes the divergence rather than encoding it — the definition below is
+-- copied verbatim from `20250904105527`, IF NOT EXISTS makes it a no-op everywhere
+-- the table already is, and nothing in `src/` or `supabase/functions/` reads the
+-- table, so adopting it cannot change any behaviour. Recorded as D32.
+CREATE TABLE IF NOT EXISTS public.network_summary (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL,
+  plant_name text NOT NULL,
+  organization text NOT NULL DEFAULT 'default_org',
+  created_by uuid,
+  uploaded_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  nodes_count integer,
+  edges_count integer,
+  tiers_data jsonb
+);
+ALTER TABLE public.network_summary ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "Network summary: project access delete" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access delete" 
 ON public.network_summary 
 FOR DELETE 
@@ -594,6 +655,7 @@ USING (EXISTS (
 ));
 
 DROP POLICY IF EXISTS "Network summary: project access insert" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access insert" 
 ON public.network_summary 
 FOR INSERT 
@@ -607,6 +669,7 @@ WITH CHECK (EXISTS (
 ));
 
 DROP POLICY IF EXISTS "Network summary: project access update" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access update" 
 ON public.network_summary 
 FOR UPDATE 
@@ -620,6 +683,7 @@ USING (EXISTS (
 ));
 
 DROP POLICY IF EXISTS "Network summary: project access view" ON public.network_summary;
+
 CREATE POLICY "Network summary: project access view" 
 ON public.network_summary 
 FOR SELECT 
