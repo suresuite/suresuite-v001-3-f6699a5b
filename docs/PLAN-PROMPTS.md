@@ -76,7 +76,12 @@ recommendation — let columnSpecs.defaultWhenMissing supply them) or tag them a
 non-data. Justify whichever you pick in the commit message.
 ```
 
-### WP 0.2 — Unit conversion + orphan-table honesty
+### WP 0.2 — Unit conversion + orphan-table honesty ✅ DONE
+
+*(Kept for the record. The evidence below describes the state BEFORE the fix, and
+two of its claims were wrong — there were EIGHT raw volume reads, not seven, and
+the `risk_data` error was warned to the console, not swallowed. §16's WP 0.2
+entry records what actually landed, and that the §15 baseline is still unrun.)*
 
 ```
 Implement WP 0.2 from docs/PLAN.md.
@@ -88,11 +93,11 @@ Already verified (re-check before relying on it):
   all of them — fixing only the four obvious ones leaves the multi-tier lane wrong.
 · rateToWeekly lives in supabase/functions/_shared/grading.ts, which is
   dependency-free and Deno-safe. Import it; do NOT write a local copy (invariant I3).
-· product_code_map at :96 destructures only { data } — the error is swallowed and
-  the table exists in NO migration. The mapped branch at :110-113 is therefore
-  dead code today. Make the failure loud; deciding whether to add the table or
-  delete the branch is WP 1.4, not this one.
-· risk_data is read at ProductLevelNetwork.tsx:482 and FirmLevelNetwork.tsx:283
+· product_code_map at combine-project/index.ts:131-145 destructures only { data }
+  — the error is swallowed and the table exists in NO migration. The mapped
+  branch at :158-163 is therefore dead code today. Make the failure loud;
+  deciding whether to add the table or delete the branch is WP 1.4, not this one.
+· risk_data is read at ProductLevelNetwork.tsx:487 and FirmLevelNetwork.tsx:288
   with quoted column names ("RISK CLASS") and has no migration either.
 
 Conversion changes weighted magnitudes. supply_chain_data.weighted is
@@ -218,8 +223,11 @@ Already verified (re-check before relying on it):
   supabase-functions.yml are the closest models.
 
 You must DECIDE the orphans in this WP, not defer them:
-· product_code_map — add the migration, or delete combine-project/index.ts:96-102
-  and :110-113. Deleting is my recommendation: the branch has never executed.
+· product_code_map — add the migration, or delete the read at
+  combine-project/index.ts:131-145 and the mapped branch at :158-163. Deleting is
+  my recommendation: the branch has never executed. WP 0.2 made the failure loud
+  (console.error + a `warnings[]` entry on the response) but changed nothing else;
+  no UI reads `warnings` yet, which is WP 4.4's Trust Report.
 · risk_data — needs a real migration with source, vintage, licence and
   refreshed_at, and the quoted columns renamed. Two pages depend on it.
 

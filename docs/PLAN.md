@@ -171,9 +171,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | ID | Defect | Evidence | Closed by |
 |---|---|---|---|
 | D1 | Auto-seed persists `safety_stock_days = 0`, overriding the engine's 7-day default | was `useStageRows.tsx:288` + `StagePolicyTable.tsx:844,887`; `project_map.py:783` | WP 0.1 ✅ |
-| D2 | `combine-project` never converts `volume` by `time_unit` | `combine-project/index.ts:60,68,268,274` (+ `:115,:234-235,:318`) | WP 0.2 |
-| D3 | `product_code_map` queried but exists in no migration; error swallowed | `combine-project/index.ts:96` | WP 0.2, 1.4 |
-| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names | `ProductLevelNetwork.tsx:482`, `FirmLevelNetwork.tsx:283` | WP 0.2, 1.4 |
+| D2 | `combine-project` never converts `volume` by `time_unit` | was `combine-project/index.ts:60,68,268,275` + `:115,:234-235,:310,:318` — **eight** read sites, not seven | WP 0.2 ✅ |
+| D3 | `product_code_map` queried but exists in no migration; error swallowed | `combine-project/index.ts:131-145` | WP 0.2 ✅ (loud); table-or-branch decision still WP 1.4 |
+| D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names | `ProductLevelNetwork.tsx:487`, `FirmLevelNetwork.tsx:288` | WP 0.2 ✅ (notice shown); table-or-branch decision still WP 1.4 |
 | D5 | No natural-key uniqueness on any lane table → re-upload duplicates | `20250820145837_…sql` | WP 3.3 |
 | D6 | CSV parse is `split(',')` — not quote-safe | `UploadWizard.tsx:477,498` | WP 3.2 |
 | D7 | Required-field validation misses `null` (blank numerics pass) | `UploadWizard.tsx:369` vs `:505,508` | WP 3.2 |
@@ -194,6 +194,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D22 | Legacy docs hand-copied the Pydantic models while `gen_docs.py` already renders them from the registry | archived `docBodies.tsx` `SIM_PARAM_GROUPS` | WP 0.3 *(done)* |
 | **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check | `resolveEffective.ts:82`; `StagePolicyTable.tsx:694`; `schemas.ts:81` | WP 6.2 |
 | D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:398-404` | WP 6.2 |
+| D25 | `combine-project`'s core reads (`outbound_logistics`, `inbound_logistics`, both BOM tables) destructured only `{ data }` — the same swallow as D3 but on the ETL's own inputs, so a failed read produced a half-empty graph and reported success. Found by WP 0.2 while fixing D3 | `combine-project/index.ts:52-64,169-174,207-220` | WP 0.2 ✅ |
 
 ### 4.1 Code map — the data layer
 
@@ -212,7 +213,9 @@ only in `PROMPTS.md` or in a session transcript.
 | `UploadWizard.tsx:1280-1307` | auto-invokes node prominence after deep-tier uploads |
 | `ingest-inbound-logistics/index.ts:37-46` | the sanitizer allow-list; no trim (D8) |
 | `ingest-bom-multi-level/index.ts:42-44` | **the correct trim/empty pattern** — copy this one |
-| `combine-project/index.ts:96-102,110-113` | the dead `product_code_map` branch (D3) |
+| `combine-project/index.ts:131-149` | the `product_code_map` read — now error-checked and loud; the mapped branch at `:158-163` is still dead until WP 1.4 decides (D3) |
+| `combine-project/index.ts:52-64` | the core lane reads. Error-checked since WP 0.2 — a failed read aborts instead of producing a half-empty graph (D25) |
+| `_shared/laneVolumes.ts:35,41,60` | `weeklyVolume` / `weeklyVolumeTotalsBy` / `volumeShare` — the ETL's unit normalization, over `grading.ts`'s table (D2) |
 
 **Units and the engine boundary**
 
@@ -690,7 +693,7 @@ literals in `useStageRows.tsx`; record further collisions in §16.
 prefill may persist; `src/lib/policies/__tests__/policyPrefill.test.ts` is the
 regression suite. The provenance vocabulary gained `suggested` (§5.4).
 
-### WP 0.2 — Unit conversion + orphan-table honesty *(D2, D3, D4)*
+### WP 0.2 — Unit conversion + orphan-table honesty ✅ *(D2, D3, D4 — done)*
 
 **Preconditions** — WP 0.1 landed (`prefillSelect.ts` exists; `useStageRows` writes
 no constants). Verify D2 with the §15 mixed-unit query.
@@ -711,6 +714,12 @@ both pages show a notice when `risk_data` is unavailable.
 
 **Gap check** — run **every** query in §15 against one real project and record the
 counts in §16. Those numbers are the baseline every later phase is measured against.
+
+**Delivered** — `supabase/functions/_shared/laneVolumes.ts` (the ETL's unit
+normalization, over `grading.ts`'s table) and
+`src/lib/policies/__tests__/laneVolumes.test.ts`;
+`src/components/network/RiskDataNotice.tsx`, one component used by both pages.
+**The §15 baseline was NOT captured — no database access. See §16.**
 
 ### WP 0.3 — Documentation consolidation ✅ *(done — `719f59b`)*
 
@@ -1293,6 +1302,95 @@ Handoff to next WP:
 - `applyPrefill` now takes `{ silent }`; the auto-seed passes it so a no-op seed does
   not toast. `buildAndApplyPrefill` holds the loop; `applyPrefill` owns `applying`.
 - Lint is red at baseline. Measure your WP by *delta* (342/115), not by green.
+
+### WP 0.2 — Unit conversion + orphan-table honesty · 2026-09-15
+
+Preconditions held? **yes, with two corrections.**
+- `// @ts-nocheck` at `combine-project/index.ts:1`, `rateToWeekly` dependency-free in
+  `_shared/grading.ts`, `product_code_map` destructuring only `{ data }`, and both
+  `risk_data` reads with quoted column names — all confirmed by reading.
+- **Correction 1: there are EIGHT raw `volume` reads, not seven.** The brief's list
+  missed `:310` (`(row.volume || 0) / totalMaterialVolume` in the multi-tier inbound
+  loop), which is a *share* denominator — exactly the class of use the WP exists to
+  fix. `:115` is not itself a read: it consumes `productDemandByPlant`, so converting
+  `:60` fixes it transitively. All eight sites are converted.
+- **Correction 2: the `risk_data` error was not fully swallowed.** Both pages already
+  `console.warn` it. What was missing — and what this WP added — is the *UI notice*;
+  an empty risk map renders every node's risk as "Unknown", which reads as an answer.
+
+Exit checks passed? **two of three; the third could not be run.**
+- ✅ Unit test: two arcs, one `week` one `year`, the same physical volume → identical
+  `sourcing_ratio` (0.5 / 0.5). The same test shows the pre-fix arithmetic gave
+  2 % / 98 %, i.e. the ETL named the wrong primary supplier.
+- ✅ Both pages show `RiskDataNotice` when `risk_data` is unavailable or empty.
+- ⚠️ **`supply_chain_data.weighted` non-zero where keys match — NOT VERIFIED.** It
+  requires a database. See below.
+
+`npm test` 40/40 (10 new). `npm run lint`: 340 errors / 115 warnings vs. the 342/115
+baseline — this WP *removed* two (`prefer-const` in the ETL) and added none.
+`audit:ui` unchanged (the one pre-existing `MobileSheet.tsx:169` violation).
+`check:docs` passes. `tsc --noEmit` errors confined to the two pre-existing files.
+
+Baseline numbers: **NONE. This session has no database access** — verified, not
+assumed: no `SUPABASE_*`/`DATABASE_URL`/`POSTGRES_*` in the environment, and
+`.env.production` holds only client feature flags. `psql` is installed but there is no
+host, project ref or key to point it at. **Every §15 query is therefore unrun, and the
+Phase 0 baseline does not exist.**
+
+What that costs, stated plainly so it is not discovered later:
+- No "before" counts for D5 (duplicate arcs), D6 (field shift), D7 (blank numerics),
+  D8 (untrimmed ids) — Phase 3 has nothing to measure its fix against.
+- The D2 headline query (`supply_chain_data` rows with `weighted = 0`) is the number
+  that would have *proved* this WP's fix on real data. It is unrun.
+- Overflow on `supply_chain_data.weighted` (`numeric(16,6)`, migration
+  `20250816031317`) is bounded by ANALYSIS, not measurement: `rateToWeekly` multiplies
+  by `7/unit_days`, so every unit coarser than a day SHRINKS the stored value
+  (month ÷4.35, quarter ÷13, year ÷52.2) and only day-quoted rows grow, by exactly 7×.
+  A day-quoted project therefore overflows only if its largest `weighted` already
+  exceeded ~1.43e9 before this change. Pinned by a test over `UNIT_DAYS`.
+  `supply_chain_data_multi_tier.weighted` is unconstrained `numeric` — no risk there.
+- **Whoever next has database access must run §15 before Phase 1 exits** and append the
+  counts here. Until then every "we improved X" in Phases 1–6 is unmeasured.
+
+Discovered:
+- **D25** — `combine-project`'s own core reads (`outbound_logistics`,
+  `inbound_logistics`, `bom_single_level`, and each `bom_multi_level` PAGE) swallowed
+  their errors exactly as `product_code_map` did. A failed read produced a graph
+  missing a whole lane and still returned `success: true`; a failed *page* was worse —
+  the pages already fetched would have been treated as the entire BOM. **Fixed here**
+  rather than deferred: it is the same defect, in the same function, in the lines this
+  WP was already editing, and the WP's theme is precisely that a silent failure must
+  become loud. → added to §4 as D25, closed by WP 0.2.
+- `product_code_map`'s failure now rides back on the response as `warnings[]`, not only
+  a function log — §5 T2 requires a substitution to be visible at the point of display.
+  **No UI reads `warnings` yet.** → affects **WP 1.4** (which decides the table's fate)
+  and **WP 4.4** (the Trust Report, the natural home for it). Recorded, not built.
+- Behaviour change, deliberate: the multi-tier inbound denominator was
+  `totalVolumeByPlantMaterial.get(k) || 1`, so when a material had no measured flow the
+  code divided by 1 and used a raw volume AS a ratio (always 0 in practice). It now
+  uses the same `volumeShare` convention as the primary lane (total 0 → share 1.0).
+  Note the standing wart this exposes, on BOTH lanes: N suppliers all quoting zero
+  volume now each get share 1.0, so the §15 "shares sum to 1" query will flag them.
+  That is the honest reading — a zero-volume material has no measurable split — but it
+  is a convention, not a measurement. → affects **WP 3.3**.
+- WP 0.1's `suggested` provenance and this WP's conversion interact: the policy grid's
+  primary-supplier suggestion ranks by volume, so before this fix the dot said
+  "suggested" over a ranking computed on mixed units. The suggestion is only as good
+  as the ETL under it. → nothing to do; noted so WP 6.1 does not re-derive it.
+
+Handoff to next WP:
+- Unit normalization for the ETL now lives in `_shared/laneVolumes.ts`. It imports
+  `rateToWeekly` from `grading.ts` — do NOT add a unit table to it (I3). WP 1.3's
+  "one unit table" work should make `grading.ts` the generated artifact and leave
+  `laneVolumes.ts` as a consumer.
+- `combine-project` is reachable from vitest only through `_shared/` (the function
+  itself imports `https://esm.sh/...`). Anything in it that needs a test has to move
+  to `_shared/` first — that is why `laneVolumes.ts` exists.
+- **Deno was not available in this session**, so the edge function was never
+  `deno check`ed. It passes eslint and its imports are relative `.ts`, but the first
+  real deploy is the first true typecheck.
+- `runETLLogic` now returns `warnings: string[]`. Callers that spread its result should
+  expect it.
 
 ---
 

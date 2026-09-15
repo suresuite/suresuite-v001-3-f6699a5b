@@ -1,10 +1,17 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { weeklyVolume, weeklyVolumeTotalsBy, volumeShare } from '../_shared/laneVolumes.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// D2 — every lane `volume` is a rate over its row's own `time_unit`. This ETL
+// read them raw at all eight read sites, so sourcing shares were computed
+// across incompatible units. Normalization is the engine's own rule and lives
+// in ONE place: _shared/laneVolumes.ts, over _shared/grading.ts's unit table
+// (invariant I3 — never a second copy here).
 
 async function runETLLogic(supabase: any, project_id: string, user_id: string, user_email: string) {
   try {
@@ -33,16 +40,31 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     await supabase.from('supply_chain_data_multi_tier').delete().eq('project_id', project_id);
 
     let totalInserted = 0;
+    // Degradations the caller must be told about. §5 T2: a substitution is
+    // visible at the point of display, not buried in a function log nobody
+    // reads. These ride back on the response so the UI can surface them.
+    const warnings: string[] = [];
     let scdOutboundCount = 0, scdBomCount = 0, scdInboundCount = 0;
     let mtOutboundCount = 0, mtBomCount = 0, mtInboundCount = 0;
 
     // --- FETCH CORE DATASETS UP FRONT ---
     
-    // Fetch Outbound
-    const { data: outboundData } = await supabase.from('outbound_logistics').select('*').eq('project_id', project_id);
-    
-    // Fetch Inbound (Moved to top)
-    const { data: inboundData } = await supabase.from('inbound_logistics').select('*').eq('project_id', project_id);
+    // Fetch Outbound / Inbound. Both reads used to destructure only `{ data }`,
+    // the same swallow as `product_code_map` below (D3) but on the ETL's CORE
+    // inputs: a failed read left the lane empty and the run reported success,
+    // so the user got a graph missing half its arcs with nothing to explain it.
+    // An empty lane is legitimate; a FAILED read is not, and the two must not
+    // look identical. (D25 — found while fixing D3.)
+    const { data: outboundData, error: outboundError } = await supabase.from('outbound_logistics').select('*').eq('project_id', project_id);
+    const { data: inboundData, error: inboundError } = await supabase.from('inbound_logistics').select('*').eq('project_id', project_id);
+    if (outboundError) {
+      console.error(`[combine-project] outbound_logistics read FAILED for project ${project_id}: ${outboundError.message ?? outboundError}`);
+      return { success: false, error: `Could not read outbound_logistics: ${outboundError.message ?? outboundError}` };
+    }
+    if (inboundError) {
+      console.error(`[combine-project] inbound_logistics read FAILED for project ${project_id}: ${inboundError.message ?? inboundError}`);
+      return { success: false, error: `Could not read inbound_logistics: ${inboundError.message ?? inboundError}` };
+    }
 
     // Create strict validation sets
     const validOutboundProducts = new Set(outboundData?.map(r => `${r.plant_name}::${r.product_id}`) || []);
@@ -57,7 +79,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     if (outboundData && outboundData.length > 0) {
       for (const row of outboundData) {
         const key = `${row.plant_name}::${row.product_id}`;
-        const volume = row.volume || 0;
+        const volume = weeklyVolume(row);
         totalsByPlantProduct.set(key, (totalsByPlantProduct.get(key) || 0) + volume);
         productDemandByPlant.set(key, (productDemandByPlant.get(key) || 0) + volume);
       }
@@ -65,7 +87,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
       const outboundInserts = outboundData.map(row => {
         const key = `${row.plant_name}::${row.product_id}`;
         const totalVolume = totalsByPlantProduct.get(key) || 0;
-        const volume = row.volume || 0;
+        const volume = weeklyVolume(row);
         return {
           project_id: project_id,
           data_source: 'outbound',
@@ -73,7 +95,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
           from_location: row.product_id || '',
           to_location: row.customer_id || '',
           material_consumption_rate: volume,
-          sourcing_ratio: totalVolume > 0 ? volume / totalVolume : 1.0,
+          sourcing_ratio: volumeShare(volume, totalVolume),
           weighted: volume,
           uploaded_by: user_id,
           organization: projectData.organization
@@ -92,17 +114,46 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     let inboundTierInserts = [];  
     let bomDataMulti = null; 
 
-    // Product mapping
-    const { data: productCodeMap } = await supabase.from('product_code_map').select('*').eq('project_id', project_id);
+    // Product mapping.
+    //
+    // D3 — `product_code_map` exists in NO migration, and this read destructured
+    // only `{ data }`, so the "relation does not exist" error was thrown away and
+    // `productMapping` silently stayed empty. The mapped branch below (the one
+    // that translates an outbound product code into a BOM material code) has
+    // therefore never executed in production, and nothing said so: a project that
+    // genuinely needs the mapping produced a BOM weighted by the WRONG product's
+    // demand, or by zero, and looked healthy.
+    //
+    // This WP makes the failure loud and nothing more. Whether the table should
+    // be created or the branch deleted is WP 1.4's orphan reconciliation — that
+    // decision needs the contract, and guessing it here would just bury the
+    // question again.
+    const { data: productCodeMap, error: productCodeMapError } = await supabase
+      .from('product_code_map').select('*').eq('project_id', project_id);
     const productMapping = new Map<string, string>();
-    if (productCodeMap) {
+    if (productCodeMapError) {
+      console.error(
+        `[combine-project] product_code_map unavailable for project ${project_id} — ` +
+        `continuing with an EMPTY product mapping, so any outbound product code that ` +
+        `differs from its BOM material code will not be joined (D3): ` +
+        `${productCodeMapError.message ?? productCodeMapError}`,
+      );
+      warnings.push(
+        'product_code_map could not be read; outbound product codes were not translated ' +
+        'to BOM material codes. BOM demand is weighted only where the two codes match.',
+      );
+    } else if (productCodeMap) {
       for (const mapping of productCodeMap) {
         productMapping.set(`${mapping.plant_name}::${mapping.outbound_product_code}`, mapping.bom_material_code);
       }
     }
     
     if (projectData.bom_level === 'single') {
-      const { data: bomData } = await supabase.from('bom_single_level').select('*').eq('project_id', project_id);
+      const { data: bomData, error: bomError } = await supabase.from('bom_single_level').select('*').eq('project_id', project_id);
+      if (bomError) {
+        console.error(`[combine-project] bom_single_level read FAILED for project ${project_id}: ${bomError.message ?? bomError}`);
+        return { success: false, error: `Could not read bom_single_level: ${bomError.message ?? bomError}` };
+      }
 
       if (bomData && bomData.length > 0) {
         const bomInserts = bomData.map(row => {
@@ -140,12 +191,18 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
       const pageSize = 1000;
       let offset = 0;
       while (true) {
-        const { data } = await supabase
+        const { data, error: bomMultiError } = await supabase
           .from('bom_multi_level')
           .select('*')
           .eq('project_id', project_id)
           .order('level', { ascending: false })
           .range(offset, offset + pageSize - 1);
+        if (bomMultiError) {
+          console.error(`[combine-project] bom_multi_level page at offset ${offset} FAILED for project ${project_id}: ${bomMultiError.message ?? bomMultiError}`);
+          // A failed PAGE is worse than a failed read: the pages already
+          // collected would be silently treated as the whole BOM.
+          return { success: false, error: `Could not read bom_multi_level: ${bomMultiError.message ?? bomMultiError}` };
+        }
         if (!data || data.length === 0) break;
         bomData = bomData.concat(data);
         if (data.length < pageSize) break;
@@ -231,8 +288,8 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
            outboundTierInserts.push({
              project_id: project_id, data_source: 'outbound', plant_name: row.plant_name,
              from_location: row.product_id || '', to_location: row.customer_id || '',
-             level: 0, material_consumption_rate: row.volume || 0, sourcing_ratio: 1.0,
-             weighted: row.volume || 0, path_root: row.product_id, uploaded_by: user_id, organization: projectData.organization
+             level: 0, material_consumption_rate: weeklyVolume(row), sourcing_ratio: 1.0,
+             weighted: weeklyVolume(row), path_root: row.product_id, uploaded_by: user_id, organization: projectData.organization
            });
         }
 
@@ -262,19 +319,17 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
 
     // Step 3: Process Inbound Logistics
     if (inboundData && inboundData.length > 0) {
-      const totalVolumeByPlantMaterial = new Map<string, number>();
-      for (const row of inboundData) {
-        const key = `${row.plant_name}::${row.material_id}`;
-        const volume = row.volume || 0;
-        totalVolumeByPlantMaterial.set(key, (totalVolumeByPlantMaterial.get(key) || 0) + volume);
-      }
+      const totalVolumeByPlantMaterial = weeklyVolumeTotalsBy(
+        inboundData,
+        (row) => `${row.plant_name}::${row.material_id}`,
+      );
 
       const inboundInserts = inboundData.map(row => {
         const materialKey = `${row.plant_name}::${row.material_id}`;
         const totalMaterialVolume = totalVolumeByPlantMaterial.get(materialKey) || 0;
-        const rowVolume = row.volume || 0;
+        const rowVolume = weeklyVolume(row);
         
-        let sourcing_ratio = totalMaterialVolume > 0 ? rowVolume / totalMaterialVolume : 1.0;
+        const sourcing_ratio = volumeShare(rowVolume, totalMaterialVolume);
         const weighted = (materialDemand.get(materialKey) || 0) * sourcing_ratio;
 
         return {
@@ -306,8 +361,9 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
         for (const row of inboundData) {
           const materialKey = `${row.plant_name}::${row.material_id}`;
           const materialLevel = materialLevels.get(materialKey) || 1;
-          const totalMaterialVolume = totalVolumeByPlantMaterial.get(materialKey) || 1;
-          let sourcing_ratio = (row.volume || 0) / totalMaterialVolume;
+          const totalMaterialVolume = totalVolumeByPlantMaterial.get(materialKey) || 0;
+          const rowVolume = weeklyVolume(row);
+          const sourcing_ratio = volumeShare(rowVolume, totalMaterialVolume);
 
           // FIX: Just use materialDemand directly
           const baseDemand = materialDemand.get(materialKey) || 0;
@@ -315,7 +371,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
           inboundTierInserts.push({
              project_id: project_id, data_source: 'inbound', plant_name: row.plant_name,
              from_location: row.supplier_id || '', to_location: row.material_id || '',
-             level: materialLevel + 1, material_consumption_rate: row.volume || 0, sourcing_ratio: sourcing_ratio,
+             level: materialLevel + 1, material_consumption_rate: rowVolume, sourcing_ratio: sourcing_ratio,
              weighted: baseDemand * sourcing_ratio, path_root: row.material_id, uploaded_by: user_id, organization: projectData.organization
           });
         }
@@ -329,6 +385,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
 
     return { 
       success: true, 
+      warnings,
       total_records: totalInserted,
       scd_breakdown: { outbound: scdOutboundCount, bom: scdBomCount, inbound: scdInboundCount, total: scdOutboundCount + scdBomCount + scdInboundCount },
       multi_tier_breakdown: { outbound: outboundTierInserts.length, bom: bomTierInserts.length, inbound: inboundTierInserts.length, total: outboundTierInserts.length + bomTierInserts.length + inboundTierInserts.length },
@@ -360,13 +417,14 @@ Deno.serve(async (req) => {
       }
 
       await supabase.rpc('refresh_node_list_for_project', { p_project_id: project_id });
-      return new Response(JSON.stringify({ success: true, message: 'Combine completed', project_id, total_records: etlResult.total_records, scd_breakdown: etlResult.scd_breakdown, multi_tier_breakdown: etlResult.multi_tier_breakdown }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: true, message: 'Combine completed', project_id, warnings: etlResult.warnings ?? [], total_records: etlResult.total_records, scd_breakdown: etlResult.scd_breakdown, multi_tier_breakdown: etlResult.multi_tier_breakdown }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Background task
     const backgroundTask = async () => {
       try {
         const etlResult = await runETLLogic(supabase, project_id, user_id, user_email);
+        for (const w of etlResult.warnings ?? []) console.warn(`[combine-project] ${w}`);
         if (etlResult.success) await supabase.rpc('refresh_node_list_for_project', { p_project_id: project_id });
       } catch (error) {
         console.error(`[combine-project] Background task failed:`, error);
