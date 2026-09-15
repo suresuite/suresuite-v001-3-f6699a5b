@@ -162,6 +162,11 @@ export function resolveCell(args: {
     overrides.some(
       (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
     );
+  // A routing decision this stage derived from the uploaded volumes (primary
+  // source, sourcing firm). Ranked BELOW a saved override: once the user (or
+  // the prefill) has persisted a choice, the override is the truer answer.
+  const suggested =
+    !edited && !imputed && !fromData && !col.master && !fromOverride && decidedMap[col.field] === true;
 
   const provenance: Provenance = edited
     ? "edited"
@@ -175,7 +180,9 @@ export function resolveCell(args: {
           ? "derived"
           : fromOverride
             ? "override"
-            : "default";
+            : suggested
+              ? "suggested"
+              : "default";
 
   return { value: cellValue ?? liveDefault, provenance };
 }

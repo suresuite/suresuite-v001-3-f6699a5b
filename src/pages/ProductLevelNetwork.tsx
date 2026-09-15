@@ -46,6 +46,7 @@ const MapView = lazy(() => import('@/components/MapView'));
 import { NetworkMetricsTable } from '@/components/NetworkMetricsTable';
 import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/networkMetrics';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
+import { RiskDataNotice } from '@/components/network/RiskDataNotice';
 import {
   LensChip,
   LensSection,
@@ -171,6 +172,10 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
   const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'network' | 'map'>('network');
   const [countryRiskMap, setCountryRiskMap] = useState<Record<string, string>>({});
+  // D4: `risk_data` has no migration, so this read normally fails. The page
+  // used to warn to the console and render an unshaded graph as if nothing
+  // were missing; now it says so on screen (RiskDataNotice).
+  const [riskDataError, setRiskDataError] = useState<string | null>(null);
   // Add state for metrics metadata
   const [metricsMetadata, setMetricsMetadata] = useState<{
     lastCalculated: string | null;
@@ -487,12 +492,14 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
         throw scError;
       }
 
+      // D4: the risk table is optional to the graph but NOT invisible when it
+      // fails — an empty risk map renders every node as "Unknown", which reads
+      // as an answer rather than as a missing source.
       if (riskError) {
         console.warn('⚠️ Could not load risk data:', riskError);
-      }
-
-      // 🚨 ADD THIS: Build the map exactly like we did in FirmLevel
-      if (riskData) {
+        setRiskDataError(riskError.message ?? String(riskError));
+        setCountryRiskMap({});
+      } else if (riskData) {
         const riskMap: Record<string, string> = {};
         riskData.forEach(row => {
           const countryVal = row['COUNTRY'] || row['country']; 
@@ -501,7 +508,11 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             riskMap[countryVal.trim().toUpperCase()] = riskVal;
           }
         });
+        setRiskDataError(Object.keys(riskMap).length === 0 ? 'The risk_data table returned no rows.' : null);
         setCountryRiskMap(riskMap);
+      } else {
+        setRiskDataError('The risk_data table returned no rows.');
+        setCountryRiskMap({});
       }
 
       // Reassign scData to 'data' so the rest of your existing code works without changes
@@ -1135,6 +1146,9 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
             {/* Graph Canvas or Map View */}
             <div className="lg:col-span-3">
+              {globalSelectedProjectId && riskDataError && (
+                <RiskDataNotice reason={riskDataError} />
+              )}
               <Card className="h-[560px]">
                 <CardContent className="p-0 h-full relative">
                   {viewMode === 'network' ? (

@@ -46,12 +46,37 @@ the simulation platform, per CLAUDE.md.
 
 ## Phase 0 — Stabilize and consolidate
 
+### WP 0.1 — Kill the silent policy override ✅ DONE
+
+*(Kept for the record. The evidence below describes the state BEFORE the fix; §16's
+WP 0.1 entry records what actually landed, including D23/D24 and the new
+`suggested` provenance state.)*
 ### WP 0.1 — Kill the silent policy override ✅ done
 
 Shipped. The prompt is retired rather than cached: every line:number it carried is
 now stale, and the record of what was found lives in `docs/PLAN.md` §16 (drift log),
 with the closed defects marked in §4 and the surviving locations in §4.1.
 
+Already verified (re-check before relying on it):
+· useStageRows.tsx:277-306 writes hardcoded constants onto every supplier row.
+  Only safety_stock_days has a matching ColSpec and reaches the engine
+  (project_map.py:783 defaults it to 7.0 — we are persisting 0).
+  supplier_capacity_per_day, ordering_cost and lead_time_distribution have NO
+  matching ColSpec field; confirm and delete them rather than preserving them.
+· StagePolicyTable.tsx:814-827 calls applyPrefill() un-awaited, and setApplying(true)
+  only runs at :865 AFTER the row loop — so the `applying` guard is not armed
+  during the window the effect can re-enter.
+· The autoSeedMarkerRef marker is `${projectId}::${stageKey}`, so a
+  supplier→plant→supplier tab round trip re-enters for supplier.
+· The provenance logic at StagePolicyTable.tsx:1192-1254 is a VERBATIM copy of
+  resolveEffective.ts:124-185. Fix both branches identically. De-duplicating
+  them is WP 6.2's job — do not do it here, but note in §16 that they must stay
+  in lockstep until then.
+
+Decide and record: whether to drop the constants from the row entirely (my
+recommendation — let columnSpecs.defaultWhenMissing supply them) or tag them as
+non-data. Justify whichever you pick in the commit message.
+```
 Two things it settled that later packages rely on:
 · the constants were **dropped**, not tagged — tagging needs a second registry of
   "not data", which is the parallel source of truth I1 forbids;
@@ -59,7 +84,12 @@ Two things it settled that later packages rely on:
   (`primary_source`, `sourcing_firm`), because the pre-dispatch validator reads
   those from the saved override bundle, not from the row.
 
-### WP 0.2 — Unit conversion + orphan-table honesty
+### WP 0.2 — Unit conversion + orphan-table honesty ✅ DONE
+
+*(Kept for the record. The evidence below describes the state BEFORE the fix, and
+two of its claims were wrong — there were EIGHT raw volume reads, not seven, and
+the `risk_data` error was warned to the console, not swallowed. §16's WP 0.2
+entry records what actually landed, and that the §15 baseline is still unrun.)*
 
 ```
 Implement WP 0.2 from docs/PLAN.md.
@@ -71,11 +101,11 @@ Already verified (re-check before relying on it):
   all of them — fixing only the four obvious ones leaves the multi-tier lane wrong.
 · rateToWeekly lives in supabase/functions/_shared/grading.ts, which is
   dependency-free and Deno-safe. Import it; do NOT write a local copy (invariant I3).
-· product_code_map at :96 destructures only { data } — the error is swallowed and
-  the table exists in NO migration. The mapped branch at :110-113 is therefore
-  dead code today. Make the failure loud; deciding whether to add the table or
-  delete the branch is WP 1.4, not this one.
-· risk_data is read at ProductLevelNetwork.tsx:482 and FirmLevelNetwork.tsx:283
+· product_code_map at combine-project/index.ts:131-145 destructures only { data }
+  — the error is swallowed and the table exists in NO migration. The mapped
+  branch at :158-163 is therefore dead code today. Make the failure loud;
+  deciding whether to add the table or delete the branch is WP 1.4, not this one.
+· risk_data is read at ProductLevelNetwork.tsx:487 and FirmLevelNetwork.tsx:288
   with quoted column names ("RISK CLASS") and has no migration either.
 
 Conversion changes weighted magnitudes. supply_chain_data.weighted is
@@ -87,7 +117,9 @@ recording the counts in §16. Those numbers are the baseline every later phase i
 measured against — this is the most valuable thing this WP produces.
 ```
 
-### WP 0.3 — Documentation consolidation · PARTLY DONE (`719f59b`)
+### WP 0.3 — Documentation consolidation ✅ DONE (`719f59b` + the Phase 0 finish)
+
+*(Kept for the record. §16's WP 0.3 entries record what landed — both halves.)*
 
 ```
 Finish WP 0.3 from docs/PLAN.md. The archive half is DONE —
@@ -202,8 +234,11 @@ Already verified (re-check before relying on it):
   supabase-functions.yml are the closest models.
 
 You must DECIDE the orphans in this WP, not defer them:
-· product_code_map — add the migration, or delete combine-project/index.ts:96-102
-  and :110-113. Deleting is my recommendation: the branch has never executed.
+· product_code_map — add the migration, or delete the read at
+  combine-project/index.ts:131-145 and the mapped branch at :158-163. Deleting is
+  my recommendation: the branch has never executed. WP 0.2 made the failure loud
+  (console.error + a `warnings[]` entry on the response) but changed nothing else;
+  no UI reads `warnings` yet, which is WP 4.4's Trust Report.
 · risk_data — needs a real migration with source, vintage, licence and
   refreshed_at, and the quoted columns renamed. Two pages depend on it.
 
@@ -666,6 +701,11 @@ Implement WP 6.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · The Supplier stage is the deepest chain and the right one to do first:
+  columnSpecs.ts:119-181 declares the columns; useStageRows.tsx:191-333 builds the
+  rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
+· Substitutions to document exhaustively: resolveField's `> 0` test
+  (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
+  defaultWhenMissing (columnSpecs.ts:132-171), the effectivePolicy bundle,
   columnSpecs.ts:119-178 declares the columns; useStageRows.tsx:208-348 builds the
   rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
 · Substitutions to document exhaustively: resolveField's `> 0` test
@@ -692,16 +732,19 @@ Already verified (re-check before relying on it):
   "0" with provenance "default" — whose colour is null, so NO dot at all. The grid
   states capacity is zero when the model means infinite.
 · D18: material_price is consumed NOWHERE in scsim/ or sim-worker/ — grep returns
-  nothing. It is COLUMN_FIT keep:true (columnSpecs.ts:350) while material_cost,
+  nothing. It is COLUMN_FIT keep:true (columnSpecs.ts:353) while material_cost,
   which the engine does read, carries prio:8 and folds away first.
 · The cheapestInboundCost / resolveField divergence: grading.ts:159 floors a <=0
   arc price to 1.0 before taking the min, while useStageRows.tsx:164 rejects the
   same 0 and imputes an average. One row can show Price 42.50 (imputed) and Cost
   1.00 (derived) for the same material.
-· D16 residual from WP 0.1: re-verify the tracked/untracked provenance branch.
+· D16 residual from WP 0.1: the untracked branch is GONE — provenance now reads
+  __from_data / __imputed / __decided and nothing else. What remains for 6.2 is
+  D23 (the row shadows a saved override) and D24. Carry `suggested` through.
 · ensure_item_masters unions bom_single_level ONLY — multi-level BOM materials get
   no master row. Fix here or record as a separate finding.
 
+De-duplicate StagePolicyTable.tsx:1192-1254 against resolveEffective.ts's
 De-duplicate StagePolicyTable.tsx:1206-1265 against resolveEffective.ts's
 resolveCell in this WP — it has been carried in lockstep since WP 0.1 and this is
 where that debt is paid.
@@ -718,11 +761,11 @@ are stated in PLAN.md §13 WP 6.2 with their evidence in §16 — read both.
 Implement WP 6.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· Current vocabulary: policyGridUi.tsx:15-35 defines data | master | imputed |
+· Current vocabulary: policyGridUi.tsx:15-41 defines data | master | imputed |
   derived | override | edited | default. `default` has colour null, so it renders
   NO dot — decide deliberately whether that stays true for the new states.
 · Reserved in WP 1.2 and now to be used: `contract` and `estimated`.
-· ProvenanceLegend (policyGridUi.tsx:49) must gain the new states or it will
+· ProvenanceLegend (policyGridUi.tsx:54) must gain the new states or it will
   under-report.
 
 The export is the deliverable that makes this researcher-grade: for a chosen

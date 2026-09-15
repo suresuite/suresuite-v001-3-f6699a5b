@@ -318,6 +318,12 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               __supplier_count: count,
               __from_data: prov.__from_data,
               __imputed: prov.__imputed,
+              // Routing DECISIONS this stage derives from the uploaded volumes.
+              // Not uploaded data (so not `__from_data`) and not an invented
+              // constant either — the grid badges them "suggested" and the
+              // prefill is allowed to persist them, because recording a primary
+              // source is what the stage exists to do (blueprint G16).
+              __decided: { primary_source: true } as Record<string, true>,
             });
           }
 
@@ -434,6 +440,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               __demand_per_day: demand,
               __from_data: prov.__from_data,
               __imputed: prov.__imputed,
+              __decided: {} as Record<string, true>,
             });
           }
 
@@ -509,6 +516,11 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               __unknown_product: bomProducts.size > 0 && !bomProducts.has(product),
               __from_data: prov.__from_data,
               __imputed: prov.__imputed,
+              // Routing decisions derived from the uploaded outbound volumes —
+              // see the supplier stage above for why these are not `__from_data`.
+              __decided: (suggestedFirm
+                ? { sourcing_firm: true, primary_source: true }
+                : {}) as Record<string, true>,
             });
           }
 

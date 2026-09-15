@@ -1,15 +1,18 @@
-# `docs/data/` — generated table reference
+# `docs/data/` — the data-layer reference
 
-Machine-generated, one page per table, rendered from `data-contract.generated.json`
-by `npm run contract:generate` (lands in WP 1.4).
+Every page here opens with a **status banner** saying whether it is GENERATED (edit the
+generator, never the page), AUTHORED (edit it by hand, and expect it to drift) or
+DEPRECATED (superseded — the banner names by what). Read the banner before editing.
 
-**Do not edit anything here.** `npm run contract:check` fails if a page differs from
-what the contract generates.
+| Page | Status | |
+|---|---|---|
+| `tables/*.md` | GENERATED | one page per table — columns, types, units, substitutions, lineage. Rendered from `data-contract.generated.json` by `npm run contract:generate`; `npm run contract:check` fails if a page differs from what the contract generates. **Do not edit.** *(empty until WP 1.4)* |
+| `field-mapping.md` | AUTHORED | how stored project data becomes a simulation run — the hand-maintained half of the contract, kept in step with `project_map.py` and `datamap.py` until WP 1.2–1.4 generate it |
+| `lifecycle.md` | AUTHORED | where each piece of project state lives and how long it survives |
 
-| | |
-|---|---|
-| `tables/*.md` | one page per table — columns, types, units, substitutions, lineage |
-| *(empty until WP 1.4)* | |
+The two authored pages moved here from the top level in WP 0.3; tombstones remain at
+`docs/data-simulation-mapping.md` and `docs/simulation-data-lifecycle.md` because
+around two dozen code comments still cite the old paths.
 
 ## The plan lives elsewhere
 

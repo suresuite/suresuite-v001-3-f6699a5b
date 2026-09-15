@@ -192,6 +192,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D20 | `projectLanes` fallback truncates at 10 000 rows silently | `projectLanes.ts:30-33` | WP 3.1 |
 | **D21** | **User docs name fields the user never sees.** `products.csv` says `sell_price`/`demand_mean`/`demand_distribution`; the engine says `unit_price`/`demand_mode`/`demand_model`; the legacy docs showed the engine's names | `public/template/products.csv`; `item_master.sql:28-32`; `network.py:145,151,154` | WP 5.2b |
 | D22 | Legacy docs hand-copied the Pydantic models while `gen_docs.py` already renders them from the registry | archived `docBodies.tsx` `SIM_PARAM_GROUPS` | WP 0.3 *(done)* |
+| **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check | `resolveEffective.ts:82`; `StagePolicyTable.tsx:694`; `schemas.ts:81` | WP 6.2 |
+| D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:398-404` | WP 6.2 |
+| D25 | `combine-project`'s core reads (`outbound_logistics`, `inbound_logistics`, both BOM tables) destructured only `{ data }` — the same swallow as D3 but on the ETL's own inputs, so a failed read produced a half-empty graph and reported success. Found by WP 0.2 while fixing D3 | `combine-project/index.ts:52-64,169-174,207-220` | WP 0.2 ✅ |
 
 ### 4.1 Code map — the data layer
 
@@ -210,7 +213,9 @@ only in `PROMPTS.md` or in a session transcript.
 | `UploadWizard.tsx:1280-1307` | auto-invokes node prominence after deep-tier uploads |
 | `ingest-inbound-logistics/index.ts:37-46` | the sanitizer allow-list; no trim (D8) |
 | `ingest-bom-multi-level/index.ts:42-44` | **the correct trim/empty pattern** — copy this one |
-| `combine-project/index.ts:96-102,110-113` | the dead `product_code_map` branch (D3) |
+| `combine-project/index.ts:131-149` | the `product_code_map` read — now error-checked and loud; the mapped branch at `:158-163` is still dead until WP 1.4 decides (D3) |
+| `combine-project/index.ts:52-64` | the core lane reads. Error-checked since WP 0.2 — a failed read aborts instead of producing a half-empty graph (D25) |
+| `_shared/laneVolumes.ts:35,41,60` | `weeklyVolume` / `weeklyVolumeTotalsBy` / `volumeShare` — the ETL's unit normalization, over `grading.ts`'s table (D2) |
 
 **Units and the engine boundary**
 
@@ -331,16 +336,19 @@ documentation that explains them.**
 
 | # | Artifact | Answers | State | WP |
 |---|---|---|---|---|
-| A1 | Provenance dot | *Is this real data?* | exists, partly lying (D16, D17) | 0.1, 6.2 |
+| A1 | Provenance dot | *Is this real data?* | D16 closed (WP 0.1); D17 open | 0.1 ✅, 6.2 |
 | A2 | Value-chain popover | *Where did THIS number come from?* | missing | 6.3 |
 | A3 | Project Data Trust Report | *Is this model built on good data?* | grading exists, unassembled | 4.4 |
 | A4 | Verifiable export | *Can I check this without your app?* | **exists, strong** | 3.3 extends it |
 | A5 | Reproducibility record | *Can I reproduce this in two years?* | missing | 6.3 |
 
 **A1 vocabulary** after the plan lands:
-`data · master · contract · estimated · imputed · derived · override · edited · default`.
-Two rules the current implementation breaks: no dot may claim more than it knows
-(D16), and a missing value must not render as a real one (D17).
+`data · master · contract · estimated · imputed · derived · suggested · override · edited ·
+default`. Two rules the current implementation breaks: no dot may claim more than it
+knows (D16 — **closed in WP 0.1**), and a missing value must not render as a real one
+(D17). `suggested` was added by WP 0.1: the stage's own routing choice, ranked from
+uploaded volumes, is neither uploaded data nor a bundle default, and calling it either
+is exactly the over-claim D16 is about.
 
 **A3 shape** — mostly assembly of what `grading.ts` already computes: coverage per
 engine-read field, blocking findings, neutral-constant substitutions, derived values,
@@ -693,9 +701,14 @@ produces **no** override for that field · auto-seed fires at most once per
 **Gap check** — grep every `col(` field in `columnSpecs.ts` against the object
 literals in `useStageRows.tsx`; record further collisions in §16.
 
-### WP 0.2 — Unit conversion + orphan-table honesty *(D2, D3, D4)*
+**Delivered** — `src/lib/policies/prefillSelect.ts` is the one rule for what the
+prefill may persist; `src/lib/policies/__tests__/policyPrefill.test.ts` is the
+regression suite. The provenance vocabulary gained `suggested` (§5.4).
 
-**Preconditions** — WP 0.1 merged. Verify D2 with the §15 mixed-unit query.
+### WP 0.2 — Unit conversion + orphan-table honesty ✅ *(D2, D3, D4 — done)*
+
+**Preconditions** — WP 0.1 landed (`prefillSelect.ts` exists; `useStageRows` writes
+no constants). Verify D2 with the §15 mixed-unit query.
 
 **Files** — `combine-project/index.ts` · `_shared/grading.ts` (import only) ·
 `ProductLevelNetwork.tsx` · `FirmLevelNetwork.tsx`
@@ -714,13 +727,31 @@ both pages show a notice when `risk_data` is unavailable.
 **Gap check** — run **every** query in §15 against one real project and record the
 counts in §16. Those numbers are the baseline every later phase is measured against.
 
-### WP 0.3 — Documentation consolidation ✅ *(done — `719f59b`)*
+**Delivered** — `supabase/functions/_shared/laneVolumes.ts` (the ETL's unit
+normalization, over `grading.ts`'s table) and
+`src/lib/policies/__tests__/laneVolumes.test.ts`;
+`src/components/network/RiskDataNotice.tsx`, one component used by both pages.
+**The §15 baseline was NOT captured — no database access. See §16.**
+
+### WP 0.3 — Documentation consolidation ✅ *(done — `719f59b` + WP 0.3 finish)*
 
 Archived `docBodies.tsx` + `HelpPage.tsx` to `docs/archive/legacy-help-site/` with a
 README recording D21/D22 and what is worth mining. `docs/data/` established as the
-single archive. **Remaining:** move `docs/data-simulation-mapping.md` and
-`docs/simulation-data-lifecycle.md` in with status banners and tombstones, and add
-the `docs/data/` rule to `CLAUDE.md`.
+single archive.
+
+**Finished in Phase 0.** The two top-level data docs moved under `docs/data/` with
+status banners, tombstones left at both old paths (≈ two dozen code comments still
+cite them), and `CLAUDE.md` gained the plan-authority rule and the §2.1 invariants.
+
+| Now at | Status | Was |
+|---|---|---|
+| `docs/data/field-mapping.md` | AUTHORED | `docs/data-simulation-mapping.md` |
+| `docs/data/lifecycle.md` | AUTHORED | `docs/simulation-data-lifecycle.md` |
+| `docs/data/tables/*.md` | GENERATED | — *(lands in WP 1.4)* |
+
+**Every page under `docs/data/` opens with a status banner** — GENERATED, AUTHORED, or
+DEPRECATED naming its successor. A reader must not have to guess whether to edit a page
+or its generator; that guess is how D22 happened.
 
 ---
 

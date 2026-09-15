@@ -50,6 +50,7 @@ import {
 } from "@/lib/policies/resolveEffective";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
+import { isPrefillable } from "@/lib/policies/prefillSelect";
 import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
@@ -1225,6 +1226,9 @@ export function StagePolicyTable({
                 : getDefault(col.field, col.family);
           const edited = rowDraft[col.field] !== undefined;
           // Provenance maps emitted by useStageRows for project-backed fields.
+          // NOTE: this block is a verbatim mirror of resolveEffective.ts's
+          // `resolveCell` (the mobile list's resolver) — de-duplicating them is
+          // WP 6.2. Until then, every change here changes BOTH.
           const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
           const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
           const imputed = !edited && !col.master && imputedMap[col.field] === true;
@@ -1246,6 +1250,13 @@ export function StagePolicyTable({
             overrides.some(
               (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
             );
+          const suggested =
+            !edited &&
+            !imputed &&
+            !fromData &&
+            !col.master &&
+            !fromOverride &&
+            decidedMap[col.field] === true;
           const prov: Provenance = edited
             ? "edited"
             : imputed
@@ -1258,7 +1269,9 @@ export function StagePolicyTable({
                   ? "derived"
                   : fromOverride
                     ? "override"
-                    : "default";
+                    : suggested
+                      ? "suggested"
+                      : "default";
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);

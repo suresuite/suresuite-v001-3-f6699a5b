@@ -45,6 +45,7 @@ import { DisruptionDialog } from '@/components/DisruptionDialog';
 const MapView = lazy(() => import('@/components/MapView'));
 import { FROZEN_CELL } from '@/components/shared';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
+import { RiskDataNotice } from '@/components/network/RiskDataNotice';
 import {
   LensChip,
   LensHowToRead,
@@ -169,6 +170,10 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
   const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'network' | 'map'>('network');
   const [countryRiskMap, setCountryRiskMap] = useState<Record<string, string>>({});
+  // D4: `risk_data` has no migration, so this read normally fails. The page
+  // used to warn to the console and render an unshaded graph as if nothing
+  // were missing; now it says so on screen (RiskDataNotice).
+  const [riskDataError, setRiskDataError] = useState<string | null>(null);
   // networkSummary state removed - no longer needed
   const [networkNodes, setNetworkNodes] = useState<NetworkNode[]>([]);
   const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([]);
@@ -286,22 +291,20 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             if (nodesError) throw nodesError;
             if (edgesError) throw edgesError;
             
-            // We don't throw the riskError to avoid crashing the whole graph if just the risk table fails
+            // We don't throw the riskError to avoid crashing the whole graph if
+            // just the risk table fails — but D4: not crashing is not the same
+            // as not telling the user. An empty risk map renders every node's
+            // risk as "Unknown", which reads as an answer rather than as a
+            // missing source, so the failure is surfaced (RiskDataNotice).
             if (riskError) {
               console.warn('⚠️ Could not load risk data:', riskError);
-            }
-
-            // 🚨 ADD THIS: Let's see exactly what Supabase handed us
-            console.log("Raw risk data from Supabase:", riskData, "Error:", riskError);
-
-            // ✅ Process and set the risk map immediately
-            if (riskData) {
+              setRiskDataError(riskError.message ?? String(riskError));
+              setCountryRiskMap({});
+            } else if (riskData) {
               const riskMap: Record<string, string> = {};
               riskData.forEach(row => {
-                // 🚨 ADD THIS: Let's see what the keys actually are
-                console.log("Looking at a row:", row); 
-                
-                // We will use bracket notation just to be safe
+                // Bracket notation: the table's columns are quoted and
+                // upper-case ("RISK CLASS"), which is itself part of D4.
                 const countryVal = row['COUNTRY'] || row['country']; 
                 const riskVal = row['RISK CLASS'] || row['risk class'] || row['risk_class'];
 
@@ -309,10 +312,11 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   riskMap[countryVal.trim().toUpperCase()] = riskVal;
                 }
               });
-              
-              // 🚨 ADD THIS: Is the map still empty?
-              console.log("Built Risk Map:", riskMap);
+              setRiskDataError(Object.keys(riskMap).length === 0 ? 'The risk_data table returned no rows.' : null);
               setCountryRiskMap(riskMap);
+            } else {
+              setRiskDataError('The risk_data table returned no rows.');
+              setCountryRiskMap({});
             }
 
             // ✅ Local variables — no stale state, no re-render loop
@@ -1398,6 +1402,9 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
             {/* Graph Canvas or Map View */}
             <div className="lg:col-span-3">
+              {globalSelectedProjectId && riskDataError && (
+                <RiskDataNotice reason={riskDataError} />
+              )}
               <Card className="h-[560px]">
                 <CardContent className="p-0 h-full relative">
                   {viewMode === 'network' ? (
