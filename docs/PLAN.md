@@ -209,6 +209,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D28** | **Every policy in the schema is PERMISSIVE, so the deny-all policies do not deny.** Postgres ORs permissive policies, and no migration anywhere declares `RESTRICTIVE`. `approved_users` — the authentication table, holding `password_hash` — carries `"Users can check their own login credentials"` `FOR SELECT USING (true)` alongside `"No direct access - use RPCs"` `FOR ALL TO authenticated, anon USING (false)`; the second was clearly meant to supersede the first and instead ORs with it. Whether it is reachable depends on the table GRANTs Supabase applies outside `supabase/migrations/`, which a static replay cannot see — §15 settles it, and it is the reason §15 now gates a security decision and not just a count. Recorded by WP 2.1's gap check, which needed the `approved_users` policy list to author its sidecar; both later prompts cite "D28" as though §4 already held it | `20250815225910_…sql`; `20250826015711_…sql` (policies on `approved_users`) | WP 2.4 |
 | D29 | **Two organizations may share a display name, and the text branch then admits one to the other.** `organizations.name` is NOT UNIQUE (only `slug` is), so `organization = get_current_user_org()` matches across tenants whenever two names collide. This is PRE-EXISTING — it is what the text-only comparison always did — and WP 2.1 deliberately preserved it rather than reading the uuid first, because a uuid-first rule DENIES where the old one granted and a package whose job is to stop revoking access must not add a new way to revoke it. It closes when the text branch is removed, which needs §15 to confirm the uuid backfill at 100 %. The chosen semantics are pinned by a truth-table case in `orgIdentity.test.ts` so the flip is deliberate. Found by WP 2.1's gap check | `org_is_current_user_org` in `20260915000004_org_identity_dual_read.sql`; `organizations.name` has no UNIQUE constraint | WP 2.4 |
 | D30 | **Six policies are created twice with no `DROP` between them, which Postgres rejects.** `20250913085427` creates the `view`/`modify` pair on `simulation_cache`, `simulation_jobs` and `simulation_performance_metrics`; `20250914113723` creates all six again, verbatim apart from `public.` qualification, and neither file drops them first. `CREATE POLICY` on an existing name raises 42710, so one of two things is true and a STATIC REPLAY CANNOT SAY WHICH: either the earlier migration did not take effect, or the later one errored and the rest of its statements never ran. The introspector recorded both copies without complaint — 150 policy entries for 144 distinct names — which is how it stayed invisible. WP 2.1's migration makes the END STATE deterministic (it drops and recreates all 59 it touches, and the duplicate entries collapse), but it does not settle which branch is true, and a fresh `supabase db push` is what would. Found by WP 2.1's gap check, from the introspected artifact's own policy count | `20250913085427_…sql:134`; `20250914113723_…sql:155` | WP 2.4 |
+| D31 | **A migration's first execution is the production deploy.** `supabase-migrations.yml` has no branch filter and runs `supabase db push --include-all` against the live project on any push touching `supabase/migrations/**`; nothing anywhere else ever executes a migration. `contract:check` REPLAYS migrations statically — it parses DDL, it does not run SQL — so an error that only exists at run time passes every gate in the repo and fails in production. WP 2.1 proved it: `min(o.id)` on a uuid is `42883 function min(uuid) does not exist`, invisible to the introspector, invisible to `npm test`, and caught only by the post-merge `db push`. The migration rolled back, so nothing partial landed — this time. The route to closing it is cheap and now known to work: PostgreSQL 16 is available in a work-package session, and a schema generated from `build/schema.introspected.json` (73 tables) plus ~6 function stubs is faithful enough to execute a migration against. §16's WP 2.1 follow-up entry records the exact commands. Found by WP 2.1's own broken migration | `supabase-migrations.yml` (no `branches:` filter); `scripts/data-contract/introspect.mjs` is a static replay by design | WP 2.4 |
+| D32 | **Three tables are created by migrations and do not exist in the production database** — `network_summary`, `tier2_suppliers` and `tier3_suppliers`. `20250904105527` creates `network_summary` beside `network_nodes` and `network_edges` — those two are in production and it is not — and `20250903080405` creates the tier2/tier3 pair. No migration drops any of them. `UploadWizard.tsx` WRITES the tier2/tier3 pair, so the deep-tier upload has been writing to tables that are not there. `risk_data` (D4) inverted: WP 1.4 found a table in production that no migration creates, and this is a table the migrations create that production lacks. A static replay cannot see either — the introspector faithfully reports what the files say, which is why both classes need an executed migration or §15 to surface. Found when the second `db push` of `20260915000004` aborted at statement 59: `DROP POLICY IF EXISTS` still requires the TABLE to exist, the `IF EXISTS` being about the policy. Closed by adopting it — `CREATE TABLE IF NOT EXISTS`, copied verbatim from the original, a no-op wherever the table already is, and read by nothing in `src/` or `supabase/functions/` so adoption changes no behaviour. Learning the set cost three deploys — one table per aborted statement — because the first preflight RAISEd a NOTICE and the Supabase CLI's `db push` log keeps ERROR lines and drops notices. Raising an EXCEPTION instead named all three at once. **Whether tables OUTSIDE the 25 this migration touches also diverge is unknown and is a §15 question** | `20250904105527_…sql:47-60`; `20260915000004_org_identity_dual_read.sql` §0 preflight | WP 2.1 ✅ |
 
 ### 4.1 Code map — the data layer
 
@@ -2850,6 +2852,167 @@ Handoff to next WP:
     constraints, and it has not run) — that was already the plan's expectation and
     this package found nothing to change it. `R7` should be written to cover a
     MISSING entry as well as a deleted one; see the top of this entry for why.
+
+### WP 2.1 follow-up — the migration that never ran · 2026-09-15 · `20260915000004`
+
+Preconditions held? n/a — a defect repair on the package's own merged commit.
+Exit checks passed? yes, and three of them are now VERIFIED AGAINST A RUNNING
+POSTGRES rather than argued from the code.
+
+**What happened.** PR #198 merged; the post-merge `db push` — the first thing that
+ever executed `20260915000004` — failed at statement 3:
+
+```
+ERROR: function min(uuid) does not exist (SQLSTATE 42883)
+```
+
+The backfill picked the single matching org with `min(o.id)`, and Postgres has no
+`min()` aggregate for uuid. `(array_agg(DISTINCT o.id))[1]` is the fix, and it is
+also the better statement of intent: the `HAVING count(DISTINCT o.id) = 1` above
+guarantees exactly one element, so the subscript is exact rather than a choice
+among candidates. The migration runs in a transaction, so it rolled back whole —
+production kept the old definitions and nothing landed partially.
+
+**The finding is not the typo, it is that nothing could have caught it (D31).**
+`contract:check` replays migrations STATICALLY: it parses DDL and never executes
+SQL. `npm test` never touches a database. So a run-time-only error passes every
+gate this repo has and surfaces on the production deploy. Every migration in this
+repository has reached production as its own first execution.
+
+**That is now cheaply fixable, and this entry is the proof of route.** A
+work-package session HAS PostgreSQL 16 (`/usr/lib/postgresql/16`), which no prior
+entry had noticed. What makes it usable is that the contract already knows the
+schema:
+
+```
+initdb -D /tmp/pg/data -U postgres --auth=trust     # must run as a non-root user
+pg_ctl -D /tmp/pg/data -o '-k /tmp/pg/run -p 5433 -c listen_addresses=' start
+#   socket dir must be SHORT — Postgres caps the path at 107 bytes
+# schema: CREATE TABLE for all 73 tables + 4 enums, generated from
+#   build/schema.introspected.json (columns and types only — no constraints needed)
+# shims:  roles anon/authenticated/service_role; schema auth with jwt()/uid()/role();
+#         stubs for the 6 functions a migration CALLS but does not define
+psql -d v --single-transaction -v ON_ERROR_STOP=1 -f supabase/migrations/<new>.sql
+```
+
+Applying `20260915000004` that way reproduced the `min(uuid)` failure exactly, and
+the fixed file applies clean: **59 policies, 87 functions, no error.**
+
+A FULL fresh replay of all 296 migrations does NOT work and should not be
+attempted as a gate: 92 of them fail on a clean database (42 on `relation does not
+exist`, 9 on return-type changes, 8 on unavailable extensions). Production was
+built incrementally with `migration repair`, so the file set has never been
+applicable from empty. That is worth knowing on its own — **this repo cannot
+currently stand up a database from its own migrations** — and it is why the
+artifact-generated schema, not a replay, is the practical base.
+
+Verified on that database, with seeded rows (NOT production data):
+  - **D13, demonstrated and closed.** Org `Acme` renamed to `Acme Corp` the way
+    `admin_update_organization` does it (name only). A user approved into the org
+    after the rename gets text `Acme Corp`; the project still says `Acme`.
+    `p.organization = get_current_user_org()` → **false** — the defect, reproduced.
+    `org_is_current_user_org(p.organization_id, p.organization)` → **true**.
+  - **D27, closed at the trigger.** A project inserted after the fix comes out with
+    `organization_id` stamped, not NULL.
+  - **No widening.** A user in a different org gets false on all three projects.
+  - **The backfill's ambiguity rule works as written.** Two organizations both named
+    `Initech` (legal — `name` is not unique, D29): the user and project carrying that
+    string were left NULL rather than resolved to one of them, while the
+    unambiguous `Acme` rows resolved.
+
+Baseline numbers:
+  - `20260915000004` applied to a real Postgres: 59 policies, 87 functions, exit 0.
+  - Fresh replay of the full migration set: 204 applied, **92 failed**.
+  - `contract:check` green · 92 tests green · `check:docs` green.
+
+**Still unverified, and unchanged:** how many PRODUCTION rows have
+`organization_id IS NULL`. That is §15 and it needs the real database. What this
+entry adds is that the MECHANISM is no longer argued from reading code — it is
+executed. The ambiguity rule means some rows are expected to stay NULL by design,
+so "100 %" remains the wrong exit phrasing for it.
+
+**IT TOOK FOUR DEPLOYS, AND THE THIRD FINDING IS ABOUT THE PROCESS.**
+Three separate things were wrong, and only the first was a coding mistake:
+`min(uuid)`, then `network_summary` absent, then `tier2_suppliers` absent at
+statement 118. Each cost a full deploy because each aborted at the FIRST thing it
+hit. The preflight added after the second was supposed to end that and did not —
+it RAISEd a NOTICE, and the Supabase CLI's `db push` log keeps ERROR lines and
+drops notices, so the report was invisible in the one place it was needed.
+Changing it to RAISE EXCEPTION named all three missing tables in a single message:
+`{network_summary, tier2_suppliers, tier3_suppliers}`.
+
+**The lesson is not "add a preflight", it is that a diagnostic which cannot reach
+the reader is not a diagnostic.** Where the only execution is a deploy (D31), the
+deploy's ERROR line is the entire feedback channel, and anything that needs to be
+seen has to fail.
+
+**A SECOND `db push` FOUND A SECOND THING, AND IT IS THE MORE INTERESTING ONE.**
+With the aggregate fixed the migration reached statement 59 and aborted on
+`relation "public.network_summary" does not exist`. The table is created by
+`20250904105527` beside `network_nodes` and `network_edges`; the other two are in
+production and it is not. That is D32, and it is `risk_data` inverted — WP 1.4
+found a table production had that no migration created; this is one the migrations
+create that production lacks. The introspector is not wrong in either case: it
+reports what the files say, and no static replay can know what a database
+actually contains.
+
+**The first fix for it was wrong and this repo's own gate said so.** Skipping the
+four policies where the table is absent meant putting them through `EXECUTE`, which
+the introspector cannot read — so `network_summary` would have shown the OLD text
+comparison in the contract for ever, and its RLS would have joined the
+indeterminate set (7 tables to 8, 32 dynamic entries to 40). That is precisely how
+the item masters became `rls.determinate: false`.
+`orgIdentity.test.ts`'s "no live policy compares a project's org text outside the
+predicate" failed on all four, which is the assertion doing exactly the job it was
+written for — a fix that buys a green deploy by blinding the contract is the thing
+it exists to refuse.
+
+Adopting the table instead closes the divergence rather than encoding it:
+`CREATE TABLE IF NOT EXISTS`, copied verbatim from the original migration, a no-op
+wherever the table is already there, and nothing in `src/` or `supabase/functions/`
+reads it so adoption cannot change behaviour. All 59 policies stay static and
+introspector-visible; `dynamic` is back to 32 and the indeterminate set back to 7.
+
+Verified three ways on the local Postgres: **all present** — applies, 59 policies;
+**production's shape**, all three dropped — applies, adopts them, 59 policies; and
+**one unexpected table dropped** (`node_list`) — fails at statement 0 naming it,
+which is the preflight doing its job for the case nobody has met yet. The file now opens with a preflight that RAISEs a NOTICE
+naming every table it touches that was absent, so the next reader of a `db push` log
+learns this database's real shape in one line instead of one aborted statement at a
+time.
+
+**OUTCOME: APPLIED.** `db push` run `35030451085` on `b4cd26c` finished clean —
+`20260915000004` is live in the production database. Four deploys: `min(uuid)`,
+`network_summary`, `tier2_suppliers`, then success. Two notes for whoever reads
+this next:
+
+  - **Production received it from the FEATURE BRANCH, not from `main`.**
+    `supabase-migrations.yml` has no branch filter, so every push touching
+    `supabase/migrations/**` deploys. Production is therefore AHEAD of `main`
+    until the PR merges, and the merge's own `db push` will skip the migration as
+    already applied. Nothing is wrong with the result; it is the ordering that is
+    worth knowing, and it is the same property that makes D31 fixable and makes an
+    unreviewed branch deployable. Both belong to the same decision.
+  - **The applied version is the file at `b4cd26c`.** A later edit to
+    `20260915000004` will NOT reach production — `db push` keys on the version, and
+    that version is now recorded as applied. Any further change to this migration's
+    behaviour needs a NEW migration file.
+
+Handoff to next WP:
+  - **WP 2.4 inherits D31**, and it is a better fit there than anywhere else: that
+    package already owns the gate changes (R5, R6, R7). A fourth — execute each new
+    migration against an artifact-generated schema — is the one that would have
+    caught this, and the commands above are known to work.
+  - **WP 2.4 should also know the 92-failure number.** A package that plans to
+    "run against a seeded project with one user per role" cannot get that project by
+    replaying the migrations; it needs the same artifact-generated base.
+  - **Tables OUTSIDE the 25 this file touches may diverge the same way — UNKNOWN.**
+    Three of 25 were missing; there is no reason to think the other 48 tables are
+    better off, and nothing checks them. §15 is the real
+    answer and WP 2.4 needs it before it generates tests per table.
+  - D30 is NOT settled by this. The duplicate-policy question needs the real
+    remote's history, and the local base is generated from the artifact rather than
+    replayed, so it never reaches the two conflicting `CREATE POLICY` files.
 
 ---
 
