@@ -112,9 +112,10 @@ Remaining:
   docs/simulation-data-lifecycle.md → docs/data/lifecycle.md, each with a status
   banner (GENERATED / AUTHORED / DEPRECATED → superseded by X).
 · Leave a tombstone stub at every old path.
-· Write docs/data/README.md as the index.
-· Add to CLAUDE.md: docs/data/ is the single archive for data facts; no data fact
-  is authored in more than one place.
+· Add to CLAUDE.md: docs/PLAN.md is the single plan and the only authority for
+  data-layer file:line evidence (§4); npm run check:docs enforces it. Add the §2.1
+  invariants table too.
+· docs/data/README.md already exists and points at the plan — leave it.
 
 Preserve content verbatim. The only new prose is the banners and the index.
 Do NOT touch the archived files — mining them is WP 5.2a's job.
