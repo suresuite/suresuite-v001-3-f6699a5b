@@ -1,0 +1,122 @@
+# AUTHORED — the data contract's sidecar for `organization_members`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+table: organization_members
+tier: G
+schema_name: public
+grain: >-
+  One user's membership of one organization, and the role they hold IN that
+  organization. Org-level only: it says nothing about which projects inside the
+  organization the user may touch, which is what WP 2.2's `project_members` is
+  for.
+owner: platform
+
+natural_key_unique:
+  - source: UNIQUE constraint
+    columns: [org_id, user_id]
+    name: null
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: organization_members_pkey
+# The real key is (org_id, user_id) and it is declared — one of the few tables in
+# the schema where `natural-key` (§2.1 I4) already holds. `id` is surrogate.
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    A member may read only their OWN membership row (`user_id =
+    get_current_user_id()`); there is no policy letting a member enumerate who
+    else is in their organization, and the admin pages that do so run through
+    super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member`
+    and friends log through `log_admin_action`, but membership rows are also
+    written by the `20260709000002` backfill and by nothing else that audits, so
+    the general claim fails. WP 2.3 is where it becomes true.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: Surrogate row identifier. The membership's identity is (org_id, user_id).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  org_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization joined, by uuid. ON DELETE CASCADE — deleting a tenant
+      removes its memberships rather than orphaning them.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The approved user who is a member, by uuid. ON DELETE CASCADE.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  org_role:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The member's standing in the organization — `owner`, `admin` or `member`,
+      CHECK-constrained. This is an ORG vocabulary and it is not the project
+      vocabulary: `min_project_role` throughout this contract speaks of
+      viewer / analyst / editor / owner, which WP 2.2 creates on
+      `project_members`. The two share the word "owner" and mean different
+      things by it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: a member row is inserted without a role
+        value: "'member' — the least of the three"
+        provenance: default
+        visible_as: the column default, and the admin member list renders the resulting role verbatim
+    ingest: {csv_header: null, required: false, validate: one of owner / admin / member}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT READ BY THE ACCESS LAYER TODAY. `capabilities_for_user()` resolves
+      role -> org -> user through `approved_users.role` and the capability
+      tables; no policy and no RPC consults `org_role`. An organization `admin`
+      therefore holds no more than a `member` does, which is the gap WP 2.2
+      closes when it extends the resolver. Recorded rather than implied, per
+      §5 T1.
+  joined_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the membership was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  Backfilled once by `20260709000002` from `approved_users`, mapping the
+  `admin` app_role to `org_role = 'admin'` and everyone else to `member`. Nothing
+  has maintained it since except the super-admin RPCs, and because
+  `approved_users.organization_id` is the column the backfill keyed on, a user
+  whose uuid org was never stamped has no membership row at all. WP 2.1's
+  backfill narrows that set; §15 is what counts what remains.

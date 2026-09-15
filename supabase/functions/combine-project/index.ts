@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import { weeklyVolume, weeklyVolumeTotalsBy, volumeShare } from '../_shared/laneVolumes.ts';
+import { sameOrganization } from '../_shared/orgIdentity.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,7 +20,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
 
     const { data: projectData, error: projectError } = await supabase
       .from('projects')
-      .select('organization, modeler_id, bom_level, plant_name')
+      .select('organization, organization_id, modeler_id, bom_level, plant_name')
       .eq('id', project_id)
       .single();
 
@@ -27,12 +28,14 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
 
     const { data: userData, error: userError } = await supabase
       .from('approved_users')
-      .select('id, email, role, organization')
+      .select('id, email, role, organization, organization_id')
       .eq('id', user_id)
       .single();
 
     if (userError || !userData) return { success: false, error: 'User not found or not approved' };
-    if (userData.organization !== projectData.organization) return { success: false, error: 'Forbidden: Organization mismatch' };
+    // D13: the uuid plane when both sides carry one, text as the fallback.
+    // This runs as the service role, so it is the whole authorization.
+    if (!sameOrganization(userData, projectData)) return { success: false, error: 'Forbidden: Organization mismatch' };
     if (projectData.modeler_id !== user_id && userData.role !== 'admin') return { success: false, error: 'Forbidden: Not project owner or admin' };
 
     // Clear existing data

@@ -2,6 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
+import { sameOrganization } from '../_shared/orgIdentity.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,7 +52,7 @@ serve(async (req) => {
         const { data: project, error: projErr } = await withRetry(
           () => supabaseAdmin
             .from('projects')
-            .select('id, organization, modeler_id')
+            .select('id, organization, organization_id, modeler_id')
             .eq('id', projectId)
             .single(),
           'load project'
@@ -62,7 +63,7 @@ serve(async (req) => {
         const { data: user, error: userErr } = await withRetry(
           () => supabaseAdmin
             .from('approved_users')
-            .select('id, role, organization')
+            .select('id, role, organization, organization_id')
             .eq('id', userId)
             .single(),
           'load user'
@@ -71,7 +72,9 @@ serve(async (req) => {
 
         const isOwner = project.modeler_id === userId;
         const isAdmin = (user.role === 'admin');
-        const sameOrg = (project.organization === user.organization);
+        // D13: the uuid plane when both sides carry one, text as the fallback.
+        // This runs as the service role, so it is the whole authorization.
+        const sameOrg = sameOrganization(project, user);
         if (!sameOrg || !(isOwner || isAdmin)) {
           throw new Error('forbidden: user not allowed to delete project');
         }

@@ -18,20 +18,6 @@
 # moves with it in the same commit.
 
 deferred:
-  - wp: "2.1"
-    why: >-
-      Identity. D13 — two org identities joined by string comparison — is
-      resolved here, and `approved_users.organization` (text) versus
-      `organization_id` (uuid) is the pair that resolves it. Authoring their
-      meaning before that decision would document a shape about to change, and
-      the contract would then be the thing arguing against the fix.
-      `approved_users` in particular: WP 1.4 gave it a CREATE TABLE
-      (`20250815000000_approved_users_base.sql`) so a fresh database can be
-      built, but reconstructing a schema is not the same as being able to say
-      what each column MEANS, and the parts that are inference rather than
-      evidence are marked as such in that file.
-    tables: [approved_users, organizations, organization_members, projects]
-
   - wp: "2.2"
     why: >-
       Capability and delegation. `min_project_role` is already a required sidecar

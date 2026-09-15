@@ -5,11 +5,11 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 295,
-      "migrations_applied": 292,
-      "last_migration": "20260915000003_risk_data.sql"
+      "migrations_found": 296,
+      "migrations_applied": 293,
+      "last_migration": "20260915000004_org_identity_dual_read.sql"
     },
-    "sidecars": 13,
+    "sidecars": 17,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
@@ -17,14 +17,619 @@
   },
   "counts": {
     "tables_in_schema": 73,
-    "tables_covered": 13,
-    "columns_covered": 156,
-    "check_constraints": 5,
+    "tables_covered": 17,
+    "columns_covered": 204,
+    "check_constraints": 6,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
   },
   "tables": {
+    "approved_users": {
+      "table": "approved_users",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one.",
+      "owner": "platform",
+      "created_by": "20250815000000_approved_users_base.sql",
+      "sidecar": "supabase/contract/approved_users.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "approved_users_pkey"
+        },
+        {
+          "source": "column UNIQUE",
+          "columns": [
+            "email"
+          ],
+          "name": "approved_users_email_key"
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies and they contradict each other: \"Users can check their own login credentials\" is `FOR SELECT USING (true)`, and \"No direct access - use RPCs\" is `FOR ALL TO authenticated, anon USING (false)`. Postgres policies are PERMISSIVE unless declared RESTRICTIVE, and permissive policies are OR'd — so the deny-all does not deny anything, and the intended rule (\"no direct access\") is not the enforced one. Whether that is reachable depends on the table GRANTs Supabase applies outside `supabase/migrations/`, which no static replay can see and which PLAN.md §15 is the way to settle. Recorded as D28 and assigned to WP 2.4, which owns the RESTRICTIVE-policy decision for the whole schema; it is named here because a reader of this page must not take `rls_enabled: true` for \"reads are restricted\"."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Users can check their own login credentials",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20250815225910_9dd177a0-dca5-45b4-a8d0-5860164eeddb.sql"
+          },
+          {
+            "name": "No direct access - use RPCs",
+            "command": "ALL",
+            "roles": [
+              "authenticated",
+              "anon"
+            ],
+            "using": "false",
+            "with_check": "false",
+            "added_by": "20250826015711_453735a3-da4a-499f-824e-8683893c6654.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "approved_users_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "approved_users_email_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "email"
+          ],
+          "definition": "UNIQUE (email)",
+          "implicit": true,
+          "added_by": "20250815000000_approved_users_base.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_approved_users_organization",
+          "unique": false,
+          "columns": [
+            "organization"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The user's identity, and the value every other governance table joins on — `organization_members.user_id`, `projects.modeler_id`, the `_user_id` argument of `capabilities_for_user()` and of `get_current_user_org_id()`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The person's name as entered when the account was approved.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": true,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The sign-in address, UNIQUE. Also a second identity path: the fallback branch of `get_current_user_org()` and `get_current_approved_user()` locate the row by `auth.jwt() ->> 'email'` when the session GUC is unset.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "unique"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "password_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The bcrypt hash of the account's password. A credential, and the reason the contradiction recorded in `governance.note` above is a security finding rather than an untidiness.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "never accepted from a client"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "role",
+          "type": "public.app_role",
+          "nullable": false,
+          "default": "'user'::public.app_role",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The account's global role — `admin`, `modeler`, `user` or `super_admin`. GLOBAL, not per-project and not per-organization: it is the left-most input to `capabilities_for_user()`'s role -> org -> user merge, and `super_admin` short-circuits that merge to grant everything.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "an account is created without a role",
+              "value": "'user' — the least of the four",
+              "provenance": "default",
+              "visible_as": "the column default; the admin user list renders the resulting role verbatim"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of the app_role enum values"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the account was approved. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250815000000_approved_users_base.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was last modified. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The user's tenant, as a string. This is the value `get_current_user_org()` returns, and it was the left-hand side of every access comparison in the schema until WP 2.1.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "an account is created without an organization",
+              "value": "'default_org'",
+              "provenance": "default",
+              "visible_as": "nowhere — and that is the defect. The string is a real tenant name to every comparison that reads it, so accounts that fall to the default share one tenant with each other without any surface saying so."
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Half of D13. A displayable, editable, non-unique string used as a join key. It is kept, not dropped: `organization_id` is nullable and the rows D27 left unstamped have nothing else to authorize on. Every live comparison now goes through `org_is_current_user_org(uuid, text)`, so when §15 confirms the backfill at 100 % the text branch is removed from one function body rather than from 107 call sites.",
+          "engine_requirement": null
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The name the user chose for themselves, overriding `name` in the UI.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "avatar_url",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "URL of the user's profile image, if they uploaded one.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Contact number. Not used for authentication or for any second factor.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "password_changed_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the password was last set. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "password_expires_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "(now() + interval '90 days')",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the current password stops being accepted — `now() + 90 days` at the time the row was written.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "no expiry is supplied",
+              "value": "90 days after the row is written",
+              "provenance": "default",
+              "visible_as": "the column default; the account pages render the resulting date"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "force_password_change",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether the user must set a new password before continuing. Set when an administrator resets an account.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NULLABLE, and rows are genuinely NULL here. It was added and backfilled once by `20260709000002`; WP 2.1 re-ran the backfill matching on `name` OR `slug` and leaving ambiguous matches alone rather than picking one. A row whose text org matches no organization — `'default_org'`, or a tenant renamed and re-typed — stays NULL and keeps working on the text branch. How many is a §15 question; no work-package session can reach the database.",
+          "engine_requirement": null
+        }
+      ],
+      "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it."
+    },
     "bom_multi_level": {
       "table": "bom_multi_level",
       "schema_name": "public",
@@ -63,22 +668,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "BOM Multi: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "BOM Multi: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "bom_multi_level_auth_read",
             "command": "SELECT",
             "roles": [
@@ -97,6 +686,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "BOM Multi: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "BOM Multi: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -486,22 +1091,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "BOM Single: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "BOM Single: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "bom_single_level_auth_read",
             "command": "SELECT",
             "roles": [
@@ -520,6 +1109,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "BOM Single: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "BOM Single: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -1200,22 +1805,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "Inbound: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "Inbound: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "inbound_logistics_auth_read",
             "command": "SELECT",
             "roles": [
@@ -1234,6 +1823,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "Inbound: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Inbound: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -2366,6 +2971,590 @@
       ],
       "note": null
     },
+    "organization_members": {
+      "table": "organization_members",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.",
+      "owner": "platform",
+      "created_by": "20260709000002_super_admin_phase1.sql",
+      "sidecar": "supabase/contract/organization_members.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "org_id",
+            "user_id"
+          ],
+          "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "organization_members_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "org_members: super full",
+            "command": "ALL",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260709000002_super_admin_phase1.sql"
+          },
+          {
+            "name": "org_members: read own",
+            "command": "SELECT",
+            "roles": [],
+            "using": "user_id = public.get_current_user_id()",
+            "with_check": "user_id = public.get_current_user_id()",
+            "added_by": "20260709000002_super_admin_phase1.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "UNIQUE",
+          "columns": [
+            "org_id",
+            "user_id"
+          ],
+          "definition": "UNIQUE(org_id, user_id)",
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organization_members_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Surrogate row identifier. The membership's identity is (org_id, user_id).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "org_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The organization joined, by uuid. ON DELETE CASCADE — deleting a tenant removes its memberships rather than orphaning them.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The approved user who is a member, by uuid. ON DELETE CASCADE.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "org_role",
+          "type": "text",
+          "nullable": false,
+          "default": "'member'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word \"owner\" and mean different things by it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "a member row is inserted without a role",
+              "value": "'member' — the least of the three",
+              "provenance": "default",
+              "visible_as": "the column default, and the admin member list renders the resulting role verbatim"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of owner / admin / member"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT READ BY THE ACCESS LAYER TODAY. `capabilities_for_user()` resolves role -> org -> user through `approved_users.role` and the capability tables; no policy and no RPC consults `org_role`. An organization `admin` therefore holds no more than a `member` does, which is the gap WP 2.2 closes when it extends the resolver. Recorded rather than implied, per §5 T1.",
+          "engine_requirement": null
+        },
+        {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the membership was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "Backfilled once by `20260709000002` from `approved_users`, mapping the `admin` app_role to `org_role = 'admin'` and everyone else to `member`. Nothing has maintained it since except the super-admin RPCs, and because `approved_users.organization_id` is the column the backfill keyed on, a user whose uuid org was never stamped has no membership row at all. WP 2.1's backfill narrows that set; §15 is what counts what remains."
+    },
+    "organizations": {
+      "table": "organizations",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold.",
+      "owner": "platform",
+      "created_by": "20260709000002_super_admin_phase1.sql",
+      "sidecar": "supabase/contract/organizations.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "organizations_pkey"
+        },
+        {
+          "source": "column UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "name": "organizations_slug_key"
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "orgs: super admin full",
+            "command": "ALL",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260709000002_super_admin_phase1.sql"
+          },
+          {
+            "name": "orgs: members read own",
+            "command": "SELECT",
+            "roles": [],
+            "using": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
+            "with_check": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "organizations_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organizations_slug_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "definition": "UNIQUE (slug)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The organization's identity. This is the value that must travel — it is what `projects.organization_id`, `approved_users.organization_id` and the public /v1 API's `p_org_id` all mean. Not displayable, and that is the property that makes it safe as a join key (§2.1 `uuid-identity`).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The organization's display name, as an administrator typed it. EDITABLE and NOT UNIQUE — two organizations may legitimately share one. It is a label for humans and it is never an identity.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty after btrim — admin_update_organization"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "D13's join key. `admin_update_organization` updates this column and nothing else: no trigger, no cascade, and no second UPDATE reaching `approved_users.organization` or `projects.organization`. So a rename leaves those two text copies holding the OLD string, and the next user approved into the organization carries the NEW one — at which point a text comparison between them can never match again. WP 2.1 routes every such comparison through `org_is_current_user_org(uuid, text)`.",
+          "engine_requirement": null
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": true,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "A URL-safe form of the name, `lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))` at the moment the row was seeded. UNIQUE, and deliberately NOT recomputed on rename — so after a rename it is a record of what the organization used to be called, which is what makes it usable to match rows written before it.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "unique"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "owner_user_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The approved user who owns the tenant. Advisory today — nothing in RLS or any RPC reads it; ownership is expressed through `organization_members.org_role = 'owner'`. Two places holding the same fact is an I1 violation waiting to diverge; WP 2.2 owns the resolution.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "default": "'active'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of active / suspended"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "SUSPENSION IS NOT ENFORCED IN THE DATA LAYER. No policy and no RPC consults this column before granting access — a suspended organization's members read and write exactly as before. It is a label the admin pages render. Recorded here rather than left to be discovered, per §5 T1; the enforcement belongs with WP 2.2's resolver, which is where a capability decision is made once instead of inevery policy.",
+          "engine_requirement": null
+        },
+        {
+          "name": "settings",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Per-tenant configuration, free-form. No key of it is read by any migration, edge function or page today; it is a forward-declared extension point.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the organization was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was last modified. Server-stamped by DEFAULT only — no trigger maintains it, and `admin_update_organization` does not set it, so a renamed organization still shows its creation time here.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DISTINCT `approved_users.organization` string. That seeding is why the uuid plane and the text plane started out agreeing, and why nothing has kept them agreeing since: the seed ran once, `set_project_defaults()` never stamped the uuid (D27), and `admin_update_organization` renames without propagating. WP 2.1 fixed the trigger, backfilled what it could match unambiguously, and routed every live comparison through one predicate. It deliberately did NOT re-seed this table from distinct strings: after a rename, a user carrying the new name slugifies to a slug no row holds, and seeding would split one organization into two."
+    },
     "outbound_logistics": {
       "table": "outbound_logistics",
       "schema_name": "public",
@@ -2403,22 +3592,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "Outbound: organization access",
-            "command": "SELECT",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
-            "name": "Outbound: modifiers only",
-            "command": "ALL",
-            "roles": [],
-            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND p.organization = public.get_current_user_org() AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
-            "added_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
-          },
-          {
             "name": "outbound_logistics_auth_read",
             "command": "SELECT",
             "roles": [
@@ -2437,6 +3610,22 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260705000001_open_logistics_reads.sql"
+          },
+          {
+            "name": "Outbound: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Outbound: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -4587,6 +5776,741 @@
       ],
       "note": null
     },
+    "projects": {
+      "table": "projects",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One modelling project: a named supply chain, owned by one modeller, belonging to one organization. It is the scope every other project-scoped table hangs off `project_id`, and it is the row almost every RLS policy in the schema reaches through to decide whether the caller may see anything at all.",
+      "owner": "platform",
+      "created_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+      "sidecar": "supabase/contract/projects.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "projects_pkey"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "modeler_id",
+            "plant_name",
+            "name"
+          ],
+          "name": "uq_modeler_project"
+        }
+      ],
+      "natural_key_intended": [
+        "organization_id",
+        "name"
+      ],
+      "governance": {
+        "read": null,
+        "write": "data_editing",
+        "min_project_role": "editor",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "Tier G rather than a data tier: `projects` holds no measured quantity. It is the SCOPE, and its access rules are the ones every other table inherits by joining to it — which is why WP 2.1 had to redefine 58 policies on 24 other tables to change one comparison. Read is org-wide (any member of the owning organization sees every project in it); write is restricted to the project's own modeller or a global `admin`. There is no project-level role between those two — a member cannot be given read on one project and not another, which is `subtractive-delegation` (§2.1 G3) having nowhere to attach. WP 2.2's `project_members` is where `min_project_role: editor` above stops being a forward declaration. `audited: false`: project creation and deletion write no audit row (WP 2.3)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Projects: org create by modeler or admin",
+            "command": "INSERT",
+            "roles": [],
+            "using": "public.org_is_current_user_org(organization_id, organization) AND ( ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'modeler' AND modeler_id = public.get_current_user_id() ) OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "with_check": "public.org_is_current_user_org(organization_id, organization) AND ( ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'modeler' AND modeler_id = public.get_current_user_id() ) OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Projects: org delete by owner or admin",
+            "command": "DELETE",
+            "roles": [],
+            "using": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "with_check": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Projects: org update by owner or admin",
+            "command": "UPDATE",
+            "roles": [],
+            "using": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "with_check": "public.org_is_current_user_org(organization_id, organization) AND ( modeler_id = public.get_current_user_id() OR ( (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Projects: org-wide view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.org_is_current_user_org(organization_id, organization)",
+            "with_check": "public.org_is_current_user_org(organization_id, organization)",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "chk_supply_chain_model",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (supply_chain_model IN ('Make-To-Stock','Make-To-Order'))",
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql"
+        },
+        {
+          "name": "projects_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql"
+        },
+        {
+          "name": "uq_modeler_project",
+          "kind": "UNIQUE",
+          "columns": [
+            "modeler_id",
+            "plant_name",
+            "name"
+          ],
+          "definition": "UNIQUE (modeler_id, plant_name, name)",
+          "added_by": "20250821120000_e54ca01d-5de5-4f4a-b9cc-510a6225c6c0.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_projects_organization",
+          "unique": false,
+          "columns": [
+            "organization"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project's identity, and the `project_id` foreign key of every project-scoped table in the schema.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project's title, as the modeller typed it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "modeler_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The approved user who owns the project. Stamped by `set_project_defaults()` from the calling user when not supplied, and it is the second half of every write policy: org match AND (modeller is caller OR caller is admin).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "a project is inserted without a modeler_id",
+              "value": "the calling user, via get_current_user_id()",
+              "provenance": "default",
+              "visible_as": "the project lists render the resulting owner"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT a declared foreign key to `approved_users` — it is a bare uuid. WP 2.2 backfills it into `project_members` as the project's `owner`, which is where the reference becomes real.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The name of the plant this project models. Part of the `(modeler_id, plant_name, name)` unique constraint, and the join key the lane and BOM tables carry as their own `plant_name`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "supply_chain_model",
+          "type": "text",
+          "nullable": false,
+          "default": "'Make-To-Order'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether the chain is modelled as `Make-To-Stock` or `Make-To-Order`, CHECK-constrained to those two.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "not supplied at insert",
+              "value": "'Make-To-Order'",
+              "provenance": "default",
+              "visible_as": "the project settings page renders the resulting mode"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of Make-To-Stock / Make-To-Order"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into `scsim` from this column. The engine's make-to-stock versus make-to-order behaviour comes from the policy set, not from a project flag; this is the label the pages branch on when deciding which forms to show.",
+          "engine_requirement": null
+        },
+        {
+          "name": "completed",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether the project has the datasets it needs to simulate. Maintained by `update_project_completion_status()`, not set by hand.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the project was created. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the project row was last modified. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The owning organization, as a string, copied from the creating user at insert. NOT NULL with a default, so it always holds something.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "a project is inserted with no user context to copy from",
+              "value": "'default_org'",
+              "provenance": "default",
+              "visible_as": "nowhere. The string authorizes like any other tenant name, so a project that fell to the default is readable by every other account that also fell to it."
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The other half of D13, and the right-hand side of 73 of the 122 live org comparisons WP 2.1 rewrote. Nothing updates it when the organization is renamed — `admin_update_organization` touches `organizations.name` only — so after a rename this column holds the old name indefinitely.",
+          "engine_requirement": null
+        },
+        {
+          "name": "modeler_name",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820220456_55139542-4086-4daa-9dbf-314f29f22708.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The owner's name, denormalized at insert. A display convenience, and stale the moment the user renames themselves; `modeler_id` is the fact.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "bom_level",
+          "type": "text",
+          "nullable": false,
+          "default": "'single'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820230602_211aea71-3cc5-43c8-bd82-64edef20ccf8.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Which bill-of-materials shape the project uses — `single` or `multi`. It decides which of `bom_single_level` / `bom_multi_level` is read, and every dataset RPC branches on it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "not supplied at insert",
+              "value": "'single'",
+              "provenance": "default",
+              "visible_as": "the data manager renders the single-level BOM uploader"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "single or multi"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "simulation_start",
+          "type": "date",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250828000823_c0efd8c6-4b46-444d-bb81-b5b76c988c4f.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "First day of the horizon the project simulates.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1).",
+          "engine_requirement": null
+        },
+        {
+          "name": "simulation_end",
+          "type": "date",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250828000823_c0efd8c6-4b46-444d-bb81-b5b76c988c4f.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Last day of the horizon the project simulates.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "As `simulation_start` — the run request is what the engine actually reads.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_latitude",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250831014416_ce29a474-1f74-40b3-b610-75559e1bdff2.sql",
+          "unit": "degrees",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "meaning": "The plant's latitude in decimal degrees, WGS 84, for the network map.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the engine, and correctly so: `scsim` has no geography. Coordinates place a node on the map; they do not affect a simulated quantity. A later package wanting distance to DRIVE anything must add the concept to the engine first.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_longitude",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250831014416_ce29a474-1f74-40b3-b610-75559e1bdff2.sql",
+          "unit": "degrees",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "meaning": "The plant's longitude in decimal degrees, WGS 84, for the network map.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "As `plant_latitude` — rendered, never simulated.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_location_text",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250831014416_ce29a474-1f74-40b3-b610-75559e1bdff2.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The plant's location as typed, e.g. \"Hanoi, Vietnam\". The last comma-separated segment, uppercased and trimmed, is what the map matches against `risk_data.country`.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "deep_tier_enabled",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether the project models tier-2 and tier-3 suppliers as well as its direct ones. Gates the deep-tier tables and the multi-tier network pages.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "data_type",
+          "type": "text",
+          "nullable": false,
+          "default": "'curated'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Whether the project's data was uploaded and curated by a user (`curated`) or generated for demonstration (`synthetic`).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "not supplied at insert",
+              "value": "'curated'",
+              "provenance": "default",
+              "visible_as": "nothing distinguishes the two in an export today. A synthetic project whose flag defaulted to 'curated' is indistinguishable from a real one downstream — the §5 T3 blind spot this column exists to prevent, not yet closed."
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "curated or synthetic"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "organizations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The owning organization by uuid. This is what the public /v1 API authorizes on (`api_can_access_project`: `p.organization_id = p_org_id`), and it is the plane that survives a rename.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "D27 lived here. `set_project_defaults()` stamped `NEW.organization` and never this column, so the one-time backfill in `20260709000002` was the only thing that had ever set it and every project created afterwards was NULL — visible through RLS, which compared text, and invisible to /v1, which compares this. WP 2.1 fixed the trigger first and then backfilled, because a backfill in front of a trigger that does not stamp rots at the next insert. Still NULLABLE: rows whose text org matches no organization row, or matches two, were deliberately left alone rather than resolved to a guess, and the dual read keeps them reachable. The count is a §15 question.",
+          "engine_requirement": null
+        }
+      ],
+      "note": "`natural_key_intended` is `(organization_id, name)` and the declared constraint is `(modeler_id, plant_name, name)` — they are different claims, and the declared one is the weaker: two modellers in one organization may each hold a project called the same thing for the same plant. Changing it is not WP 2.1's to do; `natural-key` (§2.1 I4) lands in WP 3.3 and this row is one of its inputs. Recorded here so the gap has an owner rather than being noticed again in a quarter."
+    },
     "risk_data": {
       "table": "risk_data",
       "schema_name": "public",
@@ -5423,36 +7347,36 @@
         "forced": false,
         "policies": [
           {
-            "name": "Supply chain data: project access view",
-            "command": "SELECT",
+            "name": "Supply chain data: project access delete",
+            "command": "DELETE",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Supply chain data: project access insert",
             "command": "INSERT",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
             "name": "Supply chain data: project access update",
             "command": "UPDATE",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           },
           {
-            "name": "Supply chain data: project access delete",
-            "command": "DELETE",
+            "name": "Supply chain data: project access view",
+            "command": "SELECT",
             "roles": [],
-            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND p.organization = get_current_user_org() AND (p.modeler_id = get_current_user_id() OR (SELECT get_current_approved_user.user_role FROM get_current_approved_user() get_current_approved_user(user_id, user_email, user_role) LIMIT 1) = 'admin') )",
-            "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
+            "using": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS( SELECT 1 FROM public.projects p WHERE p.id = supply_chain_data.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
           }
         ],
         "determinate": true
@@ -6849,5 +8773,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "7468a2c78304"
+  "contract_version": "19b8f6b68a11"
 }
