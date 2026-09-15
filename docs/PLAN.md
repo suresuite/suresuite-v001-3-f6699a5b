@@ -615,8 +615,14 @@ The largest feature. The catalog already renders from the registry.
 
 ---
 
-**Total: ~78 pages**, opening with the architecture,, of which ~30 are generated from the data contract, ~12 from the
-engine registry (already rendering), and ~35 hand-written narrative.
+**Total: 80 pages**, opening with the architecture, of which ~30 are generated from
+the data contract, ~12 from the engine registry (already rendering), and ~35
+hand-written narrative.
+
+*(Counted in WP 5.2a, which built the tree from this section page by page; it said
+"~78" and the per-section counts above sum to 80. §12's table said "~77", a third
+number. The tree in `src/components/docs/registry.ts` is now the enumeration, and
+`registry.test.ts` asserts it carries all fifteen sections.)*
 
 **Internal-only tables** — documented in `docs/data/tables/*.md` for the team but not
 in the user manual: `simulation_job_magnitudes`, `api_idempotency`, `ai_chat_events`,
@@ -673,8 +679,15 @@ Why first: a prospective customer, a researcher and a new modeller all ask the s
 opening question — *how is this thing put together, and can I trust it?* Answering
 that before the reference section is what separates a manual from a data dictionary.
 
-WP 5.2a moves the figure SVGs into the repo so the docs have no external dependency
-and the diagrams version with the code they describe.
+**The figures are authored in-repo as inline SVG** — `src/components/docs/figures.tsx`.
+*(Corrected in WP 5.2a; this paragraph said "WP 5.2a moves the figure SVGs into the
+repo".)* There was nothing to move: the repository contained **zero** SVG files, and
+the figures that sentence refers to live in an artifact this repository does not
+have. Linking to them would have created exactly the external dependency the
+requirement forbids, so WP 5.2a drew them instead. The requirement itself — no
+external dependency, versioned with the code they describe — is met more strictly
+this way than by a copied binary: a diagram cannot drift from the architecture
+without the drift appearing in a reviewable diff.
 
 ### 6.6 What survived the archive
 
@@ -1069,6 +1082,17 @@ intact.
 
 ### WP 2.4 — Contract-generated RLS tests
 
+**R7 must catch a §16 entry that was NEVER WRITTEN, not only one that was
+deleted.** *(WP 5.2a.)* §16 has now lost entries to a silent merge twice and had
+one never written at all — and "PHASE 2 READINESS", the entry that was never
+written, has now cost two separate packages (2.1 and 5.2a) the time to go looking
+for it. A checker built on `git log` proves the second case impossible to detect:
+history cannot show the absence of a document nobody committed. So R7 is two rules,
+not one — every `### WP` / `### PHASE` heading present in any ancestor is still
+present in HEAD, **and** every work package marked done in §7–§13 has a `### WP`
+entry in §16. The second is what makes "a package without a §16 entry is not
+finished" enforceable.
+
 **D28 and D29 now exist in §4.** They did not when the Phase 2 prompts were
 written, which cited "D28" as though §4 already held it; WP 2.1's gap check
 authored both. D28 is this package's stated finding — permissive policies OR, so
@@ -1278,13 +1302,14 @@ explicitly marked as reading no project data.
 
 ### WP 5.2 — The manual (§6.3)
 
-~77 pages. Sequenced so every sub-package ships a coherent, usable section rather
-than a scattering of stubs.
+80 pages. Sequenced so every sub-package ships a coherent, usable section rather
+than a scattering of stubs. *(Was "~77"; §6.3's own per-section counts sum to 80 and
+its footer said "~78". Enumerated and reconciled in WP 5.2a — see §16.)*
 
 | Sub | Ships | Pages | Depends on |
 |---|---|---|---|
-| **5.2a** | Shell + **Overview & architecture** + Getting started. Un-hide `/docs` (`App.tsx:212-214`), rewrite `registry.ts` for the 15-section tree, move the figure SVGs into the repo | ~10 | nothing |
-| **5.2b** | **Input tables** — the reference section, the core of the manual. **Closes D21** | 11 + 2 | WP 1.2, 1.3 |
+| **5.2a** ✅ | Shell + **Overview & architecture** + Getting started. Manual restored at `/docs` (`/help` redirects), `registry.ts` rewritten as the full 15-section tree, figures authored as inline SVG | 10 | nothing |
+| **5.2b** | **Input tables** — the reference section, the core of the manual. **Closes D21** | 11 + 1 | WP 1.2, 1.3 |
 | **5.2c** | Policies + Verification | 12 | WP 1.2; catalog already renders |
 | **5.2d** | Experiments, scenarios, results, statistics | 12 | WP 4.4 |
 | **5.2e** | Networks + Project Intelligence | 9 | WP 5.1 lineage |
@@ -1294,11 +1319,31 @@ than a scattering of stubs.
 
 **5.2a is shippable before Phase 1 and is now the most valuable single package in
 the plan.** It ships the architecture section — the answer to *how is this built and
-can I trust it* — plus Getting started and the full nav tree. None of it needs the
-contract. Everything after it is a drop-in.
+can I trust it* — plus Getting started and the full nav tree. Everything after it is
+a drop-in: a later package writes a body and flips one page's `status` to `"live"`,
+and the nav, pager and search already know about it.
+
+*(WP 5.2a correction: "None of it needs the contract" was wrong in one place. §6.3
+marks "The data model at a glance" **G**, so that page IS generated — the contract
+generator now emits `src/components/docs/generated/dataModel.generated.ts` and the
+page renders it. The rest of the package needs nothing.)*
+
+**Its exit gate is `src/components/docs/__tests__/registry.test.ts`**, which asserts
+what the tree promises: fifteen sections, no duplicate or shadowed slug, a body for
+every live page, an owing work package named on every planned one, and every
+`table:` cross-reference present in the schema. A later package that renames a table
+without moving its page fails it.
 
 **5.2b is the one that matters.** It is the section anyLogistix users would
 recognize, and the section SuReSuite has never had.
+
+*(WP 5.2a measured its shape while building the tree: §6.3 section 3 lists **11
+table pages + 1** ("Units and time periods"), not "11 + 2" — corrected above. Four
+of the eleven have no sidecar and cannot be generated: `node_list`,
+`network_nodes`, `network_edges` (deferred to WP 4.2) and
+`multi_tier_supply_chain` (WP 3.1). They are in the tree as planned pages owed by
+5.2b; **5.2b must reassign those four to the package that can ship them and correct
+its own row** — see §16.)*
 
 **Exit** — no table or field list is hand-written in `src/` · mobile and desktop read
 one payload · every generated page carries its provenance footer · every route in
@@ -1346,6 +1391,16 @@ lockstep since WP 0.1; this is where that debt is paid.
   (real median, else imputed) and **no plant column spec declares it**, so the one
   project-backed signal the plant stage has never reaches the user or the overrides.
   Either give it a column or stop computing it.
+
+**Added by the WP 5.2a gap check** — `projects.bom_level` is read against **two
+spellings and constrained by neither**. The contract says `single` or `multi` and
+the column defaults to `'single'` with no CHECK; `DataManager.tsx` and
+`ProjectCard.tsx` test `=== 'multi_level'` while `UploadWizard.tsx` and
+`ProjectDataViewer.tsx` test `=== 'single'`, and `useItemMasters.tsx` carries a
+comment reading "'single' or 'multi'/'multi_level'" — the ambiguity documented
+rather than resolved. A project stored as `multi` is read as not-multi-level by the
+two files testing for `multi_level`, which silently selects the wrong BOM table.
+Pick one spelling, add the CHECK, migrate any rows holding the other.
 
 ### WP 6.3 — Provenance vocabulary, value chain, reproducibility record
 Complete the A1 vocabulary. Ship **A2** the value-chain popover (source file → row →
@@ -2851,6 +2906,162 @@ Handoff to next WP:
     this package found nothing to change it. `R7` should be written to cover a
     MISSING entry as well as a deleted one; see the top of this entry for why.
 
+### WP 5.2a — The manual's spine: shell, architecture, getting started · 2026-09-15
+
+Preconditions held? **mostly — one was false, one was unknowable from the brief.**
+Exit checks passed? **all five.**
+
+**The §16 entry this package's brief told me to read does not exist — again.** The
+brief opened "read §16's WP 1.4 entry and its PHASE 2 READINESS entry". There is no
+PHASE 2 READINESS entry. WP 2.1's own entry, three screens above this one, records
+the identical discovery about the identical missing entry, and `git log -S` still
+finds it in no ancestor. **That is now the second package to lose budget to the same
+phantom.** WP 2.1 noted it for WP 2.4's append-only checker; this package adds the
+missing half — the checker catches an entry that was *deleted*, and both incidents
+were an entry that was *never written*. **The rule WP 2.4 writes must be that a
+package without a §16 entry cannot be called finished, keyed off the WP table in
+§7–§13 rather than off git history**, because history cannot prove the absence of a
+document nobody wrote. Plan edited at WP 2.4.
+
+**One brief claim was false, one was true and misleading.**
+- FALSE: *"None of 5.2a needs the contract"* (§12). §6.3 marks "The data model at a
+  glance" **G**. The page is generated, so the package needed the contract after
+  all — see below.
+- TRUE BUT MISLEADING: *"There are no SVGs in the repo — zero, repo-wide."* Correct,
+  and I confirmed it (`git ls-files | grep -c '\.svg$'` → 0). The misleading part is
+  the framing of it as a blocker with two options, one of which was "the figures are
+  supplied to you". Nobody can supply them to a session; the choice was never live.
+
+**THE BLOCKER §6.5 NAMED, AND WHAT WAS DONE ABOUT IT.** §6.5 said this package
+"moves the figure SVGs into the repo so the docs have no external dependency".
+There was nothing to move. The figures are authored as inline SVG in
+`src/components/docs/figures.tsx` — three diagrams (the tier journey, the seven-hop
+data flow, the system boundary), drawn with Tailwind token classes so one drawing
+serves both themes. This satisfies the requirement more strictly than a copied
+binary would: a diagram cannot drift from the architecture without the drift showing
+in a reviewable diff. **§6.5 is edited to say so**, because a plan that still asks a
+future session to "move the SVGs" sends it looking for files that do not exist.
+
+**/docs OR /help — SETTLED: `/docs`, with `/help` redirecting.** §6 names `/docs`
+throughout and §12 says "un-hide `/docs`"; the code had `/help`, and the chrome's own
+header already read "Docs". So the plan won. `/help` → `/docs` and `/help/:slug` →
+its successor page, both `replace` so the old address does not accumulate in history.
+Twenty-one legacy slugs are mapped in `src/components/docs/legacySlugs.ts`; the rest
+land on the front page rather than on an arbitrary guess, and `registry.test.ts`
+asserts every target is a real page, so the map cannot rot into redirects to nowhere.
+
+Discovered:
+  - **`public/docs/` ALREADY SERVES THREE FILES AT THE PATH THE MANUAL NOW OCCUPIES**
+    — `csv-upload-guide.md`, `location-dataset-guide.md`, `nexus-node.md`, and
+    `UploadWizard.tsx` links at least the first of them. Nobody had looked: the
+    decision to mount at `/docs` was being taken on the strength of §6's wording
+    alone. **Verified harmless, not assumed harmless:** built the app, served
+    `dist/`, and requested all three — a static file wins over the SPA fallback and
+    still returns its own content (`/docs/csv-upload-guide.md` → 200, the markdown).
+    Every file there ends in `.md` and the slug grammar forbids a dot, so no slug can
+    ever collide. **`registry.test.ts` asserts it against the real directory
+    listing**, because "they all happen to end in .md" is a fact about today.
+    → the one real risk is a host configured to rewrite `/docs/*` to `index.html`
+      unconditionally, which would break the three guides. Recorded here so whoever
+      configures hosting knows the constraint exists.
+  - **`bom_level` is compared against two different spellings, and has no CHECK
+    constraint to settle which is right.** The contract says `single` or `multi`;
+    `DataManager.tsx` and `ProjectCard.tsx` test `=== 'multi_level'` while
+    `UploadWizard.tsx`, `ProjectDataViewer.tsx` and the rest test `=== 'single'`.
+    `useItemMasters.tsx` has a comment reading "'single' or 'multi'/'multi_level'",
+    which is the confusion written down rather than resolved. The column's default is
+    `'single'` and nothing constrains it, so both spellings can coexist in one table,
+    and a project stored as `multi` would be read as not-multi-level by the two files
+    that test for `multi_level`. **Not in §4 and belongs to no WP.** In scope for
+    **WP 6.2** (fix the divergences) — a CHECK constraint plus one spelling. Recorded,
+    not fixed: it is a data-plane defect and this is a documentation package. The
+    Projects page describes the field in reader's terms ("single-level or
+    multi-level") and deliberately asserts no stored spelling.
+  - **The archived help site's README points at a document that was deleted.** Its
+    status banner reads "superseded by `docs/data/USER-DOCS-PLAN.md`" and its §"Why it
+    was archived" cites the same path; WP 0.3 folded that file into this plan and
+    removed it. The README is the file §6.6 sends every later package to for mining,
+    so the dead pointer was on the path of 5.2b, 5.2c and 5.2h. Repointed to
+    `docs/PLAN.md` §6.1. One line, and it is the same defect class as D21.
+  - **THREE PAGE TOTALS, ALL DIFFERENT, NONE OF THEM RIGHT.** §6.3's footer said
+    "~78 pages", §12's table said "~77", and §6.3's own per-section counts sum to
+    **80**. Nobody had added up the section that lists the pages. Both corrected;
+    `src/components/docs/registry.ts` is now the enumeration and the test asserts the
+    fifteen sections are all present.
+  - **§12's "5.2b ships 11 + 2" is arithmetic, and it is wrong.** §6.3 section 3
+    lists eleven table pages plus one written page ("Units and time periods") — 11 + 1.
+    Corrected. Four of the eleven cannot be generated (no sidecar): `node_list`,
+    `network_nodes`, `network_edges` and `multi_tier_supply_chain`. They are in the
+    tree as 5.2b's, because §12 assigns them there today; **5.2b reassigns them and
+    corrects its own row**, which is what its brief already tells it to do. This
+    package did not pre-empt that decision.
+  - **The mobile default was wrong in the chrome this package inherited.**
+    `DocsLayout` opened with `navOpen = true`, and the aside is `lg:block` — so on a
+    phone the reader landed on a fifteen-section table of contents with the page
+    itself below the fold. Found by rendering it, not by reading it. Now closed below
+    `lg`, and a tap on a nav link closes it. Desktop is byte-identical in behaviour.
+
+Verification — what was actually run, not what was intended:
+  - `npm run contract:check` green (4 R5 warnings, the D5 natural keys, unchanged
+    from `main`). `npm test` 115 passed, up from 92: 23 new in `registry.test.ts`.
+  - **The new gate was proved to bite.** Marking a planned page with no work package
+    and pointing a page at `network_nodez` fails two named tests; reverted.
+  - `npm run build` clean. `dist/` served and driven in Chromium: all fifteen
+    sections render, ten live pages return their own `h1`, an unknown slug renders
+    the manual's own not-found rather than the app's, `/help` and `/help/overview`
+    both land on the right page, **zero console errors**, and **zero horizontal
+    overflow at 390px**.
+  - `npm run audit:ui`: 8 violations, the same 8 as `main` (F2, from PR #190). The
+    violation list is byte-identical; only the scanned-file count moves, 333 → 350.
+    **Zero added.**
+  - `npx eslint src/components/docs src/App.tsx`: clean, no warnings. The one warning
+    it did raise (a constant exported from a component file) was fixed by splitting
+    `legacySlugs.ts` out of `legacyRedirects.tsx`, not suppressed.
+  - `npm run lint` as a whole is **red on `main` and equally red here** — 453
+    problems, 339 errors, 114 warnings, byte-identical counts on both sides (measured
+    by stashing). It is red because of `eslint .` across the pre-existing codebase,
+    not because of `audit:ui`. `data-contract.yml` already says so in its header and
+    invokes each command directly for that reason, so nothing in CI depends on it.
+    Stated rather than quietly dropped: this package cannot turn it green and did not
+    try.
+
+Handoff to next WP:
+  - **The tree is complete and the gate is written. Adding a page is two lines.**
+    Write the body in `src/components/docs/bodies/`, add it to `DOC_BODIES`, and flip
+    that page's `status` from `planned` to `live` in `registry.ts`. Nav, breadcrumb,
+    pager, search and the stub all follow. Do not add a route; `/docs/:slug` is one
+    route for all eighty pages.
+  - **`registry.test.ts` will fail you for the right reasons.** A body with no
+    registry entry, a live page with no body, a body left behind on a page still
+    marked planned, a duplicate slug, a `related:` pointing at nothing, a `table:`
+    the schema does not have. Read its failure message before assuming it is wrong.
+  - **The generator now emits into `src/`.** `contract:generate` writes
+    `src/components/docs/generated/dataModel.generated.ts` alongside
+    `docs/data/tables/*.md`, gated by the same `contract:generate -- --check`. Any
+    package that changes a sidecar or a migration must regenerate and commit it, the
+    same as the markdown pages. It carries `CONTRACT_VERSION` and `ENGINE_VERSION`,
+    which is what `Provenance` in `prose.tsx` renders — **use that component rather
+    than writing a footer, and never put a date in a generated page** (§6.4).
+  - **For 5.2h specifically: the number is 17 and 56, not 13 and 60.** Its brief says
+    "13 link to a page, 60 name their owing WP". `contract:check` R1 reports **17
+    described, 56 deferred, 73 in the schema** — WP 2.1 added four sidecars after that
+    brief was written. Do not hard-code either number: `COUNTS` in
+    `dataModel.generated.ts` already holds all three, and "All tables" should read
+    them the way "The data model at a glance" does.
+  - **For 5.2b: the input-table templates are not named after their tables.**
+    `public/template/` holds `inbound_logistic.csv` and `outbound_logistic.csv` —
+    singular, where the tables are plural. Take the filename from
+    `UploadWizard.tsx`'s `templateTypes[].templateFile` rather than deriving it from
+    the table name, or four of the seven "download the template" links will 404.
+  - **`prose.tsx` is the page vocabulary; extend it rather than styling in a body.**
+    `PageTitle`, `Section` (renders the `h3` the rail tracks, with an explicit `id`
+    because the id is the deep link and must not follow the wording), `P`, `Key`,
+    `Bullets`, `Callout` (`note` / `limit` / `law`), `Steps`, `Defs`, `Figure`,
+    `DocLink`, `AppLink`, `Term`, `Provenance`.
+  - **The UI audit's `lg:` rule exempts `DocsLayout` and nothing else under
+    `docs/`.** A page body that reaches for `lg:` adds a violation and fails the
+    zero-added check. `md:` is the product's one breakpoint; the bodies use it only.
+
 ---
 
 ## 17. Sequencing
@@ -2862,7 +3073,7 @@ Handoff to next WP:
 | 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ready |
 | 3 | 3.1 – 3.4 | one ingestion contract | 4 | — |
 | 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | — |
-| 5 | 5.1 – 5.3 | lineage + the 77-page manual | 6 | — |
+| 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | 5.2a ✅ done — manual live at `/docs`, tree complete, sections 1–2 written |
 | 6 | 6.1 – 6.3 | policy contract, researcher grade | — | — |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
 

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy, useState } from 'react';
 import { AuthProvider } from '@/hooks/useAuth';
@@ -44,6 +44,9 @@ const DeveloperApi = lazy(() => import('./pages/DeveloperApi'));
 const Forbidden = lazy(() => import('./pages/Forbidden'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const About = lazy(() => import('./pages/About'));
+const DocsLayout = lazy(() => import('./components/docs/DocsLayout'));
+const DocPage = lazy(() => import('./components/docs/DocPage'));
+const HelpSlugRedirect = lazy(() => import('./components/docs/legacyRedirects'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminUserAccess = lazy(() => import('./pages/admin/AdminUserAccess'));
@@ -209,12 +212,27 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                {/* Docs/help site is hidden from all access. The legacy site is archived at
-                    docs/archive/legacy-help-site/; its replacement and these two routes are
-                    restored by WP 5.2a (docs/PLAN.md §6). The previous comment pointed at a
-                    "CLAUDE.md task history" that does not exist. */}
-                <Route path="/help" element={<NotFound />} />
-                <Route path="/help/:slug" element={<NotFound />} />
+                {/* The manual (PLAN.md §6). Public on purpose: §6.5's argument for
+                    publishing the architecture is that a prospective customer, a
+                    researcher and a new modeller all ask the same opening question,
+                    and answering it should not require an account.
+
+                    /docs is the address §6 names throughout. /help is what the
+                    archived site used and what anything older links to, so it
+                    redirects rather than 404s — `replace` so the old address does
+                    not accumulate in the reader's history.
+
+                    NOTE for later packages: `public/docs/` serves three real files
+                    (the CSV upload guides). Static files win over the SPA fallback,
+                    and every one of them ends in `.md` while no slug does — but a
+                    slug ending `.md` would be shadowed by that directory. The
+                    registry test asserts none is. */}
+                <Route path="/docs" element={<DocsLayout />}>
+                  <Route index element={<DocPage />} />
+                  <Route path=":slug" element={<DocPage />} />
+                </Route>
+                <Route path="/help" element={<Navigate to="/docs" replace />} />
+                <Route path="/help/:slug" element={<HelpSlugRedirect />} />
                 <Route path="/about" element={<About />} />
 
                 {/* Super Admin routes */}
