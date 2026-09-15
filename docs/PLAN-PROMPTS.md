@@ -85,7 +85,7 @@ Already verified (re-check before relying on it):
   — the error is swallowed and the table exists in NO migration. The mapped
   branch at :158-163 is therefore dead code today. Make the failure loud;
   deciding whether to add the table or delete the branch is WP 1.4, not this one.
-· risk_data is read at ProductLevelNetwork.tsx:487 and FirmLevelNetwork.tsx:288
+· risk_data is read at ProductLevelNetwork.tsx:499 and FirmLevelNetwork.tsx:300
   with quoted column names ("RISK CLASS") and has no migration either.
 
 Conversion changes weighted magnitudes. supply_chain_data.weighted is
@@ -363,7 +363,7 @@ full stage→diff→promote cycle BEFORE renaming anything.
 Implement WP 3.2 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· UploadWizard.tsx:476-477 and :497-523 parse with split(','). Confirmed behaviour:
+· UploadWizard.tsx:501-502 and :497-523 parse with split(','). Confirmed behaviour:
   – a quoted comma shifts EVERY subsequent column left by one
   – BOM is stripped (U+FEFF is ES WhiteSpace, so .trim() removes it) — accidental
   – CRLF survives (the per-field .trim() removes \r)
@@ -375,7 +375,7 @@ Already verified (re-check before relying on it):
 · ingest-bom-multi-level/index.ts:42-44 already does the right thing:
   (x ?? '').toString().trim() || null. Copy that pattern to the other two — do not
   invent a third.
-· The standard upload button IS gated on errors.length === 0 (UploadWizard.tsx:1833),
+· The standard upload button IS gated on errors.length === 0 (UploadWizard.tsx:1863),
   so validateData errors do block. The problem is what it fails to catch, not the gate.
 
 Delete the client-side parse. Do not leave it behind a flag — two parsers is the
@@ -491,7 +491,7 @@ Already verified (re-check before relying on it):
   analysis in everything but name — give it analysis_kind 'combine_etl'.
 · Each currently has its own storage convention and its own (or no) invalidation.
 · calculate-node-prominence is auto-invoked after deep-tier uploads
-  (UploadWizard.tsx:1280-1307) — that call site must keep working.
+  (UploadWizard.tsx:1309-1336) — that call site must keep working.
 · auto_calculate_network_metrics_on_completion (20250925164454:78) fires on the
   projects.completed transition. Check whether it still should.
 
@@ -542,7 +542,7 @@ Already verified (re-check before relying on it):
 · Per-page reads confirmed by the audit are listed in §4 of the plan and
   in the plan's defect table — use them to validate your analyser's output, not to
   replace it.
-· Some pages read tables directly with no RPC (ProcessLevelNetwork.tsx:1110-1111).
+· Some pages read tables directly with no RPC (ProcessLevelNetwork.tsx:1104-1105).
   The lineage must record what the code does, not what it should do.
 
 Seed by static analysis, then CONFIRM by hand. An unconfirmed lineage entry is
