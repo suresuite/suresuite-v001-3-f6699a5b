@@ -117,6 +117,11 @@ $$;
 -- written before the rename carries the old name (slug matches) and one written
 -- after carries the new name (name matches).
 --
+-- `(array_agg(DISTINCT o.id))[1]` and not `min(o.id)`: Postgres has no `min()`
+-- aggregate for uuid, and `min(uuid)` is a 42883 at RUN time, not at parse time —
+-- it took the first real `db push` to surface it. The HAVING below guarantees the
+-- array has exactly one element, so the subscript is exact rather than a choice.
+--
 -- `count(DISTINCT o.id) = 1` is the point of the GROUP BY: `organizations.name`
 -- is NOT unique (only `slug` is), so a text org matching two organizations is
 -- ambiguous and is LEFT NULL rather than resolved to an arbitrary one. Rows this
@@ -127,7 +132,7 @@ $$;
 UPDATE public.approved_users au
    SET organization_id = m.org_id
   FROM (
-    SELECT u.id AS user_id, min(o.id) AS org_id
+    SELECT u.id AS user_id, (array_agg(DISTINCT o.id))[1] AS org_id
       FROM public.approved_users u
       JOIN public.organizations o
         ON o.name = u.organization
@@ -142,7 +147,7 @@ UPDATE public.approved_users au
 UPDATE public.projects p
    SET organization_id = m.org_id
   FROM (
-    SELECT pr.id AS project_id, min(o.id) AS org_id
+    SELECT pr.id AS project_id, (array_agg(DISTINCT o.id))[1] AS org_id
       FROM public.projects pr
       JOIN public.organizations o
         ON o.name = pr.organization
