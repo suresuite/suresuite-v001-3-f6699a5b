@@ -6668,6 +6668,18 @@
           "unique": false,
           "references": null,
           "added_by": "20260915000002_lead_time_unit.sql"
+        },
+        {
+          "name": "scratch_column",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260915000002_lead_time_unit.sql"
         }
       ],
       "constraints": [

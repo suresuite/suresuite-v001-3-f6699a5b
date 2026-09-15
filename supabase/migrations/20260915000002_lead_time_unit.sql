@@ -35,3 +35,8 @@ ALTER TABLE public.inbound_logistics
 ALTER TABLE public.inbound_logistics
   ADD CONSTRAINT inbound_logistics_lead_time_unit_known
   CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL);
+
+-- THROWAWAY. Phase 1 / WP 1.4's gap check: a scratch column that no sidecar
+-- describes must make CI red. This branch and its PR exist only to prove that,
+-- and are deleted once the run is recorded in PLAN.md §16.
+ALTER TABLE public.inbound_logistics ADD COLUMN IF NOT EXISTS scratch_column text;
