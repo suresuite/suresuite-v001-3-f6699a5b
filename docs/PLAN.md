@@ -1640,7 +1640,7 @@ Handoff to WP 1.1:
 - `npm ci` is required before `npm test` in a fresh container; `node_modules` is not
   present at clone time.
 
-### WP 1.1 — Schema introspector · 2026-09-15 · `<this commit>`
+### WP 1.1 — Schema introspector · 2026-09-15 · `1f77451`
 
 Preconditions held? **no.** "Phase 0 complete" was true of the code and false of the
 record; see the precondition entry above. Repaired before starting.
