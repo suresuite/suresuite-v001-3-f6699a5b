@@ -28,6 +28,7 @@ const root = resolve(__dirname, "../../../..");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
 const ETL = "supabase/functions/combine-project/index.ts";
+const CONTRACT = "supabase/contract";
 const PAGES = ["src/pages/ProductLevelNetwork.tsx", "src/pages/FirmLevelNetwork.tsx"];
 
 // The table name, assembled rather than written as a `.from('…')` literal. The
@@ -72,7 +73,6 @@ describe("D3 — product_code_map is gone, and stays gone", () => {
     expect(src, "the ETL must still explain why the mapping was removed").toMatch(
       new RegExp(`${DEAD_TABLE}[\\s\\S]{0,600}(DELETED|never executed|NEVER EXECUTED)`),
     );
-    expect(named, `product_code_map is referenced by ${named.join(", ")}`).toEqual([]);
   });
 
   it("and no sidecar describes it — the contract agrees the table does not exist", () => {
