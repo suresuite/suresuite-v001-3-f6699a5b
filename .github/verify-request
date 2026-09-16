@@ -42,3 +42,18 @@ section failed). Re-run now that `20260916000014`–`20260916000016` have landed
 #      `tier3_suppliers`, `multi_tier_supply_chain` — because "the index is free"
 #      is only true while they are empty.
 WP 3.3 — the BEFORE run, before the dedup
+
+# requested-by: Phase 3 / WP 3.3 — natural keys, upsert, normalization (§16, gap check)
+# requested-at: 2026-09-16 (the AFTER run — and read the caveat before the numbers)
+# why: §10 asks for a run after the promotion change. THIS RUN CANNOT SHOW THE
+#      DEDUP'S EFFECT AND IS NOT EXPECTED TO. Migrations deploy on merge, so
+#      20260916000017–21 have not executed against production; this measures the
+#      database the dedup has not touched. What it IS for: confirming the
+#      before-number is stable across the package (96 + 2, and 0 rows in the three
+#      WP 3.2 described — because "the index is free" stops being true the moment
+#      one of them is written to), and re-reading the 27 integer `time_unit`
+#      tokens now that the ETL reports them instead of assuming them.
+#      The prediction the NEXT run should check, recorded in §16 so it can be
+#      falsified: inbound_logistics 1 787 -> 1 691, bom_multi_level 794 -> 792,
+#      and every `rows_the_unique_index_would_reject` 0.
+WP 3.3 — the AFTER run (pre-deploy; see the caveat above)
