@@ -23,6 +23,10 @@ import KnownLimits from "./KnownLimits";
 import YourFirstProject from "./YourFirstProject";
 import Projects from "./Projects";
 import UploadingData from "./UploadingData";
+import AllTables from "./AllTables";
+import UnitsAndConventions from "./UnitsAndConventions";
+import Glossary from "./Glossary";
+import FieldIndex from "./FieldIndex";
 
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
@@ -38,4 +42,10 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "your-first-project": YourFirstProject,
   projects: Projects,
   "uploading-data": UploadingData,
+
+  // 15 · Reference
+  "all-tables": AllTables,
+  "units-and-conventions": UnitsAndConventions,
+  glossary: Glossary,
+  "field-index": FieldIndex,
 };

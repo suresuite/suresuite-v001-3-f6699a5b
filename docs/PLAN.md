@@ -1356,7 +1356,7 @@ its footer said "~78". Enumerated and reconciled in WP 5.2a — see §16.)*
 | **5.2e** | Networks + Project Intelligence | 9 | WP 5.1 lineage |
 | **5.2f** | Computed tables + Exports & reproducibility | 7 | WP 4.1, 4.4 |
 | **5.2g** | Connectors + Access & administration + Developer API | 14 | WP 2.2, 3.1 |
-| **5.2h** | Reference — all-tables detail index, units, glossary, field index | 4 | WP 1.2 |
+| **5.2h** ✅ | Reference — all-tables detail index, units, glossary, field index | 4 | WP 1.2 |
 
 **5.2a is shippable before Phase 1 and is now the most valuable single package in
 the plan.** It ships the architecture section — the answer to *how is this built and
@@ -1385,6 +1385,13 @@ of the eleven have no sidecar and cannot be generated: `node_list`,
 `multi_tier_supply_chain` (WP 3.1). They are in the tree as planned pages owed by
 5.2b; **5.2b must reassign those four to the package that can ship them and correct
 its own row** — see §16.)*
+
+*(WP 5.2h correction: its row said "WP 1.2" and that is right, but the numbers a
+session inherits from it are not. Coverage has moved three times — 13 tables when
+the Phase 5 briefs were written, 17 after WP 2.1, **25 of 76 with 256 columns**
+after WP 2.2. No page and no prompt should carry either figure: `COUNTS` and
+`REFERENCE_COLUMN_COUNT` in the generated modules hold all of them, and the
+reference pages read them.)*
 
 **Exit** — no table or field list is hand-written in `src/` · mobile and desktop read
 one payload · every generated page carries its provenance footer · every route in
@@ -3284,122 +3291,131 @@ Fixed here rather than inside WP 2.3, because a red `main` blocks everyone and
 should not wait behind a work package.
 `contract:check` green · **129 tests green** · `check:docs` green.
 
-### WP 2.3 — The data-plane audit · 2026-09-16 · `20260916000001`
+### WP 5.2h — Reference: all tables, units, glossary, field index · 2026-09-16
 
-Preconditions held? **no — `main` was red on arrival**, fixed first and separately
-(see the WP 2.3 precondition entry above). One further claim was stale.
-Exit checks passed? yes, all three EXECUTED against a live PostgreSQL 16.
+Preconditions held? **no — `main` was RED on arrival, from two different causes.**
+Exit checks passed? **all five**, with one exit-check number corrected below.
 
-**THE GAP CHECK, WHICH IS THIS PACKAGE'S REAL MEASUREMENT.** §9 asks for an
-inventory of every write path to tier 2/3/4 with a tick for whether it audits. The
-contract knows which tables those are, so the inventory is computed rather than
-recalled: **twelve tables at tier 2, 3 or 4; twenty-two live SQL functions write
-them; ZERO emitted an audit row.** Six further write paths live in edge functions
-going straight to the table:
+**`main` was red and had been for three merges.** `npm test` (4 failures) and
+`npm run contract:check` both failed on `55249d0`. Fixed first, as its own PR
+(#203), before this package opened — a package started on a red base cannot tell
+its own breakage from the breakage it inherited. Two causes:
+  - `loudFailure.test.ts` threw two `ReferenceError`s. PR #200 added assertions
+    using `named` and `CONTRACT`, neither defined anywhere in the file. **#200's
+    own `data contract` run failed and it was merged anyway**; its title is
+    "reconcile PR #193 against PR #194 — main was red".
+  - `dataModel.generated.ts` was stale. WP 2.2 (#202) added eight sidecars and
+    three tables and regenerated `build/data-contract.generated.json` and
+    `docs/data/tables/*.md` — but not the `src/` module, because its branch
+    predated the generator change that emits it (#201, merged minutes earlier).
+    Both sides were valid; the merge was stale. **A semantic conflict git cannot
+    see**, and the first real instance of the hazard WP 5.2a's handoff named.
+    `registry.test.ts` caught it, which is what it was written for.
+  → **PR #204 fixed the same red main concurrently, from another session.** Both
+    diagnoses were identical; the two fixes differed only in naming the constant
+    (`SIDECARS` vs `CONTRACT`). #204 merged first, then #203 on top, and the merge
+    kept BOTH — one used, one dead. Removed here. Nothing was broken by it, but
+    two names for one path in a plan whose first invariant is single-source is
+    worth deleting rather than leaving. **The real finding is the duplicated
+    work**: two sessions spent a package's opening on the same defect because
+    nothing announced it was being fixed.
 
-| Writer | Tier(s) | Audited before |
-|---|---|---|
-| 22 live RPCs — `bulk_insert_*`, `bulk_upsert_*`, `assign_*`, `save_policy_defaults`, `apply_policy_bundle`, `restore_policy_version`, `delete_project`, `delete_project_dataset`, `snapshot_dataset`, `combine_project_into_supply_chain`, … | 2, 3, 4 | **none** |
-| `ingest-bom-multi-level`, `ingest-inbound-logistics`, `ingest-outbound-logistics` | 2 | **none** |
-| `erp-sync-orbit-mrp` | 2 | **none** |
-| `combine-project` (the ETL), `predict-critical-nodes` | 3 | **none** |
+**THE NUMBERS IN THIS PACKAGE'S BRIEF WERE WRONG FOR THE THIRD TIME.** It says
+"All 73 tables appear in the index; 13 link to a page, 60 name their owing WP"
+and "the field index covers all 156 documented fields". Measured today: **76
+tables, 25 described, 51 deferred, 256 columns.** WP 5.2a's handoff had already
+corrected 13/60 to 17/56 and said to read `COUNTS` rather than hard-code; WP 2.2
+moved it again within the hour. **No page here carries a literal count** — every
+figure on all four pages is read from `COUNTS` or `REFERENCE_COLUMN_COUNT`, so
+the next sidecar moves them without touching a page. §12 edited to say so.
 
-**That inventory is why this package uses TRIGGERS rather than instrumenting the
-RPCs.** Editing the 22 is the obvious reading of "emit on every tier transition"
-and it is wrong twice: it is 22 function bodies to reproduce exactly, and it would
-miss all six service-role paths, which never call an RPC. A statement-level trigger
-on each of the twelve tables catches every writer that exists, every writer added
-later, and the service-role ones — the difference between a rule and a list.
-
-**STATEMENT-level, not row-level, and the number makes the case.** Verified on the
-live database: a 5,000-row bulk insert produces **one** audit row carrying
-`rows_after: 5000`, not 5,000 rows. A row-level trigger would have made the log
-unreadable at exactly the moment it mattered.
+**The honesty condition is met and gated.** All 76 tables appear on "All tables":
+25 with every column, 51 under the work package that owes them, rendered from
+`coverage.yaml` through the generated module. `registry.test.ts` asserts the two
+generated modules describe the same table set and that the column count matches
+the contract's own, so the index cannot silently undercount.
 
 Discovered:
-  - **The prompt's "same column shape" is right, and `log_admin_action` still cannot
-    be reused.** It opens with `IF NOT is_super_admin(actor) THEN RAISE 'forbidden'`.
-    Data-plane rows are by definition written by ordinary users doing ordinary work,
-    so routing them through it would make every tier-2 write fail for everyone who
-    is not a super admin. `log_data_action()` is separate and takes its actor
-    explicitly; it refuses the `admin` plane so it cannot become a way around the
-    super-admin check.
-  - **D36** — a trigger cannot attribute a service-role write. Six ingest/ETL paths
-    now audit WHAT but not WHO, and say so in the row (`actor_known: false`) rather
-    than leaving a NULL to be misread. → §4, assigned WP 3.1, which owns those
-    functions.
-  - **`export` had existed since `20260711000002` with ZERO call sites**, confirmed
-    by repo-wide search. WP 2.2 had even given it per-project-role grants. So §5.2 is
-    right that this writes the FIRST check, and right that it is the one with teeth.
-  - **WP 1.1's exit check hardcoded `admin_audit_logs`.** The rename broke it, which
-    is the gate working. It now asserts `audit_logs` — the TABLE, deliberately, since
-    the compatibility view would satisfy a weaker check while the table beneath it
-    had been dropped.
+  - **GAP CHECK — three archived glossary terms do not describe this product.**
+    Each was traced before being kept, and these three were dropped and corrected
+    on the page rather than defined:
+      · **OTIF.** The archive lists it as a headline KPI. `scsim/scsim/kpi/compute.py`
+        emits `fill_rate`, `demand_value`, `produced_value`, `revenue`,
+        `lost_sales_value`, `lost_units`, `max_backlog`, `lost_inbound_units`,
+        `avg_on_hand_value`, `capacity_utilization`, `cost_of_resilience` and the
+        Resilience Index. **There is no OTIF.** A `grep -ri otif` returns 40 hits
+        and every one of them is `_notify_progress` — which is exactly how a term
+        like this survives a casual check.
+      · **DES / SimPy.** The archive says the engine is a discrete-event simulation
+        built on SimPy. `scsim/scsim/core/phases.py` opens "The weekly cycle is
+        data, not code — every simulated week executes the named, versioned phase
+        sequence"; demand is a pre-drawn weekly schedule and there is no event
+        queue. `simpy` appears in `sim-worker/requirements.txt` — a dependency of
+        the LEGACY worker, which blueprint §3 freezes. The strategic engine is
+        fixed-increment, not event-driven. This one matters beyond vocabulary: it
+        decides what a reader believes the model can represent (nothing
+        sub-weekly).
+      · **ABC-XYZ.** The archive defines a two-axis scheme. Only ABC exists —
+        revenue-based segmentation in `p_p4_fg_safety_stock.py`. There is no XYZ
+        axis anywhere, so there is no ABC-XYZ class to set a policy against.
+    Terms traced and KEPT: cost of resilience (`kpi/compute.py`), MSER-5 and
+    Conway (`scsim/docs/statistics.md`, engine), the four centralities
+    (`NetworkMetricsTable.tsx`), nexus (`StressTestCard.tsx`, network metrics),
+    graph cache (`sim_worker/graph_cache.py`), make-to-order (`project_map.py`
+    plus the `chk_supply_chain_model` CHECK), MOQ, safety stock, warm-up,
+    replication, single-source exposure.
+  - **A CHECK constraint on an enum broke the phone layout, and only on two
+    tables.** `policy_defaults` and `policy_overrides` rendered 210px of
+    horizontal page overflow; the other 23 were clean. The cause is a quoted enum
+    list with no spaces after its commas — one unbreakable token that spills past
+    every container. `break-words` on that block fixes it. **Found by rendering
+    the page at 390px, not by reading it**, which is the second time in two
+    packages that the only way to find a layout defect was to look at one.
+  - **The sidecars are authored with markdown code spans, and an HTML page shows
+    the backticks.** Every `meaning` string is written for `docs/data/tables/*.md`
+    as well, so it contains `` `organization_members.user_id` ``. Printed raw
+    that reads as a typo in generated text — which quietly undermines the one
+    thing generated text is for. `Prose` in `prose.tsx` renders code spans and
+    nothing else; it is deliberately not a markdown parser. **Any later package
+    rendering a contract string should use it.**
+  - **`grading.ts` is imported directly by the units page, not copied.** It is
+    dependency-free TypeScript precisely so the browser, the edge functions and
+    the tests read one object, and `src/` already imported it twice. So "Units &
+    conventions" reads `UNIT_DAYS` live: the table on the page IS the table the
+    software uses. A generated copy would have been a second source for the one
+    fact D10 was about.
 
-**TWO BUGS MY OWN EXIT CHECKS CAUGHT, both invisible to every static gate:**
-
-  1. **Every audit row recorded an empty tier.** The generator that wrote 36
-     `CREATE TRIGGER` statements lost its `'2'`/`'3'`/`'4'` argument to shell
-     quoting, so `TG_NARGS` was 0. The SQL was valid, the migration applied, the
-     triggers fired — and `after->>'tier'` was blank in every row. Caught by reading
-     rows out of a real database, not by reading the file.
-  2. **A refused export was not audited.** `record_export` raised `42501` on refusal,
-     which rolled back the audit row in the SAME transaction: refused, and no trace
-     of the refusal. Postgres has no autonomous transactions, so the fix is not to
-     raise — the function RETURNS `{allowed, audit_id, reason}` and the row commits.
-     The exception survives only for a NULL actor, which is a caller bug rather than
-     a refusal. **The migration comment predicted this risk in words and the code
-     did it anyway**; the exit check is what settled it.
-
-Both are D31's lesson again: nothing in this repo executes a migration before the
-production deploy does, so "it applied cleanly" says nothing about whether it
-WORKS. The local-Postgres route is what turned both into findings instead of
-incidents.
-
-**Exit checks, executed:**
-  - *Every T2 write in a smoke run appears* — insert, update and delete on
-    `inbound_logistics` (tier 2) and an insert on `policy_overrides` (tier 4) each
-    produced exactly one row with the right tier, row counts and `actor_known: true`.
-  - *Admin history intact* — the pre-existing admin row survived the rename and is
-    still readable, both directly and through the compatibility view.
-  - *An export without the capability is refused AND audited* — `export.refused` and
-    `export.allowed` both on the record, which is precisely what the first version
-    could not do.
-
-**What this does NOT do, stated because over-claiming it would be the §5 sin:**
-the product's exports are built in the browser from data the page already fetched,
-so `record_export` governs the export ACTION and makes every attempt attributable;
-it is not an exfiltration control. A caller that ignores the answer still holds the
-data it already read. Gating the BYTES needs a server-built export, which is A4's
-verifiable export, not this button's.
-
-Baseline numbers:
-  - 12 tier 2/3/4 tables × 3 operations = **36 triggers**; 22 RPCs and 6 edge-function
-    paths now covered without either being edited.
-  - 5,000 rows inserted → **1** audit row (statement-level).
-  - 26 tables described (was 25); 50 deferred (was 51).
-  - **143 tests** (129 + 14); 8 mutations run against the new suite, 8 failures,
-    restore green.
-  - `contract:check` green · `check:docs` green.
-
-**Unverified:** whether production's `admin_audit_logs` rows all satisfy the new
-plane CHECK. They should by construction — `log_admin_action()` was the only writer
-and the column defaults to `'admin'` — but nobody has counted, and a CHECK added to
-a table with existing rows is validated on the spot. §15.
+Verification — run, not intended:
+  - `npm run contract:check` green · `npm test` **135 passed** (129 + 6 new) ·
+    `tsc --noEmit` clean · `npm run build` clean · bundle audit clean.
+  - **The new module is drift-gated and proved to bite**: editing one column name
+    in `reference.generated.ts` fails `contract:generate -- --check` naming the
+    file; regenerating restores it.
+  - Driven in Chromium at 1440px and 390px: all four pages render, 256 column
+    rows on "All tables" and 256 entries on "Field index", the field filter
+    narrows 256 → 5 on `lead_time`, a field link resolves to a real anchor, the
+    deep link `#inbound_logistics.lead_time` lands on its row, **zero console
+    errors and zero horizontal overflow on every page**.
+  - `audit:ui` unchanged from `main` — 8 violations (F2), zero added.
 
 Handoff to next WP:
-  - **WP 2.4's generated RLS tests now have an audit plane to assert against.**
-    `audit_logs` carries two disjoint SELECT policies, and the disjointness is the
-    reason the D28 permissive-OR is CORRECT here rather than a defect — a worked
-    example of when OR is the intended union, which the RESTRICTIVE decision should
-    be taken against.
-  - **`audited: true` is still not claimable on the tier tables' sidecars.** The
-    trigger records the statement, not the actor, wherever the writer is the service
-    role (D36). Flipping `audited` to true across the sidecars should wait for that,
-    or it records a stronger claim than the rows support.
-  - **The `admin_audit_logs` VIEW is a transition shim, not an alias.** Both call
-    sites moved in this package, so it has no readers today; whoever confirms that
-    across deploys should drop it.
+  - **The reference data is one import away.** `reference.generated.ts` exports
+    `REFERENCE_TABLES` with every column's type, unit, CSV header, meaning,
+    constraints, substitutions and engine fallback chain. **WP 5.2b should render
+    its seven table pages from it rather than re-reading the contract** — the
+    field index and All tables already do, and a third reader of the same data is
+    a third thing to keep in step.
+  - **`Prose` exists; use it for any contract string.** Meanings, validations and
+    substitution values all contain code spans.
+  - **The `table:` cross-reference now has 17 entries and a test.** 5.2b's four
+    deferred tables (`node_list`, `network_nodes`, `network_edges`,
+    `multi_tier_supply_chain`) are still `planned("5.2b")` in the tree and still
+    have no sidecar, so they still cannot be generated. That reassignment is
+    5.2b's to make, unchanged by this package.
+  - **`main` going red is not hypothetical.** Run `npm test` and
+    `npm run contract:check` before opening a package and FIX what you find as
+    its own commit, as this one did. Both were red on arrival here and neither
+    failure was announced anywhere.
 
 ---
 
@@ -3412,7 +3428,7 @@ Handoff to next WP:
 | 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ready |
 | 3 | 3.1 – 3.4 | one ingestion contract | 4 | — |
 | 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | — |
-| 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | 5.2a ✅ done — manual live at `/docs`, tree complete, sections 1–2 written |
+| 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | 5.2a ✅, 5.2h ✅ — manual live at `/docs`; tree complete; sections 1, 2 and 15 written (14 of 80 pages) |
 | 6 | 6.1 – 6.3 | policy contract, researcher grade | — | — |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
 
