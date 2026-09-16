@@ -1,0 +1,205 @@
+# AUTHORED — the data contract's sidecar for `audit_logs`.
+table: audit_logs
+tier: G
+schema_name: public
+grain: >-
+  One recorded action, on one plane. `admin` is what a super admin did, `data` is
+  a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed
+  decision such as an export being allowed or refused.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: admin_audit_logs_pkey
+# The constraint keeps its original name: WP 2.3 RENAMED admin_audit_logs rather
+# than creating a second table, because "admin history intact" is one of its exit
+# checks and copying rows is how history stops being intact. Postgres does not
+# rename a constraint when its table is renamed, and renaming it here would be
+# churn for its own sake.
+
+governance:
+  read: null
+  write: null
+  min_project_role: owner
+  audited: false
+  rls_enabled: true
+  note: >-
+    Two SELECT policies, and they are PERMISSIVE on purpose. A super admin reads
+    every plane; an admin of the SAME ORGANIZATION as the actor reads that org's
+    `data` and `access` rows. They grant DISJOINT slices, so the OR that D28 makes
+    unavoidable is the intended union here rather than an accidental escape hatch —
+    which is worth stating, because the same shape on `approved_users` IS the
+    defect. There is no write policy: rows arrive from SECURITY DEFINER functions
+    and from statement-level triggers, never from a client, so RLS denying writes by
+    default is the enforcement (WP 2.2's pattern).
+    `audited: false` on the audit table is not a joke — nothing records reads of it,
+    and a deletion would leave no trace. Tamper-evidence is a Phase 4 question
+    (hash-chaining a log is the same machinery as `input-hash`), not a WP 2.3 one.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The row's identity. Returned by the emit functions so a caller can cite what it wrote.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  plane:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which plane the action belongs to — `admin`, `data` or `access`,
+      CHECK-constrained. Added by WP 2.3; every row that predates it is `admin` by
+      construction, because the only writer was `log_admin_action()`, which refuses
+      anyone who is not a super admin.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: a row is written without naming a plane
+        value: "'admin'"
+        provenance: default
+        visible_as: >-
+          the column default, which is also what makes the `admin_audit_logs`
+          compatibility view writable for callers that have not moved yet
+    ingest: {csv_header: null, required: false, validate: one of admin / data / access}
+    surfaces: []
+    resolution: null
+  actor_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who did it. NULLABLE, and the null carries meaning: a service-role write with
+      no session context has no attributable actor.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      THE HONEST LIMIT OF THIS TABLE. `audit_tier_write()` reads
+      `get_current_user_id()`, which resolves only when the caller set
+      `app.current_user_id`. The ingest and ETL edge functions run as the service
+      role and do not, so their rows say WHAT changed and WHEN and record
+      `actor_known: false` in `after` rather than inventing a WHO. That is worth
+      having and it is not attribution; closing it means those functions setting
+      user context, which is their change to make (§16, WP 2.3).
+  action:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What happened. Admin-plane rows use the existing dotted vocabulary
+      (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation
+      (`insert`, `update`, `delete`); access-plane rows use `export.allowed` /
+      `export.refused`. Three vocabularies in one column, which is a cost of one
+      table and is recorded here rather than discovered by a reader.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  target_type:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: What kind of thing was acted on — a table name on the data plane, an entity name on the others.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  target_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which one, as text. NULL on data-plane rows: a statement-level trigger records
+      a STATEMENT, and a statement that touched 5,000 rows has no single id.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  before:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The prior state, where the writer knows it. Admin RPCs capture it; data-plane
+      trigger rows do NOT — a statement-level trigger has the transition tables but
+      writing 5,000 prior rows into one jsonb would make the log unreadable and
+      unbounded. Their row COUNT is in `after` instead.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  after:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The resulting state, or — on a data-plane row — the shape of the statement:
+      `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row
+      it carries the decision and what was asked for.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  ip:
+    type: inet
+    unit: null
+    unit_source: none
+    meaning: Caller IP where the writer recorded one. Never set by the triggers, which run inside the database.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  user_agent:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: Caller user agent where the writer recorded one. As with `ip`, absent on trigger-written rows.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When it happened. Server-stamped, and the column the plane index orders by.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  Coverage on the data plane is by TRIGGER, not by instrumented RPCs, and the
+  difference is the point. WP 2.3's gap check measured 22 live SQL functions writing
+  tier 2/3/4 with none emitting an audit row, plus six more write paths in edge
+  functions running as the service role. Editing the 22 would have been the obvious
+  reading of "emit on every tier transition" and would have missed all six, and
+  would have missed the twenty-third function somebody writes next month. A
+  statement-level trigger on each of the twelve tier 2/3/4 tables catches every
+  writer that exists and every writer added later.

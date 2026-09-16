@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 297,
-  "migrations_applied": 294,
+  "migrations_found": 298,
+  "migrations_applied": 295,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260915000005_project_membership_and_delegation.sql",
+  "last_migration": "20260916000001_data_plane_audit.sql",
   "counts": {
     "tables": 76,
-    "views": 6,
+    "views": 7,
     "enums": 4,
-    "functions": 237,
+    "functions": 240,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -19,199 +19,6 @@
     "aborted_migrations": 3
   },
   "tables": [
-    {
-      "name": "admin_audit_logs",
-      "schema": "public",
-      "created_by": "20260709000002_super_admin_phase1.sql",
-      "columns": [
-        {
-          "name": "id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": "gen_random_uuid()",
-          "primary_key": true,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "actor_user_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "approved_users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "SET NULL"
-          },
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "action",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "target_type",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "target_id",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "before",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "after",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "ip",
-          "quoted": false,
-          "type": "inet",
-          "type_raw": "inet",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "user_agent",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "created_at",
-          "quoted": false,
-          "type": "timestamp with time zone",
-          "type_raw": "timestamptz",
-          "nullable": false,
-          "default": "now()",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "admin_audit_logs_pkey",
-          "kind": "PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "definition": "PRIMARY KEY (id)",
-          "implicit": true,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_audit_created_at",
-          "unique": false,
-          "columns": [
-            "created_at DESC"
-          ],
-          "predicate": null,
-          "partial": false,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        },
-        {
-          "name": "idx_audit_actor",
-          "unique": false,
-          "columns": [
-            "actor_user_id"
-          ],
-          "predicate": null,
-          "partial": false,
-          "added_by": "20260709000002_super_admin_phase1.sql"
-        }
-      ],
-      "rls": {
-        "enabled": true,
-        "forced": false,
-        "policies": [
-          {
-            "name": "audit: super read",
-            "command": "SELECT",
-            "roles": [],
-            "using": "public.current_is_super_admin()",
-            "with_check": "public.current_is_super_admin()",
-            "added_by": "20260709000002_super_admin_phase1.sql"
-          }
-        ],
-        "determinate": true
-      },
-      "replica_identity": null,
-      "comment": null,
-      "natural_key_unique": [
-        {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": "admin_audit_logs_pkey"
-        }
-      ]
-    },
     {
       "name": "ai_budgets",
       "schema": "public",
@@ -2599,6 +2406,237 @@
             "email"
           ],
           "name": "approved_users_email_key"
+        }
+      ]
+    },
+    {
+      "name": "audit_logs",
+      "schema": "public",
+      "created_by": "20260709000002_super_admin_phase1.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "actor_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "action",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "target_type",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "target_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "before",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "after",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "ip",
+          "quoted": false,
+          "type": "inet",
+          "type_raw": "inet",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "user_agent",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "plane",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'admin'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000001_data_plane_audit.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "admin_audit_logs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "audit_logs_plane_known",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (plane IN ('admin','data','access'))",
+          "added_by": "20260916000001_data_plane_audit.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_audit_created_at",
+          "unique": false,
+          "columns": [
+            "created_at DESC"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "idx_audit_actor",
+          "unique": false,
+          "columns": [
+            "actor_user_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "audit_logs_plane_created_idx",
+          "unique": false,
+          "columns": [
+            "plane",
+            "created_at DESC"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000001_data_plane_audit.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "audit: super read",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260916000001_data_plane_audit.sql"
+          },
+          {
+            "name": "audit: org admins read their own org's data and access rows",
+            "command": "SELECT",
+            "roles": [],
+            "using": "plane IN ('data','access') AND EXISTS ( SELECT 1 FROM public.approved_users me JOIN public.approved_users actor ON actor.id = audit_logs.actor_user_id WHERE me.id = public.get_current_user_id() AND me.role = 'admin'::public.app_role AND me.organization_id IS NOT NULL AND me.organization_id = actor.organization_id )",
+            "with_check": "plane IN ('data','access') AND EXISTS ( SELECT 1 FROM public.approved_users me JOIN public.approved_users actor ON actor.id = audit_logs.actor_user_id WHERE me.id = public.get_current_user_id() AND me.role = 'admin'::public.app_role AND me.organization_id IS NOT NULL AND me.organization_id = actor.organization_id )",
+            "added_by": "20260916000001_data_plane_audit.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "admin_audit_logs_pkey"
         }
       ]
     },
@@ -17794,6 +17832,10 @@
     }
   ],
   "views": {
+    "admin_audit_logs": {
+      "defined_by": "20260916000001_data_plane_audit.sql",
+      "materialized": false
+    },
     "admin_org_file_usage": {
       "defined_by": "20260723000001_reports_and_file_workspace.sql",
       "materialized": false
@@ -18429,6 +18471,15 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260728000001_cartographer_product_level.sql"
+    },
+    {
+      "name": "audit_tier_write",
+      "signature": "audit_tier_write()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260916000001_data_plane_audit.sql"
     },
     {
       "name": "authenticate_approved_user",
@@ -20071,6 +20122,23 @@
       "defined_by": "20260709000002_super_admin_phase1.sql"
     },
     {
+      "name": "log_data_action",
+      "signature": "log_data_action(uuid, text, text, text, text, jsonb, jsonb)",
+      "args": [
+        "_actor_user_id uuid",
+        "_plane text",
+        "_action text",
+        "_target_type text",
+        "_target_id text",
+        "_before jsonb DEFAULT NULL",
+        "_after jsonb DEFAULT NULL"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260916000001_data_plane_audit.sql"
+    },
+    {
       "name": "mark_agent_proposal_applied",
       "signature": "mark_agent_proposal_applied(uuid, jsonb)",
       "args": [
@@ -20201,6 +20269,20 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260721000001_chat_modes_and_ui_events.sql"
+    },
+    {
+      "name": "record_export",
+      "signature": "record_export(uuid, uuid, text, integer)",
+      "args": [
+        "_actor_user_id uuid",
+        "_project_id uuid",
+        "_export_kind text",
+        "_row_count integer DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260916000001_data_plane_audit.sql"
     },
     {
       "name": "record_external_evidence",

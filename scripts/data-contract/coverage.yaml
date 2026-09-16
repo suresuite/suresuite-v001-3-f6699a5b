@@ -18,13 +18,6 @@
 # moves with it in the same commit.
 
 deferred:
-  - wp: "2.3"
-    why: >-
-      The data-plane audit (D15). Audit today covers the admin plane only;
-      `audited: false` on all thirteen covered sidecars is the honest record of
-      that. This table changes shape when the audit reaches tier transitions.
-    tables: [admin_audit_logs]
-
   - wp: "3.1"
     why: >-
       The other inbound datasets. WP 3.1 generalizes `ingest_*` and WP 3.2 moves

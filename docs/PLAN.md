@@ -214,6 +214,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D33 | **The capability catalog is hand-maintained in two languages.** `public.capabilities` holds the rows and `src/lib/capabilities.ts` holds the same keys as a union type, a list and a role-default map, because the client needs them without a round trip. Nothing checks that the two agree, and they have already drifted: the DB catalog has grown from 5 feature keys to ~20 across a dozen migrations, and the TS list learned of each one only when somebody remembered. A key present in the DB and absent from TS is a capability no client can ever be granted; the reverse is a permission screen offering a right that resolves to false. This is I1 — one fact authored twice — in the access layer. WP 2.2 asserts only its own two new keys agree. Generating one side from the other belongs with the contract's other generators | `supabase/migrations/20260711000002_unified_access_control.sql:36-53` (the seed); `src/lib/capabilities.ts` (`FeatureKey`, `FEATURE_CAPABILITIES`, the role-default map) | WP 2.4 |
 | D34 | **An empty AI allow-list means EVERYTHING, and no surface says so.** `user_ai_permissions.allowed_model_ids` is read as an allow-list only when non-empty: `capabilities_for_user()` sets `all_allowed` true when the array is empty OR the user has no row. That is deliberate — it preserves the behaviour every user had before the column existed — but it inverts how an allow-list reads, and nothing at the point of display states it (§5 T2). An administrator clearing the list to revoke model access grants all of it instead. Found by WP 2.2 while authoring the sidecar | `20260905000001_grant_ga_agent_capabilities.sql` (`v_all_models := … array_length(v_allowed_ids, 1) IS NULL`) | WP 2.3 |
 | D35 | **Nothing stops a merge while `main`'s own gate is red, and nothing stops a stale branch from overwriting a newer file.** `data-contract.yml` runs on push to `main` precisely so a semantic merge conflict is caught (it was added for that in the Phase 1 close). It WORKED: the run was green at `d5c29ab` (#199) and failed at `3bf44aa` (#200), `53119da` (#201) and `55249d0` (#202). Detection is not the gap — **three further merges went in while the branch's own gate was already red on `main`**, and each inherited the breakage rather than causing it. The second half is worse: #200 merged a branch whose `loudFailure.test.ts` predated `ff9aec1`, so an OLDER version of the file won the merge and reintroduced `expect(named, …)` and a `CONTRACT` constant that exist nowhere in it — a `ReferenceError`, not a failed assertion, which is why it reads as two unrelated test failures. This is the FOURTH time a merge rather than a commit has broken `main` in this plan's history (`5c7129f`, the WP 1.4 merge, the #193/#194 reconcile, and now #200). A required-status-check on `main` would close the first half; the second half is what `contract:check` on `pull_request` cannot see, because by construction neither branch is red alone. Found by WP 2.3's precondition check | `data-contract.yml` (runs on push to main, not enforced as required); `src/lib/policies/__tests__/loudFailure.test.ts:75` as merged by #200 | WP 2.4 |
+| D36 | **A trigger cannot attribute a service-role write, so six ingest/ETL paths audit WHAT but not WHO.** `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest edge functions (`ingest-bom-multi-level`, `ingest-inbound-logistics`, `ingest-outbound-logistics`, `erp-sync-orbit-mrp`) and the ETL (`combine-project`, `predict-critical-nodes`) write as the SERVICE ROLE with no session context, so their audit rows carry `actor_user_id: NULL` and record `actor_known: false` rather than inventing a WHO. The row still says what changed, when, and how many — which is worth having and is NOT attribution, and `audit-actor` (§2.1 G4) asks for attribution. Closing it is a one-line change in each of those six functions (call `set_current_user_context` as `delete-project` already does), which is their change to make rather than the audit's. Found by WP 2.3's gap check | `audit_tier_write()` in `20260916000001_data_plane_audit.sql`; the six functions listed above | WP 3.1 |
 
 ### 4.1 Code map — the data layer
 
@@ -1072,7 +1073,7 @@ grant exceeding the grantor's level is rejected.
 **Gap check** — hand-walk four cases (super-admin; org admin + project deny; user
 allow over org deny; expired grant) and record the truth table.
 
-### WP 2.3 — Data-plane audit *(D15)*
+### WP 2.3 — Data-plane audit ✅ *(D15 — done `20260916000001`)*
 
 **Precondition, satisfied:** WP 2.2 is done. `project_members` exists and
 `capabilities_for_user(_user_id, _project_id)` resolves through it. Two things
@@ -1097,6 +1098,18 @@ intact.
 **Gap check** — inventory every write path to T2/T3/T4 and tick whether it audits.
 
 ### WP 2.4 — Contract-generated RLS tests
+
+**Precondition, satisfied:** WP 2.1, 2.2 and 2.3 are all done and none of their
+tables is still deferred. `grep -c "wp:" scripts/data-contract/coverage.yaml`
+and check the nine names §9 lists — all authored. Three things the earlier
+packages measured that this one needs: **D35** (three merges went in while
+`main`'s own gate was red — a required status check closes it, and gates are
+this package's remit), **`audit_logs` is a worked example of when the D28
+permissive-OR is CORRECT** — its two SELECT policies grant disjoint slices, so
+the union is intended, which is the distinction any RESTRICTIVE decision has to
+make — and **a fresh replay of the migrations does not work** (92 of 296 fail on
+an empty database, §16 WP 2.1), so the seeded project this package needs comes
+from an artifact-generated schema, not a replay.
 
 **`data-contract.yml` does not run on a PR opened by an app token.** *(WP 5.2a.)*
 The `pull_request:` trigger carries no path filter and still did not fire when
@@ -3270,6 +3283,123 @@ to have noticed sooner.
 Fixed here rather than inside WP 2.3, because a red `main` blocks everyone and
 should not wait behind a work package.
 `contract:check` green · **129 tests green** · `check:docs` green.
+
+### WP 2.3 — The data-plane audit · 2026-09-16 · `20260916000001`
+
+Preconditions held? **no — `main` was red on arrival**, fixed first and separately
+(see the WP 2.3 precondition entry above). One further claim was stale.
+Exit checks passed? yes, all three EXECUTED against a live PostgreSQL 16.
+
+**THE GAP CHECK, WHICH IS THIS PACKAGE'S REAL MEASUREMENT.** §9 asks for an
+inventory of every write path to tier 2/3/4 with a tick for whether it audits. The
+contract knows which tables those are, so the inventory is computed rather than
+recalled: **twelve tables at tier 2, 3 or 4; twenty-two live SQL functions write
+them; ZERO emitted an audit row.** Six further write paths live in edge functions
+going straight to the table:
+
+| Writer | Tier(s) | Audited before |
+|---|---|---|
+| 22 live RPCs — `bulk_insert_*`, `bulk_upsert_*`, `assign_*`, `save_policy_defaults`, `apply_policy_bundle`, `restore_policy_version`, `delete_project`, `delete_project_dataset`, `snapshot_dataset`, `combine_project_into_supply_chain`, … | 2, 3, 4 | **none** |
+| `ingest-bom-multi-level`, `ingest-inbound-logistics`, `ingest-outbound-logistics` | 2 | **none** |
+| `erp-sync-orbit-mrp` | 2 | **none** |
+| `combine-project` (the ETL), `predict-critical-nodes` | 3 | **none** |
+
+**That inventory is why this package uses TRIGGERS rather than instrumenting the
+RPCs.** Editing the 22 is the obvious reading of "emit on every tier transition"
+and it is wrong twice: it is 22 function bodies to reproduce exactly, and it would
+miss all six service-role paths, which never call an RPC. A statement-level trigger
+on each of the twelve tables catches every writer that exists, every writer added
+later, and the service-role ones — the difference between a rule and a list.
+
+**STATEMENT-level, not row-level, and the number makes the case.** Verified on the
+live database: a 5,000-row bulk insert produces **one** audit row carrying
+`rows_after: 5000`, not 5,000 rows. A row-level trigger would have made the log
+unreadable at exactly the moment it mattered.
+
+Discovered:
+  - **The prompt's "same column shape" is right, and `log_admin_action` still cannot
+    be reused.** It opens with `IF NOT is_super_admin(actor) THEN RAISE 'forbidden'`.
+    Data-plane rows are by definition written by ordinary users doing ordinary work,
+    so routing them through it would make every tier-2 write fail for everyone who
+    is not a super admin. `log_data_action()` is separate and takes its actor
+    explicitly; it refuses the `admin` plane so it cannot become a way around the
+    super-admin check.
+  - **D36** — a trigger cannot attribute a service-role write. Six ingest/ETL paths
+    now audit WHAT but not WHO, and say so in the row (`actor_known: false`) rather
+    than leaving a NULL to be misread. → §4, assigned WP 3.1, which owns those
+    functions.
+  - **`export` had existed since `20260711000002` with ZERO call sites**, confirmed
+    by repo-wide search. WP 2.2 had even given it per-project-role grants. So §5.2 is
+    right that this writes the FIRST check, and right that it is the one with teeth.
+  - **WP 1.1's exit check hardcoded `admin_audit_logs`.** The rename broke it, which
+    is the gate working. It now asserts `audit_logs` — the TABLE, deliberately, since
+    the compatibility view would satisfy a weaker check while the table beneath it
+    had been dropped.
+
+**TWO BUGS MY OWN EXIT CHECKS CAUGHT, both invisible to every static gate:**
+
+  1. **Every audit row recorded an empty tier.** The generator that wrote 36
+     `CREATE TRIGGER` statements lost its `'2'`/`'3'`/`'4'` argument to shell
+     quoting, so `TG_NARGS` was 0. The SQL was valid, the migration applied, the
+     triggers fired — and `after->>'tier'` was blank in every row. Caught by reading
+     rows out of a real database, not by reading the file.
+  2. **A refused export was not audited.** `record_export` raised `42501` on refusal,
+     which rolled back the audit row in the SAME transaction: refused, and no trace
+     of the refusal. Postgres has no autonomous transactions, so the fix is not to
+     raise — the function RETURNS `{allowed, audit_id, reason}` and the row commits.
+     The exception survives only for a NULL actor, which is a caller bug rather than
+     a refusal. **The migration comment predicted this risk in words and the code
+     did it anyway**; the exit check is what settled it.
+
+Both are D31's lesson again: nothing in this repo executes a migration before the
+production deploy does, so "it applied cleanly" says nothing about whether it
+WORKS. The local-Postgres route is what turned both into findings instead of
+incidents.
+
+**Exit checks, executed:**
+  - *Every T2 write in a smoke run appears* — insert, update and delete on
+    `inbound_logistics` (tier 2) and an insert on `policy_overrides` (tier 4) each
+    produced exactly one row with the right tier, row counts and `actor_known: true`.
+  - *Admin history intact* — the pre-existing admin row survived the rename and is
+    still readable, both directly and through the compatibility view.
+  - *An export without the capability is refused AND audited* — `export.refused` and
+    `export.allowed` both on the record, which is precisely what the first version
+    could not do.
+
+**What this does NOT do, stated because over-claiming it would be the §5 sin:**
+the product's exports are built in the browser from data the page already fetched,
+so `record_export` governs the export ACTION and makes every attempt attributable;
+it is not an exfiltration control. A caller that ignores the answer still holds the
+data it already read. Gating the BYTES needs a server-built export, which is A4's
+verifiable export, not this button's.
+
+Baseline numbers:
+  - 12 tier 2/3/4 tables × 3 operations = **36 triggers**; 22 RPCs and 6 edge-function
+    paths now covered without either being edited.
+  - 5,000 rows inserted → **1** audit row (statement-level).
+  - 26 tables described (was 25); 50 deferred (was 51).
+  - **143 tests** (129 + 14); 8 mutations run against the new suite, 8 failures,
+    restore green.
+  - `contract:check` green · `check:docs` green.
+
+**Unverified:** whether production's `admin_audit_logs` rows all satisfy the new
+plane CHECK. They should by construction — `log_admin_action()` was the only writer
+and the column defaults to `'admin'` — but nobody has counted, and a CHECK added to
+a table with existing rows is validated on the spot. §15.
+
+Handoff to next WP:
+  - **WP 2.4's generated RLS tests now have an audit plane to assert against.**
+    `audit_logs` carries two disjoint SELECT policies, and the disjointness is the
+    reason the D28 permissive-OR is CORRECT here rather than a defect — a worked
+    example of when OR is the intended union, which the RESTRICTIVE decision should
+    be taken against.
+  - **`audited: true` is still not claimable on the tier tables' sidecars.** The
+    trigger records the statement, not the actor, wherever the writer is the service
+    role (D36). Flipping `audited` to true across the sidecars should wait for that,
+    or it records a stronger claim than the rows support.
+  - **The `admin_audit_logs` VIEW is a transition shim, not an alias.** Both call
+    sites moved in this package, so it has no readers today; whoever confirms that
+    across deploys should drop it.
 
 ---
 
