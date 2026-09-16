@@ -31,7 +31,7 @@ const LANES = ["inbound_logistics", "outbound_logistics", "bom_single_level", "b
 const MASTERS = ["materials", "products", "suppliers"];
 const GOVERNANCE = [
   "organizations", "organization_members", "capabilities",
-  "org_capabilities", "role_capabilities", "user_capabilities", "admin_audit_logs",
+  "org_capabilities", "role_capabilities", "user_capabilities", "audit_logs",
 ];
 // WP 1.1 expected TWO and found three. WP 1.4 reconciled all three, so the
 // assertion is now the opposite one — and it is a stronger check, not a weaker:
@@ -46,6 +46,10 @@ check("the four lane tables are present", missing(LANES).length === 0, missing(L
 check("the three item masters are present", missing(MASTERS).length === 0, missing(MASTERS).join(", "));
 check("supply_chain_data is present", T.has("supply_chain_data"));
 check("dataset_versions is present", T.has("dataset_versions"));
+// `audit_logs` and not `admin_audit_logs`: WP 2.3 RENAMED the table so the audit
+// could carry a `plane` and cover tier transitions, not just admin actions. The
+// old name survives as a compatibility VIEW, and a view would satisfy a weaker
+// check while the table it reads had been dropped — so this asserts the TABLE.
 check("the governance tables are present", missing(GOVERNANCE).length === 0, missing(GOVERNANCE).join(", "));
 
 const keys = T.get("inbound_logistics")?.natural_key_unique ?? [];

@@ -32,7 +32,11 @@ export default function AdminAudit({ isCollapsed, setIsCollapsed }: Props) {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await db.from('admin_audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
+    // WP 2.3 renamed admin_audit_logs -> audit_logs and added `plane`. This page is
+    // the ADMIN history, so it filters to that plane and shows exactly what it did
+    // before. Surfacing the data and access planes is a UI change, not a rename.
+    const { data } = await db.from('audit_logs').select('*').eq('plane', 'admin')
+      .order('created_at', { ascending: false }).limit(500);
     const logs = (data ?? []) as AuditRow[];
     const ids = Array.from(new Set(logs.map((l) => l.actor_user_id).filter(Boolean))) as string[];
     let names: Record<string, string> = {};

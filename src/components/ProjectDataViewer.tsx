@@ -187,7 +187,35 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
     [currentData, rowLimit]
   );
 
-  const downloadCSV = () => {
+  const downloadCSV = async () => {
+    // WP 2.3 / §5.2: export is a GOVERNED action. `record_export` is the server's
+    // decision and the audit row in one call — it returns `allowed` rather than
+    // raising, because a RAISE rolls back the very row that records the refusal
+    // (PLAN.md §16, WP 2.3). Both outcomes are on the record either way.
+    //
+    // This is a real check and it is NOT an exfiltration control: `currentData` is
+    // already in this component. It governs the product's export action and makes
+    // every attempt attributable. Gating the BYTES needs a server-built export,
+    // which is A4's job, not this button's.
+    const { data: decision, error: exportErr } = await supabase.rpc('record_export', {
+      _actor_user_id: user?.id ?? null,
+      _project_id: project.id,
+      _export_kind: activeTab,
+      _row_count: currentData.length,
+    });
+    const verdict = decision as { allowed?: boolean; reason?: string } | null;
+    if (exportErr || !verdict?.allowed) {
+      toast({
+        title: 'Export not permitted',
+        description:
+          verdict?.reason ??
+          exportErr?.message ??
+          'You do not have the export capability for this project.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     let columns: string[] = [];
     if (activeTab === 'bom') {
       columns = project.bom_level === 'single'

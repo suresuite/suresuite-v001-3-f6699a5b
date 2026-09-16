@@ -5,11 +5,11 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 297,
-      "migrations_applied": 294,
-      "last_migration": "20260915000005_project_membership_and_delegation.sql"
+      "migrations_found": 298,
+      "migrations_applied": 295,
+      "last_migration": "20260916000001_data_plane_audit.sql"
     },
-    "sidecars": 25,
+    "sidecars": 26,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
@@ -17,9 +17,9 @@
   },
   "counts": {
     "tables_in_schema": 76,
-    "tables_covered": 25,
-    "columns_covered": 256,
-    "check_constraints": 7,
+    "tables_covered": 26,
+    "columns_covered": 267,
+    "check_constraints": 8,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -629,6 +629,455 @@
         }
       ],
       "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it."
+    },
+    "audit_logs": {
+      "table": "audit_logs",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused.",
+      "owner": "platform",
+      "created_by": "20260709000002_super_admin_phase1.sql",
+      "sidecar": "supabase/contract/audit_logs.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "admin_audit_logs_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "owner",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "Two SELECT policies, and they are PERMISSIVE on purpose. A super admin reads every plane; an admin of the SAME ORGANIZATION as the actor reads that org's `data` and `access` rows. They grant DISJOINT slices, so the OR that D28 makes unavoidable is the intended union here rather than an accidental escape hatch — which is worth stating, because the same shape on `approved_users` IS the defect. There is no write policy: rows arrive from SECURITY DEFINER functions and from statement-level triggers, never from a client, so RLS denying writes by default is the enforcement (WP 2.2's pattern). `audited: false` on the audit table is not a joke — nothing records reads of it, and a deletion would leave no trace. Tamper-evidence is a Phase 4 question (hash-chaining a log is the same machinery as `input-hash`), not a WP 2.3 one."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "audit: super read",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260916000001_data_plane_audit.sql"
+          },
+          {
+            "name": "audit: org admins read their own org's data and access rows",
+            "command": "SELECT",
+            "roles": [],
+            "using": "plane IN ('data','access') AND EXISTS ( SELECT 1 FROM public.approved_users me JOIN public.approved_users actor ON actor.id = audit_logs.actor_user_id WHERE me.id = public.get_current_user_id() AND me.role = 'admin'::public.app_role AND me.organization_id IS NOT NULL AND me.organization_id = actor.organization_id )",
+            "with_check": "plane IN ('data','access') AND EXISTS ( SELECT 1 FROM public.approved_users me JOIN public.approved_users actor ON actor.id = audit_logs.actor_user_id WHERE me.id = public.get_current_user_id() AND me.role = 'admin'::public.app_role AND me.organization_id IS NOT NULL AND me.organization_id = actor.organization_id )",
+            "added_by": "20260916000001_data_plane_audit.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "admin_audit_logs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "audit_logs_plane_known",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (plane IN ('admin','data','access'))",
+          "added_by": "20260916000001_data_plane_audit.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_audit_created_at",
+          "unique": false,
+          "columns": [
+            "created_at DESC"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "idx_audit_actor",
+          "unique": false,
+          "columns": [
+            "actor_user_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "audit_logs_plane_created_idx",
+          "unique": false,
+          "columns": [
+            "plane",
+            "created_at DESC"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000001_data_plane_audit.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The row's identity. Returned by the emit functions so a caller can cite what it wrote.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "actor_user_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Who did it. NULLABLE, and the null carries meaning: a service-role write with no session context has no attributable actor.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "THE HONEST LIMIT OF THIS TABLE. `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest and ETL edge functions run as the service role and do not, so their rows say WHAT changed and WHEN and record `actor_known: false` in `after` rather than inventing a WHO. That is worth having and it is not attribution; closing it means those functions setting user context, which is their change to make (§16, WP 2.3).",
+          "engine_requirement": null
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`. Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "target_type",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "What kind of thing was acted on — a table name on the data plane, an entity name on the others.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Which one, as text. NULL on data-plane rows: a statement-level trigger records a STATEMENT, and a statement that touched 5,000 rows has no single id.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "before",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The prior state, where the writer knows it. Admin RPCs capture it; data-plane trigger rows do NOT — a statement-level trigger has the transition tables but writing 5,000 prior rows into one jsonb would make the log unreadable and unbounded. Their row COUNT is in `after` instead.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "after",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row it carries the decision and what was asked for.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ip",
+          "type": "inet",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Caller IP where the writer recorded one. Never set by the triggers, which run inside the database.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "user_agent",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Caller user agent where the writer recorded one. As with `ip`, absent on trigger-written rows.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260709000002_super_admin_phase1.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When it happened. Server-stamped, and the column the plane index orders by.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "plane",
+          "type": "text",
+          "nullable": false,
+          "default": "'admin'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000001_data_plane_audit.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Which plane the action belongs to — `admin`, `data` or `access`, CHECK-constrained. Added by WP 2.3; every row that predates it is `admin` by construction, because the only writer was `log_admin_action()`, which refuses anyone who is not a super admin.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "a row is written without naming a plane",
+              "value": "'admin'",
+              "provenance": "default",
+              "visible_as": "the column default, which is also what makes the `admin_audit_logs` compatibility view writable for callers that have not moved yet"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of admin / data / access"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "Coverage on the data plane is by TRIGGER, not by instrumented RPCs, and the difference is the point. WP 2.3's gap check measured 22 live SQL functions writing tier 2/3/4 with none emitting an audit row, plus six more write paths in edge functions running as the service role. Editing the 22 would have been the obvious reading of \"emit on every tier transition\" and would have missed all six, and would have missed the twenty-third function somebody writes next month. A statement-level trigger on each of the twelve tier 2/3/4 tables catches every writer that exists and every writer added later."
     },
     "bom_multi_level": {
       "table": "bom_multi_level",
@@ -11003,5 +11452,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "91c378b2e0f8"
+  "contract_version": "788187aab9e4"
 }

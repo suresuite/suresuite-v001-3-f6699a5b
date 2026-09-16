@@ -214,6 +214,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D33 | **The capability catalog is hand-maintained in two languages.** `public.capabilities` holds the rows and `src/lib/capabilities.ts` holds the same keys as a union type, a list and a role-default map, because the client needs them without a round trip. Nothing checks that the two agree, and they have already drifted: the DB catalog has grown from 5 feature keys to ~20 across a dozen migrations, and the TS list learned of each one only when somebody remembered. A key present in the DB and absent from TS is a capability no client can ever be granted; the reverse is a permission screen offering a right that resolves to false. This is I1 — one fact authored twice — in the access layer. WP 2.2 asserts only its own two new keys agree. Generating one side from the other belongs with the contract's other generators | `supabase/migrations/20260711000002_unified_access_control.sql:36-53` (the seed); `src/lib/capabilities.ts` (`FeatureKey`, `FEATURE_CAPABILITIES`, the role-default map) | WP 2.4 |
 | D34 | **An empty AI allow-list means EVERYTHING, and no surface says so.** `user_ai_permissions.allowed_model_ids` is read as an allow-list only when non-empty: `capabilities_for_user()` sets `all_allowed` true when the array is empty OR the user has no row. That is deliberate — it preserves the behaviour every user had before the column existed — but it inverts how an allow-list reads, and nothing at the point of display states it (§5 T2). An administrator clearing the list to revoke model access grants all of it instead. Found by WP 2.2 while authoring the sidecar | `20260905000001_grant_ga_agent_capabilities.sql` (`v_all_models := … array_length(v_allowed_ids, 1) IS NULL`) | WP 2.3 |
 | D35 | **Nothing stops a merge while `main`'s own gate is red, and nothing stops a stale branch from overwriting a newer file.** `data-contract.yml` runs on push to `main` precisely so a semantic merge conflict is caught (it was added for that in the Phase 1 close). It WORKED: the run was green at `d5c29ab` (#199) and failed at `3bf44aa` (#200), `53119da` (#201) and `55249d0` (#202). Detection is not the gap — **three further merges went in while the branch's own gate was already red on `main`**, and each inherited the breakage rather than causing it. The second half is worse: #200 merged a branch whose `loudFailure.test.ts` predated `ff9aec1`, so an OLDER version of the file won the merge and reintroduced `expect(named, …)` and a `CONTRACT` constant that exist nowhere in it — a `ReferenceError`, not a failed assertion, which is why it reads as two unrelated test failures. This is the FOURTH time a merge rather than a commit has broken `main` in this plan's history (`5c7129f`, the WP 1.4 merge, the #193/#194 reconcile, and now #200). A required-status-check on `main` would close the first half; the second half is what `contract:check` on `pull_request` cannot see, because by construction neither branch is red alone. Found by WP 2.3's precondition check | `data-contract.yml` (runs on push to main, not enforced as required); `src/lib/policies/__tests__/loudFailure.test.ts:75` as merged by #200 | WP 2.4 |
+| D36 | **A trigger cannot attribute a service-role write, so six ingest/ETL paths audit WHAT but not WHO.** `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest edge functions (`ingest-bom-multi-level`, `ingest-inbound-logistics`, `ingest-outbound-logistics`, `erp-sync-orbit-mrp`) and the ETL (`combine-project`, `predict-critical-nodes`) write as the SERVICE ROLE with no session context, so their audit rows carry `actor_user_id: NULL` and record `actor_known: false` rather than inventing a WHO. The row still says what changed, when, and how many — which is worth having and is NOT attribution, and `audit-actor` (§2.1 G4) asks for attribution. Closing it is a one-line change in each of those six functions (call `set_current_user_context` as `delete-project` already does), which is their change to make rather than the audit's. Found by WP 2.3's gap check | `audit_tier_write()` in `20260916000001_data_plane_audit.sql`; the six functions listed above | WP 3.1 |
 
 ### 4.1 Code map — the data layer
 
@@ -1072,7 +1073,7 @@ grant exceeding the grantor's level is rejected.
 **Gap check** — hand-walk four cases (super-admin; org admin + project deny; user
 allow over org deny; expired grant) and record the truth table.
 
-### WP 2.3 — Data-plane audit *(D15)*
+### WP 2.3 — Data-plane audit ✅ *(D15 — done `20260916000001`)*
 
 **Precondition, satisfied:** WP 2.2 is done. `project_members` exists and
 `capabilities_for_user(_user_id, _project_id)` resolves through it. Two things
@@ -1097,6 +1098,18 @@ intact.
 **Gap check** — inventory every write path to T2/T3/T4 and tick whether it audits.
 
 ### WP 2.4 — Contract-generated RLS tests
+
+**Precondition, satisfied:** WP 2.1, 2.2 and 2.3 are all done and none of their
+tables is still deferred. `grep -c "wp:" scripts/data-contract/coverage.yaml`
+and check the nine names §9 lists — all authored. Three things the earlier
+packages measured that this one needs: **D35** (three merges went in while
+`main`'s own gate was red — a required status check closes it, and gates are
+this package's remit), **`audit_logs` is a worked example of when the D28
+permissive-OR is CORRECT** — its two SELECT policies grant disjoint slices, so
+the union is intended, which is the distinction any RESTRICTIVE decision has to
+make — and **a fresh replay of the migrations does not work** (92 of 296 fail on
+an empty database, §16 WP 2.1), so the seeded project this package needs comes
+from an artifact-generated schema, not a replay.
 
 **`data-contract.yml` does not run on a PR opened by an app token.** *(WP 5.2a.)*
 The `pull_request:` trigger carries no path filter and still did not fire when
