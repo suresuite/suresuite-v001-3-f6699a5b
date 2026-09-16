@@ -1399,6 +1399,13 @@ Compute `diff_state`; review screen with counts, findings and the real diff, mod
 on the MRP mapping report (reuse `MappingWarningsCard`'s badge vocabulary); promote
 requires role ≥ editor and audits; show provenance on canonical rows.
 
+**§15 measured the MRP side and it is empty.** `ingest_runs`, the three
+`ingest_staged_*` and `project_erp_links` hold **0 rows** in production (run
+`35081703685`): the connector has never been used. So "one component serves both"
+will in practice be exercised on the CSV side only, and the MRP side of the screen
+has no real data to develop against — build it from `supabase/rehearsal/050`'s
+fixture shape, and do not read an empty staging table as "the connector works".
+
 **Exit** — a user can click from a cell through to the source row · promotion by an
 analyst is refused · **one** component serves both CSV and MRP runs.
 **Gap check** — any branch on `source_kind` beyond labels means WP 3.1 was incomplete.
@@ -4959,9 +4966,47 @@ one that did not hold is its own fixture (D50): the handoff said "add a fixture 
 the two shapes differ", and the fixtures already there could not survive their own
 migration merging.
 
-**§15 re-run, and the deltas against §16 · WP 3.0 · I:** *(filled in below once the
-verification workflow reports — this package touched no tier-2 data, so the honest
-expectation is that every WP 3.2 and WP 3.3 number is unchanged)*
+**§15 re-run — `35081703685`, SUCCESS — and the deltas against §16 · WP 3.0 · I:**
+
+| | WP 3.0 (`35064364537`) | now (`35081703685`) |
+|---|---|---|
+| relations production holds that no migration creates | 0 | **0** — and the probe now compares **78 tables + 7 views** against 85 relations, up from 77+7: the gate saw `ingest_files` appear |
+| relations a migration creates that production lacks | 0 | **0 — which is the rename's structural proof.** Four tables changed name in a deploy; had any statement not run, the four new names would be MISSING here and the run would be red |
+| `inbound_logistics` rows a unique index would reject | 96 of 1 787 | **96 of 1 787 — WP 3.3's before-number, unchanged** |
+| `bom_multi_level` / `outbound` / `bom_single` | 2 / 0 / 0 | **2 / 0 / 0** |
+| null `volume` / `lead_time` / `unit_price` | 376 / 414 / 30 | **376 / 414 / 30 — WP 3.2's, unchanged** |
+| unrecognized `time_unit` tokens | 27 | **27** (`21`×19, `15`×16, `16`×13, `7`×12, `14`×11, …) |
+| `audit_logs` by plane | 18 admin, 2 data | 18 admin, 2 data |
+| projects / accounts with `organization_id IS NULL` | 1 of 10 · 0 of 14 | 1 of 10 · 0 of 14 |
+| `policy_overrides` rows carrying the frozen zero | 0 | 0 |
+| suppliers rendered as capacity 0 | 60 of 60 | 60 of 60 (D17, WP 6.2) |
+| §15 statements | 37 | **40** |
+
+**Nothing WP 3.2 or WP 3.3 depends on moved, and the honest answer to the question
+the prompt asked is NO: this package did not touch one of the 376 null `volume`s,
+the 414 null `lead_time`s, the 30 null `unit_price`s or the 27 integer `time_unit`
+tokens.** It could not have. Every one of them is a tier-2 row in
+`inbound_logistics`, and this package's diff does not write a tier-2 row anywhere —
+it renames tier-1 tables, adds a tier-0 one, and makes a partial read visible. WP
+3.2 inherits all four numbers exactly as WP 3.0 handed them over.
+
+**AND THE NUMBER THAT MATTERS MOST TO THIS PACKAGE IS ZERO.** `ingest_runs`,
+all three `ingest_staged_*`, `ingest_files` AND `project_erp_links` hold **0 rows**
+in production. The connector has never run: there is no link, no run, no staged row.
+So the rename moved four EMPTY tables, and every claim this package makes about MRP
+behaviour rests on `supabase/rehearsal/050` — which runs against rows the fixture
+plants — rather than on production having survived it. That is the right way round
+and it is why the assertion was worth the session it cost, but it must be stated
+plainly: **production cannot corroborate the regression claim, because production
+has never exercised the path.** The first real corroboration will be WP 3.2's first
+CSV run, which is also the first row any of these tables will ever hold.
+
+**One report defect fixed while reading the run.** §15's D3/D4 line printed one
+verdict for two names with OPPOSITE expectations, so `risk_data` — correctly
+present since WP 1.4 adopted it — was rendered as "**STILL PRESENT**", which reads
+as a finding. That is D42's lesson in miniature (a report that misleads about a
+clean result costs exactly as much as one that misses a dirty one), and each name is
+now judged against its own expectation.
 
 **Findings that change a later package, edited into it in this commit:**
 
@@ -4992,7 +5037,16 @@ Baseline numbers:
   - **Two behavioural assertions** and one fixture added; two assertions and two
     fixtures deleted. Eight mutations run against the new assertions, all fired.
   - `contract:rehearse` BOTH ways before every push: 2 migrations, 0 failures, 5
-    assertion files green fresh and over production's shape.
+    assertion files green fresh and over production's shape. **The deploy then
+    landed both migrations in one go, no failures** (run `35081130888`) — the
+    second package in a row to do that, and the first one that was not D31's own.
+  - The `adaptive UI audit` workflow is red on this branch and was red on `main`
+    for at least the three merges before it (runs `35077191395`, `35060958924`,
+    `35056301518`). Every violation it names is in a page this package never
+    touched — `GettingStarted`, the two network pages, `SimulationLab`,
+    `ProjectPolicies:296` — and the local run is byte-identical with and without
+    this diff. Recorded so the next session does not spend an hour on it: it is a
+    mobile-spec debt, not a data-layer one, and it has no owner in this plan.
   - **Four §4.1 citations repaired** — this package's own edit moved
     `useStageRows.tsx` by five lines, which is the drift §4 exists to catch, caught
     by R6 on the same day rather than in a quarter.
@@ -5014,6 +5068,10 @@ Handoff to WP 3.2:
     the push that shares a migration is the push that deploys it.
   - **Write fixtures that no-op**, per `fixtures/README.md`. The alternative turned
     `main` red for a day and a half.
+  - **Production has never run an ingestion.** Zero runs, zero staged rows, zero
+    links, zero landed files. Your first CSV upload writes the first row any of
+    these tables has ever held, so treat the first production run as the real
+    test — and do not read an empty staging table as evidence that anything works.
 
 ---
 ---

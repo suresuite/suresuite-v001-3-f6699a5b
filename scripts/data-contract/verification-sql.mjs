@@ -620,13 +620,25 @@ async function section15(pid) {
       out("- Project-scoped filtering is deliberately omitted: WP 0.1 closed the WRITE path, so the question is whether any seeded zeros survive anywhere.");
     });
 
-  section("§15 · D3 / D4 — the orphan tables are genuinely absent");
+  // The two names have OPPOSITE expectations and the first version of this
+  // report printed one verdict for both, so a correct result read as a finding:
+  // `risk_data` is EXPECTED — WP 1.4 adopted it and §15's own text says so —
+  // while `product_code_map` is expected to be gone (WP 3.0 dropped it). A
+  // report whose green case reads like an accusation is D42's lesson in
+  // miniature, so each name is judged against its own expectation.
+  section("§15 · D3 / D4 — the two adopted-or-dropped tables, each against its own expectation");
   report("orphan tables", await tryQ(`
     select table_name from information_schema.tables
     where table_schema = 'public' and table_name in ('product_code_map','risk_data')`),
-    (rows) => out(rows.length
-      ? `- **STILL PRESENT: ${rows.map((r) => r.table_name).join(", ")}** — WP 1.4's reconciliation described a table production still holds.`
-      : "- Neither table exists. WP 1.4's reconciliation matches production."));
+    (rows) => {
+      const present = new Set(rows.map((r) => r.table_name));
+      out(present.has("risk_data")
+        ? "- `risk_data` is present, which is CORRECT: WP 1.4 adopted it (`20260915000003_risk_data.sql`) and it is in the contract."
+        : "- **`risk_data` is MISSING from production** and a migration creates it — the schema probe above should already have failed this run.");
+      out(present.has("product_code_map")
+        ? "- **`product_code_map` is STILL PRESENT**, and WP 3.0's migration dropped it. Read `20260916000003` before anything else."
+        : "- `product_code_map` is gone, which is CORRECT: WP 3.0 dropped it (0 rows, no writer had ever existed).");
+    });
 }
 
 /**
