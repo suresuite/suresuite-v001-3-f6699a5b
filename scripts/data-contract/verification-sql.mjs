@@ -132,9 +132,16 @@ function report(label, res, render) {
   return res.rows;
 }
 
-// ── schema probe: what does production ACTUALLY have? (D32) ────────────────
+// THE PROBE IS NOW A GATE (D43). Anything pushed here makes the run exit
+// non-zero, so `verification-sql.yml` goes red and the report still publishes.
+// §15 is the only instrument in this repo that can see production; a finding it
+// can only ever REPORT is a finding nothing enforces, which is how `customers`
+// and `product_code_map` sat untracked long enough for R4 to lose sight of them.
+const gateFailures = [];
+
+// ── schema probe: what does production ACTUALLY have? (D32, D43) ───────────
 async function schemaProbe() {
-  section("Schema probe — production vs. the migrations (D32)");
+  section("Schema probe — production vs. the migrations (D32, D43)");
 
   const live = await q(`
     select table_name, table_type
@@ -160,9 +167,133 @@ async function schemaProbe() {
   if (missingTables.length) out(...table(missingTables.map((t) => ({ missing_table: t }))));
   if (missingViews.length) out(...table(missingViews.map((t) => ({ missing_view: t }))));
   out(`- **present in production, created by NO migration: ${extra.length}**`);
-  if (extra.length) out(...table(extra.map((t) => ({ untracked_relation: t }))));
+  if (extra.length) {
+    // The shape, not just the name. Adopting a relation means writing a
+    // `CREATE TABLE IF NOT EXISTS` that matches what is already there (WP 1.4's
+    // `risk_data` pattern), and that cannot be written from a name alone — the
+    // reason D43 sat open is that nobody could see the columns from a session.
+    for (const name of extra) {
+      const cols = await tryQ(`
+        select column_name, data_type, is_nullable, column_default
+        from information_schema.columns
+        where table_schema = 'public' and table_name = '${name}'
+        order by ordinal_position`);
+      const n = await tryQ(`select count(*)::int as rows from public.${name}`);
+      const kind = live.find((r) => r.table_name === name)?.table_type ?? "?";
+      out("");
+      out(`**\`${name}\`** — ${kind}, **${n.rows?.[0]?.rows ?? "?"} rows**`);
+      report(`${name} columns`, cols, (rows) => out(...table(rows)));
+    }
+    gateFailures.push(
+      `${extra.length} relation(s) exist in production that no migration creates: ` +
+        `${extra.join(", ")}. Adopt each with a CREATE TABLE IF NOT EXISTS migration ` +
+        `(WP 1.4's risk_data is the pattern) or drop it. PLAN.md §4 D43.`,
+    );
+  }
 
   return liveNames;
+}
+
+// ── D30: which of the two migrations actually ran? ─────────────────────────
+//
+// `20250913085427` creates the view/modify policy pair on `simulation_cache`,
+// `simulation_jobs` and `simulation_performance_metrics`; `20250914113723`
+// creates all six AGAIN, verbatim apart from `public.` qualification, and
+// neither drops first. `CREATE POLICY` on an existing name raises 42710, so
+// exactly one of two things is true and NO STATIC REPLAY CAN SAY WHICH: either
+// the earlier file never took effect, or the later one aborted at its first
+// duplicate and every statement after it never ran.
+//
+// It is decidable, and it does not need a `db push` to decide it. The two files
+// end with DIFFERENTLY NAMED triggers — `20250913085427` writes
+// `simulation_jobs_defaults` / `simulation_job_timing_trigger` and the function
+// `cleanup_simulation_cache()`; `20250914113723` writes
+// `set_simulation_jobs_defaults` / `update_simulation_job_timing`. Whichever
+// set production holds is the file that ran past its policy block.
+async function d30() {
+  section("D30 — which of the two duplicate-policy migrations ran");
+
+  const trigs = await tryQ(`
+    select t.tgname as trigger_name, c.relname as on_table
+    from pg_trigger t join pg_class c on c.oid = t.tgrelid
+    where not t.tgisinternal
+      and t.tgname in (
+        'simulation_jobs_defaults','simulation_cache_defaults',
+        'simulation_performance_metrics_defaults','simulation_job_timing_trigger',
+        'set_simulation_jobs_defaults','set_simulation_cache_defaults',
+        'set_simulation_performance_metrics_defaults','update_simulation_job_timing')
+    order by 1`);
+  report("the triggers each file would have left behind", trigs, (rows) => {
+    const names = new Set(rows.map((r) => r.trigger_name));
+    const early = ['simulation_jobs_defaults', 'simulation_cache_defaults',
+      'simulation_performance_metrics_defaults', 'simulation_job_timing_trigger']
+      .filter((n) => names.has(n));
+    const late = ['set_simulation_jobs_defaults', 'set_simulation_cache_defaults',
+      'set_simulation_performance_metrics_defaults', 'update_simulation_job_timing']
+      .filter((n) => names.has(n));
+    out(...table(rows));
+    out(`- from \`20250913085427\`: **${early.length} of 4**; from \`20250914113723\`: **${late.length} of 4**.`);
+    if (early.length === 4 && late.length === 0)
+      out("- **SETTLED: `20250913085427` ran to completion and `20250914113723` ABORTED at its first duplicate `CREATE POLICY` (42710).** Everything after statement 155 of the later file — two functions and four triggers — never reached production. What the tables have is the EARLIER file's set.");
+    else if (late.length === 4 && early.length === 0)
+      out("- **SETTLED the other way: `20250914113723` ran and `20250913085427` did not**, so the earlier file's policy block never took effect and the later one found nothing to collide with.");
+    else if (early.length === 4 && late.length === 4)
+      out("- **BOTH ran.** That is only possible if something dropped the six policies between them; look for it before assuming either file is safe to re-run.");
+    else
+      out("- **Neither pattern is clean.** Record the exact set above in §16 rather than inferring; a partial set means a third migration has been at these objects.");
+  });
+
+  const fns = await tryQ(`
+    select p.proname as function_name
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('cleanup_simulation_cache','set_simulation_tables_defaults','update_simulation_job_timing')
+    order by 1`);
+  report("and the functions", fns, (rows) => out(...table(rows)));
+
+  // D44/D45 · the remediation's own audit row, read back out of production.
+  // The `db push` log drops RAISE NOTICE (§16 · WP 2.1 follow-up), so the
+  // counts the migration printed are invisible — but it wrote them into the
+  // audit row on purpose, which is what an audit row is for. This is also the
+  // first `plane='data'` row production has ever been asked to show.
+  const remediation = await tryQ(`
+    select created_at, action, target_type,
+           before ->> 'rows_carrying_zero'  as rows_carrying_zero,
+           before ->> 'distinct_targets'    as distinct_targets,
+           after  ->> 'keys_removed'        as keys_removed,
+           after  ->> 'rows_deleted_empty'  as rows_deleted_empty,
+           after  ->> 'rows_still_zero'     as rows_still_zero,
+           after  ->> 'actor_known'         as actor_known
+    from public.audit_logs
+    where plane = 'data' and action = 'remediate'
+      and after ->> 'defect' = 'D1 via D44'
+    order by created_at desc limit 5`);
+  report("D44's remediation, as the audit log recorded it", remediation, (rows) => {
+    out("");
+    out("**D44 · what the unseed actually did**, read back from the audit row rather than from a NOTICE the `db push` log discards:");
+    out(...table(rows));
+    const r = rows[0];
+    if (r) out(`- \`rows_deleted_empty = ${r.rows_deleted_empty}\` is the number that judges the SHAPE of the fix: every row it did NOT delete is a row a row-level \`DELETE\` would have taken, along with whatever else its patch held.`);
+  });
+
+  const planeRows = await tryQ(`
+    select plane, count(*)::int as rows, min(created_at)::text as first_row
+    from public.audit_logs group by 1 order by 1`);
+  report("audit_logs by plane", planeRows, (rows) => {
+    out("");
+    out("**D45 · the data plane, in production** — 18 rows and all of them `admin` was the measurement that opened D45:");
+    out(...table(rows));
+  });
+
+  const dupes = await tryQ(`
+    select schemaname, tablename, policyname, count(*)::int as copies
+    from pg_policies group by 1,2,3 having count(*) > 1 order by 4 desc`);
+  report("duplicate policy names anywhere in the database", dupes, (rows) => {
+    out(rows.length
+      ? `- **${rows.length}** policy name(s) exist more than once on the same table — Postgres does not permit this, so read the query, not the database.`
+      : "- No policy name is duplicated. WP 2.1's drop-and-recreate left one of each, which is the END STATE D30 says was already deterministic.");
+    if (rows.length) out(...table(rows));
+  });
 }
 
 // ── D29: is organizations.name unique in practice? ─────────────────────────
@@ -181,6 +312,61 @@ async function d29() {
   });
   const total = await tryQ(`select count(*)::int as organizations from public.organizations`);
   report("organization count", total, (rows) => out(`- organizations: **${rows[0]?.organizations ?? "?"}**`));
+
+  // WHAT THE TEXT BRANCH IS ACTUALLY CARRYING. §15's sweep found exactly one
+  // project with `organization_id IS NULL`, and "resolve that project" is D29's
+  // whole remaining cost — but a project cannot be resolved from its uuid. It
+  // needs the org TEXT it carries and whether any organization answers to it.
+  // Assigning a project to the wrong tenant is not a defect to be fixed later,
+  // so this prints the evidence rather than letting a migration guess.
+  const unresolved = await tryQ(`
+    select p.id::text as project_id, p.name as project_name,
+           p.organization as org_text,
+           (select count(*)::int from public.organizations o
+             where lower(btrim(o.name)) = lower(btrim(p.organization))) as orgs_matching_text,
+           (select string_agg(o.id::text || ' = ' || o.name, ' | ')
+              from public.organizations o
+             where lower(btrim(o.name)) = lower(btrim(p.organization))) as candidates,
+           p.modeler_id::text as modeler_id,
+           (select count(*)::int from public.approved_users a where a.id = p.modeler_id) as modeler_rows
+    from public.projects p
+    where p.organization_id is null`);
+  report("the unresolved project, in full", unresolved, (rows) => {
+    out("");
+    out("**D29 · the one project the text branch is load-bearing for.** Removing the branch is gated on this row:");
+    out(...table(rows));
+    out(rows.every((r) => Number(r.orgs_matching_text) === 1)
+      ? "- Each row's org text matches EXACTLY ONE organization, so the backfill's own ambiguity rule resolves it. The branch can go once it is applied."
+      : "- At least one row's org text matches zero or several organizations. A migration must not choose; say so in §16 instead.");
+  });
+
+  const orgs = await tryQ(`
+    select id::text as id, name, slug, status from public.organizations order by name`);
+  report("every organization", orgs, (rows) => out(...table(rows)));
+
+  // WHO WOULD LOSE ACCESS IF THE TEXT BRANCH WENT. This is the only question
+  // that decides D29, and asking it is cheaper than arguing about it.
+  // `org_is_current_user_org(NULL, 'default_org')` can only be true for a
+  // reader whose OWN `approved_users.organization` text is `default_org` — the
+  // column default, which names no organization. If nobody's is, dropping the
+  // branch revokes nothing from anybody, and WP 2.1's rule ("a package whose
+  // job is to stop revoking access must not add a new way to revoke it") is
+  // satisfied rather than argued around.
+  const defaultOrgUsers = await tryQ(`
+    select count(*)::int as users_with_default_org_text,
+           count(*) FILTER (WHERE is_active)::int as active,
+           (select count(*)::int from public.approved_users
+             where organization is null or btrim(organization) = '') as users_with_blank_org_text
+    from public.approved_users
+    where lower(btrim(coalesce(organization,''))) = 'default_org'`);
+  report("who the text branch still admits", defaultOrgUsers, (rows) => {
+    out("");
+    out("**D29 · who would lose access if the text branch were removed.** The branch can only admit a reader whose own org TEXT matches a project's:");
+    out(...table(rows));
+    out(Number(rows[0]?.users_with_default_org_text ?? -1) === 0
+      ? "- Nobody carries the `default_org` text, so the NULL-org project is reachable by no ordinary user today. Removing the branch revokes nothing."
+      : "- At least one account still carries `default_org`. Removing the branch WOULD revoke their access to the NULL-org project; resolve the account first.");
+  });
 }
 
 // ── the four decisions §16's PHASE BOUNDARY parked behind §15 ──────────────
@@ -502,6 +688,7 @@ async function main() {
   out(`- every statement is a \`select\`; \`assertReadOnly()\` refuses anything else.`);
 
   await schemaProbe();
+  await d30();
   await d29();
   await boundaryDecisions();
 
@@ -520,7 +707,15 @@ async function main() {
   out("");
   out(`_${queryCount} statements, all \`SELECT\`._`);
 
+  if (gateFailures.length) {
+    section("GATE — this run FAILS");
+    for (const f of gateFailures) out(`- ${f}`);
+    out("");
+    out("_The report above is complete; the run exits non-zero so the workflow is red._");
+  }
+
   if (outPath) writeFileSync(outPath, lines.join("\n") + "\n");
+  if (gateFailures.length) process.exitCode = 1;
 }
 
 main().catch((err) => {

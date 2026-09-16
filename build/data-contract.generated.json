@@ -5,20 +5,20 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 299,
-      "migrations_applied": 296,
-      "last_migration": "20260916000002_audit_view_grant_fix.sql"
+      "migrations_found": 308,
+      "migrations_applied": 305,
+      "last_migration": "20260916000011_org_identity_uuid_only.sql"
     },
-    "sidecars": 26,
+    "sidecars": 27,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 76,
-    "tables_covered": 26,
-    "columns_covered": 267,
+    "tables_in_schema": 77,
+    "tables_covered": 27,
+    "columns_covered": 275,
     "check_constraints": 8,
     "engine_requirements": 7,
     "orphans": 0,
@@ -2162,6 +2162,317 @@
         }
       ],
       "note": "THE CATALOG IS DUPLICATED IN TYPESCRIPT. `src/lib/capabilities.ts` carries the same keys as a union type and a list, because the client needs them without a round trip. Two hand-maintained copies of one fact is an I1 violation waiting to drift — `projectMembership.test.ts` asserts the WP 2.2 keys agree, but nothing checks the whole catalog, and the honest count is that the DB has grown keys the TS list learned about only when someone noticed. Generating one from the other is the fix and it belongs with the contract's other generators, not here."
+    },
+    "customers": {
+      "table": "customers",
+      "schema_name": "public",
+      "tier": "2",
+      "tier_name": "canonical — the only tier humans edit",
+      "grain": "One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows.",
+      "owner": "data-ingestion",
+      "created_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+      "sidecar": "supabase/contract/customers.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "customer_id"
+          ],
+          "name": "customers_project_customer_key"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "customer_id"
+      ],
+      "governance": {
+        "read": "project_member",
+        "write": "project_modeler_or_admin",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Adopted with RLS enabled and no `anon` policy. The logistics lanes carry an `*_anon_read` policy because the public network pages render them (D28, a standing decision); nothing reads this table at all, so there was no reader to keep working and no reason to widen that exposure. `audited: true` was NOT the first draft. The adoption was written with the three WP 2.3 triggers left off — the table had had no migration when they were written, so it had never had them — and `dataPlaneAudit.test.ts` failed on the same commit that put the table in the contract. Its rule is derived from the contract's own tier, not from a list, so a tier-2 table without its triggers is a failure by construction. The triggers are in `20260916000003_adopt_customers_drop_product_code_map.sql` and R9 holds this field to them."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Customers: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization))",
+            "with_check": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization))",
+            "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+          },
+          {
+            "name": "Customers: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
+            "with_check": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
+            "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "customers_project_customer_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "customer_id"
+          ],
+          "definition": "UNIQUE (project_id, customer_id)",
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project this customer belongs to. Scoping is what makes `customer_id` a key: the same company in two projects is two rows, and merging them would merge two customers' models.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "customer_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The customer's display name. Nullable; never a join key (G1).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "segment",
+          "type": "text",
+          "nullable": false,
+          "default": "'default'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the policy that reads it does not exist, and inventing the set before the reader is how a column gets a constraint nobody can satisfy.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "DEFAULT 'default' is production's own default, adopted rather than chosen. It is a value, not an absence, and a later reader must not treat it as \"unsegmented\" without saying so at the point of display (§5 T2).",
+          "engine_requirement": null
+        },
+        {
+          "name": "priority_weight",
+          "type": "numeric",
+          "nullable": false,
+          "default": "1.0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Relative allocation priority when demand exceeds supply. Dimensionless and relative — only the RATIO between two customers means anything, so a row at 1.0 is not \"one unit\" of anything.",
+          "grain": "rate",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the engine, and the blank is deliberate rather than unfinished. `scsim` has no customer-priority concept today: the customer echelon's allocation policies are `P-C.x` in the blueprint's catalog and none of them is implemented (§4.2, Appendix A). Whoever implements one traces this column then; wiring the mapper to a column the registry does not know is how a fallback ends up undeclared (I6).",
+          "engine_requirement": null
+        },
+        {
+          "name": "sla_fill_floor_pct",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The minimum fill rate the customer is contracted to receive, as a percentage. NULLABLE, and the null means \"no contracted floor\" — not zero. A reader that coerces it to 0 turns \"unconstrained\" into \"no service required\", which is D17's error in the other direction.",
+          "grain": "rate",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the engine, for the same reason as `priority_weight`: the service-level policies that would read a contracted fill floor are `P-C.x` and none is implemented. Recorded here so the column is a declared gap rather than a silent one.",
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was last modified. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was first inserted. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "ADOPTED IN PHASE 3 / WP 3.0 (D43). This table existed in the production database with six rows and no creating migration, and it was invisible to the `no-orphan-table` gate for a reason worth keeping: R4 catches tables the CODE READS that no migration creates, and nothing has ever read this one. §15's schema probe — which keys on \"production has it\" rather than \"the code reads it\" — is what found it, and that probe now fails the verification run rather than reporting. NOTHING READS IT YET, and the sidecar says so in every `consumed_by: null`. It is not dead: its columns are the inputs of the customer-echelon policies (`P-C.x`), which is why it was adopted rather than dropped the way `product_code_map` was in the same migration. A later package gives it a writer, a CSV template and the tier-2 audit triggers; until then it is a described, governed, empty-of-readers table, which is a better state than an undescribed one holding the same six rows."
     },
     "dataset_versions": {
       "table": "dataset_versions",
@@ -11452,5 +11763,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "633f0cf89458"
+  "contract_version": "7ac607d5f5ad"
 }

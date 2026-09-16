@@ -201,12 +201,24 @@ describe("D13 — renaming an organization must not change who can see what", ()
     expect(canSeeOwnOrgRow(other)).toBe(false);
   });
 
-  it("a project whose uuid never got stamped is still reachable by text (dual read)", () => {
-    // D27's rows: organization_id IS NULL, organization correct. The text branch
-    // is what keeps them visible, which is why this WP does not remove it.
+  it("a project whose uuid never got stamped is reachable by NOBODY — the text branch is gone (D29)", () => {
+    // FLIPPED IN WP 3.0, deliberately, and this is the pinned case.
+    //
+    // WP 2.1 kept the text branch so D27's un-stamped rows stayed visible, and
+    // said the branch would go once §15 confirmed the backfill. §15 ran
+    // (`35064364537`): 14 of 14 accounts carry `organization_id`, 9 of 10
+    // projects do, and the tenth — "Demo Simulation Project", org text
+    // `default_org`, matching none of the three organizations, modeler
+    // resolving to no account — was reachable by nobody anyway, because NO
+    // account carries the `default_org` text either.
+    //
+    // So this expectation changing from `true` to `false` describes no lost
+    // access in production. It describes the hole closing: `organizations.name`
+    // is not unique, and the text branch admitted one tenant to another
+    // whenever two display names collided.
     const w = baseline();
     w.project.organization_id = null;
-    expect(canSeeProject(w)).toBe(true);
+    expect(canSeeProject(w)).toBe(false);
   });
 });
 
@@ -265,37 +277,37 @@ describe("I1 single-source — the dual read is authored exactly once", () => {
 
 describe("D13 in the edge-function plane — the service role has no RLS to fall back on", () => {
   it("sameOrganization() and the SQL predicate agree on every case", () => {
-    // Two languages, one access rule. The SQL is
-    //   COALESCE(_org_id = <caller's org id>, false) OR COALESCE(_org_name = <caller's org>, false)
+    // Two languages, one access rule. Since WP 3.0 (D29) the SQL is
+    //   COALESCE(_org_id = <caller's org id>, false)
     // and this table is that expression, evaluated both ways.
     const A = "aaaaaaaa-0000-0000-0000-000000000000";
     const B = "bbbbbbbb-0000-0000-0000-000000000000";
     const cases: Array<[OrgBearing, OrgBearing, boolean, string]> = [
       [{ organization_id: A, organization: "Acme" }, { organization_id: A, organization: "Acme" }, true, "both planes agree"],
       [{ organization_id: A, organization: "Acme Corp" }, { organization_id: A, organization: "Acme" }, true, "renamed: uuid carries it"],
-      [{ organization_id: null, organization: "Acme" }, { organization_id: A, organization: "Acme" }, true, "un-backfilled: text carries it"],
-      [{ organization_id: null, organization: "Acme" }, { organization_id: null, organization: "Acme" }, true, "neither backfilled"],
+      // FLIPPED IN WP 3.0 (D29). These three were `true` while the text branch
+      // existed. Production has no row that relies on any of them: 14 of 14
+      // accounts carry `organization_id`, and the one project that does not is
+      // reachable by nobody because no account carries its `default_org` text
+      // either (§15 run `35064364537`).
+      [{ organization_id: null, organization: "Acme" }, { organization_id: A, organization: "Acme" }, false, "un-backfilled: the text no longer carries it"],
+      [{ organization_id: null, organization: "Acme" }, { organization_id: null, organization: "Acme" }, false, "neither backfilled: no uuid, no match"],
       [{ organization_id: B, organization: "Globex" }, { organization_id: A, organization: "Acme" }, false, "different tenant"],
-      // THE CASE THAT PINS THE SEMANTICS, and it is an OR rather than a
-      // uuid-first preference. `organizations.name` is NOT unique, so two real
-      // tenants may share a display name, and the text branch then admits one
-      // to the other. That is the PRE-EXISTING behaviour — the old check was
-      // text-only — and WP 2.1 deliberately does not change it: reading the
-      // uuid first would DENY where the old rule granted, which is a new way to
-      // revoke access inside the package whose job is to stop revoking it. The
-      // exposure closes when the text branch goes, once §15 verifies the
-      // backfill (PLAN.md §16, WP 2.1 handoff). Flipping this to `false` is a
-      // deliberate act, not a tidy-up.
-      [{ organization_id: B, organization: "Acme" }, { organization_id: A, organization: "Acme" }, true, "name collision: text still admits (pre-existing)"],
+      // THE CASE THAT PINS THE SEMANTICS, and it is now a uuid-only rule.
+      // `organizations.name` is NOT unique, so two real tenants may share a
+      // display name; while the predicate was an OR, the text branch handed one
+      // of them the other's projects. WP 2.1 kept that behaviour rather than
+      // denying where the old text-only check granted, and named its condition:
+      // §15 confirming the backfill. §15 ran, the condition is met, and this
+      // case is `false`. Flipping it back would re-open a cross-tenant read.
+      [{ organization_id: B, organization: "Acme" }, { organization_id: A, organization: "Acme" }, false, "name collision: the uuids differ, so it is refused"],
       [{ organization_id: null, organization: "Globex" }, { organization_id: A, organization: "Acme" }, false, "different tenant, no uuid"],
       [{ organization_id: null, organization: null }, { organization_id: A, organization: "Acme" }, false, "nothing to match on"],
     ];
     for (const [a, b, expected, why] of cases) {
       expect(sameOrganization(a, b), why).toBe(expected);
       // the same row through the SQL predicate's own shape
-      const sql =
-        (a.organization_id != null && a.organization_id === b.organization_id) ||
-        (a.organization != null && a.organization === b.organization);
+      const sql = a.organization_id != null && a.organization_id === b.organization_id;
       expect(sql, `SQL and TS disagree on: ${why}`).toBe(expected);
     }
   });

@@ -228,6 +228,6 @@ When the row last changed. Server-set.
 
 ---
 
-*Generated from data contract `633f0cf89458`, engine `0.2.3`,
+*Generated from data contract `7ac607d5f5ad`, engine `0.2.3`,
 sidecar `supabase/contract/bom_single_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

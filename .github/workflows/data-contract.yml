@@ -23,9 +23,16 @@ name: data contract
 # that through and then failed the NEXT migration PR for a reason it did not
 # cause. `npm test` and `check:docs` have the same property.
 
+# NO BRANCH FILTER ON `push` EITHER, and that is D35's first half. The filter
+# used to be `branches: [main]`, so a feature branch was gated only by the
+# `pull_request` event — and a pull request opened by an APP TOKEN raises no
+# `pull_request` event at all. The result is a pull request with no run, and a
+# check that never ran is indistinguishable in the UI from one that passed.
+# Running on every push means the head commit carries a `data contract` result
+# however the pull request came to exist. It costs a duplicate run per pull
+# request; a gate that can be bypassed by the way a PR was opened costs more.
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -71,6 +78,14 @@ jobs:
       - name: SQL unit table matches grading.ts::UNIT_DAYS
         run: npm run contract:units -- --check
 
+      # D33. The capability catalog is seeded across nine migrations and mirrored
+      # in TypeScript because the client needs the labels without a round trip.
+      # Nothing checked the two agreed, and the fallback had lost two keys
+      # (`reports`, `agent_report_builder`) — a silent denial for everyone
+      # holding Decision Reports whenever the capability fetch failed.
+      - name: Capability catalog matches the migrations
+        run: npm run contract:capabilities -- --check
+
       # WP 1.1's exit checks, including the orphan check — the one WP 1.4 turned
       # from red to green by reconciling `approved_users`, `risk_data` and
       # `product_code_map`. Reverting any of the three turns it red again.
@@ -96,3 +111,106 @@ jobs:
       # served by the other.
       - name: Data contract holds (coverage, page drift, §4 citations)
         run: npm run contract:check
+
+  # ── D31 · a migration's first execution is no longer the production deploy ──
+  #
+  # `contract:introspect` replays migrations STATICALLY — it parses DDL, it never
+  # runs SQL. So `min(o.id)` on a uuid (42883) passed every gate in this repo and
+  # surfaced on the `db push` that deployed it; WP 2.1 needed four deploys to land
+  # one file and only the fourth was about that file's own logic (§16 · WP 2.1
+  # follow-up).
+  #
+  # This job EXECUTES the migrations a pull request adds, against a PostgreSQL 16
+  # built from the BASE branch's own introspected artifact. It is deliberately not
+  # a replay of history: 92 of 296 migrations fail on an empty database and always
+  # will. It gates the new file, not the past.
+  migrations-run:
+    name: migrations run
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The base branch by NAME, not by whatever the checkout happened to leave
+      # behind: the rehearsal takes the schema from the merge-base's artifact, and
+      # reading HEAD's instead would hand each migration a database that already
+      # contains everything it is about to create — the one reading that cannot fail.
+      - name: Fetch the base branch
+        run: |
+          BASE="${{ github.base_ref || github.event.repository.default_branch }}"
+          git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          echo "REHEARSE_SINCE=origin/$BASE" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: New migrations apply to a real PostgreSQL 16
+        run: npm run contract:rehearse
+        env: &rehearsal_pg
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+
+      # TWICE, AND THE SECOND RUN IS THE ONE THAT WOULD HAVE CAUGHT D4. The base
+      # is generated from the contract, which describes what the MIGRATIONS say;
+      # production also holds relations no migration creates (D43). A migration
+      # written to ADOPT such a table has two paths, and the run above always
+      # takes the fresh one — which is exactly how WP 1.4's first `risk_data`
+      # migration passed every local reading and failed on the deploy at
+      # statement 2, because `CREATE TABLE IF NOT EXISTS` had silently no-opped.
+      # `--fixtures` puts production's untracked shape in first.
+      - name: …and to production's shape, including the relations no migration creates
+        run: npm run contract:rehearse -- --fixtures
+        env: *rehearsal_pg
+
+  # ── D35 · nothing stopped a merge while `main`'s own gate was red ───────────
+  #
+  # Detection was never the gap: `data-contract.yml` went red at `3bf44aa`,
+  # `53119da` and `55249d0` exactly as designed. THREE FURTHER MERGES WENT IN
+  # ANYWAY, each inheriting the breakage rather than causing it, because a red
+  # `main` blocks nothing.
+  #
+  # The conventional answer — a required status check — IS NOT AVAILABLE HERE.
+  # This repository is private and owned by a personal account on a plan where
+  # both the branch-protection and the ruleset APIs answer "Upgrade to GitHub Pro
+  # or make this repository public" (403). Measured, not assumed. So enforcement
+  # has to live in the repository, and this is it: every pull request carries a
+  # check that is RED while the branch it would merge into is red. It does not
+  # block the button — nothing in this plan can — but it removes the one excuse
+  # the three merges had, which is that nobody could see it from the pull request.
+  base-is-green:
+    name: base branch is green
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: The base branch's own data contract run must be green
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.base_ref }}
+          REPO: ${{ github.repository }}
+        run: node .github/scripts/base-is-green.mjs

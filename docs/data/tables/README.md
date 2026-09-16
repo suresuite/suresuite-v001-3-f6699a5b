@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-26 of 76 tables are covered,
-267 columns in all. A table that is not here is listed
+27 of 77 tables are covered,
+275 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -17,6 +17,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`bom_multi_level`](bom_multi_level.md) | 2 | `data-ingestion` | 9 | One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5). |
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 8 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5). |
 | [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
+| [`customers`](customers.md) | 2 | `data-ingestion` | 8 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
 | [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 8 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
 | [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 12 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5). |
@@ -41,4 +42,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `633f0cf89458`, engine `0.2.3`.*
+*Generated from data contract `7ac607d5f5ad`, engine `0.2.3`.*

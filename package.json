@@ -19,8 +19,10 @@
     "contract:verify": "node scripts/data-contract/verify-introspection.mjs",
     "contract:validate": "node scripts/data-contract/validate-sidecars.mjs",
     "contract:units": "node scripts/data-contract/gen-unit-sql.mjs",
+    "contract:capabilities": "node scripts/data-contract/gen-capabilities.mjs",
     "contract:generate": "node scripts/data-contract/generate.mjs",
     "contract:check": "node scripts/data-contract/check.mjs",
+    "contract:rehearse": "node scripts/data-contract/rehearse-migrations.mjs",
     "verify:sql": "node scripts/data-contract/verification-sql.mjs"
   },
   "dependencies": {

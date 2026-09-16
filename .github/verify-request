@@ -6,5 +6,10 @@
 # most inbound_logistics rows.
 #   project_id=<uuid>
 #
-# requested-by: Phase 2→3 readiness assessment (§16)
-# requested-at: 2026-09-16
+# requested-by: Phase 3 / WP 3.0 — the Phase 2 carry-over (§16)
+# requested-at: 2026-09-16 (gap check, final — D44's audit row read back, D29 after the flip)
+# why: D43 needs the COLUMNS and row counts of every relation production holds
+#      that no migration creates, not just their names — an adoption migration
+#      cannot be written from a name. The schema probe is also now a GATE: this
+#      run is expected to FAIL while `customers` and `product_code_map` are
+#      untracked, and that is the gate working, not the runner breaking.

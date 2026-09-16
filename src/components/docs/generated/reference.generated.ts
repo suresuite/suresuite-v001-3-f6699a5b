@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 267;
+export const REFERENCE_COLUMN_COUNT = 275;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -1019,6 +1019,152 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When its metadata last changed. Server-stamped.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "customers",
+    "tier": "2",
+    "tierName": "canonical — the only tier humans edit",
+    "owner": "data-ingestion",
+    "grain": "One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows.",
+    "naturalKey": [
+      "project_id",
+      "customer_id"
+    ],
+    "naturalKeyIntended": [
+      "project_id",
+      "customer_id"
+    ],
+    "checks": [],
+    "columns": [
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": true,
+        "validate": null,
+        "meaning": "The project this customer belongs to. Scoping is what makes `customer_id` a key: the same company in two projects is two rows, and merging them would merge two customers' models.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "customer_id",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": true,
+        "validate": null,
+        "meaning": "The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The customer's display name. Nullable; never a join key (G1).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "segment",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the policy that reads it does not exist, and inventing the set before the reader is how a column gets a constraint nobody can satisfy.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "priority_weight",
+        "type": "numeric",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Relative allocation priority when demand exceeds supply. Dimensionless and relative — only the RATIO between two customers means anything, so a row at 1.0 is not \"one unit\" of anything.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "sla_fill_floor_pct",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The minimum fill rate the customer is contracted to receive, as a percentage. NULLABLE, and the null means \"no contracted floor\" — not zero. A reader that coerces it to 0 turns \"unconstrained\" into \"no service required\", which is D17's error in the other direction.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was last modified. Server-stamped.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was first inserted. Server-stamped.",
         "primaryKey": false,
         "unique": false,
         "references": null,
