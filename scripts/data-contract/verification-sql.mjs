@@ -227,13 +227,22 @@ async function boundaryDecisions() {
 
 // ── §15 proper, for one project ───────────────────────────────────────────
 async function pickProject() {
-  if (forcedProject) return { id: forcedProject, why: "passed with --project" };
+  // The NAME matters as much as the id. `seed-project.yml` seeds "Project TRON -
+  // ver2" through the app's own RPC lifecycle, and that project is the biggest
+  // one in the database — so "the project with the most rows is clean" can mean
+  // "the seeder writes clean rows" rather than anything about real uploads. A
+  // reader cannot tell those apart from a uuid.
+  if (forcedProject) {
+    const [row] = await q(`select name from public.projects where id = '${forcedProject}'::uuid`);
+    return { id: forcedProject, name: row?.name ?? "(unknown)", why: "passed with --project" };
+  }
   const rows = await q(`
-    select i.project_id as id, count(*)::int as inbound_rows
+    select i.project_id as id, p.name, count(*)::int as inbound_rows
     from public.inbound_logistics i
-    group by 1 order by 2 desc limit 1`);
+    left join public.projects p on p.id = i.project_id
+    group by 1, 2 order by 3 desc limit 1`);
   if (!rows.length) return null;
-  return { id: rows[0].id, why: `most inbound_logistics rows (${rows[0].inbound_rows})` };
+  return { id: rows[0].id, name: rows[0].name ?? "(no projects row)", why: `most inbound_logistics rows (${rows[0].inbound_rows})` };
 }
 
 async function section15(pid) {
@@ -398,6 +407,92 @@ async function section15(pid) {
       : "- Neither table exists. WP 1.4's reconciliation matches production."));
 }
 
+/**
+ * §15 measures ONE project. Phase 3's scope depends on how much D5/D7/D8 damage
+ * exists AT ALL, and a single clean project is not that answer — least of all if
+ * it is the seeded one. This sweep runs the three counting defects across every
+ * project in the database, which is what makes a clean result mean something.
+ */
+async function allProjectsSweep() {
+  section("Across EVERY project — what one project cannot tell you");
+
+  for (const [label, lane, key] of [
+    ["inbound_logistics", "inbound_logistics", "supplier_id, material_id"],
+    ["outbound_logistics", "outbound_logistics", "customer_id, product_id"],
+    ["bom_single_level", "bom_single_level", "product_id, material_id"],
+    ["bom_multi_level", "bom_multi_level", "material_id, higher_level_component_id, level"],
+  ]) {
+    const res = await tryQ(`
+      select count(*)::int as rows,
+             count(distinct project_id)::int as projects,
+             (select coalesce(sum(copies - 1), 0)::int from (
+                select count(*)::int as copies from public.${lane}
+                group by project_id, plant_name, ${key} having count(*) > 1) d)
+               as rows_the_unique_index_would_reject
+      from public.${lane}`);
+    report(label, res, (rows) => {
+      out(`**\`${label}\`** — natural key \`project_id + plant_name + ${key}\`:`);
+      table(rows).forEach((l) => out(l));
+      out("");
+    });
+  }
+
+  report("untrimmed / blank ids across every project", await tryQ(`
+    select count(*)::int as rows_with_untrimmed_or_blank_ids
+    from public.inbound_logistics
+    where supplier_id is null or btrim(supplier_id) = ''
+       or material_id is null or btrim(material_id) = ''
+       or supplier_id is distinct from btrim(supplier_id)
+       or material_id is distinct from btrim(material_id)`),
+    (rows) => table(rows).forEach((l) => out(l)));
+
+  report("null numerics across every project", await tryQ(`
+    select count(*) filter (where volume is null)::int as null_volume,
+           count(*) filter (where lead_time is null)::int as null_lead_time,
+           count(*) filter (where unit_price is null)::int as null_price,
+           count(*)::int as total
+    from public.inbound_logistics`),
+    (rows) => { out(""); table(rows).forEach((l) => out(l)); });
+
+  report("unrecognized time_unit across every project", await tryQ(`
+    select coalesce(time_unit,'<null>') as time_unit, count(*)::int as rows
+    from public.inbound_logistics
+    where lower(btrim(coalesce(time_unit,''))) not in
+      ('day','days','d','daily','week','weeks','wk','w','weekly','month','months','mo','m',
+       'monthly','quarter','quarters','quarterly','year','years','yr','y','yearly',
+       'annual','annually')
+    group by 1 order by 2 desc`),
+    (rows) => {
+      out("");
+      out(`- **${rows.length}** unrecognized \`time_unit\` token(s) database-wide, each silently read as weekly.`);
+      if (rows.length) table(rows.slice(0, SAMPLE_CAP)).forEach((l) => out(l));
+    });
+
+  report("the row the dual read's text branch still carries", await tryQ(`
+    select p.id as project_id, (p.organization_id is null) as org_uuid_missing,
+           (a.id is null) as modeler_has_no_account
+    from public.projects p
+    left join public.approved_users a on a.id = p.modeler_id
+    where p.organization_id is null or (p.modeler_id is not null and a.id is null)`),
+    (rows) => {
+      out("");
+      out(`**Which rows are actually unresolved** — D29's text branch cannot be removed while any \`org_uuid_missing\` row exists:`);
+      table(rows).forEach((l) => out(l));
+    });
+
+  report("D1 — auto-seeded zeros, by project", await tryQ(`
+    select count(distinct target_key)::int as distinct_targets,
+           count(*)::int as rows
+    from public.policy_overrides
+    where family = 'inventory' and patch ? 'safety_stock_days'
+      and (patch->>'safety_stock_days')::numeric = 0`),
+    (rows) => {
+      out("");
+      out("**D1's surviving damage.** WP 0.1 closed the WRITE path; it did not clean what the path had already written:");
+      table(rows).forEach((l) => out(l));
+    });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -416,9 +511,11 @@ async function main() {
     out("- `inbound_logistics` holds no rows in any project, so there is no project to measure.");
   } else {
     section(`§15 · the project measured`);
-    out(`- \`project_id\` = \`${project.id}\` — chosen because it has the ${project.why}.`);
+    out(`- \`project_id\` = \`${project.id}\` — **${project.name}** — chosen because it has the ${project.why}.`);
     await section15(project.id);
   }
+
+  await allProjectsSweep();
 
   out("");
   out(`_${queryCount} statements, all \`SELECT\`._`);
