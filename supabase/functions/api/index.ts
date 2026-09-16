@@ -907,7 +907,10 @@ const revokeKey: Handler = async (ctx) => {
     .eq("id", keyId)
     .eq("org_id", ctx.principal.orgId);
   if (error) throw new ApiError(500, "write_failed", "key revoke failed");
-  const { error: auditErr } = await svc.from("admin_audit_logs").insert({
+  const { error: auditErr } = await svc.from("audit_logs").insert({
+    // WP 2.3: the table gained a `plane`. Revoking a key is an admin action, so it
+    // stays on the admin plane and this row reads exactly as it did before.
+    plane: "admin",
     action: "api_key.revoke",
     target_type: "api_keys",
     target_id: keyId,

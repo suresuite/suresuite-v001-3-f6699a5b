@@ -5,14 +5,15 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-25 of 76 tables are covered,
-256 columns in all. A table that is not here is listed
+26 of 76 tables are covered,
+267 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
 | Table | Tier | Owner | Columns | One row is |
 |---|---|---|---|---|
 | [`approved_users`](approved_users.md) | G | `platform` | 16 | One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one. |
+| [`audit_logs`](audit_logs.md) | G | `platform` | 11 | One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused. |
 | [`bom_multi_level`](bom_multi_level.md) | 2 | `data-ingestion` | 9 | One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5). |
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 8 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5). |
 | [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
@@ -40,4 +41,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `91c378b2e0f8`, engine `0.2.3`.*
+*Generated from data contract `788187aab9e4`, engine `0.2.3`.*

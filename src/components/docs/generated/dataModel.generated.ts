@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "91c378b2e0f8";
+export const CONTRACT_VERSION = "788187aab9e4";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260915000005_project_membership_and_delegation.sql";
+export const LAST_MIGRATION = "20260916000001_data_plane_audit.sql";
 
 export const COUNTS = {
   "tablesInSchema": 76,
-  "tablesDescribed": 25,
-  "columnsDescribed": 256,
-  "tablesUndescribed": 51
+  "tablesDescribed": 26,
+  "columnsDescribed": 267,
+  "tablesUndescribed": 50
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -139,6 +139,12 @@ export const TIERS: GlanceTier[] = [
         "owner": "platform"
       },
       {
+        "table": "audit_logs",
+        "grain": "One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused.",
+        "columns": 11,
+        "owner": "platform"
+      },
+      {
         "table": "capabilities",
         "grain": "One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that.",
         "columns": 7,
@@ -222,16 +228,6 @@ export const TIERS: GlanceTier[] = [
 
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
-  {
-    "wp": "2.3",
-    "why": "The data-plane audit (D15). Audit today covers the admin plane only; `audited: false` on all thirteen covered sidecars is the honest record of that. This table changes shape when the audit reaches tier transitions.",
-    "tables": [
-      {
-        "table": "admin_audit_logs",
-        "columns": 10
-      }
-    ]
-  },
   {
     "wp": "3.1",
     "why": "The other inbound datasets. WP 3.1 generalizes `ingest_*` and WP 3.2 moves the parse server-side; these tables land on the same ingestion contract as the four lane tables, and their sidecars are written against that contract rather than against the bespoke paths each has today.",
