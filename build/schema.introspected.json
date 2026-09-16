@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 317,
-  "migrations_applied": 314,
+  "migrations_found": 318,
+  "migrations_applied": 315,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000020_item_masters_land.sql",
+  "last_migration": "20260916000021_actor_on_remaining_paths.sql",
   "counts": {
     "tables": 79,
     "views": 7,
@@ -19944,7 +19944,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20260705000002_assign_material_supplier.sql"
+      "defined_by": "20260916000021_actor_on_remaining_paths.sql"
     },
     {
       "name": "assign_outbound_customer",

@@ -203,6 +203,6 @@ When the version was frozen. Server-set.
 
 ---
 
-*Generated from data contract `ee2137fd288d`, engine `0.2.3`,
+*Generated from data contract `fc67c7bde328`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

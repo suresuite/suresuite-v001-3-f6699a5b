@@ -18,6 +18,7 @@
 //       every work package marked done in §7–§13 has a §16 entry
 //   R8  no open defect, unmet invariant or table deferral is owned by a FINISHED package
 //   R9  `governance.audited` matches the audit triggers the migrations create
+//   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -614,6 +615,78 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
   if (!drift) {
     console.log(`  R9  \`governance.audited\` matches the migrations · ${live.size} table(s) audited by trigger, ` +
                 `${emitters.size} function(s) that emit an audit row`);
+  }
+}
+
+// ───────────────── R10: §17 is the table a reader consults FIRST, so check it
+//
+// WHY THIS RULE EXISTS, and it is D41's shape in the one place it does the most
+// damage. R7 rule 2 gates §16 entries against §7–§13's ✅ markers, so a package
+// cannot be marked done without a drift-log entry. NOTHING checked §17. It went
+// on saying "WP 3.2 is next" after WP 3.2 shipped — not from carelessness but
+// because a status cell no gate reads is a status cell that decays, and this one
+// is the first thing a cold session looks at. A sequencing table that is wrong
+// about what is done is worse than no sequencing table: it is confidently wrong
+// in the place a reader trusts most.
+//
+// WHAT IT CAN AND CANNOT CHECK. The status cells are prose, and a rule that tried
+// to parse prose would be a rule that fails on a rewrite. So it checks the two
+// claims that are UNAMBIGUOUS and were both wrong at once:
+//
+//   1. "WP N.M is next" may not name a package §7–§13 marks ✅.
+//   2. "N.M ✅" in §17 may not name a package §7–§13 does NOT mark ✅ — §17 may
+//      lag reality, but it may never claim more than the roadmap does.
+//
+// It deliberately does NOT require §17 to mention every done package: a phase row
+// summarises, and forcing it to enumerate would turn a reader's table into a
+// changelog. Rule 1 is what catches the staleness that actually happened.
+
+{
+  const planText = readFileSync(PLAN, "utf8");
+  const seqStart = planText.indexOf("\n## 17. Sequencing");
+  if (seqStart < 0) {
+    fail("R10", "PLAN.md §17 could not be located — the section heading moved");
+  } else {
+    const roadmapStart = planText.search(PLAN_SECTIONS);
+    const roadmap = planText.slice(roadmapStart, seqStart);
+    const seq = planText.slice(seqStart);
+
+    // Packages §7–§13 marks done, by number — from BOTH places the roadmap marks
+    // one. A package has a `### WP N.M … ✅` heading; a SUB-package of WP 5.2 has
+    // a row in that package's own table (`| **5.2a** ✅ | …`) and no heading of
+    // its own. Reading only the headings made this rule's first run report 5.2a
+    // and 5.2h as claims §7–§13 does not support, which was the RULE being wrong
+    // rather than the document — and is worth the comment, because a gate that
+    // cries wolf gets relaxed rather than fixed.
+    const done = new Set([
+      ...roadmap.split("\n")
+        .filter((l) => /^### WP /.test(l) && l.includes("✅"))
+        .map((l) => l.match(/^### WP\s+([0-9]+\.[0-9]+[a-z]?)/i)?.[1]),
+      ...roadmap.split("\n")
+        .filter((l) => /^\|\s*\*\*[0-9]+\.[0-9]+[a-z]?\*\*\s*✅/.test(l))
+        .map((l) => l.match(/^\|\s*\*\*([0-9]+\.[0-9]+[a-z]?)\*\*/)?.[1]),
+    ].filter(Boolean));
+
+    // 1 — "WP N.M is next" on a package that has shipped.
+    for (const m of seq.matchAll(/WP\s+([0-9]+\.[0-9]+[a-z]?)\s+is next/gi)) {
+      if (done.has(m[1])) {
+        fail("R10", `§17 says "WP ${m[1]} is next" and §7–§13 marks it ✅. ` +
+                    "The sequencing table is the first thing a reader consults; " +
+                    "point it at the package that IS next.");
+      }
+    }
+
+    // 2 — §17 claiming a package done that the roadmap does not.
+    for (const m of seq.matchAll(/\b([0-9]+\.[0-9]+[a-z]?)\s*✅/g)) {
+      if (!done.has(m[1])) {
+        fail("R10", `§17 marks "${m[1]}" ✅ and §7–§13 does not. ` +
+                    "§17 may lag the roadmap; it may never claim more than it.");
+      }
+    }
+
+    if (!failures.some((f) => f.startsWith("R10"))) {
+      console.log(`  R10 §17 agrees with §7–§13 · ${done.size} done package(s) cross-checked`);
+    }
   }
 }
 

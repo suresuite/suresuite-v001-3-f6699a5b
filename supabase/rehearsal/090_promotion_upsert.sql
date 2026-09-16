@@ -372,3 +372,58 @@ BEGIN
 
   RAISE NOTICE 'WP 3.3: an item master lands in tier 0/1 and upserts into tier 2 through the same statement a lane does (D55)';
 END $wp33im$;
+
+-- WP 3.3 · D36 — A SQL WRITER THAT TAKES THE ACTOR NOW TELLS THE TRIGGER.
+--
+-- `assign_material_supplier` writes three tier-2/3 tables from the /policies grid
+-- and has taken `p_user_id` since it was written, and its audit rows said
+-- `actor_known: false` anyway — the one line telling the trigger was missing.
+-- WP 2.3 declared `audit-actor` met on the strength of a migration and §15 later
+-- found zero data-plane rows in production (D45); a structural test would agree
+-- with this migration exactly as it agreed with that one. So: run it, and read
+-- the row back.
+
+DO $wp33d36$
+DECLARE
+  v_user    uuid := '00000000-0000-4000-8000-000000033400';
+  v_project uuid := '00000000-0000-4000-8000-000000033401';
+  v_n       integer;
+  v_audit   public.audit_logs%ROWTYPE;
+BEGIN
+  INSERT INTO auth.users (id, email) VALUES (v_user, 'wp33d36@example.invalid');
+  INSERT INTO public.approved_users (id, email, name, password_hash)
+    VALUES (v_user, 'wp33d36@example.invalid', 'WP33 D36', 'x');
+  INSERT INTO public.projects (id, name, modeler_id, plant_name, organization)
+    VALUES (v_project, 'WP33 D36', v_user, 'WP33D', 'WP33 Org');
+
+  DELETE FROM public.audit_logs WHERE plane = 'data';
+  PERFORM public.assign_material_supplier(v_project, 'MAT-A', 'SUP-A', v_user, 'wp33d36@example.invalid');
+
+  SELECT count(*) INTO v_n FROM public.inbound_logistics
+   WHERE project_id = v_project AND supplier_id = 'SUP-A' AND material_id = 'MAT-A';
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'WP 3.3: assign_material_supplier wrote % lane row(s), expected 1', v_n;
+  END IF;
+
+  SELECT * INTO v_audit FROM public.audit_logs
+   WHERE plane = 'data' AND target_type = 'inbound_logistics' AND action = 'insert';
+  IF v_audit.actor_user_id IS DISTINCT FROM v_user THEN
+    RAISE EXCEPTION 'WP 3.3: the assignment audit row names actor %, expected % — D36 on this path', v_audit.actor_user_id, v_user;
+  END IF;
+  IF (v_audit.after ->> 'actor_known') <> 'true' THEN
+    RAISE EXCEPTION 'WP 3.3: the assignment audit row still says actor_known=%', v_audit.after ->> 'actor_known';
+  END IF;
+
+  -- AND IT IS STILL IDEMPOTENT under the new unique index. A package that adds
+  -- unique indexes owes every EXISTING writer this check: assigning a supplier
+  -- that is already assigned must be a no-op, not a 23505 at a user who did
+  -- nothing wrong.
+  PERFORM public.assign_material_supplier(v_project, 'MAT-A', 'SUP-A', v_user, 'wp33d36@example.invalid');
+  SELECT count(*) INTO v_n FROM public.inbound_logistics
+   WHERE project_id = v_project AND supplier_id = 'SUP-A' AND material_id = 'MAT-A';
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'WP 3.3: assigning the same supplier twice left % row(s), expected 1', v_n;
+  END IF;
+
+  RAISE NOTICE 'WP 3.3: assign_material_supplier names its actor and survives the natural-key index (D36, one path)';
+END $wp33d36$;

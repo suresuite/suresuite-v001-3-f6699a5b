@@ -286,3 +286,42 @@ describe("the promotion's unit conversions exist twice and must agree", () => {
     for (const n of fromSpec) expect(UNIT_DAYS[n.canonical]).toBeGreaterThan(0);
   });
 });
+
+/**
+ * WP 3.3 — THE LEGACY EDGE FUNCTIONS' `onConflict` IS A FOURTH COPY OF THE KEY.
+ *
+ * `20260916000018` put a unique index on each lane's natural key, which turns
+ * these three functions' plain `.insert()` into a 23505 the first time a user
+ * re-sends a row that already exists — `ingest-inbound-logistics` is the fallback
+ * the /policies grid uses to assign a supplier, and "already assigned" is a no-op,
+ * not an error. They upsert now, and PostgREST needs the conflict target spelled
+ * out, so the key exists once more in a place that can drift.
+ */
+describe("the legacy ingest functions upsert on the same key the index enforces", () => {
+  const LEGACY: Array<[string, string]> = [
+    ["ingest-inbound-logistics", "inbound_logistics"],
+    ["ingest-outbound-logistics", "outbound_logistics"],
+    ["ingest-bom-multi-level", "bom_multi_level"],
+  ];
+
+  it("names exactly natural_key_intended in onConflict", () => {
+    for (const [fn, table] of LEGACY) {
+      const src = readFileSync(join(ROOT, "supabase", "functions", fn, "index.ts"), "utf8");
+      const m = src.match(/onConflict:\s*'([^']+)'/);
+      expect(m, `${fn} does not name a conflict target`).toBeTruthy();
+      const intended = (CONTRACT.tables as any)[table].natural_key_intended as string[];
+      expect(m![1].split(",").map((c) => c.trim())).toEqual(intended);
+    }
+  });
+
+  it("none of them still uses a bare .insert() into its lane", () => {
+    // A plain insert is the duplicate-or-crash behaviour, depending only on
+    // whether the row happens to exist. Neither is acceptable now.
+    for (const [fn, table] of LEGACY) {
+      const src = readFileSync(join(ROOT, "supabase", "functions", fn, "index.ts"), "utf8");
+      expect(src, `${fn} still inserts into ${table}`).not.toMatch(
+        new RegExp(`from\\('${table}'\\)\\s*\\.insert\\(`),
+      );
+    }
+  });
+});
