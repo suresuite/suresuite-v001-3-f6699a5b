@@ -30,3 +30,15 @@ WP 3.2 gap check — server-side parse landed
 WP 3.2 gap check, second run — the first raced the migration deploy: `ingest_staged_rows`
 did not exist when §15 queried it (the probe reported it MISSING, correctly, and the CSV
 section failed). Re-run now that `20260916000014`–`20260916000016` have landed.
+
+# requested-by: Phase 3 / WP 3.3 — natural keys, upsert, normalization at promotion (§16)
+# requested-at: 2026-09-16 (the BEFORE run, taken before any row is deleted)
+# why: §10 · WP 3.3 says dedup first and record before/after, and the before-number
+#      it inherits (96 + 2, run `35144057908`) is hours old across a merge that
+#      changed what reaches tier 2. A dedup sized from a stale count is a dedup
+#      that cannot be checked afterwards. This run re-measures
+#      `rows_the_unique_index_would_reject` for all SEVEN tables R5 warns on, and
+#      re-reads the three WP 3.2 counted at 0 — `tier2_suppliers`,
+#      `tier3_suppliers`, `multi_tier_supply_chain` — because "the index is free"
+#      is only true while they are empty.
+WP 3.3 — the BEFORE run, before the dedup
