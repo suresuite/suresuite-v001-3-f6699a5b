@@ -19,7 +19,7 @@
 import { describe, expect, it } from "vitest";
 import { UNIT_DAYS } from "../../../../supabase/functions/_shared/grading";
 import CONTRACT from "../../../../build/data-contract.generated.json";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   INGEST_DATASETS,
@@ -37,12 +37,30 @@ const WIZARD = read("src", "components", "UploadWizard.tsx");
 const FUNCTION = read("supabase", "functions", "ingest-file", "index.ts");
 
 describe("the promotable-target list exists twice and must agree", () => {
+  /**
+   * The LAST definition wins, and reading only the first is how this test would
+   * quietly stop meaning anything. `ingest_target_is_promotable` is
+   * `CREATE OR REPLACE`d — WP 3.2 wrote it in `20260916000015` and WP 3.3
+   * replaced it in `20260916000020` to add the three item masters. What
+   * production has is the one the LATEST migration installs, so that is what the
+   * parity is checked against; a test pinned to the first file would have gone on
+   * comparing a list nothing executes.
+   */
+  const promotableInSql = () => {
+    const dir = join(ROOT, "supabase", "migrations");
+    const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+    let body: string | null = null;
+    for (const f of files) {
+      const src = readFileSync(join(dir, f), "utf8");
+      const at = src.indexOf("CREATE OR REPLACE FUNCTION public.ingest_target_is_promotable");
+      if (at > -1) body = src.slice(at, src.indexOf("$$;", at));
+    }
+    expect(body, "no migration defines ingest_target_is_promotable").toBeTruthy();
+    return [...body!.matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]).sort();
+  };
+
   it("names the same tables in SQL as the contract generates", () => {
-    const from = LANDING_SQL.indexOf("CREATE OR REPLACE FUNCTION public.ingest_target_is_promotable");
-    expect(from).toBeGreaterThan(-1);
-    const body = LANDING_SQL.slice(from, LANDING_SQL.indexOf("$$;", from));
-    const inSql = [...body.matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]).sort();
-    expect(inSql).toEqual([...PROMOTABLE_TARGETS].sort());
+    expect(promotableInSql()).toEqual([...PROMOTABLE_TARGETS].sort());
   });
 
   it("names a target for every dataset and nothing else", () => {
@@ -50,15 +68,42 @@ describe("the promotable-target list exists twice and must agree", () => {
       .toEqual([...PROMOTABLE_TARGETS].sort());
   });
 
-  it("covers the six datasets this package moved server-side", () => {
+  it("covers every CSV dataset the contract describes — nine since WP 3.3", () => {
+    // Six from WP 3.2, plus the three item masters (D55). They were left out
+    // deliberately then: `bulk_upsert_*` already upserted on their composite
+    // primary key, and a landing whose promotion was an INSERT would have been a
+    // regression. The promotion upserts now, so the landing is strictly better
+    // and they joined it.
     expect(PROMOTABLE_TARGETS).toEqual([
       "bom_multi_level",
       "bom_single_level",
       "inbound_logistics",
+      "materials",
       "outbound_logistics",
+      "products",
+      "suppliers",
       "tier2_suppliers",
       "tier3_suppliers",
     ]);
+  });
+
+  it("no CSV dataset writes tier 2 from the browser any more (no-tier-skip, I2)", () => {
+    // The item-master branch called bulk_upsert_* directly. A claim about ABSENCE
+    // needs a test or it decays the first time somebody adds a convenience —
+    // the same reason this suite already pins the deletion of the client parse.
+    const code = WIZARD.split("\n").filter((l) => !l.trim().startsWith("*") && !l.trim().startsWith("//"));
+    expect(code.join("\n")).not.toMatch(/bulk_upsert_(materials|products|suppliers)/);
+  });
+
+  it("an item master declares project_id alone as server-set, never plant_name", () => {
+    // These tables have no `plant_name` — an item master is a property of the
+    // project. `ingest_apply_run` derives the server-set columns per target for
+    // exactly this reason; assuming both would need a second code path.
+    for (const target of ["materials", "products", "suppliers"]) {
+      const d = Object.values(INGEST_DATASETS).find((x) => x.target === target)!;
+      expect(d, `${target} is not a described dataset`).toBeTruthy();
+      expect(d.serverSet).toEqual(["project_id"]);
+    }
   });
 });
 

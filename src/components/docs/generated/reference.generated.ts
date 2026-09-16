@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 424;
+export const REFERENCE_COLUMN_COUNT = 430;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -3794,6 +3794,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
       }
     ]
   },
@@ -5387,6 +5425,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
       }
     ]
   },
@@ -6784,6 +6860,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the external system last confirmed this row.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
         "primaryKey": false,
         "unique": false,
         "references": null,

@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 316,
-      "migrations_applied": 313,
-      "last_migration": "20260916000019_promotion_upsert.sql"
+      "migrations_found": 317,
+      "migrations_applied": 314,
+      "last_migration": "20260916000020_item_masters_land.sql"
     },
     "sidecars": 37,
     "registry": {
@@ -18,7 +18,7 @@
   "counts": {
     "tables_in_schema": 79,
     "tables_covered": 37,
-    "columns_covered": 424,
+    "columns_covered": 430,
     "check_constraints": 19,
     "engine_requirements": 7,
     "orphans": 0,
@@ -7666,7 +7666,13 @@
         }
       ],
       "natural_key_intended": null,
-      "ingest_dataset": null,
+      "ingest_dataset": {
+        "wizard_id": "item_master_materials",
+        "fact_class": "master",
+        "server_set": [
+          "project_id"
+        ]
+      },
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -7694,6 +7700,15 @@
           ],
           "definition": "PRIMARY KEY (project_id, material_id)",
           "added_by": "20260614000001_item_master.sql"
+        },
+        {
+          "name": "materials_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "indexes": [],
@@ -7759,7 +7774,11 @@
           "ingest": {
             "csv_header": "material_id",
             "required": true,
-            "validate": "non-empty; unique within the project"
+            "validate": "non-empty; unique within the project",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -7797,7 +7816,11 @@
           "ingest": {
             "csv_header": "name",
             "required": false,
-            "validate": null
+            "validate": null,
+            "rule": {
+              "kind": "text",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -7846,7 +7869,12 @@
           "ingest": {
             "csv_header": "cost",
             "required": false,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -7900,7 +7928,13 @@
           "ingest": {
             "csv_header": "holding_cost_pct",
             "required": false,
-            "validate": "numeric in [0, 1]"
+            "validate": "numeric in [0, 1]",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "max": 1,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -7950,7 +7984,12 @@
           "ingest": {
             "csv_header": "moq",
             "required": false,
-            "validate": "numeric >= 0"
+            "validate": "numeric >= 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -7992,7 +8031,12 @@
           "ingest": {
             "csv_header": "initial_on_hand",
             "required": false,
-            "validate": "numeric >= 0"
+            "validate": "numeric >= 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -8043,7 +8087,16 @@
           "ingest": {
             "csv_header": "lead_time_dist",
             "required": false,
-            "validate": "one of the LeadTimeDist enum values; `empirical` is reserved for the data-import path (M7) and is not selectable yet"
+            "validate": "one of the LeadTimeDist enum values; `empirical` is reserved for the data-import path (M7) and is not selectable yet",
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "deterministic",
+                "lognormal",
+                "gamma"
+              ],
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -8094,7 +8147,12 @@
           "ingest": {
             "csv_header": "lead_time_cv",
             "required": false,
-            "validate": "numeric >= 0"
+            "validate": "numeric >= 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -8267,6 +8325,74 @@
           "surfaces": [],
           "resolution": null,
           "note": "NOT TRACED into the engine; ERP-connector provenance, as source_system.",
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000020_item_masters_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000020_item_masters_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
           "engine_requirement": null
         }
       ],
@@ -11199,7 +11325,13 @@
         }
       ],
       "natural_key_intended": null,
-      "ingest_dataset": null,
+      "ingest_dataset": {
+        "wizard_id": "item_master_products",
+        "fact_class": "master",
+        "server_set": [
+          "project_id"
+        ]
+      },
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -11227,6 +11359,15 @@
           ],
           "definition": "PRIMARY KEY (project_id, product_id)",
           "added_by": "20260614000001_item_master.sql"
+        },
+        {
+          "name": "products_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "indexes": [],
@@ -11292,7 +11433,11 @@
           "ingest": {
             "csv_header": "product_id",
             "required": true,
-            "validate": "non-empty; unique within the project"
+            "validate": "non-empty; unique within the project",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -11330,7 +11475,11 @@
           "ingest": {
             "csv_header": "name",
             "required": false,
-            "validate": null
+            "validate": null,
+            "rule": {
+              "kind": "text",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11379,7 +11528,12 @@
           "ingest": {
             "csv_header": "sell_price",
             "required": false,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11433,7 +11587,12 @@
           "ingest": {
             "csv_header": "production_capacity",
             "required": false,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11487,7 +11646,15 @@
           "ingest": {
             "csv_header": "fulfillment_mode",
             "required": false,
-            "validate": "mto or mts; ato is a reserved enum that hard-errors, eto/cto are UI labels only"
+            "validate": "mto or mts; ato is a reserved enum that hard-errors, eto/cto are UI labels only",
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "mto",
+                "mts"
+              ],
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11536,7 +11703,17 @@
           "ingest": {
             "csv_header": "demand_distribution",
             "required": false,
-            "validate": null
+            "validate": null,
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "triangular",
+                "deterministic",
+                "poisson",
+                "negbin"
+              ],
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11585,7 +11762,12 @@
           "ingest": {
             "csv_header": "demand_mean",
             "required": false,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11644,7 +11826,12 @@
           "ingest": {
             "csv_header": "demand_cv",
             "required": false,
-            "validate": "numeric >= 0"
+            "validate": "numeric >= 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11764,7 +11951,12 @@
           "ingest": {
             "csv_header": "demand_min",
             "required": false,
-            "validate": "numeric >= 0"
+            "validate": "numeric >= 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11821,7 +12013,12 @@
           "ingest": {
             "csv_header": "demand_max",
             "required": false,
-            "validate": "numeric >= 0"
+            "validate": "numeric >= 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -11932,6 +12129,74 @@
           "surfaces": [],
           "resolution": null,
           "note": "NOT TRACED into the engine; ERP-connector provenance, as source_system.",
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000020_item_masters_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000020_item_masters_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
           "engine_requirement": null
         }
       ],
@@ -14481,7 +14746,13 @@
         }
       ],
       "natural_key_intended": null,
-      "ingest_dataset": null,
+      "ingest_dataset": {
+        "wizard_id": "item_master_suppliers",
+        "fact_class": "master",
+        "server_set": [
+          "project_id"
+        ]
+      },
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -14509,6 +14780,15 @@
           ],
           "definition": "PRIMARY KEY (project_id, supplier_id)",
           "added_by": "20260614000001_item_master.sql"
+        },
+        {
+          "name": "suppliers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "indexes": [],
@@ -14574,7 +14854,11 @@
           "ingest": {
             "csv_header": "supplier_id",
             "required": true,
-            "validate": "non-empty; unique within the project"
+            "validate": "non-empty; unique within the project",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -14612,7 +14896,11 @@
           "ingest": {
             "csv_header": "name",
             "required": false,
-            "validate": null
+            "validate": null,
+            "rule": {
+              "kind": "text",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -14661,7 +14949,12 @@
           "ingest": {
             "csv_header": "capacity_per_week",
             "required": false,
-            "validate": "numeric > 0 when present"
+            "validate": "numeric > 0 when present",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -14715,7 +15008,13 @@
           "ingest": {
             "csv_header": "reliability_score",
             "required": false,
-            "validate": "numeric in (0, 1]"
+            "validate": "numeric in (0, 1]",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "max": 1,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -14888,6 +15187,74 @@
           "surfaces": [],
           "resolution": null,
           "note": "NOT TRACED into the engine; ERP-connector provenance, as source_system.",
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000020_item_masters_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000020_item_masters_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
           "engine_requirement": null
         }
       ],
@@ -18244,5 +18611,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "899cf101c943"
+  "contract_version": "ee2137fd288d"
 }

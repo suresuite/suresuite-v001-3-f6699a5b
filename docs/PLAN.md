@@ -224,7 +224,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D43 | **Two tables existed in production that no migration creates, and R4 is structurally unable to see either.** §15's schema probe found `customers` and `product_code_map`. R4 (`no-orphan-table`) catches only tables the CODE READS that no migration creates — so the moment WP 1.4 closed D3 by DELETING the dead `product_code_map` read, the table stopped being an orphan by R4's definition while remaining exactly as untracked as before; `customers` was never read at all and had been invisible since it was created. This is D4 (`risk_data`) unclosed as a CLASS. **CLOSED, both instances and the class.** `customers` is ADOPTED (§15 gave its columns and its 6 rows; its `segment` / `priority_weight` / `sla_fill_floor_pct` are the customer-echelon `P-C.x` inputs) with a natural key, RLS, the three tier-2 audit triggers and a sidecar. `product_code_map` is DROPPED — 0 rows, no writer ever existed, its one read was deleted by WP 1.4. **The class closes because §15's probe is now a GATE**: it keys on "production has it" rather than "the code reads it", prints the columns and row count of anything untracked, and exits non-zero. It went from FAILURE to SUCCESS on the run after the migration deployed — 0 missing, 0 untracked, 84 relations | §15's schema probe (runs `35059567979` → `35064364537`); `supabase/migrations/20260916000003_adopt_customers_drop_product_code_map.sql`; `scripts/data-contract/verification-sql.mjs` | WP 3.0 ✅ |
 | D44 | **WP 0.1 closed D1's write path and never cleaned what the path had already written.** §15 found **477 `policy_overrides` rows across 477 distinct targets** carrying the auto-seeded `safety_stock_days = 0`, overriding the engine's 7-day default — nothing distinguished one from a deliberate choice, so every simulation over those targets ran with zero safety stock. **CLOSED by `20260916000004_unseed_d1_zero_safety_stock.sql`, and it removes a KEY rather than a ROW.** One row carries a target's whole inventory patch, so a row-level delete would also discard the reorder point and the holding cost somebody actually chose; a row left with an empty patch overrides nothing and goes. Only exactly `0` is touched. The migration counts before and after, RAISEs if any remain, and writes its own `plane='data'` audit row naming the defect and the counts. **477 rows across 477 distinct targets is the signature of a loop, not of 477 decisions** — that, plus WP 0.1's documented mechanism, is the whole evidence for the predicate | §15 (`policy_overrides` where `family = 'inventory'` and `patch->>'safety_stock_days' = 0`); `supabase/rehearsal/020_d1_unseeded.sql` | WP 3.0 ✅ |
 | D45 | **The data-plane audit had never written a row in production.** `audit_logs` held 18 rows and every one was `plane = 'admin'`. Zero `data` rows meant the twelve tables × three triggers WP 2.3 installed had not been observed to fire even once, and `audit-actor` (G4) was claimed on the strength of a migration that landed rather than a row that appeared. `dataPlaneAudit.test.ts` reads the migration TEXT and passed throughout — a structural gate cannot tell a trigger that fires from a trigger that is merely declared. **CLOSED by `supabase/rehearsal/010_data_plane_audit_fires.sql`, which needed D31's database and could not have been written before it**: one tier-2 INSERT of three rows produces exactly ONE `plane='data'` row, at statement grain, naming the actor, with `rows_after: 3` and `tier: 2`; UPDATE and DELETE each produce exactly one; a statement matching no rows produces none. Mutation-tested by dropping a trigger. **Still open around it: D36** — six service-role paths cannot name an actor even when they do fire | `supabase/rehearsal/010_data_plane_audit_fires.sql`; `20260916000001_data_plane_audit.sql`; §15 (`select plane, count(*) from audit_logs`) | WP 3.0 ✅ |
-| D46 | **27 `time_unit` values in production are integers, and every one is silently read as weekly.** §15's unrecognized-token sweep returns `21`, `15`, `16`, `7`, `14`, `9`, `4` and twenty more — numbers, in a column whose vocabulary is `day`/`week`/`month`/`quarter`/`year`. They are almost certainly lead-time day counts that landed one column left, which is the D6 field-shift signature arriving by a different route than the quote character §15 looks for. `combine-project`'s resolver maps anything unrecognized to weekly without a finding, so a row saying `21` is computed as a weekly volume and displayed with no notice — a §5 T1 breach (a number whose source is a parse failure) and T2 (the substitution is invisible). The measured project shows none of this; it is the other six that carry it | §15's unrecognized-`time_unit` sweep; the recognized set is §15's own list, mirrored from `grading.ts::UNIT_DAYS` | WP 3.2 ✅ *(for NEW rows: `_shared/ingestValidate.ts` refuses a token `unit_days()` does not know, with a row-level finding, and lands NO value — the row never reaches tier 2 and nothing is read as weekly. The 27 rows already in tier 2 are untouched, and the REMAINING half is the reader: `combine-project`'s resolver still maps an unrecognised token to weekly without a finding, which is now the only way a bad token can be silent — WP 3.3, see §16 · WP 3.2)* |
+| D46 | **27 `time_unit` values in production are integers, and every one is silently read as weekly.** §15's unrecognized-token sweep returns `21`, `15`, `16`, `7`, `14`, `9`, `4` and twenty more — numbers, in a column whose vocabulary is `day`/`week`/`month`/`quarter`/`year`. They are almost certainly lead-time day counts that landed one column left, which is the D6 field-shift signature arriving by a different route than the quote character §15 looks for. `combine-project`'s resolver maps anything unrecognized to weekly without a finding, so a row saying `21` is computed as a weekly volume and displayed with no notice — a §5 T1 breach (a number whose source is a parse failure) and T2 (the substitution is invisible). The measured project shows none of this; it is the other six that carry it | §15's unrecognized-`time_unit` sweep; the recognized set is §15's own list, mirrored from `grading.ts::UNIT_DAYS` | WP 3.2 ✅ *(for NEW rows: `_shared/ingestValidate.ts` refuses a token `unit_days()` does not know, with a row-level finding, and lands NO value)* · **WP 3.3 ✅ for the READER** *(the decision, made rather than deferred: the row is NOT refused — blanking 88 rows in projects whose owners did not cause the defect and cannot fix it without re-uploading would destroy data to punish a parser that no longer exists — and the substitution is REPORTED. `resolveWeeklyVolume` returns the value AND the substitution; `unitSubstitutions` collapses them to one entry per token with a row count; `combine-project` pushes one warning per token. An ABSENT unit is deliberately not reported: "absent means weekly" is an EXPLICIT DEFAULT, which T1 permits — it forbids only a guess. **And the half that would have made the rest decorative**: `combine-project` has returned a `warnings` array since WP 0.2 and `DataManager` DISCARDED it, so T2's "visible at the point of display" was unreachable from the ETL alone. The page now renders them, and they do not auto-dismiss)* |
 | D47 | **`organizations`' own read policy still uses the display name AND the slug as join keys.** D29 removed the text branch from `org_is_current_user_org`, which is the predicate 59 project-scoped policies call. The `orgs: members read own` policy is a different object and was not touched: it reads `id = get_current_user_org_id(get_current_user_id()) OR name = get_current_user_org() OR slug = get_current_user_org()`. `organizations.name` has no UNIQUE constraint, so the same collision D29 closes for projects is still open for the organization ROW — two tenants sharing a display name each read the other's organization record (name, slug, status, settings). §15 measures 0 collisions across 3 organizations and 14 of 14 accounts carrying `organization_id`, so it is latent and the same two-line shape as D29 was. Not folded into WP 3.0's migration because it is a different object with a different reader, and the package had already spent its evidence budget on the predicate. Found by WP 3.0's gap check | `orgs: members read own` in `20260915000004_org_identity_dual_read.sql`; §15 (0 collisions, 3 organizations) | WP 6.2 |
 | D48 | **A migration aborted in production in 2025 and nothing has ever said so.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13: input parameters after one with a default value must also have defaults`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. Found by D31's rehearsal, whose replay of the artifact's own function list surfaced it as one of five historical definitions that do not apply. Same class as D30 and, like D30, the END STATE is probably fine — two later migrations define working overloads — but nothing has ever checked which of the three the callers reach. Found by WP 3.0's gap check | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql` (the `create_disruption_scenario_v2` definition); `scripts/data-contract/rehearsal-schema.mjs` replay output | WP 6.2 |
 | D49 | **The introspector records three indexes on columns the tables no longer have.** `idx_supply_chain_data_plant` is recorded `ON supply_chain_data (plant)`, and `20250822025432` RENAMEd `plant` to `plant_name`; Postgres renames an index's column reference with the column, so production's index is on `plant_name` and the artifact's is on a column that does not exist. `supply_chain_data_multi_tier` has two more (`material_id`, `higher_level_component_id`). The artifact is therefore wrong about three indexes, and the error is invisible to every gate that compares the artifact against the MIGRATIONS — because the migrations do say what the artifact says. Found by D31's rehearsal, which cannot apply them and skips each with a named warning. Low consequence today (an index is a performance fact, not an access one) and it is the introspector's ALTER-handling that is incomplete, which is the part worth fixing. Found by WP 3.0's gap check | `build/schema.introspected.json` `tables[].indexes`; `20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql` (the RENAME); `scripts/data-contract/rehearsal-schema.mjs` | WP 6.2 |
@@ -235,7 +235,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 
 | D53 | **Nine foreign keys have never existed in any rehearsed database, because the introspector drops the schema qualifier from `REFERENCES auth.users(id)`.** The artifact records the target as `users`, `rehearsal-schema.mjs` qualifies an unqualified name to `public.users`, no such table exists, and the key is skipped: `project_erp_links.linked_by_user_id`, `ingest_runs.triggered_by_user_id`, `ingest_runs.applied_by_user_id`, `scenarios.created_by`, `simulation_runs.created_by`, `policy_versions.created_by`, `policy_presets.owner_id`, `recovery_playbooks.created_by`, `experiments.created_by`. Production has all nine; every rehearsal has run without them, so no assertion about what happens when a user row disappears could ever have been trusted. Pre-existing and invisible until WP 3.1's follow-up made the skip WARN rather than vanish — which is how it was found, on the same run that closed D52. Same family as D49 and D52: the introspector's handling of a reference is incomplete in a way only the rehearsal can see | `introspect.mjs`'s `REFERENCES` parse (the qualifier is not kept); `rehearsal-schema.mjs` `emitConstraints`'s skip warning | WP 6.2 |
 | D54 | **The data-plane audit rule is scoped to the CONTRACT, so every DEFERRED tier-2/3/4 table is unaudited and no gate says so.** `dataPlaneAudit.test.ts` requires the three `audit_tier_write` triggers on every tier-2/3/4 table *in the contract*; a table with no sidecar is outside the contract, therefore outside the rule, therefore its writes are unattributable with nothing to notice. `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain` sat in that gap from WP 2.3 until WP 3.2 described them — and describing them is what turned the gate red, in the same session. The three are now audited (`20260916000016`). **The CLASS is open**: `contract:check` R1 counts 42 tables still deferred, and every tier-2/3/4 table among them is in exactly the same position. The coverage list decides what is audited, which nobody chose | `dataPlaneAudit.test.ts`'s "in the contract" qualifier; `coverage.yaml` | WP 4.2 *(it owns the largest remaining group of deferred tier-2/3 tables; the rule to add is "a deferral must say whether the table is audited")* |
-| D55 | **The three item-master CSVs are parsed server-side but land nothing** — `materials`, `products` and `suppliers` still go from the browser to `bulk_upsert_*` without a tier-0 record or a run, so `no-tier-skip` (I2) is PARTIAL rather than met after WP 3.2. They were left out deliberately and the reason is not laziness: `bulk_upsert_*` already UPSERTS on a natural key and validates its enums in SQL, and routing them through a landing whose promotion is an INSERT would have been a regression dressed as progress. WP 3.3 makes promotion an upsert, which is the moment this becomes cheap | `UploadWizard.tsx:1101`, the `item-master` branch; `ingestSpec.generated.ts` has no entry for them | WP 3.3 |
+| D55 | **The three item-master CSVs are parsed server-side but land nothing** — `materials`, `products` and `suppliers` still go from the browser to `bulk_upsert_*` without a tier-0 record or a run, so `no-tier-skip` (I2) is PARTIAL rather than met after WP 3.2. They were left out deliberately and the reason is not laziness: `bulk_upsert_*` already UPSERTS on a natural key and validates its enums in SQL, and routing them through a landing whose promotion is an INSERT would have been a regression dressed as progress. WP 3.3 makes promotion an upsert, which is the moment this becomes cheap | the `item-master` branch of `UploadWizard.tsx` (deleted by WP 3.3); `ingestSpec.generated.ts` now carries all three | WP 3.3 ✅ *(`20260916000020` — the three sidecars declare `ingest_dataset`, the branch that called `bulk_upsert_*` is DELETED not flagged off, and `ingestSpecParity.test.ts` fails if it returns. It cost MORE than the handoff said: the sidecars carried a `csv_header` on every item-master column and an `ingest.rule` on none, so 22 rules had to be authored from each field's own `validate` sentence and from `ITEM_MASTER_ENUMS`, which already mirrors the write-RPCs' CHECKs. The GENERALITY held, which is the claim worth testing: an item master's key is a composite PRIMARY KEY rather than an index this package made, and it has no `plant_name`, and `ingest_apply_run` promotes into it through the same statement a lane uses because it reads the key from the catalog and derives the server-set columns from the target's shape — `supabase/rehearsal/090`. So `no-tier-skip` (I2) is met for every CSV the contract describes; what remains outside is D56's group)* |
 | D56 | **The node list and the two deep-tier network CSVs land nothing either**, for a different reason: `node_list`, `network_nodes` and `network_edges` have no sidecar — they are deferred to WP 4.2 because D19 says they are a smear that package moves into `analysis_results` — so there is no contract to validate them against and no decision yet about what tier they are. They ARE parsed server-side (the client-side parse is gone for them too), and their bulk RPCs are untouched. `deep_tier_json` is not a CSV at all and is unchanged | `UploadWizard.tsx:1094,1114`; `coverage.yaml` WP 4.2 group | WP 4.2 |
 | D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — 40+ TS2322 errors under `tsc --noEmit`. Nothing catches it: `npm run build` is Vite, which does not typecheck, and `contract:generate -- --check` compares text rather than types. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | WP 5.2 |
 | D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number — and the number, measured 2026-09-16 (§15 run `35144057908`), is **0 rows across 0 projects**. It is not a table whose data nobody reads; it is a table with no data, no reader and no writer | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note; §15's every-project sweep | WP 6.2 |
@@ -6100,6 +6100,110 @@ reads all three migrations and fails when any drifts, the same arrangement
 inventing a third mechanism (blueprint §0). Mutation-tested: a `rate` declared a
 `duration`, an index missing `NULLS NOT DISTINCT`, and a dedup key that lost
 `level` each turned it red.
+---
+
+#### G · D55 — the item masters join the landing, and the handoff undercounted
+
+WP 3.2 said this would cost "an `ingest_dataset` block in three sidecars and
+nothing else". It cost that plus three things the handoff could not have known,
+and the difference is worth recording because each one is a gate doing its job:
+
+  - **The sidecars had `csv_header` on every item-master column and `ingest.rule`
+    on none.** `generate.mjs` refuses that by design — "a column the parser reads
+    with no rule it can execute is the prose-only validation WP 3.2 exists to
+    end" — so twenty-two rules had to be authored. They are not invented: the
+    numeric bounds come from each field's own `validate` sentence, and the three
+    enum vocabularies are `itemMasterCandidates.ts`'s `ITEM_MASTER_ENUMS`, which
+    already mirrors the write-RPCs' CHECKs verbatim. The prose had been the only
+    version; now something can run it.
+  - **The provenance columns**, as on the six.
+  - **`ingest_target_is_promotable` gained three names**, and
+    `ingestSpecParity.test.ts` had to learn that a `CREATE OR REPLACE`d function
+    has more than one definition — see below.
+
+**And the generality held, which is the claim actually worth testing.** An item
+master is shaped unlike a lane in two ways that would each have forced a second
+code path: its natural key is a composite PRIMARY KEY rather than an index this
+package created, and it has **no `plant_name`** — an item master is a property of
+the project. `ingest_apply_run` reads the key from the catalog and derives the
+server-set columns from the target's own shape, so both work without a branch.
+`090`'s last section promotes into `materials` and asserts exactly that: the key
+resolves to `(project_id, material_id)` without being told, two rows land through
+tier 0 and tier 1, and re-uploading updates rather than duplicates.
+
+**So `no-tier-skip` (I2) is met for every CSV dataset the contract describes.**
+Nine datasets now reach tier 2 only through `ingest_apply_run`. What remains
+outside is D56's group — the node list and the two deep-tier network tables,
+which have no sidecar because WP 4.2 owns the decision about what tier they are —
+and `deep_tier_json`, which is not a CSV. The item-master branch in
+`UploadWizard` is DELETED rather than flagged off, and
+`ingestSpecParity.test.ts` fails if `bulk_upsert_materials|products|suppliers`
+returns to that component: a claim about absence needs a test or it decays the
+first time somebody adds a convenience. The RPCs themselves are untouched.
+
+**A near-miss that shipped nine duplicate triggers for about four minutes.** This
+migration first recreated the three tables' `audit_tier_write` triggers, on the
+reasoning that a table joining the promotion path needs them. It does — and
+`20260916000001` created them for all three in WP 2.3, so the recreation meant
+every item-master write audited TWICE. `dataPlaneAudit.test.ts` caught it by
+counting: 57 statement triggers where the contract implies 48. It is recorded
+rather than quietly deleted because of what caught it — that test counts against
+the CONTRACT's tier-2/3/4 tables, which is the same scoping D54 says is too
+narrow to catch a DEFERRED table's MISSING triggers. Here the narrow scope worked
+in the other direction, and it is the only reason a doubled audit row did not
+ship.
+
+**And one gate that was about to stop meaning anything.**
+`ingestSpecParity.test.ts` read `ingest_target_is_promotable` out of
+`20260916000015` — the file that first defined it. The function is
+`CREATE OR REPLACE`d, so after `20260916000020` the definition production runs is
+in a different file, and the test would have gone on comparing a list nothing
+executes while reporting green. It now scans every migration in filename order
+and takes the LAST definition, which is what a deploy installs.
+
+---
+
+#### H · D46's reader half — the decision, made rather than deferred
+
+The writer closed in WP 3.2: an unrecognised `time_unit` is refused at ingestion
+and lands no value. The reader did not. `combine-project`'s resolver mapped every
+unrecognised token to weekly with no finding anywhere, and §15 counts **27 such
+tokens already in tier 2** — `21`, `15`, `16`, `7`, `14`, `9`, `4` and twenty
+more, across six projects — each almost certainly a lead time in days that landed
+one column left. A number whose source is a parse failure, displayed as data:
+§5 T1 has no fourth option, and T2 says the substitution must be visible.
+
+**The decision: compute, and say so. Not refuse, and not assume.**
+
+Refusing would blank rows in projects whose owners did not cause the defect and
+cannot fix it without re-uploading — destroying data to punish a parser that no
+longer exists. Assuming is what T1 forbids. So `resolveWeeklyVolume` returns the
+value AND the substitution that produced it, `unitSubstitutions` collapses them
+to one entry per token with a row count ("19 rows say `21`" is actionable; 19
+identical messages are not), and `combine-project` pushes one warning per token
+naming the token, the count, and what it was read as. The population is closed
+and shrinking — nothing has been able to add to it since WP 3.2 — so this reports
+a set that can only get smaller.
+
+**An ABSENT unit is deliberately NOT reported, and that is the line T1 draws.**
+"Absent means weekly" is an explicit default, written into `20260915000001`, the
+sidecar and `project_map.py`. T1 permits data, a named substitution rule, or an
+explicit default; it forbids the fourth thing, which is a guess. §15 counts 16
+rows with a null `time_unit` and they are not a defect — warning about them would
+bury the 88 rows that are.
+
+**AND THE HALF THAT WOULD HAVE MADE THE REST DECORATIVE.** `combine-project` has
+returned a `warnings` array since WP 0.2, and `DataManager` **discarded it**. The
+degradations rode all the way back from the server and stopped one call short of
+the only person who could act on them — so "the substitution is always visible at
+the point of display" was not met by anything the ETL could have done alone.
+`DataManager` now renders each warning, and they do not auto-dismiss: a four-second
+toast behind a success message is not visibility. `loudFailure.test.ts` pins both
+ends — that the ETL reports the token and does NOT report an absent unit, and that
+the page reads `warnings` and shows them with `duration: Infinity`.
+
+`weeklyVolume` keeps its signature, so the arithmetic-only call sites are
+untouched and the resolver is strictly additive.
 
 ---
 ---

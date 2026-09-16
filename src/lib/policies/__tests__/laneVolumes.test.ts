@@ -13,6 +13,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  resolveWeeklyVolume,
+  unitSubstitutions,
   volumeShare,
   weeklyVolume,
   weeklyVolumeTotalsBy,
@@ -114,5 +116,86 @@ describe("D2 — volumeShare keeps the ETL's single-claimant convention", () => 
     // callers convert BEFORE dividing, which is the whole of D2.
     expect(volumeShare(weeklyVolume(arcs[1]), weeklyVolumeTotalsBy(arcs, () => "k").get("k")!))
       .toBeCloseTo(0.5, 12);
+  });
+});
+
+/**
+ * D46's READER HALF (WP 3.3) — an unrecognized `time_unit` is still read as
+ * weekly, and is no longer read SILENTLY.
+ *
+ * The writer closed in WP 3.2: `ingestValidate` refuses a token `unitDays()`
+ * does not know and lands no value. But §15 found 27 such tokens already in tier
+ * 2 — `21`, `15`, `16`, `7`, `14`, `9`, `4` and twenty more, 88 rows across six
+ * projects — and this resolver mapped every one of them to weekly with no
+ * finding anywhere. A number whose source is a parse failure, displayed as data:
+ * §5 T1 has no fourth option, and T2 says the substitution must be visible at
+ * the point of display.
+ *
+ * THE DECISION, and it is a decision rather than a deferral. The row is NOT
+ * refused — blanking 88 rows of projects whose owners did not cause the defect
+ * and cannot fix it without re-uploading would destroy data to punish a parser
+ * that no longer exists — and the substitution is REPORTED, per token, with the
+ * number of rows relying on it.
+ */
+describe("D46 — an unrecognized time_unit is reported, not assumed", () => {
+  it("still computes, on the documented 7-day basis", () => {
+    // Unchanged behaviour. The number a user already sees does not move; what
+    // changes is that they are now told what it rests on.
+    expect(resolveWeeklyVolume({ volume: 10, time_unit: "21" }).weekly).toBe(10);
+  });
+
+  it("names the token and what it was read as", () => {
+    const { substitution } = resolveWeeklyVolume({ volume: 10, time_unit: "21" });
+    expect(substitution).toEqual({ token: "21", assumed: "week", reason: "unrecognized_time_unit" });
+  });
+
+  it("reports every token §15 actually found in production", () => {
+    // The real ones, from §15 run 35146894995. Each is almost certainly a lead
+    // time in days that landed one column left — the D6 field-shift signature
+    // arriving by a route the quote-character sweep does not see.
+    for (const token of ["21", "15", "16", "7", "14", "9", "4"]) {
+      expect(resolveWeeklyVolume({ volume: 1, time_unit: token }).substitution?.token).toBe(token);
+    }
+  });
+
+  it("does NOT report an ABSENT unit — that is an explicit default, not a guess", () => {
+    // "Absent means weekly" is written into 20260915000001, the sidecar and
+    // project_map.py. T1 permits an explicit default; it forbids a guess. §15
+    // counts 16 rows with a null time_unit and they are not a defect.
+    for (const row of [{ volume: 5 }, { volume: 5, time_unit: null }, { volume: 5, time_unit: "  " }]) {
+      expect(resolveWeeklyVolume(row).substitution).toBeNull();
+    }
+  });
+
+  it("does not report a unit the one unit table knows, in any of its spellings", () => {
+    for (const token of Object.keys(UNIT_DAYS)) {
+      expect(resolveWeeklyVolume({ volume: 1, time_unit: token }).substitution).toBeNull();
+    }
+    // including the spellings a user actually types
+    for (const token of [" Week ", "WEEKS", "Monthly"]) {
+      expect(resolveWeeklyVolume({ volume: 1, time_unit: token }).substitution).toBeNull();
+    }
+  });
+
+  it("collapses to one entry per token with a row count", () => {
+    // 19 identical messages are not a finding a person can act on; "19 rows say
+    // 21" is. Ordered by row count so the worst is first.
+    const rows = [
+      ...Array(3).fill({ volume: 1, time_unit: "21" }),
+      { volume: 1, time_unit: "15" },
+      { volume: 1, time_unit: "week" },
+      { volume: 1 },
+    ];
+    expect(unitSubstitutions(rows)).toEqual([
+      { token: "21", assumed: "week", reason: "unrecognized_time_unit", rows: 3 },
+      { token: "15", assumed: "week", reason: "unrecognized_time_unit", rows: 1 },
+    ]);
+  });
+
+  it("weeklyVolume is unchanged for every caller that does not want the finding", () => {
+    // The arithmetic call sites keep their signature; the resolver is additive.
+    for (const row of [{ volume: 10, time_unit: "month" }, { volume: 10, time_unit: "21" }, { volume: 10 }]) {
+      expect(weeklyVolume(row)).toBe(resolveWeeklyVolume(row).weekly);
+    }
   });
 });

@@ -22,6 +22,7 @@
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | PRIMARY KEY | `PRIMARY KEY (project_id, material_id)` |
+| `materials_source_row_fk` | FOREIGN KEY | `FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED` |
 
 ## Governance
 
@@ -65,6 +66,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `source_system` | — | `text` | — | — | Which external system this row came from, when it was synced rather than uploaded. NULL for a hand-uploaded or hand-edited row. |
 | `source_external_id` | — | `text` | — | — | This row's identifier in the external system, so a re-sync can match it. |
 | `source_synced_at` | — | `timestamp with time zone` | — | — | When the external system last confirmed this row. |
+| `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted. |
+| `source_row_id` | — | `uuid` | — | — | The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run. |
 
 ## Each column in full
 
@@ -417,8 +420,37 @@ When the external system last confirmed this row.
 
 > NOT TRACED into the engine; ERP-connector provenance, as source_system.
 
+### `ingest_run_id`
+
+The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260916000020_item_masters_land.sql` |
+| References | `ingest_runs(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `source_row_id`
+
+The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260916000020_item_masters_land.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ---
 
-*Generated from data contract `899cf101c943`, engine `0.2.3`,
+*Generated from data contract `ee2137fd288d`, engine `0.2.3`,
 sidecar `supabase/contract/materials.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

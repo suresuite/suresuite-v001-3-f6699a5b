@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 316,
-  "migrations_applied": 313,
+  "migrations_found": 317,
+  "migrations_applied": 314,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000019_promotion_upsert.sql",
+  "last_migration": "20260916000020_item_masters_land.sql",
   "counts": {
     "tables": 79,
     "views": 7,
@@ -8241,6 +8241,36 @@
           "unique": false,
           "references": null,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000020_item_masters_land.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "constraints": [
@@ -8253,6 +8283,15 @@
           ],
           "definition": "PRIMARY KEY (project_id, material_id)",
           "added_by": "20260614000001_item_master.sql"
+        },
+        {
+          "name": "materials_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "indexes": [],
@@ -12071,6 +12110,36 @@
           "unique": false,
           "references": null,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000020_item_masters_land.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "constraints": [
@@ -12083,6 +12152,15 @@
           ],
           "definition": "PRIMARY KEY (project_id, product_id)",
           "added_by": "20260614000001_item_master.sql"
+        },
+        {
+          "name": "products_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "indexes": [],
@@ -17222,6 +17300,36 @@
           "unique": false,
           "references": null,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000020_item_masters_land.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "constraints": [
@@ -17234,6 +17342,15 @@
           ],
           "definition": "PRIMARY KEY (project_id, supplier_id)",
           "added_by": "20260614000001_item_master.sql"
+        },
+        {
+          "name": "suppliers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000020_item_masters_land.sql"
         }
       ],
       "indexes": [],
@@ -21409,7 +21526,7 @@
       "returns": "boolean LANGUAGE sql IMMUTABLE SET search_path",
       "security_definer": false,
       "volatility": "IMMUTABLE",
-      "defined_by": "20260916000015_ingest_landing.sql"
+      "defined_by": "20260916000020_item_masters_land.sql"
     },
     {
       "name": "ingest_target_natural_key",

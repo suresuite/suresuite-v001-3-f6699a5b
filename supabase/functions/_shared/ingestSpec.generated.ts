@@ -285,6 +285,125 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
       }
     ]
   },
+  "item_master_materials": {
+    "dataset": "item_master_materials",
+    "target": "materials",
+    "tier": "2",
+    "factClass": "master",
+    "serverSet": [
+      "project_id"
+    ],
+    "columns": [
+      {
+        "column": "material_id",
+        "csvHeader": "material_id",
+        "required": true,
+        "type": "text",
+        "nullable": false,
+        "rule": {
+          "kind": "text",
+          "blank": "reject"
+        },
+        "validate": "non-empty; unique within the project"
+      },
+      {
+        "column": "name",
+        "csvHeader": "name",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "text",
+          "blank": "null"
+        },
+        "validate": null
+      },
+      {
+        "column": "cost",
+        "csvHeader": "cost",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "exclusive_min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric > 0"
+      },
+      {
+        "column": "holding_cost_pct",
+        "csvHeader": "holding_cost_pct",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "max": 1,
+          "blank": "null"
+        },
+        "validate": "numeric in [0, 1]"
+      },
+      {
+        "column": "moq",
+        "csvHeader": "moq",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0"
+      },
+      {
+        "column": "initial_on_hand",
+        "csvHeader": "initial_on_hand",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0"
+      },
+      {
+        "column": "lead_time_dist",
+        "csvHeader": "lead_time_dist",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "deterministic",
+            "lognormal",
+            "gamma"
+          ],
+          "blank": "null"
+        },
+        "validate": "one of the LeadTimeDist enum values; `empirical` is reserved for the data-import path (M7) and is not selectable yet"
+      },
+      {
+        "column": "lead_time_cv",
+        "csvHeader": "lead_time_cv",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0"
+      }
+    ],
+    "normalize": []
+  },
   "outbound_logistics": {
     "dataset": "outbound_logistics",
     "target": "outbound_logistics",
@@ -379,6 +498,217 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
         "canonical": "week"
       }
     ]
+  },
+  "item_master_products": {
+    "dataset": "item_master_products",
+    "target": "products",
+    "tier": "2",
+    "factClass": "master",
+    "serverSet": [
+      "project_id"
+    ],
+    "columns": [
+      {
+        "column": "product_id",
+        "csvHeader": "product_id",
+        "required": true,
+        "type": "text",
+        "nullable": false,
+        "rule": {
+          "kind": "text",
+          "blank": "reject"
+        },
+        "validate": "non-empty; unique within the project"
+      },
+      {
+        "column": "name",
+        "csvHeader": "name",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "text",
+          "blank": "null"
+        },
+        "validate": null
+      },
+      {
+        "column": "sell_price",
+        "csvHeader": "sell_price",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "exclusive_min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric > 0"
+      },
+      {
+        "column": "production_capacity",
+        "csvHeader": "production_capacity",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "exclusive_min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric > 0"
+      },
+      {
+        "column": "fulfillment_mode",
+        "csvHeader": "fulfillment_mode",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "mto",
+            "mts"
+          ],
+          "blank": "null"
+        },
+        "validate": "mto or mts; ato is a reserved enum that hard-errors, eto/cto are UI labels only"
+      },
+      {
+        "column": "demand_distribution",
+        "csvHeader": "demand_distribution",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "triangular",
+            "deterministic",
+            "poisson",
+            "negbin"
+          ],
+          "blank": "null"
+        },
+        "validate": null
+      },
+      {
+        "column": "demand_mean",
+        "csvHeader": "demand_mean",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "exclusive_min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric > 0"
+      },
+      {
+        "column": "demand_cv",
+        "csvHeader": "demand_cv",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0"
+      },
+      {
+        "column": "demand_min",
+        "csvHeader": "demand_min",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0"
+      },
+      {
+        "column": "demand_max",
+        "csvHeader": "demand_max",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0"
+      }
+    ],
+    "normalize": []
+  },
+  "item_master_suppliers": {
+    "dataset": "item_master_suppliers",
+    "target": "suppliers",
+    "tier": "2",
+    "factClass": "master",
+    "serverSet": [
+      "project_id"
+    ],
+    "columns": [
+      {
+        "column": "supplier_id",
+        "csvHeader": "supplier_id",
+        "required": true,
+        "type": "text",
+        "nullable": false,
+        "rule": {
+          "kind": "text",
+          "blank": "reject"
+        },
+        "validate": "non-empty; unique within the project"
+      },
+      {
+        "column": "name",
+        "csvHeader": "name",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "text",
+          "blank": "null"
+        },
+        "validate": null
+      },
+      {
+        "column": "capacity_per_week",
+        "csvHeader": "capacity_per_week",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "exclusive_min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric > 0 when present"
+      },
+      {
+        "column": "reliability_score",
+        "csvHeader": "reliability_score",
+        "required": false,
+        "type": "numeric",
+        "nullable": false,
+        "rule": {
+          "kind": "numeric",
+          "exclusive_min": 0,
+          "max": 1,
+          "blank": "null"
+        },
+        "validate": "numeric in (0, 1]"
+      }
+    ],
+    "normalize": []
   },
   "tier2_suppliers": {
     "dataset": "tier2_suppliers",
@@ -624,7 +954,10 @@ export const PROMOTABLE_TARGETS: string[] = [
   "bom_multi_level",
   "bom_single_level",
   "inbound_logistics",
+  "materials",
   "outbound_logistics",
+  "products",
+  "suppliers",
   "tier2_suppliers",
   "tier3_suppliers"
 ];

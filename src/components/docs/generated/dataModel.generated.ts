@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "899cf101c943";
+export const CONTRACT_VERSION = "ee2137fd288d";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260916000019_promotion_upsert.sql";
+export const LAST_MIGRATION = "20260916000020_item_masters_land.sql";
 
 export const COUNTS = {
   "tablesInSchema": 79,
   "tablesDescribed": 37,
-  "columnsDescribed": 424,
+  "columnsDescribed": 430,
   "tablesUndescribed": 42
 } as const;
 
@@ -117,7 +117,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "materials",
         "grain": "One material in one project: the economics the simulation reads for it. The precision path — the CSV lanes carry prices too, and where this row is silent the engine derives the value from them rather than treating it as missing.",
-        "columns": 14,
+        "columns": 16,
         "owner": "data-ingestion"
       },
       {
@@ -135,13 +135,13 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "products",
         "grain": "One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs.",
-        "columns": 16,
+        "columns": 18,
         "owner": "data-ingestion"
       },
       {
         "table": "suppliers",
         "grain": "One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials.",
-        "columns": 10,
+        "columns": 12,
         "owner": "data-ingestion"
       },
       {

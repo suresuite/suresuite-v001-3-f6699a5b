@@ -277,3 +277,98 @@ BEGIN
 
   RAISE NOTICE 'WP 3.3: the promotion upserts on the natural key, normalizes units inside the statement, stamps run + source line, and the same file twice is a no-op';
 END $wp33up$;
+
+-- WP 3.3 · D55 — AN ITEM MASTER PROMOTES THROUGH THE SAME STATEMENT.
+--
+-- The claim §10 makes about D55 is that once the promotion upserts, the three
+-- item masters cost "an `ingest_dataset` block in three sidecars and nothing
+-- else". That is a claim about GENERALITY, and the only way to test it is to
+-- promote into a table shaped unlike a lane:
+--
+--   · its natural key is a composite PRIMARY KEY, not the index `20260916000018`
+--     created — so `ingest_target_natural_key` has to find a key it did not make;
+--   · it has NO `plant_name` — so a promotion that hard-coded the server-set
+--     columns, as WP 3.2's did, cannot write to it at all.
+--
+-- If either needed a second code path, this section is where that shows.
+
+DO $wp33im$
+DECLARE
+  v_user    uuid := '00000000-0000-4000-8000-000000033300';
+  v_project uuid := '00000000-0000-4000-8000-000000033301';
+  v_landed  jsonb;
+  v_applied jsonb;
+  v_run     uuid;
+  v_n       integer;
+  v_num     numeric;
+BEGIN
+  INSERT INTO auth.users (id, email) VALUES (v_user, 'wp33im@example.invalid');
+  INSERT INTO public.approved_users (id, email, name, password_hash)
+    VALUES (v_user, 'wp33im@example.invalid', 'WP33 item master', 'x');
+  INSERT INTO public.projects (id, name, modeler_id, plant_name)
+    VALUES (v_project, 'WP33 item master', v_user, 'WP33M');
+
+  -- The key is the composite PRIMARY KEY, found without being told.
+  IF public.ingest_target_natural_key('materials')
+     IS DISTINCT FROM ARRAY['project_id','material_id'] THEN
+    RAISE EXCEPTION 'WP 3.3: materials resolved to natural key %, expected the composite PRIMARY KEY',
+      public.ingest_target_natural_key('materials');
+  END IF;
+
+  v_landed := public.ingest_land_file(
+    v_project, v_user, 'csv', 'master', 'materials',
+    'materials.csv', 'ingest', 'p/wp33m/1.csv', 'text/csv', 256,
+    repeat('c', 64),
+    jsonb_build_array(
+      jsonb_build_object('source_row_number', 2, 'raw', '{}'::jsonb,
+        'parsed', jsonb_build_object('material_id','MAT-1','name','Widget','cost', 5),
+        'findings', '[]'::jsonb),
+      jsonb_build_object('source_row_number', 3, 'raw', '{}'::jsonb,
+        'parsed', jsonb_build_object('material_id','MAT-2','name','Gasket','cost', 2),
+        'findings', '[]'::jsonb)));
+  v_run := (v_landed ->> 'run_id')::uuid;
+
+  v_applied := public.ingest_apply_run(v_run, v_user);
+  IF (v_applied ->> 'rows_promoted')::int <> 2 THEN
+    RAISE EXCEPTION 'WP 3.3: an item master promoted % row(s), expected 2 — a table with no plant_name must go through the SAME statement a lane does',
+      v_applied ->> 'rows_promoted';
+  END IF;
+
+  SELECT count(*) INTO v_n FROM public.materials
+   WHERE project_id = v_project AND ingest_run_id = v_run AND source_row_id IS NOT NULL;
+  IF v_n <> 2 THEN
+    RAISE EXCEPTION 'WP 3.3: % item-master row(s) carry their provenance, expected 2', v_n;
+  END IF;
+
+  -- The same file again: an upsert on the PRIMARY KEY, not two rows.
+  v_landed := public.ingest_land_file(
+    v_project, v_user, 'csv', 'master', 'materials',
+    'materials.csv', 'ingest', 'p/wp33m/2.csv', 'text/csv', 256,
+    repeat('c', 64),
+    jsonb_build_array(
+      jsonb_build_object('source_row_number', 2, 'raw', '{}'::jsonb,
+        'parsed', jsonb_build_object('material_id','MAT-1','name','Widget','cost', 9),
+        'findings', '[]'::jsonb)));
+  v_applied := public.ingest_apply_run((v_landed ->> 'run_id')::uuid, v_user);
+
+  SELECT count(*) INTO v_n FROM public.materials WHERE project_id = v_project;
+  IF v_n <> 2 THEN
+    RAISE EXCEPTION 'WP 3.3: re-uploading an item master left % row(s), expected 2', v_n;
+  END IF;
+  SELECT cost INTO v_num FROM public.materials
+   WHERE project_id = v_project AND material_id = 'MAT-1';
+  IF v_num <> 9 THEN
+    RAISE EXCEPTION 'WP 3.3: the re-uploaded item master kept cost %, expected the new value 9', v_num;
+  END IF;
+
+  -- no-tier-skip (I2): the rows arrived through tier 0 and tier 1, and the file
+  -- manifest is there to prove it.
+  SELECT count(*) INTO v_n FROM public.ingest_files f
+    JOIN public.ingest_runs r ON r.id = f.ingest_run_id
+   WHERE r.project_id = v_project;
+  IF v_n <> 2 THEN
+    RAISE EXCEPTION 'WP 3.3: % tier-0 manifest(s) for two item-master uploads, expected 2 — the upload skipped a tier', v_n;
+  END IF;
+
+  RAISE NOTICE 'WP 3.3: an item master lands in tier 0/1 and upserts into tier 2 through the same statement a lane does (D55)';
+END $wp33im$;
