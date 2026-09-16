@@ -178,6 +178,6 @@ When the row was last modified. Server-stamped by DEFAULT only — no trigger ma
 
 ---
 
-*Generated from data contract `788187aab9e4`, engine `0.2.3`,
+*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

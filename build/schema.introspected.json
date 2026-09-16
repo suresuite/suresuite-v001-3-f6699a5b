@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 298,
-  "migrations_applied": 295,
+  "migrations_found": 299,
+  "migrations_applied": 296,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000001_data_plane_audit.sql",
+  "last_migration": "20260916000002_audit_view_grant_fix.sql",
   "counts": {
     "tables": 76,
     "views": 7,
@@ -17834,31 +17834,38 @@
   "views": {
     "admin_audit_logs": {
       "defined_by": "20260916000001_data_plane_audit.sql",
-      "materialized": false
+      "materialized": false,
+      "security_invoker": true
     },
     "admin_org_file_usage": {
       "defined_by": "20260723000001_reports_and_file_workspace.sql",
-      "materialized": false
+      "materialized": false,
+      "security_invoker": false
     },
     "sc_edges": {
       "defined_by": "20260609000001_sc_simulation_views.sql",
-      "materialized": false
+      "materialized": false,
+      "security_invoker": false
     },
     "sc_nodes": {
       "defined_by": "20260915000001_one_unit_table.sql",
-      "materialized": false
+      "materialized": false,
+      "security_invoker": false
     },
     "simulation_result_scenarios": {
       "defined_by": "20250906103742_51948a68-1b5a-41d0-aca3-7bbcf511ff88.sql",
-      "materialized": false
+      "materialized": false,
+      "security_invoker": false
     },
     "simulation_results_with_settings": {
       "defined_by": "20250906103742_51948a68-1b5a-41d0-aca3-7bbcf511ff88.sql",
-      "materialized": false
+      "materialized": false,
+      "security_invoker": false
     },
     "v_admin_user_usage": {
       "defined_by": "20260709000002_super_admin_phase1.sql",
-      "materialized": false
+      "materialized": false,
+      "security_invoker": false
     }
   },
   "enums": {

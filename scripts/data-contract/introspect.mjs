@@ -403,7 +403,40 @@ function apply(schema, stmt, migration, guarded = false) {
   m = /^CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?/i.exec(s);
   if (m) {
     const id = readQualifiedName(s, m[0].length);
-    if (id) schema.views.set(id.name, { defined_by: migration, materialized: /MATERIALIZED/i.test(s) });
+    if (id) {
+      const prior = schema.views.get(id.name);
+      schema.views.set(id.name, {
+        defined_by: migration,
+        materialized: /MATERIALIZED/i.test(s),
+        // Postgres defaults this OFF, so a view is a potential RLS bypass until an
+        // ALTER VIEW says otherwise. Recording false is the honest state, not a gap.
+        security_invoker: prior?.security_invoker ?? false,
+      });
+    }
+    return;
+  }
+  // ALTER VIEW ... SET (option = value). Recorded rather than skipped because ONE
+  // of these options decides whether the view can bypass its base tables' RLS:
+  // a Postgres view runs as its OWNER unless `security_invoker` is on, so a view
+  // that is granted to a role is a way past that role's policies. WP 2.4 found
+  // exactly that on `admin_audit_logs` (D37), which is why the contract now holds
+  // the answer instead of leaving it to be rediscovered.
+  m = /^ALTER\s+VIEW\s+(?:IF\s+EXISTS\s+)?/i.exec(s);
+  if (m) {
+    const id = readQualifiedName(s, m[0].length);
+    const view = id && schema.views.get(id.name);
+    if (view) {
+      const opts = /\bSET\s*\(([^)]*)\)/i.exec(s);
+      if (opts) {
+        for (const pair of splitTopLevel(opts[1])) {
+          const [k, v] = pair.split("=").map((x) => x.trim());
+          if (!k) continue;
+          if (/^security_invoker$/i.test(k)) view.security_invoker = !/^(false|off|0)$/i.test(v ?? "true");
+          else (view.options ??= {})[k.toLowerCase()] = v ?? null;
+        }
+      }
+      if (/\bOWNER\s+TO\b/i.test(s)) view.owner_changed_by = migration;
+    }
     return;
   }
   m = /^DROP\s+(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+EXISTS\s+)?/i.exec(s);
