@@ -397,6 +397,6 @@ Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a 
 
 ---
 
-*Generated from data contract `d37d390a1ba9`, engine `0.2.3`,
+*Generated from data contract `1a531ccb9773`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

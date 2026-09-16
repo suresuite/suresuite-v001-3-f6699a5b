@@ -239,6 +239,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D56 | **The node list and the two deep-tier network CSVs land nothing either**, for a different reason: `node_list`, `network_nodes` and `network_edges` have no sidecar — they are deferred to WP 4.2 because D19 says they are a smear that package moves into `analysis_results` — so there is no contract to validate them against and no decision yet about what tier they are. They ARE parsed server-side (the client-side parse is gone for them too), and their bulk RPCs are untouched. `deep_tier_json` is not a CSV at all and is unchanged | `UploadWizard.tsx:1094,1114`; `coverage.yaml` WP 4.2 group | WP 4.2 |
 | D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — 40+ TS2322 errors under `tsc --noEmit`. Nothing catches it: `npm run build` is Vite, which does not typecheck, and `contract:generate -- --check` compares text rather than types. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | WP 5.2 |
 | D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note | WP 6.2 |
+| D59 | **A CHECK written INLINE on a column is invisible to the artifact, so the rehearsed database does not have it and the generated page does not publish it.** `introspect.mjs` reads a column's type, its NOT NULL and its DEFAULT and drops the rest; only a NAMED, table-level `ADD CONSTRAINT … CHECK` is recorded. The artifact holds **24 CHECK constraints across 15 tables** while the migrations contain **253 `CHECK (` occurrences** — most of that gap is repetition across shadowed definitions, but `ingest_files` alone loses three real ones (`source_kind`'s vocabulary, `byte_size >= 0`, and the SHA-256 shape). Two consequences, and the second is worse: `contract:rehearse` builds a database with no such constraint, so an assertion that a bad value is REFUSED passes when it is run against the migration and fails when it is run against the artifact; and `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects a user's upload appears in no document (§5 T1). **Found by the third rehearsal mode on WP 3.2's own branch** — green fresh and green over production's shape, red against its own artifact, which is precisely the case the WP 3.1 follow-up added that mode for. Same family as D49 (a column rename not followed into indexes) and D52 (a table rename not followed into foreign keys): the introspector is incomplete about DEPENDENT objects, one kind at a time. WP 3.2 walks around it — `20260916000014` writes every CHECK as a named table-level constraint — rather than relying on it being fixed | `introspect.mjs`'s `CREATE TABLE` column parser vs `20260916000013_ingest_files_tier0.sql:36,45,49` | WP 6.2 |
 
 ### 4.1 Code map — the data layer
 
@@ -1662,7 +1663,7 @@ field → unit at each hop. Pin with parity fixtures in `grading.ts` style. **A 
 you cannot write down is a bug** — list those rather than inventing prose; the list
 feeds WP 6.2.
 
-### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D58; D16 closed in WP 0.1)*
+### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D58, D59; D16 closed in WP 0.1)*
 D17 (NULL capacity renders `0` with no dot — `liveDefault = derivedVal ?? 0`),
 D18 (`material_price` consumed nowhere; mark read-only or map it to `materials.cost`),
 the `cheapestInboundCost` (floors ≤0 to 1.0) vs `resolveField` (imputes an average)
@@ -1719,6 +1720,14 @@ been carried through every RLS rewrite since 2025-08-20, most recently
 `20260915000004`'s organization dual read, which rewrote policies governing access
 to a table nobody can reach. §15 counts its rows now; dropping it is a decision to
 take against that number, not against the absence of one.
+
+**D59 — an inline column CHECK is invisible to the artifact.** Third of the family
+after D49 and D52: the introspector is incomplete about DEPENDENT objects, one kind
+at a time, and each one has been found by something breaking rather than by
+reading. This one costs twice — the rehearsed database lacks a constraint
+production has, so a behavioural assertion can pass for the wrong reason; and the
+generated page omits a rule that rejects a user's upload. Fix it with the other
+two: they are the same parser and the same afternoon.
 
 ### WP 6.3 — Provenance vocabulary, value chain, reproducibility record
 Complete the A1 vocabulary. Ship **A2** the value-chain popover (source file → row →
@@ -4808,7 +4817,46 @@ engineering remedy on this plan.
 
 ---
 
-#### I · The gap check
+#### I · D59 — green on two rehearsal modes, red on the third, exactly as warned
+
+The WP 3.1 follow-up added `contract:rehearse -- --since HEAD` because two runs had
+proved the migration and none had proved the ARTIFACT. It earned its keep on the
+first branch after it: **this package was green fresh and green over production's
+shape, and red against its own artifact**, with
+
+```
+ERROR:  WP 3.2: ingest_staged_rows accepted fact_class "reference"
+```
+
+`introspect.mjs` does not record a CHECK written INLINE on a column. It reads the
+type, the NOT NULL and the DEFAULT and drops the rest; only a named, table-level
+`ADD CONSTRAINT … CHECK` survives. So the artifact described the new table with no
+CHECKs at all, the rehearsed database had none, and the assertion that `fact_class`
+refuses `reference` passed whenever the table came from the migration and failed
+when it came from the artifact.
+
+**It is not this package's table alone.** The artifact holds 24 CHECK constraints
+across 15 tables against 253 `CHECK (` occurrences in the migrations; `ingest_files`
+— WP 3.1's, landed one package ago — loses three real ones, including the SHA-256
+shape that exists precisely so a truncated hash cannot compare unequal to itself.
+And the cost is not only the rehearsal: `docs/data/tables/*.md` renders a table's
+CHECK list, so a constraint the artifact never saw is a rule that rejects a user's
+upload and appears in no document (§5 T1).
+
+Recorded as **D59** and given to WP 6.2 with D49 and D52, because it is the same
+defect one dependent object further along: the introspector is incomplete about
+what a DDL statement implies, one kind at a time, and all three were found by
+something breaking rather than by anyone reading the parser.
+`20260916000014` walks around it — every CHECK is a named table-level constraint,
+the way `20260916000012` walked around D49 — rather than relying on the fix.
+
+**The lesson that generalises, since two packages in a row have now paid it:** run
+the third mode before you push and do not be reassured by the first two. They build
+the tables from your migration, which is the one thing you already know is right.
+
+---
+
+#### J · The gap check
 
 **§15 re-run three times during this package, and the deltas against the
 PHASE 2→3 ASSESSMENT's numbers:**
@@ -5582,7 +5630,8 @@ rehearsal, and the deletion assertion fires under mutation.
     an object. Nothing sees it because `npm run build` is Vite and
     `contract:generate -- --check` compares text. Measured on `main` at `087f2e6`
     with and without this diff: identical, so it is not this package's.
-  - **WP 6.2 gets D58.**
+  - **WP 6.2 gets D58 and D59** — D59 found by the third rehearsal mode on this
+    branch, see I above.
   - **CLAUDE.md**: `no-tier-skip` moves from "not yet" to PARTIAL with the three
     groups that still skip named; `ingestion-contract` records that the second
     source now exists and what is still unchecked; `audit-actor` records the

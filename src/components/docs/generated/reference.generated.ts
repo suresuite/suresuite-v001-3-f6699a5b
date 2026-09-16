@@ -3173,7 +3173,24 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "ingest_staged_rows_source_kind_check",
+        "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
+      },
+      {
+        "name": "ingest_staged_rows_fact_class_check",
+        "definition": "CHECK (fact_class IN ('master', 'transactional'))"
+      },
+      {
+        "name": "ingest_staged_rows_source_row_number_check",
+        "definition": "CHECK (source_row_number > 1)"
+      },
+      {
+        "name": "ingest_staged_rows_diff_state_check",
+        "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
+      }
+    ],
     "columns": [
       {
         "name": "id",

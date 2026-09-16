@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS public.ingest_staged_rows (
   -- The run is the owner and the only route to a project, exactly as for the
   -- other three staging tables and for `ingest_files`. One fact, one place (I1).
   ingest_run_id     uuid NOT NULL REFERENCES public.ingest_runs(id) ON DELETE CASCADE,
-  source_kind       text NOT NULL CHECK (source_kind IN ('csv', 'orbit-mrp', 'api')),
-  fact_class        text NOT NULL CHECK (fact_class IN ('master', 'transactional')),
+  source_kind       text NOT NULL,
+  fact_class        text NOT NULL,
   -- The TIER 2 table these rows are destined for, by name. Not a foreign key —
   -- there is no table of tables — so the landing function checks it against the
   -- set it knows how to promote and refuses anything else.
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS public.ingest_staged_rows (
   -- is what makes "click from a cell through to the source row" (WP 3.4) a
   -- lookup rather than a reconstruction, and it is what `source_row_id` on tier 2
   -- will point at (WP 3.3).
-  source_row_number integer NOT NULL CHECK (source_row_number > 1),
+  source_row_number integer NOT NULL,
   -- The cells AS RECEIVED, keyed by the header the file carried. Untrimmed,
   -- untyped, verbatim.
   raw               jsonb NOT NULL,
@@ -61,14 +61,38 @@ CREATE TABLE IF NOT EXISTS public.ingest_staged_rows (
   -- it with MappingWarningsCard unmodified. A row carrying any `error` finding
   -- is never promoted; `warn` and `info` are promoted and shown.
   findings          jsonb NOT NULL DEFAULT '[]'::jsonb,
-  diff_state        text NOT NULL DEFAULT 'new'
-                      CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream')),
+  diff_state        text NOT NULL DEFAULT 'new',
   staged_at         timestamptz NOT NULL DEFAULT now(),
   -- Idempotence at the grain the file actually has: one run, one target, one
   -- line. Re-landing the same run is a no-op rather than a duplicate, which is
   -- `natural-key` (I4) applied one tier above the place WP 3.3 lands it.
   UNIQUE (ingest_run_id, target_table, source_row_number)
 );
+
+-- EVERY CHECK IS A NAMED, TABLE-LEVEL CONSTRAINT, and that is not a style choice.
+-- `introspect.mjs` does not record a CHECK written INLINE on a column: it reads the
+-- column's type, its NOT NULL and its DEFAULT, and drops the rest. The artifact
+-- therefore describes a table with no CHECKs, `rehearsal-schema.mjs` builds a
+-- database with no CHECKs, and `supabase/rehearsal/070` — which asserts that
+-- `fact_class` refuses 'reference' — passes on the two rehearsal modes that build
+-- from the MIGRATION and fails on the one that builds from the ARTIFACT. That is
+-- D52's shape on a different dependent object and it is recorded as D59; the fix
+-- belongs with the other introspector defects (WP 6.2), and this file walks around
+-- it the way `20260916000012` walked around D49, rather than relying on it.
+--
+-- It also matters for what gets PUBLISHED: `docs/data/tables/*.md` renders a
+-- table's CHECK constraints, and a constraint the artifact never saw is a rule
+-- that rejects a user's upload and appears in no document (§5 T1).
+ALTER TABLE public.ingest_staged_rows
+  ADD CONSTRAINT ingest_staged_rows_source_kind_check
+    CHECK (source_kind IN ('csv', 'orbit-mrp', 'api')),
+  ADD CONSTRAINT ingest_staged_rows_fact_class_check
+    CHECK (fact_class IN ('master', 'transactional')),
+  -- Line 1 is the header and can never be a staged row.
+  ADD CONSTRAINT ingest_staged_rows_source_row_number_check
+    CHECK (source_row_number > 1),
+  ADD CONSTRAINT ingest_staged_rows_diff_state_check
+    CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'));
 
 CREATE INDEX IF NOT EXISTS ingest_staged_rows_run_idx
   ON public.ingest_staged_rows (ingest_run_id, target_table, source_row_number);

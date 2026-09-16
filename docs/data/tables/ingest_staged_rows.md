@@ -22,6 +22,16 @@ TIER 1, CREATED IN PHASE 3 / WP 3.2 — the fourth staging table and the last on
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `ingest_staged_rows_source_kind_check` | `CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))` | `20260916000014_ingest_staged_rows.sql` |
+| `ingest_staged_rows_fact_class_check` | `CHECK (fact_class IN ('master', 'transactional'))` | `20260916000014_ingest_staged_rows.sql` |
+| `ingest_staged_rows_source_row_number_check` | `CHECK (source_row_number > 1)` | `20260916000014_ingest_staged_rows.sql` |
+| `ingest_staged_rows_diff_state_check` | `CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))` | `20260916000014_ingest_staged_rows.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | UNIQUE | `UNIQUE (ingest_run_id, target_table, source_row_number)` |
@@ -253,6 +263,6 @@ When the row was staged. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `d37d390a1ba9`, engine `0.2.3`,
+*Generated from data contract `1a531ccb9773`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_staged_rows.contract.yaml`, table created by `20260916000014_ingest_staged_rows.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

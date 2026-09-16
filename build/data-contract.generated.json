@@ -19,7 +19,7 @@
     "tables_in_schema": 79,
     "tables_covered": 37,
     "columns_covered": 412,
-    "check_constraints": 15,
+    "check_constraints": 19,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -6737,6 +6737,34 @@
           ],
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_source_kind_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_fact_class_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fact_class IN ('master', 'transactional'))",
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_source_row_number_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (source_row_number > 1)",
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_diff_state_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))",
           "added_by": "20260916000014_ingest_staged_rows.sql"
         }
       ],
@@ -17101,5 +17129,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "d37d390a1ba9"
+  "contract_version": "1a531ccb9773"
 }
