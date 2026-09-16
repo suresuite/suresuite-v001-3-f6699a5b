@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "19b8f6b68a11";
+export const CONTRACT_VERSION = "91c378b2e0f8";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260915000004_org_identity_dual_read.sql";
+export const LAST_MIGRATION = "20260915000005_project_membership_and_delegation.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 73,
-  "tablesDescribed": 17,
-  "columnsDescribed": 204,
-  "tablesUndescribed": 56
+  "tablesInSchema": 76,
+  "tablesDescribed": 25,
+  "columnsDescribed": 256,
+  "tablesUndescribed": 51
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -139,6 +139,24 @@ export const TIERS: GlanceTier[] = [
         "owner": "platform"
       },
       {
+        "table": "capabilities",
+        "grain": "One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that.",
+        "columns": 7,
+        "owner": "platform"
+      },
+      {
+        "table": "delegation_grants",
+        "grain": "One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends.",
+        "columns": 9,
+        "owner": "platform"
+      },
+      {
+        "table": "org_capabilities",
+        "grain": "One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default.",
+        "columns": 5,
+        "owner": "platform"
+      },
+      {
         "table": "organization_members",
         "grain": "One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.",
         "columns": 5,
@@ -151,9 +169,39 @@ export const TIERS: GlanceTier[] = [
         "owner": "platform"
       },
       {
+        "table": "project_members",
+        "grain": "One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between \"in the organization\" (sees every project) and \"not in it\" (sees none).",
+        "columns": 8,
+        "owner": "platform"
+      },
+      {
+        "table": "project_role_capabilities",
+        "grain": "What one project role may do — one row per (project_role, capability). The project layer of the four-layer resolver, shaped exactly like `role_capabilities` so all four layers read the same way.",
+        "columns": 5,
+        "owner": "platform"
+      },
+      {
         "table": "projects",
         "grain": "One modelling project: a named supply chain, owned by one modeller, belonging to one organization. It is the scope every other project-scoped table hangs off `project_id`, and it is the row almost every RLS policy in the schema reaches through to decide whether the caller may see anything at all.",
         "columns": 19,
+        "owner": "platform"
+      },
+      {
+        "table": "role_capabilities",
+        "grain": "One grant or denial, for one role and one capability. The OUTERMOST layer: what a role gets before any org, project or user says otherwise.",
+        "columns": 5,
+        "owner": "platform"
+      },
+      {
+        "table": "user_ai_permissions",
+        "grain": "One user's AI entitlements — which models they may reach, which one they get by default, and how the request is shaped. One row per user, or none.",
+        "columns": 8,
+        "owner": "platform"
+      },
+      {
+        "table": "user_capabilities",
+        "grain": "One grant or denial, for one user_id and one capability. The INNERMOST layer: an explicit per-person answer that beats every other.",
+        "columns": 5,
         "owner": "platform"
       }
     ]
@@ -174,32 +222,6 @@ export const TIERS: GlanceTier[] = [
 
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
-  {
-    "wp": "2.2",
-    "why": "Capability and delegation. `min_project_role` is already a required sidecar field pointing at `project_members.project_role`, and `project_members` does not exist yet — these tables are the vocabulary it will be built from, so they are authored with it, not before it.",
-    "tables": [
-      {
-        "table": "capabilities",
-        "columns": 7
-      },
-      {
-        "table": "org_capabilities",
-        "columns": 5
-      },
-      {
-        "table": "role_capabilities",
-        "columns": 5
-      },
-      {
-        "table": "user_ai_permissions",
-        "columns": 8
-      },
-      {
-        "table": "user_capabilities",
-        "columns": 5
-      }
-    ]
-  },
   {
     "wp": "2.3",
     "why": "The data-plane audit (D15). Audit today covers the admin plane only; `audited: false` on all thirteen covered sidecars is the honest record of that. This table changes shape when the audit reaches tier transitions.",

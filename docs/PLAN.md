@@ -213,6 +213,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D32 | **Three tables are created by migrations and do not exist in the production database** — `network_summary`, `tier2_suppliers` and `tier3_suppliers`. `20250904105527` creates `network_summary` beside `network_nodes` and `network_edges` — those two are in production and it is not — and `20250903080405` creates the tier2/tier3 pair. No migration drops any of them. `UploadWizard.tsx` WRITES the tier2/tier3 pair, so the deep-tier upload has been writing to tables that are not there. `risk_data` (D4) inverted: WP 1.4 found a table in production that no migration creates, and this is a table the migrations create that production lacks. A static replay cannot see either — the introspector faithfully reports what the files say, which is why both classes need an executed migration or §15 to surface. Found when the second `db push` of `20260915000004` aborted at statement 59: `DROP POLICY IF EXISTS` still requires the TABLE to exist, the `IF EXISTS` being about the policy. Closed by adopting it — `CREATE TABLE IF NOT EXISTS`, copied verbatim from the original, a no-op wherever the table already is, and read by nothing in `src/` or `supabase/functions/` so adoption changes no behaviour. Learning the set cost three deploys — one table per aborted statement — because the first preflight RAISEd a NOTICE and the Supabase CLI's `db push` log keeps ERROR lines and drops notices. Raising an EXCEPTION instead named all three at once. **Whether tables OUTSIDE the 25 this migration touches also diverge is unknown and is a §15 question** | `20250904105527_…sql:47-60`; `20260915000004_org_identity_dual_read.sql` §0 preflight | WP 2.1 ✅ |
 | D33 | **The capability catalog is hand-maintained in two languages.** `public.capabilities` holds the rows and `src/lib/capabilities.ts` holds the same keys as a union type, a list and a role-default map, because the client needs them without a round trip. Nothing checks that the two agree, and they have already drifted: the DB catalog has grown from 5 feature keys to ~20 across a dozen migrations, and the TS list learned of each one only when somebody remembered. A key present in the DB and absent from TS is a capability no client can ever be granted; the reverse is a permission screen offering a right that resolves to false. This is I1 — one fact authored twice — in the access layer. WP 2.2 asserts only its own two new keys agree. Generating one side from the other belongs with the contract's other generators | `supabase/migrations/20260711000002_unified_access_control.sql:36-53` (the seed); `src/lib/capabilities.ts` (`FeatureKey`, `FEATURE_CAPABILITIES`, the role-default map) | WP 2.4 |
 | D34 | **An empty AI allow-list means EVERYTHING, and no surface says so.** `user_ai_permissions.allowed_model_ids` is read as an allow-list only when non-empty: `capabilities_for_user()` sets `all_allowed` true when the array is empty OR the user has no row. That is deliberate — it preserves the behaviour every user had before the column existed — but it inverts how an allow-list reads, and nothing at the point of display states it (§5 T2). An administrator clearing the list to revoke model access grants all of it instead. Found by WP 2.2 while authoring the sidecar | `20260905000001_grant_ga_agent_capabilities.sql` (`v_all_models := … array_length(v_allowed_ids, 1) IS NULL`) | WP 2.3 |
+| D35 | **Nothing stops a merge while `main`'s own gate is red, and nothing stops a stale branch from overwriting a newer file.** `data-contract.yml` runs on push to `main` precisely so a semantic merge conflict is caught (it was added for that in the Phase 1 close). It WORKED: the run was green at `d5c29ab` (#199) and failed at `3bf44aa` (#200), `53119da` (#201) and `55249d0` (#202). Detection is not the gap — **three further merges went in while the branch's own gate was already red on `main`**, and each inherited the breakage rather than causing it. The second half is worse: #200 merged a branch whose `loudFailure.test.ts` predated `ff9aec1`, so an OLDER version of the file won the merge and reintroduced `expect(named, …)` and a `CONTRACT` constant that exist nowhere in it — a `ReferenceError`, not a failed assertion, which is why it reads as two unrelated test failures. This is the FOURTH time a merge rather than a commit has broken `main` in this plan's history (`5c7129f`, the WP 1.4 merge, the #193/#194 reconcile, and now #200). A required-status-check on `main` would close the first half; the second half is what `contract:check` on `pull_request` cannot see, because by construction neither branch is red alone. Found by WP 2.3's precondition check | `data-contract.yml` (runs on push to main, not enforced as required); `src/lib/policies/__tests__/loudFailure.test.ts:75` as merged by #200 | WP 2.4 |
 
 ### 4.1 Code map — the data layer
 
@@ -3223,6 +3224,52 @@ Handoff to next WP:
     old one. Moving them is a UI change per call site, and the old key is removed only
     when the last one has moved — the same discipline as WP 2.1's text org branch, and
     for the same reason: removing it early revokes access from everyone still asking.
+
+### WP 2.3 precondition — `main` was red on arrival · 2026-09-15
+
+Not a work package. WP 2.3's first instruction is to run `contract:check` and
+`npm test` before starting and to treat red as a finding. Both were red.
+
+**What was broken.** Two independent things, presenting as four failures:
+
+  - `loudFailure.test.ts` threw `ReferenceError: named is not defined` and
+    `CONTRACT is not defined`. Not a failed assertion — the file referenced two
+    identifiers that exist nowhere in it. #200 merged a branch whose copy of that
+    file predated `ff9aec1`, so the OLDER version won the merge and brought back an
+    `expect(named, …)` line and a whole `it(...)` block written against a version of
+    the file where those names existed. The stray assertion duplicated what the test
+    above it already asserts, so it is dropped; the sidecar assertion is genuinely
+    new and worth keeping, so it is kept with the constant it needed.
+  - `dataModel.generated.ts` was stale at 73 tables against a 76-table schema, and
+    `registry.test.ts` and `contract:generate --check` both said so. WP 5.2a (#201)
+    generated it when the schema had 73 tables; WP 2.2 (#202) added three. Neither
+    is wrong; the artifact simply had to be regenerated after both landed, and
+    nobody did. `npm run contract:generate` fixes it.
+
+**The gate worked. That is the finding.** `data-contract.yml` runs on push to `main`
+exactly so a semantic merge conflict is caught, and it did: green at `d5c29ab`
+(#199), failed at `3bf44aa` (#200), `53119da` (#201) and `55249d0` (#202). So the
+problem is not detection —
+
+  - **three merges proceeded while `main`'s own gate was already red**, each
+    inheriting the breakage rather than causing it, and
+  - **a branch whose file predated `main`'s was allowed to overwrite it**, which is
+    the half a `pull_request` gate structurally cannot catch, because by construction
+    neither branch is red alone.
+
+Recorded as **D35**, assigned to WP 2.4, which owns the gate changes. Making
+`data contract` a required status check on `main` closes the first half cheaply.
+
+**Attribution, stated plainly because I had a hand in it.** I merged WP 2.2 (#202)
+onto a `main` that was already red, and did not check `main`'s own gate before or
+after — I checked the PR's, which was green, and the post-merge `db push`, which
+succeeded. Neither would show this. #202 did not cause the breakage and it did add
+the three tables that made the generated registry stale, so part of the red is mine
+to have noticed sooner.
+
+Fixed here rather than inside WP 2.3, because a red `main` blocks everyone and
+should not wait behind a work package.
+`contract:check` green · **129 tests green** · `check:docs` green.
 
 ---
 
