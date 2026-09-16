@@ -296,6 +296,42 @@ async function d30() {
   });
 }
 
+// ── WP 3.1: the ingestion tables, after the rename ─────────────────────────
+//
+// The schema probe above already fails the run if `ingest_runs` and friends are
+// missing from production, which is the rename's structural proof. This is the
+// other half: a rename moves ROWS, and nothing in the repository can see whether
+// any arrived. It also answers a question WP 3.1 could not: how much connector
+// traffic production has ever had, which is what makes the "MRP behaviour must
+// not change" exit check worth what it costs.
+async function ingestTables() {
+  section("WP 3.1 — the ingestion tables, after the rename");
+
+  const counts = await tryQ(`
+    select (select count(*) from public.ingest_runs)::int              as runs,
+           (select count(*) from public.ingest_runs
+             where source_kind = 'orbit-mrp')::int                     as runs_connector,
+           (select count(*) from public.ingest_runs
+             where link_id is null)::int                               as runs_without_link,
+           (select count(*) from public.ingest_runs
+             where project_id is null)::int                            as runs_without_project,
+           (select count(*) from public.ingest_staged_products)::int    as staged_products,
+           (select count(*) from public.ingest_staged_bom_versions)::int as staged_bom_versions,
+           (select count(*) from public.ingest_staged_bom_lines)::int   as staged_bom_lines,
+           (select count(*) from public.ingest_files)::int              as landed_files,
+           (select count(*) from public.project_erp_links)::int         as links`);
+  report("row counts under the new names", counts, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    if (Number(r.runs_without_project) > 0) {
+      out(`- **${r.runs_without_project} run(s) carry no \`project_id\`**, which the NOT NULL should have made impossible. Read the migration before anything else.`);
+    }
+    if (Number(r.runs) === 0) {
+      out("- The connector has never run in production. The rename therefore moved an EMPTY table, and `supabase/rehearsal/050` — which runs against rows — is the only evidence that the path still works. That is the right way round, and it is why the assertion exists.");
+    }
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");
@@ -691,6 +727,7 @@ async function main() {
   await d30();
   await d29();
   await boundaryDecisions();
+  await ingestTables();
 
   const project = await pickProject();
   if (!project) {

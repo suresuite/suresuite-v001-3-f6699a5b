@@ -1766,6 +1766,16 @@ WHERE table_schema='public' AND table_name IN ('product_code_map','risk_data');
 SELECT table_name, table_type FROM information_schema.tables
 WHERE table_schema='public' ORDER BY table_name;
 
+-- WP 3.1: the rename moved rows, and nothing in the repository can see whether
+-- any arrived. The schema probe above fails the run if the new names are absent;
+-- this says what is IN them, and whether any run lost its project.
+SELECT (SELECT count(*) FROM ingest_runs)                          runs,
+       (SELECT count(*) FROM ingest_runs WHERE link_id IS NULL)    runs_without_link,
+       (SELECT count(*) FROM ingest_runs WHERE project_id IS NULL) runs_without_project,
+       (SELECT count(*) FROM ingest_staged_products)               staged_products,
+       (SELECT count(*) FROM ingest_files)                         landed_files,
+       (SELECT count(*) FROM project_erp_links)                    links;
+
 -- D29: is organizations.name unique in practice? (the dual read's text branch)
 SELECT lower(btrim(name)) norm, count(*) orgs
 FROM organizations GROUP BY 1 HAVING count(*) > 1;
