@@ -5996,6 +5996,110 @@ plants the duplicates, dedups, and then **runs `20260916000018`'s real statement
 over the result**. That last step is the assertion: `CREATE UNIQUE INDEX` on a
 table still holding duplicates does not warn, it aborts the deploy, and the two
 migrations agreeing is the only claim about the dedup worth making.
+---
+
+#### F · The promotion, in the seam WP 3.2 left
+
+`20260916000019` replaces `ingest_apply_run`'s one dynamic `INSERT … SELECT`.
+There is no second promotion path, and `070` — WP 3.2's whole end-to-end
+assertion — runs UNCHANGED and green against it, which is the compatibility claim
+stated as a file rather than as a sentence.
+
+Three things change in that one statement:
+
+  - **`ON CONFLICT (<natural key>) DO UPDATE`**, with the arbiter READ FROM THE
+    DATABASE by `ingest_target_natural_key()` — the one unique, non-partial,
+    non-expression index that is not the surrogate. Restating the seven key lists
+    in the promotion would have been a third copy; the index IS the key, so the
+    function reads `pg_index`. It RAISES on no candidate and on more than one,
+    because a promotion that guessed would upsert on the wrong grain and the rows
+    would look right.
+  - **Units convert INSIDE the statement** and the unit column is written with the
+    canonical token, so the tier-2 row states what it is in.
+  - **`ingest_run_id` + `source_row_id`** on every promoted row, which is A4
+    reaching the line of the file.
+
+**Normalization moves without moving a number, and that is the design, not a
+coincidence.** Promoting `volume` as a weekly rate AND stamping `time_unit =
+'week'` makes every downstream converter — `combine-project`'s `weeklyVolume`,
+the `sc_nodes` view — multiply by 7/7, which is exactly identity. So I3 is met for
+promoted rows without touching eight read sites, the ETL, or the engine, and
+without a migration window where tier 2 holds weekly numbers under monthly
+labels. What is NOT done, said plainly: the downstream converters still exist.
+Removing them is a reader change across the ETL and `project_map.py` and it is
+not this package's; until then they are identity for promoted rows and still
+load-bearing for the rows that predate this path.
+
+The unit column is stamped **even when the file omitted it**. A file with no
+`time_unit` produces a weekly volume by the documented default, and a weekly
+number under a NULL label is a number whose source a reader has to know rather
+than read — §5 T1 says there is no such option.
+
+**`DISTINCT ON` is not decoration, and finding out why cost a design.**
+`ON CONFLICT DO UPDATE` raises `21000` — "cannot affect row a second time" — when
+ONE statement carries two rows with the same arbiter key, which is exactly what a
+CSV containing the same arc twice produces. Without it the whole upload aborts
+with an error naming nothing the uploader can act on. With it the LATER line wins
+— the same rule `20260916000017` applies to rows already in the table, so a user
+does not have to learn two — and the superseded lines are **counted, returned,
+and given a `warning` finding in tier 1 naming the line that beat them**. A count
+in an audit row tells an administrator something was collapsed; the finding tells
+the uploader which line lost (§5 T2, visible at the point of display).
+
+**Four things the rehearsal found that no static gate could (D31, four times in
+one file).** Every one of these would have been a failed production deploy:
+
+| what | how it surfaced |
+|---|---|
+| `SELECT *` from a 5-column VALUES list in a function declared to return 4 | `return type mismatch in function declared to return record` |
+| `(array_agg(cols ORDER BY …))[1]` — a PostgreSQL array of arrays is ONE multidimensional array, not a nested one, so the subscript returns an element, not the inner list | the key came back NULL and the promotion built `ON CONFLICT ()` — a syntax error in generated SQL |
+| `array_to_string(v_key, '' + '')` inside a `format()` literal | `operator is not unique: unknown + unknown` |
+| the columns added by `EXECUTE format('ALTER TABLE …')` in a `DO` block | applied fine, and were INVISIBLE to `introspect.mjs`, so `validate-sidecars` said the sidecars described fields that were not columns. Rewritten as static DDL: a migration the contract cannot read is a migration outside the contract |
+
+**And one genuine design problem, found by an assertion rather than by review.**
+Deleting a run fires TWO referential actions against the same tier-2 row —
+`ingest_staged_rows` cascades away, so `source_row_id` must go NULL, and
+`ingest_run_id` must go NULL too. The second arrives as an UPDATE of a row whose
+`source_row_id` still names an already-deleted staged row, and an immediate check
+fails on a state that is only momentarily inconsistent. The `source_row_id` FK is
+therefore `DEFERRABLE INITIALLY DEFERRED`: the constraint is not weaker, it is
+checked at commit.
+
+That has one visible consequence and it is recorded rather than hidden:
+PostgreSQL refuses `CREATE INDEX` on a table with pending trigger events, so a
+rehearsal that writes and then builds an index needs `SET CONSTRAINTS ALL
+IMMEDIATE` first. Production never meets it — a migration creates its indexes
+before writing anything — and both `080` and `090` say so where they do it.
+
+**`090` is the exit check, not a paragraph about it.** §10 asked for an assertion
+that uploading the same file twice is a no-op. `090` uploads it twice and
+requires: 2 rows after, `rows_updated = 2`, and **the same surrogate ids** — a
+table that deleted and re-inserted would satisfy a count and break every
+reference into it. It also asserts that normalization is idempotent (the second
+pass reads tier 1 again, not tier 2, so 30.4375/month is still 7 and not 1.61),
+that the provenance re-points at the newer run, and that deleting a run nulls the
+trace without touching the project's data.
+
+Five mutations run against `090`, all fired:
+
+| mutation | what fired |
+|---|---|
+| no conversion — the raw value lands | "a monthly volume of 30.4375 promoted as 30.4375, expected 7 per week" |
+| the unit column is not stamped canonical | "the promoted row still says time_unit=month, so the value and its label disagree" |
+| `ON CONFLICT DO NOTHING` instead of `DO UPDATE` | the second upload stopped updating |
+| `DISTINCT ON` removed | the statement stopped being well-formed |
+| the superseded line gets no finding | "reported 0 superseded line(s), expected 1" |
+
+**Three more copies gained a gate, rather than a note asking for care.** The
+natural keys now exist in the sidecars, in `20260916000017`'s dedup call list
+(which cannot read the index — it runs before it exists) and in
+`20260916000018`'s `CREATE UNIQUE INDEX` statements; the conversions exist in the
+sidecars and in `ingest_normalize_at_promotion()`. `ingestSpecParity.test.ts`
+reads all three migrations and fails when any drifts, the same arrangement
+`PROMOTABLE_TARGETS` already had — extending the existing artifact rather than
+inventing a third mechanism (blueprint §0). Mutation-tested: a `rate` declared a
+`duration`, an index missing `NULLS NOT DISTINCT`, and a dedup key that lost
+`level` each turned it red.
 
 ---
 ---

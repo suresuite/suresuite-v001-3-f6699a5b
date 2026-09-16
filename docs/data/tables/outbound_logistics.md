@@ -22,6 +22,12 @@
 table's grain implies and the database does NOT enforce today. A statement about
 what is missing, never a claim about what is there.
 
+## Constraints
+
+| Constraint | Kind | Definition |
+|---|---|---|
+| `outbound_logistics_source_row_fk` | FOREIGN KEY | `FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED` |
+
 ## Governance
 
 | | |
@@ -76,6 +82,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `unit_price` | `unit_price` | `numeric` | `currency per unit of product` | **yes** | What the customer pays for one unit of this product. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the row was inserted. Server-set. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row last changed. Server-set. |
+| `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else. |
+| `source_row_id` | — | `uuid` | — | — | The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it. |
 
 ## Each column in full
 
@@ -304,6 +312,35 @@ When the row last changed. Server-set.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `ingest_run_id`
+
+The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260916000019_promotion_upsert.sql` |
+| References | `ingest_runs(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `source_row_id`
+
+The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260916000019_promotion_upsert.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -314,6 +351,6 @@ When the row last changed. Server-set.
 
 ---
 
-*Generated from data contract `781d87efe93d`, engine `0.2.3`,
+*Generated from data contract `899cf101c943`, engine `0.2.3`,
 sidecar `supabase/contract/outbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

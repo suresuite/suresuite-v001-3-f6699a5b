@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 315,
-  "migrations_applied": 312,
+  "migrations_found": 316,
+  "migrations_applied": 313,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000018_natural_key_unique.sql",
+  "last_migration": "20260916000019_promotion_upsert.sql",
   "counts": {
     "tables": 79,
     "views": 7,
     "enums": 4,
-    "functions": 246,
+    "functions": 247,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -2773,6 +2773,36 @@
           "unique": false,
           "references": null,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "constraints": [
@@ -2785,6 +2815,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "bom_multi_level_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -2998,6 +3037,36 @@
           "unique": false,
           "references": null,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "constraints": [
@@ -3010,6 +3079,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "bom_single_level_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -6182,6 +6260,36 @@
           "unique": false,
           "references": null,
           "added_by": "20260915000002_lead_time_unit.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "constraints": [
@@ -6201,6 +6309,15 @@
           "columns": [],
           "definition": "CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL)",
           "added_by": "20260915000002_lead_time_unit.sql"
+        },
+        {
+          "name": "inbound_logistics_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -10605,6 +10722,36 @@
           "unique": false,
           "references": null,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "constraints": [
@@ -10617,6 +10764,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "outbound_logistics_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -18086,6 +18242,36 @@
           "unique": false,
           "references": null,
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "constraints": [
@@ -18098,6 +18284,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        },
+        {
+          "name": "tier2_suppliers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -18323,6 +18518,36 @@
           "unique": false,
           "references": null,
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "constraints": [
@@ -18335,6 +18560,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        },
+        {
+          "name": "tier3_suppliers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -21107,7 +21341,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20260916000015_ingest_landing.sql"
+      "defined_by": "20260916000019_promotion_upsert.sql"
     },
     {
       "name": "ingest_dedup_natural_key",
@@ -21154,6 +21388,17 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260916000015_ingest_landing.sql"
+    },
+    {
+      "name": "ingest_normalize_at_promotion",
+      "signature": "ingest_normalize_at_promotion(text)",
+      "args": [
+        "_target text"
+      ],
+      "returns": "TABLE (column_name text, unit_column text, conversion text, canonical text)",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "defined_by": "20260916000019_promotion_upsert.sql"
     },
     {
       "name": "ingest_target_is_promotable",

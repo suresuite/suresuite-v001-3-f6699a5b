@@ -117,33 +117,44 @@ DECLARE
   v_key   text[];
   v_count integer;
 BEGIN
-  WITH candidate AS (
-    SELECT ic.relname AS index_name,
-           array_agg(a.attname ORDER BY k.ord) AS cols
-      FROM pg_index i
-      JOIN pg_class ic     ON ic.oid = i.indexrelid
-      JOIN pg_class tc     ON tc.oid = i.indrelid
-      JOIN pg_namespace n  ON n.oid  = tc.relnamespace
-      CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
-      JOIN pg_attribute a  ON a.attrelid = i.indrelid AND a.attnum = k.attnum
-     WHERE n.nspname = 'public'
-       AND tc.relname = _target
-       AND i.indisunique
-       AND i.indpred  IS NULL      -- a partial index constrains only some rows
-       AND i.indexprs IS NULL      -- an expression index is not a column list
-     GROUP BY i.indexrelid, ic.relname
-  )
-  SELECT count(*), (array_agg(cols ORDER BY index_name))[1]
-    INTO v_count, v_key
-    FROM candidate
-   WHERE NOT ('id' = ANY(cols));
+  -- Collected in a LOOP rather than with `(array_agg(cols ORDER BY …))[1]`,
+  -- and the reason is a real bug this file shipped once: a PostgreSQL array of
+  -- arrays is ONE MULTIDIMENSIONAL array, not a nested one, so subscripting the
+  -- aggregate returns a scalar element and not the inner list. `v_key` came back
+  -- NULL, the promotion built `ON CONFLICT ()`, and it was a syntax error at run
+  -- time that no static gate can see — which is D31, caught by `rehearsal/070`
+  -- exactly where the plan says it should be.
+  v_count := 0;
+  FOR v_key IN
+    SELECT cols FROM (
+      SELECT ic.relname AS index_name,
+             array_agg(a.attname ORDER BY k.ord) AS cols
+        FROM pg_index i
+        JOIN pg_class ic     ON ic.oid = i.indexrelid
+        JOIN pg_class tc     ON tc.oid = i.indrelid
+        JOIN pg_namespace n  ON n.oid  = tc.relnamespace
+        CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+        JOIN pg_attribute a  ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+       WHERE n.nspname = 'public'
+         AND tc.relname = _target
+         AND i.indisunique
+         AND i.indpred  IS NULL      -- a partial index constrains only some rows
+         AND i.indexprs IS NULL      -- an expression index is not a column list
+       GROUP BY i.indexrelid, ic.relname
+    ) AS candidate
+     WHERE NOT ('id' = ANY(cols))
+     ORDER BY index_name
+  LOOP
+    v_count := v_count + 1;
+    EXIT WHEN v_count > 1;
+  END LOOP;
 
   IF v_count = 0 THEN
     RAISE EXCEPTION 'ingest_target_natural_key: % has no natural-key unique index — only a surrogate key, which is D5', _target
       USING ERRCODE = 'undefined_object';
   END IF;
   IF v_count > 1 THEN
-    RAISE EXCEPTION 'ingest_target_natural_key: % has % candidate natural keys; a promotion cannot choose', _target, v_count
+    RAISE EXCEPTION 'ingest_target_natural_key: % has more than one candidate natural key; a promotion cannot choose', _target
       USING ERRCODE = 'ambiguous_column';
   END IF;
 

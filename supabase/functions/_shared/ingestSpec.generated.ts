@@ -30,6 +30,20 @@ export type IngestColumn = {
   validate: string | null;
 };
 
+/**
+ * WP 3.3 (I3) — one unit conversion the PROMOTION applies, so that nothing
+ * downstream converts. `rate` is a quantity per unit-period (rate_to_weekly);
+ * `duration` is a length of time (duration_to_weeks). They are not inverses.
+ * After promotion the row's `unitColumn` reads `canonical`, so a tier-2 row
+ * states its own unit instead of relying on a default (§5 T1).
+ */
+export type IngestNormalization = {
+  column: string;
+  unitColumn: string;
+  conversion: 'rate' | 'duration';
+  canonical: string;
+};
+
 export type IngestDataset = {
   /** The template id UploadWizard offers. */
   dataset: string;
@@ -40,6 +54,8 @@ export type IngestDataset = {
   /** Columns the server supplies from the project; a file may not carry them. */
   serverSet: string[];
   columns: IngestColumn[];
+  /** Unit conversions the promotion applies; empty when the dataset has none. */
+  normalize: IngestNormalization[];
 };
 
 export const INGEST_DATASETS: Record<string, IngestDataset> = {
@@ -103,7 +119,8 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
         },
         "validate": "numeric > 0"
       }
-    ]
+    ],
+    "normalize": []
   },
   "bom_single_level": {
     "dataset": "bom_single_level",
@@ -152,7 +169,8 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
         },
         "validate": "numeric > 0"
       }
-    ]
+    ],
+    "normalize": []
   },
   "inbound_logistics": {
     "dataset": "inbound_logistics",
@@ -251,6 +269,20 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
         },
         "validate": "one of the units public.unit_days() knows — enforced by the column's CHECK constraint"
       }
+    ],
+    "normalize": [
+      {
+        "column": "lead_time",
+        "unitColumn": "lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      },
+      {
+        "column": "volume",
+        "unitColumn": "time_unit",
+        "conversion": "rate",
+        "canonical": "week"
+      }
     ]
   },
   "outbound_logistics": {
@@ -337,6 +369,14 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "reject"
         },
         "validate": "numeric > 0"
+      }
+    ],
+    "normalize": [
+      {
+        "column": "volume",
+        "unitColumn": "time_unit",
+        "conversion": "rate",
+        "canonical": "week"
       }
     ]
   },
@@ -449,6 +489,14 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
         },
         "validate": "one of the units public.unit_days() knows; blank means weeks"
       }
+    ],
+    "normalize": [
+      {
+        "column": "volume",
+        "unitColumn": "time_unit",
+        "conversion": "rate",
+        "canonical": "week"
+      }
     ]
   },
   "tier3_suppliers": {
@@ -559,6 +607,14 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "null"
         },
         "validate": "one of the units public.unit_days() knows; blank means weeks"
+      }
+    ],
+    "normalize": [
+      {
+        "column": "volume",
+        "unitColumn": "time_unit",
+        "conversion": "rate",
+        "canonical": "week"
       }
     ]
   }

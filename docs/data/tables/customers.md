@@ -189,6 +189,6 @@ When the row was first inserted. Server-stamped.
 
 ---
 
-*Generated from data contract `781d87efe93d`, engine `0.2.3`,
+*Generated from data contract `899cf101c943`, engine `0.2.3`,
 sidecar `supabase/contract/customers.contract.yaml`, table created by `20260916000003_adopt_customers_drop_product_code_map.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

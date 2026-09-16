@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "781d87efe93d";
+export const CONTRACT_VERSION = "899cf101c943";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260916000018_natural_key_unique.sql";
+export const LAST_MIGRATION = "20260916000019_promotion_upsert.sql";
 
 export const COUNTS = {
   "tablesInSchema": 79,
   "tablesDescribed": 37,
-  "columnsDescribed": 412,
+  "columnsDescribed": 424,
   "tablesUndescribed": 42
 } as const;
 
@@ -93,13 +93,13 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "bom_multi_level",
         "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed).",
-        "columns": 9,
+        "columns": 11,
         "owner": "data-ingestion"
       },
       {
         "table": "bom_single_level",
         "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed).",
-        "columns": 8,
+        "columns": 10,
         "owner": "data-ingestion"
       },
       {
@@ -111,7 +111,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "inbound_logistics",
         "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).",
-        "columns": 12,
+        "columns": 14,
         "owner": "data-ingestion"
       },
       {
@@ -129,7 +129,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "outbound_logistics",
         "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed).",
-        "columns": 11,
+        "columns": 13,
         "owner": "data-ingestion"
       },
       {
@@ -147,13 +147,13 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "tier2_suppliers",
         "grain": "One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources.",
-        "columns": 13,
+        "columns": 15,
         "owner": "data-ingestion"
       },
       {
         "table": "tier3_suppliers",
         "grain": "One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out.",
-        "columns": 13,
+        "columns": 15,
         "owner": "data-ingestion"
       }
     ]

@@ -157,6 +157,10 @@ export function buildContract({ introspected, registry, sidecars }) {
         unit: f.unit,
         unit_source: f.unit_source,
         unit_column: f.unit_column ?? null,
+        // WP 3.3 (I3) — the conversion `ingest_apply_run` applies as the value is
+        // promoted, so nothing downstream converts. Paired with `unit_column`,
+        // which already says where the unit comes from.
+        normalize_at_promotion: f.normalize_at_promotion ?? null,
         meaning: f.meaning,
         grain: f.grain,
         engine: f.engine,
@@ -829,6 +833,35 @@ export function renderIngestSpecModule(contract) {
       if (!columns.length) {
         throw new Error(`${t.table} declares ingest_dataset but no column names a csv_header.`);
       }
+      // WP 3.3 (I3) — the unit conversions the PROMOTION applies. Authored on the
+      // field, not here: `unit_column` already says which column names the unit
+      // and `normalize_at_promotion` says which conversion and what it lands in.
+      // Restated in SQL by `ingest_normalize_at_promotion()` because SQL cannot
+      // import this module, and `ingestSpecParity.test.ts` fails when the two
+      // disagree — the same arrangement PROMOTABLE_TARGETS already has.
+      const normalize = t.columns
+        .filter((c) => c.normalize_at_promotion)
+        .map((c) => {
+          if (!c.unit_column) {
+            throw new Error(
+              `${t.table}.${c.name} declares normalize_at_promotion but no unit_column. ` +
+              "A conversion with no column to read the unit from cannot be executed.",
+            );
+          }
+          const unit = t.columns.find((u) => u.name === c.unit_column);
+          if (!unit) {
+            throw new Error(
+              `${t.table}.${c.name}'s unit_column "${c.unit_column}" is not a column of ${t.table}.`,
+            );
+          }
+          return {
+            column: c.name,
+            unitColumn: c.unit_column,
+            conversion: c.normalize_at_promotion.conversion,
+            canonical: c.normalize_at_promotion.canonical,
+          };
+        })
+        .sort((a, b) => a.column.localeCompare(b.column));
       return {
         dataset: t.ingest_dataset.wizard_id,
         target: t.table,
@@ -836,6 +869,7 @@ export function renderIngestSpecModule(contract) {
         factClass: t.ingest_dataset.fact_class,
         serverSet: [...serverSet],
         columns,
+        normalize,
       };
     });
 
@@ -874,6 +908,20 @@ export function renderIngestSpecModule(contract) {
     "  validate: string | null;",
     "};",
     "",
+    "/**",
+    " * WP 3.3 (I3) — one unit conversion the PROMOTION applies, so that nothing",
+    " * downstream converts. `rate` is a quantity per unit-period (rate_to_weekly);",
+    " * `duration` is a length of time (duration_to_weeks). They are not inverses.",
+    " * After promotion the row's `unitColumn` reads `canonical`, so a tier-2 row",
+    " * states its own unit instead of relying on a default (§5 T1).",
+    " */",
+    "export type IngestNormalization = {",
+    "  column: string;",
+    "  unitColumn: string;",
+    "  conversion: 'rate' | 'duration';",
+    "  canonical: string;",
+    "};",
+    "",
     "export type IngestDataset = {",
     "  /** The template id UploadWizard offers. */",
     "  dataset: string;",
@@ -884,6 +932,8 @@ export function renderIngestSpecModule(contract) {
     "  /** Columns the server supplies from the project; a file may not carry them. */",
     "  serverSet: string[];",
     "  columns: IngestColumn[];",
+    "  /** Unit conversions the promotion applies; empty when the dataset has none. */",
+    "  normalize: IngestNormalization[];",
     "};",
     "",
     `export const INGEST_DATASETS: Record<string, IngestDataset> = ${

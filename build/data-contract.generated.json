@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 315,
-      "migrations_applied": 312,
-      "last_migration": "20260916000018_natural_key_unique.sql"
+      "migrations_found": 316,
+      "migrations_applied": 313,
+      "last_migration": "20260916000019_promotion_upsert.sql"
     },
     "sidecars": 37,
     "registry": {
@@ -18,7 +18,7 @@
   "counts": {
     "tables_in_schema": 79,
     "tables_covered": 37,
-    "columns_covered": 412,
+    "columns_covered": 424,
     "check_constraints": 19,
     "engine_requirements": 7,
     "orphans": 0,
@@ -134,6 +134,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The user's identity, and the value every other governance table joins on — `organization_members.user_id`, `projects.modeler_id`, the `_user_id` argument of `capabilities_for_user()` and of `get_current_user_org_id()`.",
           "grain": "identifier",
           "engine": {
@@ -164,6 +165,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The person's name as entered when the account was approved.",
           "grain": "metadata",
           "engine": {
@@ -194,6 +196,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The sign-in address, UNIQUE. Also a second identity path: the fallback branch of `get_current_user_org()` and `get_current_approved_user()` locate the row by `auth.jwt() ->> 'email'` when the session GUC is unset.",
           "grain": "identifier",
           "engine": {
@@ -224,6 +227,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The bcrypt hash of the account's password. A credential, and the reason the contradiction recorded in `governance.note` above is a security finding rather than an untidiness.",
           "grain": "metadata",
           "engine": {
@@ -254,6 +258,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The account's global role — `admin`, `modeler`, `user` or `super_admin`. GLOBAL, not per-project and not per-organization: it is the left-most input to `capabilities_for_user()`'s role -> org -> user merge, and `super_admin` short-circuits that merge to grant everything.",
           "grain": "metadata",
           "engine": {
@@ -291,6 +296,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the account was approved. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -321,6 +327,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was last modified. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -351,6 +358,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The user's tenant, as a string. This is the value `get_current_user_org()` returns, and it was the left-hand side of every access comparison in the schema until WP 2.1.",
           "grain": "metadata",
           "engine": {
@@ -388,6 +396,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The name the user chose for themselves, overriding `name` in the UI.",
           "grain": "metadata",
           "engine": {
@@ -418,6 +427,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "URL of the user's profile image, if they uploaded one.",
           "grain": "metadata",
           "engine": {
@@ -448,6 +458,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Contact number. Not used for authentication or for any second factor.",
           "grain": "metadata",
           "engine": {
@@ -478,6 +489,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the password was last set. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -508,6 +520,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the current password stops being accepted — `now() + 90 days` at the time the row was written.",
           "grain": "metadata",
           "engine": {
@@ -545,6 +558,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the user must set a new password before continuing. Set when an administrator resets an account.",
           "grain": "metadata",
           "engine": {
@@ -575,6 +589,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
           "grain": "metadata",
           "engine": {
@@ -611,6 +626,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.",
           "grain": "identifier",
           "engine": {
@@ -751,6 +767,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The row's identity. Returned by the emit functions so a caller can cite what it wrote.",
           "grain": "identifier",
           "engine": {
@@ -787,6 +804,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who did it. NULLABLE, and the null carries meaning: a service-role write with no session context has no attributable actor.",
           "grain": "identifier",
           "engine": {
@@ -817,6 +835,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`. Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.",
           "grain": "metadata",
           "engine": {
@@ -847,6 +866,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What kind of thing was acted on — a table name on the data plane, an entity name on the others.",
           "grain": "metadata",
           "engine": {
@@ -877,6 +897,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which one, as text. NULL on data-plane rows: a statement-level trigger records a STATEMENT, and a statement that touched 5,000 rows has no single id.",
           "grain": "identifier",
           "engine": {
@@ -907,6 +928,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The prior state, where the writer knows it. Admin RPCs capture it; data-plane trigger rows do NOT — a statement-level trigger has the transition tables but writing 5,000 prior rows into one jsonb would make the log unreadable and unbounded. Their row COUNT is in `after` instead.",
           "grain": "metadata",
           "engine": {
@@ -937,6 +959,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row it carries the decision and what was asked for.",
           "grain": "metadata",
           "engine": {
@@ -967,6 +990,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Caller IP where the writer recorded one. Never set by the triggers, which run inside the database.",
           "grain": "metadata",
           "engine": {
@@ -997,6 +1021,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Caller user agent where the writer recorded one. As with `ip`, absent on trigger-written rows.",
           "grain": "metadata",
           "engine": {
@@ -1027,6 +1052,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it happened. Server-stamped, and the column the plane index orders by.",
           "grain": "metadata",
           "engine": {
@@ -1057,6 +1083,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which plane the action belongs to — `admin`, `data` or `access`, CHECK-constrained. Added by WP 2.3; every row that predates it is `admin` by construction, because the only writer was `log_admin_action()`, which refuses anyone who is not a super admin.",
           "grain": "metadata",
           "engine": {
@@ -1190,6 +1217,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "bom_multi_level_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -1244,6 +1280,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. Carries no meaning and joins to nothing.",
           "grain": "identifier",
           "engine": {
@@ -1280,6 +1317,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this row belongs to. Every read is scoped by it.",
           "grain": "identifier",
           "engine": {
@@ -1310,6 +1348,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The focal plant this row belongs to, by NAME. A displayable string used as a join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a uuid.",
           "grain": "identifier",
           "engine": {
@@ -1347,6 +1386,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The material this line is about — the CHILD in the parent/child pair.",
           "grain": "identifier",
           "engine": {
@@ -1381,6 +1421,7 @@
           "unit": "tree depth",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Depth in the BOM tree. Level 1 is directly under the finished product; higher numbers are deeper.",
           "grain": "level",
           "engine": {
@@ -1426,6 +1467,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The parent this material feeds. Empty at the top of the tree, where the parent is the finished product itself.",
           "grain": "identifier",
           "engine": {
@@ -1460,6 +1502,7 @@
           "unit": "units of material per unit of parent",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How many units of this material one unit of the parent consumes. An engineering fact, never estimated (WP 1.3).",
           "grain": "level",
           "engine": {
@@ -1512,6 +1555,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was inserted. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -1542,8 +1586,77 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row last changed. Server-set.",
           "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+          "grain": "identifier",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -1666,6 +1779,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "bom_single_level_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -1719,6 +1841,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. Carries no meaning and joins to nothing.",
           "grain": "identifier",
           "engine": {
@@ -1755,6 +1878,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this row belongs to. Every read is scoped by it.",
           "grain": "identifier",
           "engine": {
@@ -1785,6 +1909,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The focal plant this row belongs to, by NAME. A displayable string used as a join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a uuid.",
           "grain": "identifier",
           "engine": {
@@ -1822,6 +1947,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The finished product this line belongs to.",
           "grain": "identifier",
           "engine": {
@@ -1856,6 +1982,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The material consumed. Joins to materials and to the inbound arcs that supply it.",
           "grain": "identifier",
           "engine": {
@@ -1890,6 +2017,7 @@
           "unit": "units of material per unit of product",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How many units of the material one unit of the product consumes. An engineering fact about the product, not an estimate — which is why WP 1.3 records it as never estimable.",
           "grain": "level",
           "engine": {
@@ -1942,6 +2070,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was inserted. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -1972,8 +2101,77 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row last changed. Server-set.",
           "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+          "grain": "identifier",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -2070,6 +2268,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The capability's identity, and the string every grant table and every call site names. Page keys are ROUTES (`/policies`); feature keys are snake_case verbs (`data_edit_inputs`). The convention is not enforced by a CHECK.",
           "grain": "identifier",
           "engine": {
@@ -2100,6 +2299,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "`page` or `feature`, CHECK-constrained. The resolver aggregates the two separately and returns them under separate keys, so the distinction is load-bearing rather than descriptive.",
           "grain": "metadata",
           "engine": {
@@ -2130,6 +2330,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The human name shown on permission screens.",
           "grain": "metadata",
           "engine": {
@@ -2160,6 +2361,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "One sentence on what holding it lets you do. Nullable.",
           "grain": "metadata",
           "engine": {
@@ -2190,6 +2392,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Display order on permission screens. Presentation only.",
           "grain": "metadata",
           "engine": {
@@ -2220,6 +2423,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the capability was added to the catalog. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -2250,6 +2454,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When its metadata last changed. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -2352,6 +2557,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this customer belongs to. Scoping is what makes `customer_id` a key: the same company in two projects is two rows, and merging them would merge two customers' models.",
           "grain": "identifier",
           "engine": {
@@ -2382,6 +2588,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape.",
           "grain": "identifier",
           "engine": {
@@ -2412,6 +2619,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The customer's display name. Nullable; never a join key (G1).",
           "grain": "metadata",
           "engine": {
@@ -2442,6 +2650,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the policy that reads it does not exist, and inventing the set before the reader is how a column gets a constraint nobody can satisfy.",
           "grain": "level",
           "engine": {
@@ -2472,6 +2681,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Relative allocation priority when demand exceeds supply. Dimensionless and relative — only the RATIO between two customers means anything, so a row at 1.0 is not \"one unit\" of anything.",
           "grain": "rate",
           "engine": {
@@ -2502,6 +2712,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The minimum fill rate the customer is contracted to receive, as a percentage. NULLABLE, and the null means \"no contracted floor\" — not zero. A reader that coerces it to 0 turns \"unconstrained\" into \"no service required\", which is D17's error in the other direction.",
           "grain": "rate",
           "engine": {
@@ -2532,6 +2743,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was last modified. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -2562,6 +2774,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was first inserted. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -2679,6 +2892,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate identifier for the version. Referenced by runs.",
           "grain": "identifier",
           "engine": {
@@ -2715,6 +2929,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this snapshot is of.",
           "grain": "identifier",
           "engine": {
@@ -2745,6 +2960,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A human-chosen name for this version, so a user can say which one they mean.",
           "grain": "metadata",
           "engine": {
@@ -2775,6 +2991,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The frozen tier-2 rows themselves, as JSON. What the run actually ran against, not a pointer to rows that may since have changed.",
           "grain": "metadata",
           "engine": {
@@ -2805,6 +3022,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The fingerprint of the snapshot. Two runs with the same graph_hash saw the same world; two with different hashes did not.",
           "grain": "metadata",
           "engine": {
@@ -2835,6 +3053,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who froze this version.",
           "grain": "identifier",
           "engine": {
@@ -2865,6 +3084,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The author's email, denormalized so the version survives the user record.",
           "grain": "metadata",
           "engine": {
@@ -2895,6 +3115,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the version was frozen. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -3007,6 +3228,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate identifier for the grant. What revoke takes.",
           "grain": "identifier",
           "engine": {
@@ -3043,6 +3265,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project the grant applies to. A delegation is never org-wide.",
           "grain": "identifier",
           "engine": {
@@ -3079,6 +3302,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who gave it. Their effective project role at the moment of granting is the ceiling on what the grant may contain.",
           "grain": "identifier",
           "engine": {
@@ -3115,6 +3339,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who received it.",
           "grain": "identifier",
           "engine": {
@@ -3145,6 +3370,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The level granted. Rejected by the RPC if it outranks the grantor's own — the subtractive rule, enforced in one place.",
           "grain": "metadata",
           "engine": {
@@ -3175,6 +3401,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it stops granting. NOT NULL, and the RPC additionally refuses a time already past. A delegation without an end is a membership, and the product has a table for those.",
           "grain": "metadata",
           "engine": {
@@ -3205,6 +3432,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Why the elevation exists. NOT NULL and non-empty, unlike on `project_members`: a temporary grant of someone else's access is exactly the thing a reviewer will later ask the reason for.",
           "grain": "metadata",
           "engine": {
@@ -3235,6 +3463,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it was withdrawn early, if it was. Revocation SETS this rather than deleting the row — who held what, and when, survives the withdrawal.",
           "grain": "metadata",
           "engine": {
@@ -3265,6 +3494,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the grant was made. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -3396,6 +3626,15 @@
           "columns": [],
           "definition": "CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL)",
           "added_by": "20260915000002_lead_time_unit.sql"
+        },
+        {
+          "name": "inbound_logistics_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -3449,6 +3688,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. Carries no meaning and joins to nothing.",
           "grain": "identifier",
           "engine": {
@@ -3485,6 +3725,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this arc belongs to. Every read is scoped by it.",
           "grain": "identifier",
           "engine": {
@@ -3515,6 +3756,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The focal plant receiving the material, by NAME. A displayable string used as a join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a uuid.",
           "grain": "identifier",
           "engine": {
@@ -3552,6 +3794,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The supplier's code as the user's own systems spell it.",
           "grain": "identifier",
           "engine": {
@@ -3586,6 +3829,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The material's code as the user's own systems spell it. Joins to materials and the BOM.",
           "grain": "identifier",
           "engine": {
@@ -3620,6 +3864,10 @@
           "unit": "units per `time_unit`",
           "unit_source": "column",
           "unit_column": "time_unit",
+          "normalize_at_promotion": {
+            "conversion": "rate",
+            "canonical": "week"
+          },
           "meaning": "How much of this material the user buys from this supplier over one `time_unit`. A RATE, not a quantity — two rows are only comparable after both are converted to the same period.",
           "grain": "rate",
           "engine": {
@@ -3665,6 +3913,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The period `volume` is quoted over — day, week, month, quarter, year. It describes the VOLUME only. It says nothing about `lead_time`.",
           "grain": "metadata",
           "engine": {
@@ -3716,6 +3965,10 @@
           "unit": "weeks",
           "unit_source": "column",
           "unit_column": "lead_time_unit",
+          "normalize_at_promotion": {
+            "conversion": "duration",
+            "canonical": "week"
+          },
           "meaning": "How long this supplier takes to deliver this material. The contract fixes the unit at WEEKS; `time_unit` does not apply to it and never has.",
           "grain": "level",
           "engine": {
@@ -3778,6 +4031,7 @@
           "unit": "currency per unit of material",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What one unit of this material costs from this supplier, delivered.",
           "grain": "level",
           "engine": {
@@ -3841,6 +4095,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was inserted. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -3871,6 +4126,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row last changed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -3901,6 +4157,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The period `lead_time` is quoted in — day, week, month, quarter or year. Blank means WEEKS, which is what the engine assumed before this column existed. Distinct from `time_unit`, which is the period `volume` is quoted over and has never applied to the lead time.",
           "grain": "metadata",
           "engine": {
@@ -3938,6 +4195,74 @@
             "note": "A unit is never estimated. NULL means weeks, matching project_map.py::_duration_to_weeks, and the column's CHECK constraint only admits units public.unit_days() knows."
           },
           "note": "Added by WP 1.3 (D9). The engine had read this field since the scsim bridge was written; no column supplied it, so `r.get(\"lead_time_unit\")` returned None on every row and a lead time entered in days was read as weeks — seven times too long, with no warning, because nothing in the chain knew a unit was expected. This is also the first use of the `contract` provenance state reserved in WP 1.2: the weeks default is supplied by this document, not guessed by code.",
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
           "engine_requirement": null
         }
       ],
@@ -4055,6 +4380,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key for one landed file.",
           "grain": "identifier",
           "engine": {
@@ -4091,6 +4417,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The run this file was landed for. NOT NULL: a file with no run is a byte-stream nobody asked for, and making the run the owner is what keeps a landing attached to a project, a source kind and an approval.",
           "grain": "identifier",
           "engine": {
@@ -4121,6 +4448,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "csv, orbit-mrp or api — what kind of source produced these bytes. The same closed vocabulary as the run's.",
           "grain": "level",
           "engine": {
@@ -4151,6 +4479,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The file's name as the user's machine gave it, verbatim. For display and for the person's own recognition — never a key, and never parsed for meaning: two projects upload `inbound.csv` on the same afternoon (G1's rule, applied to filenames).",
           "grain": "metadata",
           "engine": {
@@ -4181,6 +4510,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The storage bucket the bytes live in. Recorded rather than assumed, so that moving a bucket is a data change and not a code change.",
           "grain": "metadata",
           "engine": {
@@ -4211,6 +4541,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Where the bytes are inside the bucket. Generated by the writer, never supplied by the user, and UNIQUE with the bucket because it addresses exactly one stored object.",
           "grain": "identifier",
           "engine": {
@@ -4241,6 +4572,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The MIME type as reported at upload. NULLABLE and not trusted: browsers report `application/vnd.ms-excel` for CSVs often enough that a parser keying on it would reject real files. WP 3.2's parser decides from the bytes.",
           "grain": "metadata",
           "engine": {
@@ -4271,6 +4603,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How many bytes were received. The cheapest possible check that a file is the file somebody meant to send, and the number a quota will eventually be about.",
           "grain": "metadata",
           "engine": {
@@ -4301,6 +4634,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "SHA-256 of the bytes AS RECEIVED, lowercase hex, computed before any parse. The anchor: with it, 'the file you uploaded on Tuesday' is a checkable claim rather than a memory.",
           "grain": "identifier",
           "engine": {
@@ -4337,6 +4671,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account.",
           "grain": "identifier",
           "engine": {
@@ -4367,6 +4702,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the bytes were received. Server-stamped, never the client's clock.",
           "grain": "metadata",
           "engine": {
@@ -4491,6 +4827,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key. Not the grain: a run is identified by what it did, and nothing joins to this except the staging rows and the landed files.",
           "grain": "identifier",
           "engine": {
@@ -4527,6 +4864,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The ERP link this run used, or NULL for a source that has none. NULL means 'this source needs no link', never 'the link was lost' — a CSV upload and an API push have no credential to point at.",
           "grain": "identifier",
           "engine": {
@@ -4557,6 +4895,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "manual or scheduled. A manual run was asked for by a person; a scheduled one was started by the cron sweep against the link's `sync_schedule_cron`.",
           "grain": "level",
           "engine": {
@@ -4593,6 +4932,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The person who asked for a manual run, in `auth.users`. NULL for a scheduled run, where there is no person — stated rather than back-filled to a service account, because 'nobody asked, the schedule did' is the true answer (G4).",
           "grain": "identifier",
           "engine": {
@@ -4623,6 +4963,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "running, staged, applied, failed or skipped. `staged` is the state that matters: rows are in tier 1 and a human has not approved them. Nothing reaches tier 2 before `applied`.",
           "grain": "level",
           "engine": {
@@ -4653,6 +4994,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Row counts pulled from the source, per entity — {\"products\": 1007, \"bom_versions\": 25}. What the source OFFERED, which is not what was staged and not what was promoted.",
           "grain": "metadata",
           "engine": {
@@ -4683,6 +5025,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Staged rows the diff classified as new: no live row carries this source identifier yet.",
           "grain": "metadata",
           "engine": {
@@ -4713,6 +5056,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Staged rows whose live counterpart exists and differs.",
           "grain": "metadata",
           "engine": {
@@ -4743,6 +5087,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Staged rows identical to their live counterpart. Counted rather than dropped: 'nothing changed' is a result, and a report that omits it cannot be distinguished from one that failed.",
           "grain": "metadata",
           "engine": {
@@ -4773,6 +5118,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row.",
           "grain": "metadata",
           "engine": {
@@ -4803,6 +5149,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The per-field mapping report: [{level, entity, field, reason}], the same shape as `simulation_runs.mapping_warnings` and scsim's MappingWarning, so MappingWarningsCard renders it unmodified.",
           "grain": "metadata",
           "engine": {
@@ -4833,6 +5180,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Source fields that landed in a staged column with a value.",
           "grain": "metadata",
           "engine": {
@@ -4863,6 +5211,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Source fields the source did not provide, left null for the project's defaults to fill at promotion. This is the count that drives the amber badge — a defaulted field is a substitution and §5 T2 says it is visible at the point of display.",
           "grain": "metadata",
           "engine": {
@@ -4893,6 +5242,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Source fields that could not be mapped at all. A run with any failure never auto-applies, whatever the link's threshold says.",
           "grain": "metadata",
           "engine": {
@@ -4923,6 +5273,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The rendered diff the review UI reads, kept until the run is applied or rejected. WP 3.4 builds that screen; the column is the connector's own and predates it.",
           "grain": "metadata",
           "engine": {
@@ -4953,6 +5304,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the staged rows were promoted to tier 2. NULL for every run that has not been approved — which is most of them, by design.",
           "grain": "metadata",
           "engine": {
@@ -4989,6 +5341,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who approved the promotion, in `auth.users`. NULL when the link's auto-apply threshold promoted it, and that NULL is the one D36 is about: an automatic promotion has no actor and says so rather than borrowing one.",
           "grain": "identifier",
           "engine": {
@@ -5019,6 +5372,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Why a failed run failed, in the source's own words. Kept verbatim: a paraphrased error is a second source for a fact that already had one.",
           "grain": "metadata",
           "engine": {
@@ -5049,6 +5403,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the run opened. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -5085,6 +5440,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this run ingests into. Added in WP 3.1 and NOT NULL: it is what the RLS policy reads, so a run is governed by the project it writes to rather than by the credential it happened to use.",
           "grain": "identifier",
           "engine": {
@@ -5115,6 +5471,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a fourth source cannot appear without a migration that decides what it is.",
           "grain": "level",
           "engine": {
@@ -5233,6 +5590,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key for one staged row. The staging tables carry no natural key on purpose: they hold what a source SAID, including whatever duplicates it said it with, and deduplication is a decision made at promotion (WP 3.3), not a constraint that silently discards a source row before anybody has seen it.",
           "grain": "identifier",
           "engine": {
@@ -5269,6 +5627,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The run that staged this row. The owner: staged rows cascade with their run, and the run is what carries the project, the source kind and the approval.",
           "grain": "identifier",
           "engine": {
@@ -5305,6 +5664,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The ERP link the row came through, or NULL for a source that has none. Redundant with the run's own `link_id` and kept because the connector writes it; the RUN is the authority (I1) and a reader that disagrees should believe the run.",
           "grain": "identifier",
           "engine": {
@@ -5335,6 +5695,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The row's identifier IN THE SOURCE, exactly as the source spells it. Never trimmed or case-folded here: tier 1 holds what arrived, and normalizing at this tier would destroy the evidence that a source sent `\" MAT-1 \"` (D8).",
           "grain": "identifier",
           "engine": {
@@ -5365,6 +5726,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The BOM header this line belongs to, in the source's identifier space — joins to `ingest_staged_bom_versions.external_id` within the run.",
           "grain": "identifier",
           "engine": {
@@ -5395,6 +5757,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The component consumed, in the source's identifier space. Becomes the material side of a tier-2 BOM row once a promotion for BOMs exists.",
           "grain": "identifier",
           "engine": {
@@ -5425,6 +5788,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much of the component one unit of the parent consumes, in the component's own unit of measure. The dimensionless-looking number that is not dimensionless: it is per unit of the PARENT, and the parent's unit is on the staged product.",
           "grain": "rate",
           "engine": {
@@ -5455,6 +5819,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The source's expected scrap on this line, as the source expresses it — a fraction in some systems and a percentage in others. NOT normalized here, and that ambiguity is the reason a promotion cannot simply copy it.",
           "grain": "rate",
           "engine": {
@@ -5485,6 +5850,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The complete source row, verbatim. The reason a field the mapper does not yet understand is not lost: when a column turns out to matter, the answer for rows already staged is in here rather than in a re-sync.",
           "grain": "metadata",
           "engine": {
@@ -5515,6 +5881,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "new, changed, unchanged or removed_upstream — what the sync decided this row is, relative to the live tier-2 table. `removed_upstream` is the one with teeth: it is NEVER promoted, because a source dropping a row is not authority to delete the project's row.",
           "grain": "level",
           "engine": {
@@ -5545,6 +5912,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row landed in staging. Server-stamped, and it is what the promotion copies into `products.source_synced_at`, so a live row can say how old the source data behind it is.",
           "grain": "metadata",
           "engine": {
@@ -5575,6 +5943,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "csv, orbit-mrp or api — where this row came from. CHECK-constrained, and it matches its run's value for every row any current writer produces.",
           "grain": "level",
           "engine": {
@@ -5605,6 +5974,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "master or transactional. Master rows describe things that persist — an item, a BOM, a supplier; transactional rows describe events with a date. Nothing stages transactional rows yet; the vocabulary exists so WP 3.2's parser has one to declare against rather than inventing one per file.",
           "grain": "level",
           "engine": {
@@ -5723,6 +6093,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key for one staged row. The staging tables carry no natural key on purpose: they hold what a source SAID, including whatever duplicates it said it with, and deduplication is a decision made at promotion (WP 3.3), not a constraint that silently discards a source row before anybody has seen it.",
           "grain": "identifier",
           "engine": {
@@ -5759,6 +6130,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The run that staged this row. The owner: staged rows cascade with their run, and the run is what carries the project, the source kind and the approval.",
           "grain": "identifier",
           "engine": {
@@ -5795,6 +6167,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The ERP link the row came through, or NULL for a source that has none. Redundant with the run's own `link_id` and kept because the connector writes it; the RUN is the authority (I1) and a reader that disagrees should believe the run.",
           "grain": "identifier",
           "engine": {
@@ -5825,6 +6198,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The row's identifier IN THE SOURCE, exactly as the source spells it. Never trimmed or case-folded here: tier 1 holds what arrived, and normalizing at this tier would destroy the evidence that a source sent `\" MAT-1 \"` (D8).",
           "grain": "identifier",
           "engine": {
@@ -5855,6 +6229,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The product this BOM belongs to, in the SOURCE's identifier space. Resolves to a staged product through `ingest_staged_products.external_id` — within the same run, because two runs may have pulled two different versions of the same source.",
           "grain": "identifier",
           "engine": {
@@ -5885,6 +6260,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The source's own version label for the BOM. Free text: sources version BOMs by date, by letter and by integer, and picking one of those shapes at tier 1 would reject the other two.",
           "grain": "metadata",
           "engine": {
@@ -5915,6 +6291,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the source considers this the live version. NULL means the source did not say — which is not 'inactive', and a reader that treats it as false would promote nothing for a source that simply has no such flag.",
           "grain": "level",
           "engine": {
@@ -5945,6 +6322,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The complete source row, verbatim. The reason a field the mapper does not yet understand is not lost: when a column turns out to matter, the answer for rows already staged is in here rather than in a re-sync.",
           "grain": "metadata",
           "engine": {
@@ -5975,6 +6353,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "new, changed, unchanged or removed_upstream — what the sync decided this row is, relative to the live tier-2 table. `removed_upstream` is the one with teeth: it is NEVER promoted, because a source dropping a row is not authority to delete the project's row.",
           "grain": "level",
           "engine": {
@@ -6005,6 +6384,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row landed in staging. Server-stamped, and it is what the promotion copies into `products.source_synced_at`, so a live row can say how old the source data behind it is.",
           "grain": "metadata",
           "engine": {
@@ -6035,6 +6415,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "csv, orbit-mrp or api — where this row came from. CHECK-constrained, and it matches its run's value for every row any current writer produces.",
           "grain": "level",
           "engine": {
@@ -6065,6 +6446,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "master or transactional. Master rows describe things that persist — an item, a BOM, a supplier; transactional rows describe events with a date. Nothing stages transactional rows yet; the vocabulary exists so WP 3.2's parser has one to declare against rather than inventing one per file.",
           "grain": "level",
           "engine": {
@@ -6183,6 +6565,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key for one staged row. The staging tables carry no natural key on purpose: they hold what a source SAID, including whatever duplicates it said it with, and deduplication is a decision made at promotion (WP 3.3), not a constraint that silently discards a source row before anybody has seen it.",
           "grain": "identifier",
           "engine": {
@@ -6219,6 +6602,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The run that staged this row. The owner: staged rows cascade with their run, and the run is what carries the project, the source kind and the approval.",
           "grain": "identifier",
           "engine": {
@@ -6255,6 +6639,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The ERP link the row came through, or NULL for a source that has none. Redundant with the run's own `link_id` and kept because the connector writes it; the RUN is the authority (I1) and a reader that disagrees should believe the run.",
           "grain": "identifier",
           "engine": {
@@ -6285,6 +6670,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The row's identifier IN THE SOURCE, exactly as the source spells it. Never trimmed or case-folded here: tier 1 holds what arrived, and normalizing at this tier would destroy the evidence that a source sent `\" MAT-1 \"` (D8).",
           "grain": "identifier",
           "engine": {
@@ -6315,6 +6701,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The source's stock-keeping unit. Becomes `products.product_id` at promotion when present, which is why a source with no SKU falls back to `external_id` — stated here because a silent fallback is exactly what I6 forbids.",
           "grain": "identifier",
           "engine": {
@@ -6345,6 +6732,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The item's display name in the source. Never a join key (G1).",
           "grain": "metadata",
           "engine": {
@@ -6375,6 +6763,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "finished_good, subassembly or raw_material as the SOURCE classifies it. Not CHECK-constrained: the vocabulary is the source's, and forcing it into ours at tier 1 would be normalizing before anybody has looked.",
           "grain": "level",
           "engine": {
@@ -6405,6 +6794,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The unit the source quotes quantities in, in the source's own vocabulary (EA, KG, M). Recorded, NOT converted: `normalize-at-promotion` (I3) says units normalize on the way into tier 2 and nowhere else.",
           "grain": "level",
           "engine": {
@@ -6435,6 +6825,7 @@
           "unit": "day",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The source's replenishment lead time for the item, in DAYS as the source states it.",
           "grain": "level",
           "engine": {
@@ -6465,6 +6856,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Minimum order quantity in the source's own unit of measure.",
           "grain": "level",
           "engine": {
@@ -6495,6 +6887,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The source's unit cost, in the source's currency. No currency column exists — the connector never sent one — so a multi-currency source would need one before this value could be compared with anything.",
           "grain": "level",
           "engine": {
@@ -6525,6 +6918,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The supplier the source names for this item, as free text. A NAME, and therefore never a join key (G1) — resolving it to a `suppliers` row is a decision the review screen will have to surface, not one to make silently.",
           "grain": "metadata",
           "engine": {
@@ -6555,6 +6949,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The supplier's identifier in the source system. This is the one that can resolve to a supplier, and it still does not today.",
           "grain": "identifier",
           "engine": {
@@ -6585,6 +6980,7 @@
           "unit": "second",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Production cycle time per unit, in seconds, as the source states it.",
           "grain": "level",
           "engine": {
@@ -6615,6 +7011,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The complete source row, verbatim. The reason a field the mapper does not yet understand is not lost: when a column turns out to matter, the answer for rows already staged is in here rather than in a re-sync.",
           "grain": "metadata",
           "engine": {
@@ -6645,6 +7042,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "new, changed, unchanged or removed_upstream — what the sync decided this row is, relative to the live tier-2 table. `removed_upstream` is the one with teeth: it is NEVER promoted, because a source dropping a row is not authority to delete the project's row.",
           "grain": "level",
           "engine": {
@@ -6675,6 +7073,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row landed in staging. Server-stamped, and it is what the promotion copies into `products.source_synced_at`, so a live row can say how old the source data behind it is.",
           "grain": "metadata",
           "engine": {
@@ -6705,6 +7104,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "csv, orbit-mrp or api — where this row came from. CHECK-constrained, and it matches its run's value for every row any current writer produces.",
           "grain": "level",
           "engine": {
@@ -6735,6 +7135,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "master or transactional. Master rows describe things that persist — an item, a BOM, a supplier; transactional rows describe events with a date. Nothing stages transactional rows yet; the vocabulary exists so WP 3.2's parser has one to declare against rather than inventing one per file.",
           "grain": "level",
           "engine": {
@@ -6900,6 +7301,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key for one staged row.",
           "grain": "identifier",
           "engine": {
@@ -6936,6 +7338,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The run these rows were staged in. NOT NULL, ON DELETE CASCADE: the run is the owner and the only route to a project, exactly as for `ingest_files` and the three connector staging tables.",
           "grain": "identifier",
           "engine": {
@@ -6966,6 +7369,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "csv, orbit-mrp or api — the same closed vocabulary as the run's and the file's, CHECK-constrained with no DEFAULT.",
           "grain": "level",
           "engine": {
@@ -6996,6 +7400,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "master or transactional — what KIND of fact one row is. Structure (a BOM) is master; a quantity over a period (a lane) is transactional. The value comes from the target table's own `ingest_dataset.fact_class`, so the contract decides it rather than the uploader.",
           "grain": "level",
           "engine": {
@@ -7026,6 +7431,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The tier-2 table these rows are destined for, by name. Not a foreign key — there is no table of tables — so `ingest_target_is_promotable()` is the closed set, and the landing refuses anything outside it before a row is written.",
           "grain": "identifier",
           "engine": {
@@ -7056,6 +7462,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The physical line in the file, 1-based, counting the header as line 1 — so the first data row is 2, and the number matches what a spreadsheet shows the person who made the file. CHECK > 1 for that reason: line 1 is the header and can never be a staged row.",
           "grain": "identifier",
           "engine": {
@@ -7086,6 +7493,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The cells exactly as the file gave them, keyed by the header the file carried — untrimmed, untyped, verbatim, including columns the contract does not know. The left-hand side of every parse claim.",
           "grain": "metadata",
           "engine": {
@@ -7116,6 +7524,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What validation made of the cells, keyed by TIER-2 COLUMN NAME rather than by CSV header — the two differ, and the mapping is the contract's `ingest.csv_header`.",
           "grain": "metadata",
           "engine": {
@@ -7146,6 +7555,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "[{level, field, code, message}] — the same four-key shape as `ingest_runs.mapping_warnings` and scsim's MappingWarning, so WP 3.4 renders it with `MappingWarningsCard` unmodified.",
           "grain": "metadata",
           "engine": {
@@ -7176,6 +7586,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "new, changed, unchanged or removed_upstream — the same vocabulary the three connector staging tables use, so WP 3.4's one review component serves both sources.",
           "grain": "level",
           "engine": {
@@ -7213,6 +7624,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was staged. Server-stamped, never the client's clock.",
           "grain": "metadata",
           "engine": {
@@ -7304,6 +7716,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this material belongs to. Half of the primary key.",
           "grain": "identifier",
           "engine": {
@@ -7334,6 +7747,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The material's code as the user's own systems spell it. Joins to the BOM and to every inbound arc that supplies it.",
           "grain": "identifier",
           "engine": {
@@ -7364,6 +7778,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A human-readable name for the material. Display only.",
           "grain": "metadata",
           "engine": {
@@ -7412,6 +7827,7 @@
           "unit": "currency per unit of material",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What one unit of this material costs to buy. The master value; where it is unset the engine uses the cheapest inbound arc instead, which is usually what the user wants and is why leaving it blank is not an error.",
           "grain": "level",
           "engine": {
@@ -7465,6 +7881,7 @@
           "unit": "fraction of unit value per year",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The annual cost of holding one unit in stock, as a fraction of its value. 0.2 means holding a unit for a year costs a fifth of what the unit is worth.",
           "grain": "level",
           "engine": {
@@ -7514,6 +7931,7 @@
           "unit": "units of material",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Minimum order quantity: the smallest amount this material can be ordered in. A commercial fact the supplier states, not something to be inferred from order history.",
           "grain": "level",
           "engine": {
@@ -7562,6 +7980,7 @@
           "unit": "units of material",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much of this material is in stock when the simulation starts.",
           "grain": "level",
           "engine": {
@@ -7605,6 +8024,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The SHAPE of this material's delivery lead time — deterministic, or a named distribution around the arc's lead time. `deterministic` means the lead time is exactly what the arc says, every time.",
           "grain": "metadata",
           "engine": {
@@ -7655,6 +8075,7 @@
           "unit": "coefficient of variation (dimensionless)",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much the lead time varies, as a coefficient of variation. Read only when `lead_time_dist` is not deterministic: the engine skips sampling entirely when the distribution is deterministic or the CV is zero.",
           "grain": "level",
           "engine": {
@@ -7705,6 +8126,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row last changed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -7735,6 +8157,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was inserted. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -7765,6 +8188,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which external system this row came from, when it was synced rather than uploaded. NULL for a hand-uploaded or hand-edited row.",
           "grain": "metadata",
           "engine": {
@@ -7795,6 +8219,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "This row's identifier in the external system, so a re-sync can match it.",
           "grain": "metadata",
           "engine": {
@@ -7825,6 +8250,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the external system last confirmed this row.",
           "grain": "metadata",
           "engine": {
@@ -7975,6 +8401,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key. Not the grain: the row that means something is the from/to pair within a project.",
           "grain": "identifier",
           "engine": {
@@ -8011,6 +8438,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this edge belongs to, by uuid (G1).",
           "grain": "identifier",
           "engine": {
@@ -8041,6 +8469,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project's plant, copied onto every row and enforced by `ensure_dataset_plant_matches_project`.",
           "grain": "identifier",
           "engine": {
@@ -8071,6 +8500,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The firm the edge points FROM, as the user's own systems spell it. A text identifier with no referential integrity to anything — there is no firm table for it to point at.",
           "grain": "identifier",
           "engine": {
@@ -8101,6 +8531,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The firm the edge points TO. Direction is the whole content of the row and nothing in the schema defends it: swapping the two columns produces a valid row that says the opposite thing.",
           "grain": "identifier",
           "engine": {
@@ -8131,6 +8562,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How many hops from the project's own plant the TO firm sits — 1 for a direct supplier, 2 for its supplier, and so on. NULLABLE, and a NULL says the depth was never established rather than that it is zero.",
           "grain": "level",
           "engine": {
@@ -8161,6 +8593,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What the TO firm is to the FROM firm, in the user's own words. No CHECK, no closed vocabulary, no code that branches on it.",
           "grain": "metadata",
           "engine": {
@@ -8191,6 +8624,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was written. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -8221,6 +8655,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was last written. Server-stamped by trigger.",
           "grain": "metadata",
           "engine": {
@@ -8326,6 +8761,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "the organization the row grants for.",
           "grain": "identifier",
           "engine": {
@@ -8362,6 +8798,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The capability, naming a row in `capabilities`.",
           "grain": "identifier",
           "engine": {
@@ -8392,6 +8829,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether this layer grants the capability. TRI-STATE in effect: a missing row means \"inherit from the next layer out\", `false` means \"deny here\". They are different answers and the resolver's COALESCE depends on the difference.",
           "grain": "metadata",
           "engine": {
@@ -8429,6 +8867,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -8459,6 +8898,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it was last changed. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -8575,6 +9015,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. The membership's identity is (org_id, user_id).",
           "grain": "identifier",
           "engine": {
@@ -8611,6 +9052,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The organization joined, by uuid. ON DELETE CASCADE — deleting a tenant removes its memberships rather than orphaning them.",
           "grain": "identifier",
           "engine": {
@@ -8647,6 +9089,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The approved user who is a member, by uuid. ON DELETE CASCADE.",
           "grain": "identifier",
           "engine": {
@@ -8677,6 +9120,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word \"owner\" and mean different things by it.",
           "grain": "metadata",
           "engine": {
@@ -8714,6 +9158,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the membership was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -8829,6 +9274,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The organization's identity. This is the value that must travel — it is what `projects.organization_id`, `approved_users.organization_id` and the public /v1 API's `p_org_id` all mean. Not displayable, and that is the property that makes it safe as a join key (§2.1 `uuid-identity`).",
           "grain": "identifier",
           "engine": {
@@ -8859,6 +9305,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The organization's display name, as an administrator typed it. EDITABLE and NOT UNIQUE — two organizations may legitimately share one. It is a label for humans and it is never an identity.",
           "grain": "metadata",
           "engine": {
@@ -8889,6 +9336,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A URL-safe form of the name, `lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))` at the moment the row was seeded. UNIQUE, and deliberately NOT recomputed on rename — so after a rename it is a record of what the organization used to be called, which is what makes it usable to match rows written before it.",
           "grain": "identifier",
           "engine": {
@@ -8925,6 +9373,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The approved user who owns the tenant. Advisory today — nothing in RLS or any RPC reads it; ownership is expressed through `organization_members.org_role = 'owner'`. Two places holding the same fact is an I1 violation waiting to diverge; WP 2.2 owns the resolution.",
           "grain": "identifier",
           "engine": {
@@ -8955,6 +9404,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`.",
           "grain": "metadata",
           "engine": {
@@ -8985,6 +9435,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Per-tenant configuration, free-form. No key of it is read by any migration, edge function or page today; it is a forward-declared extension point.",
           "grain": "metadata",
           "engine": {
@@ -9015,6 +9466,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the organization was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -9045,6 +9497,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was last modified. Server-stamped by DEFAULT only — no trigger maintains it, and `admin_update_organization` does not set it, so a renamed organization still shows its creation time here.",
           "grain": "metadata",
           "engine": {
@@ -9169,6 +9622,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        },
+        {
+          "name": "outbound_logistics_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -9222,6 +9684,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. Carries no meaning and joins to nothing.",
           "grain": "identifier",
           "engine": {
@@ -9258,6 +9721,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this row belongs to. Every read is scoped by it.",
           "grain": "identifier",
           "engine": {
@@ -9288,6 +9752,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The focal plant this row belongs to, by NAME. A displayable string used as a join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a uuid.",
           "grain": "identifier",
           "engine": {
@@ -9325,6 +9790,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The customer's code as the user's own systems spell it.",
           "grain": "identifier",
           "engine": {
@@ -9359,6 +9825,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The finished product's code as the user's own systems spell it. Joins to products and the BOM.",
           "grain": "identifier",
           "engine": {
@@ -9393,6 +9860,10 @@
           "unit": "units per `time_unit`",
           "unit_source": "column",
           "unit_column": "time_unit",
+          "normalize_at_promotion": {
+            "conversion": "rate",
+            "canonical": "week"
+          },
           "meaning": "How much of this product the customer takes over one `time_unit`. A RATE, not a quantity — two rows are only comparable after both are converted to the same period.",
           "grain": "rate",
           "engine": {
@@ -9438,6 +9909,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The period `volume` is quoted over — day, week, month, quarter, year. It describes the VOLUME only. It says nothing about `expected_lead_time`.",
           "grain": "metadata",
           "engine": {
@@ -9489,6 +9961,7 @@
           "unit": "weeks",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How long the customer expects to wait for this product. The contract fixes the unit at WEEKS; `time_unit` does not apply to it.",
           "grain": "level",
           "engine": {
@@ -9524,6 +9997,7 @@
           "unit": "currency per unit of product",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What the customer pays for one unit of this product.",
           "grain": "level",
           "engine": {
@@ -9576,6 +10050,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was inserted. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -9606,8 +10081,77 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row last changed. Server-set.",
           "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+          "grain": "identifier",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -9745,6 +10289,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project these defaults belong to. It is the PRIMARY KEY — one bundle per project, enforced.",
           "grain": "identifier",
           "engine": {
@@ -9775,6 +10320,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The sourcing family's parameters — how supply is split across suppliers, and what happens when one fails.",
           "grain": "metadata",
           "engine": {
@@ -9805,6 +10351,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The inventory family's parameters — reorder points, order-up-to levels, safety stock and holding cost.",
           "grain": "metadata",
           "engine": {
@@ -9835,6 +10382,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The transport family's parameters. Stored and versioned; consumed by no engine mapping today (blueprint G1/G7).",
           "grain": "metadata",
           "engine": {
@@ -9865,6 +10413,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The fulfillment family's parameters — how demand is allocated when it cannot all be met.",
           "grain": "metadata",
           "engine": {
@@ -9895,6 +10444,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who last changed the bundle.",
           "grain": "identifier",
           "engine": {
@@ -9925,6 +10475,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the bundle last changed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -9955,6 +10506,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the bundle was created. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -9985,6 +10537,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The production family's parameters — capacity and lot sizing at the plant.",
           "grain": "metadata",
           "engine": {
@@ -10015,6 +10568,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The recovery family's parameters — the response list a disruption triggers.",
           "grain": "metadata",
           "engine": {
@@ -10045,6 +10599,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The policy preset this bundle was seeded from, if any.",
           "grain": "identifier",
           "engine": {
@@ -10075,6 +10630,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The demand family's parameters. Stored and versioned; the engine takes demand from product data and outbound volume instead (blueprint §2.4).",
           "grain": "metadata",
           "engine": {
@@ -10105,6 +10661,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project-wide make-to-order / make-to-stock choice, used when a product does not state its own `fulfillment_mode`.",
           "grain": "metadata",
           "engine": {
@@ -10135,6 +10692,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The name of the preset currently applied, for display beside the grid.",
           "grain": "metadata",
           "engine": {
@@ -10165,6 +10723,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the preset was last applied.",
           "grain": "metadata",
           "engine": {
@@ -10350,6 +10909,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. The natural key is the UNIQUE constraint, not this.",
           "grain": "identifier",
           "engine": {
@@ -10380,6 +10940,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this override belongs to.",
           "grain": "identifier",
           "engine": {
@@ -10410,6 +10971,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What KIND of thing the override targets — a supplier, a material, a plant, a customer/product pair. Decides how `target_key` is read.",
           "grain": "metadata",
           "engine": {
@@ -10440,6 +11002,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "WHICH thing, in the scope's own spelling — a supplier_id, a material_id, or a composite like `customer::product`.",
           "grain": "identifier",
           "engine": {
@@ -10470,6 +11033,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which policy family this patch belongs to — the same vocabulary as policy_defaults' jsonb columns.",
           "grain": "metadata",
           "engine": {
@@ -10500,6 +11064,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The fields this target overrides, and only those. A field absent from the patch keeps the bundle's value — which is exactly why D1 mattered: writing a field the user never supplied turned a default into a decision.",
           "grain": "metadata",
           "engine": {
@@ -10530,6 +11095,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who last wrote this patch.",
           "grain": "identifier",
           "engine": {
@@ -10560,6 +11126,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the patch last changed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -10590,6 +11157,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the patch was created. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -10681,6 +11249,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this product belongs to. Half of the primary key.",
           "grain": "identifier",
           "engine": {
@@ -10711,6 +11280,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The product's code as the user's own systems spell it. Joins to the BOM and to every outbound arc that sells it.",
           "grain": "identifier",
           "engine": {
@@ -10741,6 +11311,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A human-readable name for the product. Display only.",
           "grain": "metadata",
           "engine": {
@@ -10789,6 +11360,7 @@
           "unit": "currency per unit of product",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What one unit of this product sells for. Where it is unset the engine uses the demand-weighted mean of the outbound arcs' prices, which is usually what the user means and is why leaving it blank is not an error.",
           "grain": "level",
           "engine": {
@@ -10842,6 +11414,7 @@
           "unit": "units per week",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much of this product the plant can make per week. The canonical G4 example: when it is unset the engine invents a capacity generous enough that capacity never binds, so an unset value silently turns off the constraint the user thinks they are simulating.",
           "grain": "rate",
           "engine": {
@@ -10895,6 +11468,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether this product is made to order or made to stock. Decides whether the simulation holds finished goods for it.",
           "grain": "metadata",
           "engine": {
@@ -10943,6 +11517,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The SHAPE of weekly demand for this product — constant, normal, triangular and so on. What the user types here is `demand_distribution`; the engine calls the resolved value `demand_model`.",
           "grain": "metadata",
           "engine": {
@@ -10991,6 +11566,7 @@
           "unit": "units per week",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Typical weekly demand for this product. The engine treats it as the MODE of the demand distribution, not its arithmetic mean — a distinction that matters the moment the distribution is skewed.",
           "grain": "rate",
           "engine": {
@@ -11049,6 +11625,7 @@
           "unit": "coefficient of variation (dimensionless)",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much weekly demand varies, as a coefficient of variation.",
           "grain": "level",
           "engine": {
@@ -11100,6 +11677,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row last changed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -11130,6 +11708,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was inserted. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -11160,6 +11739,7 @@
           "unit": "units per week",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The lowest weekly demand the distribution allows. Used by the triangular demand shape; a value above the mode is clamped to the mode rather than rejected.",
           "grain": "rate",
           "engine": {
@@ -11216,6 +11796,7 @@
           "unit": "units per week",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The highest weekly demand the distribution allows. Used by the triangular demand shape; a value below the mode is clamped to the mode rather than rejected.",
           "grain": "rate",
           "engine": {
@@ -11272,6 +11853,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which external system this row came from, when it was synced rather than uploaded. NULL for a hand-uploaded or hand-edited row.",
           "grain": "metadata",
           "engine": {
@@ -11302,6 +11884,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "This row's identifier in the external system, so a re-sync can match it.",
           "grain": "metadata",
           "engine": {
@@ -11332,6 +11915,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the external system last confirmed this row.",
           "grain": "metadata",
           "engine": {
@@ -11459,6 +12043,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key. The link's identity for every run that used it.",
           "grain": "identifier",
           "engine": {
@@ -11495,6 +12080,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The SuReSuite project this link feeds. One side of the two-sided grant.",
           "grain": "identifier",
           "engine": {
@@ -11525,6 +12111,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which external system — `orbit-mrp` is the only value any code writes. Free text, not CHECK-constrained, and that is the one place this table still assumes a single vendor: `ingest_runs.source_kind` is the closed vocabulary WP 3.1 added, and it is the one a reader should trust.",
           "grain": "level",
           "engine": {
@@ -11555,6 +12142,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The company/tenant identifier IN THE EXTERNAL SYSTEM. Part of the natural key with the project and the system: one project may link one company of one system exactly once.",
           "grain": "identifier",
           "engine": {
@@ -11585,6 +12173,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The company's display name, cached for the picker and refreshed on each sync. A LABEL and never a key (G1) — the id above is what the grant is about.",
           "grain": "metadata",
           "engine": {
@@ -11621,6 +12210,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The person whose own OAuth consent proved membership of that company, in `auth.users`. NOT NULL because the link IS that proof: there is no way to create one from a hand-typed company id, and an unattributed link would be a credential with no owner.",
           "grain": "identifier",
           "engine": {
@@ -11651,6 +12241,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The NAME of a secret in Supabase Vault, never a token. `get_erp_oauth_token(p_ref)` resolves it and is granted to `service_role` only, so a browser session cannot read the credential even though it can read this row.",
           "grain": "identifier",
           "engine": {
@@ -11681,6 +12272,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "active, needs_attention or revoked. A sync re-verifies both sides before touching data and revokes the link on failure rather than continuing on the old assumption.",
           "grain": "level",
           "engine": {
@@ -11711,6 +12303,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Why the status is what it is, in words a user can act on — \"Access revoked in orbit-mrp — reconnect\". The reason a revoked link is not a mystery.",
           "grain": "metadata",
           "engine": {
@@ -11741,6 +12334,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When both sides were last proved live. The age of the claim that this link still works.",
           "grain": "metadata",
           "engine": {
@@ -11771,6 +12365,7 @@
           "unit": "percent",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The percentage of changed rows below which a sync may promote itself without a human. 0 — the default — means every sync waits for approval.",
           "grain": "level",
           "engine": {
@@ -11801,6 +12396,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the link was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -11831,6 +12427,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the link was revoked, or NULL. With `status_detail`, the revocation is a record rather than a disappearance.",
           "grain": "metadata",
           "engine": {
@@ -11861,6 +12458,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A cron expression for scheduled syncs, or NULL for manual-only. Read by the pg_cron sweep and by any external scheduler driving the same RPC.",
           "grain": "metadata",
           "engine": {
@@ -11891,6 +12489,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the schedule is live. Two fields rather than one because a paused schedule must not lose its expression — turning sync off and on again should not require retyping the cron.",
           "grain": "level",
           "engine": {
@@ -11988,6 +12587,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project the membership is on. CASCADEs when the project is deleted.",
           "grain": "identifier",
           "engine": {
@@ -12024,6 +12624,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The approved user who holds it. CASCADEs when the account is deleted.",
           "grain": "identifier",
           "engine": {
@@ -12054,6 +12655,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What they may do here — `owner`, `editor`, `analyst` or `viewer`, CHECK-constrained and totally ordered by `project_role_rank()`. A PROJECT vocabulary, and deliberately not `organization_members.org_role` (owner|admin|member): they share the word \"owner\" and mean different things by it.",
           "grain": "metadata",
           "engine": {
@@ -12090,6 +12692,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who granted the membership. SET NULL rather than CASCADE on purpose — losing the granter's account must not silently delete the grant they made.",
           "grain": "identifier",
           "engine": {
@@ -12120,6 +12723,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the membership lapses. NULL means standing — unlike `delegation_grants`, where an end date is mandatory. `effective_project_role()` applies the comparison so no caller can forget it.",
           "grain": "metadata",
           "engine": {
@@ -12150,6 +12754,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Why the person is on the project, in the granter's words. Optional here and REQUIRED on a delegation: a standing membership is usually self-evident from the project, a temporary elevation never is.",
           "grain": "metadata",
           "engine": {
@@ -12187,6 +12792,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the membership was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -12217,6 +12823,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it was last changed. Server-stamped by DEFAULT only; no trigger maintains it.",
           "grain": "metadata",
           "engine": {
@@ -12308,6 +12915,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project role the row grants for — owner, editor, analyst or viewer.",
           "grain": "identifier",
           "engine": {
@@ -12344,6 +12952,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The capability, FK to `capabilities.key`. CASCADEs, so retiring a capability cannot leave grants pointing at nothing.",
           "grain": "identifier",
           "engine": {
@@ -12374,6 +12983,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether this role gets it. The layer is TRI-STATE in effect: a missing row means \"inherit from the org layer\", `false` means \"deny at the project level\". They are different answers and the resolver's COALESCE relies on it.",
           "grain": "metadata",
           "engine": {
@@ -12411,6 +13021,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the grant row was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -12441,6 +13052,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it was last changed. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -12597,6 +13209,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project's identity, and the `project_id` foreign key of every project-scoped table in the schema.",
           "grain": "identifier",
           "engine": {
@@ -12627,6 +13240,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project's title, as the modeller typed it.",
           "grain": "metadata",
           "engine": {
@@ -12657,6 +13271,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The approved user who owns the project. Stamped by `set_project_defaults()` from the calling user when not supplied, and it is the second half of every write policy: org match AND (modeller is caller OR caller is admin).",
           "grain": "identifier",
           "engine": {
@@ -12694,6 +13309,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The name of the plant this project models. Part of the `(modeler_id, plant_name, name)` unique constraint, and the join key the lane and BOM tables carry as their own `plant_name`.",
           "grain": "identifier",
           "engine": {
@@ -12724,6 +13340,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the chain is modelled as `Make-To-Stock` or `Make-To-Order`, CHECK-constrained to those two.",
           "grain": "metadata",
           "engine": {
@@ -12761,6 +13378,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the project has the datasets it needs to simulate. Maintained by `update_project_completion_status()`, not set by hand.",
           "grain": "metadata",
           "engine": {
@@ -12791,6 +13409,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the project was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -12821,6 +13440,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the project row was last modified. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -12851,6 +13471,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The owning organization, as a string, copied from the creating user at insert. NOT NULL with a default, so it always holds something.",
           "grain": "metadata",
           "engine": {
@@ -12888,6 +13509,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The owner's name, denormalized at insert. A display convenience, and stale the moment the user renames themselves; `modeler_id` is the fact.",
           "grain": "metadata",
           "engine": {
@@ -12918,6 +13540,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which bill-of-materials shape the project uses — `single` or `multi`. It decides which of `bom_single_level` / `bom_multi_level` is read, and every dataset RPC branches on it.",
           "grain": "metadata",
           "engine": {
@@ -12955,6 +13578,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "First day of the horizon the project simulates.",
           "grain": "metadata",
           "engine": {
@@ -12985,6 +13609,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Last day of the horizon the project simulates.",
           "grain": "metadata",
           "engine": {
@@ -13015,6 +13640,7 @@
           "unit": "degrees",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The plant's latitude in decimal degrees, WGS 84, for the network map.",
           "grain": "level",
           "engine": {
@@ -13045,6 +13671,7 @@
           "unit": "degrees",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The plant's longitude in decimal degrees, WGS 84, for the network map.",
           "grain": "level",
           "engine": {
@@ -13075,6 +13702,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The plant's location as typed, e.g. \"Hanoi, Vietnam\". The last comma-separated segment, uppercased and trimmed, is what the map matches against `risk_data.country`.",
           "grain": "metadata",
           "engine": {
@@ -13105,6 +13733,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the project models tier-2 and tier-3 suppliers as well as its direct ones. Gates the deep-tier tables and the multi-tier network pages.",
           "grain": "metadata",
           "engine": {
@@ -13135,6 +13764,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether the project's data was uploaded and curated by a user (`curated`) or generated for demonstration (`synthetic`).",
           "grain": "metadata",
           "engine": {
@@ -13178,6 +13808,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The owning organization by uuid. This is what the public /v1 API authorizes on (`api_can_access_project`: `p.organization_id = p_org_id`), and it is the plane that survives a rename.",
           "grain": "identifier",
           "engine": {
@@ -13316,6 +13947,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. Carries no meaning and joins to nothing.",
           "grain": "identifier",
           "engine": {
@@ -13346,6 +13978,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The country the risk class applies to, spelled as the network pages spell it — `upper(btrim(...))`, matching the last comma-separated segment of a node's `location_text`. A CHECK enforces the spelling so the unique index and the page lookup cannot disagree about whether 'Vietnam' and 'VIETNAM' are one country.",
           "grain": "identifier",
           "engine": {
@@ -13376,6 +14009,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The publisher's risk grade for the country, in the five-value vocabulary the map renders — Very Low, Low, Medium, High, Very High. An ordinal label, not a score: it may be compared for order and never averaged.",
           "grain": "level",
           "engine": {
@@ -13413,6 +14047,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Who published the figure — the named index or provider. NOT NULL because a country-risk grade with no named origin is an assertion the product cannot defend, and its only output is a colour a reader will take for fact.",
           "grain": "metadata",
           "engine": {
@@ -13443,6 +14078,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The edition the figure is from, as the publisher labels it (e.g. \"2025-H1\"). This is the table's version axis: reference data is versioned by vintage, not by project (PLAN.md §2).",
           "grain": "metadata",
           "engine": {
@@ -13473,6 +14109,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The licence the row is held under. NOT NULL, and the reason is specific: country-risk indices are mostly commercial, so a row whose licence is unrecorded is a row nobody can tell you may republish — including in an export (§5 T4).",
           "grain": "metadata",
           "engine": {
@@ -13503,6 +14140,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When this row was last written from the source. Freshness, not row age.",
           "grain": "metadata",
           "engine": {
@@ -13533,6 +14171,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was first inserted. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -13563,6 +14202,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was last modified. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -13662,6 +14302,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "the global app_role the row grants for — super_admin, admin, modeler or user.",
           "grain": "identifier",
           "engine": {
@@ -13698,6 +14339,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The capability, naming a row in `capabilities`.",
           "grain": "identifier",
           "engine": {
@@ -13728,6 +14370,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether this layer grants the capability. TRI-STATE in effect: a missing row means \"inherit from the next layer out\", `false` means \"deny here\". They are different answers and the resolver's COALESCE depends on the difference.",
           "grain": "metadata",
           "engine": {
@@ -13765,6 +14408,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -13795,6 +14439,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it was last changed. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -13886,6 +14531,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this supplier belongs to. Half of the primary key.",
           "grain": "identifier",
           "engine": {
@@ -13916,6 +14562,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The supplier's code as the user's own systems spell it. Joins to every inbound arc.",
           "grain": "identifier",
           "engine": {
@@ -13946,6 +14593,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A human-readable name for the supplier. Display only.",
           "grain": "metadata",
           "engine": {
@@ -13994,6 +14642,7 @@
           "unit": "units per week",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much this supplier can ship per week, across everything they supply. NULL means UNLIMITED — an infinite supplier, which is a deliberate modelling choice and not a missing value.",
           "grain": "rate",
           "engine": {
@@ -14047,6 +14696,7 @@
           "unit": "fraction of orders delivered as promised",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How often this supplier delivers as promised, as a fraction. 0.98 means two per cent of orders do not arrive as agreed. Defaults to 1.0 — a perfect supplier.",
           "grain": "level",
           "engine": {
@@ -14097,6 +14747,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row last changed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -14127,6 +14778,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was inserted. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -14157,6 +14809,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which external system this row came from, when it was synced rather than uploaded. NULL for a hand-uploaded or hand-edited row.",
           "grain": "metadata",
           "engine": {
@@ -14187,6 +14840,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "This row's identifier in the external system, so a re-sync can match it.",
           "grain": "metadata",
           "engine": {
@@ -14217,6 +14871,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the external system last confirmed this row.",
           "grain": "metadata",
           "engine": {
@@ -14478,6 +15133,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. Carries no meaning.",
           "grain": "identifier",
           "engine": {
@@ -14508,6 +15164,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The upstream end of the edge — a supplier, a material, or the plant, depending on which lane produced it.",
           "grain": "identifier",
           "engine": {
@@ -14538,6 +15195,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The downstream end of the edge.",
           "grain": "identifier",
           "engine": {
@@ -14568,6 +15226,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The focal plant this edge belongs to, by NAME — the join key G1 forbids. Renamed from `plant` by 20250822025432, which is also when its incorrect UNIQUE constraint stopped meaning one-row-per-plant.",
           "grain": "identifier",
           "engine": {
@@ -14598,6 +15257,7 @@
           "unit": "units per week",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The volume on this edge after unit normalization — always per WEEK, whatever period the uploaded row quoted. This is where D2's fix lands: before it, a supplier quoting 52 000 a year and one quoting 1 000 a week were summed as 52 000 and 1 000.",
           "grain": "rate",
           "engine": {
@@ -14628,6 +15288,7 @@
           "unit": "units of upstream per unit of downstream",
           "unit_source": "derived",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much of the upstream item one unit of the downstream item consumes, carried through from the BOM.",
           "grain": "level",
           "engine": {
@@ -14658,6 +15319,7 @@
           "unit": "fraction of the destination's inbound flow",
           "unit_source": "derived",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "This edge's share of everything flowing into its destination. A share, so the D2 unit error did not cancel: it decides which supplier the platform calls primary.",
           "grain": "level",
           "engine": {
@@ -14688,6 +15350,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the edge was first computed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -14718,6 +15381,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the edge was last recomputed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -14748,6 +15412,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names.",
           "grain": "metadata",
           "engine": {
@@ -14778,6 +15443,7 @@
           "unit": "score in [0, 1]",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The score behind `is_critical_node`.",
           "grain": "level",
           "engine": {
@@ -14808,6 +15474,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash.",
           "grain": "metadata",
           "engine": {
@@ -14844,6 +15511,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The user whose upload produced this edge. Referenced by the RLS policies.",
           "grain": "identifier",
           "engine": {
@@ -14874,6 +15542,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The owning organization, as a NAME with a `default_org` default. A displayable string used as an authorization key — the second half of G1, and the identity D13 says is compared by string.",
           "grain": "identifier",
           "engine": {
@@ -14904,6 +15573,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this edge belongs to. NULLABLE here, unlike every lane table — a row with no project is reachable only through the organization/uploader policies.",
           "grain": "identifier",
           "engine": {
@@ -14934,6 +15604,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which lane produced this edge — inbound, outbound or BOM.",
           "grain": "metadata",
           "engine": {
@@ -14964,6 +15635,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A coarser grouping of `data_source`, for filtering.",
           "grain": "metadata",
           "engine": {
@@ -14994,6 +15666,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether this edge was hidden for carrying no flow in either direction.",
           "grain": "metadata",
           "engine": {
@@ -15024,6 +15697,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the zero-flow filter last ran over this edge.",
           "grain": "metadata",
           "engine": {
@@ -15054,6 +15728,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow.",
           "grain": "metadata",
           "engine": {
@@ -15274,6 +15949,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate row identifier. Carries no meaning.",
           "grain": "identifier",
           "engine": {
@@ -15304,6 +15980,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this edge belongs to. NOT NULL here, unlike supply_chain_data.",
           "grain": "identifier",
           "engine": {
@@ -15334,6 +16011,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The focal plant this edge hangs off, by NAME — the join key G1 forbids.",
           "grain": "identifier",
           "engine": {
@@ -15364,6 +16042,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Which deep-tier upload produced this edge.",
           "grain": "metadata",
           "engine": {
@@ -15394,6 +16073,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The upstream end of the edge — a tier-2 or tier-3 supplier.",
           "grain": "identifier",
           "engine": {
@@ -15424,6 +16104,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The downstream end of the edge.",
           "grain": "identifier",
           "engine": {
@@ -15454,6 +16135,7 @@
           "unit": "units of upstream per unit of downstream",
           "unit_source": "derived",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How much of the upstream item one unit of the downstream item consumes.",
           "grain": "level",
           "engine": {
@@ -15484,6 +16166,7 @@
           "unit": "fraction of the destination's inbound flow",
           "unit_source": "derived",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "This edge's share of everything flowing into its destination. Its denominator is the eighth raw-volume read D2 missed — a share computed over unnormalized volumes until WP 0.2.",
           "grain": "level",
           "engine": {
@@ -15514,6 +16197,7 @@
           "unit": "units per week",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The volume on this edge, normalized to weeks. Unconstrained `numeric` here, unlike supply_chain_data's numeric(16,6) — so the normalization carries no overflow risk.",
           "grain": "rate",
           "engine": {
@@ -15544,6 +16228,7 @@
           "unit": "tiers upstream",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How many tiers upstream of the plant this edge sits. 2 is a supplier's supplier.",
           "grain": "level",
           "engine": {
@@ -15574,6 +16259,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The direct (tier-1) supplier this deep chain hangs off, so a deep edge can be attributed to a supplier the plant actually buys from.",
           "grain": "identifier",
           "engine": {
@@ -15604,6 +16290,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The user whose upload produced this edge. Referenced by RLS.",
           "grain": "identifier",
           "engine": {
@@ -15634,6 +16321,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The owning organization, as a NAME with a `default_org` default (G1, D13).",
           "grain": "identifier",
           "engine": {
@@ -15664,6 +16352,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the edge was first computed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -15694,6 +16383,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the edge was last recomputed. Server-set.",
           "grain": "metadata",
           "engine": {
@@ -15800,6 +16490,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        },
+        {
+          "name": "tier2_suppliers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -15832,6 +16531,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key. Not the grain — D5's signature, the same as the four lane tables: the row that means something is the supplier/upstream/material triple, and nothing enforces it.",
           "grain": "identifier",
           "engine": {
@@ -15862,6 +16562,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this relationship belongs to. Set by the server from the selected project; the CSV never carries it (G1 — a project is referenced by uuid, never by a name the user typed).",
           "grain": "identifier",
           "engine": {
@@ -15892,6 +16593,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project's plant, copied onto every row. A denormalization the schema has carried since 2025 and a trigger enforces: `ensure_dataset_plant_matches_project` refuses a row whose plant disagrees with its project's.",
           "grain": "identifier",
           "engine": {
@@ -15922,6 +16624,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The DOWNSTREAM party of this relationship, as the user's own systems spell it — the direct supplier whose own supplier is named beside it.",
           "grain": "identifier",
           "engine": {
@@ -15956,6 +16659,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The UPSTREAM party — who supplies `supplier_id`. The direction is what makes the row a tier-2 fact rather than a tier-1 one, and it is the column a reader most often has backwards.",
           "grain": "identifier",
           "engine": {
@@ -15990,6 +16694,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What flows along the relationship. NULLABLE, and the NULL is meaningful: it says the relationship is known but what it carries is not.",
           "grain": "identifier",
           "engine": {
@@ -16024,6 +16729,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How the two parties are related, in the user's own vocabulary. NOT a closed set: no CHECK constrains it and no code branches on it, so it is a label a person reads and nothing else.",
           "grain": "metadata",
           "engine": {
@@ -16058,6 +16764,10 @@
           "unit": "units per `time_unit`",
           "unit_source": "column",
           "unit_column": "time_unit",
+          "normalize_at_promotion": {
+            "conversion": "rate",
+            "canonical": "week"
+          },
           "meaning": "How much moves along the relationship over one `time_unit`. A RATE, like the lane tables' `volume`, and comparable across rows only after both are converted to the same period.",
           "grain": "rate",
           "engine": {
@@ -16093,6 +16803,7 @@
           "unit": "currency per unit",
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Price per unit of `material_id` along this relationship, in the project's own currency — which no column names anywhere in this schema.",
           "grain": "level",
           "engine": {
@@ -16128,6 +16839,7 @@
           "unit": "weeks",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How long the upstream party takes to deliver. WEEKS by omission rather than by contract — unlike `inbound_logistics`, this table has NO `lead_time_unit` column, so there is nothing to say otherwise (the D9 shape, one table later).",
           "grain": "level",
           "engine": {
@@ -16163,6 +16875,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The period `volume` is quoted over — day, week, month, quarter or year. It describes the VOLUME only and has never applied to `lead_time`.",
           "grain": "metadata",
           "engine": {
@@ -16197,6 +16910,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was written. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -16227,8 +16941,77 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was last written. Server-stamped by trigger.",
           "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+          "grain": "identifier",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -16333,6 +17116,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        },
+        {
+          "name": "tier3_suppliers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260916000019_promotion_upsert.sql"
         }
       ],
       "indexes": [
@@ -16365,6 +17157,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Surrogate key. Not the grain — D5's signature, the same as the four lane tables: the row that means something is the supplier/upstream/material triple, and nothing enforces it.",
           "grain": "identifier",
           "engine": {
@@ -16395,6 +17188,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project this relationship belongs to. Set by the server from the selected project; the CSV never carries it (G1 — a project is referenced by uuid, never by a name the user typed).",
           "grain": "identifier",
           "engine": {
@@ -16425,6 +17219,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The project's plant, copied onto every row. A denormalization the schema has carried since 2025 and a trigger enforces: `ensure_dataset_plant_matches_project` refuses a row whose plant disagrees with its project's.",
           "grain": "identifier",
           "engine": {
@@ -16455,6 +17250,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The DOWNSTREAM party of this relationship, as the user's own systems spell it — the tier-2 supplier whose own supplier is named beside it.",
           "grain": "identifier",
           "engine": {
@@ -16489,6 +17285,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The UPSTREAM party — who supplies `supplier_id`. The direction is what makes the row a tier-3 fact rather than a tier-2 one, and it is the column a reader most often has backwards.",
           "grain": "identifier",
           "engine": {
@@ -16523,6 +17320,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "What flows along the relationship. NULLABLE, and the NULL is meaningful: it says the relationship is known but what it carries is not.",
           "grain": "identifier",
           "engine": {
@@ -16557,6 +17355,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How the two parties are related, in the user's own vocabulary. NOT a closed set: no CHECK constrains it and no code branches on it, so it is a label a person reads and nothing else.",
           "grain": "metadata",
           "engine": {
@@ -16591,6 +17390,10 @@
           "unit": "units per `time_unit`",
           "unit_source": "column",
           "unit_column": "time_unit",
+          "normalize_at_promotion": {
+            "conversion": "rate",
+            "canonical": "week"
+          },
           "meaning": "How much moves along the relationship over one `time_unit`. A RATE, like the lane tables' `volume`, and comparable across rows only after both are converted to the same period.",
           "grain": "rate",
           "engine": {
@@ -16626,6 +17429,7 @@
           "unit": "currency per unit",
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Price per unit of `material_id` along this relationship, in the project's own currency — which no column names anywhere in this schema.",
           "grain": "level",
           "engine": {
@@ -16661,6 +17465,7 @@
           "unit": "weeks",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "How long the upstream party takes to deliver. WEEKS by omission rather than by contract — unlike `inbound_logistics`, this table has NO `lead_time_unit` column, so there is nothing to say otherwise (the D9 shape, one table later).",
           "grain": "level",
           "engine": {
@@ -16696,6 +17501,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The period `volume` is quoted over — day, week, month, quarter or year. It describes the VOLUME only and has never applied to `lead_time`.",
           "grain": "metadata",
           "engine": {
@@ -16730,6 +17536,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was written. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -16760,8 +17567,77 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was last written. Server-stamped by trigger.",
           "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000019_promotion_upsert.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+          "grain": "identifier",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -16864,6 +17740,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The user these entitlements belong to. PK, so a user has at most one row.",
           "grain": "identifier",
           "engine": {
@@ -16894,6 +17771,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The models this user may use, as `ai_models.id`. An allow-list, but read as one only when it is non-empty.",
           "grain": "metadata",
           "engine": {
@@ -16937,6 +17815,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The model a new conversation starts on. Nullable — the app falls back to its own default.",
           "grain": "identifier",
           "engine": {
@@ -16973,6 +17852,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The model used when the default is unavailable or over budget.",
           "grain": "identifier",
           "engine": {
@@ -17003,6 +17883,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Per-user sampling temperature override. Dimensionless and NOT a physical quantity — it is a model knob, recorded here so nobody mistakes it for one of the platform's measured values.",
           "grain": "metadata",
           "engine": {
@@ -17033,6 +17914,7 @@
           "unit": "tokens",
           "unit_source": "fixed",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "A per-user cap on context window size, in tokens. Nullable — the model's own limit applies.",
           "grain": "level",
           "engine": {
@@ -17063,6 +17945,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -17093,6 +17976,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it was last changed. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -17198,6 +18082,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "the user the row grants for.",
           "grain": "identifier",
           "engine": {
@@ -17234,6 +18119,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "The capability, naming a row in `capabilities`.",
           "grain": "identifier",
           "engine": {
@@ -17264,6 +18150,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "Whether this layer grants the capability. TRI-STATE in effect: a missing row means \"inherit from the next layer out\", `false` means \"deny here\". They are different answers and the resolver's COALESCE depends on the difference.",
           "grain": "metadata",
           "engine": {
@@ -17301,6 +18188,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When the row was created. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -17331,6 +18219,7 @@
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
+          "normalize_at_promotion": null,
           "meaning": "When it was last changed. Server-stamped.",
           "grain": "metadata",
           "engine": {
@@ -17355,5 +18244,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "781d87efe93d"
+  "contract_version": "899cf101c943"
 }

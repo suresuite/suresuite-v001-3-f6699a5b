@@ -193,6 +193,15 @@ BEGIN
   -- is the failure that would otherwise happen in production: `CREATE UNIQUE
   -- INDEX` on a table still holding duplicates does not warn, it aborts the
   -- deploy.
+  -- `SET CONSTRAINTS ALL IMMEDIATE` first, and it is not boilerplate.
+  -- `20260916000019` makes tier 2's `source_row_id` FK DEFERRABLE INITIALLY
+  -- DEFERRED (it has to — see that file's comment on the cascade ordering), and
+  -- PostgreSQL refuses `CREATE INDEX` on a table that has pending trigger events.
+  -- Production never meets this: a migration creates its indexes before writing
+  -- anything. A rehearsal does, because it writes and then builds. Flushing the
+  -- deferred checks here is the honest way to say so rather than reaching for a
+  -- non-deferrable constraint that would break the run deletion.
+  SET CONSTRAINTS ALL IMMEDIATE;
   BEGIN
     CREATE UNIQUE INDEX inbound_logistics_natural_key
       ON public.inbound_logistics (project_id, plant_name, supplier_id, material_id)
