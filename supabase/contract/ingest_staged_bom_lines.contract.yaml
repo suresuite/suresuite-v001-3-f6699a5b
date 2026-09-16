@@ -1,0 +1,268 @@
+# AUTHORED — the data contract's sidecar for `ingest_staged_bom_lines`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: ingest_staged_bom_lines
+tier: "1"
+schema_name: public
+grain: >-
+  One component line of one staged BOM version, as the source sent it: this
+  much of that component goes into one unit of the parent.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: erp_staged_bom_lines_pkey
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    RLS reaches the project through the RUN — `EXISTS (SELECT 1 FROM
+    ingest_runs r WHERE r.id = ingest_run_id AND
+    has_project_access(r.project_id))`. WP 3.1 rewrote it: the original went
+    through `project_erp_links`, which a run without a link cannot satisfy.
+    Two things about this table were invisible to the contract until that
+    rewrite, and both are worth recording. Its policy was created inside a `DO
+    $$ EXECUTE format(...) $$` loop, which `introspect.mjs` does not read, so
+    the contract recorded RLS enabled and ZERO policies and the generated page
+    published that — D28's blind spot from the other side, hiding protection
+    rather than exposure. The policies are now four literal statements.
+    `audited: false`: no tier-2 transition happens here, and the writer is the
+    service role (D36). The transition that DOES need an audit row is
+    promotion, which WP 3.3 makes an audited upsert.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key for one staged row. The staging tables carry no natural
+      key on purpose: they hold what a source SAID, including whatever
+      duplicates it said it with, and deduplication is a decision made at
+      promotion (WP 3.3), not a constraint that silently discards a source row
+      before anybody has seen it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run that staged this row. The owner: staged rows cascade with their
+      run, and the run is what carries the project, the source kind and the
+      approval.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Renamed from `sync_run_id` in WP 3.1, with the table it points at. WP
+      3.3 puts the same column on the tier-2 lanes, so one word covers the
+      whole path from a file to a canonical row.
+  link_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The ERP link the row came through, or NULL for a source that has none.
+      Redundant with the run's own `link_id` and kept because the connector
+      writes it; the RUN is the authority (I1) and a reader that disagrees
+      should believe the run.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  source_kind:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      csv, orbit-mrp or api — where this row came from. CHECK-constrained, and
+      it matches its run's value for every row any current writer produces.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NO DEFAULT after the backfill: a writer states its source. Duplicated
+      from the run deliberately — a staged row is read in bulk and joining to
+      the run to learn what it is would make the common read the expensive
+      one. If the two ever disagree the run wins.
+  fact_class:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      master or transactional. Master rows describe things that persist — an
+      item, a BOM, a supplier; transactional rows describe events with a date.
+      Nothing stages transactional rows yet; the vocabulary exists so WP 3.2's
+      parser has one to declare against rather than inventing one per file.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Every connector row is `master`, which is a fact about the connector and
+      not a placeholder: it pulls products, BOM versions and BOM lines. The
+      backfill therefore states something true, and then the DEFAULT is
+      dropped so the next source has to answer the question itself.
+  external_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The row's identifier IN THE SOURCE, exactly as the source spells it.
+      Never trimmed or case-folded here: tier 1 holds what arrived, and
+      normalizing at this tier would destroy the evidence that a source sent
+      `" MAT-1 "` (D8).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  external_bom_version_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The BOM header this line belongs to, in the source's identifier space —
+      joins to `ingest_staged_bom_versions.external_id` within the run.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  external_component_product_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The component consumed, in the source's identifier space. Becomes the
+      material side of a tier-2 BOM row once a promotion for BOMs exists.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  quantity_per_unit:
+    type: numeric
+    unit: null
+    unit_source: none
+    meaning: >-
+      How much of the component one unit of the parent consumes, in the
+      component's own unit of measure. The dimensionless-looking number that
+      is not dimensionless: it is per unit of the PARENT, and the parent's
+      unit is on the staged product.
+    grain: rate
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Untraced: nothing promotes BOM lines yet.
+      `bom_single_level.consumption_rate` is the tier-2 column it becomes, and
+      that column defaults to 1.0 when absent — a substitution the promotion
+      will have to declare (I6) rather than apply quietly.
+  scrap_factor:
+    type: numeric
+    unit: null
+    unit_source: none
+    meaning: >-
+      The source's expected scrap on this line, as the source expresses it — a
+      fraction in some systems and a percentage in others. NOT normalized
+      here, and that ambiguity is the reason a promotion cannot simply copy
+      it.
+    grain: rate
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Untraced, and deliberately not guessed. A 5 that means 5%% and a 0.05
+      that means the same thing differ by a factor of 100, and the engine has
+      no scrap concept to receive either. Whoever promotes it names the
+      source's convention first.
+  raw:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The complete source row, verbatim. The reason a field the mapper does
+      not yet understand is not lost: when a column turns out to matter, the
+      answer for rows already staged is in here rather than in a re-sync.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  diff_state:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      new, changed, unchanged or removed_upstream — what the sync decided this
+      row is, relative to the live tier-2 table. `removed_upstream` is the one
+      with teeth: it is NEVER promoted, because a source dropping a row is not
+      authority to delete the project's row.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Computed by the connector as a full-refresh comparison against
+      `products.source_external_id`. WP 3.4 renders it and WP 3.3 makes
+      promotion an upsert keyed on the natural key, at which point `changed`
+      and `new` stop being a guess about what the upsert will do.
+  staged_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row landed in staging. Server-stamped, and it is what the
+      promotion copies into `products.source_synced_at`, so a live row can say
+      how old the source data behind it is.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Renamed from `synced_at` in WP 3.1: a CSV upload is not a sync, and the
+      column had to mean the same thing for every source kind or it would have
+      needed a second one.
+
+note: >-
+  RENAMED FROM `erp_staged_bom_lines` IN PHASE 3 / WP 3.1. Nothing here is
+  visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`):
+  staged rows reach tier 2 only through an approved promotion, which is why
+  every `consumed_by` is null and why that is a statement rather than a gap.
+  The assertions that hold this table to it are `supabase/rehearsal/050` and
+  `060`. NOTHING WRITES THIS TABLE TODAY, for the same reason as the BOM
+  headers: the connector stages products only.

@@ -36,6 +36,8 @@ export function useDataMap(projectId: string | null | undefined) {
   const [inbound, setInbound] = useState<LaneRow[]>([]);
   const [outbound, setOutbound] = useState<LaneRow[]>([]);
   const [bomCount, setBomCount] = useState(0);
+  // D20: named lane tables whose read was cut short, for the grid to show.
+  const [truncated, setTruncated] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function useDataMap(projectId: string | null | undefined) {
       setInbound([]);
       setOutbound([]);
       setBomCount(0);
+      setTruncated([]);
       return;
     }
     let cancelled = false;
@@ -55,6 +58,7 @@ export function useDataMap(projectId: string | null | undefined) {
       setInbound(lanes.inbound as unknown as LaneRow[]);
       setOutbound(lanes.outbound as unknown as LaneRow[]);
       setBomCount(lanes.bom.length);
+      setTruncated(lanes.truncated);
       setLoading(false);
     })();
     return () => {
@@ -169,5 +173,5 @@ export function useDataMap(projectId: string | null | undefined) {
     };
   }, [inbound, outbound, bomCount, materials, products, suppliers, derived]);
 
-  return { statuses, loading: loading || mastersLoading };
+  return { statuses, truncated, loading: loading || mastersLoading };
 }

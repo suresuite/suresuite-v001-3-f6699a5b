@@ -296,6 +296,42 @@ async function d30() {
   });
 }
 
+// ── WP 3.1: the ingestion tables, after the rename ─────────────────────────
+//
+// The schema probe above already fails the run if `ingest_runs` and friends are
+// missing from production, which is the rename's structural proof. This is the
+// other half: a rename moves ROWS, and nothing in the repository can see whether
+// any arrived. It also answers a question WP 3.1 could not: how much connector
+// traffic production has ever had, which is what makes the "MRP behaviour must
+// not change" exit check worth what it costs.
+async function ingestTables() {
+  section("WP 3.1 — the ingestion tables, after the rename");
+
+  const counts = await tryQ(`
+    select (select count(*) from public.ingest_runs)::int              as runs,
+           (select count(*) from public.ingest_runs
+             where source_kind = 'orbit-mrp')::int                     as runs_connector,
+           (select count(*) from public.ingest_runs
+             where link_id is null)::int                               as runs_without_link,
+           (select count(*) from public.ingest_runs
+             where project_id is null)::int                            as runs_without_project,
+           (select count(*) from public.ingest_staged_products)::int    as staged_products,
+           (select count(*) from public.ingest_staged_bom_versions)::int as staged_bom_versions,
+           (select count(*) from public.ingest_staged_bom_lines)::int   as staged_bom_lines,
+           (select count(*) from public.ingest_files)::int              as landed_files,
+           (select count(*) from public.project_erp_links)::int         as links`);
+  report("row counts under the new names", counts, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    if (Number(r.runs_without_project) > 0) {
+      out(`- **${r.runs_without_project} run(s) carry no \`project_id\`**, which the NOT NULL should have made impossible. Read the migration before anything else.`);
+    }
+    if (Number(r.runs) === 0) {
+      out("- The connector has never run in production. The rename therefore moved an EMPTY table, and `supabase/rehearsal/050` — which runs against rows — is the only evidence that the path still works. That is the right way round, and it is why the assertion exists.");
+    }
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");
@@ -584,13 +620,25 @@ async function section15(pid) {
       out("- Project-scoped filtering is deliberately omitted: WP 0.1 closed the WRITE path, so the question is whether any seeded zeros survive anywhere.");
     });
 
-  section("§15 · D3 / D4 — the orphan tables are genuinely absent");
+  // The two names have OPPOSITE expectations and the first version of this
+  // report printed one verdict for both, so a correct result read as a finding:
+  // `risk_data` is EXPECTED — WP 1.4 adopted it and §15's own text says so —
+  // while `product_code_map` is expected to be gone (WP 3.0 dropped it). A
+  // report whose green case reads like an accusation is D42's lesson in
+  // miniature, so each name is judged against its own expectation.
+  section("§15 · D3 / D4 — the two adopted-or-dropped tables, each against its own expectation");
   report("orphan tables", await tryQ(`
     select table_name from information_schema.tables
     where table_schema = 'public' and table_name in ('product_code_map','risk_data')`),
-    (rows) => out(rows.length
-      ? `- **STILL PRESENT: ${rows.map((r) => r.table_name).join(", ")}** — WP 1.4's reconciliation described a table production still holds.`
-      : "- Neither table exists. WP 1.4's reconciliation matches production."));
+    (rows) => {
+      const present = new Set(rows.map((r) => r.table_name));
+      out(present.has("risk_data")
+        ? "- `risk_data` is present, which is CORRECT: WP 1.4 adopted it (`20260915000003_risk_data.sql`) and it is in the contract."
+        : "- **`risk_data` is MISSING from production** and a migration creates it — the schema probe above should already have failed this run.");
+      out(present.has("product_code_map")
+        ? "- **`product_code_map` is STILL PRESENT**, and WP 3.0's migration dropped it. Read `20260916000003` before anything else."
+        : "- `product_code_map` is gone, which is CORRECT: WP 3.0 dropped it (0 rows, no writer had ever existed).");
+    });
 }
 
 /**
@@ -691,6 +739,7 @@ async function main() {
   await d30();
   await d29();
   await boundaryDecisions();
+  await ingestTables();
 
   const project = await pickProject();
   if (!project) {

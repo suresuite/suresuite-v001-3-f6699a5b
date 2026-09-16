@@ -383,7 +383,12 @@ Flip the natural-key rule in check.mjs from warn to error and confirm it now fai
 
 ## Phase 3 — One ingestion contract
 
-### WP 3.1 — ingest_* generalization
+### WP 3.1 — ingest_* generalization ✅ done
+
+The prompt as issued is kept below. Two of its "already verified" facts did not
+survive contact and PLAN.md §10 + §16 carry the corrections: `delete-project`
+never enumerated the connector tables (they cascade from `projects`), and the
+regression test belonged in `supabase/rehearsal/`, not in a source-level test.
 
 ```
 Implement WP 3.1 from docs/PLAN.md.
@@ -400,7 +405,7 @@ Already verified (re-check before relying on it):
 · delete-project/index.ts:173 enumerates table names by hand, including
   product_code_map. It will break silently on rename — grep for every hardcoded
   table name before you finish.
-· projectLanes.ts:30-33 truncates at .limit(10000) with no flag. GradingDataset
+· projectLanes truncates with no flag — D20, see PLAN.md §4. GradingDataset
   already models this correctly with a `truncated` field — copy that pattern.
 
 Behaviour of the MRP connector must not change. Write the regression test for a
@@ -444,7 +449,7 @@ Already verified (re-check before relying on it):
   and report counts BEFORE deduplicating, and again after.
 · Duplicates distort sourcing_ratio (combine-project:277 — the duplicate appears in
   both numerator and denominator), the smart-average imputation basis
-  (useStageRows.tsx:120-131), and the grading reducers. Dedup will therefore CHANGE
+  (useStageRows.tsx:125-136), and the grading reducers. Dedup will therefore CHANGE
   numbers. That is the D5 damage being undone — record the before/after in §16 so
   nobody later mistakes it for a regression.
 · Normalization at promotion (invariant I3) is the point of this WP. After it, no
@@ -731,10 +736,10 @@ Implement WP 6.1 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · The Supplier stage is the deepest chain and the right one to do first:
-  columnSpecs.ts:119-181 declares the columns; useStageRows.tsx:208-354 builds the
+  columnSpecs.ts:119-181 declares the columns; useStageRows.tsx:213-359 builds the
   rows; resolveEffective.ts resolves each cell; project_map.py consumes the result.
 · Substitutions to document exhaustively: resolveField's `> 0` test
-  (useStageRows.tsx:164), the per-item-then-global smart averages (:146-153),
+  (useStageRows.tsx:162), the per-item-then-global smart averages (:146-153),
   defaultWhenMissing (columnSpecs.ts:132-171), the effectivePolicy bundle,
   liveDefault = derivedVal ?? 0 (resolveEffective.ts:135), grading.ts's reducers,
   and ENGINE_DEFAULT_PRICE.
@@ -761,7 +766,7 @@ Already verified (re-check before relying on it):
   nothing. It is COLUMN_FIT keep:true (columnSpecs.ts:353) while material_cost,
   which the engine does read, carries prio:8 and folds away first.
 · The cheapestInboundCost / resolveField divergence: grading.ts:159 floors a <=0
-  arc price to 1.0 before taking the min, while useStageRows.tsx:164 rejects the
+  arc price to 1.0 before taking the min, while useStageRows.tsx:162 rejects the
   same 0 and imputes an average. One row can show Price 42.50 (imputed) and Cost
   1.00 (derived) for the same material.
 · D16 residual from WP 0.1: the untracked branch is GONE — provenance now reads

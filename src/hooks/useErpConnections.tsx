@@ -16,10 +16,19 @@ export interface ProjectErpLink {
   created_at: string;
 }
 
-/** One sync attempt + its Sync Mapping Report (plan §6c.1). */
-export interface ErpSyncRun {
+/** One ingestion attempt + its Sync Mapping Report (plan §6c.1).
+ *
+ * WP 3.1 renamed the table `erp_sync_runs` -> `ingest_runs` and widened it:
+ * a run now carries its own `project_id` and a `source_kind`, and `link_id` is
+ * null for every source that has no ERP link (a CSV upload, an API push). This
+ * hook still lists CONNECTOR runs, so it groups by link and every row it reads
+ * has one — the nullable field is typed honestly rather than convenient.
+ */
+export interface IngestRun {
   id: string;
-  link_id: string;
+  project_id: string;
+  link_id: string | null;
+  source_kind: "csv" | "orbit-mrp" | "api";
   triggered_by: "manual" | "scheduled";
   status: "running" | "staged" | "applied" | "failed" | "skipped";
   rows_fetched: Record<string, number>;
@@ -38,7 +47,7 @@ export interface ErpSyncRun {
 
 export function useErpConnections(projectId: string | null) {
   const [links, setLinks] = useState<ProjectErpLink[]>([]);
-  const [runsByLink, setRunsByLink] = useState<Record<string, ErpSyncRun[]>>({});
+  const [runsByLink, setRunsByLink] = useState<Record<string, IngestRun[]>>({});
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -53,12 +62,16 @@ export function useErpConnections(projectId: string | null) {
 
     if (linkRows?.length) {
       const { data: runRows } = await supabase
-        .from("erp_sync_runs")
+        .from("ingest_runs")
         .select("*")
         .in("link_id", linkRows.map((l) => l.id))
         .order("created_at", { ascending: false });
-      const grouped: Record<string, ErpSyncRun[]> = {};
-      for (const run of (runRows as ErpSyncRun[]) ?? []) {
+      const grouped: Record<string, IngestRun[]> = {};
+      for (const run of (runRows as IngestRun[]) ?? []) {
+        // A run without a link is a CSV or API ingestion (WP 3.1's widening).
+        // The `.in()` above cannot return one; the guard is here so the type
+        // stays honest instead of the read being narrowed by a cast.
+        if (!run.link_id) continue;
         (grouped[run.link_id] ??= []).push(run);
       }
       setRunsByLink(grouped);

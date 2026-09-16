@@ -13,3 +13,4 @@
 #      cannot be written from a name. The schema probe is also now a GATE: this
 #      run is expected to FAIL while `customers` and `product_code_map` are
 #      untracked, and that is the gate working, not the runner breaking.
+WP 3.1 gap check — 2026-09-16T09:50:43Z

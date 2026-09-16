@@ -1,0 +1,364 @@
+# AUTHORED — the data contract's sidecar for `ingest_staged_products`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: ingest_staged_products
+tier: "1"
+schema_name: public
+grain: >-
+  One item-master row as one source sent it, inside one run. The source's own
+  shape plus provenance — not the project's shape, which it takes on at
+  promotion.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: erp_staged_products_pkey
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    RLS reaches the project through the RUN — `EXISTS (SELECT 1 FROM
+    ingest_runs r WHERE r.id = ingest_run_id AND
+    has_project_access(r.project_id))`. WP 3.1 rewrote it: the original went
+    through `project_erp_links`, which a run without a link cannot satisfy.
+    Two things about this table were invisible to the contract until that
+    rewrite, and both are worth recording. Its policy was created inside a `DO
+    $$ EXECUTE format(...) $$` loop, which `introspect.mjs` does not read, so
+    the contract recorded RLS enabled and ZERO policies and the generated page
+    published that — D28's blind spot from the other side, hiding protection
+    rather than exposure. The policies are now four literal statements.
+    `audited: false`: no tier-2 transition happens here, and the writer is the
+    service role (D36). The transition that DOES need an audit row is
+    promotion, which WP 3.3 makes an audited upsert.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key for one staged row. The staging tables carry no natural
+      key on purpose: they hold what a source SAID, including whatever
+      duplicates it said it with, and deduplication is a decision made at
+      promotion (WP 3.3), not a constraint that silently discards a source row
+      before anybody has seen it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run that staged this row. The owner: staged rows cascade with their
+      run, and the run is what carries the project, the source kind and the
+      approval.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Renamed from `sync_run_id` in WP 3.1, with the table it points at. WP
+      3.3 puts the same column on the tier-2 lanes, so one word covers the
+      whole path from a file to a canonical row.
+  link_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The ERP link the row came through, or NULL for a source that has none.
+      Redundant with the run's own `link_id` and kept because the connector
+      writes it; the RUN is the authority (I1) and a reader that disagrees
+      should believe the run.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  source_kind:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      csv, orbit-mrp or api — where this row came from. CHECK-constrained, and
+      it matches its run's value for every row any current writer produces.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NO DEFAULT after the backfill: a writer states its source. Duplicated
+      from the run deliberately — a staged row is read in bulk and joining to
+      the run to learn what it is would make the common read the expensive
+      one. If the two ever disagree the run wins.
+  fact_class:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      master or transactional. Master rows describe things that persist — an
+      item, a BOM, a supplier; transactional rows describe events with a date.
+      Nothing stages transactional rows yet; the vocabulary exists so WP 3.2's
+      parser has one to declare against rather than inventing one per file.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Every connector row is `master`, which is a fact about the connector and
+      not a placeholder: it pulls products, BOM versions and BOM lines. The
+      backfill therefore states something true, and then the DEFAULT is
+      dropped so the next source has to answer the question itself.
+  external_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The row's identifier IN THE SOURCE, exactly as the source spells it.
+      Never trimmed or case-folded here: tier 1 holds what arrived, and
+      normalizing at this tier would destroy the evidence that a source sent
+      `" MAT-1 "` (D8).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  sku:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The source's stock-keeping unit. Becomes `products.product_id` at
+      promotion when present, which is why a source with no SKU falls back to
+      `external_id` — stated here because a silent fallback is exactly what I6
+      forbids.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The item's display name in the source. Never a join key (G1).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  product_type:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      finished_good, subassembly or raw_material as the SOURCE classifies it.
+      Not CHECK-constrained: the vocabulary is the source's, and forcing it
+      into ours at tier 1 would be normalizing before anybody has looked.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not mapped into tier 2 by the connector's promotion today. It is kept
+      because the classification decides which item master a row belongs in,
+      and WP 3.4's review screen is where that decision gets a surface.
+  unit_of_measure:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The unit the source quotes quantities in, in the source's own vocabulary
+      (EA, KG, M). Recorded, NOT converted: `normalize-at-promotion` (I3) says
+      units normalize on the way into tier 2 and nowhere else.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Nothing converts it yet. The promotion this sits behind writes only
+      identity and name, so no quantity crosses the tier boundary and no
+      conversion can be silently wrong. WP 3.3 is where the conversion lands,
+      and this column is its input.
+  lead_time_days:
+    type: numeric
+    unit: day
+    unit_source: fixed
+    meaning: >-
+      The source's replenishment lead time for the item, in DAYS as the source
+      states it.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      DAYS here, weeks in `inbound_logistics.lead_time` (the unit table,
+      `contract:units`). The conversion belongs at promotion (I3) and does not
+      exist yet; nothing reads this column, so nothing converts it wrongly
+      today.
+  moq:
+    type: numeric
+    unit: null
+    unit_source: none
+    meaning: >-
+      Minimum order quantity in the source's own unit of measure.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Untraced by design at this tier. `materials.moq` is the tier-2 column it
+      would become; the connector's promotion does not write it yet.
+  unit_cost:
+    type: numeric
+    unit: null
+    unit_source: none
+    meaning: >-
+      The source's unit cost, in the source's currency. No currency column
+      exists — the connector never sent one — so a multi-currency source would
+      need one before this value could be compared with anything.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Recorded as a known limit rather than a silent one (§5 T3). Nothing
+      reads it: promotion does not write cost, so no figure in the product
+      depends on this number today.
+  supplier_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The supplier the source names for this item, as free text. A NAME, and
+      therefore never a join key (G1) — resolving it to a `suppliers` row is a
+      decision the review screen will have to surface, not one to make
+      silently.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  supplier_number:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The supplier's identifier in the source system. This is the one that can
+      resolve to a supplier, and it still does not today.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  cycle_time_seconds:
+    type: numeric
+    unit: second
+    unit_source: fixed
+    meaning: >-
+      Production cycle time per unit, in seconds, as the source states it.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Seconds is the SOURCE's unit and the column name says so, which is the
+      rule the unit table enforces for tier 2 (`contract:units`). Nothing
+      reads it; the conversion to the engine's unit would happen at promotion
+      (I3).
+  raw:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The complete source row, verbatim. The reason a field the mapper does
+      not yet understand is not lost: when a column turns out to matter, the
+      answer for rows already staged is in here rather than in a re-sync.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  diff_state:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      new, changed, unchanged or removed_upstream — what the sync decided this
+      row is, relative to the live tier-2 table. `removed_upstream` is the one
+      with teeth: it is NEVER promoted, because a source dropping a row is not
+      authority to delete the project's row.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Computed by the connector as a full-refresh comparison against
+      `products.source_external_id`. WP 3.4 renders it and WP 3.3 makes
+      promotion an upsert keyed on the natural key, at which point `changed`
+      and `new` stop being a guess about what the upsert will do.
+  staged_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row landed in staging. Server-stamped, and it is what the
+      promotion copies into `products.source_synced_at`, so a live row can say
+      how old the source data behind it is.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Renamed from `synced_at` in WP 3.1: a CSV upload is not a sync, and the
+      column had to mean the same thing for every source kind or it would have
+      needed a second one.
+
+note: >-
+  RENAMED FROM `erp_staged_products` IN PHASE 3 / WP 3.1. Nothing here is
+  visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`):
+  staged rows reach tier 2 only through an approved promotion, which is why
+  every `consumed_by` is null and why that is a statement rather than a gap.
+  The assertions that hold this table to it are `supabase/rehearsal/050` and
+  `060`. WHAT IS NOT HERE. No CSV writer — WP 3.2 builds it, and `fact_class`
+  and `source_kind` exist so that it has somewhere truthful to write. No
+  natural key: see the `id` field. No audit: see governance.

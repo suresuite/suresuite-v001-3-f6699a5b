@@ -1,0 +1,363 @@
+# AUTHORED — the data contract's sidecar for `ingest_runs`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: ingest_runs
+tier: "1"
+schema_name: public
+grain: >-
+  One ingestion attempt, from any source — a connector sync, a CSV upload or
+  an API push — with the counts and the mapping report it produced. The unit a
+  person reviews and approves: staged rows belong to a run, and promotion is a
+  decision about a run rather than about a row.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: erp_sync_runs_pkey
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    RLS keys on the run's own `project_id` — `has_project_access(project_id)`
+    — which is WP 3.1's change. The original policy reached the project
+    through `project_erp_links`, and a run with no link (`source_kind` csv or
+    api) could not be reached that way at all: it would have been ungoverned
+    rather than merely unsupported. `audited: false` is the honest record and
+    it is a gap with an owner: the only writer today is the connector edge
+    function running as the service role, which cannot name an actor (D36). WP
+    3.2 lands the upload path and is where the landing becomes an audited
+    transition. `min_project_role: editor` states the intent — a viewer has no
+    business opening an ingestion run — and nothing enforces the role yet; the
+    policy is the modeler-or-admin predicate the connector shipped with.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. Not the grain: a run is identified by what it did, and
+      nothing joins to this except the staging rows and the landed files.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this run ingests into. Added in WP 3.1 and NOT NULL: it is
+      what the RLS policy reads, so a run is governed by the project it writes
+      to rather than by the credential it happened to use.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Backfilled from `project_erp_links.project_id` for every row that
+      existed. The backfill was total by construction — `link_id` was NOT NULL
+      with a foreign key — which is why the migration sets NOT NULL without
+      the guard `customers` needed.
+  link_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The ERP link this run used, or NULL for a source that has none. NULL
+      means 'this source needs no link', never 'the link was lost' — a CSV
+      upload and an API push have no credential to point at.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Was NOT NULL until WP 3.1. Nullable is the widening: with it, a run
+      belongs to a project rather than to a connector.
+  source_kind:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Where this run's rows came from: csv, orbit-mrp or api.
+      CHECK-constrained, so a fourth source cannot appear without a migration
+      that decides what it is.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NO DEFAULT, deliberately. The column is backfilled to 'orbit-mrp' for
+      the runs that existed and the default is then dropped, so the next
+      writer must state its source. A default here would record a CSV upload
+      as a connector sync and nobody would be told, which is the §5 T1 failure
+      — a value with no provenance — inside the table that exists to record
+      provenance.
+  triggered_by:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      manual or scheduled. A manual run was asked for by a person; a scheduled
+      one was started by the cron sweep against the link's
+      `sync_schedule_cron`.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input. It is the field that decides whether
+      `triggered_by_user_id` is allowed to be NULL — a scheduled run has no
+      person, and saying so is `audit-actor` (G4) being honest rather than
+      inventing an actor.
+  triggered_by_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The person who asked for a manual run, in `auth.users`. NULL for a
+      scheduled run, where there is no person — stated rather than back-filled
+      to a service account, because 'nobody asked, the schedule did' is the
+      true answer (G4).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  status:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      running, staged, applied, failed or skipped. `staged` is the state that
+      matters: rows are in tier 1 and a human has not approved them. Nothing
+      reaches tier 2 before `applied`.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not read by the engine and never will be: tier 1 is invisible below it
+      (I2). The readers are the review UI and the connector's own auto-apply
+      gate, which refuses to promote a run with any `fields_failed`.
+  rows_fetched:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      Row counts pulled from the source, per entity — {"products": 1007,
+      "bom_versions": 25}. What the source OFFERED, which is not what was
+      staged and not what was promoted.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rows_new:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Staged rows the diff classified as new: no live row carries this source
+      identifier yet.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rows_changed:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Staged rows whose live counterpart exists and differs.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rows_unchanged:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Staged rows identical to their live counterpart. Counted rather than
+      dropped: 'nothing changed' is a result, and a report that omits it
+      cannot be distinguished from one that failed.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rows_removed:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Rows present in the live table under this source and absent from the
+      pull — `diff_state = removed_upstream`. Never promoted by the connector:
+      a source dropping a row is not authority to delete the project's row.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  mapping_warnings:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The per-field mapping report: [{level, entity, field, reason}], the same
+      shape as `simulation_runs.mapping_warnings` and scsim's MappingWarning,
+      so MappingWarningsCard renders it unmodified.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  fields_mapped:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Source fields that landed in a staged column with a value.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  fields_defaulted:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Source fields the source did not provide, left null for the project's
+      defaults to fill at promotion. This is the count that drives the amber
+      badge — a defaulted field is a substitution and §5 T2 says it is visible
+      at the point of display.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  fields_failed:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Source fields that could not be mapped at all. A run with any failure
+      never auto-applies, whatever the link's threshold says.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  diff_summary:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The rendered diff the review UI reads, kept until the run is applied or
+      rejected. WP 3.4 builds that screen; the column is the connector's own
+      and predates it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  applied_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the staged rows were promoted to tier 2. NULL for every run that
+      has not been approved — which is most of them, by design.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  applied_by_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who approved the promotion, in `auth.users`. NULL when the link's
+      auto-apply threshold promoted it, and that NULL is the one D36 is about:
+      an automatic promotion has no actor and says so rather than borrowing
+      one.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  error_detail:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Why a failed run failed, in the source's own words. Kept verbatim: a
+      paraphrased error is a second source for a fact that already had one.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the run opened. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  RENAMED FROM `erp_sync_runs` IN PHASE 3 / WP 3.1. The connector migration
+  named it for the only source that existed and said in its own COMMENT ON
+  TABLE that the name would be generalized in Phase 3; invariant
+  `ingestion-contract` (I7) is why it had to be. A table whose name asserts
+  one vendor cannot hold a second source's rows without lying about what it
+  is. WHAT IS NOT HERE YET. Nothing writes a `csv` or `api` run: WP 3.2 builds
+  the `ingest-file` edge function that does. The columns those runs need are
+  here and described, which is the point of landing the schema one package
+  ahead of its writer — WP 3.2 should not have to invent a schema and a parser
+  in the same session. `supabase/rehearsal/050` and `060` assert what this
+  table does: a connector run still stages, diffs and promotes identically,
+  and a link-less run is legal and governed.

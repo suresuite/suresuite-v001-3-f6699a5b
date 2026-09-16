@@ -25,19 +25,61 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "7ac607d5f5ad";
+export const CONTRACT_VERSION = "64f3f2bdb4a2";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260916000011_org_identity_uuid_only.sql";
+export const LAST_MIGRATION = "20260916000013_ingest_files_tier0.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 77,
-  "tablesDescribed": 27,
-  "columnsDescribed": 275,
-  "tablesUndescribed": 50
+  "tablesInSchema": 78,
+  "tablesDescribed": 33,
+  "columnsDescribed": 366,
+  "tablesUndescribed": 45
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
 export const TIERS: GlanceTier[] = [
+  {
+    "tier": "0",
+    "name": "landing — raw bytes as received",
+    "tables": [
+      {
+        "table": "ingest_files",
+        "grain": "One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one.",
+        "columns": 11,
+        "owner": "data-ingestion"
+      }
+    ]
+  },
+  {
+    "tier": "1",
+    "name": "staging — parsed, diffed, unpromoted",
+    "tables": [
+      {
+        "table": "ingest_runs",
+        "grain": "One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row.",
+        "columns": 21,
+        "owner": "data-ingestion"
+      },
+      {
+        "table": "ingest_staged_bom_lines",
+        "grain": "One component line of one staged BOM version, as the source sent it: this much of that component goes into one unit of the parent.",
+        "columns": 13,
+        "owner": "data-ingestion"
+      },
+      {
+        "table": "ingest_staged_bom_versions",
+        "grain": "One BOM header as one source sent it, inside one run — a named version of a product's bill of materials, whose lines are staged in `ingest_staged_bom_lines`.",
+        "columns": 12,
+        "owner": "data-ingestion"
+      },
+      {
+        "table": "ingest_staged_products",
+        "grain": "One item-master row as one source sent it, inside one run. The source's own shape plus provenance — not the project's shape, which it takes on at promotion.",
+        "columns": 19,
+        "owner": "data-ingestion"
+      }
+    ]
+  },
   {
     "tier": "2",
     "name": "canonical — the only tier humans edit",
@@ -181,6 +223,12 @@ export const TIERS: GlanceTier[] = [
         "owner": "platform"
       },
       {
+        "table": "project_erp_links",
+        "grain": "One authorized link between one project and one company in one external system: project ownership proved on this side, company membership proved on that side by the linking user's own OAuth consent. One link is one credential and one project — never shared, so revoking one project's link cannot be bypassed by a sibling.",
+        "columns": 15,
+        "owner": "data-ingestion"
+      },
+      {
         "table": "project_members",
         "grain": "One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between \"in the organization\" (sees every project) and \"not in it\" (sees none).",
         "columns": 8,
@@ -235,32 +283,12 @@ export const TIERS: GlanceTier[] = [
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
   {
-    "wp": "3.1",
-    "why": "The other inbound datasets. WP 3.1 generalizes `ingest_*` and WP 3.2 moves the parse server-side; these tables land on the same ingestion contract as the four lane tables, and their sidecars are written against that contract rather than against the bespoke paths each has today.",
+    "wp": "3.2",
+    "why": "The other inbound datasets. WP 3.1 described the tables the ingestion contract OWNS — `ingest_runs`, the three `ingest_staged_*` and `ingest_files` — and `project_erp_links` with them, because a deferral is a commitment and carrying one to the next open package is how a defect ends up owned by nobody (D41). These three are what it does not own: each still has its own bespoke upload path, and their sidecars are written against the ingestion contract rather than against those paths. WP 3.2 moves the parse server-side, which is when there is one path to describe them against.",
     "tables": [
-      {
-        "table": "erp_staged_bom_lines",
-        "columns": 11
-      },
-      {
-        "table": "erp_staged_bom_versions",
-        "columns": 10
-      },
-      {
-        "table": "erp_staged_products",
-        "columns": 17
-      },
-      {
-        "table": "erp_sync_runs",
-        "columns": 19
-      },
       {
         "table": "multi_tier_supply_chain",
         "columns": 9
-      },
-      {
-        "table": "project_erp_links",
-        "columns": 15
       },
       {
         "table": "tier2_suppliers",

@@ -17,6 +17,9 @@ export interface StageRowsQuery {
   rows: StageRow[];
   loading: boolean;
   fallback: boolean;
+  /** D20: lane tables whose read hit `LANE_ROW_CEILING`. The stage renders it
+   *  (`LaneTruncationNotice`) — these rows are a slice when it is non-empty. */
+  truncated: string[];
   reload: () => void;
 }
 

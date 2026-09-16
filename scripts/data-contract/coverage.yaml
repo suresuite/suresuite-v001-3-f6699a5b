@@ -18,21 +18,20 @@
 # moves with it in the same commit.
 
 deferred:
-  - wp: "3.1"
+  - wp: "3.2"
     why: >-
-      The other inbound datasets. WP 3.1 generalizes `ingest_*` and WP 3.2 moves
-      the parse server-side; these tables land on the same ingestion contract as
-      the four lane tables, and their sidecars are written against that contract
-      rather than against the bespoke paths each has today.
+      The other inbound datasets. WP 3.1 described the tables the ingestion
+      contract OWNS — `ingest_runs`, the three `ingest_staged_*` and `ingest_files`
+      — and `project_erp_links` with them, because a deferral is a commitment and
+      carrying one to the next open package is how a defect ends up owned by
+      nobody (D41). These three are what it does not own: each still has its own
+      bespoke upload path, and their sidecars are written against the ingestion
+      contract rather than against those paths. WP 3.2 moves the parse
+      server-side, which is when there is one path to describe them against.
     tables:
       - multi_tier_supply_chain
       - tier2_suppliers
       - tier3_suppliers
-      - erp_staged_products
-      - erp_staged_bom_versions
-      - erp_staged_bom_lines
-      - erp_sync_runs
-      - project_erp_links
 
   - wp: "4.2"
     why: >-

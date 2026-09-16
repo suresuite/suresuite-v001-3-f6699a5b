@@ -1,20 +1,20 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 308,
-  "migrations_applied": 305,
+  "migrations_found": 310,
+  "migrations_applied": 307,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000011_org_identity_uuid_only.sql",
+  "last_migration": "20260916000013_ingest_files_tier0.sql",
   "counts": {
-    "tables": 77,
+    "tables": 78,
     "views": 7,
     "enums": 4,
-    "functions": 240,
+    "functions": 241,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
     "dynamic_ddl_statements": 32,
-    "rls_indeterminate_tables": 7,
+    "rls_indeterminate_tables": 4,
     "orphans": 0,
     "aborted_migrations": 3
   },
@@ -5555,957 +5555,6 @@
       ]
     },
     {
-      "name": "erp_staged_bom_lines",
-      "schema": "public",
-      "created_by": "20260829120000_erp_connector_phase1_2.sql",
-      "columns": [
-        {
-          "name": "id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": "gen_random_uuid()",
-          "primary_key": true,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "sync_run_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "erp_sync_runs",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "CASCADE"
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "link_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "project_erp_links",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "CASCADE"
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "external_id",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "external_bom_version_id",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "external_component_product_id",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "quantity_per_unit",
-          "quoted": false,
-          "type": "numeric",
-          "type_raw": "numeric",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "scrap_factor",
-          "quoted": false,
-          "type": "numeric",
-          "type_raw": "numeric",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "raw",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "diff_state",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": "'new'",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "synced_at",
-          "quoted": false,
-          "type": "timestamp with time zone",
-          "type_raw": "timestamptz",
-          "nullable": false,
-          "default": "now()",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "erp_staged_bom_lines_pkey",
-          "kind": "PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "definition": "PRIMARY KEY (id)",
-          "implicit": true,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "erp_staged_bom_lines_sync_run_idx",
-          "unique": false,
-          "columns": [
-            "sync_run_id"
-          ],
-          "predicate": null,
-          "partial": false,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "rls": {
-        "enabled": true,
-        "forced": false,
-        "policies": [],
-        "determinate": false,
-        "indeterminate_from": [
-          "20260829120000_erp_connector_phase1_2.sql"
-        ]
-      },
-      "replica_identity": null,
-      "comment": null,
-      "natural_key_unique": [
-        {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": "erp_staged_bom_lines_pkey"
-        }
-      ]
-    },
-    {
-      "name": "erp_staged_bom_versions",
-      "schema": "public",
-      "created_by": "20260829120000_erp_connector_phase1_2.sql",
-      "columns": [
-        {
-          "name": "id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": "gen_random_uuid()",
-          "primary_key": true,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "sync_run_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "erp_sync_runs",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "CASCADE"
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "link_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "project_erp_links",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "CASCADE"
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "external_id",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "external_product_id",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "version",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "is_active",
-          "quoted": false,
-          "type": "boolean",
-          "type_raw": "boolean",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "raw",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "diff_state",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": "'new'",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "synced_at",
-          "quoted": false,
-          "type": "timestamp with time zone",
-          "type_raw": "timestamptz",
-          "nullable": false,
-          "default": "now()",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "erp_staged_bom_versions_pkey",
-          "kind": "PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "definition": "PRIMARY KEY (id)",
-          "implicit": true,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "erp_staged_bom_versions_sync_run_idx",
-          "unique": false,
-          "columns": [
-            "sync_run_id"
-          ],
-          "predicate": null,
-          "partial": false,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "rls": {
-        "enabled": true,
-        "forced": false,
-        "policies": [],
-        "determinate": false,
-        "indeterminate_from": [
-          "20260829120000_erp_connector_phase1_2.sql"
-        ]
-      },
-      "replica_identity": null,
-      "comment": null,
-      "natural_key_unique": [
-        {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": "erp_staged_bom_versions_pkey"
-        }
-      ]
-    },
-    {
-      "name": "erp_staged_products",
-      "schema": "public",
-      "created_by": "20260829120000_erp_connector_phase1_2.sql",
-      "columns": [
-        {
-          "name": "id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": "gen_random_uuid()",
-          "primary_key": true,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "sync_run_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "erp_sync_runs",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "CASCADE"
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "link_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "project_erp_links",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "CASCADE"
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "external_id",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "sku",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "name",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "product_type",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "unit_of_measure",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "lead_time_days",
-          "quoted": false,
-          "type": "numeric",
-          "type_raw": "numeric",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "moq",
-          "quoted": false,
-          "type": "numeric",
-          "type_raw": "numeric",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "unit_cost",
-          "quoted": false,
-          "type": "numeric",
-          "type_raw": "numeric",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "supplier_name",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "supplier_number",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "cycle_time_seconds",
-          "quoted": false,
-          "type": "numeric",
-          "type_raw": "numeric",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "raw",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "diff_state",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": "'new'",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "synced_at",
-          "quoted": false,
-          "type": "timestamp with time zone",
-          "type_raw": "timestamptz",
-          "nullable": false,
-          "default": "now()",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "erp_staged_products_pkey",
-          "kind": "PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "definition": "PRIMARY KEY (id)",
-          "implicit": true,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "erp_staged_products_sync_run_idx",
-          "unique": false,
-          "columns": [
-            "sync_run_id"
-          ],
-          "predicate": null,
-          "partial": false,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "rls": {
-        "enabled": true,
-        "forced": false,
-        "policies": [],
-        "determinate": false,
-        "indeterminate_from": [
-          "20260829120000_erp_connector_phase1_2.sql"
-        ]
-      },
-      "replica_identity": null,
-      "comment": null,
-      "natural_key_unique": [
-        {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": "erp_staged_products_pkey"
-        }
-      ]
-    },
-    {
-      "name": "erp_sync_runs",
-      "schema": "public",
-      "created_by": "20260829120000_erp_connector_phase1_2.sql",
-      "columns": [
-        {
-          "name": "id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": "gen_random_uuid()",
-          "primary_key": true,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "link_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "project_erp_links",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "CASCADE"
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "triggered_by",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "triggered_by_user_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "status",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": false,
-          "default": "'running'",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "rows_fetched",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": false,
-          "default": "'{}'::jsonb",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "rows_new",
-          "quoted": false,
-          "type": "integer",
-          "type_raw": "int",
-          "nullable": false,
-          "default": "0",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "rows_changed",
-          "quoted": false,
-          "type": "integer",
-          "type_raw": "int",
-          "nullable": false,
-          "default": "0",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "rows_unchanged",
-          "quoted": false,
-          "type": "integer",
-          "type_raw": "int",
-          "nullable": false,
-          "default": "0",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "rows_removed",
-          "quoted": false,
-          "type": "integer",
-          "type_raw": "int",
-          "nullable": false,
-          "default": "0",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "mapping_warnings",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": false,
-          "default": "'[]'::jsonb",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "fields_mapped",
-          "quoted": false,
-          "type": "integer",
-          "type_raw": "int",
-          "nullable": false,
-          "default": "0",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "fields_defaulted",
-          "quoted": false,
-          "type": "integer",
-          "type_raw": "int",
-          "nullable": false,
-          "default": "0",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "fields_failed",
-          "quoted": false,
-          "type": "integer",
-          "type_raw": "int",
-          "nullable": false,
-          "default": "0",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "diff_summary",
-          "quoted": false,
-          "type": "jsonb",
-          "type_raw": "jsonb",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "applied_at",
-          "quoted": false,
-          "type": "timestamp with time zone",
-          "type_raw": "timestamptz",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "applied_by_user_id",
-          "quoted": false,
-          "type": "uuid",
-          "type_raw": "uuid",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": {
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "error_detail",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        },
-        {
-          "name": "created_at",
-          "quoted": false,
-          "type": "timestamp with time zone",
-          "type_raw": "timestamptz",
-          "nullable": false,
-          "default": "now()",
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "erp_sync_runs_pkey",
-          "kind": "PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "definition": "PRIMARY KEY (id)",
-          "implicit": true,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "erp_sync_runs_link_idx",
-          "unique": false,
-          "columns": [
-            "link_id",
-            "created_at DESC"
-          ],
-          "predicate": null,
-          "partial": false,
-          "added_by": "20260829120000_erp_connector_phase1_2.sql"
-        }
-      ],
-      "rls": {
-        "enabled": true,
-        "forced": false,
-        "policies": [
-          {
-            "name": "erp_sync_runs: project access",
-            "command": "ALL",
-            "roles": [
-              "authenticated"
-            ],
-            "using": "EXISTS (SELECT 1 FROM public.project_erp_links l WHERE l.id = link_id AND public.has_project_access(l.project_id))",
-            "with_check": "EXISTS (SELECT 1 FROM public.project_erp_links l WHERE l.id = link_id AND public.has_project_access(l.project_id))",
-            "added_by": "20260829120000_erp_connector_phase1_2.sql"
-          }
-        ],
-        "determinate": true
-      },
-      "replica_identity": null,
-      "comment": "Audit trail + Sync Mapping Report source for every connector sync, manual ",
-      "natural_key_unique": [
-        {
-          "source": "column PRIMARY KEY",
-          "columns": [
-            "id"
-          ],
-          "name": "erp_sync_runs_pkey"
-        }
-      ]
-    },
-    {
       "name": "experiments",
       "schema": "public",
       "created_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
@@ -7143,6 +6192,1380 @@
             "id"
           ],
           "name": "inbound_logistics_pkey"
+        }
+      ]
+    },
+    {
+      "name": "ingest_files",
+      "schema": "public",
+      "created_by": "20260916000013_ingest_files_tier0.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "source_kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "original_filename",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "storage_bucket",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "storage_path",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "content_type",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "byte_size",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "content_sha256",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "uploaded_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "received_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": null,
+          "kind": "UNIQUE",
+          "columns": [
+            "storage_bucket",
+            "storage_path"
+          ],
+          "definition": "UNIQUE (storage_bucket, storage_path)",
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "ingest_files_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ingest_files_run_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "ingest_files_hash_idx",
+          "unique": false,
+          "columns": [
+            "content_sha256"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "ingest_files: project access",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_files.ingest_run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_files.ingest_run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260916000013_ingest_files_tier0.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Tier 0 (PLAN.md §2) — one row per file as received, the manifest for bytes ",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "storage_bucket",
+            "storage_path"
+          ],
+          "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "ingest_files_pkey"
+        }
+      ]
+    },
+    {
+      "name": "ingest_runs",
+      "schema": "public",
+      "created_by": "20260829120000_erp_connector_phase1_2.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "link_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "project_erp_links",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "triggered_by",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "triggered_by_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": null
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "status",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'running'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "rows_fetched",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "rows_new",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "int",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "rows_changed",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "int",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "rows_unchanged",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "int",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "rows_removed",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "int",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "mapping_warnings",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "fields_mapped",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "int",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "fields_defaulted",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "int",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "fields_failed",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "int",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "diff_summary",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "applied_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "applied_by_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": null
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "error_detail",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "source_kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "erp_sync_runs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_runs_source_kind_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ingest_runs_link_idx",
+          "unique": false,
+          "columns": [
+            "link_id",
+            "created_at DESC"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "ingest_runs_project_idx",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "created_at DESC"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "ingest_runs: project access",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20260916000012_ingest_rename_and_widen.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Tier 1. One row per ingestion attempt from any source — a connector sync, a ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "erp_sync_runs_pkey"
+        }
+      ]
+    },
+    {
+      "name": "ingest_staged_bom_lines",
+      "schema": "public",
+      "created_by": "20260829120000_erp_connector_phase1_2.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "erp_sync_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql",
+          "renamed_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "link_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "project_erp_links",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "external_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "external_bom_version_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "external_component_product_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "quantity_per_unit",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "scrap_factor",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "raw",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "diff_state",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'new'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "staged_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql",
+          "renamed_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "source_kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "fact_class",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "erp_staged_bom_lines_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_staged_bom_lines_source_kind_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "ingest_staged_bom_lines_fact_class_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fact_class IN ('master', 'transactional'))",
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ingest_staged_bom_lines_run_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "ingest_staged_bom_lines: project access",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_bom_lines.ingest_run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_bom_lines.ingest_run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260916000012_ingest_rename_and_widen.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Tier 1 staging for BOM component lines, one per parent/component pair in the ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "erp_staged_bom_lines_pkey"
+        }
+      ]
+    },
+    {
+      "name": "ingest_staged_bom_versions",
+      "schema": "public",
+      "created_by": "20260829120000_erp_connector_phase1_2.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "erp_sync_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql",
+          "renamed_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "link_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "project_erp_links",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "external_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "external_product_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "version",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "is_active",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "raw",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "diff_state",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'new'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "staged_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql",
+          "renamed_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "source_kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "fact_class",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "erp_staged_bom_versions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_staged_bom_versions_source_kind_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "ingest_staged_bom_versions_fact_class_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fact_class IN ('master', 'transactional'))",
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ingest_staged_bom_versions_run_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "ingest_staged_bom_versions: project access",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_bom_versions.ingest_run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_bom_versions.ingest_run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260916000012_ingest_rename_and_widen.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Tier 1 staging for BOM headers, one per source BOM version. Renamed from ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "erp_staged_bom_versions_pkey"
+        }
+      ]
+    },
+    {
+      "name": "ingest_staged_products",
+      "schema": "public",
+      "created_by": "20260829120000_erp_connector_phase1_2.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "erp_sync_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql",
+          "renamed_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "link_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "project_erp_links",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "external_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "sku",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "product_type",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "unit_of_measure",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "lead_time_days",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "moq",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "unit_cost",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "supplier_name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "supplier_number",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "cycle_time_seconds",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "raw",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "diff_state",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'new'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "staged_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql",
+          "renamed_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "source_kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "fact_class",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "erp_staged_products_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "ingest_staged_products_source_kind_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "ingest_staged_products_fact_class_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fact_class IN ('master', 'transactional'))",
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ingest_staged_products_run_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "ingest_staged_products: project access",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_products.ingest_run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_products.ingest_run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260916000012_ingest_rename_and_widen.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Tier 1 staging for item-master rows, in the source's own shape plus ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "erp_staged_products_pkey"
         }
       ]
     },
@@ -20124,6 +20547,15 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
+    },
+    {
+      "name": "ingest_files_write_once",
+      "signature": "ingest_files_write_once()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path",
+      "security_definer": false,
+      "volatility": null,
+      "defined_by": "20260916000013_ingest_files_tier0.sql"
     },
     {
       "name": "is_super_admin",
