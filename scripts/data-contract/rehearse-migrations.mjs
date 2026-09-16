@@ -139,14 +139,30 @@ function main() {
 
   console.log(bold("\n── migration rehearsal (PLAN.md §4 D31) ───────────────────────\n"));
 
-  const { json: artifact, source } = baseArtifact(since);
-  console.log(`  base schema   ${source}`);
-
   const files = explicit.length ? explicit : newMigrations(since);
   if (files === null) {
     console.log(red(`\n  cannot diff against ${since} — fetch it, or pass --migration explicitly`));
     process.exit(2);
   }
+
+  // WHICH ARTIFACT IS THE BASE depends on whether this branch adds a migration.
+  //
+  // With one, the base must be the BASE branch's: that is the shape the new file
+  // actually meets, and reading HEAD's would hand it a database that already
+  // contains everything it is about to create.
+  //
+  // WITHOUT one there is nothing to protect from a too-complete base, and the
+  // base branch's artifact is the wrong thing to test: the only way this branch
+  // can change the schema at all is by changing the ARTIFACT, which is exactly
+  // what a generator fix does. WP 3.1's follow-up is the case — `main` carried an
+  // artifact whose foreign keys pointed at a table the rename had removed, and a
+  // branch that fixed the generator would have been judged against the broken
+  // artifact it was repairing. So: no new migrations, rehearse THIS branch's own.
+  const { json: artifact, source } = files.length
+    ? baseArtifact(since)
+    : { json: JSON.parse(readFileSync(path.join(ROOT, ARTIFACT), "utf8")),
+        source: `${ARTIFACT} (this branch — no new migrations, so the artifact IS the change)` };
+  console.log(`  base schema   ${source}`);
 
   const base = buildRehearsalSchema(artifact, ROOT);
   for (const w of base.warnings) console.log(dim(`  ⚠ ${w}`));

@@ -6807,7 +6807,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
-            "table": "erp_sync_runs",
+            "table": "ingest_runs",
             "columns": [
               "id"
             ],
@@ -7050,7 +7050,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
-            "table": "erp_sync_runs",
+            "table": "ingest_runs",
             "columns": [
               "id"
             ],
@@ -7281,7 +7281,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
-            "table": "erp_sync_runs",
+            "table": "ingest_runs",
             "columns": [
               "id"
             ],

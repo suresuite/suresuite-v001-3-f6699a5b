@@ -2400,7 +2400,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
-          "table": "erp_sync_runs",
+          "table": "ingest_runs",
           "columns": [
             "id"
           ],
@@ -2643,7 +2643,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
-          "table": "erp_sync_runs",
+          "table": "ingest_runs",
           "columns": [
             "id"
           ],
@@ -2870,7 +2870,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
-          "table": "erp_sync_runs",
+          "table": "ingest_runs",
           "columns": [
             "id"
           ],

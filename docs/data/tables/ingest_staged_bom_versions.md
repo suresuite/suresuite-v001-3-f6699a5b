@@ -96,7 +96,7 @@ The run that staged this row. The owner: staged rows cascade with their run, and
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `erp_sync_runs(id)` ON DELETE CASCADE |
+| References | `ingest_runs(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -262,6 +262,6 @@ master or transactional. Master rows describe things that persist — an item, a
 
 ---
 
-*Generated from data contract `64f3f2bdb4a2`, engine `0.2.3`,
+*Generated from data contract `db35eafa485d`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_staged_bom_versions.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
