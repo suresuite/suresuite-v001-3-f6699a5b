@@ -18,6 +18,7 @@ DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since W
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `tier3_suppliers_pkey` |
+| `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` | UNIQUE index | `tier3_suppliers_natural_key` |
 
 **Intended natural key:** `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` — the key this
 table's grain implies and the database does NOT enforce today. A statement about
@@ -258,8 +259,14 @@ When the row was last written. Server-stamped by trigger.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+## Indexes
+
+| Index | Columns | Unique | Added by |
+|---|---|---|---|
+| `tier3_suppliers_natural_key` | `project_id`, `plant_name`, `supplier_id`, `upstream_supplier_id`, `material_id` | yes | `20260916000018_natural_key_unique.sql` |
+
 ---
 
-*Generated from data contract `397209823177`, engine `0.2.3`,
+*Generated from data contract `781d87efe93d`, engine `0.2.3`,
 sidecar `supabase/contract/tier3_suppliers.contract.yaml`, table created by `20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

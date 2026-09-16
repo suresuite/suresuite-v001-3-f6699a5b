@@ -556,9 +556,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5).",
+    "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "material_id",
+      "higher_level_component_id",
+      "level"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -740,9 +745,13 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5).",
+    "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "product_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -1510,9 +1519,13 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
+    "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "supplier_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -3677,7 +3690,11 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "data-ingestion",
     "grain": "One directed firm-to-firm relationship in a project's multi-tier network: who supplies whom, at what depth, and in what capacity. An EDGE between two firm identifiers — not a party, and not a material flow: nothing here says what moves along it or how much.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "from_firm_id",
+      "to_firm_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -4222,9 +4239,13 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
+    "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "customer_id",
+      "product_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -7221,7 +7242,12 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "data-ingestion",
     "grain": "One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "supplier_id",
+      "upstream_supplier_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -7449,7 +7475,12 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "data-ingestion",
     "grain": "One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "supplier_id",
+      "upstream_supplier_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",

@@ -9,13 +9,14 @@
 
 **Tier 2** — canonical — the only tier humans edit · owned by `data-ingestion` · `public.outbound_logistics`
 
-**One row is** One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).
+**One row is** One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed).
 
 ## Uniqueness
 
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `outbound_logistics_pkey` |
+| `project_id` + `plant_name` + `customer_id` + `product_id` | UNIQUE index | `outbound_logistics_natural_key` |
 
 **Intended natural key:** `project_id` + `plant_name` + `customer_id` + `product_id` — the key this
 table's grain implies and the database does NOT enforce today. A statement about
@@ -309,9 +310,10 @@ When the row last changed. Server-set.
 |---|---|---|---|
 | `idx_outbound_logistics_project_id` | `project_id` | no | `20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql` |
 | `outbound_logistics_project_idx` | `project_id` | no | `20260712100000_arc_write_performance.sql` |
+| `outbound_logistics_natural_key` | `project_id`, `plant_name`, `customer_id`, `product_id` | yes | `20260916000018_natural_key_unique.sql` |
 
 ---
 
-*Generated from data contract `397209823177`, engine `0.2.3`,
+*Generated from data contract `781d87efe93d`, engine `0.2.3`,
 sidecar `supabase/contract/outbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

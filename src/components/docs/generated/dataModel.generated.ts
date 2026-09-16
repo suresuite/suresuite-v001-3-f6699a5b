@@ -25,9 +25,9 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "397209823177";
+export const CONTRACT_VERSION = "781d87efe93d";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260916000017_dedup_natural_keys.sql";
+export const LAST_MIGRATION = "20260916000018_natural_key_unique.sql";
 
 export const COUNTS = {
   "tablesInSchema": 79,
@@ -92,13 +92,13 @@ export const TIERS: GlanceTier[] = [
     "tables": [
       {
         "table": "bom_multi_level",
-        "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5).",
+        "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed).",
         "columns": 9,
         "owner": "data-ingestion"
       },
       {
         "table": "bom_single_level",
-        "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5).",
+        "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed).",
         "columns": 8,
         "owner": "data-ingestion"
       },
@@ -110,7 +110,7 @@ export const TIERS: GlanceTier[] = [
       },
       {
         "table": "inbound_logistics",
-        "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
+        "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).",
         "columns": 12,
         "owner": "data-ingestion"
       },
@@ -128,7 +128,7 @@ export const TIERS: GlanceTier[] = [
       },
       {
         "table": "outbound_logistics",
-        "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
+        "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed).",
         "columns": 11,
         "owner": "data-ingestion"
       },

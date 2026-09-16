@@ -282,11 +282,25 @@ function apply(schema, stmt, migration, guarded = false) {
     const after = rest.slice(tid.end).replace(/^\s*USING\s+\w+/i, "");
     const cols = parenBody(after, 0);
     const whereMatch = /\bWHERE\b(.+)$/i.exec(after);
+    // NULLS NOT DISTINCT (PostgreSQL 15+) sits between the column list and any
+    // WHERE, and dropping it is not cosmetic: it is the difference between an
+    // index that constrains a null-bearing key and one that constrains every row
+    // EXCEPT those. `rehearsal-schema.mjs` rebuilds indexes FROM this artifact,
+    // so a clause lost here produces a rehearsed database whose constraint is
+    // weaker than the migration's — and the assertion that the constraint bites
+    // then passes against the migration and fails against the artifact. That is
+    // D60, and the same family as D49 (a rename not followed into an index) and
+    // D59 (an inline CHECK never recorded): the introspector is incomplete about
+    // one kind of dependent detail at a time.
+    // `end` is the index OF the closing paren, so the tail starts one past it.
+    const tail = cols ? after.slice(cols.end + 1) : "";
+    const nullsNotDistinct = /^\s*NULLS\s+NOT\s+DISTINCT\b/i.test(tail);
     if (name && t.indexes.some((i) => i.name === name)) return; // IF NOT EXISTS
     t.indexes.push({
       name,
       unique,
       columns: cols ? splitTopLevel(cols.body).map((c) => squash(c)) : [],
+      nulls_not_distinct: nullsNotDistinct,
       predicate: whereMatch ? squash(whereMatch[1]) : null,
       partial: Boolean(whereMatch),
       added_by: migration,

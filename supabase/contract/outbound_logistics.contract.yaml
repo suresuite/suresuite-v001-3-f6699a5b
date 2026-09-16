@@ -7,8 +7,9 @@ tier: "2"
 schema_name: public
 grain: >-
   One demand arc as the user uploaded it: this customer buys this product from
-  this plant, at this price and lead time, in this volume. NOT deduplicated —
-  a second upload of the same row makes a second row (D5).
+  this plant, at this price and lead time, in this volume. UNIQUE on
+  `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the
+  same arc UPDATES it rather than adding a row (D5 closed).
 ingest_dataset:
   wizard_id: outbound_logistics
   fact_class: transactional
@@ -19,6 +20,15 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "outbound_logistics_pkey"
+  # WP 3.3 — `20260916000018`. THE KEY `natural_key_intended` HAS NAMED SINCE
+  # WP 1.4, now enforced. `NULLS NOT DISTINCT` is part of the constraint and not
+  # a detail: PostgreSQL's default makes NULLs distinct, so a plain index would
+  # constrain every row except the ones whose key column is null — and
+  # `ON CONFLICT` infers from the same index, so the promotion would INSERT a
+  # duplicate instead of updating exactly those rows (§4 D5).
+  - source: "UNIQUE index (NULLS NOT DISTINCT)"
+    columns: [project_id, plant_name, customer_id, product_id]
+    name: "outbound_logistics_natural_key"
 # The key the grain implies and the database does NOT enforce (D5); WP 3.3 lands
 # it. Mirrors `inbound_logistics`, with customer/product where that has
 # supplier/material.

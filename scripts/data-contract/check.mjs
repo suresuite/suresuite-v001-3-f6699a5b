@@ -12,7 +12,7 @@
 //   R3  the generated contract and pages match what the sources generate
 //   R4  no table the code reads is missing its migration, and none is ALTERed
 //       without being created
-//   R5  a tier-2 table whose only uniqueness is a surrogate key — WARN (WP 2.4)
+//   R5  a tier-2 table whose only uniqueness is a surrogate key — FAIL (WP 3.3)
 //   R6  every file:line in PLAN.md §4 resolves and is in bounds
 //   R7  §16 is append-only — no drift-log entry may vanish from history, AND
 //       every work package marked done in §7–§13 has a §16 entry
@@ -144,12 +144,30 @@ for (const p of schema.phantom_tables) {
 
 // ─────────────────────── R5: natural keys — WARN until WP 3.3 lands them (D5)
 
-// TODO(2026-09-15, WP 2.4): flip this to a failure. WP 3.3 adds the natural-key
-// constraints and the upsert that makes them survivable; WP 2.4 generates the RLS
-// and key tests from the contract and is where the warning becomes a gate. Until
-// 3.3 has landed, failing here would only mean every run of the gate is red for a
-// reason no one in this phase is allowed to fix — which is how `npm run lint`
-// became unreadable (PLAN.md §16, the WP 1.1 precondition entry).
+// FLIPPED FROM `warn` TO `fail` BY WP 3.3, in the same commit as the seven
+// unique indexes it asserts (`20260916000018`). The plan had split those two
+// halves — WP 2.4 to flip, WP 3.3 to make the flip survivable — and that split is
+// unexecutable in either order: WP 2.4 was told not to flip before the
+// constraints existed, so it shipped without flipping, and the flip then belonged
+// to a closed package (§16 · Phase 2→3). Landing them together is the only
+// ordering in which neither half can outlive the other.
+//
+// NO TABLE IS EXCLUDED. §10 allowed `multi_tier_supply_chain` to be left out
+// honestly — D58 records that nothing reads or writes it — and it is in anyway,
+// because §15 counts 0 rows in it and an index on an empty table costs one
+// statement, while an exclusion would be a permanent hole in this rule carried
+// for a table WP 6.2 may drop. If a later package DOES need an exception, it
+// belongs here, named, with its reason — not in a comment beside a sidecar and
+// not in a drift-log entry that the gate cannot read.
+//
+// WHAT THIS RULE STILL CANNOT SEE, stated so it is not mistaken for more than it
+// is: it checks that a non-surrogate unique key EXISTS, not that it is the key
+// the grain implies, and not that the index treats NULLs the way the key needs
+// (`natural_key_intended` is a list of columns; WP 3.3 found that a list of
+// columns is not a specification of a constraint — see §4 D5). The columns are
+// compared against `natural_key_intended` below, and the NULL rule is asserted
+// where it can only be asserted, against a running database in
+// `supabase/rehearsal/080`.
 const surrogateOnly = (t) =>
   t.natural_key_unique.length > 0 &&
   t.natural_key_unique.every((k) => k.columns.length === 1 && k.columns[0] === "id");
@@ -160,14 +178,35 @@ for (const [name, path] of [...sidecars].sort()) {
   const t = tables.get(name);
   if (!t) continue; // R1/validate already reported it
   if (t.natural_key_unique.length === 0) {
-    warn("R5", `"${name}" is tier 2 and has NO uniqueness at all — not even a primary key`);
-  } else if (surrogateOnly(t)) {
-    warn(
+    fail("R5", `"${name}" is tier 2 and has NO uniqueness at all — not even a primary key`);
+    continue;
+  }
+  if (surrogateOnly(t)) {
+    fail(
       "R5",
       `"${name}" is tier 2 and its only uniqueness is the surrogate \`id\` (D5). ` +
       `The grain implies ${doc.natural_key_intended ? `\`${doc.natural_key_intended.join(" + ")}\`` : "a key the sidecar has not stated"}; ` +
-      "re-uploading the same file duplicates every row.",
+      "re-uploading the same file duplicates every row. Add the unique index, or " +
+      "correct `natural_key_intended` if the grain is not what the sidecar says.",
     );
+    continue;
+  }
+  // The key EXISTS. Now: is it the one the sidecar says the grain implies?
+  // Without this half the rule is satisfied by any composite unique index, and a
+  // key landed on the wrong columns would pass the gate that exists to land it.
+  if (doc.natural_key_intended) {
+    const intended = [...doc.natural_key_intended].sort().join(", ");
+    const actual = t.natural_key_unique
+      .filter((k) => !(k.columns.length === 1 && k.columns[0] === "id"))
+      .map((k) => [...k.columns].sort().join(", "));
+    if (!actual.includes(intended)) {
+      fail(
+        "R5",
+        `"${name}" has a non-surrogate unique key, but not the one its sidecar says the grain implies. ` +
+        `\`natural_key_intended\` is \`${intended}\`; the database has ${actual.map((a) => `\`${a}\``).join(", ")}. ` +
+        "One of the two is wrong and the sidecar is the place to settle it.",
+      );
+    }
   }
 }
 

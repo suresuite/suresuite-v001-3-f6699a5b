@@ -240,6 +240,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — 40+ TS2322 errors under `tsc --noEmit`. Nothing catches it: `npm run build` is Vite, which does not typecheck, and `contract:generate -- --check` compares text rather than types. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | WP 5.2 |
 | D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number — and the number, measured 2026-09-16 (§15 run `35144057908`), is **0 rows across 0 projects**. It is not a table whose data nobody reads; it is a table with no data, no reader and no writer | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note; §15's every-project sweep | WP 6.2 |
 | D59 | **A CHECK written INLINE on a column is invisible to the artifact, so the rehearsed database does not have it and the generated page does not publish it.** `introspect.mjs` reads a column's type, its NOT NULL and its DEFAULT and drops the rest; only a NAMED, table-level `ADD CONSTRAINT … CHECK` is recorded. The artifact holds **24 CHECK constraints across 15 tables** while the migrations contain **253 `CHECK (` occurrences** — most of that gap is repetition across shadowed definitions, but `ingest_files` alone loses three real ones (`source_kind`'s vocabulary, `byte_size >= 0`, and the SHA-256 shape). Two consequences, and the second is worse: `contract:rehearse` builds a database with no such constraint, so an assertion that a bad value is REFUSED passes when it is run against the migration and fails when it is run against the artifact; and `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects a user's upload appears in no document (§5 T1). **Found by the third rehearsal mode on WP 3.2's own branch** — green fresh and green over production's shape, red against its own artifact, which is precisely the case the WP 3.1 follow-up added that mode for. Same family as D49 (a column rename not followed into indexes) and D52 (a table rename not followed into foreign keys): the introspector is incomplete about DEPENDENT objects, one kind at a time. WP 3.2 walks around it — `20260916000014` writes every CHECK as a named table-level constraint — rather than relying on it being fixed | `introspect.mjs`'s `CREATE TABLE` column parser vs `20260916000013_ingest_files_tier0.sql:36,45,49` | WP 6.2 |
+| **D60** | **The introspector drops `NULLS NOT DISTINCT` from a `CREATE UNIQUE INDEX`, so the rehearsed database's constraint is WEAKER than the migration's.** `introspect.mjs`'s index parser reads the column list and any `WHERE`, and keeps nothing in between — and the clause sits exactly there. `rehearsal-schema.mjs`'s `emitIndexes` then rebuilds the index from the artifact WITHOUT it. The consequence is not cosmetic and it is not symmetrical: PostgreSQL's default makes NULLs distinct, so the rebuilt index constrains every row EXCEPT the ones whose key column is null, and `ON CONFLICT` infers from the same index and INSERTS a duplicate rather than updating. An assertion that a null-bearing duplicate is refused therefore PASSES in the fresh modes, where the migration itself runs, and FAILS against the artifact — which is the case the WP 3.1 follow-up added the third rehearsal mode for. Found by WP 3.3, whose seven natural-key indexes are all `NULLS NOT DISTINCT` (three of the seven keys contain a nullable column — see D5), so the defect was between the migration and every gate that reads the artifact. Same family as D49 (a column rename not followed into indexes), D52 (a table rename not followed into foreign keys) and D59 (an inline CHECK never recorded): the introspector is incomplete about DEPENDENT detail, one kind at a time — and unlike D59 this one could not be walked around, because there is no other way to spell the clause | `introspect.mjs`'s `CREATE INDEX` parser; `rehearsal-schema.mjs`'s `emitIndexes` | WP 3.3 ✅ *(both sides fixed; the artifact records `nulls_not_distinct`, `verify-introspection.mjs` checks all seven, and `supabase/rehearsal/080` section 0a asserts `pg_index.indnullsnotdistinct` on the index THE DATABASE ARRIVED WITH rather than on one the file creates itself — which is what lets the third mode see it)* |
 
 ### 4.1 Code map — the data layer
 
@@ -5898,6 +5899,103 @@ it or is a finding: `inbound_logistics` 1 787 → **1 691**, `bom_multi_level`
 `rows_the_unique_index_would_reject` **0**. Whoever runs §15 after the deploy
 should read those three numbers first.
 
+---
+
+#### C · The seven indexes and the R5 flip, in one commit
+
+`20260916000018` creates all seven, every one `NULLS NOT DISTINCT`, and the same
+commit turns R5 from `warn` to `fail`. §10 was explicit that the two halves must
+not be split again — WP 2.4 was told not to flip before the constraints existed,
+shipped without flipping, and the flip then belonged to a finished package. They
+land together here, so neither can outlive the other.
+
+**No table is excluded, and the exclusion §10 offered was declined.**
+`multi_tier_supply_chain` could have been left out honestly (D58 — no reader, no
+writer), but §15 counts **0 rows** in it, so the index costs one statement and no
+risk, while the exclusion would have been a permanent hole in the rule carried for
+a table WP 6.2 may drop. Seven constraints and no exception is less to maintain
+than six and a footnote. If a later package does need an exception it belongs in
+the rule, named, with its reason — which is what §10 asked for and is now written
+into `check.mjs` as the standing instruction rather than as an exception.
+
+**R5 grew a second half while it was being flipped, and the first half alone
+would not have been enough.** As written it only asked whether a non-surrogate
+unique key EXISTS — which any composite unique index satisfies. A key landed on
+the wrong columns would have passed the gate that exists to land it. It now also
+compares the columns against the sidecar's `natural_key_intended` and fails when
+they differ, saying that one of the two is wrong and the sidecar is where to
+settle it. Both halves mutation-tested:
+
+| mutation | what R5 said |
+|---|---|
+| delete one of the seven indexes | `"tier3_suppliers" … its only uniqueness is the surrogate \`id\` (D5)` |
+| land `inbound_logistics`'s key on three columns instead of four | `has a non-surrogate unique key, but not the one its sidecar says the grain implies` |
+
+`contract:check` now reports **zero warnings**, where it reported seven on
+arrival.
+
+**Four pinned truths had to be flipped, which is the same work D40 named.** The
+indexes make four statements in the repository false, and every one of them was
+being published:
+
+  - `verify-introspection.mjs` asserted *"inbound_logistics has no unique
+    constraint beyond id — confirms D5"*. A check that pins a DEFECT keeps
+    asserting the defect is open after it closes. It now pins the closure, so a
+    revert of `20260916000018` turns it red, and it checks the NULL rule on all
+    seven besides.
+  - four sidecar grains said *"NOT deduplicated — a second upload of the same row
+    makes a second row (D5)"*, and `docs/data/tables/*.md` renders the grain, so
+    the manual would have gone on telling users that a re-upload duplicates.
+  - the seven `natural_key_unique` blocks said `[id]`. `validate-sidecars.mjs`
+    caught that one by itself, which is the rule working.
+
+---
+
+#### D · D60 — the introspector drops `NULLS NOT DISTINCT`
+
+Found while landing the indexes, and it is the reason section A's finding could
+have been fixed in the migration and still not been true of the database.
+
+`introspect.mjs` reads an index's columns and its `WHERE` and keeps nothing in
+between — and `NULLS NOT DISTINCT` sits exactly there. `rehearsal-schema.mjs`
+then rebuilds the index from the artifact without it. So the migration would be
+right, the artifact would record a weaker constraint, and **the database `main`
+meets after the merge is built from the artifact**. Same family as D49, D52 and
+D59: the introspector incomplete about dependent detail, one kind at a time.
+Unlike D59 it cannot be walked around, because there is no other way to spell the
+clause.
+
+Both sides fixed. What is worth recording is **how nearly it was missed**: the
+first version of `080` created its own probe index with the clause spelled out,
+so it asserted its own `CREATE` and not the database's. Mutating the emitter left
+it green in all three modes. The assertion now reads
+`pg_index.indnullsnotdistinct` for all seven on the index **the rehearsal arrived
+with** — created by the migration in the fresh modes, rebuilt from the artifact in
+the third — which is the only arrangement in which the third mode can see the
+defect it exists to see. A behavioural assertion that builds its own subject is
+testing itself.
+
+And one honest limit on that: **mode 3 can only catch an artifact defect once the
+artifact carrying it is committed.** With `20260916000018` still uncommitted, the
+index is new, so the migration creates it and the rebuild is not exercised. The
+mutation was therefore re-run after this commit, against the artifact this branch
+writes, which is where it fires.
+
+---
+
+#### E · The dedup rehearsal reproduces production's ORDER, not just its data
+
+`080` failed the first time it was run after `20260916000018` existed, and the
+failure was worth more than the fix: a rehearsal has BOTH migrations applied, so
+the tables already carry the constraints and no duplicate can be planted. The
+assertion would have been testing a database the dedup can never meet.
+
+Production's order is the opposite — `20260916000017` runs against tables with no
+constraint, `20260916000018` follows. `080` now drops the two indexes it uses,
+plants the duplicates, dedups, and then **runs `20260916000018`'s real statements
+over the result**. That last step is the assertion: `CREATE UNIQUE INDEX` on a
+table still holding duplicates does not warn, it aborts the deploy, and the two
+migrations agreeing is the only claim about the dedup worth making.
 
 ---
 ---

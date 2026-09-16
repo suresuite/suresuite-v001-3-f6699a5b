@@ -18,8 +18,16 @@
 --   · the result is a function of the DATA: same rows in, same row out, whatever
 --     order the planner reads them in.
 --
--- Section 4 is the one that would have caught the whole package being wrong:
+-- Section 5 is the one that would have caught the whole package being wrong:
 -- it runs the dedup and then CREATES THE REAL INDEX over the result.
+--
+-- WHY IT DROPS THE INDEXES FIRST. By the time a rehearsal runs, BOTH migrations
+-- have been applied, so the tables already carry the constraints and no duplicate
+-- can be planted — the assertion would be testing a database the dedup can never
+-- meet. Production's order is the opposite one: `20260916000017` runs against
+-- tables with no constraint, and `20260916000018` follows. Dropping the two
+-- indexes reproduces that order, and re-creating them at the end is the claim
+-- itself: the dedup leaves a table the real index can be built on.
 
 DO $wp33dedup$
 DECLARE
@@ -35,6 +43,58 @@ BEGIN
     VALUES (v_user, 'wp33@example.invalid', 'WP33', 'x');
   INSERT INTO public.projects (id, name, modeler_id, plant_name)
     VALUES (v_project, 'WP33 dedup', v_user, 'WP33');
+
+  -- ── 0a · THE INDEX THIS DATABASE ACTUALLY HAS, whatever built it ──────────
+  --
+  -- This runs BEFORE section 0 drops anything, so what it inspects is the index
+  -- the rehearsal arrived with: in the fresh modes, the one `20260916000018`
+  -- created; in the third mode, the one `rehearsal-schema.mjs` REBUILT from
+  -- `build/schema.introspected.json`. That difference is the whole point.
+  --
+  -- D60: the introspector read a `CREATE UNIQUE INDEX`'s columns and its WHERE
+  -- and dropped `NULLS NOT DISTINCT` in between, and the rebuild emitted a PLAIN
+  -- unique index. The migration would be right, the artifact would be wrong, and
+  -- the database `main` meets after the merge would hold a constraint weaker than
+  -- the one the migration wrote — with every fresh-mode gate green. Same family
+  -- as D49, D52 and D59: the introspector incomplete about a dependent detail,
+  -- one kind at a time. Asserting it HERE, rather than on an index this file
+  -- creates itself, is what makes the third mode able to see it.
+  SELECT count(*) INTO v_n
+    FROM pg_index i
+    JOIN pg_class ic ON ic.oid = i.indexrelid
+    JOIN pg_class tc ON tc.oid = i.indrelid
+    JOIN pg_namespace ns ON ns.oid = tc.relnamespace
+   WHERE ns.nspname = 'public'
+     AND ic.relname IN ('inbound_logistics_natural_key', 'outbound_logistics_natural_key',
+                        'bom_single_level_natural_key', 'bom_multi_level_natural_key',
+                        'tier2_suppliers_natural_key', 'tier3_suppliers_natural_key',
+                        'multi_tier_supply_chain_natural_key')
+     AND i.indisunique
+     AND i.indnullsnotdistinct;
+  IF v_n <> 7 THEN
+    RAISE EXCEPTION 'WP 3.3: % of 7 natural-key indexes are NULLS NOT DISTINCT. If this is green in the fresh modes and red here, the artifact lost the clause and the rebuilt index is weaker than the migration (D60)', v_n;
+  END IF;
+
+  -- And behaviourally, on the index as it stands: two BOM root rows are ONE row.
+  INSERT INTO public.bom_multi_level
+    (project_id, plant_name, material_id, level, higher_level_component_id, consumption_rate)
+  VALUES (v_project, 'WP33', 'MAT-PRE', 0, NULL, 1.0);
+  BEGIN
+    INSERT INTO public.bom_multi_level
+      (project_id, plant_name, material_id, level, higher_level_component_id, consumption_rate)
+    VALUES (v_project, 'WP33', 'MAT-PRE', 0, NULL, 2.0);
+    RAISE EXCEPTION 'WP 3.3: the natural-key index THIS DATABASE HAS accepted a second NULL-parent root row — it is not NULLS NOT DISTINCT';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+  DELETE FROM public.bom_multi_level WHERE project_id = v_project;
+
+  -- ── 0 · back to the shape the dedup actually meets ────────────────────────
+  --
+  -- See the header: production runs `20260916000017` BEFORE the indexes exist.
+  -- A rehearsal has both migrations applied, so without this the duplicates
+  -- below cannot even be inserted and nothing about the dedup is tested.
+  DROP INDEX public.inbound_logistics_natural_key;
+  DROP INDEX public.bom_multi_level_natural_key;
 
   -- ── 1 · the completeness tie-break beats recency ──────────────────────────
   --
@@ -126,20 +186,26 @@ BEGIN
     RAISE EXCEPTION 'WP 3.3: % row(s) survived for the two-depth material, expected 2 — `level` is part of the key', v_n;
   END IF;
 
-  -- ── 4 · THE POINT: the real index now applies to the real result ──────────
+  -- ── 4 · THE POINT: 20260916000018 now runs, exactly as it does on deploy ──
   --
-  -- `20260916000018` creates this index in production immediately after the
-  -- dedup runs. Building the same one here, over rows the dedup has just
-  -- collapsed, is the only thing that says the two migrations agree — including
-  -- that `NULLS NOT DISTINCT` accepts what `PARTITION BY` left behind.
+  -- The real statements from the real migration, over rows the dedup has just
+  -- collapsed. This is the only thing that says the two migrations agree, and it
+  -- is the failure that would otherwise happen in production: `CREATE UNIQUE
+  -- INDEX` on a table still holding duplicates does not warn, it aborts the
+  -- deploy.
   BEGIN
-    CREATE UNIQUE INDEX wp33_probe_bom ON public.bom_multi_level
-      (project_id, plant_name, material_id, higher_level_component_id, level) NULLS NOT DISTINCT;
+    CREATE UNIQUE INDEX inbound_logistics_natural_key
+      ON public.inbound_logistics (project_id, plant_name, supplier_id, material_id)
+      NULLS NOT DISTINCT;
+    CREATE UNIQUE INDEX bom_multi_level_natural_key
+      ON public.bom_multi_level (project_id, plant_name, material_id, higher_level_component_id, level)
+      NULLS NOT DISTINCT;
   EXCEPTION WHEN unique_violation THEN
     RAISE EXCEPTION 'WP 3.3: the unique index could NOT be built on the deduplicated table — 20260916000017 and 20260916000018 disagree, and the production deploy would fail here';
   END;
 
-  -- And the index bites on the case it exists for: a second root row.
+  -- And the index bites on the case it exists for: a second ROOT row, whose key
+  -- carries a NULL. A plain unique index accepts this insert.
   BEGIN
     INSERT INTO public.bom_multi_level
       (project_id, plant_name, material_id, level, higher_level_component_id, consumption_rate)
@@ -147,8 +213,6 @@ BEGIN
     RAISE EXCEPTION 'WP 3.3: a duplicate ROOT row was accepted — the index is not NULLS NOT DISTINCT, so D5 is still open for every row with a null key column';
   EXCEPTION WHEN unique_violation THEN NULL;
   END;
-
-  DROP INDEX public.wp33_probe_bom;
 
   -- ── 5 · the function refuses a table the contract does not name ───────────
   --

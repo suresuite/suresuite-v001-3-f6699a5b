@@ -9,13 +9,14 @@
 
 **Tier 2** — canonical — the only tier humans edit · owned by `data-ingestion` · `public.bom_multi_level`
 
-**One row is** One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5).
+**One row is** One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed).
 
 ## Uniqueness
 
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `bom_multi_level_pkey` |
+| `project_id` + `plant_name` + `material_id` + `higher_level_component_id` + `level` | UNIQUE index | `bom_multi_level_natural_key` |
 
 **Intended natural key:** `project_id` + `plant_name` + `material_id` + `higher_level_component_id` + `level` — the key this
 table's grain implies and the database does NOT enforce today. A statement about
@@ -253,9 +254,10 @@ When the row last changed. Server-set.
 |---|---|---|---|
 | `idx_bom_multi_level_project_id` | `project_id` | no | `20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql` |
 | `bom_multi_level_project_idx` | `project_id` | no | `20260712100000_arc_write_performance.sql` |
+| `bom_multi_level_natural_key` | `project_id`, `plant_name`, `material_id`, `higher_level_component_id`, `level` | yes | `20260916000018_natural_key_unique.sql` |
 
 ---
 
-*Generated from data contract `397209823177`, engine `0.2.3`,
+*Generated from data contract `781d87efe93d`, engine `0.2.3`,
 sidecar `supabase/contract/bom_multi_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

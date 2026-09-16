@@ -9,7 +9,9 @@ grain: >-
   One child-to-parent line of a deep bill of materials: this material is
   consumed by this higher-level component, at this level of the tree.
   Collapsed to effective product-to-material arcs before the engine sees it.
-  NOT deduplicated (D5).
+  UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index
+  is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause
+  the constraint would hold every line except the roots (D5 closed).
 ingest_dataset:
   wizard_id: bom_multi_level
   fact_class: master
@@ -20,6 +22,15 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "bom_multi_level_pkey"
+  # WP 3.3 — `20260916000018`. THE KEY `natural_key_intended` HAS NAMED SINCE
+  # WP 1.4, now enforced. `NULLS NOT DISTINCT` is part of the constraint and not
+  # a detail: PostgreSQL's default makes NULLs distinct, so a plain index would
+  # constrain every row except the ones whose key column is null — and
+  # `ON CONFLICT` infers from the same index, so the promotion would INSERT a
+  # duplicate instead of updating exactly those rows (§4 D5).
+  - source: "UNIQUE index (NULLS NOT DISTINCT)"
+    columns: [project_id, plant_name, material_id, higher_level_component_id, level]
+    name: "bom_multi_level_natural_key"
 # The key the grain implies and the database does NOT enforce (D5); WP 3.3 lands
 # it. `level` is part of it: the same material can be consumed by the same parent
 # at two depths of a deep BOM, and the two lines are different facts.

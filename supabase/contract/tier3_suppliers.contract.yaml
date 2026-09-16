@@ -17,10 +17,18 @@ ingest_dataset:
 owner: data-ingestion
 
 natural_key_unique:
-  - source: column PRIMARY KEY
+  - source: "column PRIMARY KEY"
     columns: [id]
-    name: tier3_suppliers_pkey
-
+    name: "tier3_suppliers_pkey"
+  # WP 3.3 — `20260916000018`. THE KEY `natural_key_intended` HAS NAMED SINCE
+  # WP 1.4, now enforced. `NULLS NOT DISTINCT` is part of the constraint and not
+  # a detail: PostgreSQL's default makes NULLs distinct, so a plain index would
+  # constrain every row except the ones whose key column is null — and
+  # `ON CONFLICT` infers from the same index, so the promotion would INSERT a
+  # duplicate instead of updating exactly those rows (§4 D5).
+  - source: "UNIQUE index (NULLS NOT DISTINCT)"
+    columns: [project_id, plant_name, supplier_id, upstream_supplier_id, material_id]
+    name: "tier3_suppliers_natural_key"
 natural_key_intended: [project_id, plant_name, supplier_id, upstream_supplier_id, material_id]
 
 governance:

@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 314,
-  "migrations_applied": 311,
+  "migrations_found": 315,
+  "migrations_applied": 312,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000017_dedup_natural_keys.sql",
+  "last_migration": "20260916000018_natural_key_unique.sql",
   "counts": {
     "tables": 79,
     "views": 7,
     "enums": 4,
-    "functions": 245,
+    "functions": 246,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -431,6 +431,7 @@
           "columns": [
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260715000002_agent_telemetry.sql"
@@ -442,6 +443,7 @@
             "project_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260715000002_agent_telemetry.sql"
@@ -453,6 +455,7 @@
             "event_kind",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260715000002_agent_telemetry.sql"
@@ -1243,6 +1246,7 @@
           "columns": [
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260709000002_super_admin_phase1.sql"
@@ -1254,6 +1258,7 @@
             "user_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260709000002_super_admin_phase1.sql"
@@ -1265,6 +1270,7 @@
             "org_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260709000002_super_admin_phase1.sql"
@@ -1275,6 +1281,7 @@
           "columns": [
             "model_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260709000002_super_admin_phase1.sql"
@@ -1670,6 +1677,7 @@
           "columns": [
             "org_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260711000001_api_access_control.sql"
@@ -2071,6 +2079,7 @@
           "columns": [
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260711000001_api_access_control.sql"
@@ -2082,6 +2091,7 @@
             "api_key_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260711000001_api_access_control.sql"
@@ -2093,6 +2103,7 @@
             "org_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260711000001_api_access_control.sql"
@@ -2359,6 +2370,7 @@
           "columns": [
             "organization"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql"
@@ -2579,6 +2591,7 @@
           "columns": [
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260709000002_super_admin_phase1.sql"
@@ -2589,6 +2602,7 @@
           "columns": [
             "actor_user_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260709000002_super_admin_phase1.sql"
@@ -2600,6 +2614,7 @@
             "plane",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000001_data_plane_audit.sql"
@@ -2779,6 +2794,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -2789,9 +2805,25 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712100000_arc_write_performance.sql"
+        },
+        {
+          "name": "bom_multi_level_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "material_id",
+            "higher_level_component_id",
+            "level"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000018_natural_key_unique.sql"
         }
       ],
       "rls": {
@@ -2846,6 +2878,17 @@
             "id"
           ],
           "name": "bom_multi_level_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "plant_name",
+            "material_id",
+            "higher_level_component_id",
+            "level"
+          ],
+          "name": "bom_multi_level_natural_key"
         }
       ]
     },
@@ -2976,6 +3019,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -2986,9 +3030,24 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712100000_arc_write_performance.sql"
+        },
+        {
+          "name": "bom_single_level_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "product_id",
+            "material_id"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000018_natural_key_unique.sql"
         }
       ],
       "rls": {
@@ -3043,6 +3102,16 @@
             "id"
           ],
           "name": "bom_single_level_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "plant_name",
+            "product_id",
+            "material_id"
+          ],
+          "name": "bom_single_level_natural_key"
         }
       ]
     },
@@ -3487,6 +3556,7 @@
           "columns": [
             "fts"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260717000001_chat_store.sql"
@@ -3716,6 +3786,7 @@
             "status",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260726000001_chat_plans.sql"
@@ -3954,6 +4025,7 @@
             "pinned DESC",
             "last_message_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260717000001_chat_store.sql"
@@ -4265,6 +4337,7 @@
             "project_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260703000001_dataset_versions.sql"
@@ -4470,6 +4543,7 @@
             "grantee_user_id",
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": "revoked_at IS NULL",
           "partial": true,
           "added_by": "20260915000005_project_membership_and_delegation.sql"
@@ -4642,6 +4716,7 @@
             "profile_id",
             "effect_type"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
@@ -4652,6 +4727,7 @@
           "columns": [
             "profile_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -4884,6 +4960,7 @@
             "plant_name",
             "status"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
@@ -4894,6 +4971,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -5072,6 +5150,7 @@
             "profile_id",
             "key"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
@@ -5082,6 +5161,7 @@
           "columns": [
             "profile_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -5282,6 +5362,7 @@
             "profile_id",
             "target_type"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
@@ -5292,6 +5373,7 @@
           "columns": [
             "profile_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -5711,6 +5793,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
@@ -5887,6 +5970,7 @@
             "content_hash",
             "md5(triple::text)"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260727000001_network_cartographer.sql"
@@ -5898,6 +5982,7 @@
             "project_id",
             "retrieved_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260727000001_network_cartographer.sql"
@@ -6125,6 +6210,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -6135,9 +6221,24 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712100000_arc_write_performance.sql"
+        },
+        {
+          "name": "inbound_logistics_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "supplier_id",
+            "material_id"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000018_natural_key_unique.sql"
         }
       ],
       "rls": {
@@ -6192,6 +6293,16 @@
             "id"
           ],
           "name": "inbound_logistics_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "plant_name",
+            "supplier_id",
+            "material_id"
+          ],
+          "name": "inbound_logistics_natural_key"
         }
       ]
     },
@@ -6374,6 +6485,7 @@
           "columns": [
             "ingest_run_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000013_ingest_files_tier0.sql"
@@ -6384,6 +6496,7 @@
           "columns": [
             "content_sha256"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000013_ingest_files_tier0.sql"
@@ -6735,6 +6848,7 @@
             "link_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
@@ -6746,6 +6860,7 @@
             "project_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
@@ -6989,6 +7104,7 @@
           "columns": [
             "ingest_run_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
@@ -7220,6 +7336,7 @@
           "columns": [
             "ingest_run_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
@@ -7535,6 +7652,7 @@
           "columns": [
             "ingest_run_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
@@ -7773,6 +7891,7 @@
             "target_table",
             "source_row_number"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260916000014_ingest_staged_rows.sql"
@@ -7783,6 +7902,7 @@
           "columns": [
             "ingest_run_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": "findings @> '[{\"level\": \"error\"}]'::jsonb",
           "partial": true,
           "added_by": "20260916000014_ingest_staged_rows.sql"
@@ -8386,6 +8506,7 @@
             "graph_hash",
             "scenario_hash"
           ],
+          "nulls_not_distinct": false,
           "predicate": "status = 'active'",
           "partial": true,
           "added_by": "20260710000001_model_validations.sql"
@@ -8397,6 +8518,7 @@
             "project_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260710000001_model_validations.sql"
@@ -8581,6 +8703,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -8591,9 +8714,24 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712100000_arc_write_performance.sql"
+        },
+        {
+          "name": "multi_tier_supply_chain_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "from_firm_id",
+            "to_firm_id"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000018_natural_key_unique.sql"
         }
       ],
       "rls": {
@@ -8628,6 +8766,16 @@
             "id"
           ],
           "name": "multi_tier_supply_chain_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "plant_name",
+            "from_firm_id",
+            "to_firm_id"
+          ],
+          "name": "multi_tier_supply_chain_natural_key"
         }
       ]
     },
@@ -8836,6 +8984,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -9253,6 +9402,7 @@
           "columns": [
             "prominence"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250905140016_b6e8e382-459a-4cbc-be12-cd46c578a61d.sql"
@@ -9263,6 +9413,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -9273,6 +9424,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712110000_network_metrics_check_performance.sql"
@@ -9779,6 +9931,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
@@ -9790,6 +9943,7 @@
             "project_id",
             "plant_name"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
@@ -9800,6 +9954,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
@@ -10471,6 +10626,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -10481,9 +10637,24 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712100000_arc_write_performance.sql"
+        },
+        {
+          "name": "outbound_logistics_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "customer_id",
+            "product_id"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000018_natural_key_unique.sql"
         }
       ],
       "rls": {
@@ -10538,6 +10709,16 @@
             "id"
           ],
           "name": "outbound_logistics_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "plant_name",
+            "customer_id",
+            "product_id"
+          ],
+          "name": "outbound_logistics_natural_key"
         }
       ]
     },
@@ -10968,6 +11149,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
@@ -10979,6 +11161,7 @@
             "project_id",
             "family"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
@@ -11483,6 +11666,7 @@
             "project_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260609000002_policy_versions.sql"
@@ -11996,6 +12180,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
@@ -12356,6 +12541,7 @@
             "status",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260717000003_project_memory.sql"
@@ -12781,6 +12967,7 @@
           "columns": [
             "organization"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql"
@@ -13241,6 +13428,7 @@
             "project_id",
             "idempotency_key"
           ],
+          "nulls_not_distinct": false,
           "predicate": "status IN ('draft','proposed','approved')",
           "partial": true,
           "added_by": "20260715000001_agent_proposals.sql"
@@ -13253,6 +13441,7 @@
             "status",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260715000001_agent_proposals.sql"
@@ -13264,6 +13453,7 @@
             "thread_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260715000001_agent_proposals.sql"
@@ -13453,6 +13643,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
@@ -13463,6 +13654,7 @@
           "columns": [
             "is_system"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
@@ -13683,6 +13875,7 @@
           "columns": [
             "vintage"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260915000003_risk_data.sql"
@@ -13969,6 +14162,7 @@
             "kind",
             "item_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260720000001_run_item_series.sql"
@@ -13979,6 +14173,7 @@
           "columns": [
             "run_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260720000001_run_item_series.sql"
@@ -14213,6 +14408,7 @@
           "columns": [
             "run_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
@@ -14224,6 +14420,7 @@
             "run_id",
             "rep_index"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
@@ -14235,6 +14432,7 @@
             "run_id",
             "rep_index"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260614000001_item_master.sql"
@@ -14853,6 +15051,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
@@ -15096,6 +15295,7 @@
             "cache_key",
             "expires_at"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
@@ -15106,6 +15306,7 @@
           "columns": [
             "expires_at"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
@@ -15117,6 +15318,7 @@
             "project_id",
             "cache_key"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
@@ -15127,6 +15329,7 @@
           "columns": [
             "expires_at"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
@@ -15356,6 +15559,7 @@
           "columns": [
             "job_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
@@ -15367,6 +15571,7 @@
             "project_id",
             "scenario_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
@@ -15377,6 +15582,7 @@
           "columns": [
             "recorded_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
@@ -15764,6 +15970,7 @@
             "project_id",
             "status"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
@@ -15776,6 +15983,7 @@
             "priority DESC",
             "queued_at"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
@@ -15786,6 +15994,7 @@
           "columns": [
             "status"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
@@ -15796,6 +16005,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
@@ -15806,6 +16016,7 @@
           "columns": [
             "created_at"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
@@ -15816,6 +16027,7 @@
           "columns": [
             "job_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
@@ -16278,6 +16490,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
@@ -16667,6 +16880,7 @@
           "columns": [
             "scenario_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
@@ -16677,6 +16891,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
@@ -17181,6 +17396,7 @@
           "columns": [
             "uploaded_by"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql"
@@ -17191,6 +17407,7 @@
           "columns": [
             "plant"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql"
@@ -17201,6 +17418,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
@@ -17211,6 +17429,7 @@
           "columns": [
             "data_source"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
@@ -17221,6 +17440,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
@@ -17232,6 +17452,7 @@
             "project_id",
             "data_source"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
@@ -17244,6 +17465,7 @@
             "from_location",
             "to_location"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
@@ -17254,6 +17476,7 @@
           "columns": [
             "is_zero_flow_filtered"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250925150727_13bdb56c-13dc-4bfe-94b7-eb51f213f2e3.sql"
@@ -17266,6 +17489,7 @@
             "data_source",
             "from_location"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712110000_network_metrics_check_performance.sql"
@@ -17278,6 +17502,7 @@
             "data_source",
             "to_location"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712110000_network_metrics_check_performance.sql"
@@ -17288,6 +17513,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260712110000_network_metrics_check_performance.sql"
@@ -17549,6 +17775,7 @@
           "columns": [
             "project_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
@@ -17560,6 +17787,7 @@
             "project_id",
             "data_source"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
@@ -17572,6 +17800,7 @@
             "path_root",
             "level"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
@@ -17584,6 +17813,7 @@
             "from_location",
             "to_location"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
@@ -17594,6 +17824,7 @@
           "columns": [
             "material_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
@@ -17604,6 +17835,7 @@
           "columns": [
             "higher_level_component_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
@@ -17615,6 +17847,7 @@
             "project_id",
             "level"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
@@ -17625,6 +17858,7 @@
           "columns": [
             "from_location"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql"
@@ -17635,6 +17869,7 @@
           "columns": [
             "to_location"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql"
@@ -17865,7 +18100,23 @@
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
         }
       ],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "tier2_suppliers_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "supplier_id",
+            "upstream_supplier_id",
+            "material_id"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000018_natural_key_unique.sql"
+        }
+      ],
       "rls": {
         "enabled": true,
         "forced": false,
@@ -17898,6 +18149,17 @@
             "id"
           ],
           "name": "tier2_suppliers_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "plant_name",
+            "supplier_id",
+            "upstream_supplier_id",
+            "material_id"
+          ],
+          "name": "tier2_suppliers_natural_key"
         }
       ]
     },
@@ -18075,7 +18337,23 @@
           "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
         }
       ],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "tier3_suppliers_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "supplier_id",
+            "upstream_supplier_id",
+            "material_id"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000018_natural_key_unique.sql"
+        }
+      ],
       "rls": {
         "enabled": true,
         "forced": false,
@@ -18108,6 +18386,17 @@
             "id"
           ],
           "name": "tier3_suppliers_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "plant_name",
+            "supplier_id",
+            "upstream_supplier_id",
+            "material_id"
+          ],
+          "name": "tier3_suppliers_natural_key"
         }
       ]
     },
@@ -18599,6 +18888,7 @@
             "project_id",
             "created_at DESC"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260723000001_reports_and_file_workspace.sql"
@@ -18609,6 +18899,7 @@
           "columns": [
             "expires_at"
           ],
+          "nulls_not_distinct": false,
           "predicate": "NOT retained",
           "partial": true,
           "added_by": "20260723000001_reports_and_file_workspace.sql"
@@ -18619,6 +18910,7 @@
           "columns": [
             "org_id"
           ],
+          "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
           "added_by": "20260723000001_reports_and_file_workspace.sql"
@@ -20873,6 +21165,17 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "defined_by": "20260916000015_ingest_landing.sql"
+    },
+    {
+      "name": "ingest_target_natural_key",
+      "signature": "ingest_target_natural_key(text)",
+      "args": [
+        "_target text"
+      ],
+      "returns": "text[] LANGUAGE plpgsql STABLE SET search_path",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "defined_by": "20260916000018_natural_key_unique.sql"
     },
     {
       "name": "is_super_admin",

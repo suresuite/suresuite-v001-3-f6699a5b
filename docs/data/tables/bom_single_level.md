@@ -9,13 +9,14 @@
 
 **Tier 2** — canonical — the only tier humans edit · owned by `data-ingestion` · `public.bom_single_level`
 
-**One row is** One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5).
+**One row is** One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed).
 
 ## Uniqueness
 
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `bom_single_level_pkey` |
+| `project_id` + `plant_name` + `product_id` + `material_id` | UNIQUE index | `bom_single_level_natural_key` |
 
 **Intended natural key:** `project_id` + `plant_name` + `product_id` + `material_id` — the key this
 table's grain implies and the database does NOT enforce today. A statement about
@@ -225,9 +226,10 @@ When the row last changed. Server-set.
 |---|---|---|---|
 | `idx_bom_single_level_project_id` | `project_id` | no | `20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql` |
 | `bom_single_level_project_idx` | `project_id` | no | `20260712100000_arc_write_performance.sql` |
+| `bom_single_level_natural_key` | `project_id`, `plant_name`, `product_id`, `material_id` | yes | `20260916000018_natural_key_unique.sql` |
 
 ---
 
-*Generated from data contract `397209823177`, engine `0.2.3`,
+*Generated from data contract `781d87efe93d`, engine `0.2.3`,
 sidecar `supabase/contract/bom_single_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
