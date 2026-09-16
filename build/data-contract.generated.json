@@ -8119,7 +8119,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES. The deferral that pointed here called these \"the other inbound datasets, each with its own bespoke upload path\". `tier2_suppliers` and `tier3_suppliers` are that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either: `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every occurrence is in migrations — created 2025-08-20, carried through RLS rewrites since, most recently by `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS NULL FOR THAT REASON: there is no CSV to name a column of. It is described here rather than deferred again because a deferral is a promise that someone will look, and five packages of looking have now established what there is to see. DROPPING IT IS NOT THIS PACKAGE'S CALL — a table with rows in production is not removed by the package that happened to notice, and §15 has never counted them. WP 3.2's gap check adds the count to §15 so that the package which does decide is deciding against a number."
+      "note": "DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES. The deferral that pointed here called these \"the other inbound datasets, each with its own bespoke upload path\". `tier2_suppliers` and `tier3_suppliers` are that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either: `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every occurrence is in migrations — created 2025-08-20, carried through RLS rewrites since, most recently by `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS NULL FOR THAT REASON: there is no CSV to name a column of. It is described here rather than deferred again because a deferral is a promise that someone will look, and five packages of looking have now established what there is to see. DROPPING IT IS NOT THIS PACKAGE'S CALL — a table is not removed by the package that happened to notice. WP 3.2's gap check added the count to §15 so that the package which does decide is deciding against a number, AND THE NUMBER IS ZERO: run `35143830532`, 2026-09-16, reports 0 rows across 0 projects. So it is not a table whose data nobody reads; it is a table with no data, no reader and no writer. Recorded here and as D58 rather than acted on."
     },
     "org_capabilities": {
       "table": "org_capabilities",
@@ -17129,5 +17129,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "1a531ccb9773"
+  "contract_version": "c45a2a4c88b0"
 }

@@ -171,7 +171,9 @@ note: >-
   NULL FOR THAT REASON: there is no CSV to name a column of. It is described here
   rather than deferred again because a deferral is a promise that someone will
   look, and five packages of looking have now established what there is to see.
-  DROPPING IT IS NOT THIS PACKAGE'S CALL — a table with rows in production is not
-  removed by the package that happened to notice, and §15 has never counted them.
-  WP 3.2's gap check adds the count to §15 so that the package which does decide
-  is deciding against a number.
+  DROPPING IT IS NOT THIS PACKAGE'S CALL — a table is not removed by the package
+  that happened to notice. WP 3.2's gap check added the count to §15 so that the
+  package which does decide is deciding against a number, AND THE NUMBER IS ZERO:
+  run `35143830532`, 2026-09-16, reports 0 rows across 0 projects. So it is not a
+  table whose data nobody reads; it is a table with no data, no reader and no
+  writer. Recorded here and as D58 rather than acted on.

@@ -52,4 +52,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `1a531ccb9773`, engine `0.2.3`.*
+*Generated from data contract `c45a2a4c88b0`, engine `0.2.3`.*

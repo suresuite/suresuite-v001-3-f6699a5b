@@ -238,7 +238,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D55 | **The three item-master CSVs are parsed server-side but land nothing** — `materials`, `products` and `suppliers` still go from the browser to `bulk_upsert_*` without a tier-0 record or a run, so `no-tier-skip` (I2) is PARTIAL rather than met after WP 3.2. They were left out deliberately and the reason is not laziness: `bulk_upsert_*` already UPSERTS on a natural key and validates its enums in SQL, and routing them through a landing whose promotion is an INSERT would have been a regression dressed as progress. WP 3.3 makes promotion an upsert, which is the moment this becomes cheap | `UploadWizard.tsx:1101`, the `item-master` branch; `ingestSpec.generated.ts` has no entry for them | WP 3.3 |
 | D56 | **The node list and the two deep-tier network CSVs land nothing either**, for a different reason: `node_list`, `network_nodes` and `network_edges` have no sidecar — they are deferred to WP 4.2 because D19 says they are a smear that package moves into `analysis_results` — so there is no contract to validate them against and no decision yet about what tier they are. They ARE parsed server-side (the client-side parse is gone for them too), and their bulk RPCs are untouched. `deep_tier_json` is not a CSV at all and is unchanged | `UploadWizard.tsx:1094,1114`; `coverage.yaml` WP 4.2 group | WP 4.2 |
 | D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — 40+ TS2322 errors under `tsc --noEmit`. Nothing catches it: `npm run build` is Vite, which does not typecheck, and `contract:generate -- --check` compares text rather than types. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | WP 5.2 |
-| D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note | WP 6.2 |
+| D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number — and the number, measured 2026-09-16 (§15 run `35144057908`), is **0 rows across 0 projects**. It is not a table whose data nobody reads; it is a table with no data, no reader and no writer | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note; §15's every-project sweep | WP 6.2 |
 | D59 | **A CHECK written INLINE on a column is invisible to the artifact, so the rehearsed database does not have it and the generated page does not publish it.** `introspect.mjs` reads a column's type, its NOT NULL and its DEFAULT and drops the rest; only a NAMED, table-level `ADD CONSTRAINT … CHECK` is recorded. The artifact holds **24 CHECK constraints across 15 tables** while the migrations contain **253 `CHECK (` occurrences** — most of that gap is repetition across shadowed definitions, but `ingest_files` alone loses three real ones (`source_kind`'s vocabulary, `byte_size >= 0`, and the SHA-256 shape). Two consequences, and the second is worse: `contract:rehearse` builds a database with no such constraint, so an assertion that a bad value is REFUSED passes when it is run against the migration and fails when it is run against the artifact; and `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects a user's upload appears in no document (§5 T1). **Found by the third rehearsal mode on WP 3.2's own branch** — green fresh and green over production's shape, red against its own artifact, which is precisely the case the WP 3.1 follow-up added that mode for. Same family as D49 (a column rename not followed into indexes) and D52 (a table rename not followed into foreign keys): the introspector is incomplete about DEPENDENT objects, one kind at a time. WP 3.2 walks around it — `20260916000014` writes every CHECK as a named table-level constraint — rather than relying on it being fixed | `introspect.mjs`'s `CREATE TABLE` column parser vs `20260916000013_ingest_files_tier0.sql:36,45,49` | WP 6.2 |
 
 ### 4.1 Code map — the data layer
@@ -1423,8 +1423,15 @@ fail on all seven**, so either all seven get their index in this package or the
 flip is scoped in writing and the exclusion is named in the rule, not left to
 whoever runs it next. `multi_tier_supply_chain` is the one that can honestly be
 deferred: D58 records that nothing reads or writes it, and a unique index on a
-table with no writer protects nothing — but §15 counts its rows now, so decide
-against the number rather than against the absence of one.
+table with no writer protects nothing.
+
+**And §15 has now counted all three** (run `35144057908`, 2026-09-16):
+`tier2_suppliers` **0 rows**, `tier3_suppliers` **0 rows**,
+`multi_tier_supply_chain` **0 rows** — not one of them holds a single row in
+production. So three of the seven indexes are free: nothing to deduplicate first,
+and `CREATE UNIQUE INDEX` on an empty table cannot fail. The whole of the 96 + 2
+dedup problem is still the two lane tables it always was. That is an argument for
+doing all seven rather than for scoping the flip.
 
 **Landing them DOES flip the gate.** This package owns both halves. The plan
 previously split them — WP 2.4 to flip, WP 3.3 to make the flip survivable — and
@@ -5639,6 +5646,63 @@ rehearsal, and the deletion assertion fires under mutation.
     can mean here; `table-covered` records that it is load-bearing for the audit
     rule too (D54).
 
+**§15 re-run — and it took TWO runs, which is itself the finding.** Run
+`35143830532` fired on the same push as the migrations, and
+`verification-sql.yml` and `supabase-migrations.yml` have no ordering between
+them: §15 queried `ingest_staged_rows` before `20260916000014` had created it.
+The schema probe reported it **MISSING**, which is the probe being right, and the
+new WP 3.2 section came back `42P01`. Re-requested after the deploy landed
+(`35143830407`, success — three migrations in one go, no failures) and run
+`35144057908` is the one whose numbers mean anything. **A §15 run in the same push
+as a migration measures the database from before it.** Nothing in the plan said so;
+it does now.
+
+**The deltas against §16 · WP 3.1's table:**
+
+| | WP 3.1 (`35081703685`) | now (`35144057908`) |
+|---|---|---|
+| relations production holds that no migration creates | 0 | **0** — the probe now compares **79 tables + 7 views** against 86 relations, up from 78+7: it saw `ingest_staged_rows` appear |
+| relations a migration creates that production lacks | 0 | **0** *(1 on the first run, before the deploy — see above)* |
+| `inbound_logistics` rows a unique index would reject | 96 of 1 787 | **96 of 1 787 — unchanged** |
+| `bom_multi_level` / `outbound` / `bom_single` | 2 / 0 / 0 | **2 / 0 / 0 — unchanged** (794 / 38 / 2 907 rows) |
+| null `volume` / `lead_time` / `unit_price` | 376 / 414 / 30 | **376 / 414 / 30 — unchanged** |
+| unrecognized `time_unit` tokens | 27 | **27** (`21`×19, `15`×16, `16`×13, `7`×12, `14`×11, …) |
+| `audit_logs` by plane | 18 admin, 2 data | 18 admin, 2 data |
+| projects / accounts with `organization_id IS NULL` | 1 of 10 · 0 of 14 | 1 of 10 · 0 of 14 |
+| **NEW — CSV runs / staged rows / landed files / landing audit rows** | — | **0 / 0 / 0 / 0** |
+| **NEW — `tier2_suppliers` / `tier3_suppliers` / `multi_tier_supply_chain` rows** | — | **0 / 0 / 0** |
+| **NEW — `bom_multi_level` rows at level 0** | — | **4 of 794**, `min_level` 0 |
+
+**THE ANSWER THE PROMPT ASKED FOR IS NO, AND IT WAS ALWAYS GOING TO BE.** This
+package did not move one of the 376 null `volume`s, the 414 null `lead_time`s, the
+30 null `unit_price`s or the 27 integer `time_unit` tokens. Every one is a row
+already sitting in `inbound_logistics`, and a parser stops the NEXT bad row; it
+cannot reach back through tier 2 for the ones a browser wrote three years ago.
+What changed is that a file producing them now gets a row-level finding and stays
+in tier 1. The 96 + 2 duplicate keys did not move either, for the same reason and
+because this package creates no unique index — they are WP 3.3's, unchanged from
+the number WP 3.0 first measured.
+
+**Three of the new numbers say something the plan did not know.**
+
+  - **All three tables this package described hold ZERO rows.** `tier2_suppliers`
+    and `tier3_suppliers` were the pair D32 found MISSING from production and WP
+    2.1 adopted — adopted empty, and still empty. `multi_tier_supply_chain` has 0
+    rows across 0 projects, which turns D58 from "a table nobody reads" into "a
+    table with no data, no reader and no writer". It also makes three of WP 3.3's
+    seven unique indexes free.
+  - **`bom_multi_level` holds 4 rows at level 0**, and `min_level` is 0. That is
+    the contract contradiction in H, settled by the data: the sidecar's `integer
+    >= 1` would have rejected four real production rows, and resolving it in
+    favour of the two live parsers was right. Four is small enough that WP 3.3 can
+    still revisit it deliberately — but it would now be a migration and not a
+    validation rule.
+  - **The CSV path has run zero times**, which is exactly what it should say the
+    day it merges. `landing_audit_rows` must always EQUAL `csv_files` — they are
+    written in the same transaction — so the first time those two disagree,
+    something writes `ingest_files` outside `ingest_land_file` and `audit-actor` is
+    failing. §15 says so in the report rather than leaving it to be noticed.
+
 Baseline numbers:
   - `contract:check` green · R1 **37 described** (33 → 37) / **42 deferred**
     (45 → 42) / **79 in schema** (78 → 79, `ingest_staged_rows`) · R4 0 orphans ·
@@ -5658,9 +5722,22 @@ Baseline numbers:
     `UploadWizard.tsx` held 25 before this change and holds 16 after. Not a gate:
     `data-contract.yml` runs `check:docs`, `contract:check`, `npm test` and the
     rehearsal. Recorded so the next session does not read the red as new.
-  - The `adaptive UI audit` and `verify` workflows are still red on `main` and have
-    been for seven merges. Every violation is in `docs/mobile-ui-spec.md` debt with
-    no owner in this plan (§16 · WP 3.1 says the same). Not this package's.
+  - **`scsim engine tests` is red and has been on `main` since at least WP 0.1–0.2**
+    (runs `35077191459`, `35028734679`, `34989092743`, `34982315210`). The failing
+    job is `browser-wheels`, and the diff it prints is WP 1.3's: `datamap.py` added
+    `lead_time_unit` to the `inbound_logistics` projection and the committed wheel
+    under `public/engine/` was never rebuilt. Nothing in this package touches
+    `scsim/`, `sim-worker/` or `public/engine/`. It has no owner in this plan and
+    the fix is one command (`scripts/build_engine_wheels.sh`), but rebuilding a
+    wheel is not something a data-layer package should do blind — recorded so the
+    next session does not spend an hour discovering it, and so it stops being
+    invisible.
+  - The `adaptive UI audit` and `mobile handoff conformance` workflows are still red
+    on `main` and have been for seven merges. Every violation is in `docs/mobile-ui-spec.md` debt with
+    no owner in this plan (§16 · WP 3.1 says the same). **Measured rather than
+    assumed**: `npm run audit:ui` reports 8 violations with this diff and 8 with
+    `UploadWizard.tsx` reverted to `main`'s, and none of the eight is in
+    `UploadWizard`. Not this package's.
 
 Handoff to WP 3.3:
   - **Replace `ingest_apply_run`'s one dynamic INSERT**, do not build a second
