@@ -78,6 +78,14 @@ jobs:
       - name: SQL unit table matches grading.ts::UNIT_DAYS
         run: npm run contract:units -- --check
 
+      # D33. The capability catalog is seeded across nine migrations and mirrored
+      # in TypeScript because the client needs the labels without a round trip.
+      # Nothing checked the two agreed, and the fallback had lost two keys
+      # (`reports`, `agent_report_builder`) — a silent denial for everyone
+      # holding Decision Reports whenever the capability fetch failed.
+      - name: Capability catalog matches the migrations
+        run: npm run contract:capabilities -- --check
+
       # WP 1.1's exit checks, including the orphan check — the one WP 1.4 turned
       # from red to green by reconciling `approved_users`, `risk_data` and
       # `product_code_map`. Reverting any of the three turns it red again.

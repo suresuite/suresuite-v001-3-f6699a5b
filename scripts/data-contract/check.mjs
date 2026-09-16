@@ -63,6 +63,9 @@ const SUBGATES = [
   ["introspect.mjs", ["--check"], "the introspected schema matches the migrations"],
   ["validate-sidecars.mjs", [], "the sidecars validate against the schema"],
   ["gen-unit-sql.mjs", ["--check"], "the SQL unit table matches grading.ts"],
+  // D33 — the capability catalog is seeded across nine migrations and mirrored
+  // in TypeScript. Nothing checked the two agreed until this line.
+  ["gen-capabilities.mjs", ["--check"], "the capability catalog matches the migrations"],
   ["verify-introspection.mjs", [], "WP 1.1's exit checks"],
   ["generate.mjs", ["--check"], "the contract and its pages match their sources"],
 ];

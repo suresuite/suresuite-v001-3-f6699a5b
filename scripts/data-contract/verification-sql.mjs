@@ -210,6 +210,37 @@ async function d29() {
   });
   const total = await tryQ(`select count(*)::int as organizations from public.organizations`);
   report("organization count", total, (rows) => out(`- organizations: **${rows[0]?.organizations ?? "?"}**`));
+
+  // WHAT THE TEXT BRANCH IS ACTUALLY CARRYING. §15's sweep found exactly one
+  // project with `organization_id IS NULL`, and "resolve that project" is D29's
+  // whole remaining cost — but a project cannot be resolved from its uuid. It
+  // needs the org TEXT it carries and whether any organization answers to it.
+  // Assigning a project to the wrong tenant is not a defect to be fixed later,
+  // so this prints the evidence rather than letting a migration guess.
+  const unresolved = await tryQ(`
+    select p.id::text as project_id, p.name as project_name,
+           p.organization as org_text,
+           (select count(*)::int from public.organizations o
+             where lower(btrim(o.name)) = lower(btrim(p.organization))) as orgs_matching_text,
+           (select string_agg(o.id::text || ' = ' || o.name, ' | ')
+              from public.organizations o
+             where lower(btrim(o.name)) = lower(btrim(p.organization))) as candidates,
+           p.modeler_id::text as modeler_id,
+           (select count(*)::int from public.approved_users a where a.id = p.modeler_id) as modeler_rows
+    from public.projects p
+    where p.organization_id is null`);
+  report("the unresolved project, in full", unresolved, (rows) => {
+    out("");
+    out("**D29 · the one project the text branch is load-bearing for.** Removing the branch is gated on this row:");
+    out(...table(rows));
+    out(rows.every((r) => Number(r.orgs_matching_text) === 1)
+      ? "- Each row's org text matches EXACTLY ONE organization, so the backfill's own ambiguity rule resolves it. The branch can go once it is applied."
+      : "- At least one row's org text matches zero or several organizations. A migration must not choose; say so in §16 instead.");
+  });
+
+  const orgs = await tryQ(`
+    select id::text as id, name, slug, status from public.organizations order by name`);
+  report("every organization", orgs, (rows) => out(...table(rows)));
 }
 
 // ── the four decisions §16's PHASE BOUNDARY parked behind §15 ──────────────

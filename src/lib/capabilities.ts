@@ -2,26 +2,31 @@ import type { UserRole } from '@/hooks/useUserRole';
 import { canAccessRoute } from '@/lib/permissions';
 
 /**
- * Canonical capability catalog — kept in lock-step with the DB `capabilities`
- * table seeded in supabase/migrations/20260711000002_unified_access_control.sql.
+ * Canonical capability catalog.
  *
  * Two kinds:
  *  - page    → one entry per gateable route in ROUTE_PERMISSIONS
  *  - feature → cross-page abilities (AI, simulation, data editing, export…)
  *
  * The server is the source of truth: `get_my_capabilities` resolves the merged
- * role → org → user set. This file only carries the labels the UI needs and a
+ * role → org → user set. This file carries the labels the UI needs and a
  * role-based fallback used when that fetch fails.
+ *
+ * THE CATALOG IS NO LONGER AUTHORED HERE (D33). It used to be a hand-kept copy
+ * of rows seeded across nine migrations, and nothing checked that the two
+ * agreed — a key in the database and not here is a capability no client can
+ * ever be granted; the reverse is a permission screen offering a right that
+ * resolves to false. `capabilities.generated.ts` is read out of those
+ * migrations by `npm run contract:capabilities`, and `contract:check` fails
+ * when it drifts. Add a capability by seeding it in a migration and
+ * regenerating; never by editing a list.
  */
 
-export type CapabilityKind = 'page' | 'feature';
+export type { CapabilityKind, CapabilityMeta, FeatureKey } from './capabilities.generated';
+export { PAGE_CAPABILITIES, FEATURE_CAPABILITIES, FEATURE_KEYS } from './capabilities.generated';
 
-export interface CapabilityMeta {
-  key: string;
-  kind: CapabilityKind;
-  label: string;
-  description?: string;
-}
+import type { FeatureKey } from './capabilities.generated';
+import { PAGE_CAPABILITIES } from './capabilities.generated';
 
 /**
  * Route → capability key aliases. The app home moved from `/` to `/app` when
@@ -33,85 +38,6 @@ export interface CapabilityMeta {
 const PATH_ALIASES: Record<string, string> = {
   '/app': '/',
 };
-
-export const PAGE_CAPABILITIES: CapabilityMeta[] = [
-  { key: '/', kind: 'page', label: 'Getting Started' },
-  { key: '/project-manager', kind: 'page', label: 'Project Manager' },
-  { key: '/network/product-level', kind: 'page', label: 'Product-Level Network' },
-  { key: '/network/process-level', kind: 'page', label: 'Process-Level Network' },
-  { key: '/network/firm-level', kind: 'page', label: 'Firm-Level Network' },
-  { key: '/network/interactive-space', kind: 'page', label: 'Interactive Network Space' },
-  { key: '/policies', kind: 'page', label: 'Policies' },
-  { key: '/simulation-lab', kind: 'page', label: 'Simulation Lab' },
-  { key: '/project-intelligence', kind: 'page', label: 'Project Intelligence' },
-  { key: '/developer', kind: 'page', label: 'Developer API' },
-  { key: '/profile', kind: 'page', label: 'My Profile' },
-  { key: '/admin', kind: 'page', label: 'Super Admin' },
-];
-
-export type FeatureKey =
-  | 'ai_chat'
-  | 'simulation_lab'
-  | 'project_intelligence'
-  | 'data_editing'
-  // WP 2.2 (PLAN.md §9): `data_editing` governed BOTH tier-2 inputs and tier-4
-  // decisions, so an analyst who may retune a policy also had to be handed the
-  // right to rewrite the measured data the policy is judged against. These two
-  // split it. `data_editing` is KEPT until every call site has moved — the DB
-  // seeds both new keys from it, so nobody's access changed on deploy.
-  | 'data_edit_inputs'
-  | 'data_edit_policies'
-  | 'export'
-  // AI-agent capability keys (ai-agents.md §13.1; seeded in
-  // 20260715000003_agent_capabilities.sql):
-  | 'agent_proposals'
-  | 'agent_apply'
-  | 'agent_data_steward'
-  | 'agent_policy_configurator'
-  | 'agent_vv_analyst'
-  | 'agent_experiment_designer'
-  | 'agent_explainer'
-  // workstream M0 (ai-agents.md §14.7; seeded in 20260717000001_chat_store.sql):
-  | 'chat_history_sync'
-  // workstream M2 (ai-agents.md §14.4/§14.7; seeded in 20260717000003_project_memory.sql):
-  | 'project_memory'
-  // v1.2 Phase 3 (ai-agents.md §16.1/§13.3; seeded in
-  // 20260723000001_reports_and_file_workspace.sql):
-  | 'reports'
-  | 'agent_report_builder'
-  // v1.5 Phase 4a (ai-agents.md §18.1/§13.1; seeded in
-  // 20260726193000_cost_estimator.sql):
-  | 'agent_cost_estimator'
-  // v1.5 Phase 4b (ai-agents.md §18.2/§13.1; seeded in
-  // 20260727000001_network_cartographer.sql):
-  | 'agent_network_cartographer'
-  // v1.5 Phase 4d (ai-agents.md §18.3/§13.1; seeded in
-  // 20260729000001_disruption_sentinel.sql):
-  | 'agent_disruption_sentinel';
-
-export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
-  { key: 'ai_chat', kind: 'feature', label: 'AI Assistant' },
-  { key: 'simulation_lab', kind: 'feature', label: 'Run Simulations' },
-  { key: 'project_intelligence', kind: 'feature', label: 'Project Intelligence' },
-  { key: 'data_editing', kind: 'feature', label: 'Data Editing' },
-  { key: 'data_edit_inputs', kind: 'feature', label: 'Edit Input Data' },
-  { key: 'data_edit_policies', kind: 'feature', label: 'Edit Policies' },
-  { key: 'export', kind: 'feature', label: 'Export' },
-  { key: 'agent_proposals', kind: 'feature', label: 'Agent Proposals' },
-  { key: 'agent_apply', kind: 'feature', label: 'Agent Apply' },
-  { key: 'agent_data_steward', kind: 'feature', label: 'Data Steward Agent' },
-  { key: 'agent_policy_configurator', kind: 'feature', label: 'Policy Configurator Agent' },
-  { key: 'agent_vv_analyst', kind: 'feature', label: 'V&V Analyst Agent' },
-  { key: 'agent_experiment_designer', kind: 'feature', label: 'Experiment Designer Agent' },
-  { key: 'agent_explainer', kind: 'feature', label: 'Explainer Agent' },
-  { key: 'chat_history_sync', kind: 'feature', label: 'Chat History Sync' },
-  { key: 'project_memory', kind: 'feature', label: 'Project Memory' },
-  { key: 'reports', kind: 'feature', label: 'Decision Reports' },
-  { key: 'agent_report_builder', kind: 'feature', label: 'Report Builder Agent' },
-  { key: 'agent_cost_estimator', kind: 'feature', label: 'Cost Estimator Agent' },
-  { key: 'agent_network_cartographer', kind: 'feature', label: 'Network Cartographer Agent' },
-  { key: 'agent_disruption_sentinel', kind: 'feature', label: 'Disruption Sentinel Agent' },
-];
 
 /** `/profile` is a system page — always reachable, never deniable. */
 export const ALWAYS_ON_PAGES = new Set<string>(['/profile']);
@@ -232,7 +158,14 @@ export function roleFallbackCapabilities(
     pages[key] = ALWAYS_ON_PAGES.has(key) ? true : canAccessRoute(key, r);
   }
   const powerRole = isSuper || r === 'admin' || r === 'modeler';
-  const features: Record<string, boolean> = {
+  // `Record<FeatureKey, boolean>`, not `Record<string, boolean>`, and that is
+  // the point of D33: the compiler now refuses a fallback that has forgotten a
+  // capability. It had forgotten two — `reports` and `agent_report_builder`
+  // shipped in 20260723000001 and never reached this map, so every user with
+  // Decision Reports granted silently lost them on any transient RPC failure.
+  // `capabilityCatalog.test.ts` asserts the same thing at run time, because
+  // this repository has no `tsc` step in CI.
+  const features: Record<FeatureKey, boolean> = {
     ai_chat: true,
     project_intelligence: true,
     export: true,
@@ -257,6 +190,11 @@ export function roleFallbackCapabilities(
     agent_disruption_sentinel: false,
     chat_history_sync: false,
     project_memory: false,
+    // 20260723000001 seeds `reports` from whatever `ai_chat` holds for the role,
+    // which is `true` for every role in this fallback; `agent_report_builder` is
+    // seeded false like every other per-agent key.
+    reports: true,
+    agent_report_builder: false,
   };
   return {
     user_id: null,
