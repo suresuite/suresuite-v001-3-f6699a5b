@@ -5777,7 +5777,7 @@ Handoff to WP 3.3:
 
 ---
 
-### WP 3.3 — Natural keys, upsert, normalization at promotion · 2026-09-16 · `20260916000017`–
+### WP 3.3 — Natural keys, upsert, normalization at promotion · 2026-09-16 · `20260916000017`–`20260916000021`
 
 Preconditions held? **Yes, all three, and the handoff was verified rather than
 inherited.** At `7dae8c6`: `contract:check` green with exactly SEVEN R5 warnings
@@ -6330,6 +6330,78 @@ cries wolf gets relaxed rather than fixed.
 and D36 both pointed at a package that had just finished. D5 is closed; D36's
 remainder moved to WP 4.1 with its reason. That is R8 doing precisely the job the
 Phase 2→3 assessment created it for, on its author's own package.
+---
+
+#### L · Gap check, baseline numbers, and the handoff
+
+**Exit checks — both, with what proves them rather than the claim.**
+
+| §10's exit check | met | proof |
+|---|---|---|
+| uploading the same file twice is a no-op | ✅ | `rehearsal/090` §3: two rows after, `rows_updated = 2`, **and the same surrogate ids** — a delete-and-reinsert would satisfy a count and break every reference into the table. Five mutations fire |
+| every T2 row traces to a run | ✅ *for rows this path writes* | `ingest_run_id` + `source_row_id` on all nine promotion targets, asserted in `090` §2 including the hop to `source_row_number` — the physical line. **Rows that predate this path carry NULL, and that is the honest state**: a null means the provenance is unknown, never that there was none. Nothing can backfill it, because the files were never stored |
+
+**Baseline numbers:**
+  - `contract:check` green with **ZERO warnings**, where it had seven on arrival ·
+    R1 **37 described / 42 deferred / 79 in schema** (unchanged — this package
+    described no new table) · R4 0 orphans · R9 16 audited by trigger, 20 emitter
+    functions · R8 clean · **R10 new**, 17 done packages cross-checked.
+  - **265 tests green**, 243 → 265. `ingestSpecParity.test.ts` 12 → 23,
+    `laneVolumes.test.ts` 10 → 17, `loudFailure.test.ts` +4.
+  - **Two behavioural assertion files added** (`080`, `090`), nine in total.
+    Fourteen mutations run across them, every one fired with its own message.
+  - `contract:rehearse` green **all three ways** before every push.
+  - **Four run-time errors caught by the rehearsal that no static gate can see**
+    (§16 · F), each of which would have been a failed production deploy. That is
+    D31 earning its keep four times in one file.
+
+**What is red on `main` and is not this package's.** `npm run lint` (453 problems
+repo-wide), `scsim engine tests` (the `browser-wheels` job, red since WP 0.1–0.2 —
+the committed wheel under `public/engine/` was never rebuilt after WP 1.3),
+`adaptive UI audit` and `mobile handoff conformance`. All four were red on `main`
+at `7dae8c6` before this branch existed and are recorded as such by WP 3.2.
+Nothing here touches `scsim/`, `sim-worker/` or `public/engine/`.
+
+**THE HONEST CAVEAT, and it has not changed since WP 3.2 said it.** Everything
+above rests on a rehearsal. **Production has never run an ingestion of any kind —
+the CSV path has run zero times**, which the §15 run taken for this package
+confirms: `ingest_runs`, `ingest_files` and `ingest_staged_rows` are empty, and
+the tier-2 duplicate counts did not move by a single row across WP 3.2's merge.
+A green rehearsal is not a working pipeline. The first production CSV upload is
+the real test and it has not happened; the second one — the same file again — is
+the test of everything this package built.
+
+**And the dedup has not run.** Migrations deploy on merge, so the AFTER number
+§10 asks for cannot exist on this branch. The prediction is recorded in §16 · B so
+the next run either confirms it or is itself a finding: `inbound_logistics`
+1 787 → **1 691**, `bom_multi_level` 794 → **792**, everything else unchanged, and
+every `rows_the_unique_index_would_reject` **0**. Whoever runs §15 after the deploy
+should read those three numbers first.
+
+**Handoff to WP 3.4:**
+  - **There is finally something to render.** `090`'s fixtures are the shape a
+    staged run has, and `ingest_staged_rows.findings` now carries a
+    `superseded_by_later_line` warning as well as validation errors — the review
+    screen has three states to show per row, not two: promoted, held back with an
+    error, and promoted-but-superseded-by-a-later-line-in-the-same-file.
+  - **`source_row_id` is what makes "click from a cell through to the source row"
+    a join rather than a feature.** The tier-2 row points at the staged row, whose
+    `source_row_number` is the physical line, whose run points at the
+    `ingest_files` manifest with the filename and the SHA-256.
+  - **`rows_updated` vs `rows_promoted` is the diff, already computed.**
+    `ingest_apply_run` returns both, using `xmax = 0` to tell an insert from an
+    update, so "12 new, 340 unchanged" needs no second pass over the data.
+  - **Do not add a branch on `source_kind`.** §10's own gap check for WP 3.4 says
+    any branch beyond labels means WP 3.1 was incomplete. Nothing in this package
+    added one.
+  - **The promotion is the ONLY writer of the nine tier-2 targets from CSV, and
+    `ingestSpecParity.test.ts` is what keeps it that way.** If WP 3.4 needs a
+    partial promote (promote these rows, not those), it belongs INSIDE
+    `ingest_apply_run` as a predicate, not beside it.
+
+**Handoff to WP 4.1 (new, and it is not a leftover):** D36's six PostgREST
+writers. See §16 · I for why no line count closes them and why this package is
+the wrong place to move them.
 
 ---
 ---
