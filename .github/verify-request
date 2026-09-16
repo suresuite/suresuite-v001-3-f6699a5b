@@ -27,3 +27,6 @@ WP 3.1 gap check — 2026-09-16T09:50:43Z
 #      said `>= 1` and both live parsers admit 0, resolved in favour of the parsers
 #      and this is the number that says whether that was right.
 WP 3.2 gap check — server-side parse landed
+WP 3.2 gap check, second run — the first raced the migration deploy: `ingest_staged_rows`
+did not exist when §15 queried it (the probe reported it MISSING, correctly, and the CSV
+section failed). Re-run now that `20260916000014`–`20260916000016` have landed.
