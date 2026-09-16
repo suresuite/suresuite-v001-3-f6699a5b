@@ -15,14 +15,38 @@
  * added later without triggers fails here rather than going unaudited.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 // @ts-expect-error — .mjs helper shared with the data-contract scripts; no types.
 import { liveDefinitions } from "../../../../scripts/data-contract/live-sql.mjs";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
-const MIGRATION = join(ROOT, "supabase", "migrations", "20260916000001_data_plane_audit.sql");
-const sql = () => readFileSync(MIGRATION, "utf8");
+const MIGRATIONS = join(ROOT, "supabase", "migrations");
+const MIGRATION = join(MIGRATIONS, "20260916000001_data_plane_audit.sql");
+
+/**
+ * EVERY migration, not just WP 2.3's.
+ *
+ * This used to read `20260916000001_data_plane_audit.sql` alone, and the
+ * contradiction took one new table to surface: the suite's own heading says
+ * coverage is asserted "from the CONTRACT'S OWN TIER MAP, not a list", and the
+ * SQL it compared against was a list of one file. WP 3.0 adopted `customers`
+ * (tier 2, D43) with its three triggers in the adoption migration — where they
+ * belong, beside the CREATE TABLE — and all three tests here failed on a table
+ * that is correctly audited.
+ *
+ * A trigger installed by a later migration is the normal case for every table
+ * added after WP 2.3, so the source has to be the whole directory.
+ */
+const sql = () =>
+  readdirSync(MIGRATIONS)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(join(MIGRATIONS, f), "utf8"))
+    .join("\n");
+
+/** WP 2.3's own file, for the assertions that are about THAT migration. */
+const auditMigration = () => readFileSync(MIGRATION, "utf8");
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 
 type LiveDef = { name: string; sql: string };
@@ -92,12 +116,12 @@ describe("the rename keeps the admin history", () => {
   it("renames the table rather than creating a second one", () => {
     // "admin history intact" is an exit check, and copying rows into a new table is
     // how history stops being intact.
-    expect(sql()).toMatch(/ALTER TABLE IF EXISTS public\.admin_audit_logs RENAME TO audit_logs/);
+    expect(auditMigration()).toMatch(/ALTER TABLE IF EXISTS public\.admin_audit_logs RENAME TO audit_logs/);
     expect(sql(), "a second table would strand the old rows").not.toMatch(/CREATE TABLE[^;]*\baudit_logs\b/);
   });
 
   it("constrains plane to the three planes", () => {
-    expect(squash(sql())).toMatch(/CHECK \(plane IN \('admin','data','access'\)\)/);
+    expect(squash(auditMigration())).toMatch(/CHECK \(plane IN \('admin','data','access'\)\)/);
   });
 
   it("no application code reads the old table name any more", () => {

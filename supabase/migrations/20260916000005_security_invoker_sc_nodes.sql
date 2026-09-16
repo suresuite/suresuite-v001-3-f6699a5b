@@ -1,0 +1,29 @@
+-- Phase 3 / WP 3.0 / §8.3 — `sc_nodes` runs as its CALLER (D38, view 1 of 6).
+--
+-- `security_invoker` defaults OFF in PostgreSQL, so a view executes as its OWNER
+-- and its base tables' RLS is not applied to the person reading it. Six of this
+-- schema's seven views are in that state; WP 2.3 fixed the seventh
+-- (`admin_audit_logs`) and deliberately left these, because each has readers
+-- whose results change the moment policies start applying. Each therefore gets
+-- its own migration and its own assertion, so one can be reverted without the
+-- other five and so the reasoning for each is written down where it belongs.
+--
+-- ── WHAT CHANGES FOR THIS VIEW: NOTHING TODAY, AND THAT IS THE POINT ────────
+--
+-- `sc_nodes` reads `suppliers`, `materials` and `products`. All three have RLS
+-- ENABLED (via `20260614000001_item_master.sql`'s `EXECUTE format(...)` loop —
+-- which is why the introspected artifact reports `rls.enabled: false` for them;
+-- it cannot see dynamic DDL, and the sidecars record that) and all three carry
+-- `%s_auth_all USING (true)` and `%s_anon_read USING (true)`. So an invoking
+-- reader sees exactly what the owner saw.
+--
+-- That makes this the SAFE one to do first, and it is worth doing precisely
+-- because it is safe: the day somebody narrows `materials_auth_all` to the
+-- reader's own organization, this view starts respecting it instead of quietly
+-- continuing to hand out every project's node list. A view that bypasses RLS is
+-- a hole that opens later, when the policy it ignores is finally written.
+--
+-- The engine is unaffected: `sim-worker` reads through the service role, which
+-- is BYPASSRLS, and a service-role read is unchanged by `security_invoker`.
+
+ALTER VIEW public.sc_nodes SET (security_invoker = true);

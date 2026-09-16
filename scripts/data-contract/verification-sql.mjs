@@ -241,6 +241,30 @@ async function d29() {
   const orgs = await tryQ(`
     select id::text as id, name, slug, status from public.organizations order by name`);
   report("every organization", orgs, (rows) => out(...table(rows)));
+
+  // WHO WOULD LOSE ACCESS IF THE TEXT BRANCH WENT. This is the only question
+  // that decides D29, and asking it is cheaper than arguing about it.
+  // `org_is_current_user_org(NULL, 'default_org')` can only be true for a
+  // reader whose OWN `approved_users.organization` text is `default_org` — the
+  // column default, which names no organization. If nobody's is, dropping the
+  // branch revokes nothing from anybody, and WP 2.1's rule ("a package whose
+  // job is to stop revoking access must not add a new way to revoke it") is
+  // satisfied rather than argued around.
+  const defaultOrgUsers = await tryQ(`
+    select count(*)::int as users_with_default_org_text,
+           count(*) FILTER (WHERE is_active)::int as active,
+           (select count(*)::int from public.approved_users
+             where organization is null or btrim(organization) = '') as users_with_blank_org_text
+    from public.approved_users
+    where lower(btrim(coalesce(organization,''))) = 'default_org'`);
+  report("who the text branch still admits", defaultOrgUsers, (rows) => {
+    out("");
+    out("**D29 · who would lose access if the text branch were removed.** The branch can only admit a reader whose own org TEXT matches a project's:");
+    out(...table(rows));
+    out(Number(rows[0]?.users_with_default_org_text ?? -1) === 0
+      ? "- Nobody carries the `default_org` text, so the NULL-org project is reachable by no ordinary user today. Removing the branch revokes nothing."
+      : "- At least one account still carries `default_org`. Removing the branch WOULD revoke their access to the NULL-org project; resolve the account first.");
+  });
 }
 
 // ── the four decisions §16's PHASE BOUNDARY parked behind §15 ──────────────

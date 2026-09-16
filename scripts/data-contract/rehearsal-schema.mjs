@@ -378,6 +378,47 @@ function emitTriggers(root, files) {
   return out;
 }
 
+/**
+ * GRANT and REVOKE, in migration order, every one of them.
+ *
+ * Not in the artifact either, and without them the rehearsal cannot ask the
+ * only question that matters about a view or a policy: what does a given ROLE
+ * see? `SET ROLE authenticated; SELECT … FROM v_admin_user_usage` answers
+ * "permission denied for view" on a base that has the view and not its grant —
+ * which looks like a failing assertion and is a missing shim.
+ *
+ * Applied in order rather than deduplicated: a GRANT followed by a REVOKE is
+ * two facts, and keeping only the last occurrence of each statement text would
+ * silently reorder them.
+ */
+function emitGrants(root, files) {
+  // SUPABASE'S BOOTSTRAP GRANT COMES FIRST, and leaving it out was a real bug
+  // in this file: without it a `SET ROLE authenticated` assertion answers
+  // "permission denied for table approved_users" on a database where production
+  // would have answered with rows. A rehearsal stricter than production is as
+  // misleading as one more permissive — it just fails in the other direction.
+  //
+  // Supabase's project bootstrap grants the three PostgREST roles full table
+  // access in `public` and relies on RLS for the actual rule, which is why D28
+  // is about POLICIES and not about grants. Reproducing it is what makes "what
+  // does this role see?" a question this database can answer.
+  const out = [
+    "GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;",
+    "GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;",
+    "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;",
+  ];
+  for (const file of files) {
+    const sql = readMigration(root, file);
+    if (sql === null) continue;
+    for (const s of statementsMatching(sql, /^(GRANT|REVOKE)\b/i)) {
+      // Grants to roles Supabase defines and this rehearsal does not are the
+      // caller's problem to notice, not this function's to guess at.
+      out.push(s + ";");
+    }
+  }
+  return out;
+}
+
 /** `CREATE FUNCTION` → `CREATE OR REPLACE FUNCTION`, so a re-definition is not 42723. */
 function asReplace(stmt, kind) {
   const re = new RegExp(`^CREATE\\s+${kind}\\b`, "i");
@@ -444,6 +485,7 @@ export function buildRehearsalSchema(artifact, root = ".") {
       ...section("functions", emitFunctions(artifact, root, warn)),
       ...section("views", emitViews(artifact, root, warn)),
       ...section("triggers", emitTriggers(root, files)),
+      ...section("grants", emitGrants(root, files)),
     ]),
     rules: join([
       ...header,

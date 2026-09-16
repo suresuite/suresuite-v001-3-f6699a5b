@@ -69,7 +69,21 @@ function newMigrations(since) {
   const base = gitOk("merge-base", since, "HEAD") || since;
   const diff = gitOk("diff", "--name-only", "--diff-filter=A", `${base}..HEAD`, "--", MIGRATIONS);
   if (diff === null) return null;
-  return diff.split("\n").filter((f) => f.endsWith(".sql")).sort();
+  const committed = diff.split("\n").filter((f) => f.endsWith(".sql"));
+
+  // AND THE WORKING TREE. A migration is rehearsed BEFORE it is committed or it
+  // is rehearsed too late: `supabase-migrations.yml` has no branch filter, so
+  // the push that shares the file is also the push that deploys it. Staged,
+  // unstaged and untracked additions all count.
+  const status = gitOk("status", "--porcelain", "--", MIGRATIONS) || "";
+  const pending = status
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^(\?\?|A|AM|M|MM|\sM)/.test(l))
+    .map((l) => l.replace(/^\S+\s+/, "").replace(/^"|"$/g, ""))
+    .filter((f) => f.endsWith(".sql"));
+
+  return [...new Set([...committed, ...pending])].sort();
 }
 
 /* ─────────────────────────── the base schema ─────────────────────────── */
@@ -216,6 +230,38 @@ function main() {
   console.log(green(`  ✓ base applied · ${tables} tables · ${fns} functions · ${pols} policies`));
 
   let failed = 0;
+
+  // ── the shape the artifact cannot know ────────────────────────────────────
+  //
+  // The base is built from the contract, and the contract describes what the
+  // MIGRATIONS say. Production is not identical to that: it holds relations no
+  // migration creates (D43) and, until WP 2.1 adopted them, lacked three that
+  // the migrations do create (D32). A migration written to ADOPT such a table
+  // has two paths and the fresh one is the path the base always takes — which
+  // is precisely how WP 1.4's first `risk_data` migration passed every local
+  // reading and failed on the deploy, on statement 2, because `CREATE TABLE IF
+  // NOT EXISTS` had silently no-opped.
+  //
+  // `--fixtures` applies `supabase/rehearsal/fixtures/*.sql` between the base
+  // and the migrations, so the ADOPTION path is executed too. CI runs the
+  // rehearsal both ways; neither run alone is the answer.
+  if (flag("--fixtures")) {
+    const dir = path.join(ROOT, "supabase", "rehearsal", "fixtures");
+    const fixtures = existsSync(dir)
+      ? readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()
+      : [];
+    if (fixtures.length) console.log(bold(`\n  production-shape fixtures:`));
+    for (const f of fixtures) {
+      const r = psql(path.join(dir, f), { db });
+      if (r.status !== 0) {
+        console.log(red(`  ✗ fixture ${f} did not apply`));
+        console.log(indent(r.stderr));
+        process.exit(3);
+      }
+      console.log(green(`  ✓ fixture ${f}`));
+    }
+  }
+
   for (const f of files) {
     const name = path.basename(f);
     const r = psql(path.resolve(ROOT, f), { db });

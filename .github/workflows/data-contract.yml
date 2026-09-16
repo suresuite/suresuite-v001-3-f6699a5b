@@ -165,12 +165,24 @@ jobs:
 
       - name: New migrations apply to a real PostgreSQL 16
         run: npm run contract:rehearse
-        env:
+        env: &rehearsal_pg
           PGHOST: localhost
           PGPORT: "5432"
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: postgres
+
+      # TWICE, AND THE SECOND RUN IS THE ONE THAT WOULD HAVE CAUGHT D4. The base
+      # is generated from the contract, which describes what the MIGRATIONS say;
+      # production also holds relations no migration creates (D43). A migration
+      # written to ADOPT such a table has two paths, and the run above always
+      # takes the fresh one — which is exactly how WP 1.4's first `risk_data`
+      # migration passed every local reading and failed on the deploy at
+      # statement 2, because `CREATE TABLE IF NOT EXISTS` had silently no-opped.
+      # `--fixtures` puts production's untracked shape in first.
+      - name: …and to production's shape, including the relations no migration creates
+        run: npm run contract:rehearse -- --fixtures
+        env: *rehearsal_pg
 
   # ── D35 · nothing stopped a merge while `main`'s own gate was red ───────────
   #

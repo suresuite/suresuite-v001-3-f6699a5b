@@ -1,12 +1,12 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 299,
-  "migrations_applied": 296,
+  "migrations_found": 307,
+  "migrations_applied": 304,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000002_audit_view_grant_fix.sql",
+  "last_migration": "20260916000010_security_invoker_admin_org_file_usage.sql",
   "counts": {
-    "tables": 76,
+    "tables": 77,
     "views": 7,
     "enums": 4,
     "functions": 240,
@@ -3983,6 +3983,157 @@
             "id"
           ],
           "name": "chat_threads_pkey"
+        }
+      ]
+    },
+    {
+      "name": "customers",
+      "schema": "public",
+      "created_by": "20260916000003_adopt_customers_drop_product_code_map.sql",
+      "columns": [
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "customer_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "segment",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'default'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "priority_weight",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": false,
+          "default": "1.0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "sla_fill_floor_pct",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "customers_project_customer_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "customer_id"
+          ],
+          "definition": "UNIQUE (project_id, customer_id)",
+          "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Customers: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization))",
+            "with_check": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization))",
+            "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+          },
+          {
+            "name": "Customers: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
+            "with_check": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
+            "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Tier 2 customer master, one row per (project_id, customer_id). Adopted in ",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "customer_id"
+          ],
+          "name": "customers_project_customer_key"
         }
       ]
     },
@@ -17807,6 +17958,14 @@
             "using": "user_id = public.get_current_user_id()",
             "with_check": "user_id = public.get_current_user_id()",
             "added_by": "20260723000001_reports_and_file_workspace.sql"
+          },
+          {
+            "name": "user_files_super_read",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.current_is_super_admin()",
+            "with_check": "public.current_is_super_admin()",
+            "added_by": "20260916000010_security_invoker_admin_org_file_usage.sql"
           }
         ],
         "determinate": true
@@ -17840,30 +17999,30 @@
     "admin_org_file_usage": {
       "defined_by": "20260723000001_reports_and_file_workspace.sql",
       "materialized": false,
-      "security_invoker": false
+      "security_invoker": true
     },
     "sc_edges": {
       "defined_by": "20260609000001_sc_simulation_views.sql",
       "materialized": false,
-      "security_invoker": false
+      "security_invoker": true
     },
     "sc_nodes": {
       "defined_by": "20260915000001_one_unit_table.sql",
       "materialized": false,
-      "security_invoker": false
+      "security_invoker": true
     },
     "simulation_result_scenarios": {
       "defined_by": "20250906103742_51948a68-1b5a-41d0-aca3-7bbcf511ff88.sql",
       "materialized": false,
-      "security_invoker": false
+      "security_invoker": true
     },
     "simulation_results_with_settings": {
       "defined_by": "20250906103742_51948a68-1b5a-41d0-aca3-7bbcf511ff88.sql",
       "materialized": false,
-      "security_invoker": false
+      "security_invoker": true
     },
     "v_admin_user_usage": {
-      "defined_by": "20260709000002_super_admin_phase1.sql",
+      "defined_by": "20260916000009_security_invoker_v_admin_user_usage.sql",
       "materialized": false,
       "security_invoker": false
     }
