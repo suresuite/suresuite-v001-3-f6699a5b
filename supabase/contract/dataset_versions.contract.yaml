@@ -20,7 +20,12 @@ governance:
   read: null
   write: null
   min_project_role: viewer
-  audited: false
+  # WP 2.3 created `audit_<table>_insert/update/delete`, three AFTER … FOR EACH
+  # STATEMENT triggers calling `audit_tier_write`. This flag said `false` for
+  # every one of the twelve tables it audited, and the generated page published
+  # that as "Tier transitions audited: no" (D40). `contract:check` R9 now
+  # compares this field against the live triggers, so it cannot drift again.
+  audited: true
   rls_enabled: true
   note: >-
     Written by the `_build_dataset_snapshot` database function, never by a page —

@@ -37,7 +37,7 @@ partially or get corrected — the write fails.
 | Read capability | any project member |
 | Write capability | `data_editing` |
 | Minimum project role | `editor` |
-| Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
+| Tier transitions audited | yes |
 | Row-level security | enabled |
 | Policies on the table | 4 — **2 with no predicate** |
 
@@ -389,6 +389,6 @@ A unit is never estimated. NULL means weeks, matching project_map.py::_duration_
 
 ---
 
-*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
+*Generated from data contract `633f0cf89458`, engine `0.2.3`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

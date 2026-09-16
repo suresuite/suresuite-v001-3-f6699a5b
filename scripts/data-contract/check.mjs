@@ -14,7 +14,10 @@
 //       without being created
 //   R5  a tier-2 table whose only uniqueness is a surrogate key — WARN (WP 2.4)
 //   R6  every file:line in PLAN.md §4 resolves and is in bounds
-//   R7  §16 is append-only — no drift-log entry may vanish from history
+//   R7  §16 is append-only — no drift-log entry may vanish from history, AND
+//       every work package marked done in §7–§13 has a §16 entry
+//   R8  no open defect and no unmet invariant is owned by a FINISHED package
+//   R9  `governance.audited` matches the audit triggers the migrations create
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -41,6 +44,8 @@ const ROOT = join(HERE, "..", "..");
 const INTROSPECTED = join(ROOT, "build", "schema.introspected.json");
 const COVERAGE = join(HERE, "coverage.yaml");
 const PLAN = join(ROOT, "docs", "PLAN.md");
+
+const PLAN_SECTIONS = /\n## (7|8|9|10|11|12|13)\. /;
 
 const failures = [];
 const warnings = [];
@@ -345,6 +350,212 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
     } else {
       console.log(`  R7  §16 append-only · ${head.size} entries, ${commits.length} revisions checked`);
     }
+  }
+}
+
+// ─────────── R7 rule 2: a package marked done in §7–§13 has a §16 entry
+//
+// §9 assigned R7 as TWO rules and WP 2.4 shipped one. The half that shipped is
+// built on `git log`, and §9 said in advance why that half is not enough: history
+// cannot show the absence of a document nobody ever committed. "PHASE 2
+// READINESS" was never written, and the append-only rule is structurally
+// incapable of noticing — it cost WP 2.1 and WP 5.2a a search each before anyone
+// concluded it had simply never existed.
+//
+// This is the other half, and it needs no history at all: the roadmap's own ✅
+// markers are the checklist. A package marked done in §7–§13 with no `### WP`
+// heading in §16 is a package that skipped its drift-log entry, which is what
+// "a package without a §16 entry is not finished" has to mean to be enforceable.
+//
+// IDENTITY IS THE SAME `entryKey` THE APPEND-ONLY HALF USES — the name before the
+// first `·` — so the two rules cannot disagree about what counts as an entry.
+
+{
+  const planText = readFileSync(PLAN, "utf8");
+  const roadmapStart = planText.search(PLAN_SECTIONS);
+  const roadmapEnd = planText.indexOf("\n## 14.");
+  const roadmap = roadmapStart < 0 ? "" : planText.slice(roadmapStart, roadmapEnd < 0 ? undefined : roadmapEnd);
+
+  // "### WP 2.3 — Data-plane audit ✅ *(D15 — done …)*" → "WP 2.3 — Data-plane audit"
+  const donePackages = roadmap
+    .split("\n")
+    .filter((l) => /^### WP /.test(l) && l.includes("✅"))
+    .map((l) => l.replace(/^###\s*/, "").split("✅")[0].replace(/\s+/g, " ").trim());
+
+  // A §16 heading carries the package NAME ("WP 2.3 — The data-plane audit");
+  // the roadmap heading carries the name and usually a different title, so the
+  // WP NUMBER is the identity the two spellings share.
+  //
+  // THE NUMBER ALONE IS NOT ENOUGH. §16 also holds "WP 2.3 precondition — …",
+  // "WP 2.1 follow-up — …" and "WP 2.4 base merge — …", and a number-only match
+  // let any of those stand in for the completion entry: deleting
+  // "### WP 2.3 — The data-plane audit" left the rule silent because the
+  // precondition entry still carried "2.3". A package's own entry is the one
+  // whose number is followed immediately by the em dash.
+  const loggedNumbers = new Set(
+    entryHeadings(planText)
+      .map(entryKey)
+      .map((k) => k.match(/^WP\s+([0-9]+\.[0-9]+[a-z]?)\s+—/i)?.[1])
+      .filter(Boolean),
+  );
+
+  const missing = [];
+  for (const pkg of donePackages) {
+    const num = pkg.match(/^WP\s+([0-9]+\.[0-9]+[a-z]?)/i)?.[1];
+    if (num && !loggedNumbers.has(num)) missing.push(pkg);
+  }
+  if (missing.length) {
+    for (const pkg of missing) {
+      fail("R7", `§7–§13 marks "${pkg}" done (✅) and §16 has no entry for it. ` +
+                 "A package without a §16 entry is not finished — write the entry, or drop the ✅.");
+    }
+  } else {
+    console.log(`  R7  every done package has a §16 entry · ${donePackages.length} checked`);
+  }
+}
+
+// ───────────── R8: nothing open may be owned by a package that has finished
+//
+// THE FAILURE THIS CATCHES HAS NO SYMPTOM. A defect assigned to WP 2.4 while
+// WP 2.4 is open is work scheduled; the same row after WP 2.4 ships ✅ is work
+// nobody will ever do again, and it reads identically. The Phase 2→3 assessment
+// found five of them at once — D29, D30, D31, D33, D35 all pointed at WP 2.4,
+// which had closed — plus three rows of CLAUDE.md's invariant table still saying
+// "not yet — WP 2.1 / 2.2 / 2.3" for packages that had all shipped.
+//
+// Both are the same shape: a pointer to an owner who has gone home. The rule is
+// to read the roadmap's ✅ markers and refuse any OPEN row that points at one.
+
+{
+  const planText = readFileSync(PLAN, "utf8");
+  const roadmapStart = planText.search(PLAN_SECTIONS);
+  const roadmapEnd = planText.indexOf("\n## 14.");
+  const roadmap = roadmapStart < 0 ? "" : planText.slice(roadmapStart, roadmapEnd < 0 ? undefined : roadmapEnd);
+
+  const donePackages = new Set(
+    roadmap
+      .split("\n")
+      .filter((l) => /^### WP /.test(l) && l.includes("✅"))
+      .map((l) => l.match(/^### WP\s+([0-9]+\.[0-9]+[a-z]?)/i)?.[1])
+      .filter(Boolean),
+  );
+
+  // §4's rows: the LAST cell is "Closed by". A row carrying ✅ is closed and may
+  // name any package; a row without one is open and may not name a finished one.
+  const s4start = planText.indexOf("\n## 4. ");
+  const s4end = planText.indexOf("\n### 4.1 ");
+  const section4 = s4start < 0 ? "" : planText.slice(s4start, s4end < 0 ? undefined : s4end);
+  let orphaned = 0;
+  for (const line of section4.split("\n")) {
+    if (!/^\|\s*\*{0,2}D[0-9]+/.test(line)) continue;
+    const cells = line.split("|").map((c) => c.trim());
+    const id = cells[1].replace(/\*/g, "");
+    const closedBy = cells[cells.length - 2] ?? "";
+    if (closedBy.includes("✅")) continue;                 // already closed
+    for (const num of closedBy.match(/WP\s*([0-9]+\.[0-9]+[a-z]?)/gi) ?? []) {
+      const n = num.replace(/WP\s*/i, "");
+      if (donePackages.has(n)) {
+        orphaned += 1;
+        fail("R8", `§4 ${id} is OPEN and its "Closed by" names WP ${n}, which §7–§13 marks ✅ done. ` +
+                   "An open defect owned by a finished package has no owner — reassign it to a package " +
+                   "that has not run, or close the row.");
+      }
+    }
+  }
+
+  // CLAUDE.md's invariant table says where each gate is enforced "today". A row
+  // still reading "not yet — WP N.M" for a shipped package is the same defect in
+  // the document a new session reads FIRST.
+  const claudeMd = join(ROOT, "CLAUDE.md");
+  if (existsSync(claudeMd)) {
+    for (const line of readFileSync(claudeMd, "utf8").split("\n")) {
+      if (!/^\|\s*`[a-z-]+`\s*\|/.test(line)) continue;
+      const cells = line.split("|").map((c) => c.trim());
+      const gate = cells[1];
+      const enforcedBy = cells[cells.length - 2] ?? "";
+      if (!/not yet/i.test(enforcedBy)) continue;
+      for (const num of enforcedBy.match(/WP\s*([0-9]+\.[0-9]+[a-z]?)/gi) ?? []) {
+        const n = num.replace(/WP\s*/i, "");
+        if (donePackages.has(n)) {
+          orphaned += 1;
+          fail("R8", `CLAUDE.md's ${gate} row says "not yet — WP ${n}", and §7–§13 marks WP ${n} ✅ done. ` +
+                     "Either the package shipped the gate and the row is stale, or it did not and the ✅ is wrong.");
+        }
+      }
+    }
+  }
+  if (!orphaned) console.log(`  R8  no open defect or unmet invariant is owned by a finished package`);
+}
+
+// ───────── R9: `governance.audited` is a FACT, and facts have one source (I1)
+//
+// WHAT WENT WRONG WITHOUT IT. WP 2.3 created three audit triggers on each of
+// twelve tier-2/3/4 tables. Not one of the twelve sidecars changed, so all
+// twelve still declared `audited: false` — and because the generated pages
+// render that field, `docs/data/tables/inbound_logistics.md` published "Tier
+// transitions audited: **no** — invariant `audit-actor` is not met here yet"
+// about a table that had been audited since the migration deployed. A published
+// falsehood, which is a §5 T1 breach, generated and CI-gated (T5) so it would
+// have stayed true-looking indefinitely.
+//
+// It could drift because `audited` had NO SOURCE. `introspect.mjs` has
+// `CREATE TRIGGER` on its ignore list — correctly; it builds a column schema —
+// so the contract had no representation of a trigger at all and the boolean was
+// maintained by hand. `live-sql.mjs` now replays triggers the way it already
+// replays policies, and this rule compares the two. That is `single-source`
+// (I1) applied to the field that records `audit-actor` (G4).
+
+// TWO MECHANISMS, NOT ONE. The first version of this rule counted only the
+// trigger, and it immediately called `organizations` a false claim —
+// `audited: true` there is TRUE, by the other route: every mutation goes through
+// `admin_create_organization` / `admin_update_organization` /
+// `admin_set_org_status`, each of which closes with `log_admin_action`. A rule
+// that forces a true statement to be recorded as false is the defect it exists
+// to prevent, so the trigger is a FLOOR (a trigger means the flag must be true)
+// and an RPC-audited table satisfies it by NAMING the function in its note —
+// which must exist in the migrations and must actually call an audit emitter.
+
+{
+  const { auditedTables, liveDefinitions } = await import("./live-sql.mjs");
+  const live = auditedTables();
+  const emitters = new Map(
+    [...liveDefinitions().functions]
+      .filter(([, f]) => /\b(log_admin_action|log_data_action)\s*\(/i.test(f.sql))
+      .map(([name]) => [name, true]),
+  );
+  let drift = 0;
+  for (const [name, path] of sidecars) {
+    // `sidecars` maps a table name to its PATH, not to parsed YAML — the first
+    // version of this rule read `.governance` off the string and found every
+    // table undeclared, which happens to be the answer it expected.
+    const sc = load(readFileSync(join(ROOT, path), "utf8"));
+    const declared = sc.governance?.audited === true;
+    const triggered = live.has(name);
+
+    if (triggered && !declared) {
+      drift += 1;
+      fail("R9", `"${name}" has ${live.get(name).length} live audit trigger(s) (${live.get(name).join(", ")}) ` +
+                 `and its sidecar says \`audited: false\`. The generated page publishes that as ` +
+                 `"Tier transitions audited: no" — set it true and regenerate.`);
+      continue;
+    }
+    if (!declared || triggered) continue;
+
+    // Declared true with no trigger: the note must name the auditing function.
+    const named = [...String(sc.governance?.note ?? "").matchAll(/`([a-z_][a-z0-9_]*)`/gi)]
+      .map((m) => m[1])
+      .filter((n) => emitters.has(n));
+    if (!named.length) {
+      drift += 1;
+      fail("R9", `"${name}" declares \`audited: true\`, has no \`audit_tier_write\` trigger, and its ` +
+                 "governance note names no function that calls `log_admin_action` or `log_data_action`. " +
+                 "A claim of accountability that nothing implements is worse than none — name the " +
+                 "auditing RPC in the note, or set the flag false.");
+    }
+  }
+  if (!drift) {
+    console.log(`  R9  \`governance.audited\` matches the migrations · ${live.size} table(s) audited by trigger, ` +
+                `${emitters.size} function(s) that emit an audit row`);
   }
 }
 

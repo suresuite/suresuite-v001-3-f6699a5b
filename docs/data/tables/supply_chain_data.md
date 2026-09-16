@@ -31,7 +31,7 @@
 | Read capability | any project member |
 | Write capability | **no user-facing write path** |
 | Minimum project role | `viewer` |
-| Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
+| Tier transitions audited | yes |
 | Row-level security | enabled |
 | Policies on the table | 4 — all carry a predicate |
 
@@ -406,6 +406,6 @@ Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow.
 
 ---
 
-*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
+*Generated from data contract `633f0cf89458`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -38,6 +38,7 @@ const bare = (s) => unquote(s).replace(/^public\./i, "");
  *
  * @returns {{policies: Map<string, {table:string, name:string, migration:string, sql:string}>,
  *            functions: Map<string, {name:string, migration:string, sql:string}>,
+ *            triggers: Map<string, {table:string, name:string, migration:string, sql:string}>,
  *            textualCallSites: number}}
  */
 export function liveDefinitions() {
@@ -48,6 +49,15 @@ export function liveDefinitions() {
 
   const policies = new Map();   // "table::policy name" -> record
   const functions = new Map();  // "name" (args ignored: this repo never overloads) -> record
+  // TRIGGERS are replayed here and NOWHERE ELSE. `introspect.mjs` has
+  // `CREATE TRIGGER` on its ignore list by design — it builds a COLUMN schema —
+  // so "does this table have an audit trigger?" had no source in the contract at
+  // all, and `governance.audited` was a hand-maintained boolean nothing could
+  // check. It drifted the moment WP 2.3 shipped: twelve tables gained three
+  // triggers each and all twelve sidecars still said `audited: false`, which the
+  // generated pages published as "Tier transitions audited: no". Giving the fact
+  // a source is what lets `contract:check` R9 compare the two.
+  const triggers = new Map();   // "table::trigger name" -> record
   let textualCallSites = 0;
 
   for (const file of files) {
@@ -67,16 +77,45 @@ export function liveDefinitions() {
         functions.set(name, { name, migration: file, sql: raw });
       } else if ((m = /^DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_."]+)/i.exec(head))) {
         functions.delete(bare(m[1]));
+      } else if ((m = /^CREATE\s+(?:OR\s+REPLACE\s+)?(?:CONSTRAINT\s+)?TRIGGER\s+("[^"]*"|[a-zA-Z0-9_]+)\s+(?:BEFORE|AFTER|INSTEAD\s+OF)\s+[\s\S]*?\sON\s+([a-zA-Z0-9_."]+)/i.exec(head))) {
+        const table = bare(m[2]), name = unquote(m[1]);
+        triggers.set(`${table}::${name}`, { table, name, migration: file, sql: raw });
+      } else if ((m = /^DROP\s+TRIGGER\s+(?:IF\s+EXISTS\s+)?("[^"]*"|[a-zA-Z0-9_]+)\s+ON\s+([a-zA-Z0-9_."]+)/i.exec(head))) {
+        triggers.delete(`${bare(m[2])}::${unquote(m[1])}`);
       } else if ((m = /^DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_."]+)/i.exec(head))) {
-        // CASCADE or not, the policies go with the table.
+        // CASCADE or not, the policies and triggers go with the table.
         const table = bare(m[1]);
         for (const key of [...policies.keys()]) {
           if (key.startsWith(`${table}::`)) policies.delete(key);
         }
+        for (const key of [...triggers.keys()]) {
+          if (key.startsWith(`${table}::`)) triggers.delete(key);
+        }
       }
     }
   }
-  return { policies, functions, textualCallSites };
+  return { policies, functions, triggers, textualCallSites };
+}
+
+/**
+ * Tables that have a LIVE data-plane audit trigger — the source of truth for
+ * each sidecar's `governance.audited`. WP 2.3's triggers all call
+ * `audit_tier_write`, which is the one function that writes an audit row on a
+ * tier transition; a trigger that does anything else (`set_project_defaults`,
+ * `updated_at` stamps) is not auditing and must not be counted as such.
+ *
+ * @returns {Map<string, string[]>} table -> the names of its audit triggers
+ */
+export function auditedTables() {
+  const { triggers } = liveDefinitions();
+  const byTable = new Map();
+  for (const t of triggers.values()) {
+    if (!/audit_tier_write\s*\(/i.test(t.sql)) continue;
+    if (!byTable.has(t.table)) byTable.set(t.table, []);
+    byTable.get(t.table).push(t.name);
+  }
+  for (const names of byTable.values()) names.sort();
+  return byTable;
 }
 
 /** Live objects whose definition still mentions the text-org function. */

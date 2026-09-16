@@ -1,0 +1,101 @@
+name: Verification SQL (PLAN.md §15)
+
+# WHAT THIS FIXES. PLAN.md §15 says "run against one project before Phase 0 and
+# after each phase; record counts in §16". It was never run once in Phases 0, 1
+# or 2 — not from negligence but from reach: a work-package session cannot open
+# a database connection (the egress proxy denies CONNECT), and §15 is written as
+# a psql script with no runner attached. By the Phase 2 boundary review four
+# separate decisions were parked behind it (§16 PHASE BOUNDARY, condition 2).
+#
+# CI can reach the database — §16's WP 2.1 follow-up established that, and
+# `seed-project.yml` already queries the live project through the Supabase
+# Management API with the same secret. This workflow is that route, pointed at
+# §15 and nothing else.
+#
+# IT IS READ-ONLY. `scripts/data-contract/verification-sql.mjs` sends only
+# `SELECT`, and refuses to send anything else before it reaches the wire. It
+# performs no `supabase link`, no `migration repair` and no `db push` — this is
+# deliberately NOT the migrations workflow, which deploys on push and must not
+# be re-run by hand (a standing decision in the Phase 2→3 prompts).
+#
+# TRIGGERED BY A PUSH, like `ops-request.yml` and `seed-project.yml`. A
+# `workflow_dispatch` only fires for workflows already on the default branch, so
+# a new workflow on a feature branch could never dispatch itself. Touching
+# `.github/verify-request` is the git-native trigger that works from anywhere.
+#
+# The report lands on the `verification-results` branch so it is readable over
+# plain git by an environment with no Actions API access — the same reason
+# `supabase-migrations.yml` publishes its db push log that way.
+
+on:
+  push:
+    paths:
+      - ".github/verify-request"
+      - ".github/workflows/verification-sql.yml"
+      - "scripts/data-contract/verification-sql.mjs"
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: "project uuid to measure (blank = the project with the most inbound_logistics rows)"
+        required: false
+        default: ""
+
+# Two runs writing the same orphan branch race and one loses its report.
+concurrency:
+  group: verification-sql
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # publish the report to the verification-results branch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run PLAN.md §15
+        id: sql
+        run: |
+          set -o pipefail
+          PROJECT="${{ github.event.inputs.project_id }}"
+          if [ -z "$PROJECT" ] && [ -f .github/verify-request ]; then
+            PROJECT=$(grep -oP '^project_id=\K\S+' .github/verify-request || true)
+          fi
+          if [ -n "$PROJECT" ]; then
+            node scripts/data-contract/verification-sql.mjs --project "$PROJECT" --out /tmp/section15.md 2>&1 | tee /tmp/section15.log
+          else
+            node scripts/data-contract/verification-sql.mjs --out /tmp/section15.md 2>&1 | tee /tmp/section15.log
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Publish the report to the verification-results branch
+        if: always()
+        run: |
+          [ -f /tmp/section15.md ] || echo "the runner never produced a report" > /tmp/section15.md
+          {
+            echo "<!-- run_id: ${{ github.run_id }}  outcome: ${{ steps.sql.outcome }} -->"
+            echo "<!-- trigger: ${{ github.event_name }}  ref: ${{ github.ref_name }}  sha: ${{ github.sha }} -->"
+            cat /tmp/section15.md
+          } > /tmp/section15-full.md
+          git config user.name "verification-sql"
+          git config user.email "actions@github.com"
+          git checkout --orphan verification-results
+          git rm -rfq . || true
+          mkdir -p results
+          cp /tmp/section15-full.md results/latest.md
+          cp /tmp/section15-full.md "results/run-${{ github.run_id }}.md"
+          cp /tmp/section15.log results/latest.log 2>/dev/null || true
+          git add results
+          git commit -qm "§15 run ${{ github.run_id }}: ${{ steps.sql.outcome }}"
+          git push -f origin verification-results
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: section15-report
+          path: /tmp/section15-full.md

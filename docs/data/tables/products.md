@@ -30,7 +30,7 @@
 | Read capability | any project member |
 | Write capability | `data_editing` |
 | Minimum project role | `editor` |
-| Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
+| Tier transitions audited | yes |
 | Row-level security | **cannot be determined from the migrations** |
 | Policies on the table | **none** |
 
@@ -514,6 +514,6 @@ When the external system last confirmed this row.
 
 ---
 
-*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
+*Generated from data contract `633f0cf89458`, engine `0.2.3`,
 sidecar `supabase/contract/products.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

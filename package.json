@@ -20,7 +20,8 @@
     "contract:validate": "node scripts/data-contract/validate-sidecars.mjs",
     "contract:units": "node scripts/data-contract/gen-unit-sql.mjs",
     "contract:generate": "node scripts/data-contract/generate.mjs",
-    "contract:check": "node scripts/data-contract/check.mjs"
+    "contract:check": "node scripts/data-contract/check.mjs",
+    "verify:sql": "node scripts/data-contract/verification-sql.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.5",

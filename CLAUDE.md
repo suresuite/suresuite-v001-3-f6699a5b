@@ -55,15 +55,15 @@ WP 1.4). Gates land with their work packages; the rule holds from now.
 | `single-source` | I1 | Every data fact is authored exactly once; docs/validators/RLS generate from it | `check:docs` · `contract:check` R3 (page drift) |
 | `no-tier-skip` | I2 | No tier skipping — external data never lands below T1; pages never write T3 | **not yet** — WP 3.2 |
 | `normalize-at-promotion` | I3 | Units normalize at promotion into T2; nothing downstream converts | `contract:units -- --check` (one `UNIT_DAYS`); promotion itself WP 3.3 |
-| `natural-key` | I4 | Every canonical table has a natural-key unique constraint; ingestion upserts | `contract:check` R5 — **WARN only**; WP 3.3 lands the keys, WP 2.4 flips it to a failure |
+| `natural-key` | I4 | Every canonical table has a natural-key unique constraint; ingestion upserts | `contract:check` R5 — **WARN only**; **WP 3.3 lands the keys AND flips the gate** (it was WP 2.4's, and WP 2.4 shipped without it — see §16 · Phase 2→3) |
 | `input-hash` | I5 | Every derived row carries the input hash it came from | **not yet** — WP 4.1 |
 | `declared-fallback` | I6 | A fallback absent from the contract may not exist in code | `contract:validate` (`engine.missing_default`) · `contract:generate` fails when the engine registry names a required field the contract has no column for |
 | `ingestion-contract` | I7 | A new source implements the ingestion contract; it never touches T2 schemas | **not yet** — WP 3.1 |
 | `result-binding` | I8 | Every result binds dataset + policy + scenario + engine version | **not yet** — WP 4.4 |
-| `uuid-identity` | G1 | Orgs/projects/users referenced by uuid; a displayable name is never a join key | **not yet** — WP 2.1 |
+| `uuid-identity` | G1 | Orgs/projects/users referenced by uuid; a displayable name is never a join key | **partial** — `orgIdentity.test.ts` fails if any live policy, function or edge function compares an org string outside the one predicate. The predicate itself still reads the name (D29), so the invariant holds everywhere EXCEPT inside the declared exception; §15 sizes it at one project |
 | `declared-capability` | G2 | Every table declares read/write capability and minimum project role | `contract:validate` (`governance` is a required sidecar block) |
-| `subtractive-delegation` | G3 | Delegation is subtractive and expiring | **not yet** — WP 2.2 |
-| `audit-actor` | G4 | Every tier transition writes an audit row naming the actor | **not yet** — WP 2.3; `audited: false` on every sidecar is the honest record |
+| `subtractive-delegation` | G3 | Delegation is subtractive and expiring | `projectMembership.test.ts` — subtraction in the RPC, `expires_at NOT NULL`, expiry applied in `effective_project_role`, and NO write policy on either table. **Source-level, not behavioural:** nothing executes against a database (WP 3.0) |
+| `audit-actor` | G4 | Every tier transition writes an audit row naming the actor | `dataPlaneAudit.test.ts` (every tier 2/3/4 table has all three triggers) · `contract:check` R9 (`governance.audited` matches them — D40). **The ROW half is unproven:** production holds 18 audit rows, all `plane='admin'`, so no data-plane row has been observed (D45); and six service-role paths write `actor_user_id: NULL` (D36), so "naming the actor" is not met there |
 | `table-covered` | — | Every table is described by a sidecar or deferred to a named work package | `contract:check` R1 (WP 1.4) |
 | `no-orphan-table` | — | No table the code reads is created by no migration; none is ALTERed without being created | `contract:check` R4 · `contract:verify` (WP 1.4) |
 
@@ -89,8 +89,26 @@ npm run contract:check
 
 It runs `contract:introspect -- --check`, `contract:validate`, `contract:units -- --check`,
 `contract:verify` and `contract:generate -- --check`, then its own rules (R1 coverage,
-R4 orphans, R5 natural keys, R6 §4 citation resolution). `.github/workflows/data-contract.yml`
+R4 orphans, R5 natural keys, R6 §4 citation resolution, R7 §16 append-only **and**
+every done package has a §16 entry, R8 nothing open is owned by a finished package,
+R9 `governance.audited` matches the audit triggers). `.github/workflows/data-contract.yml`
 runs the same set, plus `check:docs` and `npm test`, on every pull request.
+
+**R7's append-only half needs history.** It SKIPS on a shallow clone and says so;
+CI checks out with `fetch-depth: 0`. A local run that prints "SKIPPED" is expected.
+
+One further command reaches the LIVE database:
+
+```
+npm run verify:sql          # PLAN.md §15, read-only (SELECT only)
+```
+
+No work-package session can run it — the egress proxy denies CONNECT. Touch
+`.github/verify-request` and push; `.github/workflows/verification-sql.yml` runs it
+with CI's `SUPABASE_ACCESS_TOKEN` and publishes the report to the
+`verification-results` branch. **Measure every project, never just one** — the
+largest project in this database is the one `seed-project.yml` seeds, and reading it
+alone reports a clean data layer that is not clean (PLAN.md §4 D42).
 
 - **Added a table?** Author `supabase/contract/<table>.contract.yaml`, or defer it in
   `scripts/data-contract/coverage.yaml` under the work package that will. A table in
