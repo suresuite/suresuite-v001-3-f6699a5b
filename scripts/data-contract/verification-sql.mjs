@@ -132,9 +132,16 @@ function report(label, res, render) {
   return res.rows;
 }
 
-// ── schema probe: what does production ACTUALLY have? (D32) ────────────────
+// THE PROBE IS NOW A GATE (D43). Anything pushed here makes the run exit
+// non-zero, so `verification-sql.yml` goes red and the report still publishes.
+// §15 is the only instrument in this repo that can see production; a finding it
+// can only ever REPORT is a finding nothing enforces, which is how `customers`
+// and `product_code_map` sat untracked long enough for R4 to lose sight of them.
+const gateFailures = [];
+
+// ── schema probe: what does production ACTUALLY have? (D32, D43) ───────────
 async function schemaProbe() {
-  section("Schema probe — production vs. the migrations (D32)");
+  section("Schema probe — production vs. the migrations (D32, D43)");
 
   const live = await q(`
     select table_name, table_type
@@ -160,7 +167,29 @@ async function schemaProbe() {
   if (missingTables.length) out(...table(missingTables.map((t) => ({ missing_table: t }))));
   if (missingViews.length) out(...table(missingViews.map((t) => ({ missing_view: t }))));
   out(`- **present in production, created by NO migration: ${extra.length}**`);
-  if (extra.length) out(...table(extra.map((t) => ({ untracked_relation: t }))));
+  if (extra.length) {
+    // The shape, not just the name. Adopting a relation means writing a
+    // `CREATE TABLE IF NOT EXISTS` that matches what is already there (WP 1.4's
+    // `risk_data` pattern), and that cannot be written from a name alone — the
+    // reason D43 sat open is that nobody could see the columns from a session.
+    for (const name of extra) {
+      const cols = await tryQ(`
+        select column_name, data_type, is_nullable, column_default
+        from information_schema.columns
+        where table_schema = 'public' and table_name = '${name}'
+        order by ordinal_position`);
+      const n = await tryQ(`select count(*)::int as rows from public.${name}`);
+      const kind = live.find((r) => r.table_name === name)?.table_type ?? "?";
+      out("");
+      out(`**\`${name}\`** — ${kind}, **${n.rows?.[0]?.rows ?? "?"} rows**`);
+      report(`${name} columns`, cols, (rows) => out(...table(rows)));
+    }
+    gateFailures.push(
+      `${extra.length} relation(s) exist in production that no migration creates: ` +
+        `${extra.join(", ")}. Adopt each with a CREATE TABLE IF NOT EXISTS migration ` +
+        `(WP 1.4's risk_data is the pattern) or drop it. PLAN.md §4 D43.`,
+    );
+  }
 
   return liveNames;
 }
@@ -520,7 +549,15 @@ async function main() {
   out("");
   out(`_${queryCount} statements, all \`SELECT\`._`);
 
+  if (gateFailures.length) {
+    section("GATE — this run FAILS");
+    for (const f of gateFailures) out(`- ${f}`);
+    out("");
+    out("_The report above is complete; the run exits non-zero so the workflow is red._");
+  }
+
   if (outPath) writeFileSync(outPath, lines.join("\n") + "\n");
+  if (gateFailures.length) process.exitCode = 1;
 }
 
 main().catch((err) => {

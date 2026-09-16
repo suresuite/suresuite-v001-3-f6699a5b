@@ -21,6 +21,7 @@
     "contract:units": "node scripts/data-contract/gen-unit-sql.mjs",
     "contract:generate": "node scripts/data-contract/generate.mjs",
     "contract:check": "node scripts/data-contract/check.mjs",
+    "contract:rehearse": "node scripts/data-contract/rehearse-migrations.mjs",
     "verify:sql": "node scripts/data-contract/verification-sql.mjs"
   },
   "dependencies": {
