@@ -162,7 +162,7 @@ function emitDefaults(artifact) {
   return out;
 }
 
-function emitConstraints(artifact) {
+function emitConstraints(artifact, warn) {
   const known = new Set(artifact.tables.map((t) => `${t.schema}.${t.name}`));
   const out = [];
   // KEYS FIRST, ACROSS ALL TABLES. A foreign key needs its target's unique
@@ -192,7 +192,19 @@ function emitConstraints(artifact) {
       const target = c.references.table.includes(".")
         ? c.references.table
         : `public.${c.references.table}`;
-      if (!known.has(target) && target !== "auth.users") continue;
+      if (!known.has(target) && target !== "auth.users") {
+        // NOT SILENT. A skipped foreign key is a cascade the rehearsed database
+        // does not have, and the first time it happened — `ingest_staged_*`
+        // still pointing at `erp_sync_runs` after WP 3.1's rename — the base
+        // built cleanly, said nothing, and a behavioural assertion found it on
+        // `main`. The skip itself is still right; inventing a key would be
+        // worse. Saying nothing about it was not.
+        warn(
+          `foreign key ${t.name}.${c.name} -> ${target} skipped: the artifact has no such table. ` +
+          "The rehearsed database has no ON DELETE behaviour for that column.",
+        );
+        continue;
+      }
       const cols = (c.references.columns || ["id"]).map(q).join(", ");
       const onDelete = c.references.on_delete ? ` ON DELETE ${c.references.on_delete}` : "";
       out.push(
@@ -490,7 +502,7 @@ export function buildRehearsalSchema(artifact, root = ".") {
     rules: join([
       ...header,
       ...section("column defaults", emitDefaults(artifact)),
-      ...section("constraints", emitConstraints(artifact)),
+      ...section("constraints", emitConstraints(artifact, warn)),
       ...section("indexes", emitIndexes(artifact, warn)),
       ...section("row level security", emitRls(artifact)),
     ]),

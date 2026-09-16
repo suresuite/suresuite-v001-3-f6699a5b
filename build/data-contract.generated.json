@@ -5073,7 +5073,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
-            "table": "erp_sync_runs",
+            "table": "ingest_runs",
             "columns": [
               "id"
             ],
@@ -5561,7 +5561,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
-            "table": "erp_sync_runs",
+            "table": "ingest_runs",
             "columns": [
               "id"
             ],
@@ -6019,7 +6019,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
-            "table": "erp_sync_runs",
+            "table": "ingest_runs",
             "columns": [
               "id"
             ],
@@ -15121,5 +15121,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "64f3f2bdb4a2"
+  "contract_version": "db35eafa485d"
 }

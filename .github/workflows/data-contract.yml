@@ -184,6 +184,30 @@ jobs:
         run: npm run contract:rehearse -- --fixtures
         env: *rehearsal_pg
 
+      # THREE TIMES, AND THE THIRD IS THE ONE THAT WOULD HAVE CAUGHT WP 3.1's
+      # OWN DEFECT. The two runs above build the base from the BASE branch's
+      # artifact and then execute this branch's migrations — so the tables come
+      # from the MIGRATION, with whatever foreign keys and cascades it really
+      # creates. Nothing there ever executes the artifact this branch WRITES.
+      #
+      # `--since HEAD` does: it builds the database from this branch's own
+      # `build/schema.introspected.json` and runs the behavioural assertions
+      # against it. That is what `main` does after a merge, which is where WP
+      # 3.1's rename was caught — the introspector had not followed the rename
+      # into the foreign keys that pointed at the old name, so the artifact
+      # described a database with no ON DELETE CASCADE while production's was
+      # fine. Running it here means a pull request meets that database before
+      # `main` does.
+      #
+      # It is a separate step even where the run above already reads the same
+      # artifact (a branch that adds no migration rehearses its own), because
+      # the case it exists for is the branch that DOES add one: there the first
+      # two runs build from the base branch's artifact and only this one meets
+      # the artifact the migration produced.
+      - name: …and to the artifact THIS branch writes (the post-merge shape)
+        run: npm run contract:rehearse -- --since HEAD
+        env: *rehearsal_pg
+
   # ── D35 · nothing stopped a merge while `main`'s own gate was red ───────────
   #
   # Detection was never the gap: `data-contract.yml` went red at `3bf44aa`,

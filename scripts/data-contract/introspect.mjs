@@ -483,7 +483,33 @@ function applyAlter(schema, t, action, migration, whole) {
   }
   if ((m = /^RENAME\s+TO\s+/i.exec(a))) {
     const to = readQualifiedName(a, m[0].length);
-    if (to) { schema.tables.delete(t.name); t.name = to.name; schema.tables.set(to.name, t); }
+    if (!to) return;
+    const from = t.name;
+    schema.tables.delete(t.name); t.name = to.name; schema.tables.set(to.name, t);
+
+    // AND EVERY FOREIGN KEY THAT POINTED AT THE OLD NAME. Postgres tracks a
+    // reference by OID, so production's keys follow the table through a rename
+    // without being restated; this artifact records them by NAME, so unless they
+    // are rewritten here the contract describes a database that cannot be built.
+    //
+    // WP 3.1 recorded that gap as D52 and called it harmless "only because this
+    // package replaced those policies in the same migration". It was not harmless
+    // for one run: `ingest_staged_*.ingest_run_id` kept `REFERENCES erp_sync_runs`,
+    // `rehearsal-schema.mjs` skips a reference to a table the artifact does not
+    // know, and the rehearsed base therefore had no ON DELETE CASCADE at all.
+    // `supabase/rehearsal/050` caught it on `main` — the assertion was right and
+    // the artifact was wrong, which is the only way round worth having.
+    const ref = new RegExp(`\\bREFERENCES\\s+(public\\.)?"?${from}"?`, "i");
+    for (const other of schema.tables.values()) {
+      for (const col of other.columns) {
+        if (col.references?.table === from) col.references.table = to.name;
+      }
+      for (const c of other.constraints) {
+        if (c.kind === "FOREIGN KEY" && typeof c.definition === "string") {
+          c.definition = c.definition.replace(ref, (_all, qual) => `REFERENCES ${qual ?? ""}${to.name}`);
+        }
+      }
+    }
     return;
   }
   if ((m = /^ALTER\s+(?:COLUMN\s+)?/i.exec(a))) {

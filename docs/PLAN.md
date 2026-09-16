@@ -231,7 +231,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 
 | D50 | **A rehearsal fixture with no shape to key on turned `main` red the day WP 3.0 merged, and stayed red.** `--fixtures` plants production's divergence from the contract BEFORE the branch's new migrations run. `fixtures/020_d1_zero_safety_stock.sql` planted the four `policy_overrides` rows carrying D1's frozen zero and `rehearsal/020_d1_unseeded.sql` asserted that a migration had removed them — a migration that, once merged, is in the BASE and never runs again. The pair could only ever pass on WP 3.0's own branch. `data-contract.yml` runs the rehearsal both ways on every push, so the `migrations run` job failed on run `35077191060` (the WP 3.0 merge) and would have failed on every pull request after it, including this one — WP 3.0's own `base branch is green` job makes that a blocker rather than a nuisance. **CLOSED by WP 3.1**: both WP 3.0 fixtures and the assertion that depended on one are deleted (their subjects are settled — 477 → 0 frozen zeros, 2 → 0 untracked relations), and `fixtures/README.md` states the rule that was missing: a fixture must be SHAPE-conditional so it no-ops once its migration is in the base, and a fixture whose precondition is data rather than shape cannot be written | `supabase/rehearsal/fixtures/README.md`; the deleted `fixtures/020_d1_zero_safety_stock.sql` + `rehearsal/020_d1_unseeded.sql`; CI run `35077191060`, job `migrations run` | WP 3.1 ✅ |
 | D51 | **The contract published "RLS enabled, no policies" for three tables that each had one.** `20260829120000` creates the three `erp_staged_*` policies inside a `DO $$ … EXECUTE format('CREATE POLICY "%1$s: project access" ON public.%1$s …') $$` loop. The introspector skips DO blocks — correctly; it reads column schemas — and it compensates with an indeterminacy flag: a table whose RLS a dynamic block TOUCHES is recorded as `determinate: false`, which the generated page renders as "the migrations do not say" rather than as "off". The flag keys on table names MENTIONED in the dynamic SQL, and here the names are `%1$s` format placeholders, so it never fired. The three tables were recorded as determinately policy-less and their generated pages said so, for the whole of Phase 2 — the D40 shape (a published falsehood, CI-gated) in the other direction. WP 3.1 closes it FOR THESE TABLES by writing their policies as four literal statements, which is now the standing rule for this repository. **The flag's blind spot is not closed**: any policy built from a format placeholder is still invisible AND unflagged | `20260829120000_erp_connector_phase1_2.sql` (the `DO`/`EXECUTE format` loop); `introspect.mjs`'s `rls.determinate` marking; `20260916000012_ingest_rename_and_widen.sql` (the literal replacements) | WP 6.2 |
-| D52 | **A table rename silently CLEARS its RLS-indeterminacy flag.** The flag is recomputed from the dynamic blocks' mentioned names, and those mentions are whatever the 2026-08 migration text says — so after `ALTER TABLE erp_staged_products RENAME TO ingest_staged_products`, the lookup for `erp_staged_products` finds no table and the new one is marked determinate without anything having been settled. It was harmless here, because WP 3.1 replaced those policies with literal statements in the same migration and the claim the contract now makes is true. It will not be harmless the next time: a rename alone would turn "the migrations do not say" into a confident assertion, which is the one transition this flag exists to prevent. Same family as D49 — the introspector's ALTER handling is incomplete in a way only a rename exposes. Found by WP 3.1's own rename | `introspect.mjs` (`rls.determinate` / `indeterminate_from`, recomputed from `schema.dynamic[].mentions`) | WP 6.2 |
+| D52 | **A table rename did not follow the FOREIGN KEYS that pointed at the old name — and it was not harmless.** The introspector's `RENAME TO` moved the table in its own map and stopped there, so `ingest_staged_*.ingest_run_id` went on recording `REFERENCES erp_sync_runs` after WP 3.1's rename. `rehearsal-schema.mjs` SKIPS a reference to a table the artifact does not know — silently — so the base it built from that artifact had no `ON DELETE CASCADE` on the staging tables at all, while production's keys followed the rename the way Postgres always does, by OID. **`main`'s `data contract` went red on the merge commit** (run `35110653485`): `supabase/rehearsal/050` reported `3 staged row(s) survived the deletion of their run`. The assertion was right and the artifact was wrong, which is the only way round worth having. The row this replaces said the flag-clearing half was "harmless here… it will not be harmless the next time"; the next time was the next run. **CLOSED**: `RENAME TO` now rewrites every inbound `references.table` and FK definition, the skipped-FK case WARNS instead of vanishing, and CI runs the rehearsal a third way — `--since HEAD`, against the artifact the branch itself writes, which is the shape `main` meets after a merge | `introspect.mjs` (`RENAME TO` in `applyAlter`); `rehearsal-schema.mjs` (`emitConstraints`); CI run `35110653485` | WP 3.1 follow-up ✅ |
+
+| D53 | **Nine foreign keys have never existed in any rehearsed database, because the introspector drops the schema qualifier from `REFERENCES auth.users(id)`.** The artifact records the target as `users`, `rehearsal-schema.mjs` qualifies an unqualified name to `public.users`, no such table exists, and the key is skipped: `project_erp_links.linked_by_user_id`, `ingest_runs.triggered_by_user_id`, `ingest_runs.applied_by_user_id`, `scenarios.created_by`, `simulation_runs.created_by`, `policy_versions.created_by`, `policy_presets.owner_id`, `recovery_playbooks.created_by`, `experiments.created_by`. Production has all nine; every rehearsal has run without them, so no assertion about what happens when a user row disappears could ever have been trusted. Pre-existing and invisible until WP 3.1's follow-up made the skip WARN rather than vanish — which is how it was found, on the same run that closed D52. Same family as D49 and D52: the introspector's handling of a reference is incomplete in a way only the rehearsal can see | `introspect.mjs`'s `REFERENCES` parse (the qualifier is not kept); `rehearsal-schema.mjs` `emitConstraints`'s skip warning | WP 6.2 |
 
 ### 4.1 Code map — the data layer
 
@@ -5072,6 +5074,81 @@ Handoff to WP 3.2:
     links, zero landed files. Your first CSV upload writes the first row any of
     these tables has ever held, so treat the first production run as the real
     test — and do not read an empty staging table as evidence that anything works.
+
+### WP 3.1 follow-up — the artifact did not follow the rename · 2026-09-16 · `main` red at `5eff67e`
+
+**WP 3.1 merged and `main`'s `data contract` went red on the merge commit** (run
+`35110653485`, job `migrations run`). The failing line is this package's own
+assertion, and it was right:
+
+```
+ERROR:  WP 3.1: 3 staged row(s) survived the deletion of their run
+```
+
+**Why the branch was green and `main` was not, which is the part worth keeping.**
+The rehearsal builds its base from an ARTIFACT and then applies the branch's NEW
+migrations. On a pull request the artifact is the BASE branch's, so the staging
+tables came from `20260916000012` itself — with the real foreign keys that
+migration inherits. After the merge there are no new migrations, so the same job
+builds everything from `main`'s own artifact. **Nothing before that moment had ever
+executed the artifact WP 3.1 wrote.**
+
+And that artifact was wrong. `introspect.mjs`'s `RENAME TO` moved the table in its
+own map and did nothing else, so `ingest_staged_*.ingest_run_id` still recorded
+`REFERENCES erp_sync_runs` — a table that no longer exists. `rehearsal-schema.mjs`
+skips a reference whose target the artifact does not know, so the base came up with
+**no `ON DELETE CASCADE` on the staging tables at all**. Production was never
+affected: Postgres tracks a foreign key by OID and the rename carried all three.
+
+**This is D52, and D52's own row said it.** WP 3.1 recorded the rename/flag
+interaction as "harmless here… it will not be harmless the next time". The next
+time was the next run. A finding written down but scheduled for another package is
+still a finding nobody has acted on — and this one had a three-hour fuse.
+
+**The three-part fix, because the symptom is not the defect:**
+
+  1. **`RENAME TO` now rewrites every inbound reference** — both the column-level
+     `references.table` and any FK constraint definition that names the old table.
+     That is the root cause, and it is the same incompleteness as D49 (a column
+     rename not followed into indexes) on a different dependent object.
+  2. **The skipped FK WARNS.** `emitConstraints` was dropping a foreign key
+     silently; the skip is still the right behaviour — inventing a key would be
+     worse — but a cascade the rehearsed database does not have has to be said out
+     loud. Turning it on immediately found **nine more** (D53): every
+     `REFERENCES auth.users(id)` in the schema loses its qualifier, becomes
+     `public.users`, and has been skipped in every rehearsal this repository has
+     ever run.
+  3. **CI runs the rehearsal a THIRD way**: `--since HEAD`, against the artifact
+     the branch itself writes. That is the database `main` meets after a merge, and
+     running it on the pull request is the only thing that would have caught this
+     before the merge rather than after. Two runs proved the migration; none proved
+     the artifact.
+  4. **A branch that adds NO migration now rehearses its own artifact**, not the
+     base branch's. Found while validating the fix: this repair adds no migration,
+     so the first two runs built from `main`'s BROKEN artifact and failed — the
+     branch repairing the artifact was being judged against the artifact it was
+     repairing. The base-branch rule exists to stop a new migration meeting a
+     database that already contains what it creates; with no new migration there is
+     nothing to protect, and the only way such a branch can change the schema at
+     all is by changing the artifact. So that is what it is tested against.
+
+**What this says about the gate that caught it.** The behavioural assertion earned
+its keep twice in one package: once proving the rename preserved behaviour, and
+once refusing to believe an artifact that said otherwise. A structural test derived
+from the same artifact would have agreed with the artifact.
+
+**Baseline after the fix:** `contract:rehearse` green all three ways — fresh, with
+fixtures, and against HEAD's artifact (78 tables, 239 functions, **155 policies**,
+up from 151 because the staging policies are literal now). 182 tests. `check:docs`
+and `contract:check` green.
+
+Handoff, added to WP 3.2's:
+  - **Run `npm run contract:rehearse -- --since HEAD` before you push**, not only
+    the other two. It is in CI now, but the local loop is where it is cheap.
+  - **Nine foreign keys (D53) do not exist in any rehearsed database.** If you
+    write an assertion that depends on what happens when an `auth.users` row is
+    deleted, it will pass for the wrong reason.
+
 
 ---
 ---

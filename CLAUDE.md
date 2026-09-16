@@ -90,8 +90,9 @@ npm run contract:check
 And one more EXECUTES the migrations a branch adds, which no static gate can (D31):
 
 ```
-npm run contract:rehearse              # the migrations this branch adds, fresh
+npm run contract:rehearse                 # the migrations this branch adds, fresh
 npm run contract:rehearse -- --fixtures   # …and over production's untracked shape
+npm run contract:rehearse -- --since HEAD # …and against the artifact YOU wrote
 ```
 
 It needs a PostgreSQL 16 (`PGHOST`/`PGPORT`/`PGUSER`, or `--database-url`); CI uses
@@ -103,6 +104,15 @@ it runs `supabase/rehearsal/*.sql`, which are BEHAVIOURAL assertions against tha
 database — the half a structural test cannot reach, and the reason `audit-actor`
 went from claimed to proved (D45). **Write one whenever a change's correctness
 depends on what the database DOES rather than on what a migration SAYS.**
+
+**The third way is the shape `main` meets after your merge.** The first two build
+the base from the BASE branch's artifact and then run your migrations, so the tables
+come from the migration. Nothing there executes the artifact your branch WRITES —
+and an artifact can be wrong about what the migration did. WP 3.1's rename is what
+that costs: the introspector did not follow it into the foreign keys, the artifact
+recorded a dangling reference, `rehearsal-schema.mjs` skipped the key silently, and
+`main` went red on the merge commit with no cascade on three tables (D52). CI runs
+all three now; run the third one locally before you push.
 
 **A fixture must no-op once its migration is in the base** (`supabase/rehearsal/fixtures/README.md`).
 Guard every statement on the shape it reproduces — `IF to_regclass('public.old_name')
