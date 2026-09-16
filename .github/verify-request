@@ -30,3 +30,44 @@ WP 3.2 gap check — server-side parse landed
 WP 3.2 gap check, second run — the first raced the migration deploy: `ingest_staged_rows`
 did not exist when §15 queried it (the probe reported it MISSING, correctly, and the CSV
 section failed). Re-run now that `20260916000014`–`20260916000016` have landed.
+
+# requested-by: Phase 3 / WP 3.3 — natural keys, upsert, normalization at promotion (§16)
+# requested-at: 2026-09-16 (the BEFORE run, taken before any row is deleted)
+# why: §10 · WP 3.3 says dedup first and record before/after, and the before-number
+#      it inherits (96 + 2, run `35144057908`) is hours old across a merge that
+#      changed what reaches tier 2. A dedup sized from a stale count is a dedup
+#      that cannot be checked afterwards. This run re-measures
+#      `rows_the_unique_index_would_reject` for all SEVEN tables R5 warns on, and
+#      re-reads the three WP 3.2 counted at 0 — `tier2_suppliers`,
+#      `tier3_suppliers`, `multi_tier_supply_chain` — because "the index is free"
+#      is only true while they are empty.
+WP 3.3 — the BEFORE run, before the dedup
+
+# requested-by: Phase 3 / WP 3.3 — natural keys, upsert, normalization (§16, gap check)
+# requested-at: 2026-09-16 (the AFTER run — and read the caveat before the numbers)
+# why: §10 asks for a run after the promotion change. THIS RUN CANNOT SHOW THE
+#      DEDUP'S EFFECT AND IS NOT EXPECTED TO. Migrations deploy on merge, so
+#      20260916000017–21 have not executed against production; this measures the
+#      database the dedup has not touched. What it IS for: confirming the
+#      before-number is stable across the package (96 + 2, and 0 rows in the three
+#      WP 3.2 described — because "the index is free" stops being true the moment
+#      one of them is written to), and re-reading the 27 integer `time_unit`
+#      tokens now that the ETL reports them instead of assuming them.
+#      The prediction the NEXT run should check, recorded in §16 so it can be
+#      falsified: inbound_logistics 1 787 -> 1 691, bom_multi_level 794 -> 792,
+#      and every `rows_the_unique_index_would_reject` 0.
+WP 3.3 — the AFTER run (pre-deploy; see the caveat above)
+
+# requested-by: Phase 3 / WP 3.3 — the AFTER run, taken again because the first one raced
+# requested-at: 2026-09-16
+# why: run `35151473032` and deploy `35151472925` started in the SAME SECOND, so the
+#      report disagrees with itself: the lane sweep read `inbound_logistics` at 1 787
+#      rows with 96 rejects (before the dedup) and the null-numerics query, later in
+#      the same run, read `total` 1 691 (after it). Both are true; neither is the
+#      report. Exactly the race WP 3.2's gap check recorded, and this package walked
+#      into it by assuming migrations deploy on MERGE — `supabase-migrations.yml` has
+#      no branch filter (§4 D31 says so in its own text), so a branch push deploys.
+#      This run reads a database the migrations have finished landing on: the seven
+#      `rows_the_unique_index_would_reject` should all be 0, because the unique
+#      indexes now EXIST and nothing could be a duplicate.
+WP 3.3 — the AFTER run, after the deploy rather than during it

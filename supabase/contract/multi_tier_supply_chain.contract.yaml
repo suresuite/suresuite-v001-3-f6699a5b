@@ -13,10 +13,18 @@ grain: >-
 owner: data-ingestion
 
 natural_key_unique:
-  - source: column PRIMARY KEY
+  - source: "column PRIMARY KEY"
     columns: [id]
-    name: multi_tier_supply_chain_pkey
-
+    name: "multi_tier_supply_chain_pkey"
+  # WP 3.3 — `20260916000018`. THE KEY `natural_key_intended` HAS NAMED SINCE
+  # WP 1.4, now enforced. `NULLS NOT DISTINCT` is part of the constraint and not
+  # a detail: PostgreSQL's default makes NULLs distinct, so a plain index would
+  # constrain every row except the ones whose key column is null — and
+  # `ON CONFLICT` infers from the same index, so the promotion would INSERT a
+  # duplicate instead of updating exactly those rows (§4 D5).
+  - source: "UNIQUE index (NULLS NOT DISTINCT)"
+    columns: [project_id, plant_name, from_firm_id, to_firm_id]
+    name: "multi_tier_supply_chain_natural_key"
 natural_key_intended: [project_id, plant_name, from_firm_id, to_firm_id]
 
 governance:

@@ -575,6 +575,24 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
             const mtMsg = mt ? `Multi-tier — Outbound: ${mt.outbound}, BOM: ${mt.bom}, Inbound: ${mt.inbound}` : '';
             const details = [scdMsg, mtMsg].filter(Boolean).join(' | ');
             toast.success(details ? `Data combined and node list is ready. ${details}` : 'Data combined and node list is ready.');
+
+            // THE ETL'S WARNINGS REACH THE PERSON (WP 3.3, §5 T2).
+            //
+            // `combine-project` has returned a `warnings` array since WP 0.2 and
+            // this screen dropped it on the floor: the degradations rode all the
+            // way back from the server and then stopped one call short of the
+            // only reader who could act on them. D46's reader half is the case
+            // that made it matter — a lane row whose `time_unit` is `21` is read
+            // as weekly, and "the substitution is always visible" is not met by a
+            // field in a response nobody renders.
+            //
+            // One toast per warning, and they persist until dismissed: a
+            // substitution the user must SEE is not something to auto-hide after
+            // four seconds behind a success message.
+            const etlWarnings: string[] = (combineData as any)?.warnings ?? [];
+            for (const w of etlWarnings) {
+              toast.warning(w, { duration: Infinity, closeButton: true });
+            }
           }
         } else {
           setProjects(prevProjects => 

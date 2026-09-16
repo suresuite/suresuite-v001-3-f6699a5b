@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "c45a2a4c88b0";
+export const CONTRACT_VERSION = "fc67c7bde328";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260916000016_audit_newly_described_tier2.sql";
+export const LAST_MIGRATION = "20260916000021_actor_on_remaining_paths.sql";
 
 export const COUNTS = {
   "tablesInSchema": 79,
   "tablesDescribed": 37,
-  "columnsDescribed": 412,
+  "columnsDescribed": 430,
   "tablesUndescribed": 42
 } as const;
 
@@ -92,14 +92,14 @@ export const TIERS: GlanceTier[] = [
     "tables": [
       {
         "table": "bom_multi_level",
-        "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5).",
-        "columns": 9,
+        "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed).",
+        "columns": 11,
         "owner": "data-ingestion"
       },
       {
         "table": "bom_single_level",
-        "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5).",
-        "columns": 8,
+        "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed).",
+        "columns": 10,
         "owner": "data-ingestion"
       },
       {
@@ -110,14 +110,14 @@ export const TIERS: GlanceTier[] = [
       },
       {
         "table": "inbound_logistics",
-        "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
-        "columns": 12,
+        "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).",
+        "columns": 14,
         "owner": "data-ingestion"
       },
       {
         "table": "materials",
         "grain": "One material in one project: the economics the simulation reads for it. The precision path — the CSV lanes carry prices too, and where this row is silent the engine derives the value from them rather than treating it as missing.",
-        "columns": 14,
+        "columns": 16,
         "owner": "data-ingestion"
       },
       {
@@ -128,32 +128,32 @@ export const TIERS: GlanceTier[] = [
       },
       {
         "table": "outbound_logistics",
-        "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
-        "columns": 11,
+        "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed).",
+        "columns": 13,
         "owner": "data-ingestion"
       },
       {
         "table": "products",
         "grain": "One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs.",
-        "columns": 16,
+        "columns": 18,
         "owner": "data-ingestion"
       },
       {
         "table": "suppliers",
         "grain": "One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials.",
-        "columns": 10,
+        "columns": 12,
         "owner": "data-ingestion"
       },
       {
         "table": "tier2_suppliers",
         "grain": "One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources.",
-        "columns": 13,
+        "columns": 15,
         "owner": "data-ingestion"
       },
       {
         "table": "tier3_suppliers",
         "grain": "One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out.",
-        "columns": 13,
+        "columns": 15,
         "owner": "data-ingestion"
       }
     ]

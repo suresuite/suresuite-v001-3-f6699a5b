@@ -1098,22 +1098,15 @@ const UploadWizard = ({
       
       console.log('🚀 Starting bulk insert for:', template.id, 'with', dataToInsert.length, 'records');
       
-      // Use the appropriate bulk insert function based on template
-      if (template.category === 'item-master') {
-        // Full-row upsert into the item-master tables via SECURITY DEFINER
-        // RPCs (Phase A / G4 / §8.3); extra keys in the payload are ignored.
-        const rpcByTemplate: Record<string, string> = {
-          item_master_materials: 'bulk_upsert_materials',
-          item_master_products: 'bulk_upsert_products',
-          item_master_suppliers: 'bulk_upsert_suppliers',
-        };
-        console.log('💶 Uploading item-master data...');
-        const batchResult = await processBatches(rpcByTemplate[template.id], dataToInsert, {
-          p_project_id: selectedProject?.id,
-          p_rows: dataToInsert, // Will be replaced per batch
-        });
-        result = { insertedCount: batchResult.insertedCount };
-      } else if (template.id === 'node_list') {
+      // THE ITEM-MASTER BRANCH IS GONE (WP 3.3, D55), not flagged off. It called
+      // `bulk_upsert_materials` / `_products` / `_suppliers` straight from the
+      // browser into tier 2 — the last CSV path in the system that skipped tiers
+      // 0 and 1. All three templates are now in `INGEST_DATASETS`, so the landing
+      // branch above catches them and returns before reaching here; leaving the
+      // dead code would have left a second write path one edit away from being
+      // reachable again. The RPCs themselves are untouched and still exist for
+      // any caller outside this component.
+      if (template.id === 'node_list') {
         const batchResult = await processBatches('upload_node_list_data', dataToInsert, {
           p_project_id: selectedProject?.id,
           p_user_id: user.id,

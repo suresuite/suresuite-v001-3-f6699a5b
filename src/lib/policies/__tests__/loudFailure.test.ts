@@ -158,3 +158,50 @@ describe("D4 — risk_data is missing on screen, not silently", () => {
     }
   });
 });
+
+/**
+ * D46's READER HALF REACHES A PERSON (WP 3.3, §5 T2).
+ *
+ * `resolveWeeklyVolume` producing a substitution is necessary and not
+ * sufficient: "the substitution is always visible AT THE POINT OF DISPLAY" is
+ * not met by a field in a response nobody renders. `combine-project` has
+ * returned a `warnings` array since WP 0.2 and `DataManager` dropped it on the
+ * floor — the degradations rode all the way back from the server and stopped one
+ * call short of the only reader who could act on them.
+ *
+ * Read from disk, both ends, the way this file already reads the ETL.
+ */
+describe("D46 — the ETL's substitutions reach the screen", () => {
+  const DATA_MANAGER = "src/pages/DataManager.tsx";
+
+  it("the ETL reports an unrecognized time_unit as a warning", () => {
+    const src = read(ETL);
+    expect(src).toMatch(/unitSubstitutions/);
+    // named, with the token and the count — not "some rows had a problem"
+    expect(src).toMatch(/warnings\.push\(/);
+    expect(src).toMatch(/not a unit this[\s\S]{0,40}platform recognises/);
+  });
+
+  it("the ETL does NOT warn about an absent unit", () => {
+    // "Absent means weekly" is an explicit default the contract states. Warning
+    // about it would bury the 88 rows that are a real defect under the 16 that
+    // are not.
+    const src = read(ETL);
+    expect(src).not.toMatch(/time_unit is (null|absent|missing)/i);
+  });
+
+  it("DataManager renders the ETL's warnings instead of discarding them", () => {
+    const src = read(DATA_MANAGER);
+    expect(src, "combine-project's warnings are read").toMatch(/combineData as any\)\?\.warnings/);
+    expect(src, "and shown, not just read").toMatch(/toast\.warning\(/);
+  });
+
+  it("a substitution the user must see does not auto-dismiss", () => {
+    // A four-second toast behind a success message is not "visible at the point
+    // of display".
+    const src = read(DATA_MANAGER);
+    const at = src.indexOf("toast.warning(");
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at, at + 200)).toMatch(/duration:\s*Infinity/);
+  });
+});

@@ -3,176 +3,424 @@
   "$id": "suresuite/data-contract/sidecar",
   "title": "Data-contract sidecar",
   "description": "The AUTHORED half of the data contract (Phase 1 / WP 1.2). One file per table in supabase/contract/<table>.contract.yaml. The introspected half (build/schema.introspected.json) says what the schema IS; a sidecar says what each column MEANS, what unit it carries, which engine code reads it, and what the user typed to produce it. WP 1.4's generator merges the two; its checker fails when either describes something the other does not.",
-
   "$reserved": {
-    "$comment": "Declared now, used by nothing yet. Reserving costs a line; retrofitting costs a UI pass (PLAN.md §8 WP 1.2 step 3).",
-    "tier.2-O": "Observations — timestamped, append-only, bitemporal (PLAN.md §2, Phase 7+).",
+    "$comment": "Declared now, used by nothing yet. Reserving costs a line; retrofitting costs a UI pass (PLAN.md \u00a78 WP 1.2 step 3).",
+    "tier.2-O": "Observations \u2014 timestamped, append-only, bitemporal (PLAN.md \u00a72, Phase 7+).",
     "schema_name.observations": "The Postgres schema tier 2-O will live in. Nothing writes it yet.",
     "provenance.estimated": "A value fitted by an estimator from observations rather than asserted. Phase 7+.",
-    "provenance.contract": "A value the data contract itself supplies — the declared default, not a guess. Phase 6.",
+    "provenance.contract": "A value the data contract itself supplies \u2014 the declared default, not a guess. Phase 6.",
     "field.grain.rate": "A quantity per unit time (a flow). Needs `unit` to name the period.",
     "field.grain.event": "One timestamped occurrence rather than a standing level. Tier 2-O."
   },
-
   "type": "object",
-  "required": ["table", "tier", "grain", "owner", "natural_key_unique", "governance", "fields"],
+  "required": [
+    "table",
+    "tier",
+    "grain",
+    "owner",
+    "natural_key_unique",
+    "governance",
+    "fields"
+  ],
   "additionalProperties": false,
   "properties": {
-    "table": { "type": "string", "pattern": "^[a-z_][a-z0-9_]*$" },
+    "table": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*$"
+    },
     "tier": {
-      "description": "PLAN.md §2. '2-O' and 'reference' are reserved.",
-      "enum": ["0", "1", "2", "2-O", "3", "4", "5", "G", "reference"]
+      "description": "PLAN.md \u00a72. '2-O' and 'reference' are reserved.",
+      "enum": [
+        "0",
+        "1",
+        "2",
+        "2-O",
+        "3",
+        "4",
+        "5",
+        "G",
+        "reference"
+      ]
     },
     "schema_name": {
       "description": "Postgres schema. 'observations' is reserved for tier 2-O.",
-      "enum": ["public", "observations"],
+      "enum": [
+        "public",
+        "observations"
+      ],
       "default": "public"
     },
     "grain": {
       "type": "string",
       "minLength": 10,
-      "description": "What ONE ROW is, in the user's terms. Not the primary key — the thing."
+      "description": "What ONE ROW is, in the user's terms. Not the primary key \u2014 the thing."
     },
     "owner": {
       "description": "Which part of the system is responsible for the rows being correct.",
-      "enum": ["data-ingestion", "etl", "policy-ui", "engine", "platform", "reference-data"]
+      "enum": [
+        "data-ingestion",
+        "etl",
+        "policy-ui",
+        "engine",
+        "platform",
+        "reference-data"
+      ]
     },
     "natural_key_unique": {
       "description": "Uniqueness the table ACTUALLY has, copied from build/schema.introspected.json. Record it truthfully even when it is wrong: the four lane tables have only `id`, which is D5, and WP 3.3 fixes it.",
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["source", "columns"],
+        "required": [
+          "source",
+          "columns"
+        ],
         "additionalProperties": false,
         "properties": {
-          "source": { "type": "string" },
-          "columns": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-          "name": { "type": ["string", "null"] },
-          "predicate": { "type": "string" }
+          "source": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "predicate": {
+            "type": "string"
+          }
         }
       }
     },
     "natural_key_intended": {
       "description": "The key the grain implies, where the table does not yet have it. Present ONLY when natural_key_unique fails to enforce the grain; WP 3.3 lands these as constraints. Never a claim about today.",
-      "type": ["array", "null"],
-      "items": { "type": "string" }
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
     "governance": {
       "type": "object",
-      "required": ["read", "write", "min_project_role", "audited"],
+      "required": [
+        "read",
+        "write",
+        "min_project_role",
+        "audited"
+      ],
       "additionalProperties": false,
       "properties": {
-        "read": { "type": ["string", "null"], "description": "capability key from public.capabilities, or null for 'any project member'" },
-        "write": { "type": ["string", "null"], "description": "capability key; null means no user-facing write path exists" },
+        "read": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "capability key from public.capabilities, or null for 'any project member'"
+        },
+        "write": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "capability key; null means no user-facing write path exists"
+        },
         "min_project_role": {
           "description": "WP 2.2's project_members.project_role vocabulary. Forward-declared: project_members does not exist yet.",
-          "enum": ["viewer", "analyst", "editor", "owner"]
+          "enum": [
+            "viewer",
+            "analyst",
+            "editor",
+            "owner"
+          ]
         },
-        "audited": { "type": "boolean", "description": "I-G4: does a tier transition on this table write an audit row naming the actor? Today this is false almost everywhere; WP 2.3 is where it becomes true." },
-        "rls_enabled": { "type": "boolean", "description": "Copied from introspection. A tier-2 table with rls_enabled false is a finding." },
-        "note": { "type": "string" }
+        "audited": {
+          "type": "boolean",
+          "description": "I-G4: does a tier transition on this table write an audit row naming the actor? Today this is false almost everywhere; WP 2.3 is where it becomes true."
+        },
+        "rls_enabled": {
+          "type": "boolean",
+          "description": "Copied from introspection. A tier-2 table with rls_enabled false is a finding."
+        },
+        "note": {
+          "type": "string"
+        }
       }
     },
     "fields": {
       "type": "object",
       "description": "Every column of the table, no exceptions. WP 1.4's checker fails on a column with no entry and on an entry with no column.",
       "minProperties": 1,
-      "additionalProperties": { "$ref": "#/definitions/field" }
+      "additionalProperties": {
+        "$ref": "#/definitions/field"
+      }
     },
     "ingest_dataset": {
       "description": "WP 3.2. Present when a CSV UPLOAD targets this table, and it is what makes the upload contract-driven rather than hand-written: `ingest-file` builds its parser and its validator from the generated spec, never from a list in the function. Absent means the table has no CSV origin.",
       "type": "object",
-      "required": ["wizard_id", "fact_class", "server_set"],
+      "required": [
+        "wizard_id",
+        "fact_class",
+        "server_set"
+      ],
       "additionalProperties": false,
       "properties": {
-        "wizard_id": { "type": "string", "description": "The template id UploadWizard offers, so one name spans the button and the run." },
-        "fact_class": { "enum": ["master", "transactional"], "description": "What kind of fact one row is — the `ingest_staged_rows.fact_class` value. Structure (a BOM) is master; a quantity over a period (a lane) is transactional." },
-        "server_set": { "type": "array", "items": { "type": "string" }, "description": "Columns the SERVER supplies from the project and the CSV may never carry. A file that names one is refused rather than trusted." }
+        "wizard_id": {
+          "type": "string",
+          "description": "The template id UploadWizard offers, so one name spans the button and the run."
+        },
+        "fact_class": {
+          "enum": [
+            "master",
+            "transactional"
+          ],
+          "description": "What kind of fact one row is \u2014 the `ingest_staged_rows.fact_class` value. Structure (a BOM) is master; a quantity over a period (a lane) is transactional."
+        },
+        "server_set": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Columns the SERVER supplies from the project and the CSV may never carry. A file that names one is refused rather than trusted."
+        }
       }
     },
-    "note": { "type": "string" }
+    "note": {
+      "type": "string"
+    }
   },
-
   "definitions": {
     "field": {
       "type": "object",
-      "required": ["type", "unit", "unit_source", "meaning", "grain", "engine", "substitutions", "ingest", "surfaces"],
+      "required": [
+        "type",
+        "unit",
+        "unit_source",
+        "meaning",
+        "grain",
+        "engine",
+        "substitutions",
+        "ingest",
+        "surfaces"
+      ],
       "additionalProperties": false,
       "properties": {
-        "type": { "type": "string", "description": "The SQL type, as introspected." },
+        "type": {
+          "type": "string",
+          "description": "The SQL type, as introspected."
+        },
         "unit": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "The physical unit. null for dimensionless, identifiers and text."
         },
         "unit_source": {
-          "description": "Where the unit comes from. 'fixed' — the contract fixes it and the CSV cannot change it (inbound_logistics.lead_time is weeks, full stop). 'column' — another column of the same row names it (volume, via time_unit). 'derived' — it follows from the units of the inputs. 'none' — dimensionless.",
-          "enum": ["fixed", "column", "derived", "none"]
+          "description": "Where the unit comes from. 'fixed' \u2014 the contract fixes it and the CSV cannot change it (inbound_logistics.lead_time is weeks, full stop). 'column' \u2014 another column of the same row names it (volume, via time_unit). 'derived' \u2014 it follows from the units of the inputs. 'none' \u2014 dimensionless.",
+          "enum": [
+            "fixed",
+            "column",
+            "derived",
+            "none"
+          ]
         },
-        "unit_column": { "type": "string", "description": "Required when unit_source is 'column': which column names the unit." },
-        "meaning": { "type": "string", "minLength": 10, "description": "What the value IS, in the user's terms — not a restatement of the column name." },
+        "normalize_at_promotion": {
+          "description": "WP 3.3 (invariant I3) \u2014 how this value is converted into a canonical unit as it is PROMOTED into tier 2, so that nothing downstream has to convert it. Present only on a column that also has `unit_column`, which already names where the unit comes from; this adds the two things `unit_column` does not say \u2014 which conversion applies, and what the value is left in.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "conversion",
+            "canonical"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "conversion": {
+              "enum": [
+                "rate",
+                "duration"
+              ],
+              "description": "`rate` \u2014 a quantity PER unit-period, normalized with public.rate_to_weekly. `duration` \u2014 a LENGTH of time, normalized with public.duration_to_weeks. They are NOT inverses: a duration of 1 month is ~4.35 weeks, a rate of 1 per month is ~0.23 per week, which is why the kind has to be stated and cannot be inferred from the unit."
+            },
+            "canonical": {
+              "type": "string",
+              "description": "The unit the promoted value is in. `ingest_apply_run` writes it into `unit_column`, so the tier-2 row STATES its unit rather than leaving a reader to know a default (\u00a75 T1)."
+            }
+          }
+        },
+        "unit_column": {
+          "type": "string",
+          "description": "Required when unit_source is 'column': which column names the unit."
+        },
+        "meaning": {
+          "type": "string",
+          "minLength": 10,
+          "description": "What the value IS, in the user's terms \u2014 not a restatement of the column name."
+        },
         "grain": {
-          "description": "'level' — a standing quantity. 'rate' and 'event' are reserved (see $reserved).",
-          "enum": ["level", "rate", "event", "identifier", "metadata"]
+          "description": "'level' \u2014 a standing quantity. 'rate' and 'event' are reserved (see $reserved).",
+          "enum": [
+            "level",
+            "rate",
+            "event",
+            "identifier",
+            "metadata"
+          ]
         },
         "engine": {
           "type": "object",
-          "required": ["consumed_by", "transform", "missing_default"],
+          "required": [
+            "consumed_by",
+            "transform",
+            "missing_default"
+          ],
           "additionalProperties": false,
           "properties": {
             "consumed_by": {
-              "type": ["string", "null"],
-              "description": "Where the engine reads it, traced by grep, e.g. 'project_map.py::_map_supply -> SupplierLink.cost'. null means NOT TRACED — and then `note` must say so. Never a guess."
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Where the engine reads it, traced by grep, e.g. 'project_map.py::_map_supply -> SupplierLink.cost'. null means NOT TRACED \u2014 and then `note` must say so. Never a guess."
             },
-            "transform": { "type": ["string", "null"], "description": "What happens to the value between the column and the engine field." },
-            "missing_default": { "type": ["string", "null"], "description": "What the engine uses when the column is NULL. I6: a fallback absent from this contract may not exist in code." }
+            "transform": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What happens to the value between the column and the engine field."
+            },
+            "missing_default": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What the engine uses when the column is NULL. I6: a fallback absent from this contract may not exist in code."
+            }
           }
         },
         "substitutions": {
           "type": "array",
-          "description": "Every point where a value the user did not supply can stand in for one they did. §5's transparency standard is built on this list being complete.",
+          "description": "Every point where a value the user did not supply can stand in for one they did. \u00a75's transparency standard is built on this list being complete.",
           "items": {
             "type": "object",
-            "required": ["when", "value", "provenance"],
+            "required": [
+              "when",
+              "value",
+              "provenance"
+            ],
             "additionalProperties": false,
             "properties": {
-              "when": { "type": "string" },
-              "value": { "type": "string" },
+              "when": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
               "provenance": {
                 "description": "The vocabulary the grid already renders (policyGridUi.tsx), plus two reserved states.",
-                "enum": ["data", "master", "derived", "imputed", "suggested", "override", "default", "estimated", "contract"]
+                "enum": [
+                  "data",
+                  "master",
+                  "derived",
+                  "imputed",
+                  "suggested",
+                  "override",
+                  "default",
+                  "estimated",
+                  "contract"
+                ]
               },
-              "visible_as": { "type": ["string", "null"] }
+              "visible_as": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
             }
           }
         },
         "ingest": {
           "type": "object",
-          "required": ["csv_header", "required", "validate"],
+          "required": [
+            "csv_header",
+            "required",
+            "validate"
+          ],
           "additionalProperties": false,
           "properties": {
             "csv_header": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "description": "THE NAME THE USER TYPES. This is what closes D21: the legacy docs headed each entry with the engine's name while the user types something else. null means the column has no CSV origin (a surrogate id, a timestamp, a server-set column)."
             },
-            "required": { "type": "boolean", "description": "Must the CSV carry it for the upload to be accepted?" },
-            "validate": { "type": ["string", "null"], "description": "The rule the value must satisfy at ingestion, in a sentence a person reads." },
+            "required": {
+              "type": "boolean",
+              "description": "Must the CSV carry it for the upload to be accepted?"
+            },
+            "validate": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The rule the value must satisfy at ingestion, in a sentence a person reads."
+            },
             "rule": {
               "description": "The SAME rule, in a form a validator can execute (WP 3.2). `validate` is the sentence and this is the check; the two are not allowed to disagree, and the point of having both is that the prose was the only version for three phases and nothing could run it. Absent means the column carries no machine-checkable rule yet.",
               "type": "object",
-              "required": ["kind"],
+              "required": [
+                "kind"
+              ],
               "additionalProperties": false,
               "properties": {
                 "kind": {
-                  "description": "`unit` is a token public.unit_days() knows — the ONE unit table, never a list restated here (D10).",
-                  "enum": ["text", "numeric", "integer", "unit", "enum", "boolean"]
+                  "description": "`unit` is a token public.unit_days() knows \u2014 the ONE unit table, never a list restated here (D10).",
+                  "enum": [
+                    "text",
+                    "numeric",
+                    "integer",
+                    "unit",
+                    "enum",
+                    "boolean"
+                  ]
                 },
-                "min": { "type": "number", "description": "Inclusive lower bound." },
-                "exclusive_min": { "type": "number", "description": "Strict lower bound." },
-                "max": { "type": "number", "description": "Inclusive upper bound." },
-                "values": { "type": "array", "items": { "type": "string" }, "description": "For kind `enum`: the accepted values, lowercased." },
+                "min": {
+                  "type": "number",
+                  "description": "Inclusive lower bound."
+                },
+                "exclusive_min": {
+                  "type": "number",
+                  "description": "Strict lower bound."
+                },
+                "max": {
+                  "type": "number",
+                  "description": "Inclusive upper bound."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "For kind `enum`: the accepted values, lowercased."
+                },
                 "blank": {
                   "description": "What an empty cell means. `null` lands no value and is the contract's default for an optional column; `reject` is a row-level finding, which is what D7 asks for on a required numeric.",
-                  "enum": ["null", "reject"]
+                  "enum": [
+                    "null",
+                    "reject"
+                  ]
                 }
               }
             }
@@ -181,47 +429,94 @@
         "surfaces": {
           "type": "array",
           "description": "Where the value is rendered. Filled in Phase 5 (WP 5.1); empty until then, not absent.",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "resolution": {
           "description": "How a value for this field is decided when more than one source could supply it. Authored in WP 1.3 for engine-consumed fields; null elsewhere.",
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "type": "object",
-              "required": ["default_mode", "assertable_by", "estimable_from", "hybrid", "on_conflict"],
+              "required": [
+                "default_mode",
+                "assertable_by",
+                "estimable_from",
+                "hybrid",
+                "on_conflict"
+              ],
               "additionalProperties": false,
               "properties": {
-                "default_mode": { "enum": ["asserted", "estimated", "hybrid"] },
-                "assertable_by": { "type": "array", "items": { "type": "string" } },
+                "default_mode": {
+                  "enum": [
+                    "asserted",
+                    "estimated",
+                    "hybrid"
+                  ]
+                },
+                "assertable_by": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "estimable_from": {
                   "type": "array",
-                  "items": { "type": "string" },
+                  "items": {
+                    "type": "string"
+                  },
                   "description": "An EMPTY array is a positive statement, not an omission: this value may never be estimated. consumption_rate, moq and capacity_per_week are engineering facts, and a distribution fitted to one is a lie with error bars."
                 },
                 "hybrid": {
                   "oneOf": [
-                    { "type": "null" },
+                    {
+                      "type": "null"
+                    },
                     {
                       "type": "object",
-                      "required": ["centre", "spread"],
+                      "required": [
+                        "centre",
+                        "spread"
+                      ],
                       "additionalProperties": false,
                       "properties": {
-                        "centre": { "type": "string" },
-                        "spread": { "type": "string" }
+                        "centre": {
+                          "type": "string"
+                        },
+                        "spread": {
+                          "type": "string"
+                        }
                       }
                     }
                   ],
-                  "description": "null means the engine has no variability field for this quantity — see the RFC in PLAN.md §14. Do not invent one here."
+                  "description": "null means the engine has no variability field for this quantity \u2014 see the RFC in PLAN.md \u00a714. Do not invent one here."
                 },
-                "on_conflict": { "enum": ["assertion_wins", "estimate_wins", "flag"] },
-                "threshold_pct": { "type": ["number", "null"] },
-                "note": { "type": "string" }
+                "on_conflict": {
+                  "enum": [
+                    "assertion_wins",
+                    "estimate_wins",
+                    "flag"
+                  ]
+                },
+                "threshold_pct": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": "string"
+                }
               }
             }
           ]
         },
-        "note": { "type": "string" }
+        "note": {
+          "type": "string"
+        }
       }
     }
   }

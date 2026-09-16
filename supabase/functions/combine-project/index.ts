@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { weeklyVolume, weeklyVolumeTotalsBy, volumeShare } from '../_shared/laneVolumes.ts';
+import { weeklyVolume, weeklyVolumeTotalsBy, volumeShare, unitSubstitutions } from '../_shared/laneVolumes.ts';
 import { sameOrganization } from '../_shared/orgIdentity.ts';
 
 const corsHeaders = {
@@ -67,6 +67,29 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     if (inboundError) {
       console.error(`[combine-project] inbound_logistics read FAILED for project ${project_id}: ${inboundError.message ?? inboundError}`);
       return { success: false, error: `Could not read inbound_logistics: ${inboundError.message ?? inboundError}` };
+    }
+
+    // D46's READER HALF (WP 3.3). Every lane row whose `time_unit` this platform
+    // does not recognise is still computed on the 7-day basis — the value is
+    // usable and refusing it would blank rows whose owners did not cause the
+    // defect — but it is NO LONGER SILENT. §15 counts 27 such tokens already in
+    // tier 2 (`21`, `15`, `7`, `14`, …), each of them almost certainly a lead-time
+    // day count that landed one column left, and until now each was read as a
+    // weekly volume and displayed with nothing to say so: a §5 T1 breach (a number
+    // whose source is a parse failure) and T2 (the substitution is invisible).
+    //
+    // NOTHING CAN ADD TO THAT POPULATION since WP 3.2 — `ingestValidate` refuses
+    // an unrecognised token at ingestion — so this reports a closed and shrinking
+    // set. An ABSENT unit is not reported: "absent means weekly" is an explicit
+    // default the contract states, and T1 permits a default. It forbids a guess.
+    for (const [lane, rows] of [['inbound_logistics', inboundData], ['outbound_logistics', outboundData]] as const) {
+      for (const sub of unitSubstitutions(rows ?? [])) {
+        warnings.push(
+          `${lane}: ${sub.rows} row(s) carry time_unit "${sub.token}", which is not a unit this ` +
+          `platform recognises. Their volumes were read as ${sub.assumed}ly. If "${sub.token}" is a ` +
+          `lead time in days, the row's columns are shifted and the volume is wrong (PLAN.md §4 D46).`,
+        );
+      }
     }
 
     // Create strict validation sets

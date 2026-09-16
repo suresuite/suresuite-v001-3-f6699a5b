@@ -9,13 +9,14 @@
 
 **Tier 2** — canonical — the only tier humans edit · owned by `data-ingestion` · `public.inbound_logistics`
 
-**One row is** One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).
+**One row is** One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).
 
 ## Uniqueness
 
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `inbound_logistics_pkey` |
+| `project_id` + `plant_name` + `supplier_id` + `material_id` | UNIQUE index | `inbound_logistics_natural_key` |
 
 **Intended natural key:** `project_id` + `plant_name` + `supplier_id` + `material_id` — the key this
 table's grain implies and the database does NOT enforce today. A statement about
@@ -29,6 +30,10 @@ partially or get corrected — the write fails.
 | Constraint | Rule | Added by |
 |---|---|---|
 | `inbound_logistics_lead_time_unit_known` | `CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL)` | `20260915000002_lead_time_unit.sql` |
+
+| Constraint | Kind | Definition |
+|---|---|---|
+| `inbound_logistics_source_row_fk` | FOREIGN KEY | `FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED` |
 
 ## Governance
 
@@ -85,6 +90,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `created_at` | — | `timestamp with time zone` | — | — | When the row was inserted. Server-set. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row last changed. Server-set. |
 | `lead_time_unit` | `lead_time_unit` | `text` | — | no | The period `lead_time` is quoted in — day, week, month, quarter or year. Blank means WEEKS, which is what the engine assumed before this column existed. Distinct from `time_unit`, which is the period `volume` is quoted over and has never applied to the lead time. |
+| `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else. |
+| `source_row_id` | — | `uuid` | — | — | The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it. |
 
 ## Each column in full
 
@@ -380,15 +387,45 @@ A unit is never estimated. NULL means weeks, matching project_map.py::_duration_
 
 > Added by WP 1.3 (D9). The engine had read this field since the scsim bridge was written; no column supplied it, so `r.get("lead_time_unit")` returned None on every row and a lead time entered in days was read as weeks — seven times too long, with no warning, because nothing in the chain knew a unit was expected. This is also the first use of the `contract` provenance state reserved in WP 1.2: the weeks default is supplied by this document, not guessed by code.
 
+### `ingest_run_id`
+
+The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260916000019_promotion_upsert.sql` |
+| References | `ingest_runs(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `source_row_id`
+
+The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260916000019_promotion_upsert.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
 | `idx_inbound_logistics_project_id` | `project_id` | no | `20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql` |
 | `inbound_logistics_project_idx` | `project_id` | no | `20260712100000_arc_write_performance.sql` |
+| `inbound_logistics_natural_key` | `project_id`, `plant_name`, `supplier_id`, `material_id` | yes | `20260916000018_natural_key_unique.sql` |
 
 ---
 
-*Generated from data contract `c45a2a4c88b0`, engine `0.2.3`,
+*Generated from data contract `fc67c7bde328`, engine `0.2.3`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

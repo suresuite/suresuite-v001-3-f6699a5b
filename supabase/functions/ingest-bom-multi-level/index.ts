@@ -97,7 +97,27 @@ serve(async (req) => {
     for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
       const batch = validRows.slice(i, i + BATCH_SIZE);
       console.log('[ingest-bom-multi-level] inserting batch', { size: batch.length, i });
-      const { error } = await supabase.from('bom_multi_level').insert(batch, { returning: 'minimal' });
+      // UPSERT, NOT INSERT (WP 3.3). `20260916000018` put a unique index on this
+      // table's natural key, so a plain `.insert()` of a row that already exists
+      // now raises 23505 where it used to make a duplicate. Silently duplicating
+      // was D5; failing with a constraint name is not the fix, it is a different
+      // defect wearing the fix's clothes — this path is reached when a user
+      // assigns a supplier that may already be assigned, and "already done"
+      // is a no-op, not an error.
+      //
+      // `onConflict` names the index's own columns. It has to be spelled out for
+      // PostgREST, which is one more copy of the key; `ingestSpecParity.test.ts`
+      // checks it against the sidecar for the same reason it checks the other three.
+      //
+      // WHAT THIS DOES NOT FIX IS D36. This is still a SERVICE-ROLE write with no
+      // actor: the audit row will say WHAT changed and record `actor_known: false`.
+      // Closing that means moving the write into an RPC that takes the actor as a
+      // parameter and sets `app.current_user_id` LOCAL to its own transaction, the
+      // way `ingest_land_file` does — a PostgREST call cannot set a GUC the trigger
+      // will see, which is exactly why D36 says the one-line fix is not one. See
+      // PLAN.md §16 · WP 3.3 · I.
+      const { error } = await supabase.from('bom_multi_level')
+        .upsert(batch, { onConflict: 'project_id,plant_name,material_id,higher_level_component_id,level', returning: 'minimal' });
       if (error) {
         console.error('[ingest-bom-multi-level] insert error', error);
         return new Response(JSON.stringify({ success: false, error: error.message, inserted, invalid_count: invalidRows.length }), {

@@ -7,20 +7,32 @@ tier: "2"
 schema_name: public
 grain: >-
   One supply arc as the user uploaded it: this supplier can deliver this material
-  to this plant, at this price and lead time, in this volume. NOT deduplicated —
-  a second upload of the same row makes a second row (D5).
+  to this plant, at this price and lead time, in this volume. UNIQUE on
+  `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the
+  same arc UPDATES it rather than adding a row, and the promotion is the upsert
+  that does so (D5 closed).
 ingest_dataset:
   wizard_id: inbound_logistics
   fact_class: transactional
   server_set: [project_id, plant_name]
 owner: data-ingestion
 
-# Recorded truthfully. `id` is a surrogate; nothing stops a re-upload duplicating
-# every arc. That is D5, and WP 3.3 lands `natural_key_intended` as a constraint.
+# Recorded truthfully. `id` is a surrogate and on its own constrained nothing —
+# that was D5. WP 3.3 landed the second entry below, and the two together are the
+# whole of this table's uniqueness.
 natural_key_unique:
-  - source: column PRIMARY KEY
+  - source: "column PRIMARY KEY"
     columns: [id]
-    name: inbound_logistics_pkey
+    name: "inbound_logistics_pkey"
+  # WP 3.3 — `20260916000018`. THE KEY `natural_key_intended` HAS NAMED SINCE
+  # WP 1.4, now enforced. `NULLS NOT DISTINCT` is part of the constraint and not
+  # a detail: PostgreSQL's default makes NULLs distinct, so a plain index would
+  # constrain every row except the ones whose key column is null — and
+  # `ON CONFLICT` infers from the same index, so the promotion would INSERT a
+  # duplicate instead of updating exactly those rows (§4 D5).
+  - source: "UNIQUE index (NULLS NOT DISTINCT)"
+    columns: [project_id, plant_name, supplier_id, material_id]
+    name: "inbound_logistics_natural_key"
 natural_key_intended: [project_id, plant_name, supplier_id, material_id]
 
 governance:
@@ -123,6 +135,7 @@ fields:
     unit: units per `time_unit`
     unit_source: column
     unit_column: time_unit
+    normalize_at_promotion: {conversion: rate, canonical: week}
     meaning: >-
       How much of this material the user buys from this supplier over one
       `time_unit`. A RATE, not a quantity — two rows are only comparable after
@@ -188,6 +201,7 @@ fields:
     unit: weeks
     unit_source: column
     unit_column: lead_time_unit
+    normalize_at_promotion: {conversion: duration, canonical: week}
     meaning: >-
       How long this supplier takes to deliver this material. The contract fixes the
       unit at WEEKS; `time_unit` does not apply to it and never has.
@@ -343,3 +357,46 @@ fields:
     ingest: {csv_header: null, required: false, validate: null}
     surfaces: []
     resolution: null
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The ingestion run that last wrote this row (WP 3.3), and through it the
+      project, the source kind and who approved the promotion. NULL for every
+      row that predates the CSV landing path, and for rows whose run has since
+      been deleted — a null here means the provenance is UNKNOWN, never that
+      there was none. Set by `ingest_apply_run` and by nothing else.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+  source_row_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tier-1 staged row this was promoted from (WP 3.3). Its
+      `source_row_number` is the physical line of the uploaded file, header =
+      line 1, so a person can be shown the line rather than told a file name —
+      which is what extends A4 down to the source. `ON DELETE SET NULL` and
+      DEFERRABLE: staging is deleted with its run, and a canonical row belongs to
+      the project rather than to the run that last wrote it.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []

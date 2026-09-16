@@ -10,6 +10,25 @@ grain: >-
   precision path — the CSV lanes carry prices too, and where this row is
   silent the engine derives the value from them rather than treating it as
   missing.
+ingest_dataset:
+  # D55 — WP 3.2 left the three item masters writing tier 2 DIRECTLY, from the
+  # browser to `bulk_upsert_materials`, and the reason was not laziness: that RPC
+  # already upserts on this table's natural key, and routing it through a landing
+  # whose promotion was an INSERT would have been a regression dressed as
+  # progress. WP 3.3 makes the promotion an upsert, so the landing is now strictly
+  # better than the RPC — it adds a tier-0 manifest, a run, staged rows a person
+  # can be shown, and an audit row naming the uploader — and this block is the
+  # whole cost. `INGEST_DATASETS` is generated from it, `UploadWizard` routes on
+  # `INGEST_DATASETS[template.id]`, and `ingest-file` validates from the spec.
+  #
+  # `server_set` is `project_id` ALONE. These tables have no `plant_name`: an
+  # item master is a property of the project, not of a plant. `ingest_apply_run`
+  # therefore derives the server-set columns per target instead of assuming both,
+  # which is what lets one promotion serve nine datasets rather than six plus a
+  # special case.
+  wizard_id: item_master_materials
+  fact_class: master
+  server_set: [project_id]
 owner: data-ingestion
 
 natural_key_unique:
@@ -84,6 +103,7 @@ fields:
       csv_header: "material_id"
       required: true
       validate: "non-empty; unique within the project"
+      rule: {kind: text, blank: reject}
     surfaces: []
     resolution: null
   name:
@@ -106,6 +126,7 @@ fields:
       csv_header: "name"
       required: false
       validate: null
+      rule: {kind: text, blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -139,6 +160,7 @@ fields:
       csv_header: "cost"
       required: false
       validate: "numeric > 0"
+      rule: {kind: numeric, exclusive_min: 0, blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -180,6 +202,7 @@ fields:
       csv_header: "holding_cost_pct"
       required: false
       validate: "numeric in [0, 1]"
+      rule: {kind: numeric, min: 0, max: 1, blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -214,6 +237,7 @@ fields:
       csv_header: "moq"
       required: false
       validate: "numeric >= 0"
+      rule: {kind: numeric, min: 0, blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -248,6 +272,7 @@ fields:
       csv_header: "initial_on_hand"
       required: false
       validate: "numeric >= 0"
+      rule: {kind: numeric, min: 0, blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -282,6 +307,7 @@ fields:
       csv_header: "lead_time_dist"
       required: false
       validate: "one of the LeadTimeDist enum values; `empirical` is reserved for the data-import path (M7) and is not selectable yet"
+      rule: {kind: enum, values: [deterministic, lognormal, gamma], blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -319,6 +345,7 @@ fields:
       csv_header: "lead_time_cv"
       required: false
       validate: "numeric >= 0"
+      rule: {kind: numeric, min: 0, blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -430,3 +457,43 @@ fields:
     resolution: null
     note: >-
       NOT TRACED into the engine; ERP-connector provenance, as source_system.
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The ingestion run that last wrote this row (WP 3.3, D55), and through it
+      the project, the source kind and who approved the promotion. NULL for every
+      row that predates the CSV landing path — which, on the day this column
+      lands, is every row — and for rows whose run has since been deleted.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+  source_row_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tier-1 staged row this was promoted from (WP 3.3, D55). Its
+      `source_row_number` is the physical line of the uploaded file, header =
+      line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its
+      run and an item master belongs to the project rather than to the run.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []

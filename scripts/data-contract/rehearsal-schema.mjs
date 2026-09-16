@@ -242,9 +242,15 @@ function emitIndexes(artifact, warn) {
       // not exist.
       const cols = idx.columns.join(", ");
       const where = idx.predicate ? ` WHERE ${idx.predicate}` : "";
+      // NULLS NOT DISTINCT decides whether the index constrains a key column's
+      // null rows at all, so rebuilding without it produces a database whose
+      // constraint is WEAKER than the migration's — and an assertion that the
+      // constraint bites then passes in the fresh modes and fails against the
+      // artifact. That is the third rehearsal mode's whole purpose (D60).
+      const nulls = idx.nulls_not_distinct ? " NULLS NOT DISTINCT" : "";
       out.push(
         `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX IF NOT EXISTS ${q(idx.name)} ` +
-          `ON ${q(t.schema)}.${q(t.name)} (${cols})${where};`,
+          `ON ${q(t.schema)}.${q(t.name)} (${cols})${nulls}${where};`,
       );
     }
   }

@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 412;
+export const REFERENCE_COLUMN_COUNT = 430;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -556,9 +556,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. NOT deduplicated (D5).",
+    "grain": "One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "material_id",
+      "higher_level_component_id",
+      "level"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -732,6 +737,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
       }
     ]
   },
@@ -740,9 +783,13 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. NOT deduplicated (D5).",
+    "grain": "One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "product_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -893,6 +940,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the row last changed. Server-set.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1510,9 +1595,13 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
+    "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "supplier_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -1763,6 +1852,44 @@ export const REFERENCE_TABLES: RefTable[] = [
             "visibleAs": null
           }
         ],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
         "engineChain": null,
         "engineLevel": null
       }
@@ -3667,6 +3794,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
       }
     ]
   },
@@ -3677,7 +3842,11 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "data-ingestion",
     "grain": "One directed firm-to-firm relationship in a project's multi-tier network: who supplies whom, at what depth, and in what capacity. An EDGE between two firm identifiers — not a party, and not a material flow: nothing here says what moves along it or how much.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "from_firm_id",
+      "to_firm_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -4222,9 +4391,13 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
     "owner": "data-ingestion",
-    "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
+    "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed).",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "customer_id",
+      "product_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -4430,6 +4603,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the row last changed. Server-set.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -5208,6 +5419,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the external system last confirmed this row.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -6617,6 +6866,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
       }
     ]
   },
@@ -7221,7 +7508,12 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "data-ingestion",
     "grain": "One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "supplier_id",
+      "upstream_supplier_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -7439,6 +7731,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
       }
     ]
   },
@@ -7449,7 +7779,12 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "data-ingestion",
     "grain": "One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id",
+      "plant_name",
+      "supplier_id",
+      "upstream_supplier_id",
+      "material_id"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -7661,6 +7996,44 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the row was last written. Server-stamped by trigger.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "ingest_run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "ingest_runs",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "source_row_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it.",
         "primaryKey": false,
         "unique": false,
         "references": null,

@@ -17,10 +17,18 @@ ingest_dataset:
 owner: data-ingestion
 
 natural_key_unique:
-  - source: column PRIMARY KEY
+  - source: "column PRIMARY KEY"
     columns: [id]
-    name: tier3_suppliers_pkey
-
+    name: "tier3_suppliers_pkey"
+  # WP 3.3 — `20260916000018`. THE KEY `natural_key_intended` HAS NAMED SINCE
+  # WP 1.4, now enforced. `NULLS NOT DISTINCT` is part of the constraint and not
+  # a detail: PostgreSQL's default makes NULLs distinct, so a plain index would
+  # constrain every row except the ones whose key column is null — and
+  # `ON CONFLICT` infers from the same index, so the promotion would INSERT a
+  # duplicate instead of updating exactly those rows (§4 D5).
+  - source: "UNIQUE index (NULLS NOT DISTINCT)"
+    columns: [project_id, plant_name, supplier_id, upstream_supplier_id, material_id]
+    name: "tier3_suppliers_natural_key"
 natural_key_intended: [project_id, plant_name, supplier_id, upstream_supplier_id, material_id]
 
 governance:
@@ -165,6 +173,7 @@ fields:
     unit: units per `time_unit`
     unit_source: column
     unit_column: time_unit
+    normalize_at_promotion: {conversion: rate, canonical: week}
     meaning: >-
       How much moves along the relationship over one `time_unit`. A RATE, like
       the lane tables' `volume`, and comparable across rows only after both are
@@ -271,6 +280,49 @@ fields:
     ingest: {csv_header: null, required: false, validate: null}
     surfaces: []
     resolution: null
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The ingestion run that last wrote this row (WP 3.3), and through it the
+      project, the source kind and who approved the promotion. NULL for every
+      row that predates the CSV landing path, and for rows whose run has since
+      been deleted — a null here means the provenance is UNKNOWN, never that
+      there was none. Set by `ingest_apply_run` and by nothing else.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+  source_row_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tier-1 staged row this was promoted from (WP 3.3). Its
+      `source_row_number` is the physical line of the uploaded file, header =
+      line 1, so a person can be shown the line rather than told a file name —
+      which is what extends A4 down to the source. `ON DELETE SET NULL` and
+      DEFERRABLE: staging is deleted with its run, and a canonical row belongs to
+      the project rather than to the run that last wrote it.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
 
 note: >-
   DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since

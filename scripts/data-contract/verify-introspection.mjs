@@ -52,11 +52,39 @@ check("dataset_versions is present", T.has("dataset_versions"));
 // check while the table it reads had been dropped — so this asserts the TABLE.
 check("the governance tables are present", missing(GOVERNANCE).length === 0, missing(GOVERNANCE).join(", "));
 
+// FLIPPED BY WP 3.3, the way WP 3.0 flipped D29's pinned case. This check pinned
+// D5 — "inbound_logistics has no unique constraint beyond id" — for two phases,
+// and it was true until `20260916000018`. A pinned truth that nobody flips when
+// the defect closes is how a gate ends up asserting a defect is still open, which
+// is the same failure as twelve sidecars claiming `audited: false` on the day it
+// stopped being true (D40). It now pins the CLOSURE, so a revert of the index
+// migration turns it red.
+//
+// It asserts the NULL rule too. The columns alone are not the constraint: with a
+// plain index the same seven keys would leave every null-bearing row unconstrained
+// and make `ON CONFLICT` insert duplicates instead of updating (§4 D5). The
+// artifact has recorded `nulls_not_distinct` since WP 3.3 fixed the introspector
+// (D60), so the clause is checkable here rather than only against a database.
 const keys = T.get("inbound_logistics")?.natural_key_unique ?? [];
+const naturalKey = keys.find((k) => k.columns.join(",") === "project_id,plant_name,supplier_id,material_id");
 check(
-  "inbound_logistics has no unique constraint beyond id — confirms D5",
-  keys.length > 0 && keys.every((k) => k.columns.length === 1 && k.columns[0] === "id"),
+  "inbound_logistics has its natural key, not just the surrogate — D5 closed",
+  Boolean(naturalKey),
   keys.map((k) => `${k.source}(${k.columns.join(",")})`).join(" · "),
+);
+
+const NULLS_NOT_DISTINCT = [
+  "inbound_logistics", "outbound_logistics", "bom_single_level", "bom_multi_level",
+  "tier2_suppliers", "tier3_suppliers", "multi_tier_supply_chain",
+];
+const plainKeys = NULLS_NOT_DISTINCT.filter((t) => {
+  const idx = (T.get(t)?.indexes ?? []).find((i) => i.name === `${t}_natural_key`);
+  return !idx || !idx.nulls_not_distinct;
+});
+check(
+  "every natural-key index is NULLS NOT DISTINCT — the half a column list cannot state",
+  plainKeys.length === 0,
+  plainKeys.length ? `plain (or absent) on ${plainKeys.join(", ")}` : "",
 );
 
 const weighted = T.get("supply_chain_data")?.columns.find((c) => c.name === "weighted");
