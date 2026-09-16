@@ -17,6 +17,8 @@ import { DOC_BODIES } from "../bodies";
 import { LEGACY_SLUGS } from "../legacySlugs";
 import introspected from "../../../../build/schema.introspected.json";
 import { COUNTS, TIERS, UNDESCRIBED } from "../generated/dataModel.generated";
+import { REFERENCE_TABLES, REFERENCE_COLUMN_COUNT } from "../generated/reference.generated";
+import { UNIT_DAYS } from "../../../../supabase/functions/_shared/grading";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const live = ALL_PAGES.filter((p) => p.status === "live");
@@ -93,13 +95,16 @@ describe("pages and their bodies", () => {
     }
   });
 
-  it("ships sections 1 and 2 in full — WP 5.2a's scope", () => {
-    for (const g of DOC_GROUPS.filter((x) => x.section <= 2)) {
+  it("ships sections 1, 2 and 15 in full — WP 5.2a's and WP 5.2h's scope", () => {
+    for (const g of DOC_GROUPS.filter((x) => x.section <= 2 || x.section === 15)) {
       for (const p of g.pages) {
         expect(p.status, `${g.group} / ${p.title}`).toBe("live");
       }
     }
-    expect(live).toHaveLength(10);
+    // 10 from WP 5.2a + 4 from WP 5.2h. A later package raises this as it
+    // ships; it is here so that flipping a `status` without writing a body,
+    // or the reverse, cannot pass unnoticed.
+    expect(live).toHaveLength(14);
   });
 
   it("gives every page a summary — it is what a stub and a search hit show", () => {
@@ -192,5 +197,51 @@ describe("the generated data-model module", () => {
       expect(g.wp, "an undescribed group with no work package").toMatch(/^\d+\.\d+$/);
       expect(g.why.length, `WP ${g.wp} gives no reason`).toBeGreaterThan(20);
     }
+  });
+});
+
+describe("the generated reference module (WP 5.2h)", () => {
+  it("describes exactly the tables the contract describes", () => {
+    const described = TIERS.flatMap((t) => t.tables.map((x) => x.table)).sort();
+    expect(REFERENCE_TABLES.map((t) => t.table).sort()).toEqual(described);
+  });
+
+  it("carries every described column — the field index cannot undercount", () => {
+    const counted = REFERENCE_TABLES.reduce((n, t) => n + t.columns.length, 0);
+    expect(counted).toBe(REFERENCE_COLUMN_COUNT);
+    expect(counted).toBe(COUNTS.columnsDescribed);
+  });
+
+  it("gives every column a name and a type, and no duplicates within a table", () => {
+    for (const t of REFERENCE_TABLES) {
+      const seen = new Set<string>();
+      for (const c of t.columns) {
+        expect(c.name.length, `${t.table} has an unnamed column`).toBeGreaterThan(0);
+        expect(c.type.length, `${t.table}.${c.name} has no type`).toBeGreaterThan(0);
+        expect(seen.has(c.name), `${t.table}.${c.name} appears twice`).toBe(false);
+        seen.add(c.name);
+      }
+    }
+  });
+
+  it("leads with the CSV header wherever one exists — D21", () => {
+    // The page renders `csvHeader ?? name`. If no described table recorded a
+    // header, that rendering is vacuous and D21 is not actually closed here.
+    const withHeader = REFERENCE_TABLES.flatMap((t) => t.columns).filter((c) => c.csvHeader);
+    expect(withHeader.length).toBeGreaterThan(0);
+  });
+
+  it("reads the unit table rather than restating it", () => {
+    // The units page imports UNIT_DAYS directly. This asserts the import is
+    // live and non-empty, and pins the one value D10 was about: `quarter` was
+    // read as weekly by the old SQL, 13x its real value.
+    expect(Object.keys(UNIT_DAYS).length).toBeGreaterThan(0);
+    expect(UNIT_DAYS.quarter).toBe(91.3125);
+    expect(UNIT_DAYS.week).toBe(7);
+  });
+
+  it("declares a unit on every column the units page would list", () => {
+    const united = REFERENCE_TABLES.flatMap((t) => t.columns).filter((c) => c.unit);
+    for (const c of united) expect(c.unit!.trim().length).toBeGreaterThan(0);
   });
 });
