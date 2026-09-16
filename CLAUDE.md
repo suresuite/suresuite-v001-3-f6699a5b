@@ -141,7 +141,15 @@ npm run verify:sql          # PLAN.md §15, read-only (SELECT only)
 No work-package session can run it — the egress proxy denies CONNECT. Touch
 `.github/verify-request` and push; `.github/workflows/verification-sql.yml` runs it
 with CI's `SUPABASE_ACCESS_TOKEN` and publishes the report to the
-`verification-results` branch. **Measure every project, never just one** — the
+`verification-results` branch.
+
+**NEVER in the same push as a migration.** `supabase-migrations.yml` has no branch
+filter (§4 D31), so a branch push DEPLOYS — and both workflows fire on that push
+with no ordering between them. A §15 run that races a deploy reports a database
+that changed underneath it: WP 3.3's first after-run read 1 787 rows in its lane
+sweep and a total of 1 691 in a later query of the same report. Push the migration,
+wait for `Deploy Supabase Migrations` to finish, THEN touch `.github/verify-request`
+in a second push. Three runs across two packages have been lost to this. **Measure every project, never just one** — the
 largest project in this database is the one `seed-project.yml` seeds, and reading it
 alone reports a clean data layer that is not clean (PLAN.md §4 D42).
 

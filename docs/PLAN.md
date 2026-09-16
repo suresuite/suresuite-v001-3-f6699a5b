@@ -183,7 +183,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D2 | `combine-project` never converts `volume` by `time_unit` | was `combine-project/index.ts:60,68,268,275` + `:115,:234-235,:310,:318` — **eight** read sites, not seven | WP 0.2 ✅ *(the conversion; the DATA is not clean — §15 finds 27 unrecognized `time_unit` tokens, all of them integers like `21`, `15`, `7`, each silently read as weekly. See D46)* |
 | D3 | `product_code_map` queried but exists in no migration; error swallowed | was `combine-project/index.ts:131-145`; the decision is recorded at `combine-project/index.ts:117-140` | WP 1.4 ✅ *(branch DELETED — it had never executed; no upload path, no writer, no template column ever existed for the table)* |
 | D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names. **It is not absent — it exists untracked in production**, which a static replay cannot distinguish from absent (CI proved it; §16 WP 1.4) | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(`20260915000003_risk_data.sql` both CREATEs on a fresh database and ADOPTS the untracked one: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted, CHECKs `NOT VALID` on the adopted rows. No `project_id` — deliberately: country risk is a property of the world)* |
-| D5 | No natural-key uniqueness on any lane table → re-upload duplicates. **Measured, 2026-09-16 (§15 run `35146894995`, re-taken for WP 3.3 after WP 3.2's merge and UNCHANGED — the CSV path has still run zero times):** against `natural_key_intended`, `inbound_logistics` holds **96 rows a unique index would reject** (1 787 rows, 7 projects) and `bom_multi_level` holds 2; `outbound_logistics`, `bom_single_level` and the three WP 3.2 described hold none. WP 3.3's dedup is not a no-op. **AND THE KEY AS WRITTEN DOES NOT ENFORCE ITSELF ON THREE OF THE SEVEN TABLES**: `bom_multi_level.higher_level_component_id`, `tier2_suppliers.material_id` and `tier3_suppliers.material_id` are NULLABLE and their NULLs are meaningful (the sidecars say so — a BOM root has no parent). A plain `CREATE UNIQUE INDEX` treats NULLs as distinct, so it constrains none of those rows, and `ON CONFLICT` infers from the same index and INSERTS a duplicate instead of updating — which makes this package's own exit check, "uploading the same file twice is a no-op", false and silent for exactly the rows no constraint has ever touched. `natural_key_intended` is a list of COLUMNS and a list of columns is not a constraint; the NULL rule is the half nobody wrote down. Closed with `NULLS NOT DISTINCT` on all seven, not on the three that need it today, because nullability is a schema property a later `ALTER` can change | `20250820145837_…sql`; §15's sweep; the three sidecars' own `meaning` for those columns | WP 3.3 ✅ *(`20260916000017` deduplicates 98 rows on the rule "most complete copy, then the later one"; `20260916000018` creates all seven unique indexes, every one `NULLS NOT DISTINCT`; `contract:check` R5 is a `fail` in the same commit and grew a second half that compares the landed columns against `natural_key_intended`; and `ingest_apply_run` upserts on the key it reads from the catalog. `supabase/rehearsal/080` runs the dedup and then builds the real index over the result — the only claim about the first migration worth making is that the second can follow it. **The after-number does not exist yet and this row does not invent one**: migrations deploy on merge, so the dedup has not run against production. The prediction §16 records is `inbound_logistics` 1 787 → 1 691 and `bom_multi_level` 794 → 792)* |
+| D5 | No natural-key uniqueness on any lane table → re-upload duplicates. **Measured, 2026-09-16 (§15 run `35146894995`, re-taken for WP 3.3 after WP 3.2's merge and UNCHANGED — the CSV path has still run zero times):** against `natural_key_intended`, `inbound_logistics` holds **96 rows a unique index would reject** (1 787 rows, 7 projects) and `bom_multi_level` holds 2; `outbound_logistics`, `bom_single_level` and the three WP 3.2 described hold none. WP 3.3's dedup is not a no-op. **AND THE KEY AS WRITTEN DOES NOT ENFORCE ITSELF ON THREE OF THE SEVEN TABLES**: `bom_multi_level.higher_level_component_id`, `tier2_suppliers.material_id` and `tier3_suppliers.material_id` are NULLABLE and their NULLs are meaningful (the sidecars say so — a BOM root has no parent). A plain `CREATE UNIQUE INDEX` treats NULLs as distinct, so it constrains none of those rows, and `ON CONFLICT` infers from the same index and INSERTS a duplicate instead of updating — which makes this package's own exit check, "uploading the same file twice is a no-op", false and silent for exactly the rows no constraint has ever touched. `natural_key_intended` is a list of COLUMNS and a list of columns is not a constraint; the NULL rule is the half nobody wrote down. Closed with `NULLS NOT DISTINCT` on all seven, not on the three that need it today, because nullability is a schema property a later `ALTER` can change | `20250820145837_…sql`; §15's sweep; the three sidecars' own `meaning` for those columns | WP 3.3 ✅ *(`20260916000017` deduplicates 98 rows on the rule "most complete copy, then the later one"; `20260916000018` creates all seven unique indexes, every one `NULLS NOT DISTINCT`; `contract:check` R5 is a `fail` in the same commit and grew a second half that compares the landed columns against `natural_key_intended`; and `ingest_apply_run` upserts on the key it reads from the catalog. `supabase/rehearsal/080` runs the dedup and then builds the real index over the result — the only claim about the first migration worth making is that the second can follow it. **CLOSED AGAINST A MEASUREMENT, not against a migration that landed** (§15 run `35151725863`, every project): `inbound_logistics` 1 787 → **1 691**, `bom_multi_level` 794 → **792**, and `rows_the_unique_index_would_reject` is **0** on all seven. And the number nobody predicted: `null_volume` 376 → 280 and `null_lead_time` 414 → 318, both down by exactly the 96 deleted, while `null_price` held at 30 — so every deleted row was an empty one and the completeness tie-break never chose the emptier copy)* |
 | D6 | CSV parse is `split(',')` — not quote-safe | was `UploadWizard.tsx:502,523`; the parser is now `_shared/csvParse.ts` | WP 3.2 ✅ *(server-side RFC 4180; `csvParse.test.ts` pins the whole trace — quoted comma, BOM, CRLF, lone CR, trailing comma, short and long rows, quoted newline)* |
 | D7 | Required-field validation misses `null` (blank numerics pass). **Measured, 2026-09-16 (§15):** of 1 787 `inbound_logistics` rows, **376 have a null `volume`, 414 a null `lead_time`, 30 a null `unit_price`** — and the single project §15 told the reader to measure has none of them | was `UploadWizard.tsx:384` vs `:530-531`; §15's sweep | WP 3.2 ✅ *(for NEW rows: a blank required cell is a row-level finding and the row is held in tier 1. The 376/414/30 are already in tier 2 and a parser cannot reach back for them — see §16 · WP 3.2)* |
 | D8 | Inbound/outbound ids not trimmed or empty-checked (BOM-multi is) | `ingest-inbound-logistics/index.ts:38-39` | WP 3.2 ✅ *(on the CSV path: `ingestValidate.ts` applies BOM-multi's own trim/empty pattern from the contract, so `" MAT-1 "` and `"MAT-1"` are one id. The named function is untouched and still live for `StagePolicyTable`'s grid writes — a different path, and not this defect's)* |
@@ -5902,14 +5902,48 @@ making about `20260916000017` is that `20260916000018` can follow it. If they
 disagree the production deploy fails on the second file, which is D31's shape
 inside the two migrations meant to close D5.
 
-**THE AFTER-NUMBER DOES NOT EXIST YET, AND THIS ENTRY WILL NOT INVENT IT.**
-Migrations deploy on merge, so `20260916000017` has not run against production and
-cannot before this branch lands. A §15 run taken now measures the database the
-dedup has not touched. The prediction, recorded so the next run either confirms
-it or is a finding: `inbound_logistics` 1 787 → **1 691**, `bom_multi_level`
-794 → **792**, everything else unchanged, and every
-`rows_the_unique_index_would_reject` **0**. Whoever runs §15 after the deploy
-should read those three numbers first.
+**THE AFTER-NUMBER — AND THE PREDICTION THIS ENTRY MADE BEFORE IT HAD ONE.**
+It was written first as a prediction, on the belief that migrations deploy on
+MERGE: `inbound_logistics` 1 787 → 1 691, `bom_multi_level` 794 → 792, everything
+else unchanged, every `rows_the_unique_index_would_reject` 0. **That belief was
+wrong, and §4 D31 says so in its own text** — `supabase-migrations.yml` has no
+branch filter, so the push that shared this branch DEPLOYED it. The prediction was
+therefore checkable inside the session. It is left standing above rather than
+quietly replaced by its own answer.
+
+**Measured, §15 run `35151725863`, taken after the deploy finished:**
+
+| table | before | after | deleted | rejects now |
+|---|---|---|---|---|
+| `inbound_logistics` | 1 787 | **1 691** | 96 | **0** |
+| `bom_multi_level` | 794 | **792** | 2 | **0** |
+| `bom_single_level` | 2 907 | 2 907 | 0 | **0** |
+| `outbound_logistics` | 38 | 38 | 0 | **0** |
+| `tier2_suppliers` · `tier3_suppliers` · `multi_tier_supply_chain` | 0 | 0 | 0 | **0** |
+
+Every number as predicted. D5 closes against a measurement rather than against a
+migration that landed.
+
+**AND ONE NUMBER THE PREDICTION DID NOT COVER, WHICH IS THE BEST EVIDENCE THE
+TIE-BREAK RULE WAS RIGHT.** `inbound_logistics`'s null counts moved by exactly the
+number of rows deleted: `null_volume` 376 → **280** and `null_lead_time` 414 →
+**318**, both −96, while `null_price` stayed at **30**. So **every one of the 96
+rows the dedup deleted carried a null `volume` and a null `lead_time`, and not one
+row carrying a volume was deleted** — which is exactly what "most non-null payload
+columns first" promises, measured on production rather than on a fixture.
+
+What these totals do NOT settle is whether each SURVIVOR carries a value: a group
+of two empty rows also reduces the count by one. What they do settle is the
+direction — the rule never chose the emptier row. Under "keep the newest" it could
+have, up to 96 times, and the §15 sweep would have shown `null_volume` unchanged at
+376 with 96 fewer rows to hold it.
+
+**The audit row is there too, and the count is exactly right.** The data plane went
+2 577 → **2 580**. `audit_tier_write` returns early when a statement changes no
+rows (`IF GREATEST(n_new, n_old) = 0 THEN RETURN NULL`), so the seven DELETE
+statements produced **two** audit rows — the two tables that actually held
+duplicates — plus the one `log_data_action` the migration writes itself, carrying
+the per-table counts and `actor_known: false` because a migration has no user.
 
 ---
 
@@ -6362,21 +6396,45 @@ the committed wheel under `public/engine/` was never rebuilt after WP 1.3),
 at `7dae8c6` before this branch existed and are recorded as such by WP 3.2.
 Nothing here touches `scsim/`, `sim-worker/` or `public/engine/`.
 
-**THE HONEST CAVEAT, and it has not changed since WP 3.2 said it.** Everything
-above rests on a rehearsal. **Production has never run an ingestion of any kind —
-the CSV path has run zero times**, which the §15 run taken for this package
-confirms: `ingest_runs`, `ingest_files` and `ingest_staged_rows` are empty, and
-the tier-2 duplicate counts did not move by a single row across WP 3.2's merge.
-A green rehearsal is not a working pipeline. The first production CSV upload is
-the real test and it has not happened; the second one — the same file again — is
-the test of everything this package built.
+**THE HONEST CAVEAT, and it has not changed since WP 3.2 said it.** The dedup
+ran in production and is measured. **Everything else here still rests on a
+rehearsal**, because production has never run an ingestion of any kind: §15 run
+`35151725863`, taken after this package's own migrations deployed, reports
+`csv_runs 0 · staged_rows 0 · csv_files 0 · landing_audit_rows 0`. The upsert has
+never promoted a real row; the normalization has never converted a real volume;
+`ingest_run_id` is NULL on all 1 691 surviving arcs because no run has ever
+written one.
 
-**And the dedup has not run.** Migrations deploy on merge, so the AFTER number
-§10 asks for cannot exist on this branch. The prediction is recorded in §16 · B so
-the next run either confirms it or is itself a finding: `inbound_logistics`
-1 787 → **1 691**, `bom_multi_level` 794 → **792**, everything else unchanged, and
-every `rows_the_unique_index_would_reject` **0**. Whoever runs §15 after the deploy
-should read those three numbers first.
+So the distinction to carry forward is sharper than "it is all unproven": the
+DESTRUCTIVE half of this package executed against real data and the numbers
+confirm it, and the CONSTRUCTIVE half has still only ever run against
+`supabase/rehearsal/`. A green rehearsal is not a working pipeline. The first
+production CSV upload is the real test, and the second one — the same file again —
+is the test of everything this package built.
+
+**The dedup HAS run, and this section originally said it had not.** The
+correction is in §16 · B with the numbers; the error is worth its own line here
+because it is a misreading of this repository's own plan, not of the code:
+`supabase-migrations.yml` has **no branch filter** — §4 D31 states that in its
+first sentence — so the push that shares a branch deploys its migrations. "Deploy
+on merge" is the standing decision about not re-running the workflow BY HAND; it
+was read as a description of when the workflow fires, and those are different
+claims.
+
+Two consequences, and the second is the one for the next session:
+
+  - The prediction §16 · B recorded was checkable inside the session, and every
+    number came back exactly as predicted (1 787 → 1 691, 794 → 792, all seven
+    reject-counts 0). D5 closes against a measurement.
+  - **A §15 run triggered in the same push as a migration RACES it.** Both
+    workflows fire on push with no ordering, and run `35151473032` proves it:
+    its lane sweep read 1 787 rows with 96 rejects and its null-numerics query,
+    later in the SAME report, read a total of 1 691. Both true, neither the
+    report. WP 3.2's gap check hit the same race from the other side (a table
+    that did not exist yet) and recorded it; this package walked into it anyway.
+    **Push the migration, wait for the deploy, THEN touch `.github/verify-request`
+    in a second push.** That is the third §15 run in two packages lost to this,
+    and it is the fix.
 
 **Handoff to WP 3.4:**
   - **There is finally something to render.** `090`'s fixtures are the shape a
