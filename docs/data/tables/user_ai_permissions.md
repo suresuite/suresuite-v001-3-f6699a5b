@@ -28,6 +28,7 @@ The empty-array-means-everything rule in `allowed_model_ids` is the one thing a 
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 2 — all carry a predicate |
 
 Read by `capabilities_for_user()` into the `models` block of its result, which is what the chat surfaces use to decide what to offer. Not part of the four capability layers — a capability answers "may you", this answers "with what".
 
@@ -184,6 +185,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/user_ai_permissions.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

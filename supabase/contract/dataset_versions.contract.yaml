@@ -23,8 +23,16 @@ governance:
   audited: false
   rls_enabled: true
   note: >-
-    Written by the `_build_dataset_snapshot` database function, never by a page.
-    The snapshot is a pure function of tier 2 and is always safe to rebuild.
+    Written by the `_build_dataset_snapshot` database function, never by a page —
+    that is the INTENT, and `write: null` records it.
+    **The enforcement does not match, and WP 2.4 measured it.** The live policy
+    `dataset_versions_insert_all` is `FOR INSERT ... WITH CHECK (true)`, and
+    `20260610000002` grants `anon` SELECT and INSERT, so any holder of the public
+    anon key may insert a snapshot row. The contract reads narrower than the
+    database, which is the exact class §9 asks this package to find. It is pinned
+    by `governanceEnforcement.test.ts` rather than silently fixed: the app runs AS
+    anon with no auth session, so revoking is a Phase 3 migration with an auth
+    model behind it, and the decision taken was to document. See PLAN.md D28.
 
 fields:
   id:

@@ -29,6 +29,7 @@ Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DIS
 | Minimum project role | `viewer` |
 | Tier transitions audited | yes |
 | Row-level security | enabled |
+| Policies on the table | 2 — all carry a predicate |
 
 `write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
 
@@ -178,6 +179,6 @@ When the row was last modified. Server-stamped by DEFAULT only — no trigger ma
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

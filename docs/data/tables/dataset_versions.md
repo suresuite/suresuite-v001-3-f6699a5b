@@ -26,8 +26,21 @@
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 2 — **2 with no predicate** |
 
-Written by the `_build_dataset_snapshot` database function, never by a page. The snapshot is a pure function of tier 2 and is always safe to rebuild.
+Written by the `_build_dataset_snapshot` database function, never by a page — that is the INTENT, and `write: null` records it. **The enforcement does not match, and WP 2.4 measured it.** The live policy `dataset_versions_insert_all` is `FOR INSERT ... WITH CHECK (true)`, and `20260610000002` grants `anon` SELECT and INSERT, so any holder of the public anon key may insert a snapshot row. The contract reads narrower than the database, which is the exact class §9 asks this package to find. It is pinned by `governanceEnforcement.test.ts` rather than silently fixed: the app runs AS anon with no auth session, so revoking is a Phase 3 migration with an auth model behind it, and the decision taken was to document. See PLAN.md D28.
+
+> **What the database actually permits is wider than the row above.**
+> 2 policies here grant access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `dataset_versions_read_all` — `SELECT` to `anon`, `authenticated`
+> - `dataset_versions_insert_all` — `INSERT` to `anon`, `authenticated`
+>
+> Some of these permit **writes**. See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 <details><summary>2 RLS policies</summary>
 
@@ -190,6 +203,6 @@ When the version was frozen. Server-set.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

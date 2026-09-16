@@ -34,8 +34,20 @@ Seeded by WP 2.2 with the split that gives `analyst` its meaning: an analyst may
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 1 — **1 with no predicate** |
 
 Read is open to everyone (`USING (true)`): it is a static policy table with no per-tenant content, and every client needs it to render what a role can do. As with the other capability tables there is no write policy, so writes are service-role only.
+
+> **What the database actually permits is wider than the row above.**
+> 1 policy here grants access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `project_role_capabilities: read all` — `SELECT`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 <details><summary>1 RLS policy</summary>
 
@@ -142,6 +154,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/project_role_capabilities.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

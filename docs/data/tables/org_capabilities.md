@@ -34,6 +34,7 @@ WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from w
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 2 — all carry a predicate |
 
 One of the four layers `capabilities_for_user()` resolves, in the order role -> org -> project -> user, most specific winning. `audited: false` and it matters here more than on most tables: these rows ARE the permissions, and a change to one currently leaves no record of who made it (§2.1 `audit-actor`, WP 2.3).
 
@@ -142,6 +143,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/org_capabilities.contract.yaml`, table created by `20260711000002_unified_access_control.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

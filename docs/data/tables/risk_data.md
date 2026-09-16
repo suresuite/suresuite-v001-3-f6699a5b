@@ -47,8 +47,20 @@ partially or get corrected — the write fails.
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 1 — **1 with no predicate** |
 
 `write: null` is literal: no page, edge function or upload path writes this table. It is loaded by an operator through the service role, which bypasses RLS — so the ABSENCE of an INSERT/UPDATE/DELETE policy is the write rule, not an omission. Read is open to `authenticated` and `anon` because the risk shading renders on the public network pages.
+
+> **What the database actually permits is wider than the row above.**
+> 1 policy here grants access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `risk_data_read` — `SELECT` to `authenticated`, `anon`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 <details><summary>1 RLS policy</summary>
 
@@ -220,6 +232,6 @@ When the row was last modified. Server-stamped.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/risk_data.contract.yaml`, table created by `20260915000003_risk_data.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

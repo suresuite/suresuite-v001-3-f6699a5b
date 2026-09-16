@@ -29,8 +29,20 @@ The table WP 1.4 found existed in production but in no migration — the authent
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 2 — **1 with no predicate** |
 
 READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies and they contradict each other: "Users can check their own login credentials" is `FOR SELECT USING (true)`, and "No direct access - use RPCs" is `FOR ALL TO authenticated, anon USING (false)`. Postgres policies are PERMISSIVE unless declared RESTRICTIVE, and permissive policies are OR'd — so the deny-all does not deny anything, and the intended rule ("no direct access") is not the enforced one. Whether that is reachable depends on the table GRANTs Supabase applies outside `supabase/migrations/`, which no static replay can see and which PLAN.md §15 is the way to settle. Recorded as D28 and assigned to WP 2.4, which owns the RESTRICTIVE-policy decision for the whole schema; it is named here because a reader of this page must not take `rls_enabled: true` for "reads are restricted".
+
+> **What the database actually permits is wider than the row above.**
+> 1 policy here grants access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `Users can check their own login credentials` — `SELECT`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 <details><summary>2 RLS policies</summary>
 
@@ -325,6 +337,6 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

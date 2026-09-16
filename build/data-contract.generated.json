@@ -2188,7 +2188,7 @@
         "min_project_role": "viewer",
         "audited": false,
         "rls_enabled": true,
-        "note": "Written by the `_build_dataset_snapshot` database function, never by a page. The snapshot is a pure function of tier 2 and is always safe to rebuild."
+        "note": "Written by the `_build_dataset_snapshot` database function, never by a page — that is the INTENT, and `write: null` records it. **The enforcement does not match, and WP 2.4 measured it.** The live policy `dataset_versions_insert_all` is `FOR INSERT ... WITH CHECK (true)`, and `20260610000002` grants `anon` SELECT and INSERT, so any holder of the public anon key may insert a snapshot row. The contract reads narrower than the database, which is the exact class §9 asks this package to find. It is pinned by `governanceEnforcement.test.ts` rather than silently fixed: the app runs AS anon with no auth session, so revoking is a Phase 3 migration with an auth model behind it, and the decision taken was to document. See PLAN.md D28."
       },
       "rls": {
         "enabled": true,
@@ -9450,7 +9450,7 @@
         "min_project_role": "viewer",
         "audited": false,
         "rls_enabled": true,
-        "note": "Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one."
+        "note": "Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one. For precision, since WP 2.4 checked it: three PROJECT-SCOPED write policies do exist here, serving that ETL path. They are consistent with `write: null`, which names the capability gating a USER-facing write and not the existence of any policy — and unlike `dataset_versions` they carry a real predicate, so they do not admit an arbitrary holder of the table grant."
       },
       "rls": {
         "enabled": true,
@@ -10275,7 +10275,7 @@
         "min_project_role": "viewer",
         "audited": false,
         "rls_enabled": true,
-        "note": "Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one."
+        "note": "Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one. For precision, since WP 2.4 checked it: three PROJECT-SCOPED write policies do exist here, serving that ETL path. They are consistent with `write: null`, which names the capability gating a USER-facing write and not the existence of any policy — and unlike `dataset_versions` they carry a real predicate, so they do not admit an arbitrary holder of the table grant."
       },
       "rls": {
         "enabled": true,
@@ -11452,5 +11452,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "8d5b6da38010"
+  "contract_version": "e308e62acbd6"
 }

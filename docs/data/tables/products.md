@@ -32,6 +32,7 @@
 | Minimum project role | `editor` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | **cannot be determined from the migrations** |
+| Policies on the table | **none** |
 
 `write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all thirteen sidecars change together. SEPARATELY — AND THIS REPLACES WHAT WP 1.2 WROTE HERE, WHICH WAS WRONG: this sidecar used to assert `rls_enabled: false` and say "no migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on them". One does. `20260614000001_item_master.sql:57-66` enables RLS and creates two policies (`%s_auth_all`, `%s_anon_read`) on each of the three masters — but through `EXECUTE format(...)` inside a `FOREACH` over an array of table names, which a static replay of the migrations cannot evaluate. The introspector recorded the absence as `enabled: false`, WP 1.2 read that as fact, and the contract was one generated page away from telling a user their item masters were unprotected. WP 1.4 fixed the mechanism, not the guess: the introspector now records dynamic DDL (`dynamic_ddl`) and marks the tables it touches `rls.determinate: false`, the validator refuses to let a sidecar assert an RLS state the migrations do not settle, and the generated page says the state is indeterminate and names the migration. The ONLY way to know is to read the live database — PLAN.md §15, still unrun. WP 2.4's security review owns it.
 
@@ -513,6 +514,6 @@ When the external system last confirmed this row.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/products.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

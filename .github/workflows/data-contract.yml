@@ -34,6 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # R7 (§16 is append-only) compares every ancestor revision of
+          # docs/PLAN.md against HEAD, and actions/checkout defaults to a SHALLOW
+          # clone with no ancestors at all. Without this the rule SKIPS on every
+          # CI run and says so — a gate that always skips is not a gate, which is
+          # the same lesson as WP 2.3's RAISE NOTICE the db push log dropped.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

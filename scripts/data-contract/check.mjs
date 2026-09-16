@@ -14,6 +14,7 @@
 //       without being created
 //   R5  a tier-2 table whose only uniqueness is a surrogate key — WARN (WP 2.4)
 //   R6  every file:line in PLAN.md §4 resolves and is in bounds
+//   R7  §16 is append-only — no drift-log entry may vanish from history
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -257,6 +258,93 @@ for (let i = secStart; i >= 0 && i < secEnd; i++) {
       `${at} \`${m[0]}\` → ${file}:${lo}-${hi}; ` +
       usable.map((a) => `\`${a.t}\` is at :${src.findIndex((l) => l.includes(a.t)) + 1}`).join(", "),
     );
+  }
+}
+
+// ─────────────────────────── R7: §16 is append-only (WP 2.4, assigned by §9)
+//
+// §16 has lost entries to a silent `git merge` TWICE in one phase: `5c7129f`
+// dropped two, and the merge during WP 1.4 dropped the PHASE BOUNDARY entry
+// itself. Neither produced a conflict, because both sides had appended at the
+// same place and the ort strategy simply kept one. The drift log is the document
+// whose entire purpose is to be the thing that does not get lost, and nothing was
+// checking.
+//
+// The rule is what §16's own preamble already says: never delete an entry; a
+// superseded finding is struck through with a pointer to the entry that replaced
+// it. So every `### WP …` / `### PHASE …` heading that appears in §16 in ANY
+// ancestor commit must still appear in §16 at HEAD.
+//
+// WHY HEADINGS AND NOT CONTENT. An entry gets edited — outcomes recorded, numbers
+// corrected — and that is normal and good. What must not happen is a whole entry
+// silently ceasing to exist. The heading is the identity of the entry, so
+// comparing the SET of headings catches the loss without forbidding the edits.
+//
+// AND WHY ONLY THE PART BEFORE THE FIRST `·`. Entries are written with a
+// placeholder commit — `### WP 1.3 — … · 2026-09-15 · \`<this commit>\`` — and the
+// real SHA is filled in afterwards, so the full heading legitimately CHANGES. The
+// first version of this rule compared whole headings and reported five such
+// corrections as losses, which is a gate that cries wolf and therefore gets
+// ignored. The identity is the work-package name and title; the date and commit
+// that follow are metadata about the same entry.
+//
+// A shallow clone cannot see ancestors, so the rule SKIPS rather than fails
+// there and says so: a gate that fails for want of history teaches people to
+// ignore it. CI checks out with full history for exactly this reason.
+
+const PLAN_PATH = "docs/PLAN.md";
+const section16 = (text) => {
+  const a = text.indexOf("\n## 16.");
+  const b = text.indexOf("\n## 17.");
+  return a < 0 ? "" : text.slice(a, b < 0 ? undefined : b);
+};
+/** The stable identity of an entry: its name, without the trailing date/commit. */
+const entryKey = (heading) =>
+  heading
+    .replace(/^###\s*/, "")
+    .split("·")[0]           // drop "· 2026-09-15 · `sha`"
+    .replace(/~~/g, "")      // a struck-through retirement is still the same entry
+    .replace(/\s+/g, " ")
+    .trim();
+
+const entryHeadings = (text) =>
+  section16(text)
+    .split("\n")
+    .filter((l) => /^### /.test(l))
+    .map((l) => l.trim());
+
+const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+
+{
+  const shallow = git("rev-parse", "--is-shallow-repository").stdout?.trim();
+  const revs = git("rev-list", "HEAD", "--", PLAN_PATH).stdout?.trim();
+  if (shallow === "true") {
+    console.log("  R7  §16 append-only — SKIPPED: shallow clone, no ancestors to compare");
+  } else if (!revs) {
+    console.log("  R7  §16 append-only — SKIPPED: no history for docs/PLAN.md");
+  } else {
+    const headHeadings = entryHeadings(readFileSync(join(ROOT, PLAN_PATH), "utf8"));
+    const head = new Set(headHeadings.map(entryKey));
+    const commits = revs.split("\n").filter(Boolean);
+    const lost = new Map();   // entry key -> the last commit that still had it
+    for (const sha of commits) {
+      const past = git("show", `${sha}:${PLAN_PATH}`).stdout;
+      if (!past) continue;
+      for (const h of entryHeadings(past)) {
+        const key = entryKey(h);
+        if (!key || head.has(key)) continue;
+        if (!lost.has(key)) lost.set(key, sha.slice(0, 7));
+      }
+    }
+    if (lost.size) {
+      for (const [h, sha] of lost) {
+        fail("R7", `§16 lost an entry: "${h}" was present at ${sha} and is not in HEAD. ` +
+                   "Restore it — §16 is append-only; a superseded entry is struck through " +
+                   "with a pointer, never deleted.");
+      }
+    } else {
+      console.log(`  R7  §16 append-only · ${head.size} entries, ${commits.length} revisions checked`);
+    }
   }
 }
 

@@ -37,6 +37,7 @@ partially or get corrected — the write fails.
 | Minimum project role | `owner` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 2 — all carry a predicate |
 
 Two SELECT policies, and they are PERMISSIVE on purpose. A super admin reads every plane; an admin of the SAME ORGANIZATION as the actor reads that org's `data` and `access` rows. They grant DISJOINT slices, so the OR that D28 makes unavoidable is the intended union here rather than an accidental escape hatch — which is worth stating, because the same shape on `approved_users` IS the defect. There is no write policy: rows arrive from SECURITY DEFINER functions and from statement-level triggers, never from a client, so RLS denying writes by default is the enforcement (WP 2.2's pattern). `audited: false` on the audit table is not a joke — nothing records reads of it, and a deletion would leave no trace. Tamper-evidence is a Phase 4 question (hash-chaining a log is the same machinery as `input-hash`), not a WP 2.3 one.
 
@@ -244,6 +245,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/audit_logs.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

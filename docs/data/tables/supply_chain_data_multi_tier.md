@@ -26,8 +26,9 @@
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 4 — all carry a predicate |
 
-Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one.
+Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one. For precision, since WP 2.4 checked it: three PROJECT-SCOPED write policies do exist here, serving that ETL path. They are consistent with `write: null`, which names the capability gating a USER-facing write and not the existence of any policy — and unlike `dataset_versions` they carry a real predicate, so they do not admit an arbitrary holder of the table grant.
 
 <details><summary>4 RLS policies</summary>
 
@@ -305,6 +306,6 @@ When the edge was last recomputed. Server-set.
 
 ---
 
-*Generated from data contract `8d5b6da38010`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
