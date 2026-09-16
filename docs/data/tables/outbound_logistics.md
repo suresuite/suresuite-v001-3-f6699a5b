@@ -312,6 +312,6 @@ When the row last changed. Server-set.
 
 ---
 
-*Generated from data contract `db35eafa485d`, engine `0.2.3`,
+*Generated from data contract `c45a2a4c88b0`, engine `0.2.3`,
 sidecar `supabase/contract/outbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

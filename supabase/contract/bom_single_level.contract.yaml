@@ -8,6 +8,10 @@ schema_name: public
 grain: >-
   One product-to-material line of the bill of materials: making one unit of
   this product consumes this much of this material. NOT deduplicated (D5).
+ingest_dataset:
+  wizard_id: bom_single_level
+  fact_class: master
+  server_set: [project_id, plant_name]
 owner: data-ingestion
 
 natural_key_unique:
@@ -114,6 +118,7 @@ fields:
       csv_header: "product_id"
       required: true
       validate: "non-empty after trim — enforced here; ingest-bom-multi-level is the correct pattern"
+      rule: {kind: text, blank: reject}
     surfaces: []
     resolution: null
   material_id:
@@ -133,6 +138,7 @@ fields:
       csv_header: "material_id"
       required: true
       validate: "non-empty after trim"
+      rule: {kind: text, blank: reject}
     surfaces: []
     resolution: null
   consumption_rate:
@@ -157,6 +163,7 @@ fields:
       csv_header: "consumption_rate"
       required: true
       validate: "numeric > 0"
+      rule: {kind: numeric, exclusive_min: 0, blank: reject}
     surfaces: []
     resolution:
       default_mode: asserted

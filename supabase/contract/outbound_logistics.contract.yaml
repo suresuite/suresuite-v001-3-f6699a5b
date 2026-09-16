@@ -9,6 +9,10 @@ grain: >-
   One demand arc as the user uploaded it: this customer buys this product from
   this plant, at this price and lead time, in this volume. NOT deduplicated —
   a second upload of the same row makes a second row (D5).
+ingest_dataset:
+  wizard_id: outbound_logistics
+  fact_class: transactional
+  server_set: [project_id, plant_name]
 owner: data-ingestion
 
 natural_key_unique:
@@ -113,6 +117,7 @@ fields:
       csv_header: "customer_id"
       required: true
       validate: "non-empty after trim — NOT enforced today (D8)"
+      rule: {kind: text, blank: reject}
     surfaces: []
     resolution: null
   product_id:
@@ -132,6 +137,7 @@ fields:
       csv_header: "product_id"
       required: true
       validate: "non-empty after trim — NOT enforced today (D8)"
+      rule: {kind: text, blank: reject}
     surfaces: []
     resolution: null
   volume:
@@ -153,6 +159,7 @@ fields:
       csv_header: "volume"
       required: true
       validate: "numeric >= 0; blank becomes NULL, not 0 (D7)"
+      rule: {kind: numeric, min: 0, blank: reject}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -186,6 +193,7 @@ fields:
       csv_header: "time_unit"
       required: false
       validate: "one of day/week/month/quarter/year and their -ly spellings"
+      rule: {kind: unit, blank: "null"}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -214,6 +222,7 @@ fields:
       csv_header: "expected_lead_time"
       required: true
       validate: "numeric > 0"
+      rule: {kind: numeric, exclusive_min: 0, blank: reject}
     surfaces: []
     resolution: null
     note: >-
@@ -242,6 +251,7 @@ fields:
       csv_header: "unit_price"
       required: true
       validate: "numeric > 0"
+      rule: {kind: numeric, exclusive_min: 0, blank: reject}
     surfaces: []
     resolution:
       default_mode: asserted

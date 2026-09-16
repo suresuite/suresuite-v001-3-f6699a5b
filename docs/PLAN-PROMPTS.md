@@ -412,29 +412,21 @@ Behaviour of the MRP connector must not change. Write the regression test for a
 full stage→diff→promote cycle BEFORE renaming anything.
 ```
 
-### WP 3.2 — Server-side parse and Tier 0/1 landing for CSV
+### WP 3.2 — Server-side parse and Tier 0/1 landing for CSV ✅ *(done)*
 
 ```
-Implement WP 3.2 from docs/PLAN.md.
+DONE. The client-side parse is deleted; `ingest-file` parses server-side with a
+real RFC 4180 parser, validates against the contract's own `ingest.rule`, lands
+the bytes in tier 0 and the rows in tier 1, and promotes what passed.
 
-Already verified (re-check before relying on it):
-· UploadWizard.tsx:501-502 and :497-523 parse with split(','). Confirmed behaviour:
-  – a quoted comma shifts EVERY subsequent column left by one
-  – BOM is stripped (U+FEFF is ES WhiteSpace, so .trim() removes it) — accidental
-  – CRLF survives (the per-field .trim() removes \r)
-  – a semicolon file is correctly BLOCKED by the missing-headers check
-  – fewer fields → Number(undefined) → NaN → null, silently
-· Validation gaps: :369 tests `=== undefined || === ''`, but :505/:508 already
-  turned blanks and garbage into NULL, which passes. And :410/:413 use
-  `if (x && x < 0)`, so 0 and null pass.
-· ingest-bom-multi-level/index.ts:42-44 already does the right thing:
-  (x ?? '').toString().trim() || null. Copy that pattern to the other two — do not
-  invent a third.
-· The standard upload button IS gated on errors.length === 0 (UploadWizard.tsx:1863),
-  so validateData errors do block. The problem is what it fails to catch, not the gate.
-
-Delete the client-side parse. Do not leave it behind a flag — two parsers is the
-defect class this WP exists to end.
+What a later package needs from it (PLAN.md §4.1 · Ingestion is the authority for
+every line number; PLAN.md §16 · WP 3.2 for the findings):
+· `_shared/ingestSpec.generated.ts` is GENERATED from the sidecars. A dataset gains
+  a CSV column by gaining a sidecar entry — never by editing the edge function.
+· `ingest_land_file` and `ingest_apply_run` take the actor as a PARAMETER and set
+  `app.current_user_id` LOCAL to their own transaction. Do not replace either with
+  a GUC read: PostgREST pooling is why D36 is not a one-line fix.
+· `supabase/rehearsal/070` is the behavioural proof and is mutation-tested six ways.
 ```
 
 ### WP 3.3 — Natural keys, upsert, normalization at promotion
@@ -546,7 +538,7 @@ Already verified (re-check before relying on it):
   analysis in everything but name — give it analysis_kind 'combine_etl'.
 · Each currently has its own storage convention and its own (or no) invalidation.
 · calculate-node-prominence is auto-invoked after deep-tier uploads
-  (UploadWizard.tsx:1309-1336) — that call site must keep working.
+  (UploadWizard.tsx:1221) — that call site must keep working.
 · auto_calculate_network_metrics_on_completion (20250925164454:78) fires on the
   projects.completed transition. Check whether it still should.
 

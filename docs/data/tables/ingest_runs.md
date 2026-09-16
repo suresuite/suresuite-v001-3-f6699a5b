@@ -35,11 +35,11 @@ partially or get corrected — the write fails.
 | Read capability | any project member |
 | Write capability | **no user-facing write path** |
 | Minimum project role | `editor` |
-| Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
+| Tier transitions audited | yes |
 | Row-level security | enabled |
 | Policies on the table | 1 — all carry a predicate |
 
-RLS keys on the run's own `project_id` — `has_project_access(project_id)` — which is WP 3.1's change. The original policy reached the project through `project_erp_links`, and a run with no link (`source_kind` csv or api) could not be reached that way at all: it would have been ungoverned rather than merely unsupported. `audited: false` is the honest record and it is a gap with an owner: the only writer today is the connector edge function running as the service role, which cannot name an actor (D36). WP 3.2 lands the upload path and is where the landing becomes an audited transition. `min_project_role: editor` states the intent — a viewer has no business opening an ingestion run — and nothing enforces the role yet; the policy is the modeler-or-admin predicate the connector shipped with.
+RLS keys on the run's own `project_id` — `has_project_access(project_id)` — which is WP 3.1's change. The original policy reached the project through `project_erp_links`, and a run with no link (`source_kind` csv or api) could not be reached that way at all: it would have been ungoverned rather than merely unsupported. `audited: true` SINCE WP 3.2, by the RPC route: `ingest_land_file` writes one `plane='data'` row naming the uploader and carrying this run's id when the run is OPENED, and `ingest_apply_run` sets `app.current_user_id` LOCAL to its own transaction before the tier-2 INSERT, so the statement-level `audit_tier_write` trigger names the promoter too. That is the half D36 said was expensive: it is cheap here because both functions take their actor as a parameter and neither depends on a GUC surviving PostgREST pooling. WHAT IS STILL NOT AUDITED: the CONNECTOR's runs. `erp-sync-orbit-mrp` writes this table as the service role with no actor to name, which is D36 proper and is WP 3.3's, unchanged by this package. `min_project_role: editor` states the intent — a viewer has no business opening an ingestion run — and nothing enforces the role yet; the policy is the modeler-or-admin predicate the connector shipped with.
 
 <details><summary>1 RLS policy</summary>
 
@@ -397,6 +397,6 @@ Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a 
 
 ---
 
-*Generated from data contract `db35eafa485d`, engine `0.2.3`,
+*Generated from data contract `c45a2a4c88b0`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

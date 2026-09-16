@@ -306,6 +306,6 @@ When the edge was last recomputed. Server-set.
 
 ---
 
-*Generated from data contract `db35eafa485d`, engine `0.2.3`,
+*Generated from data contract `c45a2a4c88b0`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -33,11 +33,11 @@ TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 list
 | Read capability | any project member |
 | Write capability | **no user-facing write path** |
 | Minimum project role | `editor` |
-| Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
+| Tier transitions audited | yes |
 | Row-level security | enabled |
 | Policies on the table | 1 — all carry a predicate |
 
-RLS reaches the project through the run, the same predicate the staging tables use. The grant is narrower than theirs on purpose — `authenticated` holds SELECT and INSERT and nothing else — because tier 0 is write-once and a grant that permits UPDATE would be a promise the trigger then breaks. The trigger is the backstop the grant cannot be: the service role holds every privilege by definition, and `ingest_files_write_once()` refuses its updates too. `audited: false`, and here it is the most pointed of the four: a landing IS a tier transition, external bytes entering the system, and G4 says a tier transition writes an audit row naming the actor. What this table does instead is name the actor IN THE ROW (`uploaded_by`), which is better than nothing and less than the invariant asks. It has an owner: WP 3.2 writes the landing path, and an audit row is cheap to add from the function that already knows who uploaded the file — which is exactly the knowledge the service-role writers of D36 do not have.
+RLS reaches the project through the run, the same predicate the staging tables use. The grant is narrower than theirs on purpose — `authenticated` holds SELECT and INSERT and nothing else — because tier 0 is write-once and a grant that permits UPDATE would be a promise the trigger then breaks. The trigger is the backstop the grant cannot be: the service role holds every privilege by definition, and `ingest_files_write_once()` refuses its updates too. `audited: true` SINCE WP 3.2, and by the RPC route rather than by a trigger: `audit_tier_write` is a tier 2/3/4 instrument and a tier-0 table has none. `ingest_land_file` writes exactly one `plane='data'` audit row per landing — action `ingest_file_landed`, target `ingest_files`, the file id as target_id, and the hash, the byte count and the staged/rejected counts in `after`. It NAMES the uploader, and it can, because the actor is a PARAMETER of that function rather than a session GUC read at the far end of a pooled connection (D36's failure mode, avoided rather than inherited). The row is written in the same transaction as the landing, so a landed file without its audit row is not a state this table can reach. `supabase/rehearsal/070` asserts all of that against a real database, and is mutation-tested on it. The previous note said this was WP 3.2's to add; it did.
 
 <details><summary>1 RLS policy</summary>
 
@@ -239,6 +239,6 @@ When the bytes were received. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `db35eafa485d`, engine `0.2.3`,
+*Generated from data contract `c45a2a4c88b0`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_files.contract.yaml`, table created by `20260916000013_ingest_files_tier0.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

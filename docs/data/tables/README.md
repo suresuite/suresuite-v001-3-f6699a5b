@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-33 of 78 tables are covered,
-366 columns in all. A table that is not here is listed
+37 of 79 tables are covered,
+412 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -26,7 +26,9 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`ingest_staged_bom_lines`](ingest_staged_bom_lines.md) | 1 | `data-ingestion` | 13 | One component line of one staged BOM version, as the source sent it: this much of that component goes into one unit of the parent. |
 | [`ingest_staged_bom_versions`](ingest_staged_bom_versions.md) | 1 | `data-ingestion` | 12 | One BOM header as one source sent it, inside one run — a named version of a product's bill of materials, whose lines are staged in `ingest_staged_bom_lines`. |
 | [`ingest_staged_products`](ingest_staged_products.md) | 1 | `data-ingestion` | 19 | One item-master row as one source sent it, inside one run. The source's own shape plus provenance — not the project's shape, which it takes on at promotion. |
+| [`ingest_staged_rows`](ingest_staged_rows.md) | 1 | `data-ingestion` | 11 | One row of one uploaded file, in one run: the cells as received beside what validation made of them, and the findings that explain the difference. The unit a reviewer reads when a number looks wrong — and the only place in the system where the left-hand side of a parse survives. |
 | [`materials`](materials.md) | 2 | `data-ingestion` | 14 | One material in one project: the economics the simulation reads for it. The precision path — the CSV lanes carry prices too, and where this row is silent the engine derives the value from them rather than treating it as missing. |
+| [`multi_tier_supply_chain`](multi_tier_supply_chain.md) | 2 | `data-ingestion` | 9 | One directed firm-to-firm relationship in a project's multi-tier network: who supplies whom, at what depth, and in what capacity. An EDGE between two firm identifiers — not a party, and not a material flow: nothing here says what moves along it or how much. |
 | [`org_capabilities`](org_capabilities.md) | G | `platform` | 5 | One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default. |
 | [`organization_members`](organization_members.md) | G | `platform` | 5 | One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for. |
 | [`organizations`](organizations.md) | G | `platform` | 8 | One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold. |
@@ -43,9 +45,11 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`suppliers`](suppliers.md) | 2 | `data-ingestion` | 10 | One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials. |
 | [`supply_chain_data`](supply_chain_data.md) | 3 | `etl` | 20 | One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild. |
 | [`supply_chain_data_multi_tier`](supply_chain_data_multi_tier.md) | 3 | `etl` | 15 | One edge of the DEEP supply graph — tier-2 and tier-3 suppliers behind the direct ones. Computed by the same ETL, read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4). |
+| [`tier2_suppliers`](tier2_suppliers.md) | 2 | `data-ingestion` | 13 | One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources. |
+| [`tier3_suppliers`](tier3_suppliers.md) | 2 | `data-ingestion` | 13 | One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out. |
 | [`user_ai_permissions`](user_ai_permissions.md) | G | `platform` | 8 | One user's AI entitlements — which models they may reach, which one they get by default, and how the request is shaped. One row per user, or none. |
 | [`user_capabilities`](user_capabilities.md) | G | `platform` | 5 | One grant or denial, for one user_id and one capability. The INNERMOST layer: an explicit per-person answer that beats every other. |
 
 ---
 
-*Generated from data contract `db35eafa485d`, engine `0.2.3`.*
+*Generated from data contract `c45a2a4c88b0`, engine `0.2.3`.*
