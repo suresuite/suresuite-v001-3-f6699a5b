@@ -270,8 +270,40 @@ function renderGovernance(t) {
   out.push(
     `| Row-level security | ${indeterminate ? "**cannot be determined from the migrations**" : t.rls.enabled ? "enabled" : "**DISABLED**"} |`,
   );
+
+  // ── what the DATABASE enforces, beside what the contract INTENDS ────────────
+  // §5 T1 says every displayed value resolves to a source, and until WP 2.4 this
+  // table showed only the INTENT: the capability a page is supposed to check.
+  // A reader could not tell whether the database agreed. It frequently does not —
+  // D28 — so the page now renders BOTH, which is the choice §9 offers over
+  // rendering neither. An intent shown alone reads as an assurance.
+  const policies = t.rls.policies ?? [];
+  const isOpen = (p) => /^\s*true\s*$/i.test(p.using ?? "") || /^\s*true\s*$/i.test(p.with_check ?? "");
+  const open = policies.filter(isOpen);
+  const writeOpen = open.filter((p) => ["ALL", "INSERT", "UPDATE", "DELETE"].includes((p.command ?? "").toUpperCase()));
+  out.push(
+    `| Policies on the table | ${policies.length === 0 ? "**none**" : `${policies.length}` +
+      (open.length ? ` — **${open.length} with no predicate**` : " — all carry a predicate")} |`,
+  );
   out.push("");
   if (t.governance.note) out.push(prose(t.governance.note), "");
+  if (open.length) {
+    out.push(
+      "> **What the database actually permits is wider than the row above.**",
+      `> ${open.length} polic${open.length === 1 ? "y" : "ies"} here grant${open.length === 1 ? "s" : ""} access with`,
+      "> **no predicate at all** (`USING (true)`), so the capability named above is what the",
+      "> product intends to check, not what the database enforces:",
+      ">",
+      ...open.map((p) => `> - \`${esc(p.name)}\` — \`${esc(p.command)}\`${p.roles?.length ? ` to \`${p.roles.map(esc).join("`, `")}\`` : ""}`),
+      ">",
+      writeOpen.length
+        ? "> Some of these permit **writes**. See PLAN.md D28: the application runs as the"
+        : "> See PLAN.md D28: the application runs as the",
+      "> `anon` role with no auth session and the anon key ships in the frontend bundle, so",
+      "> closing these is a migration with an auth model behind it rather than a policy edit.",
+      "",
+    );
+  }
   if (indeterminate) {
     out.push(
       "> **The migrations do not settle whether RLS is on here.**",

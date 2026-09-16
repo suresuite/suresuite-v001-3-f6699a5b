@@ -28,8 +28,20 @@ THE CATALOG IS DUPLICATED IN TYPESCRIPT. `src/lib/capabilities.ts` carries the s
 | Minimum project role | `viewer` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 2 — **1 with no predicate** |
 
 Read is open — every client needs the catalog to render a permissions screen, and the rows contain no tenant data. Writes are service-role only, and in practice happen in migrations: a capability is introduced by the feature that needs it, not by an administrator at runtime.
+
+> **What the database actually permits is wider than the row above.**
+> 1 policy here grants access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `capabilities: read` — `SELECT`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 <details><summary>2 RLS policies</summary>
 
@@ -157,6 +169,6 @@ When its metadata last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `788187aab9e4`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/capabilities.contract.yaml`, table created by `20260711000002_unified_access_control.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

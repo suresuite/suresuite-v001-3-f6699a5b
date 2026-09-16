@@ -46,6 +46,7 @@ partially or get corrected — the write fails.
 | Minimum project role | `editor` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 4 — all carry a predicate |
 
 Tier G rather than a data tier: `projects` holds no measured quantity. It is the SCOPE, and its access rules are the ones every other table inherits by joining to it — which is why WP 2.1 had to redefine 58 policies on 24 other tables to change one comparison. Read is org-wide (any member of the owning organization sees every project in it); write is restricted to the project's own modeller or a global `admin`. There is no project-level role between those two — a member cannot be given read on one project and not another, which is `subtractive-delegation` (§2.1 G3) having nowhere to attach. WP 2.2's `project_members` is where `min_project_role: editor` above stops being a forward declaration. `audited: false`: project creation and deletion write no audit row (WP 2.3).
 
@@ -415,6 +416,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `788187aab9e4`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

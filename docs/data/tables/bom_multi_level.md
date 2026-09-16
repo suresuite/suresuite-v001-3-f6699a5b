@@ -30,8 +30,21 @@ what is missing, never a claim about what is there.
 | Minimum project role | `editor` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 4 — **2 with no predicate** |
 
 `write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all twelve sidecars change together.
+
+> **What the database actually permits is wider than the row above.**
+> 2 policies here grant access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `bom_multi_level_auth_read` — `SELECT` to `authenticated`
+> - `bom_multi_level_anon_read` — `SELECT` to `anon`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 <details><summary>4 RLS policies</summary>
 
@@ -243,6 +256,6 @@ When the row last changed. Server-set.
 
 ---
 
-*Generated from data contract `788187aab9e4`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/bom_multi_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

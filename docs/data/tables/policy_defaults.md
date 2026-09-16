@@ -35,8 +35,21 @@ partially or get corrected — the write fails.
 | Minimum project role | `editor` |
 | Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
 | Row-level security | enabled |
+| Policies on the table | 5 — **2 with no predicate** |
 
 `write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_policies` then.
+
+> **What the database actually permits is wider than the row above.**
+> 2 policies here grant access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `Authenticated users can read policy defaults` — `SELECT` to `authenticated`
+> - `Anon can read policy defaults` — `SELECT` to `anon`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 <details><summary>5 RLS policies</summary>
 
@@ -312,6 +325,6 @@ When the preset was last applied.
 
 ---
 
-*Generated from data contract `788187aab9e4`, engine `0.2.3`,
+*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
 sidecar `supabase/contract/policy_defaults.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

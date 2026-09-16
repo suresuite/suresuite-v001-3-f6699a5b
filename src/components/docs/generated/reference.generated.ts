@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 256;
+export const REFERENCE_COLUMN_COUNT = 267;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -338,6 +338,214 @@ export const REFERENCE_TABLES: RefTable[] = [
           "on_delete": "SET NULL"
         },
         "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "audit_logs",
+    "tier": "G",
+    "tierName": "governance — identity, capability, delegation, audit",
+    "owner": "platform",
+    "grain": "One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused.",
+    "naturalKey": [
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [
+      {
+        "name": "audit_logs_plane_known",
+        "definition": "CHECK (plane IN ('admin','data','access'))"
+      }
+    ],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The row's identity. Returned by the emit functions so a caller can cite what it wrote.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "actor_user_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Who did it. NULLABLE, and the null carries meaning: a service-role write with no session context has no attributable actor.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "table": "approved_users",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "action",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "non-empty",
+        "meaning": "What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`. Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "target_type",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What kind of thing was acted on — a table name on the data plane, an entity name on the others.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "target_id",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Which one, as text. NULL on data-plane rows: a statement-level trigger records a STATEMENT, and a statement that touched 5,000 rows has no single id.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "before",
+        "type": "jsonb",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The prior state, where the writer knows it. Admin RPCs capture it; data-plane trigger rows do NOT — a statement-level trigger has the transition tables but writing 5,000 prior rows into one jsonb would make the log unreadable and unbounded. Their row COUNT is in `after` instead.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "after",
+        "type": "jsonb",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row it carries the decision and what was asked for.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "ip",
+        "type": "inet",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Caller IP where the writer recorded one. Never set by the triggers, which run inside the database.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "user_agent",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Caller user agent where the writer recorded one. As with `ip`, absent on trigger-written rows.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When it happened. Server-stamped, and the column the plane index orders by.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "plane",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of admin / data / access",
+        "meaning": "Which plane the action belongs to — `admin`, `data` or `access`, CHECK-constrained. Added by WP 2.3; every row that predates it is `admin` by construction, because the only writer was `log_admin_action()`, which refuses anyone who is not a super admin.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "a row is written without naming a plane",
+            "value": "'admin'",
+            "provenance": "default",
+            "visibleAs": "the column default, which is also what makes the `admin_audit_logs` compatibility view writable for callers that have not moved yet"
+          }
+        ],
         "engineChain": null,
         "engineLevel": null
       }
