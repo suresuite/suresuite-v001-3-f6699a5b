@@ -514,6 +514,9 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       // Filter out multi-tier data sources from the product-level network
       const filteredData = data.filter((d: SupplyChainData) => d.data_source !== 'multi_tier');
 
+      console.log('Unique data_source values:', [...new Set(filteredData.map(d => d.data_source))]);
+      console.log('Sample row:', filteredData[0]);
+
       setSupplierVolumes(aggregateSupplierVolumes(filteredData));
 
       // Build group classification map based on data source logic
@@ -606,6 +609,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
           !(node.incomingFlow === 0 && node.outgoingFlow === 0)
         )
       );
+
       const filteredCount = originalNodeCount - Object.keys(filteredNodeMap).length;
 
       // Also filter edges to only include those connecting filtered nodes
@@ -633,16 +637,35 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
       const nodeList: Node<NodeData>[] = [];
       const columnX = isCollapsed ? 250 : 220;
-      const columnGap = 350;
       const rowGap = 60;
+      const baseColumnPadding = 150;
+
+      // nodeSize is the same for every node, so compute it once up front
+      const nodeSize = Math.max(50 - Math.log(Object.keys(filteredNodeMap).length) * 3, 30) * 1.05;
+      const spacing = nodeSize * 1.2;
+
+      // How wide each column's node cluster actually spreads, based on its own count
+      const columnWidths = GROUP_ORDER.map((group) => {
+        const count = grouped[group].length;
+        const subgroupCount = count >= 20 ? Math.ceil(count / 20) : 1;
+        return (subgroupCount - 1) * spacing + nodeSize;
+      });
+
+      // Turn those widths into center x-positions, packing columns with baseColumnPadding between them
+      const columnCenters: number[] = [];
+      let rightEdge = columnX;
+      GROUP_ORDER.forEach((_, i) => {
+        const width = columnWidths[i];
+        const center = rightEdge + width / 2;
+        columnCenters.push(center);
+        rightEdge = center + width / 2 + baseColumnPadding;
+      });
 
       GROUP_ORDER.forEach((group, colIdx) => {
         const ids = grouped[group];
-        const x = columnX + colIdx * columnGap;
-        const nodeSize = Math.max(50 - Math.log(Object.keys(filteredNodeMap).length) * 3, 30) * 1.05;
+        const x = columnCenters[colIdx];
 
         const subgroupCount = ids.length >= 20 ? Math.ceil(ids.length / 20) : 1;
-        const spacing = nodeSize * 1.2;
         const subgroupOffsets = Array.from({ length: subgroupCount }, (_, i) =>
           (i - (subgroupCount - 1) / 2) * spacing
         );
@@ -1187,7 +1210,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Incoming Flow:</span>
-                          <span className="font-normal">{selectedNode.data.incomingFlow.toFixed(2)}</span>
+                          <span className="font-normal">{selectedNode.data.incomingFlow.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Outgoing Connections:</span>
@@ -1195,7 +1218,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Outgoing Flow:</span>
-                          <span className="font-normal">{selectedNode.data.outgoingFlow.toFixed(2)}</span>
+                          <span className="font-normal">{selectedNode.data.outgoingFlow.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                         </div>
                       </div>
                     </>
