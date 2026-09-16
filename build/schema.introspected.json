@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 313,
-  "migrations_applied": 310,
+  "migrations_found": 314,
+  "migrations_applied": 311,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000016_audit_newly_described_tier2.sql",
+  "last_migration": "20260916000017_dedup_natural_keys.sql",
   "counts": {
     "tables": 79,
     "views": 7,
     "enums": 4,
-    "functions": 244,
+    "functions": 245,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -20816,6 +20816,19 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260916000015_ingest_landing.sql"
+    },
+    {
+      "name": "ingest_dedup_natural_key",
+      "signature": "ingest_dedup_natural_key(text, text[], text[])",
+      "args": [
+        "_target text",
+        "_key_cols text[]",
+        "_payload_cols text[]"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260916000017_dedup_natural_keys.sql"
     },
     {
       "name": "ingest_files_write_once",

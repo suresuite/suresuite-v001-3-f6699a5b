@@ -183,7 +183,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D2 | `combine-project` never converts `volume` by `time_unit` | was `combine-project/index.ts:60,68,268,275` + `:115,:234-235,:310,:318` — **eight** read sites, not seven | WP 0.2 ✅ *(the conversion; the DATA is not clean — §15 finds 27 unrecognized `time_unit` tokens, all of them integers like `21`, `15`, `7`, each silently read as weekly. See D46)* |
 | D3 | `product_code_map` queried but exists in no migration; error swallowed | was `combine-project/index.ts:131-145`; the decision is recorded at `combine-project/index.ts:117-140` | WP 1.4 ✅ *(branch DELETED — it had never executed; no upload path, no writer, no template column ever existed for the table)* |
 | D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names. **It is not absent — it exists untracked in production**, which a static replay cannot distinguish from absent (CI proved it; §16 WP 1.4) | `ProductLevelNetwork.tsx:500`, `FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(`20260915000003_risk_data.sql` both CREATEs on a fresh database and ADOPTS the untracked one: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted, CHECKs `NOT VALID` on the adopted rows. No `project_id` — deliberately: country risk is a property of the world)* |
-| D5 | No natural-key uniqueness on any lane table → re-upload duplicates. **Measured, 2026-09-16 (§15):** against `natural_key_intended`, `inbound_logistics` holds **96 rows a unique index would reject** (1 787 rows, 7 projects) and `bom_multi_level` holds 2; `outbound_logistics` and `bom_single_level` hold none. WP 3.3's dedup is not a no-op | `20250820145837_…sql`; §15's sweep | WP 3.3 |
+| D5 | No natural-key uniqueness on any lane table → re-upload duplicates. **Measured, 2026-09-16 (§15 run `35146894995`, re-taken for WP 3.3 after WP 3.2's merge and UNCHANGED — the CSV path has still run zero times):** against `natural_key_intended`, `inbound_logistics` holds **96 rows a unique index would reject** (1 787 rows, 7 projects) and `bom_multi_level` holds 2; `outbound_logistics`, `bom_single_level` and the three WP 3.2 described hold none. WP 3.3's dedup is not a no-op. **AND THE KEY AS WRITTEN DOES NOT ENFORCE ITSELF ON THREE OF THE SEVEN TABLES**: `bom_multi_level.higher_level_component_id`, `tier2_suppliers.material_id` and `tier3_suppliers.material_id` are NULLABLE and their NULLs are meaningful (the sidecars say so — a BOM root has no parent). A plain `CREATE UNIQUE INDEX` treats NULLs as distinct, so it constrains none of those rows, and `ON CONFLICT` infers from the same index and INSERTS a duplicate instead of updating — which makes this package's own exit check, "uploading the same file twice is a no-op", false and silent for exactly the rows no constraint has ever touched. `natural_key_intended` is a list of COLUMNS and a list of columns is not a constraint; the NULL rule is the half nobody wrote down. Closed with `NULLS NOT DISTINCT` on all seven, not on the three that need it today, because nullability is a schema property a later `ALTER` can change | `20250820145837_…sql`; §15's sweep; the three sidecars' own `meaning` for those columns | WP 3.3 |
 | D6 | CSV parse is `split(',')` — not quote-safe | was `UploadWizard.tsx:502,523`; the parser is now `_shared/csvParse.ts` | WP 3.2 ✅ *(server-side RFC 4180; `csvParse.test.ts` pins the whole trace — quoted comma, BOM, CRLF, lone CR, trailing comma, short and long rows, quoted newline)* |
 | D7 | Required-field validation misses `null` (blank numerics pass). **Measured, 2026-09-16 (§15):** of 1 787 `inbound_logistics` rows, **376 have a null `volume`, 414 a null `lead_time`, 30 a null `unit_price`** — and the single project §15 told the reader to measure has none of them | was `UploadWizard.tsx:384` vs `:530-531`; §15's sweep | WP 3.2 ✅ *(for NEW rows: a blank required cell is a row-level finding and the row is held in tier 1. The 376/414/30 are already in tier 2 and a parser cannot reach back for them — see §16 · WP 3.2)* |
 | D8 | Inbound/outbound ids not trimmed or empty-checked (BOM-multi is) | `ingest-inbound-logistics/index.ts:38-39` | WP 3.2 ✅ *(on the CSV path: `ingestValidate.ts` applies BOM-multi's own trim/empty pattern from the contract, so `" MAT-1 "` and `"MAT-1"` are one id. The named function is untouched and still live for `StagePolicyTable`'s grid writes — a different path, and not this defect's)* |
@@ -5760,6 +5760,143 @@ Handoff to WP 3.3:
     NEXT one; it cannot reach back, and §15 below says whether that is still true.
   - **The first production CSV upload is the real test.** Everything above rests on
     a rehearsal, because production had never run an ingestion of any kind.
+
+
+---
+
+### WP 3.3 — Natural keys, upsert, normalization at promotion · 2026-09-16 · `20260916000017`–
+
+Preconditions held? **Yes, all three, and the handoff was verified rather than
+inherited.** At `7dae8c6`: `contract:check` green with exactly SEVEN R5 warnings
+(the number WP 3.2 predicted), 243 tests green, `contract:rehearse` green in all
+three modes. `npm run lint`, `scsim engine tests`, `adaptive UI audit` and
+`mobile handoff conformance` are red on `main` and recorded as such by WP 3.2 —
+not touched, not chased.
+
+---
+
+#### A · The handoff, checked against code — two claims held, one did not
+
+§10 told this package to test WP 3.2's handoff rather than build on it. Three
+claims, checked:
+
+**"`ingest_apply_run` is ONE dynamic INSERT per target, not two paths" — TRUE.**
+`20260916000015` contains exactly one `EXECUTE format('INSERT INTO …')`, inside a
+`FOR v_target IN … LOOP`. There is no second promotion anywhere: no other
+function, view or edge function writes a promotable tier-2 table from staging.
+The seam is one statement wide, as promised.
+
+**"`tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain` are still
+empty" — TRUE, re-measured.** §15 run `35146894995`, taken for this package hours
+after the one WP 3.2 quoted and on the far side of its merge: **0 rows, 0
+projects** for all three. The three indexes really are free.
+
+**"all seven `natural_key_intended` values match the grain" — TRUE ABOUT THE
+COLUMNS, AND WRONG ABOUT WHAT THEY ENFORCE.** This is the disagreement §10 asked
+for in writing, and it is not a quibble about wording: taken literally, three of
+the seven keys do not do the thing the package exists to do.
+
+**Three of the seven keys contain a NULLABLE column:**
+
+| Table | nullable column in the key | what the sidecar says it means |
+|---|---|---|
+| `bom_multi_level` | `higher_level_component_id` | "Empty at the top of the tree, where the parent is the finished product itself" |
+| `tier2_suppliers` | `material_id` | "NULLABLE, and the NULL is meaningful: it says the relationship is known but what it carries is not" |
+| `tier3_suppliers` | `material_id` | as above |
+
+In PostgreSQL a plain `CREATE UNIQUE INDEX` treats NULLs as DISTINCT, so on those
+three tables it enforces nothing for the rows whose key column is NULL — and for
+`bom_multi_level` those are precisely the ROOT rows, the ones §15 counts at
+level 0. Measured on the rehearsal database rather than argued:
+
+```
+create table t(a text, b text); create unique index on t(a,b);
+insert into t values ('x',null),('x',null);   -- accepted. two identical rows.
+```
+
+And the consequence for the exit check is worse than a missing constraint,
+because `ON CONFLICT` infers from the same index:
+
+```
+insert into v values ('x',null,1);
+insert into v values ('x',null,2) on conflict (a,b) do update …;  -- INSERTS a
+                                                                  -- SECOND ROW
+```
+
+So with a plain index, "uploading the same file twice is a no-op" — this
+package's own exit check — **is false for every row with a null key column**,
+and false silently: the upsert reports success and the duplicate lands. The same
+statements with `NULLS NOT DISTINCT` refuse the duplicate and update in place.
+
+**The finding is not that the sidecars are wrong.** The columns are right, and
+`relationship_type` is correctly excluded (its sidecar says it is free text, "a
+label a person reads and nothing else", and no code branches on it). The finding
+is that `natural_key_intended` is a list of COLUMNS, and a list of columns is not
+a specification of a constraint — the NULL rule is the half nobody wrote down,
+and it is the half that decides whether the constraint holds. Every index this
+package creates is therefore `NULLS NOT DISTINCT`, on all seven rather than on
+the three that need it today: a key column's nullability is a property of the
+schema, which a later `ALTER` can change, and the grain has no "a null is its own
+row" clause in any of the seven.
+
+---
+
+#### B · The dedup — before, rule, and what could not be measured yet
+
+**Before (§15 run `35146894995`, 2026-09-16, EVERY project):**
+
+| table | rows | projects | rows a unique index would reject |
+|---|---|---|---|
+| `inbound_logistics` | 1 787 | 7 | **96** |
+| `bom_multi_level` | 794 | 2 | **2** |
+| `bom_single_level` | 2 907 | 5 | 0 |
+| `outbound_logistics` | 38 | 7 | 0 |
+| `tier2_suppliers` | 0 | 0 | 0 |
+| `tier3_suppliers` | 0 | 0 | 0 |
+| `multi_tier_supply_chain` | 0 | 0 | 0 |
+
+Identical to the reading WP 3.2 took (run `35144057908`), which is itself the
+finding: WP 3.2's merge did not change tier 2, because **the CSV path has still
+run zero times in production**. The re-measurement was not wasted — "the number
+did not move" is only knowable by taking it again, and §10 was right that a dedup
+sized from a stale count cannot be checked afterwards.
+
+**The rule, and why it is not "keep the newest."** A duplicate group is one fact
+stored twice, so any choice is free IF the copies agree — and D7 says they need
+not: 376 null volumes, 414 null lead times and 30 null prices are already in
+`inbound_logistics`, so a group can hold one complete row and one a field-shift
+emptied. The order is: most non-null payload columns, then `updated_at`, then
+`created_at`, then `id`. The last one is not decoration — without it the same
+input can produce two different databases and nothing downstream is reproducible
+(§5 T4).
+
+**It is a FUNCTION, not a `DO` block, and that is the point.**
+`ingest_dedup_natural_key(target, key_cols, payload_cols)` is called seven times
+by `20260916000017` and called again by `supabase/rehearsal/080` against planted
+duplicates, so the rule is asserted rather than described. Four mutations run
+against that assertion, all fired with their own message:
+
+| mutation | what fired |
+|---|---|
+| score every row 0 (recency alone decides) | "the dedup kept the NEWER, EMPTIER copy (volume `<NULL>`)" |
+| build the probe index without `NULLS NOT DISTINCT` | "a duplicate ROOT row was accepted — D5 is still open for every row with a null key column" |
+| drop `level` from the `bom_multi_level` key | "removed 2 row(s), expected exactly 1 — the two `level`s are TWO facts" |
+| drop the promotable-target guard | the arbitrary-table refusal stopped refusing |
+
+Section 4 of `080` is the one that matters most: it runs the dedup and then
+**creates the real unique index over the result**, because the only claim worth
+making about `20260916000017` is that `20260916000018` can follow it. If they
+disagree the production deploy fails on the second file, which is D31's shape
+inside the two migrations meant to close D5.
+
+**THE AFTER-NUMBER DOES NOT EXIST YET, AND THIS ENTRY WILL NOT INVENT IT.**
+Migrations deploy on merge, so `20260916000017` has not run against production and
+cannot before this branch lands. A §15 run taken now measures the database the
+dedup has not touched. The prediction, recorded so the next run either confirms
+it or is a finding: `inbound_logistics` 1 787 → **1 691**, `bom_multi_level`
+794 → **792**, everything else unchanged, and every
+`rows_the_unique_index_would_reject` **0**. Whoever runs §15 after the deploy
+should read those three numbers first.
 
 
 ---
