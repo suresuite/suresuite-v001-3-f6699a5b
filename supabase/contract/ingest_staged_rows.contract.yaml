@@ -1,0 +1,243 @@
+# AUTHORED — the data contract's sidecar for `ingest_staged_rows`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: ingest_staged_rows
+tier: "1"
+schema_name: public
+grain: >-
+  One row of one uploaded file, in one run: the cells as received beside what
+  validation made of them, and the findings that explain the difference. The
+  unit a reviewer reads when a number looks wrong — and the only place in the
+  system where the left-hand side of a parse survives.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: UNIQUE constraint
+    columns: [ingest_run_id, target_table, source_row_number]
+    name: null
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: ingest_staged_rows_pkey
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    RLS reaches the project through the RUN — `has_project_access(r.project_id)`
+    — never through `project_erp_links`, because a CSV run has no link and the
+    old predicate could not reach it at all (WP 3.1). `authenticated` holds
+    SELECT and nothing else: tier 1 is written by the landing function and read
+    by the review screen, and a client that could INSERT here would be a client
+    that could put a row into tier 1 without a file behind it.
+    `audited: true` by the RPC route, not by a trigger: `ingest_land_file`
+    writes one `plane='data'` audit row per landing, naming the uploader, and it
+    can name them because the actor is a parameter rather than a session GUC
+    (D36's failure mode, avoided rather than inherited).
+    `supabase/rehearsal/070` asserts the row, the actor and the refusal.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: Surrogate key for one staged row.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run these rows were staged in. NOT NULL, ON DELETE CASCADE: the run is
+      the owner and the only route to a project, exactly as for `ingest_files`
+      and the three connector staging tables.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  source_kind:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      csv, orbit-mrp or api — the same closed vocabulary as the run's and the
+      file's, CHECK-constrained with no DEFAULT.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: "one of csv, orbit-mrp, api"}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT AN ENGINE INPUT and never will be: tier 1 is invisible below it (I2).
+      It is provenance, read by the review screen and by anyone asking where a
+      tier-2 row came from.
+  fact_class:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      master or transactional — what KIND of fact one row is. Structure (a BOM)
+      is master; a quantity over a period (a lane) is transactional. The value
+      comes from the target table's own `ingest_dataset.fact_class`, so the
+      contract decides it rather than the uploader.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: "one of master, transactional"}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT AN ENGINE INPUT, for the same reason `source_kind` is not. It exists so
+      that a later package can treat master data and transactional data
+      differently at promotion without re-deriving which is which from the target
+      table's name.
+  target_table:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tier-2 table these rows are destined for, by name. Not a foreign key —
+      there is no table of tables — so `ingest_target_is_promotable()` is the
+      closed set, and the landing refuses anything outside it before a row is
+      written.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: "must be a promotable target"}
+    surfaces: []
+    resolution: null
+  source_row_number:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      The physical line in the file, 1-based, counting the header as line 1 — so
+      the first data row is 2, and the number matches what a spreadsheet shows
+      the person who made the file. CHECK > 1 for that reason: line 1 is the
+      header and can never be a staged row.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: "integer > 1"}
+    surfaces: []
+    resolution: null
+    note: >-
+      This is the anchor WP 3.4's review screen clicks through to and WP 3.3's
+      tier-2 `source_row_id` points at. It is also why a rejected row is KEPT
+      rather than dropped: "row 42 is why" needs row 42 to exist somewhere.
+  raw:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The cells exactly as the file gave them, keyed by the header the file
+      carried — untrimmed, untyped, verbatim, including columns the contract does
+      not know. The left-hand side of every parse claim.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Keeping it is what makes D8 and D46 diagnosable rather than arguable:
+      `" MAT-1 "` and `"MAT-1"` resolve to one id in `parsed` and remain two
+      different strings here, and a `time_unit` of `21` is visible as the token
+      it was rather than as the weekly it used to become.
+  parsed:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      What validation made of the cells, keyed by TIER-2 COLUMN NAME rather than
+      by CSV header — the two differ, and the mapping is the contract's
+      `ingest.csv_header`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      A field that failed validation is ABSENT here rather than present as null.
+      The distinction is the whole of D7: absent says "no value was established",
+      null says "the file said empty", and a validator that spells them the same
+      way puts 376 null volumes into tier 2 without telling anyone.
+  findings:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      [{level, field, code, message}] — the same four-key shape as
+      `ingest_runs.mapping_warnings` and scsim's MappingWarning, so WP 3.4
+      renders it with `MappingWarningsCard` unmodified.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      A row carrying any `error` finding is never promoted — that is what
+      "rejected with a row-level finding" means, and it is enforced in
+      `ingest_apply_run`'s WHERE clause rather than hoped for. `warn` and `info`
+      rows ARE promoted and shown, which is §5 T2: a substitution is visible at
+      the point of display, not withheld by rejecting the row it is about.
+  diff_state:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      new, changed, unchanged or removed_upstream — the same vocabulary the three
+      connector staging tables use, so WP 3.4's one review component serves both
+      sources.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: nothing has computed a diff yet
+        value: new
+        provenance: default
+        visible_as: null
+    ingest: {csv_header: null, required: false, validate: "one of new, changed, unchanged, removed_upstream"}
+    surfaces: []
+    resolution: null
+    note: >-
+      DEFAULTS TO `new` AND NOTHING COMPUTES IT YET. WP 3.4 computes the real
+      diff; until it does, every CSV row says `new` because that is what an
+      uncompared row is. Stated here rather than left for a reader to infer from
+      a uniform column.
+  staged_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was staged. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  TIER 1, CREATED IN PHASE 3 / WP 3.2 — the fourth staging table and the last one
+  of its kind. The three `ingest_staged_*` tables WP 3.1 renamed are TYPED against
+  one source's entities (`external_id`, `sku`, `cycle_time_seconds`) because the
+  connector knows what an orbit-mrp product is. A CSV of `inbound_logistics` is
+  none of those things, and widening those three to hold it would have made each
+  of them a table about two unrelated grains. So this one is generic where they
+  are specific, and the generality is `ingestion-contract` (I7) working as
+  intended: a new source lands here and never touches a tier-2 schema.
+  WHAT IT CLOSES: the CSV path is the first in this repository for which
+  `no-tier-skip` (I2) is true rather than aspirational. Before WP 3.2 a browser
+  parsed the file and inserted straight into `inbound_logistics`.

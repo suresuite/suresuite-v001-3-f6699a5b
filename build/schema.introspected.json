@@ -1,19 +1,19 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 310,
-  "migrations_applied": 307,
+  "migrations_found": 313,
+  "migrations_applied": 310,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000013_ingest_files_tier0.sql",
+  "last_migration": "20260916000016_audit_newly_described_tier2.sql",
   "counts": {
-    "tables": 78,
+    "tables": 79,
     "views": 7,
     "enums": 4,
-    "functions": 241,
+    "functions": 244,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 32,
+    "dynamic_ddl_statements": 33,
     "rls_indeterminate_tables": 4,
     "orphans": 0,
     "aborted_migrations": 3
@@ -7566,6 +7566,235 @@
             "id"
           ],
           "name": "erp_staged_products_pkey"
+        }
+      ]
+    },
+    {
+      "name": "ingest_staged_rows",
+      "schema": "public",
+      "created_by": "20260916000014_ingest_staged_rows.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "source_kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "fact_class",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "target_table",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "source_row_number",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "raw",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "parsed",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "findings",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "diff_state",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'new'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "staged_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": null,
+          "kind": "UNIQUE",
+          "columns": [
+            "ingest_run_id",
+            "target_table",
+            "source_row_number"
+          ],
+          "definition": "UNIQUE (ingest_run_id, target_table, source_row_number)",
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ingest_staged_rows_run_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id",
+            "target_table",
+            "source_row_number"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_rejected_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id"
+          ],
+          "predicate": "findings @> '[{\"level\": \"error\"}]'::jsonb",
+          "partial": true,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "ingest_staged_rows: project access",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_rows.ingest_run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_rows.ingest_run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260916000014_ingest_staged_rows.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "Tier 1 (PLAN.md §2) — one row of one uploaded file, for any row-shaped ",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "ingest_run_id",
+            "target_table",
+            "source_row_number"
+          ],
+          "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "ingest_staged_rows_pkey"
         }
       ]
     },
@@ -20549,6 +20778,18 @@
       "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
     },
     {
+      "name": "ingest_apply_run",
+      "signature": "ingest_apply_run(uuid, uuid)",
+      "args": [
+        "_run_id uuid",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260916000015_ingest_landing.sql"
+    },
+    {
       "name": "ingest_files_write_once",
       "signature": "ingest_files_write_once()",
       "args": [],
@@ -20556,6 +20797,41 @@
       "security_definer": false,
       "volatility": null,
       "defined_by": "20260916000013_ingest_files_tier0.sql"
+    },
+    {
+      "name": "ingest_land_file",
+      "signature": "ingest_land_file(uuid, uuid, text, text, text, text, text, text, text, bigint, text, jsonb, jsonb, jsonb)",
+      "args": [
+        "_project_id uuid",
+        "_actor_user_id uuid",
+        "_source_kind text",
+        "_fact_class text",
+        "_target_table text",
+        "_original_filename text",
+        "_storage_bucket text",
+        "_storage_path text",
+        "_content_type text",
+        "_byte_size bigint",
+        "_content_sha256 text",
+        "_rows jsonb",
+        "_file_findings jsonb DEFAULT '[]'::jsonb",
+        "_counts jsonb DEFAULT '{}'::jsonb"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260916000015_ingest_landing.sql"
+    },
+    {
+      "name": "ingest_target_is_promotable",
+      "signature": "ingest_target_is_promotable(text)",
+      "args": [
+        "_target_table text"
+      ],
+      "returns": "boolean LANGUAGE sql IMMUTABLE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "defined_by": "20260916000015_ingest_landing.sql"
     },
     {
       "name": "is_super_admin",
@@ -22085,6 +22361,15 @@
       "mentions": [
         "risk_data",
         "risk_data_country_key"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260916000014_ingest_staged_rows.sql",
+      "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('ingest', 'ingest', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
+      "mentions": [
+        "ingest"
       ],
       "touches_rls": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"

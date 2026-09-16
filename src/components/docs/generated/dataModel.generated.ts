@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "db35eafa485d";
+export const CONTRACT_VERSION = "d37d390a1ba9";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260916000013_ingest_files_tier0.sql";
+export const LAST_MIGRATION = "20260916000016_audit_newly_described_tier2.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 78,
-  "tablesDescribed": 33,
-  "columnsDescribed": 366,
-  "tablesUndescribed": 45
+  "tablesInSchema": 79,
+  "tablesDescribed": 37,
+  "columnsDescribed": 412,
+  "tablesUndescribed": 42
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -77,6 +77,12 @@ export const TIERS: GlanceTier[] = [
         "grain": "One item-master row as one source sent it, inside one run. The source's own shape plus provenance — not the project's shape, which it takes on at promotion.",
         "columns": 19,
         "owner": "data-ingestion"
+      },
+      {
+        "table": "ingest_staged_rows",
+        "grain": "One row of one uploaded file, in one run: the cells as received beside what validation made of them, and the findings that explain the difference. The unit a reviewer reads when a number looks wrong — and the only place in the system where the left-hand side of a parse survives.",
+        "columns": 11,
+        "owner": "data-ingestion"
       }
     ]
   },
@@ -115,6 +121,12 @@ export const TIERS: GlanceTier[] = [
         "owner": "data-ingestion"
       },
       {
+        "table": "multi_tier_supply_chain",
+        "grain": "One directed firm-to-firm relationship in a project's multi-tier network: who supplies whom, at what depth, and in what capacity. An EDGE between two firm identifiers — not a party, and not a material flow: nothing here says what moves along it or how much.",
+        "columns": 9,
+        "owner": "data-ingestion"
+      },
+      {
         "table": "outbound_logistics",
         "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. NOT deduplicated — a second upload of the same row makes a second row (D5).",
         "columns": 11,
@@ -130,6 +142,18 @@ export const TIERS: GlanceTier[] = [
         "table": "suppliers",
         "grain": "One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials.",
         "columns": 10,
+        "owner": "data-ingestion"
+      },
+      {
+        "table": "tier2_suppliers",
+        "grain": "One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources.",
+        "columns": 13,
+        "owner": "data-ingestion"
+      },
+      {
+        "table": "tier3_suppliers",
+        "grain": "One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out.",
+        "columns": 13,
         "owner": "data-ingestion"
       }
     ]
@@ -282,24 +306,6 @@ export const TIERS: GlanceTier[] = [
 
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
-  {
-    "wp": "3.2",
-    "why": "The other inbound datasets. WP 3.1 described the tables the ingestion contract OWNS — `ingest_runs`, the three `ingest_staged_*` and `ingest_files` — and `project_erp_links` with them, because a deferral is a commitment and carrying one to the next open package is how a defect ends up owned by nobody (D41). These three are what it does not own: each still has its own bespoke upload path, and their sidecars are written against the ingestion contract rather than against those paths. WP 3.2 moves the parse server-side, which is when there is one path to describe them against.",
-    "tables": [
-      {
-        "table": "multi_tier_supply_chain",
-        "columns": 9
-      },
-      {
-        "table": "tier2_suppliers",
-        "columns": 13
-      },
-      {
-        "table": "tier3_suppliers",
-        "columns": 13
-      }
-    ]
-  },
   {
     "wp": "4.2",
     "why": "Analysis output. D19 — results smeared onto entity columns with no identity or version — is exactly what these tables are, and WP 4.2 moves them into `analysis_results`. Documenting the smear as though it were the design would make the contract an argument for keeping it.",

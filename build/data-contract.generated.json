@@ -5,20 +5,20 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 310,
-      "migrations_applied": 307,
-      "last_migration": "20260916000013_ingest_files_tier0.sql"
+      "migrations_found": 313,
+      "migrations_applied": 310,
+      "last_migration": "20260916000016_audit_newly_described_tier2.sql"
     },
-    "sidecars": 33,
+    "sidecars": 37,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 78,
-    "tables_covered": 33,
-    "columns_covered": 366,
+    "tables_in_schema": 79,
+    "tables_covered": 37,
+    "columns_covered": 412,
     "check_constraints": 15,
     "engine_requirements": 7,
     "orphans": 0,
@@ -51,6 +51,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -649,6 +650,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -1104,6 +1106,14 @@
         "higher_level_component_id",
         "level"
       ],
+      "ingest_dataset": {
+        "wizard_id": "bom_multi_level",
+        "fact_class": "master",
+        "server_set": [
+          "project_id",
+          "plant_name"
+        ]
+      },
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -1316,7 +1326,11 @@
           "ingest": {
             "csv_header": "material_id",
             "required": true,
-            "validate": "non-empty after trim — this ingest function is the correct pattern to copy"
+            "validate": "non-empty after trim — this ingest function is the correct pattern to copy",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -1346,7 +1360,12 @@
           "ingest": {
             "csv_header": "level",
             "required": true,
-            "validate": "integer >= 1"
+            "validate": "integer >= 0 — level 0 is a root component, which both live parsers admit and always have (WP 3.2 §16)",
+            "rule": {
+              "kind": "integer",
+              "min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -1386,7 +1405,11 @@
           "ingest": {
             "csv_header": "higher_level_component_id",
             "required": false,
-            "validate": "may be blank only at level 1"
+            "validate": "may be blank only at the root level",
+            "rule": {
+              "kind": "text",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -1423,7 +1446,12 @@
           "ingest": {
             "csv_header": "consumption_rate",
             "required": true,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -1527,6 +1555,14 @@
         "product_id",
         "material_id"
       ],
+      "ingest_dataset": {
+        "wizard_id": "bom_single_level",
+        "fact_class": "master",
+        "server_set": [
+          "project_id",
+          "plant_name"
+        ]
+      },
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -1739,7 +1775,11 @@
           "ingest": {
             "csv_header": "product_id",
             "required": true,
-            "validate": "non-empty after trim — enforced here; ingest-bom-multi-level is the correct pattern"
+            "validate": "non-empty after trim — enforced here; ingest-bom-multi-level is the correct pattern",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -1769,7 +1809,11 @@
           "ingest": {
             "csv_header": "material_id",
             "required": true,
-            "validate": "non-empty after trim"
+            "validate": "non-empty after trim",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -1806,7 +1850,12 @@
           "ingest": {
             "csv_header": "consumption_rate",
             "required": true,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -1905,6 +1954,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -2186,6 +2236,7 @@
         "project_id",
         "customer_id"
       ],
+      "ingest_dataset": null,
       "governance": {
         "read": "project_member",
         "write": "project_modeler_or_admin",
@@ -2493,6 +2544,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -2826,6 +2878,7 @@
       "natural_key_intended": [
         "id"
       ],
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -3197,6 +3250,14 @@
         "supplier_id",
         "material_id"
       ],
+      "ingest_dataset": {
+        "wizard_id": "inbound_logistics",
+        "fact_class": "transactional",
+        "server_set": [
+          "project_id",
+          "plant_name"
+        ]
+      },
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -3416,7 +3477,11 @@
           "ingest": {
             "csv_header": "supplier_id",
             "required": true,
-            "validate": "non-empty after trim — NOT enforced today (D8)"
+            "validate": "non-empty after trim — NOT enforced today (D8)",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -3446,7 +3511,11 @@
           "ingest": {
             "csv_header": "material_id",
             "required": true,
-            "validate": "non-empty after trim — NOT enforced today (D8)"
+            "validate": "non-empty after trim — NOT enforced today (D8)",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -3476,7 +3545,12 @@
           "ingest": {
             "csv_header": "volume",
             "required": true,
-            "validate": "numeric >= 0; blank becomes NULL, not 0 (D7)"
+            "validate": "numeric >= 0; blank becomes NULL, not 0 (D7)",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -3523,7 +3597,11 @@
           "ingest": {
             "csv_header": "time_unit",
             "required": false,
-            "validate": "one of day/week/month/quarter/year and their -ly spellings"
+            "validate": "one of day/week/month/quarter/year and their -ly spellings",
+            "rule": {
+              "kind": "unit",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -3570,7 +3648,12 @@
           "ingest": {
             "csv_header": "lead_time",
             "required": true,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -3633,7 +3716,12 @@
           "ingest": {
             "csv_header": "unit_price",
             "required": true,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -3745,7 +3833,11 @@
           "ingest": {
             "csv_header": "lead_time_unit",
             "required": false,
-            "validate": "one of the units public.unit_days() knows — enforced by the column's CHECK constraint"
+            "validate": "one of the units public.unit_days() knows — enforced by the column's CHECK constraint",
+            "rule": {
+              "kind": "unit",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -3792,13 +3884,14 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
-        "note": "RLS reaches the project through the run, the same predicate the staging tables use. The grant is narrower than theirs on purpose — `authenticated` holds SELECT and INSERT and nothing else — because tier 0 is write-once and a grant that permits UPDATE would be a promise the trigger then breaks. The trigger is the backstop the grant cannot be: the service role holds every privilege by definition, and `ingest_files_write_once()` refuses its updates too. `audited: false`, and here it is the most pointed of the four: a landing IS a tier transition, external bytes entering the system, and G4 says a tier transition writes an audit row naming the actor. What this table does instead is name the actor IN THE ROW (`uploaded_by`), which is better than nothing and less than the invariant asks. It has an owner: WP 3.2 writes the landing path, and an audit row is cheap to add from the function that already knows who uploaded the file — which is exactly the knowledge the service-role writers of D36 do not have."
+        "note": "RLS reaches the project through the run, the same predicate the staging tables use. The grant is narrower than theirs on purpose — `authenticated` holds SELECT and INSERT and nothing else — because tier 0 is write-once and a grant that permits UPDATE would be a promise the trigger then breaks. The trigger is the backstop the grant cannot be: the service role holds every privilege by definition, and `ingest_files_write_once()` refuses its updates too. `audited: true` SINCE WP 3.2, and by the RPC route rather than by a trigger: `audit_tier_write` is a tier 2/3/4 instrument and a tier-0 table has none. `ingest_land_file` writes exactly one `plane='data'` audit row per landing — action `ingest_file_landed`, target `ingest_files`, the file id as target_id, and the hash, the byte count and the staged/rejected counts in `after`. It NAMES the uploader, and it can, because the actor is a PARAMETER of that function rather than a session GUC read at the far end of a pooled connection (D36's failure mode, avoided rather than inherited). The row is written in the same transaction as the landing, so a landed file without its audit row is not a state this table can reach. `supabase/rehearsal/070` asserts all of that against a real database, and is mutation-tested on it. The previous note said this was WP 3.2's to add; it did."
       },
       "rls": {
         "enabled": true,
@@ -4226,13 +4319,14 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
-        "note": "RLS keys on the run's own `project_id` — `has_project_access(project_id)` — which is WP 3.1's change. The original policy reached the project through `project_erp_links`, and a run with no link (`source_kind` csv or api) could not be reached that way at all: it would have been ungoverned rather than merely unsupported. `audited: false` is the honest record and it is a gap with an owner: the only writer today is the connector edge function running as the service role, which cannot name an actor (D36). WP 3.2 lands the upload path and is where the landing becomes an audited transition. `min_project_role: editor` states the intent — a viewer has no business opening an ingestion run — and nothing enforces the role yet; the policy is the modeler-or-admin predicate the connector shipped with."
+        "note": "RLS keys on the run's own `project_id` — `has_project_access(project_id)` — which is WP 3.1's change. The original policy reached the project through `project_erp_links`, and a run with no link (`source_kind` csv or api) could not be reached that way at all: it would have been ungoverned rather than merely unsupported. `audited: true` SINCE WP 3.2, by the RPC route: `ingest_land_file` writes one `plane='data'` row naming the uploader and carrying this run's id when the run is OPENED, and `ingest_apply_run` sets `app.current_user_id` LOCAL to its own transaction before the tier-2 INSERT, so the statement-level `audit_tier_write` trigger names the promoter too. That is the half D36 said was expensive: it is cheap here because both functions take their actor as a parameter and neither depends on a GUC surviving PostgREST pooling. WHAT IS STILL NOT AUDITED: the CONNECTOR's runs. `erp-sync-orbit-mrp` writes this table as the service role with no actor to name, which is D36 proper and is WP 3.3's, unchanged by this package. `min_project_role: editor` states the intent — a viewer has no business opening an ingestion run — and nothing enforces the role yet; the policy is the modeler-or-admin predicate the connector shipped with."
       },
       "rls": {
         "enabled": true,
@@ -4971,6 +5065,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -5459,6 +5554,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -5917,6 +6013,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -6566,6 +6663,454 @@
       ],
       "note": "RENAMED FROM `erp_staged_products` IN PHASE 3 / WP 3.1. Nothing here is visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`): staged rows reach tier 2 only through an approved promotion, which is why every `consumed_by` is null and why that is a statement rather than a gap. The assertions that hold this table to it are `supabase/rehearsal/050` and `060`. WHAT IS NOT HERE. No CSV writer — WP 3.2 builds it, and `fact_class` and `source_kind` exist so that it has somewhere truthful to write. No natural key: see the `id` field. No audit: see governance."
     },
+    "ingest_staged_rows": {
+      "table": "ingest_staged_rows",
+      "schema_name": "public",
+      "tier": "1",
+      "tier_name": "staging — parsed, diffed, unpromoted",
+      "grain": "One row of one uploaded file, in one run: the cells as received beside what validation made of them, and the findings that explain the difference. The unit a reviewer reads when a number looks wrong — and the only place in the system where the left-hand side of a parse survives.",
+      "owner": "data-ingestion",
+      "created_by": "20260916000014_ingest_staged_rows.sql",
+      "sidecar": "supabase/contract/ingest_staged_rows.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "ingest_run_id",
+            "target_table",
+            "source_row_number"
+          ],
+          "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "ingest_staged_rows_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "RLS reaches the project through the RUN — `has_project_access(r.project_id)` — never through `project_erp_links`, because a CSV run has no link and the old predicate could not reach it at all (WP 3.1). `authenticated` holds SELECT and nothing else: tier 1 is written by the landing function and read by the review screen, and a client that could INSERT here would be a client that could put a row into tier 1 without a file behind it. `audited: true` by the RPC route, not by a trigger: `ingest_land_file` writes one `plane='data'` audit row per landing, naming the uploader, and it can name them because the actor is a parameter rather than a session GUC (D36's failure mode, avoided rather than inherited). `supabase/rehearsal/070` asserts the row, the actor and the refusal."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "ingest_staged_rows: project access",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_rows.ingest_run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS (SELECT 1 FROM public.ingest_runs r WHERE r.id = ingest_staged_rows.ingest_run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260916000014_ingest_staged_rows.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "UNIQUE",
+          "columns": [
+            "ingest_run_id",
+            "target_table",
+            "source_row_number"
+          ],
+          "definition": "UNIQUE (ingest_run_id, target_table, source_row_number)",
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ingest_staged_rows_run_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id",
+            "target_table",
+            "source_row_number"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        },
+        {
+          "name": "ingest_staged_rows_rejected_idx",
+          "unique": false,
+          "columns": [
+            "ingest_run_id"
+          ],
+          "predicate": "findings @> '[{\"level\": \"error\"}]'::jsonb",
+          "partial": true,
+          "added_by": "20260916000014_ingest_staged_rows.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Surrogate key for one staged row.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The run these rows were staged in. NOT NULL, ON DELETE CASCADE: the run is the owner and the only route to a project, exactly as for `ingest_files` and the three connector staging tables.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_kind",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "csv, orbit-mrp or api — the same closed vocabulary as the run's and the file's, CHECK-constrained with no DEFAULT.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": "one of csv, orbit-mrp, api"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT AN ENGINE INPUT and never will be: tier 1 is invisible below it (I2). It is provenance, read by the review screen and by anyone asking where a tier-2 row came from.",
+          "engine_requirement": null
+        },
+        {
+          "name": "fact_class",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "master or transactional — what KIND of fact one row is. Structure (a BOM) is master; a quantity over a period (a lane) is transactional. The value comes from the target table's own `ingest_dataset.fact_class`, so the contract decides it rather than the uploader.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": "one of master, transactional"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT AN ENGINE INPUT, for the same reason `source_kind` is not. It exists so that a later package can treat master data and transactional data differently at promotion without re-deriving which is which from the target table's name.",
+          "engine_requirement": null
+        },
+        {
+          "name": "target_table",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The tier-2 table these rows are destined for, by name. Not a foreign key — there is no table of tables — so `ingest_target_is_promotable()` is the closed set, and the landing refuses anything outside it before a row is written.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": "must be a promotable target"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_number",
+          "type": "integer",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The physical line in the file, 1-based, counting the header as line 1 — so the first data row is 2, and the number matches what a spreadsheet shows the person who made the file. CHECK > 1 for that reason: line 1 is the header and can never be a staged row.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": "integer > 1"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "This is the anchor WP 3.4's review screen clicks through to and WP 3.3's tier-2 `source_row_id` points at. It is also why a rejected row is KEPT rather than dropped: \"row 42 is why\" needs row 42 to exist somewhere.",
+          "engine_requirement": null
+        },
+        {
+          "name": "raw",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The cells exactly as the file gave them, keyed by the header the file carried — untrimmed, untyped, verbatim, including columns the contract does not know. The left-hand side of every parse claim.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": true,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Keeping it is what makes D8 and D46 diagnosable rather than arguable: `\" MAT-1 \"` and `\"MAT-1\"` resolve to one id in `parsed` and remain two different strings here, and a `time_unit` of `21` is visible as the token it was rather than as the weekly it used to become.",
+          "engine_requirement": null
+        },
+        {
+          "name": "parsed",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "What validation made of the cells, keyed by TIER-2 COLUMN NAME rather than by CSV header — the two differ, and the mapping is the contract's `ingest.csv_header`.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "A field that failed validation is ABSENT here rather than present as null. The distinction is the whole of D7: absent says \"no value was established\", null says \"the file said empty\", and a validator that spells them the same way puts 376 null volumes into tier 2 without telling anyone.",
+          "engine_requirement": null
+        },
+        {
+          "name": "findings",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "[{level, field, code, message}] — the same four-key shape as `ingest_runs.mapping_warnings` and scsim's MappingWarning, so WP 3.4 renders it with `MappingWarningsCard` unmodified.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "A row carrying any `error` finding is never promoted — that is what \"rejected with a row-level finding\" means, and it is enforced in `ingest_apply_run`'s WHERE clause rather than hoped for. `warn` and `info` rows ARE promoted and shown, which is §5 T2: a substitution is visible at the point of display, not withheld by rejecting the row it is about.",
+          "engine_requirement": null
+        },
+        {
+          "name": "diff_state",
+          "type": "text",
+          "nullable": false,
+          "default": "'new'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "new, changed, unchanged or removed_upstream — the same vocabulary the three connector staging tables use, so WP 3.4's one review component serves both sources.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "nothing has computed a diff yet",
+              "value": "new",
+              "provenance": "default",
+              "visible_as": null
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of new, changed, unchanged, removed_upstream"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "DEFAULTS TO `new` AND NOTHING COMPUTES IT YET. WP 3.4 computes the real diff; until it does, every CSV row says `new` because that is what an uncompared row is. Stated here rather than left for a reader to infer from a uniform column.",
+          "engine_requirement": null
+        },
+        {
+          "name": "staged_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260916000014_ingest_staged_rows.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was staged. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "TIER 1, CREATED IN PHASE 3 / WP 3.2 — the fourth staging table and the last one of its kind. The three `ingest_staged_*` tables WP 3.1 renamed are TYPED against one source's entities (`external_id`, `sku`, `cycle_time_seconds`) because the connector knows what an orbit-mrp product is. A CSV of `inbound_logistics` is none of those things, and widening those three to hold it would have made each of them a table about two unrelated grains. So this one is generic where they are specific, and the generality is `ingestion-contract` (I7) working as intended: a new source lands here and never touches a tier-2 schema. WHAT IT CLOSES: the CSV path is the first in this repository for which `no-tier-skip` (I2) is true rather than aspirational. Before WP 3.2 a browser parsed the file and inserted straight into `inbound_logistics`."
+    },
     "materials": {
       "table": "materials",
       "schema_name": "public",
@@ -6586,6 +7131,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -7177,6 +7723,376 @@
       ],
       "note": null
     },
+    "multi_tier_supply_chain": {
+      "table": "multi_tier_supply_chain",
+      "schema_name": "public",
+      "tier": "2",
+      "tier_name": "canonical — the only tier humans edit",
+      "grain": "One directed firm-to-firm relationship in a project's multi-tier network: who supplies whom, at what depth, and in what capacity. An EDGE between two firm identifiers — not a party, and not a material flow: nothing here says what moves along it or how much.",
+      "owner": "data-ingestion",
+      "created_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+      "sidecar": "supabase/contract/multi_tier_supply_chain.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "multi_tier_supply_chain_pkey"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "plant_name",
+        "from_firm_id",
+        "to_firm_id"
+      ],
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Two policies through the project's organization, the same pair `tier2_suppliers` carries: `org_is_current_user_org(p.organization_id, p.organization)` for SELECT, and the same predicate plus modeler-or-admin for writes. `audited: true` SINCE WP 3.2. No trigger existed before it, because WP 2.3 instrumented the tables the contract DESCRIBED and this was not one of them — the qualifier in `dataPlaneAudit.test.ts` is exactly the hole, and writing this sidecar is what made it visible. `20260916000016` adds the three triggers. On a table nothing writes they will never fire, which is the point: the rule is about every tier-2 table, not about the ones that happen to be busy."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Multi-tier: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Multi-tier: organization access",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = multi_tier_supply_chain.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "multi_tier_supply_chain_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_multi_tier_supply_chain_project_id",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
+        },
+        {
+          "name": "multi_tier_project_idx",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260712100000_arc_write_performance.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Surrogate key. Not the grain: the row that means something is the from/to pair within a project.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project this edge belongs to, by uuid (G1).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "set by the writer from the project, never from a file"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project's plant, copied onto every row and enforced by `ensure_dataset_plant_matches_project`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must equal the project's plant_name — a trigger raises otherwise"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "from_firm_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The firm the edge points FROM, as the user's own systems spell it. A text identifier with no referential integrity to anything — there is no firm table for it to point at.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty; NOT NULL at the column"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "to_firm_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The firm the edge points TO. Direction is the whole content of the row and nothing in the schema defends it: swapping the two columns produces a valid row that says the opposite thing.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty; NOT NULL at the column"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "to_firm_tier",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "How many hops from the project's own plant the TO firm sits — 1 for a direct supplier, 2 for its supplier, and so on. NULLABLE, and a NULL says the depth was never established rather than that it is zero.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "integer >= 1 where present"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine, and nothing else reads it either — see the table note. `scsim` models one tier of supply; a depth number has nowhere to go.",
+          "engine_requirement": null
+        },
+        {
+          "name": "to_firm_relationship",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "What the TO firm is to the FROM firm, in the user's own words. No CHECK, no closed vocabulary, no code that branches on it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "free text"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was written. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was last written. Server-stamped by trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES. The deferral that pointed here called these \"the other inbound datasets, each with its own bespoke upload path\". `tier2_suppliers` and `tier3_suppliers` are that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either: `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every occurrence is in migrations — created 2025-08-20, carried through RLS rewrites since, most recently by `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS NULL FOR THAT REASON: there is no CSV to name a column of. It is described here rather than deferred again because a deferral is a promise that someone will look, and five packages of looking have now established what there is to see. DROPPING IT IS NOT THIS PACKAGE'S CALL — a table with rows in production is not removed by the package that happened to notice, and §15 has never counted them. WP 3.2's gap check adds the count to §15 so that the package which does decide is deciding against a number."
+    },
     "org_capabilities": {
       "table": "org_capabilities",
       "schema_name": "public",
@@ -7197,6 +8113,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -7441,6 +8358,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -7694,6 +8612,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -8022,6 +8941,14 @@
         "customer_id",
         "product_id"
       ],
+      "ingest_dataset": {
+        "wizard_id": "outbound_logistics",
+        "fact_class": "transactional",
+        "server_set": [
+          "project_id",
+          "plant_name"
+        ]
+      },
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -8234,7 +9161,11 @@
           "ingest": {
             "csv_header": "customer_id",
             "required": true,
-            "validate": "non-empty after trim — NOT enforced today (D8)"
+            "validate": "non-empty after trim — NOT enforced today (D8)",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -8264,7 +9195,11 @@
           "ingest": {
             "csv_header": "product_id",
             "required": true,
-            "validate": "non-empty after trim — NOT enforced today (D8)"
+            "validate": "non-empty after trim — NOT enforced today (D8)",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -8294,7 +9229,12 @@
           "ingest": {
             "csv_header": "volume",
             "required": true,
-            "validate": "numeric >= 0; blank becomes NULL, not 0 (D7)"
+            "validate": "numeric >= 0; blank becomes NULL, not 0 (D7)",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -8341,7 +9281,11 @@
           "ingest": {
             "csv_header": "time_unit",
             "required": false,
-            "validate": "one of day/week/month/quarter/year and their -ly spellings"
+            "validate": "one of day/week/month/quarter/year and their -ly spellings",
+            "rule": {
+              "kind": "unit",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -8381,7 +9325,12 @@
           "ingest": {
             "csv_header": "expected_lead_time",
             "required": true,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -8418,7 +9367,12 @@
           "ingest": {
             "csv_header": "unit_price",
             "required": true,
-            "validate": "numeric > 0"
+            "validate": "numeric > 0",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": {
@@ -8517,6 +9471,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -9085,6 +10040,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -9498,6 +10454,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -10247,6 +11204,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -10796,6 +11754,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -11121,6 +12080,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -11355,6 +12315,7 @@
         "organization_id",
         "name"
       ],
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -12088,6 +13049,7 @@
         "country",
         "vintage"
       ],
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -12462,6 +13424,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -12693,6 +13656,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -13113,6 +14077,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -13938,6 +14903,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": null,
@@ -14549,6 +15515,1018 @@
       ],
       "note": null
     },
+    "tier2_suppliers": {
+      "table": "tier2_suppliers",
+      "schema_name": "public",
+      "tier": "2",
+      "tier_name": "canonical — the only tier humans edit",
+      "grain": "One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources.",
+      "owner": "data-ingestion",
+      "created_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+      "sidecar": "supabase/contract/tier2_suppliers.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "tier2_suppliers_pkey"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "plant_name",
+        "supplier_id",
+        "upstream_supplier_id",
+        "material_id"
+      ],
+      "ingest_dataset": {
+        "wizard_id": "tier2_suppliers",
+        "fact_class": "transactional",
+        "server_set": [
+          "project_id",
+          "plant_name"
+        ]
+      },
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Two policies, both routed through the project's organization — `org_is_current_user_org(p.organization_id, p.organization)` for SELECT and the same predicate plus modeler-or-admin for writes. It is the dual-read shape WP 3.0 made uuid-only at the predicate (D29); the one remaining text branch is `organizations`' own read policy (D47, WP 6.2), not this one. `audited: true` SINCE WP 3.2, and the sequence is worth keeping. WP 2.3 instrumented twelve tier-2/3/4 tables and this was not among them, because nothing in the contract described it: `dataPlaneAudit.test.ts` requires the three triggers on every tier-2/3/4 table IN THE CONTRACT, so a table with no sidecar was outside the rule and nobody could see that its writes were unattributable. Writing this sidecar turned that gate red in the same session, and `20260916000016` is the gate being obeyed rather than a decision taken. It matters here more than most: `ingest_apply_run` promotes a CSV into this table, and a promotion into an unaudited table is the `audit-actor` hole this package exists to close."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Tier2: organization access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Tier2: project access modify",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier2_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "tier2_suppliers_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Surrogate key. Not the grain — D5's signature, the same as the four lane tables: the row that means something is the supplier/upstream/material triple, and nothing enforces it.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project this relationship belongs to. Set by the server from the selected project; the CSV never carries it (G1 — a project is referenced by uuid, never by a name the user typed).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "set from the selected project, never from the CSV"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project's plant, copied onto every row. A denormalization the schema has carried since 2025 and a trigger enforces: `ensure_dataset_plant_matches_project` refuses a row whose plant disagrees with its project's.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must equal the project's plant_name — a trigger raises otherwise"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "supplier_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The DOWNSTREAM party of this relationship, as the user's own systems spell it — the direct supplier whose own supplier is named beside it.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "supplier_id",
+            "required": true,
+            "validate": "non-empty after trim",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "upstream_supplier_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The UPSTREAM party — who supplies `supplier_id`. The direction is what makes the row a tier-2 fact rather than a tier-1 one, and it is the column a reader most often has backwards.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "upstream_supplier_id",
+            "required": true,
+            "validate": "non-empty after trim",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "material_id",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "What flows along the relationship. NULLABLE, and the NULL is meaningful: it says the relationship is known but what it carries is not.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "material_id",
+            "required": true,
+            "validate": "non-empty after trim",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "relationship_type",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "How the two parties are related, in the user's own vocabulary. NOT a closed set: no CHECK constrains it and no code branches on it, so it is a label a person reads and nothing else.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "relationship_type",
+            "required": true,
+            "validate": "free text; no closed vocabulary exists for it",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "volume",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": "units per `time_unit`",
+          "unit_source": "column",
+          "unit_column": "time_unit",
+          "meaning": "How much moves along the relationship over one `time_unit`. A RATE, like the lane tables' `volume`, and comparable across rows only after both are converted to the same period.",
+          "grain": "rate",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "volume",
+            "required": false,
+            "validate": "numeric >= 0; blank lands no value, never 0 (D7)",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine. `scsim` models one tier of supply; these rows are read by the network pages, not by `project_map.py`. Recorded so that nobody reads the shared column name as a shared code path.",
+          "engine_requirement": null
+        },
+        {
+          "name": "unit_price",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": "currency per unit",
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Price per unit of `material_id` along this relationship, in the project's own currency — which no column names anywhere in this schema.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "unit_price",
+            "required": false,
+            "validate": "numeric > 0; blank lands no value",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine, for the same reason `volume` is not: `scsim` models one tier of supply. The price of a tier-2 purchase reaches no cost term in the engine today.",
+          "engine_requirement": null
+        },
+        {
+          "name": "lead_time",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": "weeks",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "meaning": "How long the upstream party takes to deliver. WEEKS by omission rather than by contract — unlike `inbound_logistics`, this table has NO `lead_time_unit` column, so there is nothing to say otherwise (the D9 shape, one table later).",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "lead_time",
+            "required": false,
+            "validate": "numeric > 0; blank lands no value",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine. It is a number the network pages display and nothing computes with — which is worth saying plainly, because a column named `lead_time` beside one the engine DOES read (`inbound_logistics.lead_time`) invites the assumption that both are inputs.",
+          "engine_requirement": null
+        },
+        {
+          "name": "time_unit",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The period `volume` is quoted over — day, week, month, quarter or year. It describes the VOLUME only and has never applied to `lead_time`.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "time_unit",
+            "required": false,
+            "validate": "one of the units public.unit_days() knows; blank means weeks",
+            "rule": {
+              "kind": "unit",
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "D46 is about this column's twin in `inbound_logistics` — 27 production values that are integers, every one read as weekly. The rule above is what refuses that token here rather than coercing it.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was written. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was last written. Server-stamped by trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since WP 1.4. The deferral said these were \"the other inbound datasets, each with its own bespoke upload path\", and this package is the one that gives them the shared one: a tier2_suppliers CSV is now parsed server-side, landed in tier 0, staged in `ingest_staged_rows` and promoted by `ingest_apply_run` like any other lane. WHAT IS STILL TRUE AND UNCOMFORTABLE: the table has no natural-key constraint (D5's shape, WP 3.3) and no audit trigger (WP 2.3 instrumented twelve tables and could not instrument one the contract did not describe). Both are recorded above rather than rounded off, because a sidecar that describes the table it wishes existed is worth less than none."
+    },
+    "tier3_suppliers": {
+      "table": "tier3_suppliers",
+      "schema_name": "public",
+      "tier": "2",
+      "tier_name": "canonical — the only tier humans edit",
+      "grain": "One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out.",
+      "owner": "data-ingestion",
+      "created_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+      "sidecar": "supabase/contract/tier3_suppliers.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "tier3_suppliers_pkey"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "plant_name",
+        "supplier_id",
+        "upstream_supplier_id",
+        "material_id"
+      ],
+      "ingest_dataset": {
+        "wizard_id": "tier3_suppliers",
+        "fact_class": "transactional",
+        "server_set": [
+          "project_id",
+          "plant_name"
+        ]
+      },
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Two policies, both routed through the project's organization — `org_is_current_user_org(p.organization_id, p.organization)` for SELECT and the same predicate plus modeler-or-admin for writes. It is the dual-read shape WP 3.0 made uuid-only at the predicate (D29); the one remaining text branch is `organizations`' own read policy (D47, WP 6.2), not this one. `audited: true` SINCE WP 3.2, and the sequence is worth keeping. WP 2.3 instrumented twelve tier-2/3/4 tables and this was not among them, because nothing in the contract described it: `dataPlaneAudit.test.ts` requires the three triggers on every tier-2/3/4 table IN THE CONTRACT, so a table with no sidecar was outside the rule and nobody could see that its writes were unattributable. Writing this sidecar turned that gate red in the same session, and `20260916000016` is the gate being obeyed rather than a decision taken. It matters here more than most: `ingest_apply_run` promotes a CSV into this table, and a promotion into an unaudited table is the `audit-actor` hole this package exists to close."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Tier3: organization access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Tier3: project access modify",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = tier3_suppliers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "tier3_suppliers_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Surrogate key. Not the grain — D5's signature, the same as the four lane tables: the row that means something is the supplier/upstream/material triple, and nothing enforces it.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project this relationship belongs to. Set by the server from the selected project; the CSV never carries it (G1 — a project is referenced by uuid, never by a name the user typed).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "set from the selected project, never from the CSV"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The project's plant, copied onto every row. A denormalization the schema has carried since 2025 and a trigger enforces: `ensure_dataset_plant_matches_project` refuses a row whose plant disagrees with its project's.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "must equal the project's plant_name — a trigger raises otherwise"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "supplier_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The DOWNSTREAM party of this relationship, as the user's own systems spell it — the tier-2 supplier whose own supplier is named beside it.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "supplier_id",
+            "required": true,
+            "validate": "non-empty after trim",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "upstream_supplier_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The UPSTREAM party — who supplies `supplier_id`. The direction is what makes the row a tier-3 fact rather than a tier-2 one, and it is the column a reader most often has backwards.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "upstream_supplier_id",
+            "required": true,
+            "validate": "non-empty after trim",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "material_id",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "What flows along the relationship. NULLABLE, and the NULL is meaningful: it says the relationship is known but what it carries is not.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "material_id",
+            "required": true,
+            "validate": "non-empty after trim",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "relationship_type",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "How the two parties are related, in the user's own vocabulary. NOT a closed set: no CHECK constrains it and no code branches on it, so it is a label a person reads and nothing else.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "relationship_type",
+            "required": true,
+            "validate": "free text; no closed vocabulary exists for it",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "volume",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": "units per `time_unit`",
+          "unit_source": "column",
+          "unit_column": "time_unit",
+          "meaning": "How much moves along the relationship over one `time_unit`. A RATE, like the lane tables' `volume`, and comparable across rows only after both are converted to the same period.",
+          "grain": "rate",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "volume",
+            "required": false,
+            "validate": "numeric >= 0; blank lands no value, never 0 (D7)",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine. `scsim` models one tier of supply; these rows are read by the network pages, not by `project_map.py`. Recorded so that nobody reads the shared column name as a shared code path.",
+          "engine_requirement": null
+        },
+        {
+          "name": "unit_price",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": "currency per unit",
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "Price per unit of `material_id` along this relationship, in the project's own currency — which no column names anywhere in this schema.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "unit_price",
+            "required": false,
+            "validate": "numeric > 0; blank lands no value",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine, for the same reason `volume` is not: `scsim` models one tier of supply. The price of a tier-2 purchase reaches no cost term in the engine today.",
+          "engine_requirement": null
+        },
+        {
+          "name": "lead_time",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": "weeks",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "meaning": "How long the upstream party takes to deliver. WEEKS by omission rather than by contract — unlike `inbound_logistics`, this table has NO `lead_time_unit` column, so there is nothing to say otherwise (the D9 shape, one table later).",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "lead_time",
+            "required": false,
+            "validate": "numeric > 0; blank lands no value",
+            "rule": {
+              "kind": "numeric",
+              "exclusive_min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "NOT TRACED into the simulation engine. It is a number the network pages display and nothing computes with — which is worth saying plainly, because a column named `lead_time` beside one the engine DOES read (`inbound_logistics.lead_time`) invites the assumption that both are inputs.",
+          "engine_requirement": null
+        },
+        {
+          "name": "time_unit",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "The period `volume` is quoted over — day, week, month, quarter or year. It describes the VOLUME only and has never applied to `lead_time`.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "time_unit",
+            "required": false,
+            "validate": "one of the units public.unit_days() knows; blank means weeks",
+            "rule": {
+              "kind": "unit",
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "D46 is about this column's twin in `inbound_logistics` — 27 production values that are integers, every one read as weekly. The rule above is what refuses that token here rather than coercing it.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was written. Server-stamped.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "meaning": "When the row was last written. Server-stamped by trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since WP 1.4. The deferral said these were \"the other inbound datasets, each with its own bespoke upload path\", and this package is the one that gives them the shared one: a tier3_suppliers CSV is now parsed server-side, landed in tier 0, staged in `ingest_staged_rows` and promoted by `ingest_apply_run` like any other lane. WHAT IS STILL TRUE AND UNCOMFORTABLE: the table has no natural-key constraint (D5's shape, WP 3.3) and no audit trigger (WP 2.3 instrumented twelve tables and could not instrument one the contract did not describe). Both are recorded above rather than rounded off, because a sidecar that describes the table it wishes existed is worth less than none."
+    },
     "user_ai_permissions": {
       "table": "user_ai_permissions",
       "schema_name": "public",
@@ -14568,6 +16546,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -14901,6 +16880,7 @@
         }
       ],
       "natural_key_intended": null,
+      "ingest_dataset": null,
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -15121,5 +17101,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "db35eafa485d"
+  "contract_version": "d37d390a1ba9"
 }

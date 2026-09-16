@@ -1,0 +1,177 @@
+# AUTHORED — the data contract's sidecar for `multi_tier_supply_chain`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: multi_tier_supply_chain
+tier: "2"
+schema_name: public
+grain: >-
+  One directed firm-to-firm relationship in a project's multi-tier network: who
+  supplies whom, at what depth, and in what capacity. An EDGE between two firm
+  identifiers — not a party, and not a material flow: nothing here says what
+  moves along it or how much.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: multi_tier_supply_chain_pkey
+
+natural_key_intended: [project_id, plant_name, from_firm_id, to_firm_id]
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Two policies through the project's organization, the same pair
+    `tier2_suppliers` carries: `org_is_current_user_org(p.organization_id,
+    p.organization)` for SELECT, and the same predicate plus modeler-or-admin for
+    writes. `audited: true` SINCE WP 3.2. No trigger existed before it, because WP 2.3
+    instrumented the tables the contract DESCRIBED and this was not one of them —
+    the qualifier in `dataPlaneAudit.test.ts` is exactly the hole, and writing
+    this sidecar is what made it visible. `20260916000016` adds the three
+    triggers. On a table nothing writes they will never fire, which is the point:
+    the rule is about every tier-2 table, not about the ones that happen to be
+    busy.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. Not the grain: the row that means something is the
+      from/to pair within a project.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: The project this edge belongs to, by uuid (G1).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "set by the writer from the project, never from a file"}
+    surfaces: []
+    resolution: null
+  plant_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project's plant, copied onto every row and enforced by
+      `ensure_dataset_plant_matches_project`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "must equal the project's plant_name — a trigger raises otherwise"}
+    surfaces: []
+    resolution: null
+  from_firm_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The firm the edge points FROM, as the user's own systems spell it. A text
+      identifier with no referential integrity to anything — there is no firm
+      table for it to point at.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "non-empty; NOT NULL at the column"}
+    surfaces: []
+    resolution: null
+  to_firm_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The firm the edge points TO. Direction is the whole content of the row and
+      nothing in the schema defends it: swapping the two columns produces a valid
+      row that says the opposite thing.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "non-empty; NOT NULL at the column"}
+    surfaces: []
+    resolution: null
+  to_firm_tier:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      How many hops from the project's own plant the TO firm sits — 1 for a
+      direct supplier, 2 for its supplier, and so on. NULLABLE, and a NULL says
+      the depth was never established rather than that it is zero.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "integer >= 1 where present"}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED into the simulation engine, and nothing else reads it either —
+      see the table note. `scsim` models one tier of supply; a depth number has
+      nowhere to go.
+  to_firm_relationship:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the TO firm is to the FROM firm, in the user's own words. No CHECK, no
+      closed vocabulary, no code that branches on it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "free text"}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was written. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: When the row was last written. Server-stamped by trigger.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES.
+  The deferral that pointed here called these "the other inbound datasets, each
+  with its own bespoke upload path". `tier2_suppliers` and `tier3_suppliers` are
+  that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either:
+  `UploadWizard` offers no template for it, no RPC writes it, no edge function
+  writes it, and outside the generated documentation modules no application code
+  in `src/` or `supabase/functions/` mentions it. Every occurrence is in
+  migrations — created 2025-08-20, carried through RLS rewrites since, most
+  recently by `20260915000004`'s organization dual read, which rewrote policies
+  governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS
+  NULL FOR THAT REASON: there is no CSV to name a column of. It is described here
+  rather than deferred again because a deferral is a promise that someone will
+  look, and five packages of looking have now established what there is to see.
+  DROPPING IT IS NOT THIS PACKAGE'S CALL — a table with rows in production is not
+  removed by the package that happened to notice, and §15 has never counted them.
+  WP 3.2's gap check adds the count to §15 so that the package which does decide
+  is deciding against a number.

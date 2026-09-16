@@ -9,6 +9,10 @@ grain: >-
   One supply arc as the user uploaded it: this supplier can deliver this material
   to this plant, at this price and lead time, in this volume. NOT deduplicated —
   a second upload of the same row makes a second row (D5).
+ingest_dataset:
+  wizard_id: inbound_logistics
+  fact_class: transactional
+  server_set: [project_id, plant_name]
 owner: data-ingestion
 
 # Recorded truthfully. `id` is a surrogate; nothing stops a re-upload duplicating
@@ -89,7 +93,11 @@ fields:
       transform: str(); no trimming (D8)
       missing_default: null
     substitutions: []
-    ingest: {csv_header: supplier_id, required: true, validate: non-empty after trim — NOT enforced today (D8)}
+    ingest:
+      csv_header: supplier_id
+      required: true
+      validate: non-empty after trim — NOT enforced today (D8)
+      rule: {kind: text, blank: reject}
     surfaces: []
     resolution: null
   material_id:
@@ -103,7 +111,11 @@ fields:
       transform: str(); arcs whose material is not in the BOM are dropped
       missing_default: null
     substitutions: []
-    ingest: {csv_header: material_id, required: true, validate: non-empty after trim — NOT enforced today (D8)}
+    ingest:
+      csv_header: material_id
+      required: true
+      validate: non-empty after trim — NOT enforced today (D8)
+      rule: {kind: text, blank: reject}
     surfaces: []
     resolution: null
   volume:
@@ -121,7 +133,11 @@ fields:
       transform: rateToWeekly(volume, time_unit) — normalized to weeks
       missing_default: "0 (the arc carries no share)"
     substitutions: []
-    ingest: {csv_header: volume, required: true, validate: "numeric >= 0; blank becomes NULL, not 0 (D7)"}
+    ingest:
+      csv_header: volume
+      required: true
+      validate: "numeric >= 0; blank becomes NULL, not 0 (D7)"
+      rule: {kind: numeric, min: 0, blank: reject}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -151,7 +167,11 @@ fields:
         value: treated as weekly
         provenance: default
         visible_as: null
-    ingest: {csv_header: time_unit, required: false, validate: one of day/week/month/quarter/year and their -ly spellings}
+    ingest:
+      csv_header: time_unit
+      required: false
+      validate: one of day/week/month/quarter/year and their -ly spellings
+      rule: {kind: unit, blank: "null"}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -181,7 +201,11 @@ fields:
         value: 2 weeks
         provenance: default
         visible_as: MappingWarning on the run's mapping report
-    ingest: {csv_header: lead_time, required: true, validate: numeric > 0}
+    ingest:
+      csv_header: lead_time
+      required: true
+      validate: numeric > 0
+      rule: {kind: numeric, exclusive_min: 0, blank: reject}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -231,6 +255,7 @@ fields:
       csv_header: lead_time_unit
       required: false
       validate: "one of the units public.unit_days() knows — enforced by the column's CHECK constraint"
+      rule: {kind: unit, blank: "null"}
     surfaces: []
     resolution:
       default_mode: asserted
@@ -270,7 +295,11 @@ fields:
         value: this arc's price becomes the material's cost, via the cheapest inbound arc
         provenance: derived
         visible_as: the effective-economics badge in /policies
-    ingest: {csv_header: unit_price, required: true, validate: numeric > 0}
+    ingest:
+      csv_header: unit_price
+      required: true
+      validate: numeric > 0
+      rule: {kind: numeric, exclusive_min: 0, blank: reject}
     surfaces: []
     resolution:
       default_mode: asserted

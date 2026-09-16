@@ -330,6 +330,36 @@ async function ingestTables() {
       out("- The connector has never run in production. The rename therefore moved an EMPTY table, and `supabase/rehearsal/050` — which runs against rows — is the only evidence that the path still works. That is the right way round, and it is why the assertion exists.");
     }
   });
+
+  // WP 3.2 — the CSV path's own tables. Production had never run an ingestion of
+  // any kind when this was written (§16 · WP 3.1), so the first non-zero here is
+  // the first row `ingest_files` or `ingest_staged_rows` has ever held, and it is
+  // the only corroboration the landing will ever get that is not a rehearsal.
+  section("WP 3.2 — the CSV landing, and whether it has ever run");
+  const csv = await tryQ(`
+    select (select count(*) from public.ingest_runs
+             where source_kind = 'csv')::int                            as csv_runs,
+           (select count(*) from public.ingest_runs
+             where source_kind = 'csv' and status = 'applied')::int     as csv_runs_applied,
+           (select count(*) from public.ingest_staged_rows)::int         as staged_rows,
+           (select count(*) from public.ingest_staged_rows
+             where findings @> '[{"level": "error"}]'::jsonb)::int       as staged_rows_rejected,
+           (select count(*) from public.ingest_files
+             where source_kind = 'csv')::int                            as csv_files,
+           (select count(*) from public.audit_logs
+             where action = 'ingest_file_landed')::int                   as landing_audit_rows`);
+  report("the CSV path", csv, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    if (Number(r.csv_runs) === 0) {
+      out("- **No CSV has been uploaded through `ingest-file` yet.** Every claim WP 3.2 makes rests on `supabase/rehearsal/070`. Do not read an empty staging table as evidence that anything works (§16 · WP 3.1).");
+    } else if (Number(r.landing_audit_rows) !== Number(r.csv_files)) {
+      out(`- **${r.csv_files} landed CSV file(s) but ${r.landing_audit_rows} landing audit row(s)** — they are written in the same transaction, so a difference means something writes \`ingest_files\` outside \`ingest_land_file\`. That is invariant \`audit-actor\` failing, not a counting quirk.`);
+    }
+    if (Number(r.staged_rows_rejected) > 0) {
+      out(`- ${r.staged_rows_rejected} staged row(s) carry an \`error\` finding and were never promoted. That is the feature, not a fault — each one is a row the old parser would have written to tier 2 as a null.`);
+    }
+  });
 }
 
 // ── D29: is organizations.name unique in practice? ─────────────────────────
@@ -670,6 +700,44 @@ async function allProjectsSweep() {
       out("");
     });
   }
+
+  // WP 3.2 described these three, which is what brought them inside the rules.
+  // `tier2_suppliers` and `tier3_suppliers` are now promotion targets, so their
+  // duplicate counts are WP 3.3's before-numbers exactly as the four lanes' are.
+  // `multi_tier_supply_chain` is here for a different reason: its sidecar says no
+  // code in `src/` or `supabase/functions/` reads or writes it, and whoever
+  // decides whether to drop it should be deciding against a row count.
+  for (const [label, lane, key] of [
+    ["tier2_suppliers", "tier2_suppliers", "supplier_id, upstream_supplier_id, material_id"],
+    ["tier3_suppliers", "tier3_suppliers", "supplier_id, upstream_supplier_id, material_id"],
+    ["multi_tier_supply_chain", "multi_tier_supply_chain", "from_firm_id, to_firm_id"],
+  ]) {
+    const res = await tryQ(`
+      select count(*)::int as rows,
+             count(distinct project_id)::int as projects,
+             (select coalesce(sum(copies - 1), 0)::int from (
+                select count(*)::int as copies from public.${lane}
+                group by project_id, plant_name, ${key} having count(*) > 1) d)
+               as rows_the_unique_index_would_reject
+      from public.${lane}`);
+    report(label, res, (rows) => {
+      out(`**\`${label}\`** (described in WP 3.2) — natural key \`project_id + plant_name + ${key}\`:`);
+      table(rows).forEach((l) => out(l));
+      out("");
+    });
+  }
+
+  // The sidecar for `bom_multi_level` said `integer >= 1` and both live parsers
+  // admitted 0 as the root level. WP 3.2 resolved it in favour of the parsers and
+  // this is the measurement that says whether that was the right call: every
+  // level-0 row is a row the stricter reading would have rejected.
+  report("bom_multi_level rows at level 0 (WP 3.2's contract contradiction)", await tryQ(`
+    select count(*) filter (where level = 0)::int as level_0,
+           count(*) filter (where level < 0)::int as level_negative,
+           min(level)::int as min_level,
+           count(*)::int as total
+    from public.bom_multi_level`),
+    (rows) => { out(""); table(rows).forEach((l) => out(l)); });
 
   report("untrimmed / blank ids across every project", await tryQ(`
     select count(*)::int as rows_with_untrimmed_or_blank_ids

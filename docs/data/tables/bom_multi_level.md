@@ -154,7 +154,7 @@ Depth in the BOM tree. Level 1 is directly under the finished product; higher nu
 | Added by | `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql` |
 | Read by the engine | `project_map.py::_map_bom -> collapse order` |
 | Transform | int() |
-| Validated at ingest | integer >= 1 |
+| Validated at ingest | integer >= 0 — level 0 is a root component, which both live parsers admit and always have (WP 3.2 §16) |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 **Resolution** — how a value is decided when more than one source could supply one.
@@ -181,7 +181,7 @@ The parent this material feeds. Empty at the top of the tree, where the parent i
 | Added by | `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql` |
 | Read by the engine | `project_map.py::_map_bom -> collapse parent` |
 | Transform | str(); NULL means 'the product' |
-| Validated at ingest | may be blank only at level 1 |
+| Validated at ingest | may be blank only at the root level |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ### `consumption_rate`
@@ -256,6 +256,6 @@ When the row last changed. Server-set.
 
 ---
 
-*Generated from data contract `db35eafa485d`, engine `0.2.3`,
+*Generated from data contract `d37d390a1ba9`, engine `0.2.3`,
 sidecar `supabase/contract/bom_multi_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

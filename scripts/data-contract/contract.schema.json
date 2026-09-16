@@ -79,6 +79,17 @@
       "minProperties": 1,
       "additionalProperties": { "$ref": "#/definitions/field" }
     },
+    "ingest_dataset": {
+      "description": "WP 3.2. Present when a CSV UPLOAD targets this table, and it is what makes the upload contract-driven rather than hand-written: `ingest-file` builds its parser and its validator from the generated spec, never from a list in the function. Absent means the table has no CSV origin.",
+      "type": "object",
+      "required": ["wizard_id", "fact_class", "server_set"],
+      "additionalProperties": false,
+      "properties": {
+        "wizard_id": { "type": "string", "description": "The template id UploadWizard offers, so one name spans the button and the run." },
+        "fact_class": { "enum": ["master", "transactional"], "description": "What kind of fact one row is — the `ingest_staged_rows.fact_class` value. Structure (a BOM) is master; a quantity over a period (a lane) is transactional." },
+        "server_set": { "type": "array", "items": { "type": "string" }, "description": "Columns the SERVER supplies from the project and the CSV may never carry. A file that names one is refused rather than trusted." }
+      }
+    },
     "note": { "type": "string" }
   },
 
@@ -144,7 +155,27 @@
               "description": "THE NAME THE USER TYPES. This is what closes D21: the legacy docs headed each entry with the engine's name while the user types something else. null means the column has no CSV origin (a surrogate id, a timestamp, a server-set column)."
             },
             "required": { "type": "boolean", "description": "Must the CSV carry it for the upload to be accepted?" },
-            "validate": { "type": ["string", "null"], "description": "The rule the value must satisfy at ingestion." }
+            "validate": { "type": ["string", "null"], "description": "The rule the value must satisfy at ingestion, in a sentence a person reads." },
+            "rule": {
+              "description": "The SAME rule, in a form a validator can execute (WP 3.2). `validate` is the sentence and this is the check; the two are not allowed to disagree, and the point of having both is that the prose was the only version for three phases and nothing could run it. Absent means the column carries no machine-checkable rule yet.",
+              "type": "object",
+              "required": ["kind"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "description": "`unit` is a token public.unit_days() knows — the ONE unit table, never a list restated here (D10).",
+                  "enum": ["text", "numeric", "integer", "unit", "enum", "boolean"]
+                },
+                "min": { "type": "number", "description": "Inclusive lower bound." },
+                "exclusive_min": { "type": "number", "description": "Strict lower bound." },
+                "max": { "type": "number", "description": "Inclusive upper bound." },
+                "values": { "type": "array", "items": { "type": "string" }, "description": "For kind `enum`: the accepted values, lowercased." },
+                "blank": {
+                  "description": "What an empty cell means. `null` lands no value and is the contract's default for an optional column; `reject` is a row-level finding, which is what D7 asks for on a required numeric.",
+                  "enum": ["null", "reject"]
+                }
+              }
+            }
           }
         },
         "surfaces": {

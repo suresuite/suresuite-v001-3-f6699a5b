@@ -48,3 +48,11 @@ verify_jwt = false
 # the service-role bearer. Platform JWT verification must be off for the
 # anon-key client (`useUserFiles`) to reach it.
 verify_jwt = false
+
+[functions.ingest-file]
+# Phase 3 / WP 3.2. Same trust model as the other ingest functions: the caller
+# asserts its user id (this application authenticates against `approved_users`,
+# not Supabase Auth — D28, a standing decision). The assertion is not taken on
+# trust: `ingest_land_file` refuses a landing into a project the asserted user
+# cannot reach. Platform verification stays on, as it is for the three it replaces.
+verify_jwt = true

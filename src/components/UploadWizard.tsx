@@ -14,6 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 // The ONE unit table (PLAN.md §4 D10, invariant I3). Never restate it here.
 import { unitDays } from '../../supabase/functions/_shared/grading.ts';
+// The CSV ingestion spec, GENERATED from the data contract (WP 3.2). The wizard
+// reads it to know which datasets go through `ingest-file`'s landing; it never
+// restates a header, a required flag or a rule.
+import { INGEST_DATASETS } from '../../supabase/functions/_shared/ingestSpec.generated.ts';
 
 const SMALL_TXT = 'text-[11px] leading-tight';
 const CELL_PAD = 'py-1 px-2';       // compact body cells
@@ -131,6 +135,29 @@ interface Project {
   deep_tier_enabled?: boolean;
 }
 
+/** `ingest_runs.mapping_warnings`' shape, and scsim's MappingWarning's. */
+interface ParseFinding {
+  level: 'error' | 'warn' | 'info';
+  field: string | null;
+  code: string;
+  message: string;
+  row?: number;
+}
+
+/** What `ingest-file` reports after a landing — the status half of this screen. */
+interface IngestRunSummary {
+  run_id: string;
+  file_id: string;
+  content_sha256: string;
+  target: string;
+  rows_read: number;
+  rows_staged: number;
+  rows_promoted: number;
+  rows_held: number;
+  findings: ParseFinding[];
+  findings_truncated: number;
+}
+
 interface UploadWizardProps {
   onUploadComplete: () => void;
   userId: string;
@@ -149,6 +176,10 @@ const UploadWizard = ({
   const [csvData, setCsvData] = useState<DataRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  // The parse is a network round trip now, so the button has to say so.
+  const [isParsing, setIsParsing] = useState(false);
+  // WP 3.2: the wizard is an uploader and a STATUS VIEW. This is the status.
+  const [lastRun, setLastRun] = useState<IngestRunSummary | null>(null);
   const [deepTierFormat, setDeepTierFormat] = useState<'csv' | 'json'>('csv');
   const [itemMasterType, setItemMasterType] = useState<'materials' | 'products' | 'suppliers'>('materials');
   
@@ -470,214 +501,175 @@ const UploadWizard = ({
     }
   };
 
+  /**
+   * THE CLIENT DOES NOT PARSE CSV ANY MORE (Phase 3 / WP 3.2, D6/D7/D8/D46).
+   *
+   * What used to be here was `content.split('\n')` and `line.split(',')`, three
+   * times over — once for the main file and once each for the deep-tier nodes and
+   * edges. A quoted comma split a field in half and shifted every column after it
+   * left; a CRLF file left a carriage return on the last value of every row; a BOM
+   * made the first header unrecognisable. All three copies are gone. `ingest-file`
+   * parses the bytes with a real RFC 4180 parser and, for a dataset the data
+   * contract describes, validates them against the contract's own rules before a
+   * single row is landed.
+   *
+   * This is the DRY RUN: nothing is stored and no run is opened. It exists so
+   * that choosing a file still shows a preview and its problems immediately,
+   * which is what the client-side parse bought and what deleting it must not cost.
+   */
+  const parseOnServer = async (
+    uploadedFile: File,
+    datasetId: string,
+  ): Promise<{ rows: Record<string, string>[]; findings: ParseFinding[]; described: boolean }> => {
+    if (!selectedProject?.id) throw new Error('Select a project before uploading a file.');
+    if (!user?.id) throw new Error('You must be signed in to upload a file.');
+
+    const body = new FormData();
+    body.append('file', uploadedFile);
+    body.append('dataset', datasetId);
+    body.append('project_id', selectedProject.id);
+    body.append('user_id', user.id);
+    body.append('mode', 'parse');
+
+    const { data, error } = await supabase.functions.invoke('ingest-file', { body });
+    if (error) throw new Error(error.message || 'The file could not be read.');
+    if (!data?.success) {
+      const findings: ParseFinding[] = data?.findings ?? [];
+      throw new Error(findings.map((f) => f.message).join('\n') || data?.error || 'The file could not be read.');
+    }
+    return { rows: data.rows ?? [], findings: data.findings ?? [], described: Boolean(data.described) };
+  };
+
+  /**
+   * The typing the datasets this package does NOT land still expect.
+   *
+   * For the six datasets the contract describes, the server types every cell from
+   * `ingest.rule` and this function is never reached. For the item masters, the
+   * node list and the two deep-tier network tables it is, because their bulk RPCs
+   * take numbers where the file has text, and their tables are not described yet
+   * (they are deferred to WP 4.2). It is the old coercion, kept verbatim so that
+   * moving the PARSE server-side does not also change what those paths insert —
+   * and it moves into the contract when those tables are described.
+   */
+  const LEGACY_NUMERIC_HEADERS = [
+    'consumption_rate','level','volume','lead_time','unit_price','expected_lead_time','longitude','latitude',
+    'depth','relative_revenue','relative_revenue_percentage','lat','long','number_of_employees','revenue',
+    'cost','holding_cost_pct','moq','initial_on_hand','lead_time_cv',
+    'sell_price','production_capacity','demand_mean','demand_cv',
+    'capacity_per_week','reliability_score',
+  ];
+
+  const applyLegacyTyping = (row: Record<string, string>): Record<string, unknown> => {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      if (key === '__line') continue;
+      if (LEGACY_NUMERIC_HEADERS.includes(key)) {
+        if (value === '') { out[key] = null; continue; }
+        const num = Number(value);
+        out[key] = Number.isFinite(num) ? num : null;
+      } else if (key === 'is_seed') {
+        out[key] = ['true', '1', 'yes'].includes(String(value).toLowerCase());
+      } else if ((key === 'higher_level_component_id' || key === 'lead_time_unit') && value === '') {
+        // D9: blank `lead_time_unit` means weeks, and NULL is how that is spelled.
+        out[key] = null;
+      } else {
+        out[key] = value;
+      }
+    }
+    out.plant_name = selectedProject?.plant_name;
+    out.project_id = selectedProject?.id;
+    return out;
+  };
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0];
     if (!uploadedFile) return;
 
+    setIsParsing(true);
+    setLastRun(null);
     try {
       if (selectedDataset === 'deep_tier' && deepTierFormat === 'json') {
-        // Handle JSON format for deep tier
+        // JSON, not CSV. `JSON.parse` is a real parser and was never the defect;
+        // the deep-tier tables are WP 4.2's to describe, so this path is
+        // unchanged (§16).
         if (!uploadedFile.name.endsWith('.json')) {
           setErrors(['Please upload a JSON file']);
           return;
         }
-        
         const content = await uploadedFile.text();
         const { nodes, edges } = parseJSON(content);
-        
         setFile(uploadedFile);
         setCsvData([...nodes, ...edges] as DataRow[]);
         setErrors([]);
         return;
       }
 
-      // CSV parsing for all other cases
       if (!uploadedFile.name.endsWith('.csv')) {
         setErrors(['Please upload a CSV file']);
         return;
       }
 
-      const content = await uploadedFile.text();
-      const lines = content.trim().split('\n');
-      const headers = lines[0].split(',').map((h) => h.trim());
-
       const targetTemplate = templateTypes.find((t) => t.id === selectedTemplate);
       if (!targetTemplate) return;
 
-      const missingHeaders = targetTemplate.expectedHeaders.filter((h) => !headers.includes(h));
-      if (missingHeaders.length > 0) {
-        setErrors([`Missing required columns: ${missingHeaders.join(', ')}`]);
-        return;
-      }
-
-      const data: DataRow[] = [];
-      const numericHeaders = [
-        'consumption_rate','level','volume','lead_time','unit_price','expected_lead_time','longitude','latitude',
-        'depth','relative_revenue','relative_revenue_percentage','lat','long','number_of_employees',
-        // item-master economics
-        'cost','holding_cost_pct','moq','initial_on_hand','lead_time_cv',
-        'sell_price','production_capacity','demand_mean','demand_cv',
-        'capacity_per_week','reliability_score'
-      ];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map((v) => v.trim());
-        const row: any = {};
-
-        headers.forEach((header, index) => {
-          const value = values[index];
-          if (numericHeaders.includes(header)) {
-            if (value === '') {
-              row[header] = null;
-            } else {
-              const num = Number(value);
-              row[header] = Number.isFinite(num) ? num : null;
-            }
-          } else if (header === 'is_seed') {
-            row[header] = ['true', '1', 'yes'].includes(String(value).toLowerCase());
-          } else if (header === 'higher_level_component_id' && value === '') {
-            // Convert empty higher_level_component_id to null for root components
-            row[header] = null;
-          } else if (header === 'lead_time_unit' && value === '') {
-            // D9: blank means weeks, and NULL is how that is spelled. An empty
-            // string would fail the column's CHECK, which asks unit_days() to
-            // recognise the value.
-            row[header] = null;
-          } else {
-            row[header] = value;
-          }
-        });
-
-        row.plant_name = selectedProject?.plant_name;
-        row.project_id = selectedProject?.id;
-        data.push(row);
-      }
-
-      const validationErrors = await validateData(data, targetTemplate);
+      const { rows, findings, described } = await parseOnServer(uploadedFile, selectedTemplate);
+      const data = rows.map(applyLegacyTyping) as DataRow[];
 
       setFile(uploadedFile);
       setCsvData(data);
-      setErrors(validationErrors);
+
+      if (described) {
+        // The server validated against the contract. Re-checking here would be a
+        // second copy of the rules, which is the defect the contract exists to
+        // end — so the findings are shown as they came back.
+        setErrors(findings.filter((f) => f.level === 'error').map((f) => f.message));
+      } else {
+        setErrors(await validateData(data, targetTemplate));
+      }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to parse file';
-      setErrors([errorMsg]);
+      setErrors([error instanceof Error ? error.message : 'Failed to read the file']);
+    } finally {
+      setIsParsing(false);
     }
   };
 
   const handleNodesFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0];
     if (!uploadedFile) return;
-
+    if (!uploadedFile.name.endsWith('.csv')) {
+      setNodesErrors(['Please upload a CSV file']);
+      return;
+    }
+    setIsParsing(true);
     try {
-      if (!uploadedFile.name.endsWith('.csv')) {
-        setNodesErrors(['Please upload a CSV file']);
-        return;
-      }
-
-      const content = await uploadedFile.text();
-      const lines = content.trim().split('\n');
-      const headers = lines[0].split(',').map((h) => h.trim());
-
-      const nodesTemplate = templateTypes.find((t) => t.id === 'network_nodes');
-      if (!nodesTemplate) return;
-
-      const missingHeaders = nodesTemplate.expectedHeaders.filter((h) => !headers.includes(h));
-      if (missingHeaders.length > 0) {
-        setNodesErrors([`Missing required columns: ${missingHeaders.join(', ')}`]);
-        return;
-      }
-
-      const data: DeepNodeRow[] = [];
-      const numericHeaders = ['depth', 'number_of_employees', 'revenue', 'lat', 'long'];
-      
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map((v) => v.trim());
-        const row: any = {};
-
-        headers.forEach((header, index) => {
-          const value = values[index];
-          if (numericHeaders.includes(header)) {
-            if (value === '') {
-              row[header] = null;
-            } else {
-              const num = Number(value);
-              row[header] = Number.isFinite(num) ? num : null;
-            }
-          } else if (header === 'is_seed') {
-            row[header] = ['true', '1', 'yes'].includes(String(value).toLowerCase());
-          } else {
-            row[header] = value;
-          }
-        });
-
-        row.plant_name = selectedProject?.plant_name;
-        row.project_id = selectedProject?.id;
-        data.push(row);
-      }
-
+      const { rows } = await parseOnServer(uploadedFile, 'network_nodes');
       setNodesFile(uploadedFile);
-      setNodesData(data);
+      setNodesData(rows.map(applyLegacyTyping) as DeepNodeRow[]);
       setNodesErrors([]);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to parse nodes file';
-      setNodesErrors([errorMsg]);
+      setNodesErrors([error instanceof Error ? error.message : 'Failed to read the nodes file']);
+    } finally {
+      setIsParsing(false);
     }
   };
 
   const handleEdgesFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0];
     if (!uploadedFile) return;
-
+    if (!uploadedFile.name.endsWith('.csv')) {
+      setEdgesErrors(['Please upload a CSV file']);
+      return;
+    }
+    setIsParsing(true);
     try {
-      if (!uploadedFile.name.endsWith('.csv')) {
-        setEdgesErrors(['Please upload a CSV file']);
-        return;
-      }
-
-      const content = await uploadedFile.text();
-      const lines = content.trim().split('\n');
-      const headers = lines[0].split(',').map((h) => h.trim());
-
-      const edgesTemplate = templateTypes.find((t) => t.id === 'network_edges');
-      if (!edgesTemplate) return;
-
-      const missingHeaders = edgesTemplate.expectedHeaders.filter((h) => !headers.includes(h));
-      if (missingHeaders.length > 0) {
-        setEdgesErrors([`Missing required columns: ${missingHeaders.join(', ')}`]);
-        return;
-      }
-
-      const data: DeepEdgeRow[] = [];
-      const numericHeaders = ['relative_revenue', 'relative_revenue_percentage', 'depth'];
-      
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map((v) => v.trim());
-        const row: any = {};
-
-        headers.forEach((header, index) => {
-          const value = values[index];
-          if (numericHeaders.includes(header)) {
-            if (value === '') {
-              row[header] = null;
-            } else {
-              const num = Number(value);
-              row[header] = Number.isFinite(num) ? num : null;
-            }
-          } else {
-            row[header] = value;
-          }
-        });
-
-        row.plant_name = selectedProject?.plant_name;
-        row.project_id = selectedProject?.id;
-        data.push(row);
-      }
-
+      const { rows } = await parseOnServer(uploadedFile, 'network_edges');
       setEdgesFile(uploadedFile);
-      setEdgesData(data);
+      setEdgesData(rows.map(applyLegacyTyping) as DeepEdgeRow[]);
       setEdgesErrors([]);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to parse edges file';
-      setEdgesErrors([errorMsg]);
+      setEdgesErrors([error instanceof Error ? error.message : 'Failed to read the edges file']);
+    } finally {
+      setIsParsing(false);
     }
   };
 
@@ -944,96 +936,6 @@ const UploadWizard = ({
         return { insertedCount: totalInserted };
       };
 
-      // Edge-based outbound ingestion to avoid DB timeouts
-      const uploadOutboundViaEdge = async (rows: any[]) => {
-        const BATCH_SIZE = 50;
-        let totalInserted = 0;
-        const failedBatches: { batchNumber: number; error: string }[] = [];
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-          const batch = rows.slice(i, i + BATCH_SIZE);
-          try {
-            const { data, error } = await supabase.functions.invoke('ingest-outbound-logistics', {
-              body: { rows: batch, userId: user.id, userEmail: user.email },
-            });
-            if (error || !data?.success) {
-              failedBatches.push({ batchNumber: Math.floor(i / BATCH_SIZE) + 1, error: String(error?.message || data?.error || 'Unknown') });
-              continue;
-            }
-            totalInserted += data.inserted ?? batch.length;
-            if (i + BATCH_SIZE < rows.length) {
-              await new Promise((r) => setTimeout(r, 300));
-            }
-          } catch (e: any) {
-            failedBatches.push({ batchNumber: Math.floor(i / BATCH_SIZE) + 1, error: String(e?.message || e) });
-          }
-        }
-        if (failedBatches.length) {
-          const summary = failedBatches.map((f) => `Batch ${f.batchNumber}: ${f.error}`).join('\n');
-          throw new Error(`Outbound upload partially failed: ${summary}`);
-        }
-        return { insertedCount: totalInserted };
-      };
-
-      // Edge-based inbound ingestion to avoid DB timeouts
-      const uploadInboundViaEdge = async (rows: any[]) => {
-        const BATCH_SIZE = 50;
-        let totalInserted = 0;
-        const failedBatches: { batchNumber: number; error: string }[] = [];
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-          const batch = rows.slice(i, i + BATCH_SIZE);
-          try {
-            const { data, error } = await supabase.functions.invoke('ingest-inbound-logistics', {
-              body: { rows: batch, userId: user.id, userEmail: user.email },
-            });
-            if (error || !data?.success) {
-              failedBatches.push({ batchNumber: Math.floor(i / BATCH_SIZE) + 1, error: String(error?.message || data?.error || 'Unknown') });
-              continue;
-            }
-            totalInserted += data.inserted ?? batch.length;
-            if (i + BATCH_SIZE < rows.length) {
-              await new Promise((r) => setTimeout(r, 300));
-            }
-          } catch (e: any) {
-            failedBatches.push({ batchNumber: Math.floor(i / BATCH_SIZE) + 1, error: String(e?.message || e) });
-          }
-        }
-        if (failedBatches.length) {
-          const summary = failedBatches.map((f) => `Batch ${f.batchNumber}: ${f.error}`).join('\n');
-          throw new Error(`Inbound upload partially failed: ${summary}`);
-        }
-        return { insertedCount: totalInserted };
-      };
-
-      // Edge-based BOM Multi Level ingestion to avoid DB timeouts
-      const uploadBomMultiViaEdge = async (rows: any[]) => {
-        const BATCH_SIZE = 200;
-        let totalInserted = 0;
-        const failedBatches: { batchNumber: number; error: string }[] = [];
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-          const batch = rows.slice(i, i + BATCH_SIZE);
-          try {
-            const { data, error } = await supabase.functions.invoke('ingest-bom-multi-level', {
-              body: { rows: batch, userId: user.id, userEmail: user.email },
-            });
-            if (error || !data?.success) {
-              failedBatches.push({ batchNumber: Math.floor(i / BATCH_SIZE) + 1, error: String(error?.message || data?.error || 'Unknown') });
-              continue;
-            }
-            totalInserted += data.inserted ?? batch.length;
-            if (i + BATCH_SIZE < rows.length) {
-              await new Promise((r) => setTimeout(r, 300));
-            }
-          } catch (e: any) {
-            failedBatches.push({ batchNumber: Math.floor(i / BATCH_SIZE) + 1, error: String(e?.message || e) });
-          }
-        }
-        if (failedBatches.length) {
-          const summary = failedBatches.map((f) => `Batch ${f.batchNumber}: ${f.error}`).join('\n');
-          throw new Error(`BOM Multi Level upload partially failed: ${summary}`);
-        }
-        return { insertedCount: totalInserted };
-      };
-
       // Batch processing for deep tier network nodes
       const uploadNetworkNodesBatch = async (rows: any[]) => {
         const BATCH_SIZE = 200; // Optimal batch size for network nodes
@@ -1145,33 +1047,59 @@ const UploadWizard = ({
       };
 
 
+      // ── THE LANDING (Phase 3 / WP 3.2) ─────────────────────────────────
+      // For every dataset the data contract describes, the FILE goes to the
+      // server and nothing else does. `ingest-file` hashes the bytes, stores
+      // them, opens a run, stages every row in tier 1 with its findings, writes
+      // the audit row that names the uploader, and promotes the rows that
+      // passed. The browser sends a file and reads a report.
+      //
+      // `INGEST_DATASETS` is generated from the contract, so this branch widens
+      // by describing a table rather than by editing this component.
+      if (INGEST_DATASETS[template.id]) {
+        if (!file) throw new Error('Choose a file first.');
+        const body = new FormData();
+        body.append('file', file);
+        body.append('dataset', template.id);
+        body.append('project_id', selectedProject.id);
+        body.append('user_id', user.id);
+        body.append('mode', 'land');
+
+        const { data, error } = await supabase.functions.invoke('ingest-file', { body });
+        if (error) throw new Error(error.message || 'The upload failed.');
+        if (!data?.success) {
+          const findings: ParseFinding[] = data?.findings ?? [];
+          throw new Error(
+            findings.filter((f) => f.level === 'error').map((f) => f.message).join('\n') ||
+            data?.error || 'The upload failed.',
+          );
+        }
+
+        const summary = data as IngestRunSummary;
+        setLastRun(summary);
+        setFile(null);
+        setCsvData([]);
+        setErrors([]);
+        toast({
+          title: summary.rows_held
+            ? `${summary.rows_promoted} of ${summary.rows_read} rows uploaded`
+            : 'Upload successful',
+          description: summary.rows_held
+            ? `${summary.rows_held} row(s) were held back with a reason attached — see below.`
+            : `${summary.rows_promoted} records uploaded`,
+          variant: summary.rows_held ? 'default' : undefined,
+        });
+        setTimeout(() => { onUploadComplete(); }, 100);
+        return;
+      }
+
       let result;
       const uploadStartTime = Date.now();
       
       console.log('🚀 Starting bulk insert for:', template.id, 'with', dataToInsert.length, 'records');
       
       // Use the appropriate bulk insert function based on template
-      if (template.id === 'bom_single_level') {
-        console.log('📦 Uploading BOM Single Level data...');
-        const batchResult = await processBatches('bulk_insert_bom_single_level', dataToInsert, {
-          p_rows: dataToInsert, // Will be replaced per batch
-          p_user_id: user.id,
-          p_user_email: user.email
-        });
-        result = { insertedCount: batchResult.insertedCount };
-      } else if (template.id === 'bom_multi_level') {
-        console.log('📦 Uploading BOM Multi Level data via Edge Function...');
-        const batchResult = await uploadBomMultiViaEdge(dataToInsert);
-        result = { insertedCount: batchResult.insertedCount };
-      } else if (template.id === 'inbound_logistics') {
-        console.log('📥 Uploading Inbound Logistics data via Edge Function...');
-        const batchResult = await uploadInboundViaEdge(dataToInsert);
-        result = { insertedCount: batchResult.insertedCount };
-      } else if (template.id === 'outbound_logistics') {
-        console.log('📤 Uploading Outbound Logistics data via Edge Function...');
-        const batchResult = await uploadOutboundViaEdge(dataToInsert);
-        result = { insertedCount: batchResult.insertedCount };
-      } else if (template.category === 'item-master') {
+      if (template.category === 'item-master') {
         // Full-row upsert into the item-master tables via SECURITY DEFINER
         // RPCs (Phase A / G4 / §8.3); extra keys in the payload are ignored.
         const rpcByTemplate: Record<string, string> = {
@@ -1191,22 +1119,6 @@ const UploadWizard = ({
           p_user_id: user.id,
           p_user_email: user.email,
           p_rows: dataToInsert // Will be replaced per batch
-        });
-        result = { insertedCount: batchResult.insertedCount };
-      } else if (template.id === 'tier2_suppliers') {
-        const batchResult = await processBatches('bulk_insert_tier2_suppliers', dataToInsert, {
-          p_project_id: selectedProject?.id,
-          p_data: dataToInsert, // Will be replaced per batch
-          p_user_id: user.id,
-          p_user_email: user.email
-        });
-        result = { insertedCount: batchResult.insertedCount };
-      } else if (template.id === 'tier3_suppliers') {
-        const batchResult = await processBatches('bulk_insert_tier3_suppliers', dataToInsert, {
-          p_project_id: selectedProject?.id,
-          p_data: dataToInsert, // Will be replaced per batch
-          p_user_id: user.id,
-          p_user_email: user.email
         });
         result = { insertedCount: batchResult.insertedCount };
       } else if (template.id === 'deep_tier_json') {
@@ -1830,6 +1742,48 @@ const UploadWizard = ({
                   ))}
                 </AlertDescription>
               </Alert>
+            )}
+
+            {/* THE STATUS VIEW (Phase 3 / WP 3.2).
+                The wizard is an uploader and a status view now: the parse and the
+                validation happen on the server, so what it shows afterwards is the
+                RUN — what was read, what was promoted, what was held back and why.
+                §5 T2 says a substitution is visible at the point of display; a row
+                held back with its reason is the same rule applied to a rejection. */}
+            {lastRun && (
+              <Card className="border-muted">
+                <CardContent className="p-3 space-y-2">
+                  <div className={`${SMALL_TXT} font-medium flex items-center gap-2`}>
+                    <Database className="h-3.5 w-3.5" />
+                    Ingestion run — {lastRun.target}
+                  </div>
+                  <div className={`${SMALL_TXT} text-muted-foreground`}>
+                    {lastRun.rows_read} row(s) read · {lastRun.rows_staged} staged ·{' '}
+                    <span className="font-medium text-foreground">{lastRun.rows_promoted} promoted</span>
+                    {lastRun.rows_held > 0 && <> · {lastRun.rows_held} held back</>}
+                  </div>
+                  <div className={`${SMALL_TXT} text-muted-foreground font-mono break-all`}>
+                    sha256 {lastRun.content_sha256}
+                  </div>
+                  {lastRun.findings.length > 0 && (
+                    <div className="space-y-0.5 max-h-48 overflow-auto">
+                      {lastRun.findings.map((f, i) => (
+                        <div
+                          key={i}
+                          className={`${SMALL_TXT} ${f.level === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+                        >
+                          {f.message}
+                        </div>
+                      ))}
+                      {lastRun.findings_truncated > 0 && (
+                        <div className={`${SMALL_TXT} text-muted-foreground italic`}>
+                          …and {lastRun.findings_truncated} more, kept with the run.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             {/* Upload button logic */}

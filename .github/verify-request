@@ -14,3 +14,16 @@
 #      run is expected to FAIL while `customers` and `product_code_map` are
 #      untracked, and that is the gate working, not the runner breaking.
 WP 3.1 gap check — 2026-09-16T09:50:43Z
+
+# requested-by: Phase 3 / WP 3.2 — server-side parse and Tier 0/1 landing (§16)
+# requested-at: 2026-09-16 (gap check)
+# why: the deltas against §16 · WP 3.1's table — whether the 376/414/30 nulls and
+#      the 27 integer `time_unit` tokens are still there (they must be: a parser
+#      cannot reach back into tier 2), and whether the 96 + 2 duplicate keys WP 3.3
+#      inherits moved. Plus four NEW statements this package added: the CSV landing
+#      counts (`ingest_staged_rows`, and `landing_audit_rows` which must EQUAL
+#      `csv_files` or `audit-actor` is failing), the duplicate counts for the three
+#      tables WP 3.2 described, and `bom_multi_level` rows at level 0 — the contract
+#      said `>= 1` and both live parsers admit 0, resolved in favour of the parsers
+#      and this is the number that says whether that was right.
+WP 3.2 gap check — server-side parse landed
