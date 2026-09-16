@@ -1,0 +1,228 @@
+# AUTHORED — the data contract's sidecar for `ingest_files`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: ingest_files
+tier: "0"
+schema_name: public
+grain: >-
+  One file as received, in one run: the manifest for bytes held in storage —
+  where they are, how many there were, and the SHA-256 of exactly the sequence
+  received. Write-once: the row records an event that has already happened and
+  cannot be edited into a different one.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: UNIQUE constraint
+    columns: [storage_bucket, storage_path]
+    name: null
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: ingest_files_pkey
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: false
+  rls_enabled: true
+  note: >-
+    RLS reaches the project through the run, the same predicate the staging
+    tables use. The grant is narrower than theirs on purpose — `authenticated`
+    holds SELECT and INSERT and nothing else — because tier 0 is write-once
+    and a grant that permits UPDATE would be a promise the trigger then
+    breaks. The trigger is the backstop the grant cannot be: the service role
+    holds every privilege by definition, and `ingest_files_write_once()`
+    refuses its updates too. `audited: false`, and here it is the most pointed
+    of the four: a landing IS a tier transition, external bytes entering the
+    system, and G4 says a tier transition writes an audit row naming the
+    actor. What this table does instead is name the actor IN THE ROW
+    (`uploaded_by`), which is better than nothing and less than the invariant
+    asks. It has an owner: WP 3.2 writes the landing path, and an audit row is
+    cheap to add from the function that already knows who uploaded the file —
+    which is exactly the knowledge the service-role writers of D36 do not
+    have.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key for one landed file.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run this file was landed for. NOT NULL: a file with no run is a
+      byte-stream nobody asked for, and making the run the owner is what keeps
+      a landing attached to a project, a source kind and an approval.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      ON DELETE CASCADE, and the direction matters: deleting a project deletes
+      its runs and therefore its file manifests. Tier 0 is immutable, not
+      immortal — a RESTRICT here would have made a project undeletable, which
+      is a defect dressed as rigour.
+  source_kind:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      csv, orbit-mrp or api — what kind of source produced these bytes. The
+      same closed vocabulary as the run's.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      No default here either, and unlike the other two tables this column
+      never needed a backfill: the table is new and has no rows to be wrong
+      about.
+  original_filename:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The file's name as the user's machine gave it, verbatim. For display and
+      for the person's own recognition — never a key, and never parsed for
+      meaning: two projects upload `inbound.csv` on the same afternoon (G1's
+      rule, applied to filenames).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  storage_bucket:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The storage bucket the bytes live in. Recorded rather than assumed, so
+      that moving a bucket is a data change and not a code change.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  storage_path:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Where the bytes are inside the bucket. Generated by the writer, never
+      supplied by the user, and UNIQUE with the bucket because it addresses
+      exactly one stored object.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  content_type:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The MIME type as reported at upload. NULLABLE and not trusted: browsers
+      report `application/vnd.ms-excel` for CSVs often enough that a parser
+      keying on it would reject real files. WP 3.2's parser decides from the
+      bytes.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  byte_size:
+    type: bigint
+    unit: null
+    unit_source: none
+    meaning: >-
+      How many bytes were received. The cheapest possible check that a file is
+      the file somebody meant to send, and the number a quota will eventually
+      be about.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  content_sha256:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      SHA-256 of the bytes AS RECEIVED, lowercase hex, computed before any
+      parse. The anchor: with it, 'the file you uploaded on Tuesday' is a
+      checkable claim rather than a memory.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      CHECK-constrained on SHAPE (`^[0-9a-f]{64}$`) rather than on content,
+      because a truncated or upper-cased hash compares unequal to itself and
+      would break every lineage claim built on it — quietly, and much later.
+      It is also the dedup signal: 'you have uploaded these bytes before' is a
+      question asked by hash, not by filename, and the index exists for it.
+  uploaded_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The person who uploaded the file, in `approved_users`. NULL when the
+      landing had no human — an API push or a scheduled pull — which is stated
+      rather than filled with a service account.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  received_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the bytes were received. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2
+  lists six tiers and this repository had five: there has never been a record
+  of what a user actually uploaded. `UploadWizard` parses the file in the
+  browser and throws it away, which is why every parse defect — D6's quoted
+  comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer
+  `time_unit` — is unreproducible after the fact. You cannot re-read a file
+  that was never kept. WP 3.2 is the writer: upload lands the bytes here,
+  opens a run, and parses SERVER-SIDE. Landing the table one package ahead
+  means that package does not have to invent a schema and a parser in the same
+  session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()`
+  refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real
+  database — both halves, because the rule is 'immutable' and not
+  'undeletable'. §2's tier laws have been sentences in a plan for three
+  phases; a sentence nothing enforces drifts within two months, which is the
+  lesson of the two orphan tables.

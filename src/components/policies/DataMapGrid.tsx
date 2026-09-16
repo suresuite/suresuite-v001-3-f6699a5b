@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { DATA_MAP_CONTRACT, DATASET_LABEL, type DataMapDataset } from "@/lib/policies/dataMap";
 import { useDataMap, type DataMapStatus } from "@/hooks/useDataMap";
 import { requirementsByField } from "@/lib/policies/validationService";
+import { LaneTruncationNotice } from "@/components/policies/LaneTruncationNotice";
 
 // §8.1 — which engine mechanics / catalog policies demand each column, from
 // the registry's data_requirements (static: independent of the current
@@ -39,10 +40,14 @@ const DATASET_ORDER: DataMapDataset[] = [
 ];
 
 export function DataMapGrid({ projectId }: { projectId: string }) {
-  const { statuses, loading } = useDataMap(projectId);
+  const { statuses, truncated, loading } = useDataMap(projectId);
 
   return (
     <div className="flex flex-col gap-4">
+      {/* D20 — every status below is a count over the lane rows that were read.
+          If the read was cut short, the counts are about a slice and the reader
+          is told so here rather than in a console nobody opens (§5 T2). */}
+      <LaneTruncationNotice truncated={truncated} />
       <div className="flex items-start gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
         <Database className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <p>

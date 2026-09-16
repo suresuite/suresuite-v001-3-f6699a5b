@@ -72,6 +72,7 @@ import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import { verifyProjectPolicies, type Finding } from "@/lib/policies/verification";
 import { fieldWalkToRoute } from "@/lib/policies/dataMap";
 import { FindingsList } from "./FindingsList";
+import { LaneTruncationNotice } from "./LaneTruncationNotice";
 import {
   cancelBrowserRun,
   EngineCancelledError,
@@ -1422,6 +1423,12 @@ export function RunValidateStage({
               )}
               {verifiedAt && <span>verified {verifiedAt.toLocaleTimeString()}</span>}
             </div>
+            {/* D20 / §5 T3 — a report states the limits of its own computation.
+                These findings are graded against the lane rows that were READ;
+                if that read hit the ceiling, the grade is about a slice and the
+                clearance it gives is worth less than it looks. */}
+            <LaneTruncationNotice truncated={itemMasters.lanes.truncated} />
+
             {findings !== null && (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2.5 font-mono text-[11px] text-muted-foreground">

@@ -58,7 +58,7 @@ WP 1.4). Gates land with their work packages; the rule holds from now.
 | `natural-key` | I4 | Every canonical table has a natural-key unique constraint; ingestion upserts | `contract:check` R5 — **WARN only**; **WP 3.3 lands the keys AND flips the gate** (it was WP 2.4's, and WP 2.4 shipped without it — see §16 · Phase 2→3) |
 | `input-hash` | I5 | Every derived row carries the input hash it came from | **not yet** — WP 4.1 |
 | `declared-fallback` | I6 | A fallback absent from the contract may not exist in code | `contract:validate` (`engine.missing_default`) · `contract:generate` fails when the engine registry names a required field the contract has no column for |
-| `ingestion-contract` | I7 | A new source implements the ingestion contract; it never touches T2 schemas | **not yet** — WP 3.1 |
+| `ingestion-contract` | I7 | A new source implements the ingestion contract; it never touches T2 schemas | **PARTIAL since WP 3.1.** The tables are source-agnostic (`ingest_runs`, `ingest_staged_*`, `ingest_files`, with `source_kind` and `fact_class` CHECK-constrained and no DEFAULT) and `supabase/rehearsal/050`+`060` prove against a real database that a link-less run is governed and that staging reaches T2 only through a promotion. **No gate yet says a new source USED them** — the second source is WP 3.2's `ingest-file`, and the rule that it never touches a T2 schema is still a reading, not a check |
 | `result-binding` | I8 | Every result binds dataset + policy + scenario + engine version | **not yet** — WP 4.4 |
 | `uuid-identity` | G1 | Orgs/projects/users referenced by uuid; a displayable name is never a join key | `orgIdentity.test.ts` (no live policy, function or edge function compares an org string outside the one predicate) · the predicate itself is **uuid-only since WP 3.0** (D29) · `supabase/rehearsal/040` proves against a real database that a rename still matches and a shared display name does not. **One exception remains and it is named**: the `organizations` table's own read policy still ORs name and slug (D47, WP 6.2) |
 | `declared-capability` | G2 | Every table declares read/write capability and minimum project role | `contract:validate` (`governance` is a required sidecar block) |
@@ -103,6 +103,13 @@ it runs `supabase/rehearsal/*.sql`, which are BEHAVIOURAL assertions against tha
 database — the half a structural test cannot reach, and the reason `audit-actor`
 went from claimed to proved (D45). **Write one whenever a change's correctness
 depends on what the database DOES rather than on what a migration SAYS.**
+
+**A fixture must no-op once its migration is in the base** (`supabase/rehearsal/fixtures/README.md`).
+Guard every statement on the shape it reproduces — `IF to_regclass('public.old_name')
+IS NOT NULL` — so the day the migration merges, the fixture stops doing anything. A
+fixture that plants ROWS a migration then removes has no shape to key on: it passes
+once, on its own branch, and fails on every branch after it. That is D50, and it kept
+`main` red from the WP 3.0 merge until WP 3.1.
 
 It runs `contract:introspect -- --check`, `contract:validate`, `contract:units -- --check`,
 `contract:verify` and `contract:generate -- --check`, then its own rules (R1 coverage,

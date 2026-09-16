@@ -1,0 +1,293 @@
+# AUTHORED — the data contract's sidecar for `project_erp_links`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+table: project_erp_links
+tier: "G"
+schema_name: public
+grain: >-
+  One authorized link between one project and one company in one external
+  system: project ownership proved on this side, company membership proved on
+  that side by the linking user's own OAuth consent. One link is one
+  credential and one project — never shared, so revoking one project's link
+  cannot be bypassed by a sibling.
+owner: data-ingestion
+
+natural_key_unique:
+  - source: UNIQUE constraint
+    columns: [project_id, external_system, external_company_id]
+    name: null
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: project_erp_links_pkey
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: false
+  note: >-
+    One FOR ALL policy — `has_project_access(project_id)` — so reading and
+    writing a link are the same permission: whoever can administer the project
+    can connect it to a source and disconnect it. That is deliberate and it is
+    also the loosest thing on this page, because `min_project_role: owner` is
+    the intent and nothing enforces a project role yet (WP 2.2 landed the
+    resolver; no policy here calls it). `audited: false` is the one that
+    should be uncomfortable: creating a link grants an external system
+    standing access to a project's data and revoking one takes it away, and
+    neither writes an audit row. It is not a tier transition, so G4 does not
+    formally cover it; it is a governance event by any reading of §5, and it
+    is recorded here as a named gap rather than left to be noticed. The
+    table's own honesty is elsewhere and it is real: `status`,
+    `status_detail`, `last_verified_at` and `revoked_at` mean a revoked link
+    says when and why. NO `rls_enabled` FIELD, and its absence is the point.
+    The connector migration enables RLS on this table in a plain statement and
+    creates its policy in another — but the same file also builds the staging
+    policies inside a `DO $$ EXECUTE format(...) $$` loop whose SQL mentions
+    this table, so the introspector marks its RLS indeterminate: "the
+    migrations do not say", which is a different claim from "off" and may not
+    be rendered as one. Only the live database can answer (§15), and a sidecar
+    may not assert what the schema does not settle.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The link's identity for every run that used it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The SuReSuite project this link feeds. One side of the two-sided grant.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  external_system:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which external system — `orbit-mrp` is the only value any code writes.
+      Free text, not CHECK-constrained, and that is the one place this table
+      still assumes a single vendor: `ingest_runs.source_kind` is the closed
+      vocabulary WP 3.1 added, and it is the one a reader should trust.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      A second connector would add a value here AND a `source_kind`, and the
+      two would have to agree. Whoever adds it: make this column a CHECK, or
+      derive it. Two vocabularies for one fact is what I1 exists to prevent,
+      and this is the half WP 3.1 did not close.
+  external_company_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The company/tenant identifier IN THE EXTERNAL SYSTEM. Part of the
+      natural key with the project and the system: one project may link one
+      company of one system exactly once.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  external_company_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The company's display name, cached for the picker and refreshed on each
+      sync. A LABEL and never a key (G1) — the id above is what the grant is
+      about.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  linked_by_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The person whose own OAuth consent proved membership of that company, in
+      `auth.users`. NOT NULL because the link IS that proof: there is no way
+      to create one from a hand-typed company id, and an unattributed link
+      would be a credential with no owner.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+  external_oauth_token_ref:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The NAME of a secret in Supabase Vault, never a token.
+      `get_erp_oauth_token(p_ref)` resolves it and is granted to
+      `service_role` only, so a browser session cannot read the credential
+      even though it can read this row.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      The pointer is readable by any project member and the value is not. That
+      is the design: a per-link, per-user delegated token, so revoking one
+      project's link cannot be bypassed by a sibling project.
+  status:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      active, needs_attention or revoked. A sync re-verifies both sides before
+      touching data and revokes the link on failure rather than continuing on
+      the old assumption.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input. It is the field the sync path reads first, and
+      `revoked` is terminal: the connector never resurrects a link, a person
+      re-links.
+  status_detail:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Why the status is what it is, in words a user can act on — "Access
+      revoked in orbit-mrp — reconnect". The reason a revoked link is not a
+      mystery.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  last_verified_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When both sides were last proved live. The age of the claim that this
+      link still works.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  auto_apply_threshold_pct:
+    type: numeric
+    unit: percent
+    unit_source: fixed
+    meaning: >-
+      The percentage of changed rows below which a sync may promote itself
+      without a human. 0 — the default — means every sync waits for approval.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      A number with teeth: above it, staged rows reach tier 2 with no person
+      in the loop, and the resulting audit row names no actor (D36). It is
+      bounded 0..100 by CHECK, and the connector additionally refuses to
+      auto-apply any run with `fields_failed > 0`.
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the link was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  revoked_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the link was revoked, or NULL. With `status_detail`, the revocation
+      is a record rather than a disappearance.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  sync_schedule_cron:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      A cron expression for scheduled syncs, or NULL for manual-only. Read by
+      the pg_cron sweep and by any external scheduler driving the same RPC.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  sync_enabled:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the schedule is live. Two fields rather than one because a
+      paused schedule must not lose its expression — turning sync off and on
+      again should not require retyping the cron.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: true, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input. `due_erp_sync_links()` reads it with `status =
+      'active'` and a non-null cron; its own comment records that it is a
+      placeholder that does not evaluate the expression, so today the sweep
+      offers every enabled link and the Edge Function decides.
+
+note: >-
+  NOT RENAMED BY WP 3.1, AND THAT IS A DECISION. The four tables around it
+  became `ingest_*` because they hold rows from ANY source; this one holds the
+  credential and the consent for ONE source, and calling it `ingest_links`
+  would promise a generality it does not have — a CSV upload has nothing to
+  link. When a second connector arrives, the question to ask is whether it
+  shares this shape (a per-user delegated token proving membership of an
+  external tenant) or needs its own; `ingest_runs.source_kind` already carries
+  the distinction that matters to everything downstream. ITS SIDECAR IS HERE
+  BECAUSE WP 3.1 IS WHERE IT WAS DUE. The table was deferred under this
+  package in `coverage.yaml` since WP 1.4, and a deferral is a commitment:
+  carrying it forward to the next open package would have been the same move
+  that produced D41 — an owner who has gone home, indistinguishable from an
+  owner.

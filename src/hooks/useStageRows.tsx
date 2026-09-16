@@ -37,6 +37,9 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
   const [rows, setRows] = useState<StageRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [fallback, setFallback] = useState<boolean>(false);
+  // D20: lane tables whose read hit the ceiling. The grid RENDERS this; it is
+  // not a log line. An empty array is the normal case and the honest one.
+  const [truncated, setTruncated] = useState<string[]>([]);
   // Bumped by reload() to refetch after a write (e.g. assigning a supplier).
   const [tick, setTick] = useState(0);
 
@@ -48,6 +51,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
     let cancelled = false;
     setLoading(true);
     setFallback(false);
+    setTruncated([]);
 
     (async () => {
       const sb = supabase as any;
@@ -68,6 +72,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         //    auth makes direct .from() reads on the lane tables return empty
         //    under RLS — see src/lib/policies/projectLanes.ts).
         const lanes = await fetchProjectLanes(projectId, user);
+        if (!cancelled) setTruncated(lanes.truncated);
         const inbound = lanes.inbound;
         const outbound = lanes.outbound;
         // Multi-level BOM shape only; single-level projects have no
@@ -546,5 +551,5 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
 
   const reload = () => setTick((t) => t + 1);
 
-  return { rows, loading, fallback, reload };
+  return { rows, loading, fallback, truncated, reload };
 }

@@ -16,7 +16,7 @@
 //   R6  every file:line in PLAN.md §4 resolves and is in bounds
 //   R7  §16 is append-only — no drift-log entry may vanish from history, AND
 //       every work package marked done in §7–§13 has a §16 entry
-//   R8  no open defect and no unmet invariant is owned by a FINISHED package
+//   R8  no open defect, unmet invariant or table deferral is owned by a FINISHED package
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
@@ -487,6 +487,22 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
       }
     }
   }
+  // AND coverage.yaml's deferrals, which are the third document making the same
+  // kind of promise. WP 3.1 is where this half was written, because WP 3.1 is
+  // the package a deferral named: five tables waited under it since WP 1.4, and
+  // the moment it ships ✅ any that are still deferred under it are deferred to
+  // nobody. `coverage.yaml` says a deferral "names a work package that already
+  // exists in PLAN.md" — the file's own words — and a package that has FINISHED
+  // exists in exactly the way an owner who has gone home exists.
+  for (const [table, wp] of deferred) {
+    if (donePackages.has(wp)) {
+      orphaned += 1;
+      fail("R8", `coverage.yaml defers "${table}" to WP ${wp}, which §7–§13 marks ✅ done. ` +
+                 "Write the sidecar, or move the deferral to a package that has not run. " +
+                 "A table waiting on a finished package is a table nobody has decided about.");
+    }
+  }
+
   if (!orphaned) console.log(`  R8  no open defect or unmet invariant is owned by a finished package`);
 }
 

@@ -82,7 +82,7 @@ class OrbitMrpAuthError extends Error {
 
 // ── Field mapping: orbit-mrp's products/bom shape -> SuReSuite's staged
 //    shape, tracking what mapped cleanly vs. what had to be defaulted or
-//    couldn't be mapped at all (feeds erp_sync_runs' mapping report, which
+//    couldn't be mapped at all (feeds ingest_runs' mapping report, which
 //    the UI's Sync Mapping Report renders — plan §6c.1). ────────────────────
 // Same shape as scsim's MappingWarning (level/entity/field/reason) so the
 // existing MappingWarningsCard component can render this unmodified —
@@ -254,9 +254,14 @@ async function actionSync(admin: ReturnType<typeof createClient>, body: { link_i
   await admin.from("project_erp_links").update({ last_verified_at: new Date().toISOString(), status: "active" }).eq("id", link.id);
 
   const { data: run } = await admin
-    .from("erp_sync_runs")
+    .from("ingest_runs")
     .insert({
+      // WP 3.1: the run carries its own project, so a source with no ERP link
+      // (a CSV upload, an API push) is governed by the same policy. `link_id`
+      // is nullable now; for this connector it is always set.
+      project_id: link.project_id,
       link_id: link.id,
+      source_kind: "orbit-mrp",
       triggered_by: body.triggered_by_user_id ? "manual" : "scheduled",
       triggered_by_user_id: body.triggered_by_user_id ?? null,
       status: "running",
@@ -283,22 +288,33 @@ async function actionSync(admin: ReturnType<typeof createClient>, body: { link_i
       const existing = existingByExternalId.get(mapped.external_id as string);
       const diffState = !existing ? "new" : "changed"; // Phase 1: full-refresh diff; Phase 2 can use updated-since if orbit-mrp exposes it
       if (diffState === "new") rowsNew++; else rowsChanged++;
-      stagedRows.push({ ...mapped, sync_run_id: run.id, link_id: link.id, diff_state: diffState });
+      // WP 3.1: every staged row states WHERE it came from and WHAT KIND of
+      // fact it is. The columns carry no default, so omitting either is a
+      // NOT NULL failure rather than a silent "orbit-mrp, master".
+      stagedRows.push({
+        ...mapped,
+        ingest_run_id: run.id,
+        link_id: link.id,
+        source_kind: "orbit-mrp",
+        fact_class: "master",
+        diff_state: diffState,
+      });
     }
     // Anything in existingByExternalId not present in this pull is flagged removed upstream.
     const pulledIds = new Set(products.map((p) => p.id as string));
     for (const [externalId] of existingByExternalId) {
       if (externalId && !pulledIds.has(externalId)) {
         stagedRows.push({
-          external_id: externalId, sync_run_id: run.id, link_id: link.id,
+          external_id: externalId, ingest_run_id: run.id, link_id: link.id,
+          source_kind: "orbit-mrp", fact_class: "master",
           diff_state: "removed_upstream", raw: {},
         });
       }
     }
-    if (stagedRows.length) await admin.from("erp_staged_products").insert(stagedRows);
+    if (stagedRows.length) await admin.from("ingest_staged_products").insert(stagedRows);
 
     await admin
-      .from("erp_sync_runs")
+      .from("ingest_runs")
       .update({
         status: "staged",
         rows_fetched: { products: products.length },
@@ -323,7 +339,7 @@ async function actionSync(admin: ReturnType<typeof createClient>, body: { link_i
 
     return json({ run_id: run.id, rows_new: rowsNew, rows_changed: rowsChanged, fields_defaulted: outcome.defaulted, fields_failed: outcome.failed });
   } catch (e) {
-    await admin.from("erp_sync_runs").update({ status: "failed", error_detail: String(e) }).eq("id", run.id);
+    await admin.from("ingest_runs").update({ status: "failed", error_detail: String(e) }).eq("id", run.id);
     return json({ error: String(e) }, 500);
   }
 }
@@ -336,28 +352,30 @@ async function actionSync(admin: ReturnType<typeof createClient>, body: { link_i
  *  expected to have shown the confirmation copy before invoking this for a
  *  manual approval. */
 async function applyStagedRun(admin: ReturnType<typeof createClient>, runId: string, appliedByUserId: string | null) {
-  const { data: run } = await admin.from("erp_sync_runs").select("*, project_erp_links(*)").eq("id", runId).single();
-  if (!run) throw new Error("sync run not found");
-  const link = (run as any).project_erp_links;
+  // WP 3.1: the project comes from the RUN, not from the link. A run may have
+  // no link at all now (`source_kind` csv/api), and reading the project through
+  // one would have made this function fail on exactly those runs.
+  const { data: run } = await admin.from("ingest_runs").select("*").eq("id", runId).single();
+  if (!run) throw new Error("ingest run not found");
 
-  const { data: staged } = await admin.from("erp_staged_products").select("*").eq("sync_run_id", runId).neq("diff_state", "removed_upstream");
+  const { data: staged } = await admin.from("ingest_staged_products").select("*").eq("ingest_run_id", runId).neq("diff_state", "removed_upstream");
 
   for (const row of staged ?? []) {
     await admin.from("products").upsert(
       {
-        project_id: link.project_id,
+        project_id: (run as any).project_id,
         product_id: row.sku ?? row.external_id,
         name: row.name,
         source_system: "orbit-mrp",
         source_external_id: row.external_id,
-        source_synced_at: row.synced_at,
+        source_synced_at: row.staged_at,
       },
       { onConflict: "project_id,product_id" },
     );
   }
 
   await admin
-    .from("erp_sync_runs")
+    .from("ingest_runs")
     .update({ status: "applied", applied_at: new Date().toISOString(), applied_by_user_id: appliedByUserId })
     .eq("id", runId);
 }
@@ -365,9 +383,9 @@ async function applyStagedRun(admin: ReturnType<typeof createClient>, runId: str
 async function actionApply(admin: ReturnType<typeof createClient>, supabaseWithUserAuth: ReturnType<typeof createClient>, body: { run_id: string }) {
   const { data: userRes } = await supabaseWithUserAuth.auth.getUser();
   if (!userRes?.user) return json({ error: "Not authenticated" }, 401);
-  // RLS on erp_sync_runs (via project_erp_links) already refuses this select
+  // RLS on ingest_runs (via the run's own project_id) already refuses this select
   // if the caller lacks project access — fail-closed by construction.
-  const { data: run, error } = await supabaseWithUserAuth.from("erp_sync_runs").select("id").eq("id", body.run_id).single();
+  const { data: run, error } = await supabaseWithUserAuth.from("ingest_runs").select("id").eq("id", body.run_id).single();
   if (error || !run) return json({ error: "sync run not found or not authorized" }, 404);
 
   await applyStagedRun(admin, body.run_id, userRes.user.id);

@@ -9,6 +9,13 @@
 // is the exact path ProjectDataViewer uses — it provably returns the rows.
 // Direct reads remain only as a fallback.
 import { supabase } from "@/integrations/supabase/client";
+// The ceiling and the sentence live in their own module: they are the half of
+// D20's fix that has to be TESTABLE, and importing this file pulls in the
+// Supabase browser client, which needs a DOM. Re-exported so callers still have
+// one import for the lane read and the limit it was read under.
+import { LANE_ROW_CEILING, laneTruncationNotice } from "@/lib/policies/laneTruncation";
+
+export { LANE_ROW_CEILING, laneTruncationNotice };
 
 export interface ProjectLanes {
   /** inbound_logistics rows (all columns). */
@@ -19,28 +26,48 @@ export interface ProjectLanes {
   bomLevel: string;
   /** BOM rows: single- or multi-level shape depending on bomLevel. */
   bom: Record<string, unknown>[];
+  /**
+   * Lane tables whose read came back AT the ceiling and was therefore probably
+   * cut short (D20). Empty on every complete read, and empty on the RPC path,
+   * which applies no limit at all. Callers must SHOW it: a partial project
+   * rendered as a whole one is the §5 T1 failure — a number with no source —
+   * and a console warning is not a display (§5 T2).
+   */
+  truncated: string[];
 }
 
-const EMPTY: ProjectLanes = { inbound: [], outbound: [], bomLevel: "single", bom: [] };
+const EMPTY: ProjectLanes = { inbound: [], outbound: [], bomLevel: "single", bom: [], truncated: [] };
 
 async function fetchDirect(projectId: string): Promise<ProjectLanes> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
   const [inQ, outQ, bomSingleQ, bomMultiQ] = await Promise.all([
-    sb.from("inbound_logistics").select("*").eq("project_id", projectId).limit(10000),
-    sb.from("outbound_logistics").select("*").eq("project_id", projectId).limit(10000),
-    sb.from("bom_single_level").select("*").eq("project_id", projectId).limit(10000),
-    sb.from("bom_multi_level").select("*").eq("project_id", projectId).limit(10000),
+    sb.from("inbound_logistics").select("*").eq("project_id", projectId).limit(LANE_ROW_CEILING),
+    sb.from("outbound_logistics").select("*").eq("project_id", projectId).limit(LANE_ROW_CEILING),
+    sb.from("bom_single_level").select("*").eq("project_id", projectId).limit(LANE_ROW_CEILING),
+    sb.from("bom_multi_level").select("*").eq("project_id", projectId).limit(LANE_ROW_CEILING),
   ]);
   if (inQ.error) console.warn("[projectLanes] inbound_logistics read failed", inQ.error);
   if (outQ.error) console.warn("[projectLanes] outbound_logistics read failed", outQ.error);
   const multi = bomMultiQ.data ?? [];
   const single = bomSingleQ.data ?? [];
+  const bomTable = multi.length > 0 ? "bom_multi_level" : "bom_single_level";
+  // A table that came back at exactly the ceiling was probably cut short. Which
+  // BOM table is named depends on which one was used, because naming the one
+  // the caller is not reading would be a true statement about the wrong table.
+  const truncated = ([
+    ["inbound_logistics", inQ],
+    ["outbound_logistics", outQ],
+    [bomTable, multi.length > 0 ? bomMultiQ : bomSingleQ],
+  ] as Array<[string, { data?: unknown[] | null }]>)
+    .filter(([, q]) => (q?.data?.length ?? 0) >= LANE_ROW_CEILING)
+    .map(([name]) => name);
   return {
     inbound: inQ.data ?? [],
     outbound: outQ.data ?? [],
     bomLevel: multi.length > 0 ? "multi" : "single",
     bom: multi.length > 0 ? multi : single,
+    truncated,
   };
 }
 
@@ -64,6 +91,10 @@ export async function fetchProjectLanes(
         outbound: (ds.outbound as Record<string, unknown>[]) ?? [],
         bomLevel: String(ds.bom_level ?? "single"),
         bom: (ds.bom as Record<string, unknown>[]) ?? [],
+        // The RPC aggregates each lane with no LIMIT, so this path cannot
+        // truncate. Stated rather than left implied: if `get_project_datasets`
+        // ever grows a bound, this is the line that has to change with it.
+        truncated: [],
       };
     } catch (err) {
       console.warn("[projectLanes] get_project_datasets failed — falling back to direct reads", err);

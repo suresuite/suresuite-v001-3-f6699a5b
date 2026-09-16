@@ -15,6 +15,7 @@ import { MobileGroup, MobileNote, MobilePanel, MobileRow } from "@/components/mo
 import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
 import { ApplyPresetDialog } from "./ApplyPresetDialog";
 import { PresetDiffBanner } from "./PresetDiffBanner";
+import { LaneTruncationNotice } from "@/components/policies/LaneTruncationNotice";
 import { RunValidateStage } from "./RunValidateStage";
 import { getStage, type StageKey } from "@/lib/policies/stages";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
@@ -236,6 +237,7 @@ export function FocusedStage({
     return (
       <div className="flex flex-col gap-[var(--m-gap)]">
         {noDataNote}
+        <LaneTruncationNotice truncated={rowsByStage[stageKey].truncated} />
         <MobileStagePolicyList
           projectId={projectId}
           stageKey={stageKey}
@@ -274,6 +276,7 @@ export function FocusedStage({
   return (
     <div className="flex flex-col gap-2">
       {noDataBanner}
+      <LaneTruncationNotice truncated={rowsByStage[stageKey].truncated} />
 
       {showBanner && (
         <PresetDiffBanner

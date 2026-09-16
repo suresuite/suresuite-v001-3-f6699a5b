@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { fetchProjectLanes, laneTruncationNotice } from "@/lib/policies/projectLanes";
 import { downloadWorkbook } from "@/lib/policies/excel";
 import {
   buildDatasetWorkbook,
@@ -108,6 +108,12 @@ export function useVerifiableExports(
       try {
         const lanes = await fetchProjectLanes(projectId, user);
         if (lanes.bomLevel === "multi") bomMulti = lanes.bom;
+        // D20 / §5 T3 — an export states the limits of its own computation.
+        // The rows still go into the workbook (dropping them silently would be
+        // worse), but the person clicking Export is told, now, that the sheet
+        // is a slice. A file leaves the building; a console warning does not.
+        const note = laneTruncationNotice(lanes);
+        if (note) toast.warning(note);
       } catch {
         /* optional sheet only */
       }

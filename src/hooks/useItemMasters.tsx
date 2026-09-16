@@ -98,6 +98,9 @@ interface UseItemMastersResult {
     bom: Record<string, unknown>[];
     /** projects.bom_level — 'single' or 'multi'/'multi_level'. */
     bomLevel: string;
+    /** D20: lane tables whose read hit the ceiling — the grade below was
+     *  computed on a slice, and the surface says so. */
+    truncated: string[];
     loaded: boolean;
   };
   reload: () => Promise<void>;
@@ -122,6 +125,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
   const [bomLevel, setBomLevel] = useState<string>("single");
   const [lanesLoaded, setLanesLoaded] = useState(false);
+  const [laneTruncation, setLaneTruncation] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -140,6 +144,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     // materials.supplier_link blocks the sim-command gate then raised.
     setBomRows(lanes.bom);
     setBomLevel(lanes.bomLevel);
+    setLaneTruncation(lanes.truncated);
     setLanesLoaded(true);
   }, [projectId, user]);
 
@@ -270,8 +275,11 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   };
 
   const lanes = useMemo(
-    () => ({ inbound: inboundArcs, outbound: outboundArcs, bom: bomRows, bomLevel, loaded: lanesLoaded }),
-    [inboundArcs, outboundArcs, bomRows, bomLevel, lanesLoaded],
+    () => ({
+      inbound: inboundArcs, outbound: outboundArcs, bom: bomRows, bomLevel,
+      truncated: laneTruncation, loaded: lanesLoaded,
+    }),
+    [inboundArcs, outboundArcs, bomRows, bomLevel, laneTruncation, lanesLoaded],
   );
 
   return { materials, products, suppliers, loading, error, missingCounts, derived, lanes, reload, saveRows };
