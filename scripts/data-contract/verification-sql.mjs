@@ -251,6 +251,40 @@ async function d30() {
     order by 1`);
   report("and the functions", fns, (rows) => out(...table(rows)));
 
+  // D44/D45 · the remediation's own audit row, read back out of production.
+  // The `db push` log drops RAISE NOTICE (§16 · WP 2.1 follow-up), so the
+  // counts the migration printed are invisible — but it wrote them into the
+  // audit row on purpose, which is what an audit row is for. This is also the
+  // first `plane='data'` row production has ever been asked to show.
+  const remediation = await tryQ(`
+    select created_at, action, target_type,
+           before ->> 'rows_carrying_zero'  as rows_carrying_zero,
+           before ->> 'distinct_targets'    as distinct_targets,
+           after  ->> 'keys_removed'        as keys_removed,
+           after  ->> 'rows_deleted_empty'  as rows_deleted_empty,
+           after  ->> 'rows_still_zero'     as rows_still_zero,
+           after  ->> 'actor_known'         as actor_known
+    from public.audit_logs
+    where plane = 'data' and action = 'remediate'
+      and after ->> 'defect' = 'D1 via D44'
+    order by created_at desc limit 5`);
+  report("D44's remediation, as the audit log recorded it", remediation, (rows) => {
+    out("");
+    out("**D44 · what the unseed actually did**, read back from the audit row rather than from a NOTICE the `db push` log discards:");
+    out(...table(rows));
+    const r = rows[0];
+    if (r) out(`- \`rows_deleted_empty = ${r.rows_deleted_empty}\` is the number that judges the SHAPE of the fix: every row it did NOT delete is a row a row-level \`DELETE\` would have taken, along with whatever else its patch held.`);
+  });
+
+  const planeRows = await tryQ(`
+    select plane, count(*)::int as rows, min(created_at)::text as first_row
+    from public.audit_logs group by 1 order by 1`);
+  report("audit_logs by plane", planeRows, (rows) => {
+    out("");
+    out("**D45 · the data plane, in production** — 18 rows and all of them `admin` was the measurement that opened D45:");
+    out(...table(rows));
+  });
+
   const dupes = await tryQ(`
     select schemaname, tablename, policyname, count(*)::int as copies
     from pg_policies group by 1,2,3 having count(*) > 1 order by 4 desc`);

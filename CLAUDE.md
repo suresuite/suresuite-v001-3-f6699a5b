@@ -60,12 +60,12 @@ WP 1.4). Gates land with their work packages; the rule holds from now.
 | `declared-fallback` | I6 | A fallback absent from the contract may not exist in code | `contract:validate` (`engine.missing_default`) · `contract:generate` fails when the engine registry names a required field the contract has no column for |
 | `ingestion-contract` | I7 | A new source implements the ingestion contract; it never touches T2 schemas | **not yet** — WP 3.1 |
 | `result-binding` | I8 | Every result binds dataset + policy + scenario + engine version | **not yet** — WP 4.4 |
-| `uuid-identity` | G1 | Orgs/projects/users referenced by uuid; a displayable name is never a join key | **partial** — `orgIdentity.test.ts` fails if any live policy, function or edge function compares an org string outside the one predicate. The predicate itself still reads the name (D29), so the invariant holds everywhere EXCEPT inside the declared exception; §15 sizes it at one project |
+| `uuid-identity` | G1 | Orgs/projects/users referenced by uuid; a displayable name is never a join key | `orgIdentity.test.ts` (no live policy, function or edge function compares an org string outside the one predicate) · the predicate itself is **uuid-only since WP 3.0** (D29) · `supabase/rehearsal/040` proves against a real database that a rename still matches and a shared display name does not. **One exception remains and it is named**: the `organizations` table's own read policy still ORs name and slug (D47, WP 6.2) |
 | `declared-capability` | G2 | Every table declares read/write capability and minimum project role | `contract:validate` (`governance` is a required sidecar block) |
 | `subtractive-delegation` | G3 | Delegation is subtractive and expiring | `projectMembership.test.ts` — subtraction in the RPC, `expires_at NOT NULL`, expiry applied in `effective_project_role`, and NO write policy on either table. **Source-level, not behavioural:** nothing executes against a database (WP 3.0) |
-| `audit-actor` | G4 | Every tier transition writes an audit row naming the actor | `dataPlaneAudit.test.ts` (every tier 2/3/4 table has all three triggers) · `contract:check` R9 (`governance.audited` matches them — D40). **The ROW half is unproven:** production holds 18 audit rows, all `plane='admin'`, so no data-plane row has been observed (D45); and six service-role paths write `actor_user_id: NULL` (D36), so "naming the actor" is not met there |
+| `audit-actor` | G4 | Every tier transition writes an audit row naming the actor | `dataPlaneAudit.test.ts` (every tier 2/3/4 table **in the contract** has all three triggers, read from every migration) · `contract:check` R9 (`governance.audited` matches them — D40) · **the ROW half is now PROVEN**: `supabase/rehearsal/010` writes one tier-2 statement and asserts exactly one `plane='data'` row at statement grain naming the actor, mutation-tested (D45). **Still not met on six paths:** the service-role writers cannot name an actor and record `actor_known: false` (D36) |
 | `table-covered` | — | Every table is described by a sidecar or deferred to a named work package | `contract:check` R1 (WP 1.4) |
-| `no-orphan-table` | — | No table the code reads is created by no migration; none is ALTERed without being created | `contract:check` R4 · `contract:verify` (WP 1.4) |
+| `no-orphan-table` | — | No relation in production is created by no migration | `contract:check` R4 · `contract:verify` (WP 1.4) — those see only tables the CODE READS · **`npm run verify:sql`'s schema probe is the rule for the class** (WP 3.0, D43): it keys on "production has it", prints the columns of anything untracked and EXITS NON-ZERO. It needs CI to reach the database, so it gates on demand rather than on every pull request |
 
 ## The transparency commitments (PLAN.md §5.3)
 
@@ -86,6 +86,23 @@ One command reproduces everything CI asserts about the data layer:
 ```
 npm run contract:check
 ```
+
+And one more EXECUTES the migrations a branch adds, which no static gate can (D31):
+
+```
+npm run contract:rehearse              # the migrations this branch adds, fresh
+npm run contract:rehearse -- --fixtures   # …and over production's untracked shape
+```
+
+It needs a PostgreSQL 16 (`PGHOST`/`PGPORT`/`PGUSER`, or `--database-url`); CI uses
+a `postgres:16` service container in `data-contract.yml`'s `migrations run` job and
+runs it BOTH ways. It builds the base from the BASE branch's
+`build/schema.introspected.json` — not a replay of history, which cannot work: 92
+of 296 migrations fail on an empty database and always will. After the migrations
+it runs `supabase/rehearsal/*.sql`, which are BEHAVIOURAL assertions against that
+database — the half a structural test cannot reach, and the reason `audit-actor`
+went from claimed to proved (D45). **Write one whenever a change's correctness
+depends on what the database DOES rather than on what a migration SAYS.**
 
 It runs `contract:introspect -- --check`, `contract:validate`, `contract:units -- --check`,
 `contract:verify` and `contract:generate -- --check`, then its own rules (R1 coverage,

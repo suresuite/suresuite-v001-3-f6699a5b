@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 307,
-  "migrations_applied": 304,
+  "migrations_found": 308,
+  "migrations_applied": 305,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000010_security_invoker_admin_org_file_usage.sql",
+  "last_migration": "20260916000011_org_identity_uuid_only.sql",
   "counts": {
     "tables": 77,
     "views": 7,
@@ -20360,7 +20360,7 @@
       "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20260916000011_org_identity_uuid_only.sql"
     },
     {
       "name": "project_role_rank",
