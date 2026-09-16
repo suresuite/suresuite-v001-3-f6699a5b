@@ -58,9 +58,15 @@ if (!ref) {
 }
 
 const lines = [];
-const out = (s = "") => {
-  lines.push(s);
-  console.log(s);
+const out = (...parts) => {
+  // `table()` returns an ARRAY of lines, and the first version of this spread it
+  // into `out(...)` against a single-parameter signature — which printed the
+  // header and silently dropped every data row. A reporting script that loses
+  // its own rows is the §5 T1 defect in miniature, so out() takes many.
+  for (const s of parts.length ? parts : [""]) {
+    lines.push(s);
+    console.log(s);
+  }
 };
 
 function assertReadOnly(sql) {
@@ -138,7 +144,11 @@ async function schemaProbe() {
   const liveNames = new Set(live.map((r) => r.table_name));
 
   const art = JSON.parse(readFileSync(new URL("../../build/schema.introspected.json", import.meta.url), "utf8"));
-  const artTables = Object.keys(art.tables ?? {});
+  // `tables` is an ARRAY of records; `views` is an OBJECT keyed by name. Reading
+  // both the same way made every table look missing AND every relation look
+  // untracked — 76 and 78 on the first run, which is how this bug announced
+  // itself: a divergence report whose two halves are both "everything".
+  const artTables = (art.tables ?? []).map((t) => t.name);
   const artViews = Object.keys(art.views ?? {});
 
   const missingTables = artTables.filter((t) => !liveNames.has(t));
