@@ -1,0 +1,10 @@
+# Touch this file to run PLAN.md §15 against the live project.
+# See .github/workflows/verification-sql.yml — the run is read-only (SELECT only)
+# and publishes its report to the `verification-results` branch.
+#
+# Optional: pin the project instead of letting the runner pick the one with the
+# most inbound_logistics rows.
+#   project_id=<uuid>
+#
+# requested-by: Phase 2→3 readiness assessment (§16)
+# requested-at: 2026-09-16
