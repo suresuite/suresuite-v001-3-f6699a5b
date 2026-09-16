@@ -21,7 +21,12 @@ governance:
   read: null
   write: "data_editing"
   min_project_role: editor
-  audited: false
+  # WP 2.3 created `audit_<table>_insert/update/delete`, three AFTER … FOR EACH
+  # STATEMENT triggers calling `audit_tier_write`. This flag said `false` for
+  # every one of the twelve tables it audited, and the generated page published
+  # that as "Tier transitions audited: no" (D40). `contract:check` R9 now
+  # compares this field against the live triggers, so it cannot drift again.
+  audited: true
   # `rls_enabled` is DELIBERATELY ABSENT, and that is the finding. See the note.
   note: >-
     `write` names the capability that exists today. WP 2.2 splits `data_editing`

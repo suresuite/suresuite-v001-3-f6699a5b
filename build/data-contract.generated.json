@@ -1108,7 +1108,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all twelve sidecars change together."
       },
@@ -1531,7 +1531,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all twelve sidecars change together."
       },
@@ -2186,7 +2186,7 @@
         "read": null,
         "write": null,
         "min_project_role": "viewer",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "Written by the `_build_dataset_snapshot` database function, never by a page — that is the INTENT, and `write: null` records it. **The enforcement does not match, and WP 2.4 measured it.** The live policy `dataset_versions_insert_all` is `FOR INSERT ... WITH CHECK (true)`, and `20260610000002` grants `anon` SELECT and INSERT, so any holder of the public anon key may insert a snapshot row. The contract reads narrower than the database, which is the exact class §9 asks this package to find. It is pinned by `governanceEnforcement.test.ts` rather than silently fixed: the app runs AS anon with no auth session, so revoking is a Phase 3 migration with an auth model behind it, and the decision taken was to document. See PLAN.md D28."
       },
@@ -2890,7 +2890,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all twelve sidecars change together."
       },
@@ -3478,7 +3478,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all thirteen sidecars change together. SEPARATELY — AND THIS REPLACES WHAT WP 1.2 WROTE HERE, WHICH WAS WRONG: this sidecar used to assert `rls_enabled: false` and say \"no migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on them\". One does. `20260614000001_item_master.sql:57-66` enables RLS and creates two policies (`%s_auth_all`, `%s_anon_read`) on each of the three masters — but through `EXECUTE format(...)` inside a `FOREACH` over an array of table names, which a static replay of the migrations cannot evaluate. The introspector recorded the absence as `enabled: false`, WP 1.2 read that as fact, and the contract was one generated page away from telling a user their item masters were unprotected. WP 1.4 fixed the mechanism, not the guess: the introspector now records dynamic DDL (`dynamic_ddl`) and marks the tables it touches `rls.determinate: false`, the validator refuses to let a sidecar assert an RLS state the migrations do not settle, and the generated page says the state is indeterminate and names the migration. The ONLY way to know is to read the live database — PLAN.md §15, still unrun. WP 2.4's security review owns it.",
         "rls_enabled": null
       },
@@ -4914,7 +4914,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all twelve sidecars change together."
       },
@@ -5409,7 +5409,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_policies` then."
       },
@@ -5977,7 +5977,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_policies` then."
       },
@@ -6390,7 +6390,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all thirteen sidecars change together. SEPARATELY — AND THIS REPLACES WHAT WP 1.2 WROTE HERE, WHICH WAS WRONG: this sidecar used to assert `rls_enabled: false` and say \"no migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on them\". One does. `20260614000001_item_master.sql:57-66` enables RLS and creates two policies (`%s_auth_all`, `%s_anon_read`) on each of the three masters — but through `EXECUTE format(...)` inside a `FOREACH` over an array of table names, which a static replay of the migrations cannot evaluate. The introspector recorded the absence as `enabled: false`, WP 1.2 read that as fact, and the contract was one generated page away from telling a user their item masters were unprotected. WP 1.4 fixed the mechanism, not the guess: the introspector now records dynamic DDL (`dynamic_ddl`) and marks the tables it touches `rls.determinate: false`, the validator refuses to let a sidecar assert an RLS state the migrations do not settle, and the generated page says the state is indeterminate and names the migration. The ONLY way to know is to read the live database — PLAN.md §15, still unrun. WP 2.4's security review owns it.",
         "rls_enabled": null
       },
@@ -9028,7 +9028,7 @@
         "read": null,
         "write": "data_editing",
         "min_project_role": "editor",
-        "audited": false,
+        "audited": true,
         "note": "`write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all thirteen sidecars change together. SEPARATELY — AND THIS REPLACES WHAT WP 1.2 WROTE HERE, WHICH WAS WRONG: this sidecar used to assert `rls_enabled: false` and say \"no migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on them\". One does. `20260614000001_item_master.sql:57-66` enables RLS and creates two policies (`%s_auth_all`, `%s_anon_read`) on each of the three masters — but through `EXECUTE format(...)` inside a `FOREACH` over an array of table names, which a static replay of the migrations cannot evaluate. The introspector recorded the absence as `enabled: false`, WP 1.2 read that as fact, and the contract was one generated page away from telling a user their item masters were unprotected. WP 1.4 fixed the mechanism, not the guess: the introspector now records dynamic DDL (`dynamic_ddl`) and marks the tables it touches `rls.determinate: false`, the validator refuses to let a sidecar assert an RLS state the migrations do not settle, and the generated page says the state is indeterminate and names the migration. The ONLY way to know is to read the live database — PLAN.md §15, still unrun. WP 2.4's security review owns it.",
         "rls_enabled": null
       },
@@ -9448,7 +9448,7 @@
         "read": null,
         "write": null,
         "min_project_role": "viewer",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one. For precision, since WP 2.4 checked it: three PROJECT-SCOPED write policies do exist here, serving that ETL path. They are consistent with `write: null`, which names the capability gating a USER-facing write and not the existence of any policy — and unlike `dataset_versions` they carry a real predicate, so they do not admit an arbitrary holder of the table grant."
       },
@@ -10273,7 +10273,7 @@
         "read": null,
         "write": null,
         "min_project_role": "viewer",
-        "audited": false,
+        "audited": true,
         "rls_enabled": true,
         "note": "Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one. For precision, since WP 2.4 checked it: three PROJECT-SCOPED write policies do exist here, serving that ETL path. They are consistent with `write: null`, which names the capability gating a USER-facing write and not the existence of any policy — and unlike `dataset_versions` they carry a real predicate, so they do not admit an arbitrary holder of the table grant."
       },
@@ -11452,5 +11452,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "e308e62acbd6"
+  "contract_version": "633f0cf89458"
 }

@@ -38,7 +38,7 @@ partially or get corrected — the write fails.
 | Read capability | any project member |
 | Write capability | `data_editing` |
 | Minimum project role | `editor` |
-| Tier transitions audited | **no** — invariant `audit-actor` is not met here yet |
+| Tier transitions audited | yes |
 | Row-level security | enabled |
 | Policies on the table | 5 — **2 with no predicate** |
 
@@ -232,6 +232,6 @@ When the patch was created. Server-set.
 
 ---
 
-*Generated from data contract `e308e62acbd6`, engine `0.2.3`,
+*Generated from data contract `633f0cf89458`, engine `0.2.3`,
 sidecar `supabase/contract/policy_overrides.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
