@@ -9,7 +9,7 @@
 
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { PageTitle, Section, P, Key, Callout, Provenance, Term, DocLink } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, Prose, Provenance, Term, DocLink } from "@/components/docs/prose";
 import { ALL_PAGES } from "@/components/docs/registry";
 import { COUNTS, TIERS, UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
 
@@ -26,7 +26,7 @@ function TableRow({ table, grain, columns }: { table: string; grain: string; col
         <span className="font-mono text-[12px] font-medium text-foreground">{table}</span>
         <span className="mt-1 block text-[11px] text-muted-foreground">{columns} columns</span>
       </th>
-      <td className="p-3 text-sm leading-relaxed text-muted-foreground">{grain}</td>
+      <td className="p-3 text-sm leading-relaxed text-muted-foreground"><Prose text={grain} /></td>
       <td className="whitespace-nowrap p-3 text-right text-xs">
         {page ? (
           page.status === "live" ? (

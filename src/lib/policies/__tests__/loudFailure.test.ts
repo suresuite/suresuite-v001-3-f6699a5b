@@ -28,7 +28,6 @@ const root = resolve(__dirname, "../../../..");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
 const ETL = "supabase/functions/combine-project/index.ts";
-const CONTRACT = "supabase/contract";
 const PAGES = ["src/pages/ProductLevelNetwork.tsx", "src/pages/FirmLevelNetwork.tsx"];
 
 // The table name, assembled rather than written as a `.from('…')` literal. The

@@ -17,6 +17,37 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CONTRACT_VERSION, ENGINE_VERSION } from "@/components/docs/generated/dataModel.generated";
 
+/**
+ * Render a contract string, turning `backticked` spans into code.
+ *
+ * The sidecars are authored in prose with markdown code spans — "joins on
+ * `organization_members.user_id`" — because they are also rendered into
+ * markdown pages under docs/data/tables/. Printing them raw on an HTML page
+ * shows the backticks, which reads as a typo in generated text and quietly
+ * undermines the thing generated text is for. Nothing else in markdown is
+ * interpreted: this is a code-span renderer, not a markdown parser.
+ */
+export function Prose({ text }: { text: string }) {
+  if (!text.includes("`")) return <>{text}</>;
+  const parts = text.split(/`([^`]+)`/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <code
+            key={i}
+            className="rounded-sm border border-border bg-muted/50 px-1 py-0.5 font-mono text-[0.92em] text-foreground"
+          >
+            {part}
+          </code>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 export function PageTitle({ children, lead }: { children: ReactNode; lead?: ReactNode }) {
   return (
     <header className="space-y-3">

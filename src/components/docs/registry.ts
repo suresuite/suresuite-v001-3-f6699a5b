@@ -319,10 +319,10 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Reference",
     blurb: "The lookup section — every table, every field, every term.",
     pages: [
-      { ...planned("5.2h"), slug: "all-tables", title: "All tables", summary: "The detailed index — every column of every described table, and the package that owes the rest.", keywords: "all tables index columns reference schema complete", source: "contract" },
-      { ...planned("5.2h"), slug: "units-and-conventions", title: "Units & conventions", summary: "Every unit the system uses, and the one place it is defined.", keywords: "units conventions days weeks currency percent normalization", source: "contract" },
-      { ...planned("5.2h"), slug: "glossary", title: "Glossary", summary: "Plain-language definitions across all domains.", keywords: "glossary definitions terms vocabulary jargon" },
-      { ...planned("5.2h"), slug: "field-index", title: "Field index", summary: "Every field, A to Z, linking to the table it belongs to.", keywords: "field index alphabetical a to z columns lookup", source: "contract" },
+      { ...live, slug: "all-tables", title: "All tables", summary: "The detailed index — every column of every described table, and the package that owes the rest.", keywords: "all tables index columns reference schema complete", source: "contract" },
+      { ...live, slug: "units-and-conventions", title: "Units & conventions", summary: "Every unit the system uses, and the one place it is defined.", keywords: "units conventions days weeks currency percent normalization", source: "contract" },
+      { ...live, slug: "glossary", title: "Glossary", summary: "Plain-language definitions across all domains.", keywords: "glossary definitions terms vocabulary jargon" },
+      { ...live, slug: "field-index", title: "Field index", summary: "Every field, A to Z, linking to the table it belongs to.", keywords: "field index alphabetical a to z columns lookup", source: "contract" },
     ],
   },
 ];
