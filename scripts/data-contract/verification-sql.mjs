@@ -194,6 +194,74 @@ async function schemaProbe() {
   return liveNames;
 }
 
+// ── D30: which of the two migrations actually ran? ─────────────────────────
+//
+// `20250913085427` creates the view/modify policy pair on `simulation_cache`,
+// `simulation_jobs` and `simulation_performance_metrics`; `20250914113723`
+// creates all six AGAIN, verbatim apart from `public.` qualification, and
+// neither drops first. `CREATE POLICY` on an existing name raises 42710, so
+// exactly one of two things is true and NO STATIC REPLAY CAN SAY WHICH: either
+// the earlier file never took effect, or the later one aborted at its first
+// duplicate and every statement after it never ran.
+//
+// It is decidable, and it does not need a `db push` to decide it. The two files
+// end with DIFFERENTLY NAMED triggers — `20250913085427` writes
+// `simulation_jobs_defaults` / `simulation_job_timing_trigger` and the function
+// `cleanup_simulation_cache()`; `20250914113723` writes
+// `set_simulation_jobs_defaults` / `update_simulation_job_timing`. Whichever
+// set production holds is the file that ran past its policy block.
+async function d30() {
+  section("D30 — which of the two duplicate-policy migrations ran");
+
+  const trigs = await tryQ(`
+    select t.tgname as trigger_name, c.relname as on_table
+    from pg_trigger t join pg_class c on c.oid = t.tgrelid
+    where not t.tgisinternal
+      and t.tgname in (
+        'simulation_jobs_defaults','simulation_cache_defaults',
+        'simulation_performance_metrics_defaults','simulation_job_timing_trigger',
+        'set_simulation_jobs_defaults','set_simulation_cache_defaults',
+        'set_simulation_performance_metrics_defaults','update_simulation_job_timing')
+    order by 1`);
+  report("the triggers each file would have left behind", trigs, (rows) => {
+    const names = new Set(rows.map((r) => r.trigger_name));
+    const early = ['simulation_jobs_defaults', 'simulation_cache_defaults',
+      'simulation_performance_metrics_defaults', 'simulation_job_timing_trigger']
+      .filter((n) => names.has(n));
+    const late = ['set_simulation_jobs_defaults', 'set_simulation_cache_defaults',
+      'set_simulation_performance_metrics_defaults', 'update_simulation_job_timing']
+      .filter((n) => names.has(n));
+    out(...table(rows));
+    out(`- from \`20250913085427\`: **${early.length} of 4**; from \`20250914113723\`: **${late.length} of 4**.`);
+    if (early.length === 4 && late.length === 0)
+      out("- **SETTLED: `20250913085427` ran to completion and `20250914113723` ABORTED at its first duplicate `CREATE POLICY` (42710).** Everything after statement 155 of the later file — two functions and four triggers — never reached production. What the tables have is the EARLIER file's set.");
+    else if (late.length === 4 && early.length === 0)
+      out("- **SETTLED the other way: `20250914113723` ran and `20250913085427` did not**, so the earlier file's policy block never took effect and the later one found nothing to collide with.");
+    else if (early.length === 4 && late.length === 4)
+      out("- **BOTH ran.** That is only possible if something dropped the six policies between them; look for it before assuming either file is safe to re-run.");
+    else
+      out("- **Neither pattern is clean.** Record the exact set above in §16 rather than inferring; a partial set means a third migration has been at these objects.");
+  });
+
+  const fns = await tryQ(`
+    select p.proname as function_name
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('cleanup_simulation_cache','set_simulation_tables_defaults','update_simulation_job_timing')
+    order by 1`);
+  report("and the functions", fns, (rows) => out(...table(rows)));
+
+  const dupes = await tryQ(`
+    select schemaname, tablename, policyname, count(*)::int as copies
+    from pg_policies group by 1,2,3 having count(*) > 1 order by 4 desc`);
+  report("duplicate policy names anywhere in the database", dupes, (rows) => {
+    out(rows.length
+      ? `- **${rows.length}** policy name(s) exist more than once on the same table — Postgres does not permit this, so read the query, not the database.`
+      : "- No policy name is duplicated. WP 2.1's drop-and-recreate left one of each, which is the END STATE D30 says was already deterministic.");
+    if (rows.length) out(...table(rows));
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");
@@ -586,6 +654,7 @@ async function main() {
   out(`- every statement is a \`select\`; \`assertReadOnly()\` refuses anything else.`);
 
   await schemaProbe();
+  await d30();
   await d29();
   await boundaryDecisions();
 
