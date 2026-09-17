@@ -195,7 +195,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D14 | No project-level delegation exists | no `project_members` table | WP 2.2 ✅ |
 | D15 | Audit covers admin plane only | `admin_audit_logs` | WP 2.3 ✅ *(the TABLE is general and the triggers exist; production still holds 18 rows, all `plane='admin'` — see D45)* |
 | D16 | Hardcoded constants render with "From project data" dot | was `StagePolicyTable.tsx:1194-1203` | WP 0.1 ✅ *(constants deleted; untracked ⇒ `default`; de-dup of the two copies remains 6.2)* |
-| D17 | NULL `capacity_per_week` (= unlimited) renders as `0`, no dot. **Measured, 2026-09-16 (§15): 60 of 60 suppliers** in the measured project have a NULL capacity, so the grid tells the user every single supplier has zero capacity | `resolveEffective.ts:135`; §15 | WP 6.2 |
+| D17 | NULL `capacity_per_week` (= unlimited) renders as `0`, no dot. **Measured, 2026-09-16 (§15): 60 of 60 suppliers** in the measured project have a NULL capacity, so the grid tells the user every single supplier has zero capacity. **CORRECTED WHILE FIXING IT (WP 6.2): the `0` is the MOBILE list's, not the desktop grid's**, and the distinction was worth an hour. `resolveCell` returns `cellValue ?? liveDefault` and `MobileStagePolicyList` renders that directly, so the mobile sheet read "Capacity 0" for all sixty. The desktop grid passed only `cellValue` to `NumCell`, so it rendered the "—" placeholder: not a claim that capacity is zero, but still nothing saying that blank means unlimited, and no dot either — `default`'s colour is null. Two different failures of the same declaration, and the SAME `?? 0` behind both. **CLOSED**: `columnSpecs.ts` declares `master.nullMeans` next to the pointer (`{ token: "∞", title }`), the resolver returns no substituted number and a `contract` provenance that HAS a colour, `NumCell` and `formatValue` render the declared token, and `columnNullMeans.test.ts` pins all three (mutation-tested: restore the `0` → red; make the dot invisible → red; drop the declaration → three red). Fixed ONCE rather than twice because the resolver was de-duplicated in the same commit | `resolveEffective.ts`'s `liveDefault` (the `?? 0`, now guarded by `nullMeans`); `supabase/migrations/20260614000001_item_master.sql:44` ("NULL = ∞"); §15 | **CLOSED (WP 6.2)** |
 | D18 | `material_price` displayed prominently; consumed nowhere in the engine | `columnSpecs.ts:133,350` | WP 6.2 |
 | D19 | **Analysis results smeared onto entity columns; no identity or version. MEASURED for the first time, 2026-09-17 (§15 run `35229431958`, every project): 5 261 rows across the four tables — `node_list` 1 747 (7 projects), `network_nodes` 1 385 (1 project), `network_edges` 2 129 (1 project), `network_summary` 0 — of which 1 385 carry at least one COMPUTED column and NONE carries an input hash**, because no tier-3 table has `computed_from_hash` yet. WP 4.1's probes did not touch these tables, so until now the defect had an adjective and no magnitude. The number that matters for WP 4.3 is the 1 385: every one is a row where a centrality sits beside a `country` a user typed, with nothing saying which inputs or which code produced it | `network_nodes.degree_centrality`; §15's WP 4.2 sweep | WP 4.2 ✅ *(the STORE — `analysis_runs` + `analysis_results`, `20260917000006`. A metric now belongs to a run, and therefore to an input hash and a code version)* · WP 4.3 *(the dual-write and `computed_from_hash`; the 1 385 is its before-number)* · WP 5.3 *(drops the entity columns, after every reader has moved)* |
 | D20 | **`projectLanes`'s fallback truncated at 10 000 rows silently.** Each of the four lane reads carried a bare `.limit(10000)` and returned the slice shaped exactly like a whole project, so every count computed from it — the data map's "k of n lanes priced", the Run & validate clearance, the exported BOM sheet — was a statement about data nobody knew was missing. **CLOSED by WP 3.1, and not by removing the bound**: without an explicit `.limit()` PostgREST applies its own `db-max-rows` and truncates anyway, which is the same defect with a smaller number. The ceiling is now one named constant (`LANE_ROW_CEILING`, equal to the grading gate's `GATE_ROW_CEILING`, so two reads of the same tables cannot disagree about what "complete" means), a lane that comes back AT it is named in `ProjectLanes.truncated`, and every surface that renders lane-derived numbers renders it — the policy grid, the data map, Run & validate, and a toast on the export path. §5 T2: at the point of display, not in a console warning. `laneTruncation.test.ts` fails if a bare numeric limit returns or if any of those surfaces stops rendering the notice | `projectLanes.ts`; `laneTruncation.ts`; `LaneTruncationNotice.tsx`; `laneTruncation.test.ts` | WP 3.1 ✅ |
@@ -9359,3 +9359,87 @@ named it.
 **Still open in WP 6.2**, untouched by this slice: D17, D18, D23, D24, D26, D34,
 D47, D48, D49, D51, D53, D58, D59, D66, D69, D71, D85, D87, and the
 `StagePolicyTable.tsx:1208-1276` / `resolveEffective.ts` de-duplication.
+
+### WP 6.2 (slice 2) — One resolver, and the sixty suppliers · 2026-09-17 · no migration
+
+**What slice 1 promised.** That the remaining WP 6.2 defects were reachable now
+that the evidence base was corrected. The first one attempted proved the order
+mattered more than expected.
+
+**D17 could not be fixed once, so the duplication was paid first.** The intended
+target was D17 — a null `capacity_per_week` (`item_master.sql:44`: "NULL = ∞")
+rendering as a substituted `0`. Its fix lives in `liveDefault`, and `liveDefault`
+existed **twice**: `resolveEffective.ts::resolveCell` and a verbatim copy inside
+`StagePolicyTable.tsx`'s cell renderer, about seventy lines, each carrying a
+comment telling the reader to change both. Fixing D17 in two places would have
+deepened the exact debt this package owns, so the de-duplication came first and
+D17 became a one-place change.
+
+The desktop grid now calls `resolveCell`. `ResolvedCell` gained `cellValue`,
+`liveDefault` and `edited` — the intermediates that renderer needs, and nothing
+else, because a second return shape is how the copy started. `oneResolver.test.ts`
+is a **GATE**: both renderers must call `resolveCell`, neither may declare the
+ladder inline, and a third assertion checks the ladder is still present in
+`resolveEffective.ts` so the first two cannot pass by renaming. Proven red against
+the pre-commit tree — two of three fail on `HEAD~`.
+
+**Why a gate and not a comment.** The plan has already run this experiment. D26:
+two implementations of the D1 prefill rule, both imported, both unit-tested, one
+never called — both suites green while only one ran. A comment did not prevent
+that, because nothing was watching.
+
+**D17, and the correction it needed.** The recorded symptom was "renders as `0`,
+no dot", measured at **60 of 60 suppliers**. That is true of the MOBILE list and
+not of the desktop grid, and checking which was worth the time:
+
+- `MobileStagePolicyList` renders `resolveCell`'s `value`, which is
+  `cellValue ?? liveDefault` — so it read **"Capacity 0"** for all sixty.
+- The desktop grid passed only `cellValue` to `NumCell`, so it rendered the "—"
+  placeholder: not a claim that capacity is zero, but nothing saying blank means
+  unlimited, and no dot either — `default`'s colour is null.
+
+Two different failures, one `?? 0` behind both, and the six-for-six lesson holds:
+a symptom recorded once is a symptom recorded on one surface.
+
+The fix is `declared-fallback` (I6) applied to the UI. `columnSpecs.ts` declares
+`master.nullMeans: { token: "∞", title }` **next to the pointer**, which is the
+one place a reader looks to find out what the column is. The resolver substitutes
+no number, and returns provenance `contract` — a state that HAS a colour, so the
+substitution is visible at the point of display (T2). `NumCell` gained a
+`placeholder`, `formatValue` an argument. Mutation-tested three ways: restore the
+`0` → red; make the dot invisible → red; drop the declaration → three red.
+
+**One trap found while fixing it, worth naming.** `kindOf` picks the cell widget
+with `typeof liveDefault === "number"`. The fix makes `liveDefault` *undefined*
+by construction, so the capacity column would have silently become a **text
+input** — a fix for a display lie introducing a worse editing bug. `kindOf` now
+forces a `nullMeans` column to the numeric widget, and the fourth assertion in
+`columnNullMeans.test.ts` gates that `nullMeans` is only ever declared on a
+column `COLUMN_FIT` calls numeric, so that shortcut stays true.
+
+**One reserved state spent, and WP 6.3 should know.** §13 WP 6.3 reserves
+`contract` and `estimated` for the provenance vocabulary. This package spent
+`contract`, for exactly its reserved meaning — the value is what the schema says
+an empty cell means. `ProvenanceLegend` was updated in the same commit, because a
+state absent from the legend under-reports, which is the failure §13 warns about.
+`estimated` is untouched.
+
+**Gap check.** Two findings, neither this slice's:
+
+1. **`nullMeans` is declared on exactly one column, and it is not the only
+   nullable master column that means something.** `materials.moq` and
+   `products.initial_on_hand` are nullable too, and nothing here establishes what
+   *their* empty state means — the sidecars do not say and the engine's behaviour
+   was not read. Declaring a meaning that is wrong is worse than declaring none,
+   so only the column with a schema comment, an engine field-map entry and a §15
+   measurement behind it was declared. The rest is a per-column reading.
+2. **The desktop grid and the mobile list still differ in what they DISPLAY for a
+   resolved value**, even sharing one resolver: the grid passes `cellValue` to
+   `NumCell` and the list renders `cellValue ?? liveDefault`. That difference is
+   how D17 hid on one surface for six phases. It is deliberate today (an input
+   must not pre-fill with a default the user did not type), but nothing states it
+   and no test holds it, so the next person to "fix the inconsistency" can
+   reintroduce the frozen-default bug D1 is about.
+
+**Still open in WP 6.2:** D18, D23, D24, D26, D34, D47, D48, D49, D51, D53, D58,
+D59, D66, D69, D71, D85, D87.

@@ -96,10 +96,43 @@ export interface ResolvedCell {
   /** What the grid actually displays for this cell (`cellValue ?? liveDefault`). */
   value: unknown;
   provenance: Provenance;
+  /**
+   * The two halves of `value`, exposed because the DESKTOP grid needs them
+   * apart and used to compute them itself (see the note on `resolveCell`).
+   * `kindOf` picks a widget from both, a `<Select>` falls back through them to
+   * an option list, and a checkbox reads `liveDefault` for its unchecked state.
+   */
+  cellValue: unknown;
+  liveDefault: unknown;
+  /** True when an unsaved draft supplied the value. */
+  edited: boolean;
+  /**
+   * What an empty cell should SHOW, when the schema declares a meaning for empty
+   * (§4 D17). `undefined` for every other column, which keeps the "—" placeholder.
+   */
+  placeholder?: string;
+  /** The sentence explaining that token, for the cell's own tooltip. */
+  placeholderTitle?: string;
 }
 
-/** Resolves one cell's displayed value + provenance dot, matching exactly
- *  what StagePolicyTable's own cell renderer computes and shows. */
+/**
+ * Resolves one cell's displayed value + provenance dot.
+ *
+ * ── THIS WAS TWO IMPLEMENTATIONS UNTIL WP 6.2 ─────────────────────────────
+ *
+ * `StagePolicyTable.tsx`'s desktop renderer carried a VERBATIM copy of the body
+ * below — about seventy lines, from `masterSet` through the `provenance`
+ * ladder — and both copies carried a comment telling the next reader that "every
+ * change here changes BOTH". It had been that way since WP 0.1. Two copies of a
+ * resolution rule is `single-source` (I1) broken in the one place the product
+ * decides what a number MEANS, and the plan already has D26 on the record for
+ * what it costs: two implementations of the D1 prefill rule, both unit-tested,
+ * one of them dead and unreachable, so the tests stayed green while only one ran.
+ *
+ * The desktop grid now calls this. The extra fields on `ResolvedCell` are the
+ * intermediates its renderer needs and nothing else — deliberately not a second
+ * return shape, because that is how the copy started.
+ */
 export function resolveCell(args: {
   rowKey: string;
   row: Record<string, unknown>;
@@ -132,8 +165,25 @@ export function resolveCell(args: {
   const bundleVal = (
     effectivePolicy(defaults, overrides, scope, rowKey)[col.family] as Record<string, unknown> | undefined
   )?.[col.field];
+  /**
+   * `?? 0` WAS A SUBSTITUTION NOBODY DECLARED (§4 D17).
+   *
+   * For a master column with no master value and no derived fallback, this read
+   * `derivedVal ?? 0` — a hard-coded zero, with provenance `default`, whose
+   * colour is null, so the cell showed a number and no dot. For
+   * `capacity_per_week` that zero is the exact inverse of the schema's meaning
+   * (`item_master.sql:44`: "NULL = ∞"), and §15 measured 60 of 60 suppliers with
+   * a null capacity — so the grid reported every supplier in the network as
+   * having no capacity at all.
+   *
+   * `declared-fallback` (I6) is the rule this broke: a fallback absent from the
+   * contract may not exist in code. A column whose empty state MEANS something
+   * now declares it in `columnSpecs.ts`, and the cell renders that token instead
+   * of inventing a number.
+   */
+  const nullMeans = col.master?.nullMeans;
   const liveDefault = col.master
-    ? derivedVal ?? 0
+    ? derivedVal ?? (nullMeans ? undefined : 0)
     : bundleVal !== undefined
       ? bundleVal
       : col.defaultWhenMissing !== undefined
@@ -146,7 +196,8 @@ export function resolveCell(args: {
   // The stage's own routing decisions (`primary_source`, `sourcing_firm`), written
   // by `useStageRows::markFromData`. Read here so the `suggested` branch below has
   // a map to test — it referenced `decidedMap` without one from `5c7129f` until the
-  // Phase 1 precondition check, and every cell render threw (D26's sibling).
+  // Phase 1 precondition check, and every cell render threw (D26's sibling). That
+  // bug is exactly what one copy of a two-copy rule looks like from the inside.
   const decidedMap = (row.__decided ?? {}) as Record<string, true>;
   const imputed = !edited && !col.master && imputedMap[col.field] === true;
   // D16 — `__from_data` is the ONLY evidence that a value came from the
@@ -154,11 +205,15 @@ export function resolveCell(args: {
   // green-dotted every hardcoded constant useStageRows wrote onto the row as
   // "From project data". A field that is neither tracked nor master-backed
   // resolves to `default`, never `data`.
-  // NOTE: duplicated verbatim in StagePolicyTable.tsx's cell renderer — the
-  // two must stay in lockstep until WP 6.2 de-duplicates them.
   const fromData =
     !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
   const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
+  // The master column is empty, nothing derived a value for it, and the schema
+  // says what empty means. Ranked BELOW `derived`: a computed fallback is a
+  // better answer than "this is what blank means", and above everything else,
+  // because for a master column there is nothing else left.
+  const declaredEmpty =
+    !edited && !!nullMeans && !masterSet && derivedVal === undefined && cellValue === undefined;
   const fromOverride =
     !edited &&
     !imputed &&
@@ -183,13 +238,23 @@ export function resolveCell(args: {
           : "data"
         : derivedFallback
           ? "derived"
-          : fromOverride
+          : declaredEmpty
+            ? "contract"
+            : fromOverride
             ? "override"
             : suggested
               ? "suggested"
               : "default";
 
-  return { value: cellValue ?? liveDefault, provenance };
+  return {
+    value: cellValue ?? liveDefault,
+    provenance,
+    cellValue,
+    liveDefault,
+    edited,
+    placeholder: declaredEmpty ? nullMeans!.token : undefined,
+    placeholderTitle: declaredEmpty ? nullMeans!.title : undefined,
+  };
 }
 
 /**

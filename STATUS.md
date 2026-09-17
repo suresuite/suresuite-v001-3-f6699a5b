@@ -3,11 +3,49 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slice 1**
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–2**
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 2) — One resolver, and the sixty suppliers · no migration
+
+**D17 could not be fixed once, so the duplication was paid first.** The fix lives
+in `liveDefault`, and `liveDefault` existed *twice* — `resolveCell` and a verbatim
+seventy-line copy inside `StagePolicyTable.tsx`, each with a comment telling the
+reader to change both, since WP 0.1. Fixing D17 in two places would have deepened
+the exact debt this package owns.
+
+The desktop grid now calls `resolveCell`. `oneResolver.test.ts` is a **gate** —
+both renderers must call it, neither may rebuild the ladder inline, and a third
+assertion stops the first two passing by renaming. **Proven red on `HEAD~`.**
+(A comment did not prevent this before: D26 is two prefill rules, both
+unit-tested, one dead, the suite green while only one ran.)
+
+**D17 needed a correction of its own.** Recorded as "renders `0`, no dot" at 60 of
+60 suppliers. That is the **mobile** list — it renders `cellValue ?? liveDefault`.
+The desktop grid showed `—`: not a claim of zero capacity, but nothing saying
+blank means unlimited, and no dot either. Two failures, one `?? 0`. Six for six
+now: a symptom recorded once is a symptom recorded on one surface.
+
+Fixed as `declared-fallback` (I6) applied to the UI — `columnSpecs.ts` declares
+`master.nullMeans: { token: "∞", title }` next to the pointer, the resolver
+substitutes no number and returns a `contract` provenance that *has* a colour.
+Mutation-tested three ways.
+
+**A trap worth naming:** `kindOf` picks the widget from `typeof liveDefault ===
+"number"`. Making `liveDefault` undefined would have silently turned the capacity
+cell into a **text input** — a fix for a display lie introducing a worse editing
+bug. Caught, fixed, and gated.
+
+**WP 6.3 should know:** this spent the reserved `contract` provenance state, for
+exactly its reserved meaning. `estimated` is untouched. The legend was updated in
+the same commit.
+
+**Verified:** `contract:check` ✓ · `check:docs` ✓ (it caught a §4 citation I had
+removed while PLAN-PROMPTS still held it) · 359 tests ✓ · build ✓ · eslint 336/116
+and `audit:ui` 8, both unchanged.
 
 ### WP 6.2 (slice 1) — The engine scan, corrected · no migration
 

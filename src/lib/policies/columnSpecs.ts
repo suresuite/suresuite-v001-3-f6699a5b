@@ -34,7 +34,26 @@ export interface ColSpec {
    * from the masters first, with a logistics-derived fallback
    * (docs/data-simulation-mapping.md §4).
    */
-  master?: { table: "materials" | "products" | "suppliers"; field: string; idFrom: string };
+  master?: {
+    table: "materials" | "products" | "suppliers";
+    field: string;
+    idFrom: string;
+    /**
+     * What an EMPTY master column MEANS, when empty means something (§4 D17).
+     *
+     * Most master columns are simply unset when null. A few carry a declared
+     * semantic: `suppliers.capacity_per_week` is `NULL = ∞` per
+     * `item_master.sql:44`, and the engine's own field map says the same
+     * ("master → unlimited", `dataMap.ts:134`). Without this the resolver
+     * substituted `0` — the exact inverse of the meaning — with provenance
+     * `default`, which has no dot, so nothing on screen said a substitution had
+     * happened at all.
+     *
+     * Authored HERE, next to the pointer, because that is the one place a
+     * reader looks to find out what this column is (`single-source`, I1).
+     */
+    nullMeans?: { token: string; title: string };
+  };
   /**
    * Type-specific inventory level/lot params (reorder point, order-up-to, lot Q,
    * review period, basis) are not rendered as their own columns. Instead they are
@@ -140,7 +159,18 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // Engine-real supplier attributes (suppliers master): finite capacity
       // enables partial capacity-reduction disruptions; empty = unlimited.
       col("capacity_per_week", "sourcing", {
-        master: { table: "suppliers", field: "capacity_per_week", idFrom: "supplier_id" },
+        master: {
+          table: "suppliers", field: "capacity_per_week", idFrom: "supplier_id",
+          // `item_master.sql:44` — "NULL = ∞; finite enables partial capacity
+          // cuts". Measured at 60 of 60 suppliers null in the §15 project, every
+          // one of which the grid used to report as a capacity of zero.
+          nullMeans: {
+            token: "∞",
+            title:
+              "No capacity limit. This supplier's capacity is empty, and an empty " +
+              "capacity means unlimited — enter a number to model a finite one.",
+          },
+        },
       }),
       col("reliability_score", "sourcing", {
         master: { table: "suppliers", field: "reliability_score", idFrom: "supplier_id" },
