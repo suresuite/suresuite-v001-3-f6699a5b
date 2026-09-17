@@ -16,7 +16,8 @@
 //   R6  every file:line in PLAN.md §4 resolves and is in bounds
 //   R7  §16 is append-only — no drift-log entry may vanish from history, AND
 //       every work package marked done in §7–§13 has a §16 entry
-//   R8  no open defect, unmet invariant or table deferral is owned by a FINISHED package
+//   R8  no open defect, unmet invariant or table deferral is owned by a FINISHED package,
+//       a FINISHED PHASE, or a package the plan does not contain (WP 3.4)
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
 //
@@ -475,12 +476,55 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
   const roadmapEnd = planText.indexOf("\n## 14.");
   const roadmap = roadmapStart < 0 ? "" : planText.slice(roadmapStart, roadmapEnd < 0 ? undefined : roadmapEnd);
 
+  const headings = roadmap.split("\n").filter((l) => /^### WP /.test(l));
   const donePackages = new Set(
-    roadmap
-      .split("\n")
-      .filter((l) => /^### WP /.test(l) && l.includes("✅"))
+    headings
+      .filter((l) => l.includes("✅"))
       .map((l) => l.match(/^### WP\s+([0-9]+\.[0-9]+[a-z]?)/i)?.[1])
       .filter(Boolean),
+  );
+
+  // A PACKAGE THAT EXISTS AT ALL, anywhere in the plan — §7–§13's roadmap plus
+  // §14's deferred work. An owner the document does not contain is the same
+  // failure as an owner who has gone home, arriving by a typo instead of by a
+  // shipment, and nothing looked for it.
+  //
+  // From BOTH places the plan names a package, which R10 had to learn the same
+  // way: a package has a `### WP N.M` heading, and a SUB-package of WP 5.2 has
+  // a row in that package's own table (`| **5.2b** | …`) and no heading. This
+  // rule's first run reported D21's owner WP 5.2b as a package the plan does
+  // not contain — the RULE being wrong rather than the document, and a gate
+  // that cries wolf gets relaxed rather than fixed.
+  const knownPackages = new Set(
+    [
+      ...planText.split("\n")
+        .filter((l) => /^### WP /.test(l))
+        .map((l) => l.match(/^### WP\s+([0-9]+\.[0-9]+[a-z]?)/i)?.[1]),
+      ...planText.split("\n")
+        .filter((l) => /^\|\s*\*\*[0-9]+\.[0-9]+[a-z]?\*\*/.test(l))
+        .map((l) => l.match(/^\|\s*\*\*([0-9]+\.[0-9]+[a-z]?)\*\*/)?.[1]),
+    ].filter(Boolean),
+  );
+
+  // AND PHASE-LEVEL OWNERS, which is D41's shape in the blind spot of the gate
+  // built to prevent D41. §4 D28's "Closed by" cell read `Phase 3` — its own
+  // text says closing it "needs an auth model, which is a Phase 3 package" —
+  // and no such package was ever written. The moment WP 3.4 shipped, D28 was
+  // owned by a FINISHED PHASE, which is exactly the thing this rule exists to
+  // refuse, and the rule could not see it because its regex matches `WP N.M`.
+  //
+  // A phase is finished when every package the roadmap lists for it is ✅. That
+  // is derived from the same ✅ markers rather than from §17's prose, so it
+  // cannot disagree with the rest of this rule (R10 is what keeps §17 honest).
+  const byPhase = new Map();
+  for (const l of headings) {
+    const n = l.match(/^### WP\s+([0-9]+)\.[0-9]+[a-z]?/i)?.[1];
+    if (!n) continue;
+    if (!byPhase.has(n)) byPhase.set(n, []);
+    byPhase.get(n).push(l.includes("✅"));
+  }
+  const donePhases = new Set(
+    [...byPhase.entries()].filter(([, marks]) => marks.length > 0 && marks.every(Boolean)).map(([n]) => n),
   );
 
   // §4's rows: the LAST cell is "Closed by". A row carrying ✅ is closed and may
@@ -502,6 +546,26 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
         fail("R8", `§4 ${id} is OPEN and its "Closed by" names WP ${n}, which §7–§13 marks ✅ done. ` +
                    "An open defect owned by a finished package has no owner — reassign it to a package " +
                    "that has not run, or close the row.");
+      } else if (!knownPackages.has(n)) {
+        orphaned += 1;
+        fail("R8", `§4 ${id} is OPEN and its "Closed by" names WP ${n}, which this plan does not ` +
+                   "contain. An owner the document does not have is not an owner — add the package, " +
+                   "or name one that exists.");
+      }
+    }
+    // A PHASE is an owner only while the phase still has a package left to run —
+    // and only when the cell names NO package at all. A cell that names one has
+    // an owner; the `Phase N` in it is prose (D36's cell cites "§16 · Phase 3's
+    // last package" and is owned by WP 4.1), and reading that as a second owner
+    // is the gate crying wolf, which gets it relaxed rather than fixed.
+    const namesAPackage = (closedBy.match(/WP\s*[0-9]+\.[0-9]+[a-z]?/gi) ?? []).length > 0;
+    for (const ph of namesAPackage ? [] : closedBy.match(/Phase\s*([0-9]+)/gi) ?? []) {
+      const n = ph.replace(/Phase\s*/i, "");
+      if (donePhases.has(n)) {
+        orphaned += 1;
+        fail("R8", `§4 ${id} is OPEN and its "Closed by" names Phase ${n}, every package of which ` +
+                   "§7–§13 marks ✅ done. A phase is a weaker owner than a package and it stops being " +
+                   "one entirely when the phase ends — name the package that will do the work.");
       }
     }
   }
@@ -543,7 +607,11 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
     }
   }
 
-  if (!orphaned) console.log(`  R8  no open defect or unmet invariant is owned by a finished package`);
+  if (!orphaned)
+    console.log(
+      `  R8  no open defect or unmet invariant is owned by a finished package · ` +
+        `${donePackages.size} done, ${donePhases.size} finished phase(s), ${knownPackages.size} named`,
+    );
 }
 
 // ───────── R9: `governance.audited` is a FACT, and facts have one source (I1)

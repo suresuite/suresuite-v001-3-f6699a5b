@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 318,
-  "migrations_applied": 315,
+  "migrations_found": 319,
+  "migrations_applied": 316,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260916000021_actor_on_remaining_paths.sql",
+  "last_migration": "20260917000001_diff_before_promotion.sql",
   "counts": {
     "tables": 79,
     "views": 7,
     "enums": 4,
-    "functions": 247,
+    "functions": 250,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -6936,6 +6936,30 @@
           "unique": false,
           "references": null,
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "rows_held",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000001_diff_before_promotion.sql"
+        },
+        {
+          "name": "rows_superseded",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000001_diff_before_promotion.sql"
         }
       ],
       "constraints": [
@@ -7928,8 +7952,8 @@
           "quoted": false,
           "type": "text",
           "type_raw": "text",
-          "nullable": false,
-          "default": "'new'",
+          "nullable": true,
+          "default": null,
           "primary_key": false,
           "unique": false,
           "references": null,
@@ -21458,7 +21482,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20260916000019_promotion_upsert.sql"
+      "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
       "name": "ingest_dedup_natural_key",
@@ -21472,6 +21496,18 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260916000017_dedup_natural_keys.sql"
+    },
+    {
+      "name": "ingest_diff_run",
+      "signature": "ingest_diff_run(uuid, uuid)",
+      "args": [
+        "_run_id uuid",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
       "name": "ingest_files_write_once",
@@ -21516,6 +21552,26 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "defined_by": "20260916000019_promotion_upsert.sql"
+    },
+    {
+      "name": "ingest_promotion_plan",
+      "signature": "ingest_promotion_plan(uuid, text, text[], text, text, text, text, text, text[], text[])",
+      "args": [
+        "_run_id uuid",
+        "_target text",
+        "OUT natural_key text[]",
+        "OUT file_key text",
+        "OUT server_cols text",
+        "OUT server_vals text",
+        "OUT write_cols text",
+        "OUT write_vals text",
+        "OUT write_names text[]",
+        "OUT write_exprs text[]"
+      ],
+      "returns": null,
+      "security_definer": false,
+      "volatility": "STABLE",
+      "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
       "name": "ingest_target_is_promotable",
@@ -21775,6 +21831,15 @@
       "security_definer": true,
       "volatility": "STABLE",
       "defined_by": "20260916000011_org_identity_uuid_only.sql"
+    },
+    {
+      "name": "project_owner_membership",
+      "signature": "project_owner_membership()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
       "name": "project_role_rank",

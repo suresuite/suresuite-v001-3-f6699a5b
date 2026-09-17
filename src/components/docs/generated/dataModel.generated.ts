@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "fc67c7bde328";
+export const CONTRACT_VERSION = "57ad4b32bb9f";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260916000021_actor_on_remaining_paths.sql";
+export const LAST_MIGRATION = "20260917000001_diff_before_promotion.sql";
 
 export const COUNTS = {
   "tablesInSchema": 79,
   "tablesDescribed": 37,
-  "columnsDescribed": 430,
+  "columnsDescribed": 432,
   "tablesUndescribed": 42
 } as const;
 
@@ -57,7 +57,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "ingest_runs",
         "grain": "One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row.",
-        "columns": 21,
+        "columns": 23,
         "owner": "data-ingestion"
       },
       {

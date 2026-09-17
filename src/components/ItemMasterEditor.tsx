@@ -24,6 +24,12 @@ import {
   type SupplierRow,
 } from "@/hooks/useItemMasters";
 import { ProvenanceBadge } from "@/components/policies/ProvenanceBadge";
+// WP 3.4 (§10: "show provenance on canonical rows"). The item masters became
+// promotion targets in WP 3.3 (D55), so every row written since carries
+// `ingest_run_id` + `source_row_id` and can name the line of the file it came
+// from. Every row written BEFORE carries neither, and the badge says "source
+// unknown" rather than inventing one — which today is every row in production.
+import { RowProvenance } from "@/components/ingest/RowProvenance";
 import type { Provenance } from "@/lib/policies/effectiveEconomics";
 
 // Enum options restricted to what the scsim engine accepts
@@ -230,6 +236,12 @@ const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorPr
           <TableHeader>
             <TableRow>
               <TableHead className="whitespace-nowrap">ID</TableHead>
+              <TableHead className="whitespace-nowrap">
+                Source
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  the file and line this row came from
+                </span>
+              </TableHead>
               {columns.map((c) => (
                 <TableHead key={c.field} className="whitespace-nowrap">
                   {c.label}
@@ -248,6 +260,9 @@ const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorPr
               return (
                 <TableRow key={rowId} className={rowDraft ? "bg-primary/5" : undefined}>
                   <TableCell className="font-mono text-xs whitespace-nowrap">{rowId}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <RowProvenance row={row as { ingest_run_id?: string | null; source_row_id?: string | null }} />
+                  </TableCell>
                   {columns.map((c) => {
                     const value = cellValue(table, row, c.field);
                     const missing = required.includes(c.field) && value === "";

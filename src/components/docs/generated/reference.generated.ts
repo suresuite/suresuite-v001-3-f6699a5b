@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 430;
+export const REFERENCE_COLUMN_COUNT = 432;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -2232,7 +2232,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Staged rows the diff classified as new: no live row carries this source identifier yet.",
+        "meaning": "Staged rows the diff classified as new: no live row carries this source identifier yet. For a file run this is `ingest_diff_run`'s count of rows whose natural key is absent from the tier-2 table, and it excludes the rows a later line of the same file superseded.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -2280,7 +2280,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row.",
+        "meaning": "Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row. ALWAYS 0 FOR A FILE RUN, and that zero is a statement rather than a measurement: a connector pull speaks for the whole source, a CSV speaks only for the rows it contains, so an upload can never mark anything removed. The review screen says so in those words rather than rendering the zero (§5 T1).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -2469,6 +2469,38 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": true,
         "validate": null,
         "meaning": "Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a fourth source cannot appear without a migration that decides what it is.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "rows_held",
+        "type": "integer",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Staged rows carrying an `error` finding. They are never promoted and they stay in tier 1 with their reason attached, which is what makes a partial upload reviewable instead of a failure.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "rows_superseded",
+        "type": "integer",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Staged rows that a LATER line of the same file repeats on the natural key. The promotion collapses them (`DISTINCT ON`, so one statement cannot affect one row twice) and each one carries a `superseded_by_later_line` finding naming the line that beat it — the one case where the uploader's own file disagreed with itself.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -3472,23 +3504,16 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "diff_state",
         "type": "text",
-        "nullable": false,
+        "nullable": true,
         "unit": null,
         "csvHeader": null,
         "required": false,
         "validate": "one of new, changed, unchanged, removed_upstream",
-        "meaning": "new, changed, unchanged or removed_upstream — the same vocabulary the three connector staging tables use, so WP 3.4's one review component serves both sources.",
+        "meaning": "What this row is relative to the CURRENT tier-2 table — new, changed or unchanged — computed by `ingest_diff_run` at landing, again when the review screen is opened and again inside `ingest_apply_run` immediately before the upsert. NULL means the diff has not been computed for this row: a row held back by an `error` finding may have failed on a key field and so has nothing to compare. The CHECK also admits `removed_upstream`, which is the same vocabulary the three connector staging tables use so that one review component serves both sources; nothing writing THIS table ever sets it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
-        "substitutions": [
-          {
-            "when": "nothing has computed a diff yet",
-            "value": "new",
-            "provenance": "default",
-            "visibleAs": null
-          }
-        ],
+        "substitutions": [],
         "engineChain": null,
         "engineLevel": null
       },

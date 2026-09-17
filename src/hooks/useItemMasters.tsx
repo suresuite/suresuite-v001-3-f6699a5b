@@ -12,7 +12,19 @@ import {
 // The generated Supabase types are out of sync with the supply-chain schema,
 // so these tables are typed locally like the rest of the data layer.
 
-export interface MaterialRow {
+/**
+ * WP 3.3 (D55) put `ingest_run_id` and `source_row_id` on all three item
+ * masters, and `select("*")` has been returning them ever since without anything
+ * reading them. Declared here so WP 3.4's `RowProvenance` can: a canonical row
+ * that names the line of the file it came from is A4 reaching the surface, and a
+ * row with neither is one whose provenance is UNKNOWN — never one that had none.
+ */
+export interface RowSource {
+  ingest_run_id?: string | null;
+  source_row_id?: string | null;
+}
+
+export interface MaterialRow extends RowSource {
   material_id: string;
   name: string | null;
   cost: number | null; // €/unit
@@ -23,7 +35,7 @@ export interface MaterialRow {
   lead_time_cv: number | null;
 }
 
-export interface ProductRow {
+export interface ProductRow extends RowSource {
   product_id: string;
   name: string | null;
   sell_price: number | null; // €/unit
@@ -36,7 +48,7 @@ export interface ProductRow {
   demand_max: number | null; // c_p — explicit triangular upper bound, e.g. historical max (null → mean·(1+cv))
 }
 
-export interface SupplierRow {
+export interface SupplierRow extends RowSource {
   supplier_id: string;
   name: string | null;
   capacity_per_week: number | null; // null = unlimited

@@ -18,6 +18,10 @@ import { unitDays } from '../../supabase/functions/_shared/grading.ts';
 // reads it to know which datasets go through `ingest-file`'s landing; it never
 // restates a header, a required flag or a rule.
 import { INGEST_DATASETS } from '../../supabase/functions/_shared/ingestSpec.generated.ts';
+// WP 3.4 — the wizard lands a file and then hands the RUN to the review screen.
+// The same component serves an MRP sync; nothing here branches on source_kind.
+import { IngestRunReview } from '@/components/ingest/IngestRunReview';
+import { useIngestRun } from '@/hooks/useIngestRun';
 
 const SMALL_TXT = 'text-[11px] leading-tight';
 const CELL_PAD = 'py-1 px-2';       // compact body cells
@@ -144,7 +148,14 @@ interface ParseFinding {
   row?: number;
 }
 
-/** What `ingest-file` reports after a landing — the status half of this screen. */
+/**
+ * What `ingest-file` reports after a landing. WP 3.4 REMOVED `rows_promoted`
+ * from it, and the absence is the change: the landing no longer promotes. It
+ * stages the rows, computes the diff against the project's current data, and
+ * returns a run for somebody to look at — because §10's design point is that
+ * the diff exists BEFORE the decision, and because the role gate is unreachable
+ * while the upload itself writes tier 2.
+ */
 interface IngestRunSummary {
   run_id: string;
   file_id: string;
@@ -152,8 +163,13 @@ interface IngestRunSummary {
   target: string;
   rows_read: number;
   rows_staged: number;
-  rows_promoted: number;
-  rows_held: number;
+  rows_new: number | null;
+  rows_changed: number | null;
+  rows_unchanged: number | null;
+  rows_superseded: number | null;
+  rows_held: number | null;
+  /** False when the diff did not run: every row reads "not compared", never "new". */
+  diffed: boolean;
   findings: ParseFinding[];
   findings_truncated: number;
 }
@@ -163,6 +179,59 @@ interface UploadWizardProps {
   userId: string;
   selectedProject: Project | null;
   onClose: () => void;
+}
+
+/**
+ * The review screen bound to one run. A component rather than three hooks in
+ * the wizard's body, so that the run's own loading state does not entangle the
+ * upload form's — and so the same panel can be mounted anywhere a run id is
+ * known (an MRP sync's status page is the obvious second caller).
+ */
+function IngestRunPanel({
+  runId,
+  userId,
+  onPromoted,
+}: {
+  runId: string;
+  userId: string | null;
+  onPromoted: () => void;
+}) {
+  const { run, file, rows, actorRole, canPromote, busy, error, recompute, promote } =
+    useIngestRun(runId, userId);
+  const { toast } = useToast();
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription className={SMALL_TXT}>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+  if (!run) return null;
+
+  return (
+    <IngestRunReview
+      run={run}
+      file={file}
+      rows={rows}
+      canPromote={canPromote}
+      roleLabel={actorRole}
+      busy={busy}
+      onRecompute={() => void recompute()}
+      onPromote={async () => {
+        const applied = await promote();
+        if (!applied) return;
+        toast({
+          title: `${applied.rows_promoted} row(s) promoted`,
+          description:
+            `${applied.rows_new} new · ${applied.rows_changed} changed · ` +
+            `${applied.rows_unchanged} rewritten unchanged` +
+            (Number(applied.rows_held) > 0 ? ` · ${applied.rows_held} still held back` : ''),
+        });
+        onPromoted();
+      }}
+    />
+  );
 }
 
 const UploadWizard = ({
@@ -1080,16 +1149,19 @@ const UploadWizard = ({
         setFile(null);
         setCsvData([]);
         setErrors([]);
+        // NOTHING HAS BEEN WRITTEN YET, so the toast must not say it has. The
+        // old one said "N records uploaded" the moment the bytes arrived, which
+        // was true while the landing promoted and would be a lie now.
+        const willWrite =
+          (summary.rows_new ?? 0) + (summary.rows_changed ?? 0) + (summary.rows_unchanged ?? 0);
         toast({
-          title: summary.rows_held
-            ? `${summary.rows_promoted} of ${summary.rows_read} rows uploaded`
-            : 'Upload successful',
-          description: summary.rows_held
-            ? `${summary.rows_held} row(s) were held back with a reason attached — see below.`
-            : `${summary.rows_promoted} records uploaded`,
-          variant: summary.rows_held ? 'default' : undefined,
+          title: `${summary.rows_staged} row(s) staged — review before promoting`,
+          description: summary.diffed
+            ? `${willWrite} row(s) will be written` +
+              (summary.rows_held ? ` · ${summary.rows_held} held back with a reason attached` : '') +
+              '. Nothing has changed in the project yet.'
+            : 'The comparison with your current data did not run; open the review and re-compare.',
         });
-        setTimeout(() => { onUploadComplete(); }, 100);
         return;
       }
 
@@ -1737,46 +1809,20 @@ const UploadWizard = ({
               </Alert>
             )}
 
-            {/* THE STATUS VIEW (Phase 3 / WP 3.2).
-                The wizard is an uploader and a status view now: the parse and the
-                validation happen on the server, so what it shows afterwards is the
-                RUN — what was read, what was promoted, what was held back and why.
-                §5 T2 says a substitution is visible at the point of display; a row
-                held back with its reason is the same rule applied to a rejection. */}
+            {/* THE REVIEW SCREEN (Phase 3 / WP 3.4, §10).
+                WP 3.2 made this a status view of a run that had already been
+                promoted. It is a REVIEW now: the run is `staged`, nothing has
+                reached the project, and `IngestRunReview` shows the diff, the
+                findings and the three row states so a person can decide. The
+                same component renders an MRP sync — §10's gap check for this
+                package is that any branch on `source_kind` beyond a label means
+                WP 3.1 was incomplete, and there is none. */}
             {lastRun && (
-              <Card className="border-muted">
-                <CardContent className="p-3 space-y-2">
-                  <div className={`${SMALL_TXT} font-medium flex items-center gap-2`}>
-                    <Database className="h-3.5 w-3.5" />
-                    Ingestion run — {lastRun.target}
-                  </div>
-                  <div className={`${SMALL_TXT} text-muted-foreground`}>
-                    {lastRun.rows_read} row(s) read · {lastRun.rows_staged} staged ·{' '}
-                    <span className="font-medium text-foreground">{lastRun.rows_promoted} promoted</span>
-                    {lastRun.rows_held > 0 && <> · {lastRun.rows_held} held back</>}
-                  </div>
-                  <div className={`${SMALL_TXT} text-muted-foreground font-mono break-all`}>
-                    sha256 {lastRun.content_sha256}
-                  </div>
-                  {lastRun.findings.length > 0 && (
-                    <div className="space-y-0.5 max-h-48 overflow-auto">
-                      {lastRun.findings.map((f, i) => (
-                        <div
-                          key={i}
-                          className={`${SMALL_TXT} ${f.level === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
-                        >
-                          {f.message}
-                        </div>
-                      ))}
-                      {lastRun.findings_truncated > 0 && (
-                        <div className={`${SMALL_TXT} text-muted-foreground italic`}>
-                          …and {lastRun.findings_truncated} more, kept with the run.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <IngestRunPanel
+                runId={lastRun.run_id}
+                userId={user?.id ?? null}
+                onPromoted={() => { onUploadComplete(); }}
+              />
             )}
 
             {/* Upload button logic */}

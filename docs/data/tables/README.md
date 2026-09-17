@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 37 of 79 tables are covered,
-430 columns in all. A table that is not here is listed
+432 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -22,7 +22,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
 | [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 14 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
 | [`ingest_files`](ingest_files.md) | 0 | `data-ingestion` | 11 | One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one. |
-| [`ingest_runs`](ingest_runs.md) | 1 | `data-ingestion` | 21 | One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row. |
+| [`ingest_runs`](ingest_runs.md) | 1 | `data-ingestion` | 23 | One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row. |
 | [`ingest_staged_bom_lines`](ingest_staged_bom_lines.md) | 1 | `data-ingestion` | 13 | One component line of one staged BOM version, as the source sent it: this much of that component goes into one unit of the parent. |
 | [`ingest_staged_bom_versions`](ingest_staged_bom_versions.md) | 1 | `data-ingestion` | 12 | One BOM header as one source sent it, inside one run — a named version of a product's bill of materials, whose lines are staged in `ingest_staged_bom_lines`. |
 | [`ingest_staged_products`](ingest_staged_products.md) | 1 | `data-ingestion` | 19 | One item-master row as one source sent it, inside one run. The source's own shape plus provenance — not the project's shape, which it takes on at promotion. |
@@ -52,4 +52,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `fc67c7bde328`, engine `0.2.3`.*
+*Generated from data contract `57ad4b32bb9f`, engine `0.2.3`.*

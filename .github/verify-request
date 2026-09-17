@@ -71,3 +71,31 @@ WP 3.3 — the AFTER run (pre-deploy; see the caveat above)
 #      `rows_the_unique_index_would_reject` should all be 0, because the unique
 #      indexes now EXIST and nothing could be a duplicate.
 WP 3.3 — the AFTER run, after the deploy rather than during it
+
+# requested-by: Phase 3 / WP 3.4 — diff, review, promote UI (§16)
+# requested-at: 2026-09-17 (BEFORE the package's migration, deliberately in its
+#      own push — three §15 runs across two packages were lost to racing the
+#      deploy, §16 · WP 3.3 · L)
+# why: the before-number for the last package in Phase 3. Specifically: whether
+#      `ingest_run_id` and `source_row_id` are still NULL on every tier-2 row
+#      (they must be — no run has ever written one), whether `ingest_staged_rows`
+#      still holds zero rows, and the per-project lane counts after WP 3.3's
+#      dedup so the after-run has something to be a delta against. Every project,
+#      never just one (D42).
+WP 3.4 gap check — before
+
+# requested-by: Phase 3 / WP 3.4 — diff, review, promote UI (§16)
+# requested-at: 2026-09-17 (AFTER `Deploy Supabase Migrations` finished for
+#      `20260917000001`, confirmed success before this push)
+# why: the after-run, and a RE-run. Run 35175080826 fired on the migration push
+#      itself — not because that push touched this file, but because it edited
+#      `scripts/data-contract/verification-sql.mjs`, which is the workflow's
+#      THIRD trigger path. Its report contains the race in plain sight:
+#      `column r.rows_superseded does not exist`, because it queried the
+#      database before the deploy had added it. Fourth run lost to this in
+#      three packages, and the first through that door.
+# measure: provenance coverage on all seven promotion targets (expected 0 of
+#      6 760 — no run has ever written one), `diff_state` as the rows hold it,
+#      the five-count partition, and D61's number now the trigger and backfill
+#      have deployed.
+WP 3.4 gap check — after
