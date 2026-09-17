@@ -3,11 +3,44 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–2**
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–3**
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 3) — D26, and the test that belonged to the dead copy · no migration
+
+**D26 predicted a risk. The risk had already happened.** D26 records two
+implementations of the D1 prefill rule and warns that the next edit has "even odds
+of landing on the dead one". Comparing them before deleting either — rather than
+assuming the dead one was a copy — found they **already disagreed**, on a case
+both were tested for: *the user types a value over an imputed average.* The live
+rule refuses it (`__imputed` is tested before the draft); the dead one persisted
+it as an edit.
+
+`policyPrefill.test.ts` asserted the **dead** answer, in a test named "does NOT
+persist an imputed average, but DOES persist an edit of one", and it passed for
+its whole life against a function no screen ever called. That is worse than an
+untested rule: a claim on the record that the product does something it does not
+do — and here the claimed behaviour is the D1 defect's own shape.
+
+The live answer is kept, on its merits: the prefill freezes what the *data* says,
+an imputed average is an estimate to verify, and a manual save still writes the
+user's value. The assertion is inverted **in place**, with the reasoning above it,
+so it does not read as a test edited to pass.
+
+A second difference was latent — the dead copy had a third source, `"decision"`,
+reading `__decided`. Adding it would make a field with *no* value newly
+persistable, which is the other half of D23. Left alone deliberately.
+
+**Gated:** `oneResolver.test.ts` now also requires exactly one module to define
+the predicate, and that it still tests `__imputed` before the draft — the order
+that *is* the behaviour. Mutation-tested.
+
+**Verified:** `contract:check` ✓ (R6 caught two citations left dangling by the
+deletion) · `check:docs` ✓ · 362 tests ✓ · build ✓ · eslint 336/116 and
+`audit:ui` 8, both unchanged.
 
 ### WP 6.2 (slice 2) — One resolver, and the sixty suppliers · no migration
 

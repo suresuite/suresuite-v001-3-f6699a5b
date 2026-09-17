@@ -204,7 +204,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check | `resolveEffective.ts:82`; `StagePolicyTable.tsx:694`; `schemas.ts:81` | WP 6.2 |
 | D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:420-425` | WP 6.2 |
 | D25 | `combine-project`'s core reads (`outbound_logistics`, `inbound_logistics`, both BOM tables) destructured only `{ data }` — the same swallow as D3 but on the ETL's own inputs, so a failed read produced a half-empty graph and reported success. Found by WP 0.2 while fixing D3 | `combine-project/index.ts:52-64,169-174,207-220` | WP 0.2 ✅ |
-| D26 | **Two copies of the D1 prefill rule.** `5c7129f` merged two independent WP 0.1 implementations: `resolveEffective.ts:isPrefillPersistable` (imported and called at `StagePolicyTable.tsx:865`) and `prefillSelect.ts:prefillSourceFor` (imported at `StagePolicyTable.tsx:53` and never called). Both are unit-tested, so both stay green while only one runs — an I1 violation, and the next edit to "the rule" has even odds of landing on the dead one. Found by the WP 1.1 precondition check | `resolveEffective.ts:214`, `prefillSelect.ts:33`, `StagePolicyTable.tsx:53,865` | WP 6.2 |
+| D26 | **Two copies of the D1 prefill rule.** `5c7129f` merged two independent WP 0.1 implementations: `resolveEffective.ts:isPrefillPersistable` (imported and called at `StagePolicyTable.tsx:865`) and `prefillSelect.ts:prefillSourceFor` (imported at `StagePolicyTable.tsx:53` and never called). Both are unit-tested, so both stay green while only one runs — an I1 violation, and the next edit to "the rule" has even odds of landing on the dead one. Found by the WP 1.1 precondition check. **CLOSED (WP 6.2), and it had already cost what it predicted — see D93.** `prefillSelect.ts` is deleted, its dead import removed from `StagePolicyTable`, and `prefillSourceFor` now lives beside `isPrefillPersistable` in `resolveEffective.ts` as one implementation. `oneResolver.test.ts` gates it two ways: exactly one module in `src/lib/policies` may define the predicate, and that predicate must still test `__imputed` BEFORE the draft — the order the two copies disagreed on. Mutation-tested | `src/lib/policies/resolveEffective.ts` (`prefillSourceFor`); `src/lib/policies/__tests__/oneResolver.test.ts` | **CLOSED (WP 6.2)** |
+| **D93** | **The two prefill rules had already drifted, and the green test belonged to the copy that never ran.** D26 recorded two implementations of the D1 rule and predicted that "the next edit to *the rule* has even odds of landing on the dead one". Deleting the dead one found that the drift had ALREADY happened, on a case both were tested for: **the user types a value over an imputed average.** `isPrefillPersistable` (live, `StagePolicyTable:866`) tests `__imputed` BEFORE the draft and refuses it; `prefillSelect.ts::prefillSourceFor` never tested `__imputed` at all and returned `"edit"`. `policyPrefill.test.ts` asserted the SECOND answer, in a test named *"does NOT persist an imputed average, but DOES persist an edit of one"*, and it passed for its whole life against a function no screen ever called. A green test for behaviour that has never run is worse than no test: it is a claim on the record that the product does something it does not do — and this one described the D1 defect's own shape (freezing an estimate as though it were data) as the intended behaviour. The live answer is kept, and not merely because it is incumbent: the prefill's job is to freeze what the DATA says, an imputed average is an estimate to verify whether or not somebody typed over it, and a manual save is a different path that still writes the user's value. The assertion is inverted in place with the reason written above it, so it is not mistaken for a test edited to pass. **A second difference was also latent**: the dead copy had a third source, `"decision"`, reading `__decided`. The live rule has none and does not need one — `useStageRows::markFromData` writes `__from_data.primary_source` whenever the field has a value, so the G16 routing decision persists through the same door as an uploaded column. Adding a `__decided` branch would make a field with NO value newly persistable, which is the other half of §4 D23 | `src/lib/policies/resolveEffective.ts` (`prefillSourceFor`'s `__imputed`-before-draft order); `src/lib/policies/__tests__/policyPrefill.test.ts` (the inverted assertion) | **CLOSED (WP 6.2)** — one rule, gated both ways |
 | **D27** | **The uuid org plane and the text org plane diverge on every project insert.** `set_project_defaults()` stamps `NEW.organization` (text) and never `NEW.organization_id`, so the one-time backfill in `20260709000002` is the only thing that ever set the uuid. Every project created since has `organization_id IS NULL` — visible through RLS, which compares text, and invisible to the public `/v1` API, which authorizes by uuid (`p.organization_id = p_org_id`). D13 records that two identities exist; this records that they already disagree, and that the disagreement grows by one row per project. Found after WP 1.4 while sizing WP 2.1 | `20250820170403_…sql:58-84`; `20260711000001_api_access_control.sql:401,415` | WP 2.1 ✅ |
 | **D28** | **Every policy in the schema is PERMISSIVE, so deny-all policies do not deny — and `anon` holds real grants behind them.** Postgres ORs permissive policies and no migration anywhere declares `RESTRICTIVE`. `approved_users` — the authentication table, holding `password_hash` — carries `FOR SELECT USING (true)` beside `FOR ALL TO authenticated, anon USING (false)`; the second was meant to supersede the first and instead ORs with it. **WP 2.4 measured the whole class rather than the one example.** 27 tables carry at least one policy with no predicate; 7 of those permit unconditional WRITES (`scenarios`, `simulation_runs`, `run_replications`, `run_item_series`, `experiments`, `policy_versions`, `dataset_versions`). The grants are real and are in the migrations, not merely Supabase defaults: `anon` has SELECT+INSERT+UPDATE+DELETE on `scenarios`, SELECT+INSERT+UPDATE on `simulation_runs`, `run_replications` and `run_item_series`, INSERT on `policy_versions` and `dataset_versions`, and SELECT on the four lane tables, the policy tables and the three item masters — the last three invisible to a static scan because `20260614000001` grants them inside `EXECUTE format(...)`. The anon key is hardcoded in the frontend bundle (`src/integrations/supabase/client.ts:6`), so `anon` is anyone who loads the site. **NOT closed, deliberately:** the application itself runs as `anon` with no `supabase.auth` session, so revoking breaks the product — it needs an auth model, which is a Phase 3 package and not a policy edit. Pinned instead by `governanceEnforcement.test.ts`, which fails if the set GROWS, and rendered on every generated page beside the intended capability. **ITS OWNER WAS A PHASE AND THE PHASE ENDED.** Until WP 3.4 this row's "Closed by" cell read the phase number, on the strength of the sentence above — and no package in that phase was ever written for it, so when the phase's last package shipped the owner became a finished phase. That is D41 exactly, standing in the blind spot of R8, the rule built to prevent D41: R8 matched `WP N.M`. R8 now reads phase-level owners, and refuses an owner the plan does not contain, and §14 gained `WP 7.1 — the authentication model` so this row has one that exists | `20260826015711_…sql` + `20250815225910_…sql` (`approved_users`); `20260614000001_item_master.sql:53-71` (the dynamic grants); `src/integrations/supabase/client.ts:6` | **WP 7.1** *(§14, deferred — the standing decision is unchanged: document, do not change)* |
 | D29 | **Two organizations may share a display name, and the text branch then admits one to the other.** `organizations.name` is NOT UNIQUE (only `slug` is), so `organization = get_current_user_org()` matched across tenants whenever two names collided. WP 2.1 preserved it deliberately — a uuid-first rule DENIES where the old one granted, and a package whose job is to stop revoking access must not add a new way to revoke it — and named its condition: §15 confirming the backfill. **§15 CONFIRMED IT, 2026-09-16 (run `35064364537`): 14 of 14 accounts carry `organization_id`, so every caller resolves on the uuid plane; 0 accounts carry the `default_org` text and 0 carry a blank one, so the ONE project without an `organization_id` (`4f314330-…`, "Demo Simulation Project", org text `default_org` matching none of the three organizations, modeler resolving to no account) was reachable by nobody anyway. Removing the branch revokes nothing — measured, not argued.** Closed by `20260916000011_org_identity_uuid_only.sql`: uuid only, signature unchanged so the 59 calling policies are untouched, `sameOrganization()` matched in TypeScript, `orgIdentity.test.ts`'s pinned truth-table case flipped to `false`, and `supabase/rehearsal/040` proves against a real database that a rename still matches and a shared display name does not. **The demo project's TENANCY is not resolved and a migration must not guess it — §16** | `org_is_current_user_org` in `20260916000011_org_identity_uuid_only.sql`; `organizations.name` has no UNIQUE constraint; §15 | WP 3.0 ✅ |
@@ -330,7 +331,7 @@ only in `PROMPTS.md` or in a session transcript.
 | `resolveEffective.ts:82` | `dataRow[field]` is checked **before** the override bundle (D23) |
 | `resolveEffective.ts:103-193` | `resolveCell` — the canonical provenance logic |
 | `resolveEffective.ts:200-224` | `isPrefillPersistable` — the D1 rule: persist `__from_data` or an unsaved edit, never a default. **The live rule**; `prefillSelect.ts` is its unreachable twin (D26) |
-| `prefillSelect.ts:33,48` | `prefillSourceFor` / `isPrefillable` — a second, unreachable copy of the same rule (D26) |
+| `resolveEffective.ts` `prefillSourceFor` | the ONE prefill rule. `prefillSelect.ts` held a second, unreachable copy that disagreed with it; deleted in WP 6.2 (D26, D93), gated by `oneResolver.test.ts` |
 | `StagePolicyTable.tsx:1208-1276` | a **verbatim copy** of `resolveCell` (de-dup in WP 6.2) |
 | `StagePolicyTable.tsx:820-831` | `applyPrefill` — raises `applying` before the row loop, then `runPrefill` (`:833`) |
 | `StagePolicyTable.tsx:900-917` | the auto-seed effect; marker is a **Set** of `${projectId}::${stageKey}` |
@@ -9443,3 +9444,69 @@ state absent from the legend under-reports, which is the failure §13 warns abou
 
 **Still open in WP 6.2:** D18, D23, D24, D26, D34, D47, D48, D49, D51, D53, D58,
 D59, D66, D69, D71, D85, D87.
+
+### WP 6.2 (slice 3) — D26, and the test that belonged to the dead copy · 2026-09-17 · no migration
+
+**What slice 2 promised.** Slice 2 cited D26 twice as the reason a gate beats a
+comment. This slice closes it, and the closing found the cost was already paid.
+
+**D26 predicted a risk. The risk had already happened.** D26 records two
+implementations of the D1 prefill rule and warns that "the next edit to *the rule*
+has even odds of landing on the dead one". Comparing them line by line before
+deleting either — rather than assuming the dead one was a copy — found they
+**already disagreed**, on a case both were tested for:
+
+> the user types a value over an imputed average
+
+| | answer |
+|---|---|
+| `isPrefillPersistable` (live, called at `StagePolicyTable:866`) | **not persisted** — `__imputed` is tested BEFORE the draft |
+| `prefillSelect.ts::prefillSourceFor` (imported, never called) | **persisted** as `"edit"` — `__imputed` was not tested at all |
+
+`policyPrefill.test.ts` asserted the second answer, in a test named *"does NOT
+persist an imputed average, but DOES persist an edit of one"*. It passed for its
+whole life, against a function no screen has ever called. **That is worse than an
+untested rule**: it is a claim on the record that the product behaves a certain
+way, and here the claimed behaviour is the D1 defect's own shape — freezing an
+estimate as though it were data — written down as the intention.
+
+**Which answer was kept, and why it is not just incumbency.** The live one. The
+prefill's job is to freeze what the DATA says; an imputed average is an estimate
+to verify whether or not somebody typed over it; and a manual save is a different
+path that still writes the user's value. The assertion is inverted **in place**,
+with the reasoning written above it, so a later reader does not find a test that
+looks edited to pass.
+
+**A second difference, latent.** The dead copy had a third source, `"decision"`,
+reading `__decided`. The live rule has none and needs none:
+`useStageRows::markFromData` writes `__from_data.primary_source` whenever the
+field has a value, so the G16 routing decision persists through the same door as
+an uploaded column. Adding a `__decided` branch would make a field with **no**
+value newly persistable — the other half of §4 D23, and not something to change
+blind while closing a different defect. The test fixture carried `__decided`
+without the matching `__from_data`, which no row from that hook actually emits;
+it is corrected, and a new assertion pins that a `__decided` marker ALONE does not
+persist.
+
+**The gate.** `oneResolver.test.ts` gained two assertions: exactly one module in
+`src/lib/policies` may define the predicate, and that predicate must still test
+`__imputed` before the draft — the order that IS the behaviour, and the exact
+point the copies disagreed on. Mutation-tested: hoisting the draft test fails both
+the gate and the behavioural test.
+
+**Gap check.** Two findings:
+
+1. **`__from_data` and `__decided` overlap and nothing says how.** `markFromData`
+   sets `__from_data.primary_source`; `useStageRows` also sets
+   `__decided.primary_source` unconditionally on the same rows. One field, two
+   provenance markers, with different rules keying off each — `__decided` drives
+   the `suggested` dot, `__from_data` drives persistence. The relationship is
+   discoverable only by reading both writers. This is the substrate D23 sits on
+   and it should be settled when D23 is.
+2. **The deletion removed a vocabulary the plan may want back.** `PrefillSource`
+   is now `"edit" | "data"`, where the dead copy had three. If WP 6.3's provenance
+   export wants to say *why* a prefill wrote a value, the label already exists and
+   is honest for the two cases that occur.
+
+**Still open in WP 6.2:** D18, D23, D24, D34, D47, D48, D49, D51, D53, D58, D59,
+D66, D69, D71, D85, D87.

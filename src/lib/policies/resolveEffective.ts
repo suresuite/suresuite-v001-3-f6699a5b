@@ -274,16 +274,60 @@ export function resolveCell(args: {
  * which the pre-dispatch validator reads from the saved bundle.
  *
  * Imputed averages are excluded even when edited: they are estimates to verify,
- * and silently freezing them has poisoned projects before.
+ * and silently freezing them has poisoned projects before. Note the ORDER — the
+ * imputed test runs BEFORE the draft test, and that is the whole of the
+ * difference described next.
+ *
+ * ── THE SECOND IMPLEMENTATION IS GONE, AND IT DISAGREED (§4 D26, D93) ──────
+ *
+ * `prefillSelect.ts` held `prefillSourceFor` / `isPrefillable`: the same rule,
+ * separately written, imported by `StagePolicyTable` and never called. D26
+ * predicted the cost — "the next edit to the rule has even odds of landing on the
+ * dead one" — and understated it. The two did not merely risk drifting; they had
+ * already drifted, on a case each of them was TESTED for:
+ *
+ *     the user types a value over an imputed average
+ *       · this rule      → NOT persisted by the prefill (imputed is checked first)
+ *       · prefillSelect  → persisted as `"edit"` (imputed was not checked at all)
+ *
+ * `policyPrefill.test.ts` asserted the second answer, in a test named "does NOT
+ * persist an imputed average, but DOES persist an edit of one", and it passed for
+ * as long as it existed — against a function no screen ever called. A green test
+ * for behaviour that has never run is worse than no test: it is a claim on the
+ * record that the product does something it does not do.
+ *
+ * This rule's answer is kept because it is the one that has been running and the
+ * safer of the two: the prefill's job is to freeze what the DATA says, and an
+ * imputed average is an estimate to verify whether or not somebody typed over it.
+ * A manual save is a different path and still writes the user's value.
+ *
+ * `__decided` is deliberately NOT a source here. It marks the stage's routing
+ * suggestion for the `suggested` provenance dot; the routing decision reaches the
+ * prefill through `__from_data`, which `useStageRows::markFromData` sets for
+ * `primary_source`/`sourcing_firm` whenever they have a value. Adding a
+ * `__decided` branch would make a field with NO value newly persistable, which is
+ * the other half of §4 D23 and not this package's to change blind.
  */
+
+/** Why a row×field may be persisted by the prefill. */
+export type PrefillSource = "edit" | "data";
+
+export function prefillSourceFor(
+  row: Record<string, unknown>,
+  field: string,
+  draft?: unknown,
+): PrefillSource | null {
+  const imputed = (row.__imputed ?? {}) as Record<string, true>;
+  if (imputed[field] === true) return null;
+  if (draft !== undefined) return "edit";
+  const fromData = (row.__from_data ?? {}) as Record<string, true>;
+  return fromData[field] === true ? "data" : null;
+}
+
 export function isPrefillPersistable(
   row: Record<string, unknown>,
   field: string,
   draft?: unknown,
 ): boolean {
-  const imputed = (row.__imputed ?? {}) as Record<string, true>;
-  if (imputed[field] === true) return false;
-  if (draft !== undefined) return true;
-  const fromData = (row.__from_data ?? {}) as Record<string, true>;
-  return fromData[field] === true;
+  return prefillSourceFor(row, field, draft) !== null;
 }

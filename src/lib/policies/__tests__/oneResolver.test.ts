@@ -25,7 +25,7 @@
  * how the copy started.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
@@ -74,5 +74,52 @@ describe("WP 6.2 · one resolver", () => {
     for (const re of LADDER) {
       expect(re.test(resolver), `${re} is gone from resolveEffective.ts — the gate above is now vacuous`).toBe(true);
     }
+  });
+});
+
+/**
+ * THE SAME DEFECT, ONE FLOOR DOWN (§4 D26, D93).
+ *
+ * "May the prefill persist this row×field?" also existed twice — this rule in
+ * `resolveEffective.ts`, and `prefillSelect.ts`'s `prefillSourceFor` /
+ * `isPrefillable`, imported by `StagePolicyTable` and never called. They had
+ * already drifted on a case each was tested for: an edit of an imputed average is
+ * persisted by one and refused by the other, and `policyPrefill.test.ts` asserted
+ * the answer of the copy that never ran.
+ *
+ * The scan is over `src/lib/policies` rather than the whole tree because that is
+ * where a policy rule belongs; a copy smuggled into a component is caught by the
+ * renderer gate above, which requires the resolver to be CALLED.
+ */
+describe("WP 6.2 · one prefill rule", () => {
+  const DIR = join(ROOT, "src/lib/policies");
+  const files = readdirSync(DIR).filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"));
+
+  it("exactly one module defines the prefill predicate", () => {
+    const decl = /export function (prefillSourceFor|isPrefillPersistable|isPrefillable)\b/g;
+    const owners = files.filter((f) => decl.test(readFileSync(join(DIR, f), "utf8")));
+    expect(
+      owners,
+      "the prefill rule is defined in more than one module. That is exactly how " +
+        "§4 D26 happened: two implementations, both unit-tested, one never called, " +
+        "and they disagreed on whether an edit of an imputed average is persisted.",
+    ).toEqual(["resolveEffective.ts"]);
+  });
+
+  it("and the rule it defines still checks `__imputed` BEFORE the draft", () => {
+    // The order IS the behaviour, and it is the exact point the two copies
+    // disagreed on. A refactor that hoists the draft test above the imputed test
+    // silently adopts the dead copy's answer.
+    const src = readFileSync(join(DIR, "resolveEffective.ts"), "utf8");
+    const body = src.slice(src.indexOf("export function prefillSourceFor"));
+    const imputed = body.indexOf("__imputed");
+    const draft = body.indexOf("draft !== undefined");
+    expect(imputed).toBeGreaterThan(-1);
+    expect(draft).toBeGreaterThan(-1);
+    expect(
+      imputed < draft,
+      "`prefillSourceFor` now tests the draft before `__imputed`, so the prefill " +
+        "freezes an edited estimate — the behaviour of the copy deleted in WP 6.2.",
+    ).toBe(true);
   });
 });

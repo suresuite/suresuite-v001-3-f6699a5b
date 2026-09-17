@@ -9,8 +9,13 @@
  * default could never apply to a project the user had merely opened.
  */
 import { describe, expect, it } from "vitest";
-import { isPrefillable, prefillSourceFor } from "../prefillSelect";
-import { resolveCell, type DerivedMaps, type MasterRowMaps } from "../resolveEffective";
+import {
+  isPrefillPersistable,
+  prefillSourceFor,
+  resolveCell,
+  type DerivedMaps,
+  type MasterRowMaps,
+} from "../resolveEffective";
 import { specFor } from "../columnSpecs";
 import { DEFAULT_BUNDLE, type PolicyBundle, type PolicyFamily } from "../schemas";
 import type { OverrideRow } from "../resolve";
@@ -67,7 +72,7 @@ describe("D1 — the prefill persists only what the row can source", () => {
     // The exact defect: `safety_stock_days` is not in `__from_data`, so the
     // auto-seed must write no override for it and the engine's default stands.
     expect(prefillSourceFor(supplierRow(), "safety_stock_days")).toBeNull();
-    expect(isPrefillable(supplierRow(), "safety_stock_days")).toBe(false);
+    expect(isPrefillPersistable(supplierRow(), "safety_stock_days")).toBe(false);
   });
 
   it("persists an uploaded value", () => {
@@ -77,17 +82,48 @@ describe("D1 — the prefill persists only what the row can source", () => {
   it("persists the stage's routing decision, so the pre-run gate still passes", () => {
     // G16: the gate requires a persisted primary supplier per material. The
     // decision is derived from uploaded volumes, so it survives the D1 fix.
-    expect(prefillSourceFor(supplierRow(), "primary_source")).toBe("decision");
+    //
+    // IT ARRIVES AS `data`, NOT AS A SOURCE OF ITS OWN (§4 D93). The deleted
+    // `prefillSelect.ts` had a third source, `"decision"`, reading `__decided`.
+    // The live rule has never had one, and does not need one:
+    // `useStageRows::markFromData` writes `__from_data.primary_source` whenever
+    // the field has a value, so the routing decision is persisted through the
+    // same door as an uploaded column. The fixture is corrected to match what
+    // `useStageRows` actually emits — it carried `__decided` alone, which no row
+    // from that hook ever does for a field with a value.
+    const row = supplierRow({
+      __from_data: { material_price: true, primary_source: true } as Record<string, true>,
+    });
+    expect(prefillSourceFor(row, "primary_source")).toBe("data");
   });
 
-  it("does NOT persist an imputed average, but DOES persist an edit of one", () => {
+  it("a `__decided` marker ALONE does not persist — it is a display marker", () => {
+    // The distinction the deleted copy erased. `__decided` drives the `suggested`
+    // provenance dot. A field marked decided with no value in `__from_data` is a
+    // suggestion the user has not accepted, and freezing it is D1's shape again.
+    expect(prefillSourceFor(supplierRow(), "primary_source")).toBeNull();
+  });
+
+  it("does NOT persist an imputed average, NOR an edit of one", () => {
+    // ── THIS ASSERTION IS INVERTED FROM WHAT IT SAID, AND THAT IS THE POINT ──
+    //
+    // It used to read `.toBe("edit")` and it passed — against `prefillSelect.ts`,
+    // a second implementation of this rule that no screen ever called (§4 D26,
+    // D93). The LIVE rule tests `__imputed` BEFORE the draft, so an edit of an
+    // imputed average has never been persisted by the prefill, and this test has
+    // documented the opposite for as long as it existed.
+    //
+    // The live answer is kept, on its own merits and not merely because it is
+    // incumbent: the prefill's job is to freeze what the DATA says, and an
+    // imputed average is an estimate to verify whether or not somebody typed over
+    // it. A manual save is a different path and still writes the user's value.
     const row = supplierRow({
       material_price: 9,
       __from_data: {},
       __imputed: { material_price: true },
     });
     expect(prefillSourceFor(row, "material_price")).toBeNull();
-    expect(prefillSourceFor(row, "material_price", 11)).toBe("edit");
+    expect(prefillSourceFor(row, "material_price", 11)).toBeNull();
   });
 
   it("persists an unsaved edit of any field, sourced or not", () => {
