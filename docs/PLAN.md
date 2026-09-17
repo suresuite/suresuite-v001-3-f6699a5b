@@ -7887,7 +7887,7 @@ lose — not the seven-lane exercise D5 was. WP 4.3 should re-budget it down. Th
 measurement had to be taken NOW, because a package cannot take its own
 before-number after it has acted.
 
-#### M · D73 — THE THIRD MODE EARNED ITS KEEP, AGAIN
+#### L · D73 — THE THIRD MODE EARNED ITS KEEP, AGAIN
 
 The brief says to run `--since HEAD` before every push because it builds the shape
 `main` meets after the merge and no other mode does. It caught something.
@@ -7924,7 +7924,7 @@ an EARLIER migration had set — although PostgreSQL preserves it across a repla
 The artifact now carries it forward, which is the artifact agreeing with the
 database rather than with the statement it last read.
 
-#### N · D74 — THE PAGES WERE WRONG ABOUT THE INVARIANT THEY REPORT
+#### M · D74 — THE PAGES WERE WRONG ABOUT THE INVARIANT THEY REPORT
 
 Reading the page this package's own sidecar generated turned up a third finding.
 `docs/data/tables/analysis_runs.md` said:
@@ -7951,7 +7951,7 @@ a generated falsehood also survives handover. The fix is conditional prose that
 names the constraint when the key is landed. The field, and therefore R5, is
 untouched.
 
-#### L · The caveat, and what WP 4.3 should not inherit as settled
+#### N · The caveat, and what WP 4.3 should not inherit as settled
 
   - **Nothing has ever called `analysis_get_or_start` outside a rehearsal.** Every
     claim about a cache hit is a claim about `supabase/rehearsal/` fixtures. The
