@@ -49,6 +49,26 @@ def _policy(policies: dict, scope: str, key: str, family: str) -> dict:
     return {**default, **override}
 
 
+def _production_policy(policies: dict, p_id: str) -> dict:
+    """``production`` patch for a product, from both target-key spellings.
+
+    The plant grid writes one override row per (focal plant, product) pair,
+    ``node:<plant>::<product>``, while this engine only holds the product id
+    — so the bare lookup above never matches it and a line-capacity edit is
+    stored and never read (§4 D75). Most specific wins; composite keys are
+    visited in sorted order for determinism.
+    """
+    merged = _policy(policies, "node", p_id, "production")
+    for key in sorted(k for k in policies if isinstance(k, str)):
+        if not key.startswith("node:") or "::" not in key:
+            continue
+        _owner, _, target = key[len("node:"):].partition("::")
+        if not target or target != p_id:
+            continue
+        merged = {**merged, **((policies.get(key) or {}).get("production") or {})}
+    return merged
+
+
 def _bom(graph: nx.DiGraph, p_id: str) -> dict[str, float]:
     """Return {m_id: consumption_rate} for product p_id (in-edges typed 'bom')."""
     result: dict[str, float] = {}
@@ -190,7 +210,7 @@ def _production_step(
 ) -> tuple[float, float, float]:
     """Produce Q_p, consume materials.  Returns (Q_p, revenue_t, lost_sales_t)."""
     node = graph.nodes.get(p_id, {})
-    prod_pol = _policy(policies, "node", p_id, "production")
+    prod_pol = _production_policy(policies, p_id)
     fulfill_pol = _policy(policies, "node", p_id, "fulfillment")
 
     backlog_allowed = bool(fulfill_pol.get("backorder_allowed", True))
