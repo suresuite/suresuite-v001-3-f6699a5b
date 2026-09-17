@@ -3,7 +3,7 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **4 packages closed**
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed**
 
 ---
 
@@ -104,6 +104,30 @@ now.
 **Verified:** `contract:check` ✓ · 337 tests ✓ · eslint at baseline · build ✓ · 15
 rehearsals green in both modes · mutation-tested.
 
+### WP 6.1 — Resolution chains, documented and pinned · no migration
+
+**38 chains, derived rather than written.** ~120 hand-written chains are true on
+the day they're typed (D21/D22); every hop already exists as data, so
+`resolutionChains.ts` computes them and a test pins what rots. **9 break**, each
+ratcheted so the number can only fall — that list is WP 6.2's actual work.
+
+- **D89** — `plant.initial_on_hand` is master-backed by `products.initial_on_hand`
+  and **`products` has no such column**. `materials` does, and the supplier stage
+  uses it correctly fifty lines earlier. The cell silently falls through to the
+  bundle under a header claiming item-master data.
+- **D90** — three doors reach the engine and only two are declarations. For nine
+  bundle keys, a quoted string in `project_map.py` is the only evidence they're
+  read at all. §3 says the registry export is the single source for policy
+  schemas — true of the ones that exist, silent about these.
+- **Three over-claims caught inside the package** (28→11, 11→9, 7→0), each of
+  which would have shipped a confidently wrong list of findings.
+- **Its gap check found eleven tables** deferred to WP 6.1 behind an association
+  rather than a plan. They now have a real owner: **WP 6.4**, a new package, kept
+  off WP 6.3 because 22 tables under one package misrepresents its cost.
+
+**Verified:** `contract:check` ✓ · 348 tests ✓ · eslint at baseline · build ✓ ·
+mutation-tested.
+
 ## ⚠ READ FIRST — `main` IS RED, and this branch fixes it
 
 PR #222 **merged** at `0ca07da` — two commits pushed to the branch after that
@@ -174,12 +198,12 @@ diagnosed:
 
 | # | Package | State |
 |---|---|---|
-| 1 | **WP 6.1** — resolution chains, pinned | not started |
-| 2 | WP 6.2 — fix the divergences | not started · budget shrank after D78 |
-| 3 | WP 6.3 — vocabulary, value chain, reproducibility record | **re-scoped**: now owns `result-binding` + 11 table sidecars |
+| 1 | **WP 6.2** — fix the divergences | not started · budget shrank after D78 |
+| 2 | WP 6.3 — vocabulary, value chain, reproducibility record | **re-scoped**: now owns `result-binding` + 11 table sidecars |
+| 3 | **WP 6.4** — the decision plane described (NEW, created by 6.1's gap check: 11 tables) | not started |
 | — | WP 5.2b–g — the manual | 14 of 80 pages live |
 | — | D57 — `reference.generated.ts` does not typecheck | unowned, one line, pick up anywhere |
 
 ## Blocked
 
-Nothing. WP 6.1 can start immediately.
+Nothing. WP 6.2 can start immediately — its list is now nine named broken chains plus D90's nine undeclared keys.

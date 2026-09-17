@@ -270,6 +270,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D86** | **`main` went red on a gate this plan introduced, because the fix for it was pushed after the PR had already been merged.** PR #222 merged at `0ca07da`. Two commits pushed to the same branch afterwards — the §15 probe repair (D84) and the R12 lineage repair — were not in it, so `main`'s `contract:check` exits 1 with six R12 failures: PR #221's rewrite of `ProcessLevelNetwork.tsx` moved three table reads (`bom_multi_level` :1104, `supply_chain_data_multi_tier` :1105, `projects` :248) and the re-pointed evidence never landed. **The gate is behaving correctly and the base branch is broken by it**, which is a distinction worth keeping: R12 found a real staleness on the merge commit, and the repair simply missed the train. **The lesson is about CONCURRENCY, not about R12**: two agents on one plan, one branch merged by a third party mid-flight, and a gate keyed on line numbers in files the other agent rewrites. Any evidence-carrying gate has this property — §4's citations (R6) would have done the same | `origin/main` at `d51543d`: `npm run contract:check` exits 1 | *(fixed on `claude/busy-thompson-9p8zb9` and awaiting a merge — the repair is `node scripts/data-contract/analyse-surfaces.mjs && … --write && npm run contract:generate`, which is idempotent since the same session made it so)* |
 | **D87** | **The committed browser-engine wheels are stale against `scsim`, and the drift gate says so on `main`.** `scripts/build_engine_wheels.sh --check` fails: the wheel's `project_map.py` still calls `_policy(policies, "node", p_id, "production")` where the source now calls `_production_policy(policies, p_id)` — PR #221's plant-stage override work changed the Python and did not regenerate `public/engine/`. The wheels are committed on purpose so the Vercel build stays pure-Vite, so a stale wheel means **the browser engine runs different code from the worker engine**, which is `single-source` (I1) across a boundary no test crosses. Regeneration is one command and CI names it. **It could not be done from a work-package session**: `build_engine_wheels.sh` derives `engine_version` by importing `scsim`, that import needs `pydantic`, and the egress proxy denies PyPI — so a regeneration here writes `"engine_version": "unknown"` into a manifest whose own docstring says the version "is embedded in every result". A green check bought by regressing that field is the trade §5 exists to refuse | `scripts/build_engine_wheels.sh --check` against `scsim/scsim/io/project_map.py`; `public/engine/manifest.json` | WP 6.2 *(with the rest of PR #221's package; whoever runs it needs an environment with `pip install ./scsim` available, which CI has and a work-package session does not)* |
 | **D88** | **WP 5.3 cannot drop the entity columns, and the number is 8 577 of 8 577.** §11's WP 5.3 is "pages read `analysis_results`; drop entity columns", and §15 run `35280849096` measured what that would cost: `network_nodes` 1 385 rows, `node_list` 1 747, `supply_chain_data` 5 445, `network_summary` 0 — **every one of the 8 577 carrying `computed_from_hash IS NULL`** — against `analysis_runs` = 0 and `analysis_results` = 0. The store is EMPTY in production. So the migration has no source: switching a reader to `analysis_results` shows nothing for every project, and dropping the columns destroys 8 577 values with nothing to replace them. **Neither half of the package's name is executable today, and the reason is not a defect in the design**: WP 4.3 shipped the dual-write, and an analyzer fills the store only when somebody RUNS an analysis. The precondition is adoption, not code. **A backfill cannot substitute**: a row written before WP 4.3 has no input hash and one cannot be invented — inventing it is precisely the fabricated provenance `declared-fallback` (I6) forbids, and a `computed_from_hash` that is confidently wrong is worse than the NULL it replaced | §15 run `35280849096`, sections "WP 4.3 / 4.4 — provenance coverage" and "WP 4.2 — did the analysis store reach production" | WP 6.3 *(re-homed with the rest of the result-binding group. The unblocking condition is a NUMBER and belongs in §15's standing report rather than in a package's prose: `analysis_results` non-zero for a project, and `computed_from_hash IS NULL` falling. Until then the entity columns stay and the readers dual-read — prefer the store, fall back to the column, and say which at the point of display (T2))* |
+| **D89** | **The plant stage's `initial_on_hand` is master-backed by `products.initial_on_hand`, and `products` has no such column.** `columnSpecs.ts:216-218` declares `master: { table: "products", field: "initial_on_hand", idFrom: "product_id" }`. The `products` table has eighteen columns and that is not one of them — **`materials` does have it**, and the supplier stage uses it correctly fifty lines earlier (`:164-165`), which is what makes this a copy rather than a misunderstanding. The consequence is silent by construction: `masterValueFor` returns undefined for a column that does not exist, so the cell falls through the resolver to `derivedValueFor` and then to the policy bundle, and the user sees a number that came from the bundle while the column header says it is item-master data. **Found by WP 6.1's chain resolver, which could not write the chain down** — the DB hop has no target — and it is the only one of the nine breaks that is a pointer at nothing rather than a value nothing reads | `src/lib/policies/columnSpecs.ts:216-218` against `products`'s introspected columns | WP 6.2 *(two ways out and they are not equivalent: add the column to `products` — it is a real engine input for a finished-goods buffer — or drop the `master:` block so the cell is honestly bundle-backed. The first is a schema change and the second is a one-line deletion, and choosing by cost rather than by what the number MEANS is how D17's class starts)* |
+| **D90** | **Nothing declares which policy-bundle keys the engine reads; `project_map.py` is the only evidence for nine of them.** WP 6.1 traced every grid field to the engine and found three doors: the registry's `data_requirements` (`table.column` the engine needs from the dataset), a policy's `params_schema` (80 declared parameters), and — for everything else — **a quoted string in `project_map.py`**. Door 3 is not a contract: it is a text scan over a Python file, it is the only proof those fields reach the engine at all, and `single-source` (I1) says a data fact is authored once, in a place a generator can read. §3's standing law says "the registry export is the single source of truth for policy schemas (§6.2)" — and these keys are outside it, so the law is true of the schemas that exist and silent about the ones that do not. **The measurement is the finding**: of 38 grid fields, the registry declares the engine hop for 29 and a string literal is the only evidence for the rest | `scsim/scsim/io/project_map.py` against `supabase/functions/_shared/registry.generated.json`'s `params_schema` blocks; `src/lib/policies/resolutionChains.ts`'s three doors | WP 6.2 *(the fix is in `scsim`, not here: a bundle key the engine reads belongs in a policy's `params_schema`, which `registry_export.py` already generates. Until then `resolutionChains.test.ts` accepts door 3 and SAYS it is the weakest of the three, so the next reader is not told these nine are as well-declared as the other 29)* |
 
 ### 4.1 Code map — the data layer
 
@@ -1958,11 +1960,58 @@ definition is worse than a red one.
 
 ## 13. Phase 6 — Policy contract, researcher grade
 
-### WP 6.1 — Resolution chains, documented and pinned
+### WP 6.1 — Resolution chains, documented and pinned ✅ *(D89, D90 found — done, no migration)*
+
 For every grid field: CSV column → DB column → RPC → hook → substitution → engine
-field → unit at each hop. Pin with parity fixtures in `grading.ts` style. **A chain
-you cannot write down is a bug** — list those rather than inventing prose; the list
-feeds WP 6.2.
+field → unit at each hop. **A chain you cannot write down is a bug** — list those
+rather than inventing prose; the list feeds WP 6.2.
+
+**THE CHAINS ARE DERIVED, NOT WRITTEN DOWN**, and that is the one design decision
+this package makes. Roughly 120 hand-written chains are true on the day they are
+typed; every hop already exists as data — the column specs, the contract, the
+engine registry, the resolver's own ordering — so `resolutionChains.ts` computes
+them and `resolutionChains.test.ts` pins the parts that rot. What a person writes
+is the exception list, and even that is computed: a chain is unwritable when a
+hop it needs is missing, and **the missing hop IS the finding**.
+
+**38 chains. NINE break, and every one is WP 6.2's.** Eight are the class the
+WP 0.1 gap check named, pointing the other way — rendered, editable, hashed into
+`policy_hash`, and read by nothing (`material_price` is D18 itself). The ninth is
+new: **D89**, `plant.initial_on_hand` is master-backed by a column `products` does
+not have.
+
+**The one hop that is transcribed rather than computed is the resolver's ORDER**,
+because executing `getEffectiveValue` here would be a second implementation of it
+— `single-source` (I1) broken in order to document `single-source`. So the order
+is prose with a source file, and the test asserts the six branches still appear in
+that sequence. `dataRow` BEFORE the bundle is asserted on its own: WP 4.4's
+`seeded_from_hash` turns on it.
+
+**D90 — three doors reach the engine and only two are declarations.** The
+registry's `data_requirements`, a policy's `params_schema`, and a quoted string in
+`project_map.py`. Of 38 fields the registry declares the hop for 29; for the rest
+a string literal in a Python file is the only evidence. §3's standing law says the
+registry export is the single source for policy schemas — true of the schemas that
+exist, silent about the ones that do not.
+
+**Exit** ✅ — `resolutionChains.test.ts`, eleven assertions: every unbroken chain
+names its storage and write path · a declared default is always recorded as a
+substitution (T2) · the resolver's six branches still appear in the transcribed
+order · `dataRow` precedes the bundle · the break list is a RATCHET that may
+shrink and not grow, with a companion test that removes a name which stops
+breaking · **G4 as a gate**: no engine-read field is unreachable by both the grid
+and every upload, which is EMPTY today and so is a gate rather than a ratchet.
+Mutation-tested: closing door 3 and dropping a storage hop each turn it red.
+
+**Gap check** ✅ — and it is about this package's own method. **Three over-claims
+were caught inside it before anything shipped**, each of which would have produced
+a confident list of false findings: 28 → 11 (looking only at `data_requirements`
+for the engine hop, which reported `safety_stock_days` as unread — the field D1 is
+entirely about the engine reading); 11 → 9 (`__inv_params` is `synthetic: true`, a
+vector cell rather than a field); 7 → 0 (comparing the engine's `table.column`
+against the grid's `field` id, which reported `materials.cost` as invisible while
+it is on screen as `material_cost`). That is D82 and D83's lesson arriving a
+package later, in a package whose entire output is a list.
 
 ### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D53, D58, D59, D66, D69, D71; D16 closed in WP 0.1)*
 
@@ -2044,6 +2093,39 @@ Reproducibility Record (dataset, policy, scenario, engine and analysis versions 
 declared limits). Deep-link grid → P3 and the legend → P5.
 
 **Exit — the §5.4 acceptance test.**
+
+### WP 6.4 — The decision plane, described *(created by WP 6.1's gap check)*
+
+Eleven tables — `policy_versions`, `policy_presets`, `scenarios`,
+`scenario_templates`, the five `disruption_scenario_*`, `recovery_playbooks` and
+`external_evidence` — described, governed and audited like every other tier in the
+contract.
+
+**IT EXISTS BECAUSE R8 FOUND THEM WAITING ON A PACKAGE THAT NEVER CLAIMED THEM.**
+`coverage.yaml` deferred all eleven to WP 6.1, whose own reasoning gave it away:
+*"WP 6.1 pins the resolution chains … the scenario and disruption tables are the
+surface those chains resolve against."* Being the surface a package READS is not
+being its deliverable, and §13's WP 6.1 described no table at all — it traced 38
+grid fields. Eleven tables sat behind a sentence that reads like a plan and is an
+association.
+
+**WHY NOT ONTO WP 6.3, WHICH IS WHERE WP 4.4 SENT ITS ELEVEN.** Budget honesty.
+WP 6.3 already carries A2, A3, A5, the provenance vocabulary and the eleven
+result-binding tables. Twenty-two tables under one package is a number that
+misrepresents what it costs, and misrepresented budget is the thing boundary
+reviews exist to catch (§16 · Phase 2→3, where seven items were "carried by
+pointing at a package that had already shipped").
+
+**They belong together on their own terms**: this is the DECISION plane — what a
+person or an agent chose, as against the dataset they chose it over and the result
+it produced. `result-binding` (I8) is the invariant that needs all three, which is
+why WP 6.3 keeps the results and this package takes the decisions.
+
+**Gap check** — every one of the eleven is tier 4 or above and none is audited
+today (`contract:check` R11 prints the count). Describing them brings them inside
+`dataPlaneAudit.test.ts`'s rule, which is D54's lesson: a deferral hides a table's
+WRITERS from every check scoped to the contract, and WP 4.3 measured what that
+costs when the four deep-tier tables came in.
 
 ---
 
@@ -8993,6 +9075,124 @@ the same failure mode, one level down.
   assertion goes, the function goes with it — §0 of that file says so, so the two
   cannot quietly outlive each other.
 
+### WP 6.1 — Resolution chains, documented and pinned · 2026-09-17 · no migration
+
+**What §13 asks for:** every grid field's chain, CSV column through to engine
+field, pinned. **What the package decided first:** to compute the chains rather
+than write them, because the one line in the brief that constrains everything is
+*"a chain you cannot write down is a bug — list those rather than inventing prose"*
+— and a list is only worth having if it is derived from the same sources the code
+uses.
+
+#### A · WHY ~120 HAND-WRITTEN CHAINS WOULD HAVE BEEN THE WRONG ARTEFACT
+
+Every hop already exists as data: the column specs declare the field and its
+master, the contract declares the unit and the engine consumer, the registry
+declares the requirement level, the resolver declares the precedence. A prose
+document restates all of it in a place no generator reads, and is true on the day
+it is typed — which is D21 and D22, and which WP 5.1 spent a package learning
+about lineage.
+
+So `resolutionChains.ts` derives them and `resolutionChains.test.ts` pins the
+parts that rot. **38 chains, 9 broken**, and the nine are the deliverable.
+
+#### B · THE ONE HOP THAT IS TRANSCRIBED, AND WHY IT HAD TO BE
+
+`getEffectiveValue` takes eight arguments' worth of live React state. Executing it
+here would mean constructing that state — a second implementation of the resolver,
+which is `single-source` (I1) broken in order to document `single-source`.
+
+So `RESOLUTION_ORDER` is prose with a source file, and the test asserts the six
+branches still appear in `resolveEffective.ts` in that sequence. A reordering that
+does not update the transcription fails there.
+
+**`dataRow` BEFORE the bundle gets its own assertion**, because WP 4.4's whole
+`seeded_from_hash` design turns on it: a re-upload refreshes a field that lives on
+the row and does not refresh one that lives only in the bundle.
+
+#### C · THREE OVER-CLAIMS, CAUGHT INSIDE THE PACKAGE
+
+This is the part worth keeping, because the package's entire output is a list of
+findings and each of these would have made that list confidently wrong.
+
+**28 → 11.** The first engine hop looked only at the registry's
+`data_requirements` and reported 28 of 40 chains as reaching no engine field —
+including `safety_stock_days`, which §4 D1 is *entirely about the engine reading*.
+`data_requirements` names the TABLE columns a policy needs; a policy PARAMETER
+arrives by a different route. **Three doors**: `data_requirements`,
+`params_schema` (80 declared parameters), and a quoted key in `project_map.py`.
+
+**11 → 9.** `__inv_params` is `synthetic: true` — the vector CELL that groups a
+row's replenishment parameters (§II.3), not a field. Asking which engine field it
+reaches is a question about nothing, and two stages declare one.
+
+**7 → 0.** The reverse direction compared the engine's `table.column` against the
+grid's `field` id. They differ ON PURPOSE for a master-backed column:
+`materials.cost` is rendered as `material_cost`, and it and `materials.moq` were
+reported as invisible while both are on screen.
+
+Each was found by asking "is this plausible?" of a number, which is the only
+defence a derived list has. D82 and D83 are the same lesson one package earlier,
+and it did not transfer by being written down — it transferred by the number
+looking wrong.
+
+#### D · D89 · A MASTER COLUMN THAT POINTS AT NOTHING
+
+`plant.initial_on_hand` declares `master: { table: "products", field:
+"initial_on_hand" }`. `products` has eighteen columns and that is not one.
+**`materials` has it**, and the supplier stage uses it correctly fifty lines
+earlier — which is what makes this a copy rather than a misunderstanding.
+
+The failure is silent by construction: `masterValueFor` returns undefined for a
+column that does not exist, the cell falls through to the bundle, and the user
+sees a number under a header that says it is item-master data.
+
+It is the only one of the nine breaks that is a POINTER AT NOTHING rather than a
+value nothing reads, and the two ways out are not equivalent — add the column, or
+drop the `master:` block. Choosing by cost rather than by what the number means is
+how D17's class starts.
+
+#### E · D90 · THE THIRD DOOR IS NOT A DECLARATION
+
+Of 38 fields, the registry declares the engine hop for 29. For the rest, a quoted
+string in `project_map.py` is the only evidence they reach the engine at all.
+
+§3's standing law says "the registry export is the single source of truth for
+policy schemas (§6.2)". That is true of the schemas that EXIST and silent about
+the ones that do not: nine bundle keys the engine reads are declared nowhere.
+
+The fix is in `scsim` rather than here — a bundle key the engine reads belongs in
+a policy's `params_schema`, which `registry_export.py` already generates — so it
+is WP 6.2's. What this package did is make the weakness VISIBLE: the test accepts
+door 3 and says it is the weakest of the three, so the next reader is not told
+those nine are as well-declared as the other 29.
+
+#### F · THE GAP CHECK FOUND ELEVEN TABLES BEHIND AN ASSOCIATION
+
+R8 fired on this package's own ✅: `coverage.yaml` deferred eleven tables to
+WP 6.1 — the five `disruption_scenario_*`, `scenarios`, `scenario_templates`,
+`policy_versions`, `policy_presets`, `recovery_playbooks` and `external_evidence`.
+
+The deferral's reasoning is the finding: *"WP 6.1 pins the resolution chains … the
+scenario and disruption tables are the surface those chains resolve against."*
+Being the surface a package READS is not being its deliverable, and §13's WP 6.1
+describes no table at all.
+
+**They went to a NEW package (§13 · WP 6.4) rather than onto WP 6.3**, which is
+where WP 4.4 sent its eleven. WP 6.3 already carries A2, A3, A5, the vocabulary
+and the result-binding group; twenty-two tables under one package is a number that
+misrepresents what it costs. **Second time in three packages that R8 has caught a
+table waiting on an owner nothing behind it agreed to** — and the second time the
+answer was to give them one that had.
+
+#### G · WHAT WP 6.2 INHERITS, AS A LIST RATHER THAN A PARAGRAPH
+
+- **Nine broken chains**, ratcheted in `resolutionChains.test.ts` so the number can
+  only fall. Eight are "editable, stored, hashed, read by nothing"; one is D89.
+- **D90's nine undeclared bundle keys**, fixable in `registry_export.py`.
+- Every fix shows up as a name leaving `KNOWN_BREAKS`, so progress is countable
+  rather than described.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -9000,10 +9200,10 @@ the same failure mode, one level down.
 | 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
 | 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ✅ done — `contract:check` green, six commands wired in `data-contract.yml`, three orphans reconciled |
 | 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ✅ done — uuid identity dual-read, project membership + subtractive delegation, data-plane audit, and the R7 §16 gate. **Reviewed 2026-09-16: still done, but NINE conditions carried, not two** — they are WP 3.0's (§16 · PHASE 2→3 ASSESSMENT) |
-| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 has run**, and **WP 4.3 has run** — it closed `no-tier-skip`'s deep-tier gap by DESCRIBING the four tables rather than by moving them, which brought them inside the audit rule for the first time (D54's largest group). **Phase 4 is complete: WP 4.4 has run.** **WP 5.1 and WP 5.3 have run.** **WP 6.1 is next**
-| 4 | 4.1 – 4.4 ✅ | trust anchor + analysis store + Trust Report | 5 | **PHASE COMPLETE.** **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **4.2 ✅** — the analysis store (`analysis_runs` + `analysis_results`) with the identity D19 says the centralities never had: a metric belongs to a run, and therefore to an input hash and a code version, so a repeat request is a HIT BY DEFINITION rather than a bet on a timestamp. `supabase/rehearsal/120` was written RED against `main` and holds all five exit checks plus the audit row read back with the GUC POISONED first; the concurrency gap check is proved from TWO REAL SESSIONS because one transaction cannot ask the question. D12's own citation was stale and is corrected against the live definition, measured rather than reasoned about; D54's rule landed as `contract:check` R11 (42 of 42 deferrals now SAY whether they are audited, and 42 of 42 are not); **D56's three-package deferral is decided — `network_nodes` is BOTH, so the answer is a split, deferred to WP 4.3 with its blast radius enumerated.** **Two findings: D72** (`calculate-network-science-metrics` upserts on a unique constraint that does not exist, fails every run, logs and carries on) **D73** (the introspected artifact discarded every `COMMENT ON FUNCTION`, so a base rebuilt from it lost them — D52's class, caught by `--since HEAD` alone) and **D74** (eleven of thirteen generated pages published the OPPOSITE of the truth about the natural key — D40's class, false since WP 3.3 landed the indexes). **4.3 ✅** — the analyzers dual-write, and the package changed shape before it wrote a line. **D75**: `analysis_runs.input_hash` is `current_graph_hash`, which hashes eleven tier-2 tables, and the two centrality analyzers read `network_nodes`/`network_edges` — NEITHER of them. Keying their cache on that anchor serves the PREVIOUS graph's centralities as a hit, which is D19 rebuilt one layer up by the package meant to close it. Mitigated by a declared `topology_digest` in `params` rather than by a `schema_version` bump, because D70 makes a bump unsafe to spend on a day nothing has measured; WP 4.4 takes the real fix. **D56's split executed as far as a package that drops nothing can**: the four deep-tier tables are DESCRIBED at tier 3, which is what the anchor has treated them as since WP 4.1, so they enter the audit rule for the first time and gain three triggers each — **D54's largest remaining group, closed** (38 deferred now, was 42; 22 tables audited by trigger, was 18). **D72 closed with one statement and no dedup**, because the count it needed was already in its own §4 row and the first draft of the migration deferred it anyway — the inverse of the precondition failure the preamble warns about. **Three more found by reading the invocation path nothing had named: D76** (the prominence auto-invoker is `FOR EACH ROW`, so §15's 2 129-edge project fires 2 129 full recomputations of one graph — and the store cannot absorb it, because the digest moves with every inserted row and every request is a genuine cold miss), **D77** (the `pg_net` fallback catches `undefined_function` and the real error is `invalid_schema_name`, so a failed notification ABORTED the write — found by execution, because the rehearsal deliberately does not stub `pg_net`), **D78** (D71's "26 write, TWO attribute" was a text scan's reading: ten writers attribute through `set_current_user_context` and have since 2025-08-20, so the honest figures are 31 and 15 — the invariant does not move, the re-budget shrinks from seventeen live functions to six) and **D79** (the catalog declared `project_ai_health` as an analysis kind and a `threshold` parameter no code takes; §11 named "the four analyzers" and one of the four never was). `supabase/rehearsal/130` holds eleven sections and was mutation-tested — the mutation that deletes the mirror's `assert_writer_may_act` outright passed the first draft, because the poison sat before a call that sets the GUC itself, which is §16 · WP 4.1 · E happening again inside the package that quotes it. **4.3 ✅** and **4.4 ✅** — see §16 for both. 4.4 closed **D70** by SPLITTING rather than deleting: a TTL is a record of something that happened and still persists, while grounding drift became a computed column, so a project that drifts and drifts back leaves its proposals untouched — `rehearsal/140` §3 moves a real project twice, which is the half no source read can settle. It found that **the rule needed a THIRD state** (`unknown` is not `stale`; WP 4.3 shipped the provenance columns nullable, and reporting "we cannot tell" as "out of date" is T1 answered with a guess), that **one of the three ad-hoc mechanisms it was told to delete does not exist** (D81 — the third is a re-entry guard whose comment records the bug that made it one), and that **the trigger at the centre of D12 has never invoked anything** (D80 — `20260712110000` is a whole performance migration spent optimising the inputs to a `RAISE LOG`). The gap check is a GATE: nine of `stalenessOneRule.test.ts`'s ten tests are red without the migration, measured by removing it. **Phase 4 is complete.** **WP 5.1 ✅** — lineage lands with an evidence line per entry that `contract:check` R12 re-opens on every run, three grades that are never blurred (table / column / shell), and the gap check as R12's second half: 17 of 17 pages either carry a non-shell entry or are declared as reading no project data. It found the section's own scope too narrow to see most reads (17 pages, 8 direct table reads between them) and two over-claiming heuristics — **D82** (a 404 page reported as a surface for user data, and an explicit `select` list in a shell module does not save it) and **D83** (979 unverifiable field-page pairs, and zero for the table the policy grid plainly renders). **5.1 ✅** and **5.3 ✅**. 5.3 could not do what its name says and §15 is why: **8 577 of 8 577** derived rows carry no input hash and the store holds **0 runs, 0 results**, so switching readers shows nothing and dropping the columns destroys 8 577 values with no replacement (**D88**, re-homed to WP 6.3 with its unblocking condition stated as a number rather than as prose). What it DID ship is **D75 closed**: the deep-tier topology is in `hash_network`, `schema_version` 2 → 3, taken against a measured blast radius of zero and as the first bump after D70 made a hash change reversible. The fold is BY COLUMN because D88 closed the tier route — and `graphHashCoverage.test.ts` moves from "these four tables are excluded" to "no computed column is hashed", which is what the invariant says. Its gap check found that same suite had been passing 24 assertions about a migration the database no longer runs. **WP 6.1 is next** |
+| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 has run**, and **WP 4.3 has run** — it closed `no-tier-skip`'s deep-tier gap by DESCRIBING the four tables rather than by moving them, which brought them inside the audit rule for the first time (D54's largest group). **Phase 4 is complete: WP 4.4 has run.** **WP 5.1, 5.3 and 6.1 have run.** **WP 6.2 is next**
+| 4 | 4.1 – 4.4 ✅ | trust anchor + analysis store + Trust Report | 5 | **PHASE COMPLETE.** **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **4.2 ✅** — the analysis store (`analysis_runs` + `analysis_results`) with the identity D19 says the centralities never had: a metric belongs to a run, and therefore to an input hash and a code version, so a repeat request is a HIT BY DEFINITION rather than a bet on a timestamp. `supabase/rehearsal/120` was written RED against `main` and holds all five exit checks plus the audit row read back with the GUC POISONED first; the concurrency gap check is proved from TWO REAL SESSIONS because one transaction cannot ask the question. D12's own citation was stale and is corrected against the live definition, measured rather than reasoned about; D54's rule landed as `contract:check` R11 (42 of 42 deferrals now SAY whether they are audited, and 42 of 42 are not); **D56's three-package deferral is decided — `network_nodes` is BOTH, so the answer is a split, deferred to WP 4.3 with its blast radius enumerated.** **Two findings: D72** (`calculate-network-science-metrics` upserts on a unique constraint that does not exist, fails every run, logs and carries on) **D73** (the introspected artifact discarded every `COMMENT ON FUNCTION`, so a base rebuilt from it lost them — D52's class, caught by `--since HEAD` alone) and **D74** (eleven of thirteen generated pages published the OPPOSITE of the truth about the natural key — D40's class, false since WP 3.3 landed the indexes). **4.3 ✅** — the analyzers dual-write, and the package changed shape before it wrote a line. **D75**: `analysis_runs.input_hash` is `current_graph_hash`, which hashes eleven tier-2 tables, and the two centrality analyzers read `network_nodes`/`network_edges` — NEITHER of them. Keying their cache on that anchor serves the PREVIOUS graph's centralities as a hit, which is D19 rebuilt one layer up by the package meant to close it. Mitigated by a declared `topology_digest` in `params` rather than by a `schema_version` bump, because D70 makes a bump unsafe to spend on a day nothing has measured; WP 4.4 takes the real fix. **D56's split executed as far as a package that drops nothing can**: the four deep-tier tables are DESCRIBED at tier 3, which is what the anchor has treated them as since WP 4.1, so they enter the audit rule for the first time and gain three triggers each — **D54's largest remaining group, closed** (38 deferred now, was 42; 22 tables audited by trigger, was 18). **D72 closed with one statement and no dedup**, because the count it needed was already in its own §4 row and the first draft of the migration deferred it anyway — the inverse of the precondition failure the preamble warns about. **Three more found by reading the invocation path nothing had named: D76** (the prominence auto-invoker is `FOR EACH ROW`, so §15's 2 129-edge project fires 2 129 full recomputations of one graph — and the store cannot absorb it, because the digest moves with every inserted row and every request is a genuine cold miss), **D77** (the `pg_net` fallback catches `undefined_function` and the real error is `invalid_schema_name`, so a failed notification ABORTED the write — found by execution, because the rehearsal deliberately does not stub `pg_net`), **D78** (D71's "26 write, TWO attribute" was a text scan's reading: ten writers attribute through `set_current_user_context` and have since 2025-08-20, so the honest figures are 31 and 15 — the invariant does not move, the re-budget shrinks from seventeen live functions to six) and **D79** (the catalog declared `project_ai_health` as an analysis kind and a `threshold` parameter no code takes; §11 named "the four analyzers" and one of the four never was). `supabase/rehearsal/130` holds eleven sections and was mutation-tested — the mutation that deletes the mirror's `assert_writer_may_act` outright passed the first draft, because the poison sat before a call that sets the GUC itself, which is §16 · WP 4.1 · E happening again inside the package that quotes it. **4.3 ✅** and **4.4 ✅** — see §16 for both. 4.4 closed **D70** by SPLITTING rather than deleting: a TTL is a record of something that happened and still persists, while grounding drift became a computed column, so a project that drifts and drifts back leaves its proposals untouched — `rehearsal/140` §3 moves a real project twice, which is the half no source read can settle. It found that **the rule needed a THIRD state** (`unknown` is not `stale`; WP 4.3 shipped the provenance columns nullable, and reporting "we cannot tell" as "out of date" is T1 answered with a guess), that **one of the three ad-hoc mechanisms it was told to delete does not exist** (D81 — the third is a re-entry guard whose comment records the bug that made it one), and that **the trigger at the centre of D12 has never invoked anything** (D80 — `20260712110000` is a whole performance migration spent optimising the inputs to a `RAISE LOG`). The gap check is a GATE: nine of `stalenessOneRule.test.ts`'s ten tests are red without the migration, measured by removing it. **Phase 4 is complete.** **WP 5.1 ✅** — lineage lands with an evidence line per entry that `contract:check` R12 re-opens on every run, three grades that are never blurred (table / column / shell), and the gap check as R12's second half: 17 of 17 pages either carry a non-shell entry or are declared as reading no project data. It found the section's own scope too narrow to see most reads (17 pages, 8 direct table reads between them) and two over-claiming heuristics — **D82** (a 404 page reported as a surface for user data, and an explicit `select` list in a shell module does not save it) and **D83** (979 unverifiable field-page pairs, and zero for the table the policy grid plainly renders). **5.1 ✅** and **5.3 ✅**. 5.3 could not do what its name says and §15 is why: **8 577 of 8 577** derived rows carry no input hash and the store holds **0 runs, 0 results**, so switching readers shows nothing and dropping the columns destroys 8 577 values with no replacement (**D88**, re-homed to WP 6.3 with its unblocking condition stated as a number rather than as prose). What it DID ship is **D75 closed**: the deep-tier topology is in `hash_network`, `schema_version` 2 → 3, taken against a measured blast radius of zero and as the first bump after D70 made a hash change reversible. The fold is BY COLUMN because D88 closed the tier route — and `graphHashCoverage.test.ts` moves from "these four tables are excluded" to "no computed column is hashed", which is what the invariant says. Its gap check found that same suite had been passing 24 assertions about a migration the database no longer runs. **6.1 ✅** — 38 chains DERIVED rather than written (≈120 hand-written chains are true on the day they are typed, which is D21/D22), **9 broken and ratcheted** as WP 6.2's list. Found **D89** (`plant.initial_on_hand` is master-backed by a column `products` does not have — the cell silently falls through to the bundle under a header claiming item-master data) and **D90** (three doors reach the engine and only two are declarations: for nine bundle keys a quoted string in `project_map.py` is the only evidence). **Three over-claims were caught inside the package**, each of which would have shipped a confidently wrong list — 28→11, 11→9, 7→0. Its gap check found eleven tables deferred to it behind an association rather than a plan, now **WP 6.4**. **WP 6.2 is next** |
 | 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | **5.1 ✅** — 129 surface entries, R12 re-opens every evidence line · 5.2a ✅, 5.2h ✅ — manual live at `/docs`; tree complete; sections 1, 2 and 15 written (14 of 80 pages) |
-| 6 | 6.1 – 6.3 | policy contract, researcher grade | — | — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
+| 6 | 6.1 – 6.4 | policy contract, researcher grade | — | **6.1 ✅** · — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
