@@ -8785,6 +8785,24 @@ Both fixed in the same push that noticed them. **The class is the finding**: a
 probe encoding "the world is currently in state X" is a gate with an expiry date
 nobody wrote down. §15 should assert relations that stay true.
 
+**R12 CAUGHT ITS FIRST REAL DRIFT WITHIN THE HOUR, AND IT WAS NOT A DRILL.** A
+parallel branch (PR #221, WP 6.2's plant-stage overrides) rewrote 269 lines of
+`ProcessLevelNetwork.tsx` and merged into this one. Three reads moved:
+`bom_multi_level` at :1104, `supply_chain_data_multi_tier` at :1105 and `projects`
+at :248. The gate went red on the merge commit naming D21 and D22, and the lineage
+was re-pointed by re-running the analyser.
+
+That is the whole argument for evidence-with-a-gate rather than a
+lineage block somebody once confirmed: it took **one merge from a branch nobody
+here was watching** to make six entries false, and the drift was found by CI on
+the same commit rather than by a reader trusting a page a quarter later.
+
+**It also exposed the writer as single-use.** `--write` could only fill an empty
+`surfaces: []`, so the fix for drift — re-run the analyser — would have duplicated
+every table block and left the stale field entries in place. A repair procedure
+that cannot be run twice is not a repair procedure; the writer strips what is
+there before writing now.
+
 **And the answers the run was actually asked for are in it**, unaffected by the two
 bad gates: `docs/PLAN.md` readers should take them from the report on the
 `verification-results` branch rather than from this entry, because a number copied
