@@ -38,9 +38,21 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     if (!sameOrganization(userData, projectData)) return { success: false, error: 'Forbidden: Organization mismatch' };
     if (projectData.modeler_id !== user_id && userData.role !== 'admin') return { success: false, error: 'Forbidden: Not project owner or admin' };
 
-    // Clear existing data
-    await supabase.from('supply_chain_data').delete().eq('project_id', project_id);
-    await supabase.from('supply_chain_data_multi_tier').delete().eq('project_id', project_id);
+    // WP 4.1 — D36 CLOSED, AND THE REPLACE IS ATOMIC NOW.
+    //
+    // What stood here was `DELETE` on both tier-3 tables followed, hundreds of
+    // lines later, by four `INSERT`s — each a separate PostgREST call. Two
+    // things were wrong and only one of them was the audit:
+    //   * a failure between the delete and the inserts left the project with NO
+    //     ETL output at all, and the only symptom is a page that renders zero
+    //     rows. Nothing retried and nothing said so;
+    //   * every one of those statements wrote as the service role with no
+    //     session context, so the audit rows recorded `actor_known: false`
+    //     although `user_id` has been a parameter of this function all along.
+    // The rows are accumulated here and written by `etl_replace_supply_chain`
+    // in ONE transaction, with the actor as a parameter. See
+    // `supabase/rehearsal/110` §7c, which reads the audit row back.
+    const scdInserts: Record<string, unknown>[] = [];
 
     let totalInserted = 0;
     // Degradations the caller must be told about. §5 T2: a substitution is
@@ -128,7 +140,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
         };
       });
 
-      await supabase.from('supply_chain_data').insert(outboundInserts);
+      scdInserts.push(...outboundInserts);
       totalInserted += outboundInserts.length;
       scdOutboundCount += outboundInserts.length;
     }
@@ -195,7 +207,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
           };
         });
 
-        await supabase.from('supply_chain_data').insert(bomInserts);
+        scdInserts.push(...bomInserts);
         totalInserted += bomInserts.length;
         scdBomCount += bomInserts.length;
       }
@@ -292,7 +304,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
         }
 
         if (bomInserts.length > 0) {
-            await supabase.from('supply_chain_data').insert(bomInserts);
+            scdInserts.push(...bomInserts);
             totalInserted += bomInserts.length;
             scdBomCount += bomInserts.length;
         }
@@ -360,7 +372,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
         };
       });
 
-      await supabase.from('supply_chain_data').insert(inboundInserts);
+      scdInserts.push(...inboundInserts);
       totalInserted += inboundInserts.length;
       scdInboundCount += inboundInserts.length;
 
@@ -392,15 +404,36 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
       }
     }
 
-    // Insert multi-tier data by tier
-    if (outboundTierInserts.length > 0) await supabase.from('supply_chain_data_multi_tier').insert(outboundTierInserts);
-    if (bomTierInserts.length > 0) await supabase.from('supply_chain_data_multi_tier').insert(bomTierInserts);
-    if (inboundTierInserts.length > 0) await supabase.from('supply_chain_data_multi_tier').insert(inboundTierInserts);
+    // ── the one write ────────────────────────────────────────────────────
+    // Delete both tier-3 tables and insert everything, in one transaction, with
+    // the actor named. The RPC also enforces project role >= editor, which a
+    // service-role key made irrelevant on this path.
+    const { data: etl, error: etlError } = await supabase.rpc('etl_replace_supply_chain', {
+      _project_id: project_id,
+      _actor_user_id: user_id,
+      _rows: scdInserts,
+      _multi_tier_rows: [...outboundTierInserts, ...bomTierInserts, ...inboundTierInserts],
+    });
+    if (etlError) return { success: false, error: `etl_replace_supply_chain: ${etlError.message}` };
+    const etlCounts = etl as { deleted: number; inserted: number;
+                               multi_tier_deleted: number; multi_tier_inserted: number };
+
+    // THE COUNTS THE RESPONSE REPORTS ARE THE STATEMENT'S, not the array
+    // lengths that were pushed. They can differ — a row the table refuses is a
+    // row not written — and a count with no source is the defect §5 T1 names.
+    if (etlCounts.inserted !== scdInserts.length) {
+      warnings.push(
+        `The ETL wrote ${etlCounts.inserted} of ${scdInserts.length} supply-chain rows. ` +
+        `The difference was refused by the database, not dropped here.`,
+      );
+    }
 
     return { 
       success: true, 
       warnings,
-      total_records: totalInserted,
+      total_records: etlCounts.inserted,
+      total_rows_built: totalInserted,
+      multi_tier_written: etlCounts.multi_tier_inserted,
       scd_breakdown: { outbound: scdOutboundCount, bom: scdBomCount, inbound: scdInboundCount, total: scdOutboundCount + scdBomCount + scdInboundCount },
       multi_tier_breakdown: { outbound: outboundTierInserts.length, bom: bomTierInserts.length, inbound: inboundTierInserts.length, total: outboundTierInserts.length + bomTierInserts.length + inboundTierInserts.length },
       message: 'Project data combined successfully'

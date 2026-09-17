@@ -41,31 +41,50 @@ serve(async (req) => {
     // ── Process ALL data at once (no batching) so graph metrics are global ──
     const predictions = await predictCriticalNodes(supplyChainData);
 
-    const updatePromises = predictions.map(async (prediction) => {
-      const { error: updateError } = await supabase
-        .from('supply_chain_data')
-        .update({
-          is_critical_node: prediction.is_critical,
-          critical_node_score: prediction.score,
-          prediction_timestamp: new Date().toISOString()
-        })
-        .eq('id', prediction.id);
+    // WP 4.1 — D36 CLOSED, AND THE AUDIT LOG STOPS BEING UNREADABLE.
+    //
+    // What stood here was ONE UPDATE PER PREDICTION, fired in parallel. Since
+    // WP 2.3 every one of those statements writes its own audit row, so a single
+    // analysis of the largest project in this database produced ~1 800 rows in
+    // the log the statement grain exists to keep readable — each saying
+    // `actor_known: false`, because a service-role PostgREST call cannot set the
+    // GUC the trigger reads.
+    //
+    // `analysis_mark_critical_nodes` takes the actor as a parameter, sets
+    // `app.current_user_id` LOCAL, and writes every score in ONE statement. It
+    // also derives the project from the SCORED ROWS and refuses a set spanning
+    // two — this function filters by `plant_name`, which is not scoped to a
+    // project, so "which project am I writing" had no answer here at all.
+    // `supabase/rehearsal/110` §7d reads the audit row back.
+    if (!uploaded_by) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'uploaded_by is required: a tier-3 write must name its actor (invariant audit-actor)',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
-      if (updateError) {
-        console.error(`Error updating record ${prediction.id}:`, updateError);
-        throw updateError;
-      }
+    const { data: marked, error: markError } = await supabase.rpc('analysis_mark_critical_nodes', {
+      _actor_user_id: uploaded_by,
+      _scores: predictions.map((p) => ({ id: p.id, is_critical: p.is_critical, score: p.score })),
     });
+    if (markError) {
+      console.error('analysis_mark_critical_nodes failed', markError);
+      throw markError;
+    }
+    const rowsUpdated = Number((marked as { rows_updated?: number } | null)?.rows_updated ?? 0);
 
-    await Promise.all(updatePromises);
-
-    console.log(`Successfully updated ${predictions.length} records with predictions`);
+    // The number reported is the one the STATEMENT wrote, not the number of
+    // predictions computed. They differ when a scored row was deleted between
+    // the read and the write, and a count with no source is the defect §5 T1
+    // names.
+    console.log(`Updated ${rowsUpdated} of ${predictions.length} scored records`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Successfully predicted and updated ${predictions.length} records`,
-        predictions: predictions.length
+        message: `Predicted ${predictions.length} records and updated ${rowsUpdated}`,
+        predictions: predictions.length,
+        rows_updated: rowsUpdated
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

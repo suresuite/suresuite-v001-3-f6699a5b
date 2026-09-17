@@ -198,3 +198,117 @@ describe("export is a governed action — the first check there has ever been", 
     expect(viewer, "and must refuse when told no").toMatch(/allowed/);
   });
 });
+
+/**
+ * WP 4.1 — THE RATCHET, AND WHY IT IS A RATCHET RATHER THAN A GATE.
+ *
+ * D36 was scoped to SIX PostgREST writers, because that is where WP 2.3 looked.
+ * WP 3.3 then found `assign_material_supplier` — a SECURITY DEFINER SQL function
+ * that had taken the actor as a parameter all along and never told the trigger —
+ * and D36's own evidence says it "was never in the list of six because nothing
+ * had looked at it". WP 4.1 found a second, `snapshot_dataset`, the same way.
+ *
+ * So the gap check looked at the whole class, and the class is not six:
+ *
+ *     26 SECURITY DEFINER functions write a tier-2/3/4 table.
+ *     TWO of them set `app.current_user_id`.
+ *     SIXTEEN of the rest already TAKE an actor parameter.
+ *     SEVENTEEN have at least one live caller in src/ or supabase/functions/.
+ *
+ * Every one is the one-line fix D36 correctly says is NOT one for a PostgREST
+ * call — a SECURITY DEFINER function runs in a transaction it controls. It is
+ * not this package's (§11 scopes WP 4.1 to D36's six) and the honest
+ * consequence is stated in §16: **`audit-actor` (G4) is NOT met after WP 4.1.**
+ * The data plane still records `actor_known: false` for most of what writes it.
+ *
+ * A gate would be red on arrival, which is unlandable, so this is a RATCHET:
+ * the set of unattributed writers may SHRINK and may not GROW. A 27th fails
+ * here, on the commit that adds it, which is the property the plan keeps
+ * discovering it needs two months late.
+ */
+describe("the actor reaches the trigger — a ratchet on the class D36 was one slice of", () => {
+  /** Known, measured, and owned by WP 6.2. Shrinking this list is the work. */
+  const UNATTRIBUTED = [
+    "analysis_mark_critical_nodes", "apply_policy_bundle", "assign_bom_line",
+    "assign_outbound_customer", "bulk_insert_bom_multi_level",
+    "bulk_insert_bom_single_level", "bulk_insert_inbound_logistics",
+    "bulk_insert_multi_tier_supply_chain", "bulk_insert_outbound_logistics",
+    "bulk_insert_tier2_suppliers", "bulk_insert_tier3_suppliers",
+    "bulk_upsert_materials", "bulk_upsert_policy_overrides", "bulk_upsert_products",
+    "bulk_upsert_suppliers", "clear_policy_preset", "combine_project_into_supply_chain",
+    "create_default_policy_defaults", "delete_policy_override", "delete_project",
+    "delete_project_dataset", "ensure_item_masters", "etl_replace_supply_chain",
+    "mrp_apply_staged_products", "restore_policy_version", "save_policy_defaults",
+  ];
+
+  /**
+   * Three of the names above DO set the GUC — through
+   * `assert_writer_may_act`, which WP 4.1 wrote so three RPCs share one
+   * preamble instead of three copies of it. They stay on the list because a
+   * text scan cannot follow a call, and quietly special-casing them here would
+   * make the ratchet lie about its own method. The rehearsal is what proves
+   * those three: `supabase/rehearsal/110` §7 performs each write and reads the
+   * audit row back, with the GUC deliberately POISONED first so a row naming
+   * the right actor can only have come from the RPC.
+   */
+  const VIA_SHARED_PREAMBLE = new Set([
+    "analysis_mark_critical_nodes", "etl_replace_supply_chain", "mrp_apply_staged_products",
+  ]);
+
+  const writers = () => {
+    const tier = new Set(tieredTables().map(([t]) => t));
+    const out: Array<{ name: string; guc: boolean; actor: boolean }> = [];
+    for (const [name, def] of live().functions) {
+      const body = def.sql;
+      if (!/SECURITY DEFINER/i.test(body)) continue;
+      const writes = [...tier].some((t) =>
+        new RegExp(`(INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+(public\\.)?${t}\\b`, "i").test(body),
+      );
+      if (!writes) continue;
+      out.push({
+        name,
+        guc: /set_config\s*\(\s*'app\.current_user_id'/i.test(body)
+          || /assert_writer_may_act/.test(body),
+        actor: /_actor|_user_id|p_user_id|_by_user/i.test(body),
+      });
+    }
+    return out;
+  };
+
+  it("finds the writers at all — a scan that finds none is a green test that checks nothing", () => {
+    expect(writers().length).toBeGreaterThanOrEqual(25);
+  });
+
+  it("no NEW tier-2/3/4 writer may be added without setting app.current_user_id", () => {
+    const known = new Set(UNATTRIBUTED);
+    const found = writers().filter((w) => !w.guc).map((w) => w.name).sort();
+    const added = found.filter((n) => !known.has(n));
+    expect(
+      added,
+      `these SECURITY DEFINER functions write a tier-2/3/4 table without setting ` +
+        `app.current_user_id, so their audit rows will say actor_known: false. A ` +
+        `SECURITY DEFINER function runs in a transaction it controls — unlike a ` +
+        `PostgREST call (D36), one line closes it: ` +
+        `PERFORM set_config('app.current_user_id', <actor>::text, true).`,
+    ).toEqual([]);
+  });
+
+  it("the list shrinks honestly — a name that is now attributed must leave it", () => {
+    // Otherwise the ratchet records a debt that is already paid and the next
+    // reader budgets for work that does not exist.
+    const found = new Set(writers().filter((w) => !w.guc).map((w) => w.name));
+    const stale = UNATTRIBUTED.filter((n) => !found.has(n) && !VIA_SHARED_PREAMBLE.has(n));
+    expect(stale, `no longer unattributed — remove from UNATTRIBUTED`).toEqual([]);
+  });
+
+  it("the two that DO name their actor still do", () => {
+    // `assign_material_supplier` (WP 3.3) and `snapshot_dataset` (WP 4.1) are
+    // the whole of the attributed SQL surface. A regression in either is the
+    // invariant going backwards.
+    for (const name of ["assign_material_supplier", "snapshot_dataset"]) {
+      expect(fn(name).sql, `${name} stopped setting the actor GUC`).toMatch(
+        /set_config\s*\(\s*'app\.current_user_id'/i,
+      );
+    }
+  });
+});

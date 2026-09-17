@@ -334,7 +334,32 @@ async function actionSync(admin: ReturnType<typeof createClient>, body: { link_i
     // diff is small relative to the live table (plan §5 Phase 2 anomaly gate).
     const changePct = ((rowsNew + rowsChanged) / Math.max(products.length, 1)) * 100;
     if (link.auto_apply_threshold_pct > 0 && changePct <= link.auto_apply_threshold_pct && outcome.failed === 0) {
-      await applyStagedRun(admin, run.id, null);
+      // WP 4.1 — AUTO-APPLY NOW HAS AN ACTOR, AND IT IS A REAL ONE.
+      // This passed `null` and wrote tier 2 with `actor_known: false`. The
+      // promotion RPC refuses a NULL actor outright, so "who is a scheduled
+      // sync" had to be answered rather than left blank. It is the person who
+      // CREATED THE LINK and set the auto-apply threshold: they authorized this
+      // write when they configured it. That is attribution to whoever
+      // authorized the automation, NOT to a person present at the time, and the
+      // two are different claims — `triggered_by` already records which of them
+      // this run was.
+      //
+      // If that person no longer holds `editor` on the project the RPC refuses,
+      // and the right outcome is a run left `staged` for a human to review, not
+      // a failed sync and not a silent unattributed write. So the refusal is
+      // caught and recorded rather than thrown.
+      try {
+        await applyStagedRun(admin, run.id, link.linked_by_user_id ?? null);
+      } catch (applyErr) {
+        await admin
+          .from("ingest_runs")
+          .update({
+            error_detail:
+              `auto-apply declined: ${String(applyErr)}. The run is staged and can be ` +
+              `applied by somebody with project role editor or higher.`,
+          })
+          .eq("id", run.id);
+      }
     }
 
     return json({ run_id: run.id, rows_new: rowsNew, rows_changed: rowsChanged, fields_defaulted: outcome.defaulted, fields_failed: outcome.failed });
@@ -352,32 +377,29 @@ async function actionSync(admin: ReturnType<typeof createClient>, body: { link_i
  *  expected to have shown the confirmation copy before invoking this for a
  *  manual approval. */
 async function applyStagedRun(admin: ReturnType<typeof createClient>, runId: string, appliedByUserId: string | null) {
-  // WP 3.1: the project comes from the RUN, not from the link. A run may have
-  // no link at all now (`source_kind` csv/api), and reading the project through
-  // one would have made this function fail on exactly those runs.
-  const { data: run } = await admin.from("ingest_runs").select("*").eq("id", runId).single();
-  if (!run) throw new Error("ingest run not found");
-
-  const { data: staged } = await admin.from("ingest_staged_products").select("*").eq("ingest_run_id", runId).neq("diff_state", "removed_upstream");
-
-  for (const row of staged ?? []) {
-    await admin.from("products").upsert(
-      {
-        project_id: (run as any).project_id,
-        product_id: row.sku ?? row.external_id,
-        name: row.name,
-        source_system: "orbit-mrp",
-        source_external_id: row.external_id,
-        source_synced_at: row.staged_at,
-      },
-      { onConflict: "project_id,product_id" },
-    );
-  }
-
-  await admin
-    .from("ingest_runs")
-    .update({ status: "applied", applied_at: new Date().toISOString(), applied_by_user_id: appliedByUserId })
-    .eq("id", runId);
+  // WP 4.1 — D36 CLOSED, AND THIS WAS A SECOND PROMOTION PATH.
+  //
+  // What stood here read `ingest_staged_products` and upserted `products` ONE
+  // ROW AT A TIME over PostgREST. Three things were wrong with that and only
+  // one of them was the audit:
+  //   * the actor was in scope — `appliedByUserId` — and was written to
+  //     `ingest_runs` while the tier-2 write recorded `actor_known: false`;
+  //   * it was a tier-1 → tier-2 promotion that never went through
+  //     `ingest_apply_run`, so `no-tier-skip` (I2) held for the nine CSV
+  //     datasets and not for this one;
+  //   * it answered to no project role: a service-role key made the caller's
+  //     role irrelevant on a path reached from the sync screen.
+  // `mrp_apply_staged_products` takes the actor as a parameter, sets
+  // `app.current_user_id` LOCAL, refuses below `editor`, and upserts in ONE
+  // statement — so the audit trigger writes one row naming the promoter rather
+  // than one row per product naming nobody. `supabase/rehearsal/110` §7b reads
+  // that row back.
+  const { data, error } = await admin.rpc("mrp_apply_staged_products", {
+    _run_id: runId,
+    _actor_user_id: appliedByUserId,
+  });
+  if (error) throw new Error(`mrp_apply_staged_products: ${error.message}`);
+  return data as { run_id: string; rows_promoted: number; rows_updated: number };
 }
 
 async function actionApply(admin: ReturnType<typeof createClient>, supabaseWithUserAuth: ReturnType<typeof createClient>, body: { run_id: string }) {
@@ -388,8 +410,9 @@ async function actionApply(admin: ReturnType<typeof createClient>, supabaseWithU
   const { data: run, error } = await supabaseWithUserAuth.from("ingest_runs").select("id").eq("id", body.run_id).single();
   if (error || !run) return json({ error: "sync run not found or not authorized" }, 404);
 
-  await applyStagedRun(admin, body.run_id, userRes.user.id);
-  return json({ applied: true });
+  const result = await applyStagedRun(admin, body.run_id, userRes.user.id);
+  // The counts come from the statement that wrote them (§5 T1).
+  return json({ applied: true, ...result });
 }
 
 /** run_due_schedules: the Phase 2 cron entry point (see the pg_cron sweep in

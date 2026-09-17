@@ -66,6 +66,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `author_user_id` | — | `uuid` | — | — | Who froze this version. |
 | `author_email` | — | `text` | — | — | The author's email, denormalized so the version survives the user record. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the version was frozen. Server-set. |
+| `hash_inputs` | — | `text` | — | — | SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULATION reads. When this moves, a run stamped with the old composite cannot be reproduced. |
+| `hash_network` | — | `text` | — | — | SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes. |
 
 ## Each column in full
 
@@ -130,7 +132,7 @@ The frozen tier-2 rows themselves, as JSON. What the run actually ran against, n
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> Incomplete today: the snapshot hashes `bom_single_level` only, so a project whose depth lives in `bom_multi_level` gets the same graph_hash before and after a deep-tier change (D11). WP 4.1 completes and composes it.
+> `schema_version: 2` since WP 4.1 (`20260917000002`), and the shape changed with it: the tables now sit under two keys, `inputs` (what a SIMULATION reads) and `network` (what the multi-tier ANALYSES read), where v1 held them at the top level. A row written before that migration still holds the v1 shape and always will — nothing rewrites a frozen version — so any reader of this column handles both. `verifiableExports.ts` does. The rule for WHAT is in it changed too, and that is the point: v1 mirrored `datamap.py` by hand and missed three things as the engine moved on (D11, D67). v2 hashes every VALUE column of every tier-2 input table — everything but the surrogate `id`, `project_id`, the audit timestamps, the ingestion provenance and the cosmetic `name` — and `graphHashCoverage.test.ts` fails when a tier-2 value column is missing from it.
 
 ### `graph_hash`
 
@@ -147,7 +149,7 @@ The fingerprint of the snapshot. Two runs with the same graph_hash saw the same 
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> Inherits D11: it is a hash of an incomplete snapshot, so equal hashes do not yet prove equal worlds. I8 depends on WP 4.1 closing that.
+> D11 and D67 CLOSED by WP 4.1: the snapshot now covers `bom_multi_level` (which `datamap.py` PREFERS over the single-level table), `lead_time_unit`, `demand_min`/`demand_max` and `customers`, and every row ordering is the table's UNIQUE natural key rather than a hand-picked prefix, so the same data cannot hash two ways (D68). Equal hashes now prove equal inputs for every tier-2 table the contract describes; what they still do not cover is the four DERIVED network tables, which are WP 4.2's and deliberately out — a derived artifact inside the identity of its own inputs is the confusion I5 exists to prevent. COMPOSITE since WP 4.1: SHA-256 over `{schema_version, hash_inputs, hash_network}`, so it decomposes into the two columns beside it and `supabase/rehearsal/110` fails if it stops doing so. The name and the place in `simulation_runs` are unchanged on purpose (§11) — a rename is a migration across every reader.
 
 ### `author_user_id`
 
@@ -195,6 +197,40 @@ When the version was frozen. Server-set.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `hash_inputs`
+
+SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULATION reads. When this moves, a run stamped with the old composite cannot be reproduced.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260917000002_graph_hash_v2.sql` |
+| Read by the engine | `current_hash_inputs() -> staleness display; not read by the engine` |
+| Transform | sha256 over snapshot->'inputs', computed inside snapshot_dataset |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> NULL on every version frozen before WP 4.1 and NOT BACKFILLABLE: a v1 snapshot has no `inputs` key and the rows it was built from have moved on. A NULL here means "this version predates the split", never "this version has no inputs", and a reader that treats the two as the same is reporting an absence as a fact.
+
+### `hash_network`
+
+SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260917000002_graph_hash_v2.sql` |
+| Read by the engine | `current_hash_network() -> staleness display; not read by the engine` |
+| Transform | sha256 over snapshot->'network', computed inside snapshot_dataset |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> All three source tables hold ZERO rows in production (§15), so this column is the digest of an empty domain on every project today and the half is UNEXERCISED outside `supabase/rehearsal/110`. A green test on it is not a working path. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -203,6 +239,6 @@ When the version was frozen. Server-set.
 
 ---
 
-*Generated from data contract `57ad4b32bb9f`, engine `0.2.3`,
+*Generated from data contract `b18df39b8bf9`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "57ad4b32bb9f";
+export const CONTRACT_VERSION = "b18df39b8bf9";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260917000001_diff_before_promotion.sql";
+export const LAST_MIGRATION = "20260917000003_actor_on_postgrest_writers.sql";
 
 export const COUNTS = {
   "tablesInSchema": 79,
   "tablesDescribed": 37,
-  "columnsDescribed": 432,
+  "columnsDescribed": 434,
   "tablesUndescribed": 42
 } as const;
 
@@ -165,7 +165,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "dataset_versions",
         "grain": "One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot.",
-        "columns": 8,
+        "columns": 10,
         "owner": "platform"
       },
       {
