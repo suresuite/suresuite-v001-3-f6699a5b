@@ -71,3 +71,15 @@ WP 3.3 — the AFTER run (pre-deploy; see the caveat above)
 #      `rows_the_unique_index_would_reject` should all be 0, because the unique
 #      indexes now EXIST and nothing could be a duplicate.
 WP 3.3 — the AFTER run, after the deploy rather than during it
+
+# requested-by: Phase 3 / WP 3.4 — diff, review, promote UI (§16)
+# requested-at: 2026-09-17 (BEFORE the package's migration, deliberately in its
+#      own push — three §15 runs across two packages were lost to racing the
+#      deploy, §16 · WP 3.3 · L)
+# why: the before-number for the last package in Phase 3. Specifically: whether
+#      `ingest_run_id` and `source_row_id` are still NULL on every tier-2 row
+#      (they must be — no run has ever written one), whether `ingest_staged_rows`
+#      still holds zero rows, and the per-project lane counts after WP 3.3's
+#      dedup so the after-run has something to be a delta against. Every project,
+#      never just one (D42).
+WP 3.4 gap check — before
