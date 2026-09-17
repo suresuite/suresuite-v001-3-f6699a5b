@@ -20,9 +20,9 @@ DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES.
 | `id` | column PRIMARY KEY | `multi_tier_supply_chain_pkey` |
 | `project_id` + `plant_name` + `from_firm_id` + `to_firm_id` | UNIQUE index | `multi_tier_supply_chain_natural_key` |
 
-**Intended natural key:** `project_id` + `plant_name` + `from_firm_id` + `to_firm_id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `plant_name` + `from_firm_id` + `to_firm_id` — the key this table's grain implies, and the
+database ENFORCES it: `multi_tier_supply_chain_natural_key`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Governance
 

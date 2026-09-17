@@ -20,9 +20,9 @@ DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since W
 | `id` | column PRIMARY KEY | `tier2_suppliers_pkey` |
 | `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` | UNIQUE index | `tier2_suppliers_natural_key` |
 
-**Intended natural key:** `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` — the key this table's grain implies, and the
+database ENFORCES it: `tier2_suppliers_natural_key`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Constraints
 

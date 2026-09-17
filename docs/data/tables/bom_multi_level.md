@@ -18,9 +18,9 @@
 | `id` | column PRIMARY KEY | `bom_multi_level_pkey` |
 | `project_id` + `plant_name` + `material_id` + `higher_level_component_id` + `level` | UNIQUE index | `bom_multi_level_natural_key` |
 
-**Intended natural key:** `project_id` + `plant_name` + `material_id` + `higher_level_component_id` + `level` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `plant_name` + `material_id` + `higher_level_component_id` + `level` — the key this table's grain implies, and the
+database ENFORCES it: `bom_multi_level_natural_key`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Constraints
 

@@ -19,9 +19,9 @@ ADOPTED IN PHASE 3 / WP 3.0 (D43). This table existed in the production database
 |---|---|---|
 | `project_id` + `customer_id` | UNIQUE constraint | `customers_project_customer_key` |
 
-**Intended natural key:** `project_id` + `customer_id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `customer_id` — the key this table's grain implies, and the
+database ENFORCES it: `customers_project_customer_key`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Constraints
 

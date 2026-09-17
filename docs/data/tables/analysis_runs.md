@@ -18,9 +18,9 @@
 | `id` | column PRIMARY KEY | `analysis_runs_pkey` |
 | `project_id` + `analysis_kind` + `input_hash` + `params_hash` + `code_version` | partial UNIQUE index | `analysis_runs_key_uniq` |
 
-**Intended natural key:** `project_id` + `analysis_kind` + `input_hash` + `params_hash` + `code_version` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `analysis_kind` + `input_hash` + `params_hash` + `code_version` — the key this table's grain implies, and the
+database ENFORCES it: `analysis_runs_key_uniq`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Governance
 

@@ -19,9 +19,9 @@ Expiry and revocation are both applied inside `effective_project_role()` rather 
 |---|---|---|
 | `id` | column PRIMARY KEY | `delegation_grants_pkey` |
 
-**Intended natural key:** `id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `id` — the key this table's grain implies, and the
+database ENFORCES it: `delegation_grants_pkey`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Constraints
 

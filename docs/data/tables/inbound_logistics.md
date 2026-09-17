@@ -18,9 +18,9 @@
 | `id` | column PRIMARY KEY | `inbound_logistics_pkey` |
 | `project_id` + `plant_name` + `supplier_id` + `material_id` | UNIQUE index | `inbound_logistics_natural_key` |
 
-**Intended natural key:** `project_id` + `plant_name` + `supplier_id` + `material_id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `plant_name` + `supplier_id` + `material_id` — the key this table's grain implies, and the
+database ENFORCES it: `inbound_logistics_natural_key`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Constraints
 

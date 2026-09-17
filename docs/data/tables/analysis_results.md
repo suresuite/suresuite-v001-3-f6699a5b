@@ -18,9 +18,9 @@
 | `id` | column PRIMARY KEY | `analysis_results_pkey` |
 | `run_id` + `entity_type` + `entity_id` | UNIQUE index | `analysis_results_entity_uniq` |
 
-**Intended natural key:** `run_id` + `entity_type` + `entity_id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `run_id` + `entity_type` + `entity_id` — the key this table's grain implies, and the
+database ENFORCES it: `analysis_results_entity_uniq`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Governance
 
