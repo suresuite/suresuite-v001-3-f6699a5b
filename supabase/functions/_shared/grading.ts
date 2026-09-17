@@ -432,9 +432,9 @@ const FIELD_BINDINGS: Record<string, FieldBinding> = {
 /** Per-product `production` patches, resolved the way the engine resolves them.
  *
  * The TS mirror of `_composite_patches` + `_merged_policy` in
- * `scsim/scsim/io/project_map.py` — same parse (`node:` prefix, `::` partition,
- * keyed by the TARGET component), same sorted-key determinism, same guard on an
- * empty target. Most specific last:
+ * `scsim/scsim/io/project_map.py` — same two-candidate parse (first `::`, then
+ * last, each validated against the known ids: `_composite_target`), same
+ * sorted-key determinism. Most specific last:
  *
  *     defaults.production  <  node:<product>  <  node:<owner>::<product>
  *
@@ -442,6 +442,18 @@ const FIELD_BINDINGS: Record<string, FieldBinding> = {
  * byte-identical agreement with the engine, and the parity fixture is what
  * holds the two to it (§4 D75).
  */
+function compositeTarget(keyBody: string, ids: Set<string>): string | undefined {
+  // Split at the FIRST "::" — this file's convention and the engine's. Both
+  // halves are free-text user data, so the LAST "::" is tried as a second
+  // candidate (a plant literally named "A::B"). Each is validated against the
+  // known ids, so the extra candidate can only rescue, never mis-resolve.
+  const first = keyBody.slice(keyBody.indexOf("::") + 2);
+  if (first && ids.has(first)) return first;
+  const last = keyBody.slice(keyBody.lastIndexOf("::") + 2);
+  if (last && ids.has(last)) return last;
+  return undefined;
+}
+
 function productionByProduct(overrides: Row[], productIds: Set<string>): Map<string, Row> {
   const bare = new Map<string, Row>();
   const composite = new Map<string, Row>();
@@ -453,10 +465,10 @@ function productionByProduct(overrides: Row[], productIds: Set<string>): Map<str
     if (!key) continue;
     const patch = (o.patch ?? {}) as Row;
     if (!patch || typeof patch !== "object") continue;
-    const sep = key.indexOf("::");
-    const target = sep < 0 ? key : key.slice(sep + 2);
+    const isComposite = key.includes("::");
+    const target = isComposite ? compositeTarget(key, productIds) : key;
     if (!target || !productIds.has(target)) continue;
-    const into = sep < 0 ? bare : composite;
+    const into = isComposite ? composite : bare;
     into.set(target, { ...(into.get(target) ?? {}), ...patch });
   }
   const out = new Map<string, Row>();

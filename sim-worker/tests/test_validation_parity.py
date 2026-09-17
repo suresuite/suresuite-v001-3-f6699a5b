@@ -304,3 +304,21 @@ def test_engine_and_grader_agree_on_which_rows_are_capacity_defaulted():
         "engine capacity warns diverged from the grader's — grading.ts and "
         "project_map.py no longer mirror each other on per-product capacity"
     )
+
+
+def test_two_owners_on_one_product_match_the_grader():
+    """nganho124's ambiguity case, pinned on both sides from one fixture."""
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    cap, warns = _capacity_of(fx, variant["ambiguous"], variant["target_product"])
+    assert cap == pytest.approx(variant["expected_weekly_capacity"]["ambiguous"])
+    assert any(w.field == "target_key" and w.level == "warn" for w in warns), (
+        "two owners on one product must be announced, not silently resolved"
+    )
+
+
+def test_owner_name_containing_the_separator_matches_the_grader():
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    cap, _ = _capacity_of(fx, variant["nested_owner"], variant["target_product"])
+    assert cap == pytest.approx(variant["expected_weekly_capacity"]["nested_owner"])

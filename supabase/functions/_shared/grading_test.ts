@@ -282,3 +282,19 @@ Deno.test("D75: a non-production or non-node override is ignored", () => {
   assertEquals(rows, ["P_PRICE_FALLBACK", "P_NO_DEMAND"],
     "only a node-scoped production patch naming a real product may resolve capacity");
 });
+
+Deno.test("D75: two owners on one product merge in key order (nganho124, PR #220)", () => {
+  assertEquals(
+    resolvedCapacity(PLANT.ambiguous as Row[], CAP_TARGET),
+    PLANT.expected_weekly_capacity.ambiguous,
+    "last key wins on a shared field; the other owner's untouched fields survive",
+  );
+});
+
+Deno.test("D75: an owner name containing the separator still resolves", () => {
+  assertEquals(
+    resolvedCapacity(PLANT.nested_owner as Row[], CAP_TARGET),
+    PLANT.expected_weekly_capacity.nested_owner,
+    "second split candidate — a plant literally named \"A::B\"",
+  );
+});

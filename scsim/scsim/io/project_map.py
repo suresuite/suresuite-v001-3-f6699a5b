@@ -293,70 +293,68 @@ def base_data_requirements() -> tuple:
 
 # ── Policy & demand helpers ───────────────────────────────────────────────────
 
-def _merged_policy(
-    policies: dict, node_id: str, family: str,
-    *, plant_scoped: bool = False,
-    warnings: Optional[list["MappingWarning"]] = None,
-) -> dict:
-    """Family patch of the default merged with a node-level override.
-
-    Most callers key overrides by the bare entity id ("node:<id>"). Some
-    families (currently: production) are written by the UI as
-    "node:<plant name>::<entity id>", since a project may have more than one
-    plant. When `plant_scoped` is set, a compound key is matched by its LAST
-    "::"-segment against `node_id` — the plant name itself is never
-    consulted, so this works for any plant name or count of plants. If more
-    than one compound key resolves to the same node_id (the same product
-    overridden under two different plants), the first match wins and — when
-    `warnings` is supplied — a MappingWarning records the ambiguity instead
-    of silently picking one.
-    """
+def _merged_policy(policies: dict, node_id: str, family: str) -> dict:
     default = (policies.get("default") or {}).get(family) or {}
     override = (policies.get(f"node:{node_id}") or {}).get(family) or {}
-    if not override and plant_scoped:
-        matches: list[tuple[str, dict]] = []
-        for key, families in policies.items():
-            if not isinstance(key, str) or not key.startswith("node:") or "::" not in key:
-                continue
-            _prefix, _, suffix = key[len("node:"):].rpartition("::")
-            if suffix == node_id:
-                candidate = (families or {}).get(family) or {}
-                if candidate:
-                    matches.append((key, candidate))
-        if matches:
-            override = matches[0][1]
-            if len(matches) > 1 and warnings is not None:
-                other_keys = ", ".join(k for k, _ in matches[1:])
-                warnings.append(MappingWarning(
-                    "warn", f"{family}:{node_id}", "target_key",
-                    f"multiple plant-scoped {family!r} overrides match {node_id!r} "
-                    f"({matches[0][0]!r} used; ignored: {other_keys})"))
     return {**default, **override}
 
 
-def _composite_patches(policies: dict, family: str, targets: set[str]) -> dict[str, dict]:
+def _composite_target(key_body: str, targets: set[str]) -> Optional[str]:
+    """The target id inside a composite ``<owner>::<target>`` key, or None.
+
+    Splitting at the FIRST ``::`` is this file's convention — the same parse
+    :func:`_multi_sourcing_weights` and the P-P.9 priority fold use, and the
+    one the TS grader mirrors. Both halves of a key are free-text user data
+    though, so a plant named ``A::B`` would defeat it; the LAST ``::`` is
+    tried as a second candidate for exactly that case. Each candidate is
+    validated against the known ids, so an extra one cannot mis-resolve —
+    it can only rescue a key the first split got wrong.
+    """
+    first = key_body.partition("::")[2]
+    if first and first in targets:
+        return first
+    last = key_body.rpartition("::")[2]
+    if last and last in targets:
+        return last
+    return None
+
+
+def _composite_patches(
+    policies: dict, family: str, targets: set[str], w: list[MappingWarning],
+) -> dict[str, dict]:
     """Index ``node:<owner>::<target>`` patches of ``family`` by their target.
 
     The policy grid's two-key stages write one override row per pair — the
     plant stage as ``<plant>::<product>``, the supplier stage as
     ``<supplier>::<material>`` (``src/lib/policies/columnSpecs.ts``). The
     engine only ever holds the target id, so a lookup keyed by the target
-    alone has to reach those rows or they are stored and never read. Same
-    parse as :func:`_multi_sourcing_weights` and the P-P.9 priority fold.
+    alone has to reach those rows or they are stored and never read (§4 D75).
 
-    Keys are visited in sorted order so a project carrying more than one
-    owner per target resolves deterministically (the model is single-plant).
+    Keys are visited in sorted order, so when two owners patch the same
+    target the winner is stable — and it is ANNOUNCED rather than picked in
+    silence, because a silent choice between two user-entered values is the
+    same defect this function exists to close.
     """
+    seen: dict[str, list[str]] = {}
     out: dict[str, dict] = {}
     for key in sorted(k for k in policies if isinstance(k, str)):
         if not key.startswith("node:") or "::" not in key:
             continue
-        _owner, _, target = key[len("node:"):].partition("::")
-        if not target or target not in targets:
+        target = _composite_target(key[len("node:"):], targets)
+        if target is None:
             continue
         patch = (policies.get(key) or {}).get(family) or {}
-        if patch:
-            out.setdefault(target, {}).update(patch)
+        if not patch:
+            continue
+        seen.setdefault(target, []).append(key)
+        out.setdefault(target, {}).update(patch)
+    for target, keys in seen.items():
+        if len(keys) > 1:
+            w.append(MappingWarning(
+                "warn", f"{family}:{target}", "target_key",
+                f"{len(keys)} {family!r} overrides name {target!r} under different "
+                f"owners ({', '.join(repr(k) for k in keys)}) — merged in key order, "
+                f"{keys[-1]!r} wins on any field they share"))
     return out
 
 
@@ -572,7 +570,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
     # so the composite index is what makes a per-row line-capacity edit reach
     # the engine at all; the bare "node:<product>" form still wins nothing and
     # loses nothing (§4 D75).
-    prod_composite = _composite_patches(data.policies, "production", prod_ids)
+    prod_composite = _composite_patches(data.policies, "production", prod_ids, w)
     products: list[Product] = []
     product_modes: set[FulfillmentMode] = set()
     for p in data.products:

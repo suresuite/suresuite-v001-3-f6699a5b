@@ -286,7 +286,7 @@
     ]
   },
   "plant_override_variant": {
-    "_comment": "policy_overrides rows AS STORED. composite = what the plant grid writes; bare = the node:<product> form; both_precedence proves composite wins. 20 units/day x 7 x 80% = 112 units/week; bare is 10 x 7 x 80% = 56.",
+    "_comment": "policy_overrides rows AS STORED. composite = what the plant grid writes; bare = the node:<product> form; both_precedence proves composite wins. 20 units/day x 7 x 80% = 112 units/week; bare is 10 x 7 x 80% = 56. ambiguous = the SAME product patched under two plants (nganho124's case, PR #220): merged in key order, last wins, and the pick is announced. nested_owner = an owner whose own name contains '::' — the second split candidate.",
     "composite": [
       {
         "scope": "node",
@@ -311,8 +311,40 @@
     ],
     "expected_weekly_capacity": {
       "composite": 112.0,
-      "bare": 56.0
+      "bare": 56.0,
+      "ambiguous": 168.0,
+      "nested_owner": 112.0
     },
-    "target_product": "P_PRICE_FALLBACK"
+    "target_product": "P_PRICE_FALLBACK",
+    "ambiguous": [
+      {
+        "scope": "node",
+        "target_key": "Plant A::P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 20.0,
+          "utilization_cap_pct": 80.0
+        }
+      },
+      {
+        "scope": "node",
+        "target_key": "Plant B::P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 30.0
+        }
+      }
+    ],
+    "nested_owner": [
+      {
+        "scope": "node",
+        "target_key": "Plant A::B::P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 20.0,
+          "utilization_cap_pct": 80.0
+        }
+      }
+    ]
   }
 }
