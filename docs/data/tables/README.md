@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 37 of 79 tables are covered,
-432 columns in all. A table that is not here is listed
+434 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -18,7 +18,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 10 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed). |
 | [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
 | [`customers`](customers.md) | 2 | `data-ingestion` | 8 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
-| [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 8 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
+| [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 10 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
 | [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 14 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
 | [`ingest_files`](ingest_files.md) | 0 | `data-ingestion` | 11 | One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one. |
@@ -52,4 +52,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `57ad4b32bb9f`, engine `0.2.3`.*
+*Generated from data contract `3da477ea5282`, engine `0.2.3`.*

@@ -132,20 +132,47 @@ export function buildPolicyVersionWorkbook(
 
 // ── 2. Dataset (canonical hashed rows) ──────────────────────────────────────
 
+type SnapshotTables = {
+  suppliers?: Record<string, unknown>[];
+  materials?: Record<string, unknown>[];
+  products?: Record<string, unknown>[];
+  customers?: Record<string, unknown>[];
+  inbound?: Record<string, unknown>[];
+  bom?: Record<string, unknown>[];
+  bom_multi_level?: Record<string, unknown>[];
+  outbound?: Record<string, unknown>[];
+};
+
+type SnapshotNetwork = {
+  tier2_suppliers?: Record<string, unknown>[];
+  tier3_suppliers?: Record<string, unknown>[];
+  multi_tier?: Record<string, unknown>[];
+};
+
 export interface DatasetVersionRow {
   id: string;
   label: string | null;
   graph_hash: string;
+  /** NULL on every version frozen before WP 4.1; not backfillable. */
+  hash_inputs?: string | null;
+  hash_network?: string | null;
   created_at: string;
-  snapshot: {
-    schema_version?: number;
-    suppliers?: Record<string, unknown>[];
-    materials?: Record<string, unknown>[];
-    products?: Record<string, unknown>[];
-    inbound?: Record<string, unknown>[];
-    bom?: Record<string, unknown>[];
-    outbound?: Record<string, unknown>[];
-  };
+  /**
+   * TWO SHAPES LIVE HERE AT ONCE, and that is not a transition to be tidied
+   * away later. v1 (`20260703000001`) put the six tables at the top level; v2
+   * (WP 4.1, `20260917000002`) puts them under `inputs` and adds `network`.
+   * A frozen version is IMMUTABLE — nothing rewrites one, which is what lets a
+   * run resolve the dataset it actually ran against — so every v1 row in this
+   * table will hold the v1 shape forever. A reader that handles only the new
+   * one silently exports empty sheets for every historical version.
+   */
+  snapshot: ({ schema_version?: number; inputs?: SnapshotTables; network?: SnapshotNetwork }
+             & SnapshotTables);
+}
+
+/** The tables, from whichever shape this version happens to be. */
+function snapshotTables(snap: DatasetVersionRow["snapshot"]): SnapshotTables {
+  return (snap?.inputs ?? snap ?? {}) as SnapshotTables;
 }
 
 function sheetFromRows(rows: Record<string, unknown>[], columns?: string[]): XLSX.WorkSheet {
@@ -156,12 +183,23 @@ function sheetFromRows(rows: Record<string, unknown>[], columns?: string[]): XLS
 }
 
 /**
- * The six engine-read tables, exactly as canonically snapshotted and hashed
- * by `_build_dataset_snapshot` (dataset_versions.snapshot) — re-hashing the
- * snapshot JSON reproduces graph_hash, so this export is verifiable against
- * any run stamped with the same hash. `bomMulti` (when the project uses a
- * multi-level BOM) is included as an extra sheet: the engine reads it when
- * present, but graph_hash v1 covers bom_single_level only (stated in _meta).
+ * The canonical rows, exactly as snapshotted and hashed by
+ * `_build_dataset_snapshot` — so re-hashing the snapshot JSON reproduces
+ * `graph_hash` and this export is verifiable against any run stamped with it.
+ *
+ * WP 4.1 changed what is in there and the workbook says which version it is
+ * looking at, per sheet, because the two are genuinely different documents:
+ *
+ *   v1 — six tables at the top level. `bom_multi_level` was NOT hashed, so on a
+ *        multi-level project the export carried a sheet the hash did not cover
+ *        and said so in `_meta`. That is D11 and every v1 version still has it.
+ *   v2 — `inputs` (eight tables, including the deep BOM the engine PREFERS) and
+ *        `network` (the three deep-tier tables). `bom_multi_level` comes out of
+ *        the snapshot itself and the caveat is gone with it.
+ *
+ * A frozen version is never rewritten, so both shapes are live forever and
+ * `_meta` states which one this file is. `bomMulti` is still accepted for a v1
+ * version, where it is the only way to get those rows into the sheet at all.
  */
 export function buildDatasetWorkbook(
   dataset: DatasetVersionRow,
@@ -169,7 +207,14 @@ export function buildDatasetWorkbook(
   bomMulti?: Record<string, unknown>[],
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
-  const snap = dataset.snapshot ?? {};
+  const raw = dataset.snapshot ?? {};
+  const version = Number(raw.schema_version ?? 1);
+  const snap = snapshotTables(raw);
+  const net = (raw.network ?? {}) as SnapshotNetwork;
+  // A v1 version has no deep BOM in its snapshot; the caller may pass the live
+  // rows, which is what v1's `_meta` note was about. From v2 the snapshot has
+  // them and the live rows would be a DIFFERENT dataset in a hashed workbook.
+  const deepBom = version >= 2 ? (snap.bom_multi_level ?? []) : (bomMulti ?? []);
 
   const tables: Array<{ sheet: string; rows: Record<string, unknown>[]; cols: string[] }> = [
     {
@@ -187,44 +232,76 @@ export function buildDatasetWorkbook(
       rows: snap.products ?? [],
       cols: [
         "product_id", "sell_price", "production_capacity", "fulfillment_mode",
-        "demand_distribution", "demand_mean", "demand_cv",
+        "demand_distribution", "demand_mean", "demand_cv", "demand_min", "demand_max",
       ],
     },
     {
       sheet: "inbound_logistics",
       rows: snap.inbound ?? [],
-      cols: ["supplier_id", "material_id", "unit_price", "lead_time", "time_unit", "volume"],
+      // `lead_time_unit` is what the lead time is QUOTED IN. v1 hashed the
+      // number without it, so 14 days and 14 weeks were the same dataset (D67).
+      cols: ["plant_name", "supplier_id", "material_id", "unit_price", "lead_time",
+             "lead_time_unit", "time_unit", "volume"],
     },
     {
       sheet: "bom_single_level",
       rows: snap.bom ?? [],
-      cols: ["product_id", "material_id", "consumption_rate"],
+      cols: ["plant_name", "product_id", "material_id", "consumption_rate"],
     },
     {
       sheet: "outbound_logistics",
       rows: snap.outbound ?? [],
-      cols: ["product_id", "customer_id", "unit_price", "volume", "time_unit"],
+      cols: ["plant_name", "product_id", "customer_id", "unit_price", "volume",
+             "time_unit", "expected_lead_time"],
+    },
+    {
+      sheet: "customers",
+      rows: snap.customers ?? [],
+      cols: ["customer_id", "segment", "priority_weight", "sla_fill_floor_pct"],
     },
   ];
   for (const t of tables) {
     XLSX.utils.book_append_sheet(wb, sheetFromRows(t.rows, t.cols), t.sheet);
   }
-  if (bomMulti && bomMulti.length > 0) {
+  if (deepBom.length > 0) {
     XLSX.utils.book_append_sheet(
       wb,
-      sheetFromRows(bomMulti, ["material_id", "higher_level_component_id", "level", "consumption_rate"]),
+      sheetFromRows(deepBom, ["plant_name", "material_id", "higher_level_component_id",
+                              "level", "consumption_rate"]),
       "bom_multi_level",
     );
+  }
+  // The network domain, from v2 on. It is empty on every project in production
+  // today (§15), so these sheets exist and hold nothing — which is the honest
+  // rendering of "no deep-tier data", and different from the sheet being absent
+  // because the export does not know about it.
+  if (version >= 2) {
+    for (const [sheet, rows, cols] of [
+      ["tier2_suppliers", net.tier2_suppliers ?? [],
+       ["plant_name", "supplier_id", "upstream_supplier_id", "material_id",
+        "relationship_type", "volume", "unit_price", "lead_time", "time_unit"]],
+      ["tier3_suppliers", net.tier3_suppliers ?? [],
+       ["plant_name", "supplier_id", "upstream_supplier_id", "material_id",
+        "relationship_type", "volume", "unit_price", "lead_time", "time_unit"]],
+      ["multi_tier_supply_chain", net.multi_tier ?? [],
+       ["plant_name", "from_firm_id", "to_firm_id", "to_firm_tier", "to_firm_relationship"]],
+    ] as Array<[string, Record<string, unknown>[], string[]]>) {
+      XLSX.utils.book_append_sheet(wb, sheetFromRows(rows, cols), sheet);
+    }
   }
 
   const meta: (string | number | null)[][] = [
     ["SuReSuite verifiable export — DATASET (engine-read tables)"],
     [
       "Scope",
-      "The canonical source rows of the six tables the simulation engine consumes, exactly as " +
-        "snapshotted and hashed (dataset_versions.snapshot). Re-hashing the snapshot JSON " +
-        "(SHA-256 over its canonical text) reproduces graph_hash; any run stamped with the same " +
-        "graph_hash ran on exactly this data.",
+      version >= 2
+        ? "The canonical source rows of every tier-2 input table, exactly as snapshotted and " +
+          "hashed (dataset_versions.snapshot), in two domains: inputs (what a simulation reads) " +
+          "and network (what the multi-tier analyses read). graph_hash is SHA-256 over " +
+          "{schema_version, hash_inputs, hash_network}; any run stamped with the same graph_hash " +
+          "ran on exactly this data."
+        : "The canonical source rows of the six tables the simulation engine consumed under " +
+          "snapshot v1. Re-hashing the snapshot JSON reproduces this version's graph_hash.",
     ],
     [],
     ["Project", projectName ?? ""],
@@ -232,16 +309,40 @@ export function buildDatasetWorkbook(
     ["Label", dataset.label ?? ""],
     ["graph_hash (SHA-256)", dataset.graph_hash],
     ["Snapshot taken", dataset.created_at],
-    ["Snapshot schema_version", snap.schema_version ?? 1],
+    ["Snapshot schema_version", version],
+    ["hash_inputs (SHA-256)", dataset.hash_inputs ?? "not recorded — frozen before WP 4.1"],
+    ["hash_network (SHA-256)", dataset.hash_network ?? "not recorded — frozen before WP 4.1"],
     [],
-    ...(bomMulti && bomMulti.length > 0
-      ? [[
-          "Note",
-          "bom_multi_level is included because this project carries multi-level BOM rows (the engine " +
-            "reads them when present, collapsed to effective product→material arcs); graph_hash v1 " +
-            "canonicalizes bom_single_level only.",
-        ] as (string | number | null)[]]
-      : []),
+    // §5 T3 — an export states the limits of its OWN computation. For a v1
+    // version that limit is real and permanent: the deep BOM sheet below was
+    // read live and is NOT part of what this version's graph_hash covers, so
+    // the rows can have changed since the freeze. Nothing can repair that after
+    // the fact; saying so is the whole of the commitment.
+    ...(version < 2
+      ? [
+          [
+            "Known limit",
+            "This version was frozen under snapshot v1, which canonicalized bom_single_level only. " +
+              "graph_hash does NOT cover bom_multi_level, lead_time_unit, demand_min/demand_max, " +
+              "customers or the deep-tier network tables (PLAN.md §4 D11, D67). Two datasets " +
+              "differing only in those produce the same hash for this version.",
+          ] as (string | number | null)[],
+          ...(deepBom.length > 0
+            ? [[
+                "Known limit",
+                "The bom_multi_level sheet was read LIVE, not from the snapshot — v1 does not " +
+                  "contain it. Those rows may have changed since this version was frozen.",
+              ] as (string | number | null)[]]
+            : []),
+        ]
+      : [
+          [
+            "Known limit",
+            "graph_hash covers every tier-2 input table. It does NOT cover the four derived " +
+              "network tables (node_list, network_nodes, network_edges, network_summary): those " +
+              "are analysis OUTPUTS, and WP 4.2 binds them to their own input hash.",
+          ] as (string | number | null)[],
+        ]),
     ["Generated", new Date().toISOString()],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), "_meta");

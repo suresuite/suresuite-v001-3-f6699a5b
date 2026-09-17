@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 432;
+export const REFERENCE_COLUMN_COUNT = 434;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -1398,6 +1398,38 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the version was frozen. Server-set.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "hash_inputs",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULATION reads. When this moves, a run stamped with the old composite cannot be reproduced.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "hash_network",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes.",
         "primaryKey": false,
         "unique": false,
         "references": null,

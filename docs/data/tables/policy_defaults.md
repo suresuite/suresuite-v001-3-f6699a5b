@@ -325,6 +325,6 @@ When the preset was last applied.
 
 ---
 
-*Generated from data contract `57ad4b32bb9f`, engine `0.2.3`,
+*Generated from data contract `3da477ea5282`, engine `0.2.3`,
 sidecar `supabase/contract/policy_defaults.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

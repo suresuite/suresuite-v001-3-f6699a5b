@@ -33,6 +33,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // The project comes from the payload, as it always has, but it is now read
+    // ONCE and passed as a scalar: the RPC sets `project_id` and `plant_name`
+    // on every row from the PROJECT, so a payload that disagreed with itself
+    // can no longer write two projects' rows in one call.
+    const projectIds = Array.from(new Set(rows.map((r: any) => r.project_id).filter(Boolean)));
+    if (projectIds.length !== 1) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `rows must belong to exactly one project; got ${projectIds.length}`,
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const projectId = projectIds[0] as string;
+
     // Normalize payload to allowed columns
     const sanitized = rows.map((r: any) => ({
       supplier_id: r.supplier_id ?? null,
@@ -52,31 +65,42 @@ serve(async (req) => {
 
     const BATCH_SIZE = 100;
     let inserted = 0;
+    let updated = 0;
 
     for (let i = 0; i < sanitized.length; i += BATCH_SIZE) {
       const batch = sanitized.slice(i, i + BATCH_SIZE);
       console.log('[ingest-inbound-logistics] inserting batch', { size: batch.length, i });
-      // UPSERT, NOT INSERT (WP 3.3). `20260916000018` put a unique index on this
-      // table's natural key, so a plain `.insert()` of a row that already exists
-      // now raises 23505 where it used to make a duplicate. Silently duplicating
-      // was D5; failing with a constraint name is not the fix, it is a different
-      // defect wearing the fix's clothes — this path is reached when a user
-      // assigns a supplier that may already be assigned, and "already done"
-      // is a no-op, not an error.
+      // WP 4.1 — D36 CLOSED HERE, AND IT IS NOT THE ONE-LINE FIX.
+      // The write goes through an RPC that takes the actor as a PARAMETER and
+      // sets `app.current_user_id` LOCAL to its own transaction, so the tier-2
+      // audit trigger sees it. A `.upsert()` over PostgREST cannot do that: the
+      // GUC would have to survive into a different statement on a pooled
+      // connection, which `projectLanes.ts`'s header records that it does not.
       //
-      // `onConflict` names the index's own columns. It has to be spelled out for
-      // PostgREST, which is one more copy of the key; `ingestSpecParity.test.ts`
-      // checks it against the sidecar for the same reason it checks the other three.
-      //
-      // WHAT THIS DOES NOT FIX IS D36. This is still a SERVICE-ROLE write with no
-      // actor: the audit row will say WHAT changed and record `actor_known: false`.
-      // Closing that means moving the write into an RPC that takes the actor as a
-      // parameter and sets `app.current_user_id` LOCAL to its own transaction, the
-      // way `ingest_land_file` does — a PostgREST call cannot set a GUC the trigger
-      // will see, which is exactly why D36 says the one-line fix is not one. See
-      // PLAN.md §16 · WP 3.3 · I.
-      const { error } = await supabase.from('inbound_logistics')
-        .upsert(batch, { onConflict: 'project_id,plant_name,supplier_id,material_id', returning: 'minimal' });
+      // THREE OTHER THINGS MOVE WITH IT, and they are the reason this is worth
+      // more than an audit column:
+      //   * the natural key is no longer spelled here. `ingest_legacy_upsert_lane`
+      //     reads the arbiter from `pg_index`, so there is ONE copy of the key
+      //     and it cannot drift from the index `ON CONFLICT` infers from;
+      //   * the RPC AUTHENTICATES and does not AUTHORIZE. An earlier draft
+      //     refused below project role `editor` and it came out: an
+      //     organization admin who is not a project member resolves to NULL
+      //     from `effective_project_role`, and `combine-project` has always
+      //     permitted that user — see `20260917000005`. This function keeps
+      //     the authorization it already had; making `min_project_role` the
+      //     one live answer is D66, and WP 6.2's;
+      //   * `no-tier-skip` (I2) stops being a property of this file. While this
+      //     function held a PostgREST client it was one `.upsert()` away from
+      //     any tier-2 table in the schema. Now the set it can reach is a
+      //     whitelist in a migration.
+      // One statement for the whole batch, so the statement-grain audit writes
+      // ONE row saying "n rows" rather than n rows saying one (WP 2.3).
+      const { data: written, error } = await supabase.rpc('ingest_legacy_upsert_lane', {
+        _project_id: projectId,
+        _actor_user_id: userId,
+        _target: 'inbound_logistics',
+        _rows: batch,
+      });
       if (error) {
         console.error('[ingest-inbound-logistics] insert error', error);
         return new Response(JSON.stringify({ success: false, error: error.message }), {
@@ -84,13 +108,18 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      inserted += batch.length;
+      // THE COUNT COMES FROM THE STATEMENT, not from the batch length. The two
+      // differ whenever a batch carries the same natural key twice — the upsert
+      // folds those to one row — and reporting the input size as the number
+      // written is a number with no source (§5 T1).
+      inserted += Number((written as { rows_written?: number } | null)?.rows_written ?? 0);
+      updated  += Number((written as { rows_updated?: number } | null)?.rows_updated ?? 0);
       if (i + BATCH_SIZE < sanitized.length) {
         await new Promise((res) => setTimeout(res, 150));
       }
     }
 
-    return new Response(JSON.stringify({ success: true, inserted }), {
+    return new Response(JSON.stringify({ success: true, inserted, updated }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

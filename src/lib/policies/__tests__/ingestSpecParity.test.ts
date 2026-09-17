@@ -288,40 +288,123 @@ describe("the promotion's unit conversions exist twice and must agree", () => {
 });
 
 /**
- * WP 3.3 — THE LEGACY EDGE FUNCTIONS' `onConflict` IS A FOURTH COPY OF THE KEY.
+ * WP 4.1 — THE FOURTH COPY OF THE KEY IS GONE, AND THAT IS WHY THIS BLOCK
+ * CHANGED SHAPE.
  *
- * `20260916000018` put a unique index on each lane's natural key, which turns
- * these three functions' plain `.insert()` into a 23505 the first time a user
- * re-sends a row that already exists — `ingest-inbound-logistics` is the fallback
- * the /policies grid uses to assign a supplier, and "already assigned" is a no-op,
- * not an error. They upsert now, and PostgREST needs the conflict target spelled
- * out, so the key exists once more in a place that can drift.
+ * WP 3.3 made these three functions upsert, and PostgREST needs the conflict
+ * target spelled out — so the key existed a fourth time, in TypeScript, and
+ * this test held that copy to the sidecar. WP 4.1 moved the WRITE into
+ * `ingest_legacy_upsert_lane`, which reads the arbiter from `pg_index`. There
+ * is no fourth copy left to check.
+ *
+ * So the assertion gets STRONGER rather than weaker: these functions must name
+ * no key, no conflict target and no tier-2 table at all. If one of them ever
+ * gets a PostgREST write back, it is one `.upsert()` away from any tier-2 table
+ * in the schema — which is `no-tier-skip` (I2) and `audit-actor` (G4) failing
+ * together, silently, in a file nobody is looking at.
  */
-describe("the legacy ingest functions upsert on the same key the index enforces", () => {
+describe("the legacy ingest functions write through the RPC, not through PostgREST", () => {
   const LEGACY: Array<[string, string]> = [
     ["ingest-inbound-logistics", "inbound_logistics"],
     ["ingest-outbound-logistics", "outbound_logistics"],
     ["ingest-bom-multi-level", "bom_multi_level"],
   ];
 
-  it("names exactly natural_key_intended in onConflict", () => {
+  const sourceOf = (fn: string) =>
+    readFileSync(join(ROOT, "supabase", "functions", fn, "index.ts"), "utf8");
+
+  /** Comments are where the key is DISCUSSED; only live code may not spell it. */
+  const codeOf = (fn: string) =>
+    sourceOf(fn)
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+      .join("\n");
+
+  it("each one calls ingest_legacy_upsert_lane with its own target", () => {
     for (const [fn, table] of LEGACY) {
-      const src = readFileSync(join(ROOT, "supabase", "functions", fn, "index.ts"), "utf8");
-      const m = src.match(/onConflict:\s*'([^']+)'/);
-      expect(m, `${fn} does not name a conflict target`).toBeTruthy();
-      const intended = (CONTRACT.tables as any)[table].natural_key_intended as string[];
-      expect(m![1].split(",").map((c) => c.trim())).toEqual(intended);
+      const code = codeOf(fn);
+      expect(code, `${fn} does not call the RPC`).toMatch(/rpc\('ingest_legacy_upsert_lane'/);
+      expect(code, `${fn} does not name ${table} as its target`).toMatch(
+        new RegExp(`_target:\\s*'${table}'`),
+      );
     }
   });
 
-  it("none of them still uses a bare .insert() into its lane", () => {
-    // A plain insert is the duplicate-or-crash behaviour, depending only on
-    // whether the row happens to exist. Neither is acceptable now.
-    for (const [fn, table] of LEGACY) {
-      const src = readFileSync(join(ROOT, "supabase", "functions", fn, "index.ts"), "utf8");
-      expect(src, `${fn} still inserts into ${table}`).not.toMatch(
-        new RegExp(`from\\('${table}'\\)\\s*\\.insert\\(`),
+  it("each one passes the actor as a parameter (D36)", () => {
+    // The whole of D36 is that a service-role PostgREST write cannot tell the
+    // audit trigger who is acting. An RPC call that forgot the actor would
+    // reintroduce it while looking exactly like the fix.
+    for (const [fn] of LEGACY) {
+      expect(codeOf(fn), `${fn} calls the RPC without an actor`).toMatch(
+        /_actor_user_id:\s*userId/,
       );
+    }
+  });
+
+  it("none of them spells a natural key any more", () => {
+    for (const [fn, table] of LEGACY) {
+      const code = codeOf(fn);
+      expect(code, `${fn} still names a conflict target`).not.toMatch(/onConflict:/);
+      const intended = (CONTRACT.tables as any)[table].natural_key_intended as string[];
+      expect(code, `${fn} still spells ${table}'s key`).not.toContain(intended.join(","));
+    }
+  });
+
+  it("none of them holds a write to its lane, by any PostgREST verb", () => {
+    // A plain insert is duplicate-or-crash depending only on whether the row
+    // happens to exist; an upsert is unattributed. Neither is acceptable now,
+    // and neither is a delete.
+    for (const [fn, table] of LEGACY) {
+      const code = codeOf(fn);
+      for (const verb of ["insert", "upsert", "update", "delete"]) {
+        expect(code, `${fn} still calls .${verb}() on ${table}`).not.toMatch(
+          new RegExp(`from\\('${table}'\\)\\s*\\.?\\s*\\.${verb}\\(`),
+        );
+      }
+    }
+  });
+});
+
+/**
+ * WP 4.1 — THE OTHER THREE OF D36's SIX, held to the same rule.
+ *
+ * `combine-project`, `predict-critical-nodes` and `erp-sync-orbit-mrp` wrote
+ * tier-2/3 tables directly. Each now calls an RPC that takes the actor. The
+ * table-name assertion is what keeps it that way: a future edit that adds a
+ * `.from('supply_chain_data').insert(...)` back is the defect returning, and
+ * nothing else in the repository would notice.
+ */
+describe("D36's remaining three write through an RPC that names the actor", () => {
+  const MOVED: Array<[string, string, string[]]> = [
+    ["combine-project", "etl_replace_supply_chain", ["supply_chain_data", "supply_chain_data_multi_tier"]],
+    ["predict-critical-nodes", "analysis_mark_critical_nodes", ["supply_chain_data"]],
+    ["erp-sync-orbit-mrp", "mrp_apply_staged_products", ["products"]],
+  ];
+
+  const codeOf = (fn: string) =>
+    readFileSync(join(ROOT, "supabase", "functions", fn, "index.ts"), "utf8")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+      .join("\n");
+
+  it("each one calls its RPC and passes an actor", () => {
+    for (const [fn, rpc] of MOVED) {
+      const code = codeOf(fn);
+      expect(code, `${fn} does not call ${rpc}`).toContain(rpc);
+      expect(code, `${fn} calls ${rpc} without an actor`).toMatch(/_actor_user_id:/);
+    }
+  });
+
+  it("none of them still writes its tier-2/3 table over PostgREST", () => {
+    for (const [fn, , tables] of MOVED) {
+      const code = codeOf(fn);
+      for (const table of tables) {
+        for (const verb of ["insert", "upsert", "update", "delete"]) {
+          expect(code, `${fn} still calls .${verb}() on ${table}`).not.toMatch(
+            new RegExp(`from\\(["']${table}["']\\)[\\s\\n]*\\.${verb}\\(`),
+          );
+        }
+      }
     }
   });
 });

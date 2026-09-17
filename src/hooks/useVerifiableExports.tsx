@@ -98,24 +98,36 @@ export function useVerifiableExports(
       if (dsErr) throw dsErr;
       const { data: version, error: verErr } = await sb
         .from("dataset_versions")
-        .select("id,label,graph_hash,created_at,snapshot")
+        .select("id,label,graph_hash,hash_inputs,hash_network,created_at,snapshot")
         .eq("id", dsId as string)
         .maybeSingle();
       if (verErr || !version) throw verErr ?? new Error("dataset version not readable");
-      // Multi-level BOM rows ride along when the project uses them (the
-      // engine reads them when present; graph_hash v1 hashes single-level).
+
+      // WP 4.1 — THE LIVE READ IS ONLY FOR v1 VERSIONS NOW, and that is the
+      // point of the change rather than an optimization.
+      //
+      // `bom_multi_level` is INSIDE the snapshot from v2 on, so the workbook
+      // takes it from the frozen rows like every other sheet. Reading it live
+      // would put rows in a hashed export that the hash does not describe — the
+      // exact defect the v1 path had to carry a `_meta` note about, because v1
+      // could not do anything else. A freshly frozen version needs no note.
+      const snapshotVersion = Number(
+        (version as { snapshot?: { schema_version?: number } }).snapshot?.schema_version ?? 1,
+      );
       let bomMulti: Record<string, unknown>[] | undefined;
-      try {
-        const lanes = await fetchProjectLanes(projectId, user);
-        if (lanes.bomLevel === "multi") bomMulti = lanes.bom;
-        // D20 / §5 T3 — an export states the limits of its own computation.
-        // The rows still go into the workbook (dropping them silently would be
-        // worse), but the person clicking Export is told, now, that the sheet
-        // is a slice. A file leaves the building; a console warning does not.
-        const note = laneTruncationNotice(lanes);
-        if (note) toast.warning(note);
-      } catch {
-        /* optional sheet only */
+      if (snapshotVersion < 2) {
+        try {
+          const lanes = await fetchProjectLanes(projectId, user);
+          if (lanes.bomLevel === "multi") bomMulti = lanes.bom;
+          // D20 / §5 T3 — an export states the limits of its own computation.
+          // The rows still go into the workbook (dropping them silently would be
+          // worse), but the person clicking Export is told, now, that the sheet
+          // is a slice. A file leaves the building; a console warning does not.
+          const note = laneTruncationNotice(lanes);
+          if (note) toast.warning(note);
+        } catch {
+          /* optional sheet only */
+        }
       }
       const wb = buildDatasetWorkbook(
         version as DatasetVersionRow,
