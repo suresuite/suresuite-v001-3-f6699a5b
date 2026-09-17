@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 323,
-  "migrations_applied": 320,
+  "migrations_found": 324,
+  "migrations_applied": 321,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260917000005_writer_preamble_actor_only.sql",
+  "last_migration": "20260917000006_analysis_store.sql",
   "counts": {
-    "tables": 79,
+    "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 259,
+    "functions": 264,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -1319,6 +1319,444 @@
             "id"
           ],
           "name": "ai_usage_logs_pkey"
+        }
+      ]
+    },
+    {
+      "name": "analysis_results",
+      "schema": "public",
+      "created_by": "20260917000006_analysis_store.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "analysis_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "entity_type",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "entity_id",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "metrics",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "analysis_results_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "analysis_results_entity_uniq",
+          "unique": true,
+          "columns": [
+            "run_id",
+            "entity_type",
+            "entity_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "analysis_results_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.analysis_runs r WHERE r.id = analysis_results.run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS ( SELECT 1 FROM public.analysis_runs r WHERE r.id = analysis_results.run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260917000006_analysis_store.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 4.2 · What one run computed, one row per entity, IMMUTABLE. Rewriting a ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "analysis_results_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "run_id",
+            "entity_type",
+            "entity_id"
+          ],
+          "name": "analysis_results_entity_uniq"
+        }
+      ]
+    },
+    {
+      "name": "analysis_runs",
+      "schema": "public",
+      "created_by": "20260917000006_analysis_store.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "input_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "params_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "code_version",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "params",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "status",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'running'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "started_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "finished_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "duration_ms",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "row_counts",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "warnings",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "actor_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": null
+          },
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "analysis_runs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "analysis_runs_key_uniq",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "analysis_kind",
+            "input_hash",
+            "params_hash",
+            "code_version"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "status <> 'failed'",
+          "partial": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_runs_project_kind_idx",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "analysis_kind",
+            "started_at DESC"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "analysis_runs_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20260917000006_analysis_store.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 4.2 · One execution of one analysis, identified by the world it ran against ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "analysis_runs_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "project_id",
+            "analysis_kind",
+            "input_hash",
+            "params_hash",
+            "code_version"
+          ],
+          "name": "analysis_runs_key_uniq",
+          "predicate": "status <> 'failed'"
         }
       ]
     },
@@ -19890,6 +20328,49 @@
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
+      "name": "analysis_complete_run",
+      "signature": "analysis_complete_run(uuid, jsonb, jsonb, jsonb, uuid)",
+      "args": [
+        "_run_id uuid",
+        "_results jsonb",
+        "_row_counts jsonb",
+        "_warnings jsonb",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260917000006_analysis_store.sql"
+    },
+    {
+      "name": "analysis_fail_run",
+      "signature": "analysis_fail_run(uuid, jsonb, uuid)",
+      "args": [
+        "_run_id uuid",
+        "_warnings jsonb",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260917000006_analysis_store.sql"
+    },
+    {
+      "name": "analysis_get_or_start",
+      "signature": "analysis_get_or_start(uuid, text, jsonb, text, uuid)",
+      "args": [
+        "_project_id uuid",
+        "_analysis_kind text",
+        "_params jsonb",
+        "_code_version text",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "defined_by": "20260917000006_analysis_store.sql"
+    },
+    {
       "name": "analysis_mark_critical_nodes",
       "signature": "analysis_mark_critical_nodes(uuid, jsonb)",
       "args": [
@@ -19900,6 +20381,24 @@
       "security_definer": true,
       "volatility": null,
       "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
+    },
+    {
+      "name": "analysis_results_are_immutable",
+      "signature": "analysis_results_are_immutable()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql AS",
+      "security_definer": false,
+      "volatility": null,
+      "defined_by": "20260917000006_analysis_store.sql"
+    },
+    {
+      "name": "analysis_runs_identity_is_immutable",
+      "signature": "analysis_runs_identity_is_immutable()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql AS",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "defined_by": "20260917000006_analysis_store.sql"
     },
     {
       "name": "api_can_access_project",

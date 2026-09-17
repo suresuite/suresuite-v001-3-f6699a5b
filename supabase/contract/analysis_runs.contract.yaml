@@ -1,0 +1,414 @@
+# AUTHORED — the data contract's sidecar for `analysis_runs`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+#
+# WP 4.2 · §11. This table is the answer to D19 — "analysis results smeared onto
+# entity columns; no identity or version". A centrality living as a COLUMN on
+# `network_nodes` cannot say which inputs produced it, which code produced it, or
+# whether it has already been computed. A run row says all three, and that is the
+# whole design: the cache is a CONSEQUENCE of the identity, not the point of it.
+table: analysis_runs
+tier: "3"
+schema_name: public
+grain: >-
+  One execution of one analysis for one project, identified by the world it ran
+  against (`input_hash`), the parameters it ran with (`params_hash`) and the code
+  that ran (`code_version`). Two runs carrying the same five-part key ARE the same
+  run by definition, which is what makes serving a stored answer sound rather than
+  a bet on how recently a timestamp moved.
+owner: analysis
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "analysis_runs_pkey"
+  - source: "unique index 20260917000006_analysis_store.sql"
+    columns: [project_id, analysis_kind, input_hash, params_hash, code_version]
+    name: "analysis_runs_key_uniq"
+
+natural_key_intended: [project_id, analysis_kind, input_hash, params_hash, code_version]
+
+# THE OPEN ENUM LIVES HERE, which is what §11 means by "an open enum with a params
+# schema in the contract". `analysis_kind` is a TEXT column with a CHECK on its
+# SHAPE only — a PostgreSQL enum type would make `lead_time_fit` cost an
+# `ALTER TYPE`, a migration and a deploy. The catalog of kinds is a data fact, and
+# `single-source` (I1) says a data fact is authored once, here.
+#
+# Adding a kind: add a row below. No migration.
+analysis_kinds:
+  network_metrics:
+    computed_by: "calculate-network-science-metrics (WP 4.3 migrates it)"
+    entity_type: node
+    params:
+      weighted:
+        type: boolean
+        default: true
+        meaning: "Weight edges by `relative_revenue` rather than treating the graph as unweighted."
+  prominence:
+    computed_by: "calculate-node-prominence (WP 4.3 migrates it)"
+    entity_type: node
+    params: {}
+  critical_nodes:
+    computed_by: "predict-critical-nodes (WP 4.3 migrates it)"
+    entity_type: node
+    params:
+      threshold:
+        type: number
+        default: null
+        meaning: "Score above which a node is reported critical. Null means the analyzer's own default, which WP 4.3 must make explicit — an undeclared default is `declared-fallback` (I6) broken."
+  project_ai_health:
+    computed_by: "project-ai-health (WP 4.3 migrates it)"
+    entity_type: project
+    params: {}
+  combine_etl:
+    computed_by: "combine-project (WP 4.3 migrates it, as §11 names it)"
+    entity_type: project
+    params: {}
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: true
+  rls_enabled: true
+  note: >-
+    Read follows project reachability (`has_project_access`), uuid-only since
+    WP 3.0. `write: null` is a STATEMENT, not an omission: there is no user-facing
+    write path and there must not be one. Every write goes through
+    `analysis_get_or_start`, `analysis_complete_run` and `analysis_fail_run`, each
+    of which takes the actor as a PARAMETER and routes it through
+    `assert_writer_may_act` — so the audit trigger names a person rather than
+    recording `actor_known: false` (G4). There is deliberately NO write policy on
+    this table, which makes `no-tier-skip` (I2) a property of the schema here
+    rather than of today's callers. The RPCs AUTHENTICATE and do not AUTHORIZE:
+    `20260917000005` removed a role gate from the shared preamble after it was
+    found to refuse an organization admin on a live path, and making
+    `min_project_role` load-bearing is D66 and WP 6.2's.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. Carries no meaning — the IDENTITY of a run is the
+      five-column natural key, not this.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this analysis ran for. Referenced by uuid and never by a
+      displayable name (`uuid-identity`, G1); cascades on project delete, which is
+      retention rather than mutation of a result.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  analysis_kind:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WHICH analysis ran. Open enum — the CHECK constrains the shape to a lowercase
+      identifier and the catalog of values is the `analysis_kinds` block above, so a
+      new kind costs a sidecar edit and not a migration.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  input_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WP 4.1's `current_graph_hash(project_id)` at the moment the run was claimed:
+      the world this answer is about. This is the anchor invariant `input-hash` (I5)
+      is about — and I5 is NOT met by this table alone, because I5 is about the
+      DERIVED ROW carrying it. WP 4.3 stamps the same value onto the tier-3 rows the
+      analyzers already write.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  params_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      SHA-256 of `params` as canonical `jsonb` text. Over jsonb and never over the
+      text a caller sent, because jsonb normalises key order and duplicate keys — so
+      the same parameters written two ways are one cache key rather than two.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  code_version:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WHICH code produced the answer. Part of the key so that a changed analyzer
+      does not serve its predecessor's numbers, and so two versions can coexist on
+      one input hash and be compared (§11's fourth exit check).
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  params:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The parameters as sent, beside the hash of them, so a run can be read without
+      reversing a digest. Immutable: re-pointing a stored run at different parameters
+      would re-attribute an answer to a question it never answered.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  status:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      `running`, `succeeded` or `failed`. Only a `succeeded` run is ever served as a
+      hit — a `running` row is a claim somebody else is still working on and holds no
+      results, and handing it back would render an empty analysis as a complete one.
+      `failed` sits OUTSIDE the unique index on purpose (see `natural_key_unique`):
+      otherwise the first crash would own that cache key forever and the analysis
+      could never be retried on that input.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  started_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the key was claimed. Part of the run's frozen identity, not of its state.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  finished_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the run reached `succeeded` or `failed`. Null while running.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  duration_ms:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Wall-clock milliseconds from claim to finish. Reporting only — nothing keys on
+      it, and a staleness rule that compared it to anything would be the timestamp
+      comparison D12 is about.
+    grain: level
+    note: >-
+      Nothing reads it, deliberately. It is here so a slow analysis is VISIBLE
+      rather than inferred from two timestamps, and the moment anything keys on
+      it we are back to asking whether a clock moved instead of whether the data
+      changed — which is exactly D12.
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  row_counts:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the run produced, by entity type. Reporting and the Trust Report's input
+      (A3); WP 4.4 assembles it.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  warnings:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run's own account of its blind spots, carried with the result rather than
+      left in a log — transparency commitment T3, which says every report states the
+      known limits of its own computation.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  actor_user_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot
+      exist — the same stance `assert_writer_may_act` takes for the RPC writers
+      (`20260917000005`). Note what attribution means here: the application
+      authenticates against `approved_users` and not Supabase Auth, so the id is
+      CLIENT-ASSERTED (D28) — the database refuses a write into a project the user
+      cannot reach, which is a real constraint, but it is not proof of identity.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Row insert time, maintained by the database.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Last lifecycle change. The IDENTITY columns are frozen by
+      `analysis_runs_identity_is_immutable`; only status, finish and reporting columns
+      move, which is the line between what a run IS and what it is DOING.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null

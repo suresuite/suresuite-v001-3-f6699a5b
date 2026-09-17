@@ -20,6 +20,7 @@
 //       a FINISHED PHASE, or a package the plan does not contain (WP 3.4)
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
+//   R11 every DEFERRED table says whether it is audited, and is right (D54, WP 4.2)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -103,8 +104,10 @@ for (const f of readdirSync(join(ROOT, "supabase", "contract")).filter((f) => f.
 
 const coverage = load(readFileSync(COVERAGE, "utf8"));
 const deferred = new Map();
+const deferredAudited = new Map();
 for (const group of coverage.deferred ?? []) {
   if (!group.wp || !group.why) fail("R2", `a coverage.yaml group has no wp or no why: ${JSON.stringify(group.tables)}`);
+  for (const [t, v] of Object.entries(group.audited ?? {})) deferredAudited.set(t, v);
   for (const t of group.tables ?? []) {
     if (deferred.has(t)) fail("R2", `coverage.yaml defers "${t}" twice (WP ${deferred.get(t)} and WP ${group.wp})`);
     deferred.set(t, group.wp);
@@ -683,6 +686,69 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
   if (!drift) {
     console.log(`  R9  \`governance.audited\` matches the migrations · ${live.size} table(s) audited by trigger, ` +
                 `${emitters.size} function(s) that emit an audit row`);
+  }
+}
+
+// ───────── R11: a DEFERRAL must SAY whether the table is audited (D54, WP 4.2)
+//
+// WHAT WENT WRONG WITHOUT IT. `dataPlaneAudit.test.ts` requires the three
+// `audit_tier_write` triggers on every tier-2/3/4 table IN THE CONTRACT. That
+// qualifier is load-bearing and it was invisible: a table deferred in
+// coverage.yaml is outside the contract, therefore outside the rule, therefore
+// its writes are unattributable and NOTHING anywhere says so. `tier2_suppliers`,
+// `tier3_suppliers` and `multi_tier_supply_chain` sat in that gap from WP 2.3
+// until WP 3.2 described them — and describing them is what turned the audit gate
+// red, in the same session. The gap closed for those three by accident of
+// somebody choosing to document them, not because a rule noticed.
+//
+// So the coverage list was DECIDING which tables are audited, by omission, and
+// nobody chose that. This rule takes the decision away from the omission:
+//
+//   1. every deferred table must appear in its group's `audited:` map — a
+//      missing entry is the silence D54 is about; and
+//   2. the declared value must match the triggers the migrations actually
+//      create, read from the same `auditedTables()` R9 uses. A deferral that
+//      claims `audited: true` about a table with no trigger is the published
+//      falsehood R9 exists to prevent, arriving through the other door.
+//
+// IT IS NOT A GATE ON BEING AUDITED, and it must not become one: 42 of 42
+// deferred tables are unaudited today, so requiring `true` would be red on
+// arrival and unlandable — the same reasoning that made WP 4.1's writer list a
+// RATCHET rather than a gate. The rule requires the SENTENCE, not the trigger.
+// `false` now has to be typed by a person, next to the work package that owns
+// fixing it, and the count is printed on every run so it cannot quietly grow.
+
+{
+  const { auditedTables } = await import("./live-sql.mjs");
+  const liveAudited = auditedTables();
+  const undeclared = [];
+  let wrong = 0;
+  let unaudited = 0;
+
+  for (const [table, wp] of deferred) {
+    if (!deferredAudited.has(table)) { undeclared.push(`${table} (WP ${wp})`); continue; }
+    const declared = deferredAudited.get(table) === true;
+    const actual = liveAudited.has(table);
+    if (declared !== actual) {
+      wrong++;
+      fail("R11", `coverage.yaml defers "${table}" (WP ${wp}) declaring \`audited: ${declared}\`, ` +
+                  `but the migrations ${actual ? "DO" : "do NOT"} create its \`audit_tier_write\` triggers. ` +
+                  "A deferral's audit claim is a fact about the schema and facts have one source (I1).");
+    }
+    if (!actual) unaudited++;
+  }
+
+  if (undeclared.length) {
+    fail("R11", `${undeclared.length} deferred table(s) do not say whether they are audited: ` +
+                `${undeclared.slice(0, 8).join(", ")}${undeclared.length > 8 ? ", …" : ""}.\n` +
+                "        Add the table to its group's `audited:` map in coverage.yaml. A deferred\n" +
+                "        tier-2/3/4 table with no audit trigger is an unattributable write path, and\n" +
+                "        leaving the question unanswered is how it stays one (D54).");
+  }
+
+  if (!undeclared.length && !wrong) {
+    console.log(`  R11 every deferral says whether it is audited · ${deferred.size} deferred · ` +
+                `${unaudited} of them UNAUDITED, each owned by a named package (D54)`);
   }
 }
 

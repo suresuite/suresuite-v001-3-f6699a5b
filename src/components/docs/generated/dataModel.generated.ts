@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "3da477ea5282";
+export const CONTRACT_VERSION = "a29fd67bde88";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260917000005_writer_preamble_actor_only.sql";
+export const LAST_MIGRATION = "20260917000006_analysis_store.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 79,
-  "tablesDescribed": 37,
-  "columnsDescribed": 434,
+  "tablesInSchema": 81,
+  "tablesDescribed": 39,
+  "columnsDescribed": 456,
   "tablesUndescribed": 42
 } as const;
 
@@ -162,6 +162,18 @@ export const TIERS: GlanceTier[] = [
     "tier": "3",
     "name": "derived — a pure function of tier 2",
     "tables": [
+      {
+        "table": "analysis_results",
+        "grain": "One entity's metrics from one run. `metrics` is jsonb rather than a column per measure on purpose: the set of measures is the analysis's business and adding one must not be a migration — which is the same argument the open `analysis_kind` enum makes, applied to the output side.",
+        "columns": 6,
+        "owner": "analysis"
+      },
+      {
+        "table": "analysis_runs",
+        "grain": "One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved.",
+        "columns": 16,
+        "owner": "analysis"
+      },
       {
         "table": "dataset_versions",
         "grain": "One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot.",
@@ -307,17 +319,9 @@ export const TIERS: GlanceTier[] = [
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
   {
-    "wp": "4.2",
-    "why": "Analysis output. D19 — results smeared onto entity columns with no identity or version — is exactly what these tables are, and WP 4.2 moves them into `analysis_results`. Documenting the smear as though it were the design would make the contract an argument for keeping it.",
+    "wp": "4.3",
+    "why": "Analysis output, and the four tables D56's decision is about. WP 4.2 built the store (`analysis_runs` + `analysis_results`) and DECIDED what these are: `network_nodes` and `node_list` are BOTH — each carries columns a user uploaded beside columns an analysis wrote, which is D19 stated precisely in one table and is why \"what tier is it\" has no answer while the table is one thing. So the answer is a SPLIT, not a tier, and WP 4.3 executes it because the computed half has nowhere to go until the analyzers dual-write into `analysis_results`. Two things must land before the input half can be described: D72 (`network_nodes` has no unique key on `(project_id, uid)`, so an upsert that names one fails every time it runs) and the second `schema_version` bump that describing it would force, because WP 4.1's coverage rule folds a described tier-2 input table into `hash_network` the moment its sidecar exists. §4 D56 carries the enumerated blast radius — every writer, every reader, every RPC — so this package inherits it rather than rediscovering it.",
     "tables": [
-      {
-        "table": "external_evidence",
-        "columns": 9
-      },
-      {
-        "table": "model_validations",
-        "columns": 24
-      },
       {
         "table": "network_edges",
         "columns": 15
@@ -333,6 +337,16 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "node_list",
         "columns": 17
+      }
+    ]
+  },
+  {
+    "wp": "4.4",
+    "why": "`model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",
+    "tables": [
+      {
+        "table": "model_validations",
+        "columns": 24
       }
     ]
   },
@@ -449,6 +463,16 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "user_files",
         "columns": 12
+      }
+    ]
+  },
+  {
+    "wp": "6.1",
+    "why": "`external_evidence` is the AGENT's evidence store — retrieved URLs, content hashes and confidence behind a proposal — and it belongs with the decision plane rather than with analysis output. Same regrouping as `model_validations` above: it was in the WP 4.2 bucket because nobody had looked at it, which is exactly what D54 says a deferral list does when it is allowed to decide by omission.",
+    "tables": [
+      {
+        "table": "external_evidence",
+        "columns": 9
       }
     ]
   },

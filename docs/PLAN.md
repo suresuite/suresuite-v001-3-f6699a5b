@@ -190,14 +190,14 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D9 | `lead_time_unit` read by engine; no column, dropped by sanitizer | `project_map.py:420`; `datamap.py:126` | WP 1.3 ✅ |
 | D10 | Three competing unit tables disagree (`quarter` is 13× wrong in SQL) | `grading.ts:113`, `effectiveEconomics.ts:48`, `item_master.sql:138` | WP 1.3 ✅ *(one table; `contract:units -- --check` is the gate)* |
 | D11 | `_build_dataset_snapshot` hashes `bom_single_level` only — and `datamap.py` PREFERS `bom_multi_level` when it has rows, so on a multi-level project the anchor hashed the one BOM table the run did NOT read. 792 rows across two production projects sit in that table | `20260703000001_dataset_versions.sql:119-126`; the preference at `sim-worker/sim_worker/datamap.py:214-219` | WP 4.1 ✅ *(`20260917000002` — snapshot v2 hashes it, and `supabase/rehearsal/110` §1 was written RED against `main`: on a multi-level project an edit to `consumption_rate` moved no hash and `snapshot_dataset` returned the same version id. The fix is not the table: v1's RULE was "mirror datamap.py exactly", which needs a person to re-mirror a Python file whenever the engine changes, and D67 is what that produced twice more. v2 hashes every VALUE column of every tier-2 input table and `graphHashCoverage.test.ts` fails when one is missing)* |
-| D12 | `should_recalculate_network_metrics` returns "up to date" for an empty project; 5-way cartesian join | `20250925164454_…sql:39-52` | WP 4.2 |
+| D12 | **`should_recalculate_network_metrics` — BOTH HALVES CLOSED, AND THE ROW WAS WRONG ABOUT ONE OF THEM. The citation was stale and is corrected here.** The row cited `20250925164454_…sql:39-52` for two defects. That is NOT the live definition: `20260712110000_network_metrics_check_performance.sql` does a `CREATE OR REPLACE` on the same function, so one half was fixed by a package this plan does not contain. **Half 2 — the 5-way cartesian join — was REAL and is CLOSED**: the old `last_data_time` drove `FROM supply_chain_data scd LEFT JOIN bom/inbound/outbound ON <project match only>`, whose conditions do not correlate rows (≈6.8 × 10⁹ intermediate rows for a 1 200-node project; observed live as a 3-second timeout on Project TRON - ver2), and the rewrite replaced it with independent per-table MAXes. **Half 1 — "returns up to date for an empty project" — was MIS-STATED, and WP 4.2 measured it rather than reasoning about it**: both definitions were run side by side over the full 8-case matrix (supply_chain_data × fresher BOM × node metrics) on a real PostgreSQL 16. `needs_recalculation` is IDENTICAL in all 8 — the old version can never wrongly answer "up to date", because that answer requires `has_metrics`, which requires `supply_chain_data` to be non-empty, which is exactly the condition under which the cartesian FROM produces rows and its MAXes are correct. What IS true, and is what lines 39-52 actually produce, is that the RETURNED `data_last_modified` reads **1970-01-01** for a project with empty `supply_chain_data` however fresh its BOM and lane tables are — 2 of the 8 cases differ on that column and only on it. **So the rewrite silently fixed half 1 too, while its own header claimed "index-friendly rewrites with identical semantics"** — the semantics differ in precisely the empty-`supply_chain_data` case, in the direction of correctness | live definition: `20260712110000_network_metrics_check_performance.sql`; superseded: `20250925164454_…sql:39-52` | WP 4.2 ✅ *(deprecated IN PLACE, not dropped — `auto_calculate_network_metrics_on_completion` still calls it inside every projects-row UPDATE that flips `completed = true`. `20260917000006` attaches a `COMMENT ON FUNCTION` naming D12 and what replaces it, and `supabase/rehearsal/120` §8 fails if the function is dropped OR if the comment stops naming D12 — mutation-tested both ways. **What replaces it is the question, not the query**: a timestamp comparison asks whether a clock moved, so an UPDATE writing the same value reports stale and a restored backup reports fresh; `analysis_runs.input_hash` asks whether the DATA changed. WP 4.4 deletes the three ad-hoc staleness rules)*
 | D13 | Two org identities joined by string comparison | `super_admin_phase1.sql:43-44`; `get_current_user_org()` | WP 2.1 ✅ *(one predicate, dual read; demonstrated on a live PostgreSQL — §16 WP 2.1 follow-up)* |
 | D14 | No project-level delegation exists | no `project_members` table | WP 2.2 ✅ |
 | D15 | Audit covers admin plane only | `admin_audit_logs` | WP 2.3 ✅ *(the TABLE is general and the triggers exist; production still holds 18 rows, all `plane='admin'` — see D45)* |
 | D16 | Hardcoded constants render with "From project data" dot | was `StagePolicyTable.tsx:1194-1203` | WP 0.1 ✅ *(constants deleted; untracked ⇒ `default`; de-dup of the two copies remains 6.2)* |
 | D17 | NULL `capacity_per_week` (= unlimited) renders as `0`, no dot. **Measured, 2026-09-16 (§15): 60 of 60 suppliers** in the measured project have a NULL capacity, so the grid tells the user every single supplier has zero capacity | `resolveEffective.ts:135`; §15 | WP 6.2 |
 | D18 | `material_price` displayed prominently; consumed nowhere in the engine | `columnSpecs.ts:133,350` | WP 6.2 |
-| D19 | Analysis results smeared onto entity columns; no identity or version | `network_nodes.degree_centrality` | WP 4.2, 4.3 |
+| D19 | **Analysis results smeared onto entity columns; no identity or version. MEASURED for the first time, 2026-09-17 (§15 run `35229431958`, every project): 5 261 rows across the four tables — `node_list` 1 747 (7 projects), `network_nodes` 1 385 (1 project), `network_edges` 2 129 (1 project), `network_summary` 0 — of which 1 385 carry at least one COMPUTED column and NONE carries an input hash**, because no tier-3 table has `computed_from_hash` yet. WP 4.1's probes did not touch these tables, so until now the defect had an adjective and no magnitude. The number that matters for WP 4.3 is the 1 385: every one is a row where a centrality sits beside a `country` a user typed, with nothing saying which inputs or which code produced it | `network_nodes.degree_centrality`; §15's WP 4.2 sweep | WP 4.2 ✅ *(the STORE — `analysis_runs` + `analysis_results`, `20260917000006`. A metric now belongs to a run, and therefore to an input hash and a code version)* · WP 4.3 *(the dual-write and `computed_from_hash`; the 1 385 is its before-number)* · WP 5.3 *(drops the entity columns, after every reader has moved)* |
 | D20 | **`projectLanes`'s fallback truncated at 10 000 rows silently.** Each of the four lane reads carried a bare `.limit(10000)` and returned the slice shaped exactly like a whole project, so every count computed from it — the data map's "k of n lanes priced", the Run & validate clearance, the exported BOM sheet — was a statement about data nobody knew was missing. **CLOSED by WP 3.1, and not by removing the bound**: without an explicit `.limit()` PostgREST applies its own `db-max-rows` and truncates anyway, which is the same defect with a smaller number. The ceiling is now one named constant (`LANE_ROW_CEILING`, equal to the grading gate's `GATE_ROW_CEILING`, so two reads of the same tables cannot disagree about what "complete" means), a lane that comes back AT it is named in `ProjectLanes.truncated`, and every surface that renders lane-derived numbers renders it — the policy grid, the data map, Run & validate, and a toast on the export path. §5 T2: at the point of display, not in a console warning. `laneTruncation.test.ts` fails if a bare numeric limit returns or if any of those surfaces stops rendering the notice | `projectLanes.ts`; `laneTruncation.ts`; `LaneTruncationNotice.tsx`; `laneTruncation.test.ts` | WP 3.1 ✅ |
 | **D21** | **User docs name fields the user never sees.** `products.csv` says `sell_price`/`demand_mean`/`demand_distribution`; the engine says `unit_price`/`demand_mode`/`demand_model`; the legacy docs showed the engine's names | `public/template/products.csv`; `item_master.sql:28-32`; `network.py:145,151,154` | WP 5.2b |
 | D22 | Legacy docs hand-copied the Pydantic models while `gen_docs.py` already renders them from the registry | archived `docBodies.tsx` `SIM_PARAM_GROUPS` | WP 0.3 ✅ |
@@ -234,9 +234,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D52 | **A table rename did not follow the FOREIGN KEYS that pointed at the old name — and it was not harmless.** The introspector's `RENAME TO` moved the table in its own map and stopped there, so `ingest_staged_*.ingest_run_id` went on recording `REFERENCES erp_sync_runs` after WP 3.1's rename. `rehearsal-schema.mjs` SKIPS a reference to a table the artifact does not know — silently — so the base it built from that artifact had no `ON DELETE CASCADE` on the staging tables at all, while production's keys followed the rename the way Postgres always does, by OID. **`main`'s `data contract` went red on the merge commit** (run `35110653485`): `supabase/rehearsal/050` reported `3 staged row(s) survived the deletion of their run`. The assertion was right and the artifact was wrong, which is the only way round worth having. The row this replaces said the flag-clearing half was "harmless here… it will not be harmless the next time"; the next time was the next run. **CLOSED**: `RENAME TO` now rewrites every inbound `references.table` and FK definition, the skipped-FK case WARNS instead of vanishing, and CI runs the rehearsal a third way — `--since HEAD`, against the artifact the branch itself writes, which is the shape `main` meets after a merge | `introspect.mjs` (`RENAME TO` in `applyAlter`); `rehearsal-schema.mjs` (`emitConstraints`); CI run `35110653485` | WP 3.1 follow-up ✅ |
 
 | D53 | **Nine foreign keys have never existed in any rehearsed database, because the introspector drops the schema qualifier from `REFERENCES auth.users(id)`.** The artifact records the target as `users`, `rehearsal-schema.mjs` qualifies an unqualified name to `public.users`, no such table exists, and the key is skipped: `project_erp_links.linked_by_user_id`, `ingest_runs.triggered_by_user_id`, `ingest_runs.applied_by_user_id`, `scenarios.created_by`, `simulation_runs.created_by`, `policy_versions.created_by`, `policy_presets.owner_id`, `recovery_playbooks.created_by`, `experiments.created_by`. Production has all nine; every rehearsal has run without them, so no assertion about what happens when a user row disappears could ever have been trusted. Pre-existing and invisible until WP 3.1's follow-up made the skip WARN rather than vanish — which is how it was found, on the same run that closed D52. Same family as D49 and D52: the introspector's handling of a reference is incomplete in a way only the rehearsal can see | `introspect.mjs`'s `REFERENCES` parse (the qualifier is not kept); `rehearsal-schema.mjs` `emitConstraints`'s skip warning | WP 6.2 |
-| D54 | **The data-plane audit rule is scoped to the CONTRACT, so every DEFERRED tier-2/3/4 table is unaudited and no gate says so.** `dataPlaneAudit.test.ts` requires the three `audit_tier_write` triggers on every tier-2/3/4 table *in the contract*; a table with no sidecar is outside the contract, therefore outside the rule, therefore its writes are unattributable with nothing to notice. `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain` sat in that gap from WP 2.3 until WP 3.2 described them — and describing them is what turned the gate red, in the same session. The three are now audited (`20260916000016`). **The CLASS is open**: `contract:check` R1 counts 42 tables still deferred, and every tier-2/3/4 table among them is in exactly the same position. The coverage list decides what is audited, which nobody chose | `dataPlaneAudit.test.ts`'s "in the contract" qualifier; `coverage.yaml` | WP 4.2 *(it owns the largest remaining group of deferred tier-2/3 tables; the rule to add is "a deferral must say whether the table is audited")* |
+| D54 | **The data-plane audit rule is scoped to the CONTRACT, so every DEFERRED tier-2/3/4 table is unaudited and no gate says so.** `dataPlaneAudit.test.ts` requires the three `audit_tier_write` triggers on every tier-2/3/4 table *in the contract*; a table with no sidecar is outside the contract, therefore outside the rule, therefore its writes are unattributable with nothing to notice. `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain` sat in that gap from WP 2.3 until WP 3.2 described them — and describing them is what turned the gate red, in the same session, which is the gate working and is only possible for a table somebody had already chosen to describe. **MEASURED, 2026-09-17 (§15 run `35229431958`): 0 of the 6 tables WP 4.2 owns carry an `audit_tier_write` trigger — and `contract:check` R11 puts the number for the whole class at 42 of 42 deferred tables unaudited.** | `dataPlaneAudit.test.ts`'s "in the contract" qualifier; `coverage.yaml`; `contract:check` R11 | WP 4.2 ✅ *(the RULE, which is what this row asked for: a deferral must SAY whether the table is audited, and it lives in `contract:check` R11 — where R1 already reads the same file — rather than in a comment. Each `coverage.yaml` group now carries an `audited:` map naming every table in it; R11 fails when a table is missing from the map AND when the declaration disagrees with the triggers the migrations create, read from the same `auditedTables()` R9 uses. Mutation-tested both ways. **It is deliberately NOT a gate on BEING audited** — 42 of 42 are unaudited, so requiring `true` would be red on arrival and unlandable, the same reasoning that made WP 4.1's writer list a ratchet. The rule requires the SENTENCE: `false` now has to be typed by a person, beside the package that owns fixing it, and R11 prints the count on every run so it cannot quietly grow. **The 42 remain unaudited and that is the open half**, owned per group by WP 4.2's successors — 6 here, 9 WP 4.4, 10 WP 6.1, 17 WP 5.2)*
 | D55 | **The three item-master CSVs are parsed server-side but land nothing** — `materials`, `products` and `suppliers` still go from the browser to `bulk_upsert_*` without a tier-0 record or a run, so `no-tier-skip` (I2) is PARTIAL rather than met after WP 3.2. They were left out deliberately and the reason is not laziness: `bulk_upsert_*` already UPSERTS on a natural key and validates its enums in SQL, and routing them through a landing whose promotion is an INSERT would have been a regression dressed as progress. WP 3.3 makes promotion an upsert, which is the moment this becomes cheap | the `item-master` branch of `UploadWizard.tsx` (deleted by WP 3.3); `ingestSpec.generated.ts` now carries all three | WP 3.3 ✅ *(`20260916000020` — the three sidecars declare `ingest_dataset`, the branch that called `bulk_upsert_*` is DELETED not flagged off, and `ingestSpecParity.test.ts` fails if it returns. It cost MORE than the handoff said: the sidecars carried a `csv_header` on every item-master column and an `ingest.rule` on none, so 22 rules had to be authored from each field's own `validate` sentence and from `ITEM_MASTER_ENUMS`, which already mirrors the write-RPCs' CHECKs. The GENERALITY held, which is the claim worth testing: an item master's key is a composite PRIMARY KEY rather than an index this package made, and it has no `plant_name`, and `ingest_apply_run` promotes into it through the same statement a lane uses because it reads the key from the catalog and derives the server-set columns from the target's shape — `supabase/rehearsal/090`. So `no-tier-skip` (I2) is met for every CSV the contract describes; what remains outside is D56's group)* |
-| D56 | **The node list and the two deep-tier network CSVs land nothing either**, for a different reason: `node_list`, `network_nodes` and `network_edges` have no sidecar — they are deferred to WP 4.2 because D19 says they are a smear that package moves into `analysis_results` — so there is no contract to validate them against and no decision yet about what tier they are. They ARE parsed server-side (the client-side parse is gone for them too), and their bulk RPCs are untouched. `deep_tier_json` is not a CSV at all and is unchanged | `UploadWizard.tsx:1094,1114`; `coverage.yaml` WP 4.2 group | WP 4.2 |
+| D56 | **The node list and the two deep-tier network CSVs land nothing either** — `node_list`, `network_nodes` and `network_edges` are parsed server-side now but still go straight to tier 2 through their bulk RPCs, because there was no contract to validate them against and no decision about what tier they are. **THE DECISION IS MADE AND IT IS WP 4.2'S: `network_nodes` IS BOTH, SO THE ANSWER IS A SPLIT AND NOT A TIER — AND THE SPLIT IS DEFERRED TO WP 4.3 WITH A REASON RATHER THAN TAKEN HERE.** The table carries seven columns a user uploaded (`name`, `country`, `industry`, `revenue`, `lat`, `long`, `is_seed`, plus `uid`/`depth`) and eight an analysis wrote (`prominence`, `prominence_updated_at`, the five centralities, `network_metrics_updated_at`). `node_list` is the same shape (`is_critical_node`, `critical_node_score`, `prediction_timestamp` written by an analysis; `longitude`/`latitude` written by `geocode-locations`). That is D19 stated precisely, in one table, and it is why "what tier is it" has no answer while the table is one thing. **Why the split is not taken in WP 4.2**: (1) the computed half has nowhere to go until the analyzers write `analysis_results`, which is WP 4.3's dual-write — splitting first would mean a migration that moves columns no writer targets yet, and §11 says do not migrate a reader here; (2) the input half cannot become a described tier-2 table until it has a natural key, and **it does not have one — D72**; (3) describing the input half makes WP 4.1's coverage rule fold it into `hash_network` the moment the sidecar exists, which is a SECOND `schema_version` bump, and §16 · WP 4.1 · C is what one of those costs on a day D70's proposal count is not zero. **The blast radius, enumerated so WP 4.3 inherits it rather than rediscovering it** — writers of the input half: `UploadWizard.tsx:1024` (`bulk_insert_network_nodes`), `:1079` (`bulk_insert_network_edges`), `combine-project/index.ts:468,477` (`refresh_node_list_for_project`); `bulk_insert_network_summary` exists and **has no caller at all**. Writers of the computed half: `calculate-network-science-metrics/index.ts:132` (the five centralities + `prominence`), `calculate-node-prominence/index.ts:111` (`prominence`), `geocode-locations/index.ts:245,292` (`node_list` lat/long). Readers of both halves as one row: `ProjectDataViewer.tsx` and `FirmLevelNetwork.tsx` (`prominence`), `DataManager.tsx` (`is_critical_node`, `critical_node_score`), `MapView.tsx` (`node_list` coordinates), `verifiableExports.ts`. All four bulk RPCs remain tier-2-skipping and unaudited | `UploadWizard.tsx:373,400,409`; `coverage.yaml` WP 4.2 group; the writers and readers enumerated in this row | WP 4.2 ✅ *(the DECISION and its blast radius, which is what three packages deferred)* · WP 4.3 *(executes the split, with D72 first)* |
 | D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — 40+ TS2322 errors under `tsc --noEmit`. Nothing catches it: `npm run build` is Vite, which does not typecheck, and `contract:generate -- --check` compares text rather than types. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | WP 5.2 |
 | D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number — and the number, measured 2026-09-16 (§15 run `35144057908`), is **0 rows across 0 projects**. It is not a table whose data nobody reads; it is a table with no data, no reader and no writer | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note; §15's every-project sweep | WP 6.2 |
 | D59 | **A CHECK written INLINE on a column is invisible to the artifact, so the rehearsed database does not have it and the generated page does not publish it.** `introspect.mjs` reads a column's type, its NOT NULL and its DEFAULT and drops the rest; only a NAMED, table-level `ADD CONSTRAINT … CHECK` is recorded. The artifact holds **24 CHECK constraints across 15 tables** while the migrations contain **253 `CHECK (` occurrences** — most of that gap is repetition across shadowed definitions, but `ingest_files` alone loses three real ones (`source_kind`'s vocabulary, `byte_size >= 0`, and the SHA-256 shape). Two consequences, and the second is worse: `contract:rehearse` builds a database with no such constraint, so an assertion that a bad value is REFUSED passes when it is run against the migration and fails when it is run against the artifact; and `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects a user's upload appears in no document (§5 T1). **Found by the third rehearsal mode on WP 3.2's own branch** — green fresh and green over production's shape, red against its own artifact, which is precisely the case the WP 3.1 follow-up added that mode for. Same family as D49 (a column rename not followed into indexes) and D52 (a table rename not followed into foreign keys): the introspector is incomplete about DEPENDENT objects, one kind at a time. WP 3.2 walks around it — `20260916000014` writes every CHECK as a named table-level constraint — rather than relying on it being fixed | `introspect.mjs`'s `CREATE TABLE` column parser vs `20260916000013_ingest_files_tier0.sql:36,45,49` | WP 6.2 |
@@ -253,6 +253,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D70** | **A `schema_version` bump EXPIRES stored proposals, one-way, from a READ, and nothing says so.** `expire_agent_proposals` UPDATEs `proposals.status` to `expired` with `status_reason = 'grounding_drift'` for every row in `draft`, `proposed` or **`approved`** whose `grounding->>'graph_hash'` differs from `current_graph_hash(project)`, and `list_agent_proposals` calls it — so the first page load after a deploy that moves the hash writes the change, and the predicate is one-way: nothing un-expires a proposal when the hash comes back. That is correct as a staleness rule and dangerous as an undocumented consequence of a migration. **WP 4.1 is the first bump and it costs nothing — §15 measured 0 live proposals grounded on a `graph_hash`** — which is a fact about adoption, not about the mechanism. The next bump lands on whatever is there | `20260715000001_agent_proposals.sql:245-256` (the UPDATE and its predicate); the call at `list_agent_proposals` | WP 4.4 *(its scope is "ONE staleness rule everywhere", so the rule that a hash change is a REVERSIBLE display state and never a persisted status write belongs there. Until then the mitigation is the measurement: §15 counts `live_grounded_on_graph_hash` before every bump)* |
 | **D71** | **D36 was one slice of a class, and the class is 26 functions rather than six.** D36 counted the SERVICE-ROLE PostgREST writers, because that is where WP 2.3 looked. WP 3.3 then found `assign_material_supplier` — a `SECURITY DEFINER` SQL function that had taken the actor as a parameter all along and never told the trigger — and D36's own evidence says it "was never in the list of six because nothing had looked at it". WP 4.1 found a second the same way, `snapshot_dataset`, which has recorded `actor_known: false` on every dataset version ever frozen beside an `author_user_id` the caller supplied. **So the gap check measured the whole class: 26 `SECURITY DEFINER` functions write a tier-2/3/4 table, TWO set `app.current_user_id`, SIXTEEN of the rest already TAKE an actor parameter, and SEVENTEEN have a live caller in `src/` or `supabase/functions/`.** Every one is the one-line fix D36 correctly says is NOT one for a PostgREST call, because a `SECURITY DEFINER` function runs in a transaction it controls. **The consequence for the invariant is the point: `audit-actor` (G4) is NOT met after `20260917000003`**, and closing D36 must not be reported as though it were | the 26 function bodies, enumerated by `dataPlaneAudit.test.ts`'s `UNATTRIBUTED` list; `assign_material_supplier` and `snapshot_dataset` are the two that do set it | WP 6.2 *(`20260917000002`–`20260917000003` closed the two they rewrote and left a RATCHET rather than a gate, because a gate would be red on arrival and unlandable: `dataPlaneAudit.test.ts` fails when a 27th appears and when a name that is now attributed is left on the list, so the number can shrink and cannot grow. Mutation-tested both ways. **re-budget for it** — 17 live functions, each needing one line and a rehearsal assertion that reads the row back)* |
 
+| **D72** | **`calculate-network-science-metrics` upserts `network_nodes` on a unique constraint that does not exist, so the statement fails every time it runs and the function logs the error and carries on.** `calculate-network-science-metrics/index.ts:114-115` calls `.upsert(upsertRows, { onConflict: 'project_id,uid' })` on the fallback path — the one that derives a graph from `supply_chain_data` when the network tables are empty and has to create the node rows before metrics can be stored against them. **`network_nodes` has no unique index on `(project_id, uid)`**: its only uniqueness is the surrogate `network_nodes_pkey` on `id`. PostgREST passes `on_conflict` through to `ON CONFLICT (project_id, uid)`, which PostgreSQL rejects with `42P10` *there is no unique or exclusion constraint matching the ON CONFLICT specification* — **verified against a real PostgreSQL 16, not read off the source**. The handler is `console.error(...)` with no throw and no early return, so the function proceeds to its per-node `.update()` loop, which matches zero rows because the nodes were never created, and then reports success. A project whose nodes exist only via that fallback gets NO metrics and NO error anybody sees. **This is D5's class arriving in the deferred group**, and the reason `natural-key` (I4) being MET does not cover it is that I4 and `contract:check` R5 are scoped to tier-2 tables IN THE CONTRACT — `network_nodes` is deferred, so R5 has never looked at it, which is D54's qualifier doing damage in a second place. **Found by WP 4.2 enumerating D56's blast radius**: the split cannot give the input half a natural key it does not have | `calculate-network-science-metrics/index.ts:114-115` against `network_nodes`'s indexes (`network_nodes_pkey` only) | WP 4.3 *(it owns the analyzer and the split D56 hands it; the key must land BEFORE the input half can be described, and landing it follows the dedup-then-index shape the natural-key package already proved — deduplicate on `(project_id, uid)` first, then create the unique index, `NULLS NOT DISTINCT` if either column is nullable (see D5 for why a plain index constrains nothing when a key column is nullable). §15 should count the duplicates before the index is attempted, the way D5's before-number was taken)* |
 
 ### 4.1 Code map — the data layer
 
@@ -1574,15 +1575,34 @@ and is not.** `audit-actor` is still unmet: 26 `SECURITY DEFINER` functions writ
 tier 2/3/4 and two set the actor GUC (D71, WP 6.2). And `hash_network`'s three tables
 hold ZERO rows in production, so that half is unexercised outside the rehearsal.
 
-### WP 4.2 — The analysis store *(D12, D19, D54, D56)*
+### WP 4.2 — The analysis store ✅ *(D12, D19, D54, D56 closed; D72 found — done `20260917000006`)*
 
 ```
 analysis_runs(id, project_id, analysis_kind, input_hash, params_hash, code_version,
-              status, started_at, finished_at, duration_ms, row_counts jsonb,
-              warnings jsonb, actor_user_id,
-              UNIQUE (project_id, analysis_kind, input_hash, params_hash, code_version))
-analysis_results(run_id, entity_type, entity_id, metrics jsonb)
+              params jsonb, status, started_at, finished_at, duration_ms,
+              row_counts jsonb, warnings jsonb, actor_user_id,
+              UNIQUE (project_id, analysis_kind, input_hash, params_hash, code_version)
+                WHERE status <> 'failed')
+analysis_results(id, run_id, entity_type, entity_id, metrics jsonb,
+                 UNIQUE (run_id, entity_type, entity_id))
 ```
+
+**THE KEY IS PARTIAL, AND THAT IS A DELIBERATE REFINEMENT OF WHAT THIS SECTION USED
+TO SAY.** It read `UNIQUE (project_id, analysis_kind, input_hash, params_hash,
+code_version)`, flat. Taken literally the FIRST FAILED attempt at a key owns it
+forever: the retry cannot insert, so an analysis that crashed once can never be run
+again on that input — a permanently poisoned cache entry with no way out that does
+not delete history, and the store never deletes. Excluding `failed` keeps the
+failure as a row (the audit trail stands, and repeated failures accumulate as
+evidence) and leaves the key free. `supabase/rehearsal/120` §9 asserts both halves,
+and the mutation that restores the flat index turns it red with the poisoned key
+visible in the message.
+
+**`analysis_results` gained a unique key this section did not ask for**, on
+`(run_id, entity_type, entity_id)`: without it a retried completion writes two
+metrics rows for one node and nothing says which is current, which is D19 rebuilt
+inside the table that exists to end it. A mutation found it — §10 of the rehearsal
+is where it is asserted.
 
 `analysis_kind` is an **open** enum with a params schema in the contract, so
 `lead_time_fit` needs no migration later. Shared `getOrCompute(...)`: lookup by key,
@@ -1590,14 +1610,31 @@ return on hit, compute and persist on miss — **never update, never delete**. A
 each run. Deprecate `should_recalculate_network_metrics` in place with a comment
 naming D12.
 
-**Exit** — repeat request on an unchanged project is a hit with zero compute · a
-changed input is a miss, not a stale hit · reverting re-hits the original · two
-`code_version`s coexist · **no analysis OUTPUT contributes to `graph_hash`** — a claim
-about ABSENCE, which WP 4.1 was told not to break and did not: `graphHashCoverage.test.ts`
-already fails if `node_list`, `network_nodes`, `network_edges` or `network_summary`
-appears in the snapshot, so this exit check has a test before the package starts.
-**Gap check** — test concurrency: two parallel requests on a cold key must not create
-two runs.
+**Exit** ✅ — all five, each asserted against a real PostgreSQL 16 in
+`supabase/rehearsal/120`, which was written RED against `main` (§1 fails there with
+"there is no analysis store"): repeat request on an unchanged project is a hit with
+zero compute (§1) · a changed input is a miss, not a stale hit (§2) · reverting
+re-hits the original (§3) · two `code_version`s coexist (§4) · **no analysis OUTPUT
+contributes to `graph_hash`** (§7, against a running database — the text-scan half
+was `graphHashCoverage.test.ts`'s and WP 4.2 verified it by MUTATION before building
+on it, which is what "a test you did not write is a test you have not seen fail"
+asks for).
+
+**Gap check** ✅ — **two parallel requests on a cold key create exactly ONE run**,
+proved from TWO REAL SESSIONS (`npm run contract:concurrency`,
+`scripts/data-contract/wp42-concurrency.mjs`), because one transaction cannot ask
+this question: inside a single session the second call sees the first one's
+uncommitted row through its own snapshot and the race cannot happen. Session A holds
+its transaction open across a `pg_sleep` so B's claim is GUARANTEED to arrive inside
+the window rather than hoped to; B blocked 1 453 ms on A's uncommitted index entry,
+both were handed the same run id, and one run row exists after four requests. **What
+serialises them is the unique index, not the lookup** — the `SELECT` is not a lock
+and on a cold key both sessions miss it; `ON CONFLICT DO NOTHING` then returns
+NOTHING to the loser rather than raising, which is how it learns to read the winner.
+The script REFUSES TO RUN against a database whose key index is not unique and
+partial: its first run reported two runs and looked like a genuine defect, and it was
+not — the database still held a mutant schema from the previous mutation round, so
+the check had faithfully measured a mutant and would have reported it as the product.
 
 **TWO THINGS WP 3.2 PUT HERE, BOTH ABOUT THE TABLES THIS PACKAGE ALREADY OWNS.**
 
@@ -7539,6 +7576,316 @@ a handoff is a checkable assertion, and checking the four in §16 · WP 3.3 · L
 about twenty minutes and produced D62, D63 and D64.*
 
 ---
+
+### WP 4.2 — The analysis store · 2026-09-17 · `20260917000006`
+
+#### A · The failing test, and it is D19 in one message
+
+On `main`, against a real PostgreSQL 16:
+
+```
+analysis_get_or_start(project, 'network_metrics', {...}, 'nm@1', editor)
+  → ERROR: WP 4.2 §1 — THERE IS NO ANALYSIS STORE.
+```
+
+`supabase/rehearsal/120` §1 was written to fail on exactly that before any of this
+package existed, and its message says the defect rather than the symptom: there is
+no table in which a completed analysis could be recognised a second time, so every
+request recomputes and **nothing anywhere records that it did**.
+
+**The store is an IDENTITY and the cache is a CONSEQUENCE**, which is the only
+framing that makes a hit sound rather than a guess. The key is (project, kind,
+`input_hash`, `params_hash`, `code_version`); two runs with the same key ARE the
+same run by definition. That is why this package had to come after WP 4.1: without
+a trust anchor that covers what the engine reads, `input_hash` would be a digest of
+the wrong world and every hit would be a confident lie.
+
+#### B · THE PREMISE CHECK — three inherited claims, and all three held
+
+The brief said to check them rather than inherit them. Doing it cost under half an
+hour and one of the three was worth the whole exercise:
+
+  - **`graphHashCoverage.test.ts` really does assert the four DERIVED tables are
+    ABSENT.** Verified by MUTATION, not by reading: adding a `network_nodes`
+    `centrality` block to the snapshot's `network` domain turned it red with its own
+    message (`network_nodes is an analysis OUTPUT and is inside the hash`) **and
+    took two sibling assertions with it** — the "exactly three deep-tier tables"
+    count and the column-membership check. A test that only one assertion guards is
+    a test one refactor from silence; this one is guarded three ways.
+  - **`hash_network` covers exactly `tier2_suppliers`, `tier3_suppliers`,
+    `multi_tier_supply_chain`** — confirmed in `20260917000002:218-256`. Still zero
+    rows in production.
+  - **`main` is green on `data contract` at `06626c8`** — run `35227049832`,
+    success.
+
+#### C · D12's EVIDENCE WAS STALE, AND THE ROW WAS WRONG ABOUT WHICH HALF
+
+The brief flagged the citation and it was right to. §4 D12 cited
+`20250925164454_…sql:39-52`; the live definition is
+`20260712110000_network_metrics_check_performance.sql`, a `CREATE OR REPLACE` by a
+package this plan does not contain. **So one half was fixed by work the plan cannot
+see** — which is exactly the "fact with no owner" §4 exists to prevent.
+
+**The second half was checked by MEASUREMENT rather than by reading**, because
+reading is how the row got wrong in the first place. Both definitions were built
+side by side on a real PostgreSQL 16 and run over the full 8-case matrix
+(`supply_chain_data` × fresher BOM × node metrics):
+
+```
+8 cases: needs_recalculation differs in 0, data_last_modified differs in 2
+```
+
+**`needs_recalculation` is identical in all eight.** The old version can NEVER
+wrongly answer "up to date", because that answer requires `has_metrics`, which
+requires `supply_chain_data` to be non-empty — which is precisely the condition
+under which the cartesian `FROM` produces rows and its MAXes are correct. The two
+cases that differ are `data_last_modified`, which the old version reports as
+**1970-01-01** for a project with empty `supply_chain_data` however fresh its BOM
+and lane tables are.
+
+So: the cartesian half was real and is closed; the "up to date" half was
+mis-stated, and the true defect underneath it — an epoch timestamp returned to
+every caller on a pre-combine project — is closed by the same rewrite, **whose own
+header claims "index-friendly rewrites with identical semantics".** The semantics
+differ in exactly those two cases, in the direction of correctness. A fix nobody
+recorded as a fix.
+
+The function is deprecated IN PLACE (`auto_calculate_network_metrics_on_completion`
+still calls it on every completion flip) with a `COMMENT ON FUNCTION` naming D12,
+and §8 of the rehearsal fails if it is dropped or if the comment stops naming D12.
+
+#### D · THE D56 DECISION, WHICH IS A SPLIT AND NOT A TIER
+
+Three packages deferred this with the same sentence. The reason it survived is that
+the honest answer is uncomfortable: **`network_nodes` is BOTH.** Eight columns an
+analysis wrote (`prominence`, `prominence_updated_at`, five centralities,
+`network_metrics_updated_at`) beside nine a user uploaded (`uid`, `depth`, `name`,
+`country`, `industry`, `website`, `traded_as`, `revenue`, `lat`, `long`, `is_seed`).
+`node_list` is the same shape. That is D19 in one table, and it is why "what tier is
+it" has no answer while the table is one thing.
+
+**Decision: the answer is a SPLIT, and WP 4.3 executes it. Written down with the
+reason, because "we deferred it again" is what three packages already said.** Three
+things have to be true first and none of them is true today:
+
+  1. **The computed half has nowhere to go until the analyzers dual-write.** §11
+     gives that to WP 4.3 and tells this package not to migrate a reader. Splitting
+     first means a migration moving columns no writer targets.
+  2. **The input half cannot be described until it has a natural key — and it does
+     not have one. That is D72**, found while enumerating this blast radius.
+  3. **Describing the input half is a second `schema_version` bump.** WP 4.1's rule
+     is "every value column of every tier-2 input table", so the coverage gate folds
+     it into `hash_network` the moment the sidecar exists. §16 · WP 4.1 · C is what
+     one bump costs, and D70 is what it costs on a day the proposal count is not
+     zero.
+
+**The blast radius, enumerated so WP 4.3 inherits it** (also in §4 D56). Writers of
+the input half: `UploadWizard.tsx:1024` (`bulk_insert_network_nodes`), `:1079`
+(`bulk_insert_network_edges`), `combine-project/index.ts:468,477`
+(`refresh_node_list_for_project`). **`bulk_insert_network_summary` exists and has no
+caller at all** — which is why `network_summary` holds 0 rows while its two inputs
+hold 3 514. Writers of the computed half:
+`calculate-network-science-metrics/index.ts:132`,
+`calculate-node-prominence/index.ts:111`, `geocode-locations/index.ts:245,292`.
+Readers of both halves as one row: `ProjectDataViewer.tsx`, `FirmLevelNetwork.tsx`
+(`prominence`), `DataManager.tsx` (`is_critical_node`, `critical_node_score`),
+`MapView.tsx`, `verifiableExports.ts`. All four bulk RPCs remain tier-2-skipping and
+unaudited.
+
+#### E · D72 — AN UPSERT ON A CONSTRAINT THAT DOES NOT EXIST
+
+Enumerating that blast radius turned up a live defect.
+`calculate-network-science-metrics/index.ts:114-115` calls
+`.upsert(upsertRows, { onConflict: 'project_id,uid' })` on the fallback path — the
+one that derives a graph from `supply_chain_data` when the network tables are empty
+and must create node rows before metrics can be stored against them.
+**`network_nodes` has no unique index on `(project_id, uid)`.** Its only uniqueness
+is the surrogate `network_nodes_pkey`. Confirmed against a real database rather than
+inferred:
+
+```
+ERROR: there is no unique or exclusion constraint matching the ON CONFLICT specification
+```
+
+The handler is `console.error(...)` with no throw and no early return, so the
+function proceeds to a per-node `.update()` loop that matches zero rows, and reports
+success. **A project whose nodes exist only via that fallback gets no metrics and no
+error anybody sees.**
+
+This is D5's class arriving in the deferred group, and the reason `natural-key` (I4)
+being MET does not cover it is that I4 and R5 are scoped to tier-2 tables IN THE
+CONTRACT. `network_nodes` is deferred, so R5 has never looked at it — **D54's
+qualifier doing damage in a second place, which is the argument for R11 stated as a
+live bug rather than as a principle.**
+
+#### F · D54 — THE RULE, AND WHY IT IS NOT A GATE ON BEING AUDITED
+
+`contract:check` **R11**: every deferred table must appear in its group's `audited:`
+map, and the declaration must match the triggers the migrations create — read from
+the same `auditedTables()` R9 uses, so the two halves of the same fact have one
+source (I1). It lives where R1 already reads `coverage.yaml`, not in a comment,
+which is what §11 asked for. Mutation-tested both ways: a table dropped from the map
+fails, and a table declaring `audited: true` with no trigger fails naming the
+disagreement.
+
+**It deliberately does NOT require `true`.** 42 of 42 deferred tables are unaudited,
+so a gate would be red on arrival and unlandable — the same reasoning that made WP
+4.1's writer list a ratchet. The rule requires the SENTENCE: `false` has to be typed
+by a person, beside the package that owns fixing it, and R11 prints the count every
+run so it cannot quietly grow.
+
+**And the deferral list itself was making decisions nobody had made.**
+`model_validations` and `external_evidence` were in the WP 4.2 group — the first
+because it has "validation" in its name, the second because nobody had looked at it.
+`model_validations` already carries `graph_hash`, `policy_hash`, `scenario_hash` and
+`engine_fingerprint`; its whole subject is staleness, so it is WP 4.4's.
+`external_evidence` is the agent's evidence store and belongs with the decision
+plane, WP 6.1's. Both moved, with the reason written in the file. That regrouping is
+D54's own thesis applied to D54's own list.
+
+#### G · THE MUTATIONS, AND THE TWO THAT SURVIVED
+
+**Twenty-one mutations, every one finally red with its own message. Two were GREEN
+first, and both were defects in the TEST:**
+
+  - **the audit assertion could not tell which STATEMENT wrote the row.** Removing
+    the `analysis_runs` INSERT trigger left §5 green, because
+    `analysis_complete_run`'s UPDATE writes an `analysis_runs` audit row too and an
+    untyped `count(*)` cannot distinguish them. The claim is that CLAIMING a run is
+    audited, so the assertion now names `action = 'insert'` — and a second
+    assertion covers `analysis_results` on its own statement.
+  - **`analysis_results` had no per-entity uniqueness and nothing noticed.** The
+    mutation that downgraded the index stayed green because
+    `analysis_complete_run` refuses a second completion, so no test reached the
+    duplicate. §10 now attempts the direct INSERT a future writer would make.
+
+**The two mutations that stayed GREEN for WP 4.1 both fire here** (§16 · WP 4.1 ·
+E): removing `set_config` from `assert_writer_may_act`, and making it keep whatever
+the session already held. The whole file is one transaction and
+`set_config(..., true)` is transaction-local, so every call is preceded by setting
+`app.current_user_id` to a DIFFERENT user and the message names the poison. An
+assertion that cannot fail is the failure mode this plan keeps rediscovering; the
+rule that catches it is not "be careful", it is *run the mutation, and when it does
+not fire, the test is what is wrong.*
+
+**And a mutation run left a trap that caught the next tool.** The concurrency check
+reported TWO runs on one key on its first execution and looked like a genuine
+defect. It was not: `contract:rehearse` leaves its database behind, and the database
+still held the mutant schema from the previous round, where the key index had been
+downgraded on purpose. The script had faithfully measured a mutant and would have
+reported it as the product. It now refuses to run unless
+`analysis_runs_key_uniq` is both unique and partial — **the same failure mode as a
+scan that finds nothing and passes, which is why the guard is a hard exit and not a
+warning.**
+
+#### H · GAP CHECK — concurrency, from two real sessions
+
+§11 asks whether two parallel requests on a COLD key create two runs. **They create
+one.** `npm run contract:concurrency`:
+
+```
+✓ session B BLOCKED on A's uncommitted key (1453 ms)
+✓ two parallel requests on a cold key created exactly ONE run (got 1)
+✓ both sessions were handed the SAME run id
+✓ an unfinished claim is NOT reported as a cache hit
+✓ once the winner completes, the next request is a HIT
+✓ still exactly ONE run after four requests (got 1)
+```
+
+**Not assertable in one transaction, and the file says why**: inside a single
+session the second call sees the first one's uncommitted row through its own
+snapshot, so the race cannot happen and a single-transaction assertion would answer
+a different question while wearing this one's label. Session A holds its transaction
+open across a `pg_sleep` so B's claim is GUARANTEED to arrive inside the window
+rather than hoped to — and B's 1 453 ms is asserted, because a B that returned
+immediately never overlapped and would make everything below it meaningless.
+
+**What serialises them is the unique index, not the lookup.** The `SELECT` is not a
+lock and on a cold key both sessions miss it; `ON CONFLICT DO NOTHING` returns
+NOTHING to the loser rather than raising, which is how it learns to read the winner's
+row. The mutation that drops `ON CONFLICT` turns it into a duplicate-key error, and
+the mutation that removes the unique index produces two runs.
+
+#### I · THE DEVIATION FROM §11, AND WHY
+
+§11 wrote the key as a flat `UNIQUE (project_id, analysis_kind, input_hash,
+params_hash, code_version)`. **Taken literally, the first FAILED attempt owns that
+key forever**: the retry cannot insert, so an analysis that crashed once can never
+run again on that input — a permanently poisoned cache entry with no exit that does
+not delete history, and the store never deletes. The index is partial,
+`WHERE status <> 'failed'`. §11 is edited in this commit to say so, §9 of the
+rehearsal asserts both halves, and the mutation restoring the flat index turns it
+red with the poisoned key visible in the message.
+
+#### J · Baseline numbers
+
+  - **326 tests, unchanged.** This package's assertions are BEHAVIOURAL and belong
+    in the rehearsal; adding a TypeScript test that re-reads the migration text
+    would have been a second source for a fact the database already answers.
+  - **Eleven rehearsal files** (10 → 11), green all three ways — fresh, over
+    production's shape, and `--since HEAD` against the artifact this branch WROTE,
+    which is the mode D52 was added for.
+  - **Twenty-one mutations**, two of which found tests that could not fail.
+  - `contract:check` green with **zero warnings**. **R1 37/42/79 → 39/42/81**; R9 16
+    → 18 tables audited by trigger; **R11 is new** and reports 42 of 42 deferrals
+    unaudited.
+  - `check:docs` green. The audit RATCHET holds at 26 and was proved to SEE the new
+    writers: removing `assert_writer_may_act` from `analysis_get_or_start` fails
+    `dataPlaneAudit.test.ts` naming it.
+  - **Two §15 runs, none lost to the deploy race.** The before-run went out FIRST,
+    in a push with no migration in it, so the migration push could change none of
+    the trigger's three doors.
+
+#### K · §15, before — and the expectation in the request was WRONG
+
+The before-run (`35229431958`) measured two things nothing had ever measured.
+`.github/verify-request` said "EXPECTED: zero rows in all four tables". **It was
+wrong, and reading the report rather than the exit code is what says so:**
+
+| table | rows | projects | rows with a COMPUTED column |
+|---|---|---|---|
+| `node_list` | **1 747** | **7** | 0 |
+| `network_nodes` | **1 385** | 1 | **1 385** |
+| `network_edges` | **2 129** | 1 | 0 |
+| `network_summary` | **0** | 0 | 0 |
+
+**5 261 rows, 1 385 carrying a computed column, and NONE carrying an input hash.**
+That is D19 as a number for the first time, and it is WP 4.3's before-figure.
+
+**The caveat the request supplied was right about the CSV path and wrong about
+these tables, and the distinction matters.** The CSV ingestion path has still run
+zero times in production — but these four tables are not fed by it. They are fed by
+the bulk RPCs and the analyzers, which HAVE run: `calculate-network-science-metrics`
+on one project (1 385 nodes, 1 003 with metrics timestamps) and `geocode-locations`
+on seven (108 coordinates in `node_list`). So the smear is real, sizeable and
+already in production, while the cache in front of it will be exercised only by
+fixtures. **Both halves of that sentence are true and neither may be dropped**: no
+`analysis_runs` count from this package is adoption, and no "zero rows" claim about
+the smear is accurate.
+
+D54 measured as predicted: **0 of 6 carry an `audit_tier_write` trigger** — R11 now
+puts the whole class at 42 of 42.
+
+#### L · The caveat, and what WP 4.3 should not inherit as settled
+
+  - **Nothing has ever called `analysis_get_or_start` outside a rehearsal.** Every
+    claim about a cache hit is a claim about `supabase/rehearsal/` fixtures. The
+    after-run asserts the TABLES AND FUNCTIONS are present in production — not that
+    anything used them — because WP 4.1's after-run could not distinguish a landed
+    deploy from a failed one and every count came back identical.
+  - **`analysis_kind` is open, and "open" has a cost nobody has paid yet.** The
+    CHECK constrains the shape; the catalog lives in the sidecar. Nothing yet
+    verifies that a kind a CALLER passes exists in that catalog, because there are
+    no callers. The first one should bring that gate with it.
+  - **The four deferred tables are still written by the four bulk RPCs**, still
+    tier-2-skipping, still unaudited. This package described none of them on
+    purpose (section D); WP 4.3 inherits the enumerated radius and D72 as its first
+    step.
+  - **`audit-actor` (G4) is still NOT met** and this package did not move it. D71's
+    26 stand at 26; the two new writers were built attributed rather than added to
+    the debt.
+
+---
 ---
 
 ## 17. Sequencing
@@ -7548,8 +7895,8 @@ about twenty minutes and produced D62, D63 and D64.*
 | 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
 | 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ✅ done — `contract:check` green, six commands wired in `data-contract.yml`, three orphans reconciled |
 | 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ✅ done — uuid identity dual-read, project membership + subtractive delegation, data-plane audit, and the R7 §16 gate. **Reviewed 2026-09-16: still done, but NINE conditions carried, not two** — they are WP 3.0's (§16 · PHASE 2→3 ASSESSMENT) |
-| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 is next**
-| 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **WP 4.2 is next** |
+| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 has run**; WP 4.3 is next
+| 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **4.2 ✅** — the analysis store (`analysis_runs` + `analysis_results`) with the identity D19 says the centralities never had: a metric belongs to a run, and therefore to an input hash and a code version, so a repeat request is a HIT BY DEFINITION rather than a bet on a timestamp. `supabase/rehearsal/120` was written RED against `main` and holds all five exit checks plus the audit row read back with the GUC POISONED first; the concurrency gap check is proved from TWO REAL SESSIONS because one transaction cannot ask the question. D12's own citation was stale and is corrected against the live definition, measured rather than reasoned about; D54's rule landed as `contract:check` R11 (42 of 42 deferrals now SAY whether they are audited, and 42 of 42 are not); **D56's three-package deferral is decided — `network_nodes` is BOTH, so the answer is a split, deferred to WP 4.3 with its blast radius enumerated.** **One finding: D72** (`calculate-network-science-metrics` upserts on a unique constraint that does not exist, fails every run, logs and carries on). **WP 4.3 is next** |
 | 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | 5.2a ✅, 5.2h ✅ — manual live at `/docs`; tree complete; sections 1, 2 and 15 written (14 of 80 pages) |
 | 6 | 6.1 – 6.3 | policy contract, researcher grade | — | — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
