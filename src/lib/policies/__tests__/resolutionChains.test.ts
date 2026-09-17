@@ -135,7 +135,12 @@ describe("WP 6.1 · the resolver's order is transcribed, and still true", () => 
       "if (draft !== undefined) return draft",
       "masterValueFor",
       "derivedValueFor",
-      "if (dataRow[field] !== undefined",
+      "if (hasValue && !isSuggestion) return dataRow[field]",
+      // §4 D23 — the rung that lets a SAVED routing choice outrank the stage's
+      // own suggestion. It reads the raw patches, not `effectivePolicy`, so it
+      // must appear BEFORE the bundle lookup or the schema default wins and
+      // every suggestion disappears instead of only the replaced ones.
+      "savedOverrideValue(overrides, rowKey, field, family, families)",
       "effectivePolicy(defaults, overrides, scope, rowKey)",
       "for (const fam of families)",
     ];
@@ -149,7 +154,9 @@ describe("WP 6.1 · the resolver's order is transcribed, and still true", () => 
 
   it("the transcription lists a step for each of those branches", () => {
     expect(RESOLUTION_ORDER.map((r) => r.step)).toEqual([
-      "draft", "master", "derived", "dataRow", "bundle.family", "bundle.families", "undefined",
+      "draft", "master", "derived", "dataRow",
+      "savedOverride", "suggestion",
+      "bundle.family", "bundle.families", "undefined",
     ]);
   });
 

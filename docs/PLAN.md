@@ -201,8 +201,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D20 | **`projectLanes`'s fallback truncated at 10 000 rows silently.** Each of the four lane reads carried a bare `.limit(10000)` and returned the slice shaped exactly like a whole project, so every count computed from it — the data map's "k of n lanes priced", the Run & validate clearance, the exported BOM sheet — was a statement about data nobody knew was missing. **CLOSED by WP 3.1, and not by removing the bound**: without an explicit `.limit()` PostgREST applies its own `db-max-rows` and truncates anyway, which is the same defect with a smaller number. The ceiling is now one named constant (`LANE_ROW_CEILING`, equal to the grading gate's `GATE_ROW_CEILING`, so two reads of the same tables cannot disagree about what "complete" means), a lane that comes back AT it is named in `ProjectLanes.truncated`, and every surface that renders lane-derived numbers renders it — the policy grid, the data map, Run & validate, and a toast on the export path. §5 T2: at the point of display, not in a console warning. `laneTruncation.test.ts` fails if a bare numeric limit returns or if any of those surfaces stops rendering the notice | `projectLanes.ts`; `laneTruncation.ts`; `LaneTruncationNotice.tsx`; `laneTruncation.test.ts` | WP 3.1 ✅ |
 | **D21** | **User docs name fields the user never sees.** `products.csv` says `sell_price`/`demand_mean`/`demand_distribution`; the engine says `unit_price`/`demand_mode`/`demand_model`; the legacy docs showed the engine's names | `public/template/products.csv`; `item_master.sql:28-32`; `network.py:145,151,154` | WP 5.2b |
 | D22 | Legacy docs hand-copied the Pydantic models while `gen_docs.py` already renders them from the registry | archived `docBodies.tsx` `SIM_PARAM_GROUPS` | WP 0.3 ✅ |
-| **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check | `resolveEffective.ts:82`; `StagePolicyTable.tsx:694`; `schemas.ts:81` | WP 6.2 |
-| D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:420-425` | WP 6.2 |
+| **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check. **CLOSED (WP 6.2), and the root cause was one step further back than this row says.** Both mechanisms are real and each alone loses the choice — confirmed against the code before either was touched. But the reason a SUGGESTION was sitting in the slot reserved for uploaded data is that `useStageRows` marked it `__from_data` via a `markFromData` helper, while the comment at BOTH call sites said these fields are "not `__from_data`". The intent was on the record and the code did the other thing, for three costs: the shadowing above; a green "From project data" dot for a value no upload contained (D16's shape); and `hasRealProjectData` counting a project with no uploads as having real data. **The fix:** routing decisions carry `__decided` only; `getEffectiveValue` resolves a `__decided` field against the raw override PATCHES (`savedOverrideValue`) rather than against `effectivePolicy`'s merged answer — which cannot tell "somebody saved `false`" from "nobody saved anything and the default is `false`" — and falls back to the suggestion, so a fresh row still shows one; `saveAll` no longer drops an edit equal to the default when the field is overridden or is a decision; and `prefillSourceFor` gains the `decision` source, which is now the ONLY thing keeping blueprint G16 satisfied. `savedRoutingSurvives.test.ts` proves the round trip — decide, persist, re-resolve — and FOUR of its nine assertions fail against the pre-fix tree, including the round trip itself | `src/lib/policies/resolveEffective.ts` (`savedOverrideValue`, and the `__decided` rung in `getEffectiveValue`); `src/hooks/useStageRows.tsx` (the routing decisions, no longer `__from_data`); `src/lib/policies/__tests__/savedRoutingSurvives.test.ts` | **CLOSED (WP 6.2)** |
+| D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check. **CLOSED (WP 6.2), and the latency was CONFIRMED rather than inherited**: the plant spec declares no column, and `runPrefill` iterates the SPEC rather than the row's fields, so nothing renders it and nothing persists it either — the two ways it could have been live were both checked. Fixed while it was still cheap, because the day a column is added is the day the marker starts lying. The median is now passed as `resolveField`'s IMPUTED argument rather than its REAL one, which keeps the same precedence (this product's own median first, then the smart average), marks it "an estimate to verify", and rounds to 2dp as every other imputed value does. Same class as D23 and found beside it: a value the application COMPUTED wearing the marker that means an upload carried it | `src/hooks/useStageRows.tsx` (the plant stage's `production_lead_time_mean_days` call); `src/lib/policies/__tests__/savedRoutingSurvives.test.ts` | **CLOSED (WP 6.2)** |
 | D25 | `combine-project`'s core reads (`outbound_logistics`, `inbound_logistics`, both BOM tables) destructured only `{ data }` — the same swallow as D3 but on the ETL's own inputs, so a failed read produced a half-empty graph and reported success. Found by WP 0.2 while fixing D3 | `combine-project/index.ts:52-64,169-174,207-220` | WP 0.2 ✅ |
 | D26 | **Two copies of the D1 prefill rule.** `5c7129f` merged two independent WP 0.1 implementations: `resolveEffective.ts:isPrefillPersistable` (imported and called at `StagePolicyTable.tsx:865`) and `prefillSelect.ts:prefillSourceFor` (imported at `StagePolicyTable.tsx:53` and never called). Both are unit-tested, so both stay green while only one runs — an I1 violation, and the next edit to "the rule" has even odds of landing on the dead one. Found by the WP 1.1 precondition check. **CLOSED (WP 6.2), and it had already cost what it predicted — see D93.** `prefillSelect.ts` is deleted, its dead import removed from `StagePolicyTable`, and `prefillSourceFor` now lives beside `isPrefillPersistable` in `resolveEffective.ts` as one implementation. `oneResolver.test.ts` gates it two ways: exactly one module in `src/lib/policies` may define the predicate, and that predicate must still test `__imputed` BEFORE the draft — the order the two copies disagreed on. Mutation-tested | `src/lib/policies/resolveEffective.ts` (`prefillSourceFor`); `src/lib/policies/__tests__/oneResolver.test.ts` | **CLOSED (WP 6.2)** |
 | **D93** | **The two prefill rules had already drifted, and the green test belonged to the copy that never ran.** D26 recorded two implementations of the D1 rule and predicted that "the next edit to *the rule* has even odds of landing on the dead one". Deleting the dead one found that the drift had ALREADY happened, on a case both were tested for: **the user types a value over an imputed average.** `isPrefillPersistable` (live, `StagePolicyTable:866`) tests `__imputed` BEFORE the draft and refuses it; `prefillSelect.ts::prefillSourceFor` never tested `__imputed` at all and returned `"edit"`. `policyPrefill.test.ts` asserted the SECOND answer, in a test named *"does NOT persist an imputed average, but DOES persist an edit of one"*, and it passed for its whole life against a function no screen ever called. A green test for behaviour that has never run is worse than no test: it is a claim on the record that the product does something it does not do — and this one described the D1 defect's own shape (freezing an estimate as though it were data) as the intended behaviour. The live answer is kept, and not merely because it is incumbent: the prefill's job is to freeze what the DATA says, an imputed average is an estimate to verify whether or not somebody typed over it, and a manual save is a different path that still writes the user's value. The assertion is inverted in place with the reason written above it, so it is not mistaken for a test edited to pass. **A second difference was also latent**: the dead copy had a third source, `"decision"`, reading `__decided`. The live rule has none and does not need one — `useStageRows::markFromData` writes `__from_data.primary_source` whenever the field has a value, so the G16 routing decision persists through the same door as an uploaded column. Adding a `__decided` branch would make a field with NO value newly persistable, which is the other half of §4 D23 | `src/lib/policies/resolveEffective.ts` (`prefillSourceFor`'s `__imputed`-before-draft order); `src/lib/policies/__tests__/policyPrefill.test.ts` (the inverted assertion) | **CLOSED (WP 6.2)** — one rule, gated both ways |
@@ -9510,3 +9510,95 @@ the gate and the behavioural test.
 
 **Still open in WP 6.2:** D18, D23, D24, D34, D47, D48, D49, D51, D53, D58, D59,
 D66, D69, D71, D85, D87.
+
+### WP 6.2 (slice 4) — A saved sourcing choice survives a reload · 2026-09-17 · no migration
+
+**What slice 3 promised.** It deferred one thing explicitly: "adding a `__decided`
+branch would make a field with NO value newly persistable, which is the other half
+of §4 D23". This slice is that other half, and the deferral was right — the
+condition that made it unsafe is exactly what D23 turned out to be.
+
+**Both of D23's recorded mechanisms are real.** Verified against the code before
+touching either, because eight packages in a row have found "already verified"
+lines wrong:
+
+1. `getEffectiveValue` returns `dataRow[field]` before consulting the override
+   bundle, and `useStageRows` always puts a boolean `primary_source` on the row.
+   A saved override could never surface.
+2. `saveAll` skips any edit equal to the family default, and `primary_source`
+   defaults to `false`. Un-checking a primary wrote nothing at all.
+
+**The root cause is one step further back than the row said.** Why was a
+SUGGESTION sitting in the slot reserved for uploaded data? Because a
+`markFromData` helper put it there — while the comment at **both** call sites
+said these fields are "not `__from_data`". The intent was on the record and the
+code did the other thing. Three costs, and the recorded defect is only the first:
+
+- the shadowing above;
+- a green **"From project data"** dot for a value no upload contained — §4 D16's
+  exact shape, on the most-clicked cell in the stage;
+- `hasRealProjectData` counting a project with no uploads at all as having real
+  data.
+
+**The fix, in four parts, none of which could ship alone.**
+
+- Routing decisions carry `__decided` only. `markFromData` is deleted; it existed
+  for nothing else.
+- `getEffectiveValue` resolves a `__decided` field against the **raw override
+  patches** (`savedOverrideValue`) rather than `effectivePolicy`'s merged answer.
+  That distinction is the whole fix: the merged bundle cannot tell *somebody saved
+  `false`* from *nobody saved anything and the default is `false`*, and for a
+  routing decision those are opposite answers. It then falls back to the
+  suggestion, so a fresh row still shows one — ranking the bundle above the row
+  would have deleted **every** suggestion instead of the replaced ones.
+- `saveAll` no longer drops an edit equal to the default when the field is
+  overridden or is a decision. Both exceptions are the same user action.
+- `prefillSourceFor` gains the `decision` source. Taking the decisions out of
+  `__from_data` would otherwise have silently broken blueprint **G16** — the
+  pre-dispatch gate reads the primary supplier from the SAVED bundle, so the
+  prefill has to write it. This branch is now the only thing that keeps it
+  satisfied.
+
+`savedRoutingSurvives.test.ts` proves the round trip a person performs — decide,
+persist, re-resolve — and **four of its nine assertions fail against the pre-fix
+tree**, including the round trip itself. Two of its assertions exist to pin what
+must NOT change: an uploaded field still outranks the bundle (WP 4.4's staleness
+brief turns on that), and a row with no `__decided` map behaves exactly as before.
+
+**Two transcriptions had to move with the behaviour, and neither is a test edited
+to pass.** `RESOLUTION_ORDER` is a transcription of the resolver's branches, so it
+gains `savedOverride` and `suggestion` steps; and `policyPrefill.test.ts`'s
+assertion that "a `__decided` marker ALONE does not persist" — which slice 3 wrote,
+correctly, one slice ago — is now deliberately false, and says so above itself with
+the reason.
+
+**D24 closed in the same commit**, being the same class one stage over: a value
+the application COMPUTED wearing the marker that means an upload carried it.
+`production_lead_time_mean_days` is the median of a product's **inbound** lead
+times. Its latency was confirmed rather than inherited — the plant spec declares
+no column, AND `runPrefill` iterates the spec rather than the row's fields, so
+both ways it could have been live were checked. Fixed while cheap: the median
+moves to `resolveField`'s imputed argument, keeping the same precedence and
+telling the truth.
+
+**Gap check.** Three findings:
+
+1. **`resolveField` decides a provenance from a value's SHAPE, not its origin.**
+   Its real branch fires on `Number.isFinite(r) && r > 0`, so any number in the
+   third argument becomes `__from_data`. That is how D24 happened, and the
+   parameter position is the only thing distinguishing "uploaded" from
+   "computed". A named argument, or two functions, would make the class
+   unwritable; today a gate would have nothing textual to key on.
+2. **There is no `derived` provenance for a non-master field.** `resolveCell`'s
+   `derivedFallback` requires `col.master`, so a computed non-master value can
+   only be `data` or `imputed`. `imputed` is the honest choice for D24 and is not
+   an exact one — a median of a real signal is not a project average. WP 6.3 owns
+   the vocabulary and `estimated` is still reserved.
+3. **`__from_data` is now three markers' worth of meaning in two maps.** Uploaded
+   (`__from_data`), estimated (`__imputed`), decided (`__decided`) — with
+   `savedOverrideValue` keying off the third and the prefill off all three.
+   Nothing states the set or checks it is exhaustive; a fourth kind of value will
+   be added to whichever map is nearest.
+
+**Still open in WP 6.2:** D18, D34, D47, D48, D49, D51, D53, D58, D59, D66, D69,
+D71, D85, D87.

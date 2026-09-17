@@ -91,17 +91,27 @@ describe("D1 — the prefill persists only what the row can source", () => {
     // same door as an uploaded column. The fixture is corrected to match what
     // `useStageRows` actually emits — it carried `__decided` alone, which no row
     // from that hook ever does for a field with a value.
-    const row = supplierRow({
-      __from_data: { material_price: true, primary_source: true } as Record<string, true>,
-    });
-    expect(prefillSourceFor(row, "primary_source")).toBe("data");
+    // It arrives as `decision` since §4 D23 — see the test below for why the
+    // fixture no longer puts routing decisions in `__from_data`.
+    expect(prefillSourceFor(supplierRow(), "primary_source")).toBe("decision");
   });
 
-  it("a `__decided` marker ALONE does not persist — it is a display marker", () => {
-    // The distinction the deleted copy erased. `__decided` drives the `suggested`
-    // provenance dot. A field marked decided with no value in `__from_data` is a
-    // suggestion the user has not accepted, and freezing it is D1's shape again.
-    expect(prefillSourceFor(supplierRow(), "primary_source")).toBeNull();
+  it("a `__decided` marker persists as `decision` — G16 needs it on the bundle", () => {
+    // ── THIS ASSERTION WAS `toBeNull()` ONE SLICE AGO, AND THE REASON MATTERS ─
+    //
+    // Slice 3 deleted a dead second copy of this rule that had a `"decision"`
+    // source, and deliberately did NOT adopt it: at the time `useStageRows` put
+    // the routing decisions in `__from_data` TOO, so they already persisted, and
+    // a `__decided` branch would only have made a valueless field newly
+    // persistable. §4 D23 is what changed — the decisions are out of
+    // `__from_data`, because nobody uploads a `primary_source` column and
+    // sitting there let a suggestion outrank the user's saved choice forever.
+    //
+    // So this branch is now the ONLY thing keeping blueprint G16 satisfied: the
+    // pre-dispatch gate reads the primary supplier from the SAVED bundle, so the
+    // prefill has to write it. `useStageRows` sets `__decided` only where a
+    // value exists, which is the condition slice 3 could not rely on.
+    expect(prefillSourceFor(supplierRow(), "primary_source")).toBe("decision");
   });
 
   it("does NOT persist an imputed average, NOR an edit of one", () => {

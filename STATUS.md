@@ -3,11 +3,49 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–3**
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–4**
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 4) — A saved sourcing choice survives a reload · no migration
+
+**D23 + D24 closed.** The user picks a primary supplier, saves, reloads, and sees
+the suggestion again. Both recorded mechanisms are real and each alone loses the
+choice — but the root cause is one step further back than the defect row said.
+
+A `markFromData` helper wrote the routing SUGGESTION into `__from_data` — the
+marker that means "an upload carried this" — while the comment at **both** call
+sites said these fields are *not* `__from_data`. The intent was on the record and
+the code did the other thing. Three costs: the shadowing; a green "From project
+data" dot on the most-clicked cell in the stage for a value no upload contained
+(D16's shape); and `hasRealProjectData` counting an upload-free project as having
+real data.
+
+Four parts, none shippable alone — routing decisions carry `__decided` only; the
+resolver ranks a saved override above a suggestion by reading the **raw patches**
+(the merged bundle cannot tell "somebody saved `false`" from "the default is
+`false`", and for a routing decision those are opposite answers); `saveAll` stops
+dropping the un-check; and `prefillSourceFor` gains the `decision` source, which
+is now the only thing keeping blueprint **G16** satisfied.
+
+**Four of nine assertions fail against the pre-fix tree**, including the round
+trip itself. Two assertions exist to pin what must *not* change: an uploaded field
+still outranks the bundle (WP 4.4's staleness brief turns on it), and a row with
+no `__decided` map behaves exactly as before.
+
+Two transcriptions moved with the behaviour and neither is a test edited to pass:
+`RESOLUTION_ORDER` gains two steps, and slice 3's own assertion that a `__decided`
+marker alone does not persist is now deliberately false, with the reason written
+above it.
+
+**D24** closed alongside — same class, one stage over. Its latency was *confirmed*
+(no column in the spec, and `runPrefill` iterates the spec not the row) rather
+than inherited from the defect row.
+
+**Verified:** `contract:check` ✓ · `check:docs` ✓ · 374 tests ✓ · build ✓ ·
+eslint 336/116 and `audit:ui` 8, both unchanged.
 
 ### WP 6.2 (slice 3) — D26, and the test that belonged to the dead copy · no migration
 

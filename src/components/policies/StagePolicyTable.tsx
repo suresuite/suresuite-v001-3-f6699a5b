@@ -690,7 +690,29 @@ export function StagePolicyTable({
         }
         if (v === undefined) continue;
         const def = getDefault(field, col.family);
-        if (isEqual(v, def)) continue;
+        // ── "EQUAL TO THE DEFAULT" IS NOT ALWAYS A NO-OP (§4 D23) ──────────
+        //
+        // Skipping an edit that matches the family default keeps the bundle
+        // clean: an override restating the default is noise, and writing one is
+        // how §4 D1 froze decisions nobody made. But it is only a no-op when the
+        // default is what the cell would SHOW after the skip, and there are two
+        // cases where it is not:
+        //
+        //   · a saved override already carries a different value for this field,
+        //     so dropping the edit leaves the STALE override in place. Setting
+        //     `primary_source` back to `false` looked saved and reloaded as
+        //     `true`, because `false` is the schema default (`schemas.ts:81`).
+        //   · the field is a routing DECISION, so the row's own suggestion is
+        //     what shows when no override exists — not the default. Un-checking
+        //     the suggested primary wrote nothing and changed nothing.
+        //
+        // Both are the same user action — un-checking a primary supplier — and
+        // it was unsaveable either way.
+        const overridden = overrides.some(
+          (o) => o.target_key === rowKey && o.family === col.family && field in (o.patch ?? {}),
+        );
+        const isDecision = ((dataRow?.__decided ?? {}) as Record<string, true>)[field] === true;
+        if (isEqual(v, def) && !overridden && !isDecision) continue;
         const bucket = byFamily.get(col.family) ?? {};
         bucket[field] = v;
         byFamily.set(col.family, bucket);

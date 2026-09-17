@@ -79,7 +79,35 @@ export function getEffectiveValue(args: {
     const mv = masterValueFor(mcol, dataRow, masterRowById);
     return mv !== undefined ? mv : derivedValueFor(mcol, dataRow, derived);
   }
-  if (dataRow[field] !== undefined && dataRow[field] !== null) return dataRow[field];
+  /**
+   * A ROUTING SUGGESTION IS NOT UPLOADED DATA, AND THAT DISTINCTION IS §4 D23.
+   *
+   * `dataRow[field]` ranks above the bundle on purpose: an uploaded column is a
+   * fact about the project and must beat a stale override, and WP 4.4's
+   * staleness brief turns on exactly that. But `useStageRows` also puts the
+   * stage's own routing SUGGESTION on the row — which supplier it thinks is
+   * primary, which firm it thinks ships a lane — and a suggestion in that slot
+   * outranked the user's saved decision forever: pick a supplier, save, reload,
+   * and the suggestion is back. Nothing on screen said why.
+   *
+   * So a `__decided` field is resolved in two pieces. An EXPLICIT override — a
+   * patch somebody saved — beats it; the family DEFAULT does not, because the
+   * bundle always carries one (`primary_source` defaults to `false`) and letting
+   * that win would delete every suggestion instead of the ones a user replaced.
+   * Ordering it against the raw patches rather than against `effectivePolicy`'s
+   * merged answer is the whole of the fix.
+   */
+  const decided = (dataRow.__decided ?? {}) as Record<string, true>;
+  const isSuggestion = decided[field] === true;
+  const hasValue = dataRow[field] !== undefined && dataRow[field] !== null;
+  if (hasValue && !isSuggestion) return dataRow[field];
+
+  if (isSuggestion) {
+    const saved = savedOverrideValue(overrides, rowKey, field, family, families);
+    if (saved !== undefined) return saved;
+    if (hasValue) return dataRow[field];
+  }
+
   const bundle = effectivePolicy(defaults, overrides, scope, rowKey);
   if (family) {
     const own = bundle[family] as Record<string, unknown> | undefined;
@@ -88,6 +116,44 @@ export function getEffectiveValue(args: {
   for (const fam of families) {
     const eff = bundle[fam] as Record<string, unknown>;
     if (eff[field] !== undefined) return eff[field];
+  }
+  return undefined;
+}
+
+/**
+ * The value an override PATCH carries for this row+field, or `undefined`.
+ *
+ * Deliberately not `effectivePolicy`: that merges the schema defaults under the
+ * patches and cannot tell "somebody saved `false`" from "nobody saved anything
+ * and the default is `false`". For a routing decision those are opposite
+ * answers — the first is a user un-checking a primary supplier, the second is a
+ * fresh row — so the distinction has to be read from the patches themselves.
+ */
+export function savedOverrideValue(
+  overrides: OverrideRow[],
+  rowKey: string,
+  field: string,
+  family: PolicyFamily | undefined,
+  families: readonly PolicyFamily[],
+): unknown {
+  const forRow = overrides.filter((o) => o.target_key === rowKey);
+  const pick = (fam: PolicyFamily): unknown => {
+    for (const o of forRow) {
+      if (o.family !== fam) continue;
+      const patch = (o.patch ?? {}) as Record<string, unknown>;
+      if (field in patch) return patch[field];
+    }
+    return undefined;
+  };
+  // The column's own family first, then the others — the same order the bundle
+  // lookup below uses, so a name shared across families resolves consistently.
+  if (family) {
+    const own = pick(family);
+    if (own !== undefined) return own;
+  }
+  for (const fam of families) {
+    const v = pick(fam);
+    if (v !== undefined) return v;
   }
   return undefined;
 }
@@ -310,7 +376,7 @@ export function resolveCell(args: {
  */
 
 /** Why a row×field may be persisted by the prefill. */
-export type PrefillSource = "edit" | "data";
+export type PrefillSource = "edit" | "data" | "decision";
 
 export function prefillSourceFor(
   row: Record<string, unknown>,
@@ -321,7 +387,17 @@ export function prefillSourceFor(
   if (imputed[field] === true) return null;
   if (draft !== undefined) return "edit";
   const fromData = (row.__from_data ?? {}) as Record<string, true>;
-  return fromData[field] === true ? "data" : null;
+  if (fromData[field] === true) return "data";
+  // THE THIRD SOURCE, RESTORED DELIBERATELY (§4 D23). WP 6.2 slice 3 deleted a
+  // dead copy of this rule that had one, and did NOT adopt it, because at the
+  // time the routing decisions ALSO sat in `__from_data` and a `__decided`
+  // branch would only have made a valueless field newly persistable. D23 took
+  // them out of `__from_data` — they were never uploaded — so this branch is
+  // now the only thing that keeps blueprint G16 satisfied: the pre-dispatch
+  // gate reads the primary supplier from the SAVED bundle, so the prefill has
+  // to write it. `useStageRows` sets `__decided` only where a value exists.
+  const decided = (row.__decided ?? {}) as Record<string, true>;
+  return decided[field] === true ? "decision" : null;
 }
 
 export function isPrefillPersistable(
