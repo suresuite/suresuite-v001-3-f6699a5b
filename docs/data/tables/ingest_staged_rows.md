@@ -73,7 +73,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `raw` | — | `jsonb` | — | — | The cells exactly as the file gave them, keyed by the header the file carried — untrimmed, untyped, verbatim, including columns the contract does not know. The left-hand side of every parse claim. |
 | `parsed` | — | `jsonb` | — | — | What validation made of the cells, keyed by TIER-2 COLUMN NAME rather than by CSV header — the two differ, and the mapping is the contract's `ingest.csv_header`. |
 | `findings` | — | `jsonb` | — | — | [{level, field, code, message}] — the same four-key shape as `ingest_runs.mapping_warnings` and scsim's MappingWarning, so WP 3.4 renders it with `MappingWarningsCard` unmodified. |
-| `diff_state` | — | `text` | — | — | new, changed, unchanged or removed_upstream — the same vocabulary the three connector staging tables use, so WP 3.4's one review component serves both sources. |
+| `diff_state` | — | `text` | — | — | What this row is relative to the CURRENT tier-2 table — new, changed or unchanged — computed by `ingest_diff_run` at landing, again when the review screen is opened and again inside `ingest_apply_run` immediately before the upsert. NULL means the diff has not been computed for this row: a row held back by an `error` finding may have failed on a key field and so has nothing to compare. The CHECK also admits `removed_upstream`, which is the same vocabulary the three connector staging tables use so that one review component serves both sources; nothing writing THIS table ever sets it. |
 | `staged_at` | — | `timestamp with time zone` | — | — | When the row was staged. Server-stamped, never the client's clock. |
 
 ## Each column in full
@@ -219,11 +219,11 @@ What validation made of the cells, keyed by TIER-2 COLUMN NAME rather than by CS
 
 ### `diff_state`
 
-new, changed, unchanged or removed_upstream — the same vocabulary the three connector staging tables use, so WP 3.4's one review component serves both sources.
+What this row is relative to the CURRENT tier-2 table — new, changed or unchanged — computed by `ingest_diff_run` at landing, again when the review screen is opened and again inside `ingest_apply_run` immediately before the upsert. NULL means the diff has not been computed for this row: a row held back by an `error` finding may have failed on a key field and so has nothing to compare. The CHECK also admits `removed_upstream`, which is the same vocabulary the three connector staging tables use so that one review component serves both sources; nothing writing THIS table ever sets it.
 
 | | |
 |---|---|
-| Type | `text`, `NOT NULL`, default `'new'` |
+| Type | `text` |
 | Grain | `level` |
 | Unit | dimensionless |
 | Added by | `20260916000014_ingest_staged_rows.sql` |
@@ -231,14 +231,7 @@ new, changed, unchanged or removed_upstream — the same vocabulary the three co
 | Validated at ingest | one of new, changed, unchanged, removed_upstream |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-**Substitutions** — every point where a value you did not supply can stand in
-for one you did.
-
-| When | The value used | Shown as | Visible where |
-|---|---|---|---|
-| nothing has computed a diff yet | new | `default` | — |
-
-> DEFAULTS TO `new` AND NOTHING COMPUTES IT YET. WP 3.4 computes the real diff; until it does, every CSV row says `new` because that is what an uncompared row is. Stated here rather than left for a reader to infer from a uniform column.
+> NULL IS "NOT COMPUTED", AND IT REPLACED A DEFAULT THAT WAS AN ANSWER. Until WP 3.4 this column was `NOT NULL DEFAULT 'new'` and no code path wrote it — `20260916000019` does not mention it once — so every staged row claimed `new`, including the rows the upsert UPDATED, and a review screen reading it would have rendered "340 new" for 340 unchanged rows with a number and no hedge. PLAN.md §4 D62. A file run never writes `removed_upstream`: a connector PULL is a statement about the whole source and a FILE is not — nothing about one upload says it is the complete set of a project's rows, so an absent row means the file does not mention it, and `ingest_runs.rows_removed` is 0 for every file run.
 
 ### `staged_at`
 
@@ -263,6 +256,6 @@ When the row was staged. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `fc67c7bde328`, engine `0.2.3`,
+*Generated from data contract `57ad4b32bb9f`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_staged_rows.contract.yaml`, table created by `20260916000014_ingest_staged_rows.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

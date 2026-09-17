@@ -186,13 +186,22 @@ fields:
     unit_source: none
     meaning: >-
       Staged rows the diff classified as new: no live row carries this source
-      identifier yet.
+      identifier yet. For a file run this is `ingest_diff_run`'s count of rows
+      whose natural key is absent from the tier-2 table, and it excludes the
+      rows a later line of the same file superseded.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
     surfaces: []
     resolution: null
+    note: >-
+      WP 3.3 SET THIS TO INSERTS PLUS UPDATES. `ingest_apply_run` wrote
+      `rows_new = v_total`, the total number of rows the upsert touched, and
+      never wrote `rows_changed` or `rows_unchanged` at all — so the column
+      named for one half of the split held the whole of it and the other two
+      held zeroes that were not measurements. PLAN.md §4 D63; closed in WP 3.4
+      by computing the diff BEFORE the upsert and persisting what it found.
   rows_changed:
     type: integer
     unit: null
@@ -227,12 +236,57 @@ fields:
       Rows present in the live table under this source and absent from the
       pull — `diff_state = removed_upstream`. Never promoted by the connector:
       a source dropping a row is not authority to delete the project's row.
+      ALWAYS 0 FOR A FILE RUN, and that zero is a statement rather than a
+      measurement: a connector pull speaks for the whole source, a CSV speaks
+      only for the rows it contains, so an upload can never mark anything
+      removed. The review screen says so in those words rather than rendering
+      the zero (§5 T1).
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
     surfaces: []
     resolution: null
+    note: >-
+      WP 3.3's `ingest_apply_run` wrote the count of rows HELD BACK by an error
+      finding into this column — two unrelated facts in one place, and the one
+      that was there was not the one the column is documented to hold. PLAN.md
+      §4 D64. WP 3.4 gave the held-back count its own column, `rows_held`.
+  rows_held:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Staged rows carrying an `error` finding. They are never promoted and they
+      stay in tier 1 with their reason attached, which is what makes a partial
+      upload reviewable instead of a failure.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rows_superseded:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Staged rows that a LATER line of the same file repeats on the natural key.
+      The promotion collapses them (`DISTINCT ON`, so one statement cannot
+      affect one row twice) and each one carries a `superseded_by_later_line`
+      finding naming the line that beat it — the one case where the uploader's
+      own file disagreed with itself.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Counted separately from the three diff states, not inside them, so the
+      five numbers partition the run exactly: new + changed + unchanged +
+      superseded + held = rows staged. A review screen whose categories do not
+      add up to the file is a screen that has lost rows.
   mapping_warnings:
     type: jsonb
     unit: null

@@ -62,10 +62,10 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `triggered_by_user_id` | — | `uuid` | — | — | The person who asked for a manual run, in `auth.users`. NULL for a scheduled run, where there is no person — stated rather than back-filled to a service account, because 'nobody asked, the schedule did' is the true answer (G4). |
 | `status` | — | `text` | — | — | running, staged, applied, failed or skipped. `staged` is the state that matters: rows are in tier 1 and a human has not approved them. Nothing reaches tier 2 before `applied`. |
 | `rows_fetched` | — | `jsonb` | — | — | Row counts pulled from the source, per entity — {"products": 1007, "bom_versions": 25}. What the source OFFERED, which is not what was staged and not what was promoted. |
-| `rows_new` | — | `integer` | — | — | Staged rows the diff classified as new: no live row carries this source identifier yet. |
+| `rows_new` | — | `integer` | — | — | Staged rows the diff classified as new: no live row carries this source identifier yet. For a file run this is `ingest_diff_run`'s count of rows whose natural key is absent from the tier-2 table, and it excludes the rows a later line of the same file superseded. |
 | `rows_changed` | — | `integer` | — | — | Staged rows whose live counterpart exists and differs. |
 | `rows_unchanged` | — | `integer` | — | — | Staged rows identical to their live counterpart. Counted rather than dropped: 'nothing changed' is a result, and a report that omits it cannot be distinguished from one that failed. |
-| `rows_removed` | — | `integer` | — | — | Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row. |
+| `rows_removed` | — | `integer` | — | — | Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row. ALWAYS 0 FOR A FILE RUN, and that zero is a statement rather than a measurement: a connector pull speaks for the whole source, a CSV speaks only for the rows it contains, so an upload can never mark anything removed. The review screen says so in those words rather than rendering the zero (§5 T1). |
 | `mapping_warnings` | — | `jsonb` | — | — | The per-field mapping report: [{level, entity, field, reason}], the same shape as `simulation_runs.mapping_warnings` and scsim's MappingWarning, so MappingWarningsCard renders it unmodified. |
 | `fields_mapped` | — | `integer` | — | — | Source fields that landed in a staged column with a value. |
 | `fields_defaulted` | — | `integer` | — | — | Source fields the source did not provide, left null for the project's defaults to fill at promotion. This is the count that drives the amber badge — a defaulted field is a substitution and §5 T2 says it is visible at the point of display. |
@@ -77,6 +77,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `created_at` | — | `timestamp with time zone` | — | — | When the run opened. Server-stamped. |
 | `project_id` | — | `uuid` | — | — | The project this run ingests into. Added in WP 3.1 and NOT NULL: it is what the RLS policy reads, so a run is governed by the project it writes to rather than by the credential it happened to use. |
 | `source_kind` | — | `text` | — | — | Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a fourth source cannot appear without a migration that decides what it is. |
+| `rows_held` | — | `integer` | — | — | Staged rows carrying an `error` finding. They are never promoted and they stay in tier 1 with their reason attached, which is what makes a partial upload reviewable instead of a failure. |
+| `rows_superseded` | — | `integer` | — | — | Staged rows that a LATER line of the same file repeats on the natural key. The promotion collapses them (`DISTINCT ON`, so one statement cannot affect one row twice) and each one carries a `superseded_by_later_line` finding naming the line that beat it — the one case where the uploader's own file disagreed with itself. |
 
 ## Each column in full
 
@@ -174,7 +176,7 @@ Row counts pulled from the source, per entity — {"products": 1007, "bom_versio
 
 ### `rows_new`
 
-Staged rows the diff classified as new: no live row carries this source identifier yet.
+Staged rows the diff classified as new: no live row carries this source identifier yet. For a file run this is `ingest_diff_run`'s count of rows whose natural key is absent from the tier-2 table, and it excludes the rows a later line of the same file superseded.
 
 | | |
 |---|---|
@@ -185,6 +187,8 @@ Staged rows the diff classified as new: no live row carries this source identifi
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
+
+> WP 3.3 SET THIS TO INSERTS PLUS UPDATES. `ingest_apply_run` wrote `rows_new = v_total`, the total number of rows the upsert touched, and never wrote `rows_changed` or `rows_unchanged` at all — so the column named for one half of the split held the whole of it and the other two held zeroes that were not measurements. PLAN.md §4 D63; closed in WP 3.4 by computing the diff BEFORE the upsert and persisting what it found.
 
 ### `rows_changed`
 
@@ -216,7 +220,7 @@ Staged rows identical to their live counterpart. Counted rather than dropped: 'n
 
 ### `rows_removed`
 
-Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row.
+Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row. ALWAYS 0 FOR A FILE RUN, and that zero is a statement rather than a measurement: a connector pull speaks for the whole source, a CSV speaks only for the rows it contains, so an upload can never mark anything removed. The review screen says so in those words rather than rendering the zero (§5 T1).
 
 | | |
 |---|---|
@@ -227,6 +231,8 @@ Rows present in the live table under this source and absent from the pull — `d
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
+
+> WP 3.3's `ingest_apply_run` wrote the count of rows HELD BACK by an error finding into this column — two unrelated facts in one place, and the one that was there was not the one the column is documented to hold. PLAN.md §4 D64. WP 3.4 gave the held-back count its own column, `rows_held`.
 
 ### `mapping_warnings`
 
@@ -388,6 +394,36 @@ Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a 
 
 > NO DEFAULT, deliberately. The column is backfilled to 'orbit-mrp' for the runs that existed and the default is then dropped, so the next writer must state its source. A default here would record a CSV upload as a connector sync and nobody would be told, which is the §5 T1 failure — a value with no provenance — inside the table that exists to record provenance.
 
+### `rows_held`
+
+Staged rows carrying an `error` finding. They are never promoted and they stay in tier 1 with their reason attached, which is what makes a partial upload reviewable instead of a failure.
+
+| | |
+|---|---|
+| Type | `integer`, `NOT NULL`, default `0` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260917000001_diff_before_promotion.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `rows_superseded`
+
+Staged rows that a LATER line of the same file repeats on the natural key. The promotion collapses them (`DISTINCT ON`, so one statement cannot affect one row twice) and each one carries a `superseded_by_later_line` finding naming the line that beat it — the one case where the uploader's own file disagreed with itself.
+
+| | |
+|---|---|
+| Type | `integer`, `NOT NULL`, default `0` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260917000001_diff_before_promotion.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> Counted separately from the three diff states, not inside them, so the five numbers partition the run exactly: new + changed + unchanged + superseded + held = rows staged. A review screen whose categories do not add up to the file is a screen that has lost rows.
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -397,6 +433,6 @@ Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a 
 
 ---
 
-*Generated from data contract `fc67c7bde328`, engine `0.2.3`,
+*Generated from data contract `57ad4b32bb9f`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

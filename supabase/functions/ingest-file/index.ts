@@ -76,12 +76,67 @@ serve(async (req) => {
     const dataset = String(form.get("dataset") ?? "");
     const projectId = String(form.get("project_id") ?? "");
     const userId = String(form.get("user_id") ?? "");
-    // `parse` returns the parsed rows and lands nothing. It exists for the
-    // datasets the contract does not yet describe — the item masters, the node
-    // list and the two deep-tier network tables — so that NO CSV is parsed in a
-    // browser any more, while their promotion stays where it is until the package
-    // that owns those tables (§16).
+    // THREE MODES, AND WP 3.4 CHANGED WHAT THE MIDDLE ONE DOES.
+    //
+    //   `parse`  — returns the parsed rows and lands nothing. It exists for the
+    //              datasets the contract does not yet describe (the node list and
+    //              the two deep-tier network tables) so that NO CSV is parsed in a
+    //              browser any more, while their promotion stays where it is until
+    //              the package that owns those tables (§16).
+    //   `land`   — tier 0 + tier 1 + the audit row, then the DIFF. It no longer
+    //              promotes. §10's design point for WP 3.4 is that the diff is
+    //              computed BEFORE the promotion, because the review screen shows
+    //              it so a person can decide whether to promote — and a landing
+    //              that promoted on the way past has already made the decision.
+    //              It is also what makes the role gate reachable at all: an
+    //              analyst may upload and review, and only an editor may write
+    //              tier 2, which cannot be true while the upload writes tier 2.
+    //   `apply`  — promotes a run somebody has looked at. Takes a `run_id` and
+    //              no file.
     const mode = String(form.get("mode") ?? "land");
+
+    if (mode === "apply") {
+      const runId = String(form.get("run_id") ?? "");
+      if (!runId) return json({ success: false, error: "Missing run_id." }, 400);
+      if (!userId) return json({ success: false, error: "Missing user_id." }, 400);
+      const admin = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      );
+      const { data, error } = await admin.rpc("ingest_apply_run", {
+        _run_id: runId, _actor_user_id: userId,
+      });
+      if (error) {
+        // THE REFUSAL IS THE DATABASE'S AND IT IS RELAYED, NOT RESTATED.
+        // `ingest_apply_run` raises `insufficient_privilege` (SQLSTATE 42501)
+        // when the role is below editor; a 403 here is that refusal reaching the
+        // person, and the message names the role it read.
+        const denied = error.code === "42501";
+        console.error("[ingest-file] apply failed", error);
+        return json({ success: false, stage: "apply", run_id: runId, error: error.message },
+                    denied ? 403 : 500);
+      }
+      return json({ success: true, mode: "apply", ...(data as Record<string, unknown>) });
+    }
+
+    if (mode === "diff") {
+      const runId = String(form.get("run_id") ?? "");
+      if (!runId) return json({ success: false, error: "Missing run_id." }, 400);
+      if (!userId) return json({ success: false, error: "Missing user_id." }, 400);
+      const admin = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      );
+      const { data, error } = await admin.rpc("ingest_diff_run", {
+        _run_id: runId, _actor_user_id: userId,
+      });
+      if (error) {
+        console.error("[ingest-file] diff failed", error);
+        return json({ success: false, stage: "diff", run_id: runId, error: error.message },
+                    error.code === "42501" ? 403 : 500);
+      }
+      return json({ success: true, mode: "diff", ...(data as Record<string, unknown>) });
+    }
 
     if (!(file instanceof File)) return json({ success: false, error: "No file was uploaded." }, 400);
     if (!projectId) return json({ success: false, error: "Missing project_id." }, 400);
@@ -190,20 +245,23 @@ serve(async (req) => {
 
     const runId = (landed as { run_id: string }).run_id;
 
-    const { data: applied, error: applyError } = await supabase.rpc("ingest_apply_run", {
+    // THE DIFF, NOT THE PROMOTION. Nothing has been written to tier 2 when this
+    // returns; the run is `staged` and the review screen is what decides.
+    //
+    // It is a second RPC rather than a line inside `ingest_land_file` on purpose.
+    // The landing is WP 3.2's function and replacing its whole body to append one
+    // call would have been the duplication this plan exists to end — and the
+    // failure mode is already designed for: a run whose diff did not run has
+    // `diff_state` NULL on every row, which the screen renders as "not compared"
+    // with a button to compute it, and `ingest_apply_run` recomputes it in its
+    // own transaction regardless. Correctness never depends on this call
+    // succeeding; only the first render does.
+    const { data: diffed, error: diffError } = await supabase.rpc("ingest_diff_run", {
       _run_id: runId, _actor_user_id: userId,
     });
-    if (applyError) {
-      // The landing STANDS. Tier 0 and tier 1 record what was uploaded whether or
-      // not the promotion succeeded, which is the point of having them: the run
-      // is re-appliable and the file is still there to look at.
-      console.error("[ingest-file] apply failed", applyError);
-      return json({
-        success: false, stage: "apply", error: applyError.message,
-        run_id: runId, landed, findings: result.fileFindings,
-      }, 500);
-    }
+    if (diffError) console.error("[ingest-file] diff failed; the run is staged and re-diffable", diffError);
 
+    const counts = (diffed ?? {}) as Record<string, number>;
     const rowFindings: Finding[] = result.rows.flatMap((r) => r.findings);
     return json({
       success: true,
@@ -213,8 +271,13 @@ serve(async (req) => {
       target: spec.target,
       rows_read: result.rows.length,
       rows_staged: (landed as { rows_staged: number }).rows_staged,
-      rows_promoted: (applied as { rows_promoted: number }).rows_promoted,
-      rows_held: (applied as { rows_held: number }).rows_held,
+      // The split the review screen renders, or nulls when the diff did not run.
+      rows_new: counts.rows_new ?? null,
+      rows_changed: counts.rows_changed ?? null,
+      rows_unchanged: counts.rows_unchanged ?? null,
+      rows_superseded: counts.rows_superseded ?? null,
+      rows_held: counts.rows_held ?? (landed as { rows_rejected: number }).rows_rejected,
+      diffed: !diffError,
       counts: result.counts,
       // Bounded: a file where every row is wrong would otherwise return a
       // response the size of the file. The counts above are complete; the run

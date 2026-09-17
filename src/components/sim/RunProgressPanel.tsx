@@ -161,9 +161,19 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
   );
 }
 
-const WARN_META = {
+/**
+ * THE FINDING BADGE VOCABULARY, and there is one of it. §10 tells WP 3.4's
+ * ingestion review screen to "reuse `MappingWarningsCard`'s badge vocabulary
+ * rather than inventing a second", and a vocabulary you cannot import is a
+ * vocabulary you copy. `ingest_staged_rows.findings` and
+ * `ingest_runs.mapping_warnings` carry the same `{level, ...}` shape as
+ * scsim's MappingWarning precisely so that one table of levels serves all of
+ * them. `warning` is the spelling the SQL findings use for `warn`.
+ */
+export const WARN_META = {
   error: { icon: AlertTriangle, cls: "text-destructive" },
   warn: { icon: AlertTriangle, cls: "text-amber-600 dark:text-amber-400" },
+  warning: { icon: AlertTriangle, cls: "text-amber-600 dark:text-amber-400" },
   info: { icon: Info, cls: "text-muted-foreground" },
 } as const;
 

@@ -360,6 +360,105 @@ async function ingestTables() {
       out(`- ${r.staged_rows_rejected} staged row(s) carry an \`error\` finding and were never promoted. That is the feature, not a fault — each one is a row the old parser would have written to tier 2 as a null.`);
     }
   });
+
+  // ── WP 3.4 ────────────────────────────────────────────────────────────────
+  //
+  // THREE THINGS §15 HAS BEEN ASSERTING WITHOUT MEASURING. §16 · WP 3.3 · L
+  // says "`ingest_run_id` is NULL on all 1 691 surviving arcs" — true, and it
+  // was read off the absence of runs rather than off the columns. The same for
+  // `diff_state`: the claim that every staged row says `new` was a reading of
+  // the DDL, and the staging table was empty, so neither number had ever come
+  // back from the database that holds it.
+  section("WP 3.4 — provenance on tier 2, and what `diff_state` actually holds");
+
+  const prov = await tryQ(`
+    select t.tbl,
+           t.total,
+           t.with_run,
+           t.with_row
+      from (
+        select 'inbound_logistics'::text as tbl, count(*)::int as total,
+               count(ingest_run_id)::int as with_run, count(source_row_id)::int as with_row
+          from public.inbound_logistics
+        union all select 'outbound_logistics', count(*)::int, count(ingest_run_id)::int, count(source_row_id)::int from public.outbound_logistics
+        union all select 'bom_single_level',   count(*)::int, count(ingest_run_id)::int, count(source_row_id)::int from public.bom_single_level
+        union all select 'bom_multi_level',    count(*)::int, count(ingest_run_id)::int, count(source_row_id)::int from public.bom_multi_level
+        union all select 'materials',          count(*)::int, count(ingest_run_id)::int, count(source_row_id)::int from public.materials
+        union all select 'products',           count(*)::int, count(ingest_run_id)::int, count(source_row_id)::int from public.products
+        union all select 'suppliers',          count(*)::int, count(ingest_run_id)::int, count(source_row_id)::int from public.suppliers
+      ) t
+     order by t.tbl`);
+  report("tier-2 rows that can name the line they came from (A4)", prov, (rows) => {
+    out(...table(rows));
+    const traced = rows.reduce((a, r) => a + Number(r.with_row || 0), 0);
+    const total = rows.reduce((a, r) => a + Number(r.total || 0), 0);
+    out(
+      `- **${traced} of ${total} canonical rows trace to a source line.** A NULL means the ` +
+        "provenance is UNKNOWN, never that there was none: both columns are `ON DELETE SET " +
+        "NULL`, and every row predating the CSV landing path carries neither because the " +
+        "files were never stored. Nothing can backfill it.",
+    );
+  });
+
+  const diffs = await tryQ(`
+    select coalesce(diff_state, '(not computed)') as diff_state, count(*)::int as rows
+      from public.ingest_staged_rows group by 1 order by 2 desc`);
+  report("`diff_state`, as the rows actually hold it (D62)", diffs, (rows) => {
+    if (!rows.length) {
+      out("- No staged row exists, so the column holds nothing. The claim that WP 3.3 left every row saying `new` is about the DDL, not about data — there is none.");
+      return;
+    }
+    out(...table(rows));
+  });
+
+  const runCounts = await tryQ(`
+    select r.id, r.source_kind, r.status,
+           (select count(*)::int from public.ingest_staged_rows s where s.ingest_run_id = r.id) as staged,
+           r.rows_new, r.rows_changed, r.rows_unchanged, r.rows_superseded, r.rows_held, r.rows_removed
+      from public.ingest_runs r
+     where exists (select 1 from public.ingest_staged_rows s where s.ingest_run_id = r.id)
+     order by r.started_at desc nulls last
+     limit 25`);
+  report("do a run's five counts add up to the rows it staged?", runCounts, (rows) => {
+    if (!rows.length) {
+      out("- No run stages `ingest_staged_rows`. The partition the review screen renders has never been exercised on real data.");
+      return;
+    }
+    out(...table(rows));
+    const bad = rows.filter(
+      (r) =>
+        Number(r.rows_new) + Number(r.rows_changed) + Number(r.rows_unchanged) +
+          Number(r.rows_superseded) + Number(r.rows_held) !== Number(r.staged),
+    );
+    out(
+      bad.length
+        ? `- **${bad.length} run(s) whose counts do not account for every staged row.** The review screen says so where it renders them, and this is the same check against production.`
+        : "- Every run's five counts partition its staged rows exactly.",
+    );
+  });
+
+  // D61 — the number this package CHANGES in production, so it needs a before.
+  const members = await tryQ(`
+    select (select count(*)::int from public.projects)                              as projects,
+           (select count(*)::int from public.projects p
+             where not exists (select 1 from public.project_members m where m.project_id = p.id))
+                                                                                    as projects_with_no_member,
+           (select count(*)::int from public.projects p
+             where p.modeler_id is not null
+               and exists (select 1 from public.approved_users au where au.id = p.modeler_id)
+               and not exists (select 1 from public.project_members m
+                                where m.project_id = p.id and m.user_id = p.modeler_id))
+                                                                                    as modeler_not_a_member,
+           (select count(*)::int from public.project_members)                       as memberships`);
+  report("D61 — can a project's own creator promote into it?", members, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    out(
+      Number(r.modeler_not_a_member) > 0
+        ? `- **${r.modeler_not_a_member} project(s) whose modeler holds no membership row**, so \`effective_project_role\` returns NULL for them and the WP 3.4 promotion gate refuses them. WP 2.2's backfill ran once and left no writer; WP 3.4's trigger is the writer.`
+        : "- Every project's modeler is a member of it. The role gate resolves for the person who created the project, which is the precondition WP 3.4's exit check stands on.",
+    );
+  });
 }
 
 // ── D29: is organizations.name unique in practice? ─────────────────────────

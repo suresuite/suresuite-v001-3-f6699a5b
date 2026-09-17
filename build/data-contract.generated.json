@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 318,
-      "migrations_applied": 315,
-      "last_migration": "20260916000021_actor_on_remaining_paths.sql"
+      "migrations_found": 319,
+      "migrations_applied": 316,
+      "last_migration": "20260917000001_diff_before_promotion.sql"
     },
     "sidecars": 37,
     "registry": {
@@ -18,7 +18,7 @@
   "counts": {
     "tables_in_schema": 79,
     "tables_covered": 37,
-    "columns_covered": 430,
+    "columns_covered": 432,
     "check_constraints": 19,
     "engine_requirements": 7,
     "orphans": 0,
@@ -5026,7 +5026,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "Staged rows the diff classified as new: no live row carries this source identifier yet.",
+          "meaning": "Staged rows the diff classified as new: no live row carries this source identifier yet. For a file run this is `ingest_diff_run`'s count of rows whose natural key is absent from the tier-2 table, and it excludes the rows a later line of the same file superseded.",
           "grain": "metadata",
           "engine": {
             "consumed_by": null,
@@ -5041,7 +5041,7 @@
           },
           "surfaces": [],
           "resolution": null,
-          "note": null,
+          "note": "WP 3.3 SET THIS TO INSERTS PLUS UPDATES. `ingest_apply_run` wrote `rows_new = v_total`, the total number of rows the upsert touched, and never wrote `rows_changed` or `rows_unchanged` at all — so the column named for one half of the split held the whole of it and the other two held zeroes that were not measurements. PLAN.md §4 D63; closed in WP 3.4 by computing the diff BEFORE the upsert and persisting what it found.",
           "engine_requirement": null
         },
         {
@@ -5119,7 +5119,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row.",
+          "meaning": "Rows present in the live table under this source and absent from the pull — `diff_state = removed_upstream`. Never promoted by the connector: a source dropping a row is not authority to delete the project's row. ALWAYS 0 FOR A FILE RUN, and that zero is a statement rather than a measurement: a connector pull speaks for the whole source, a CSV speaks only for the rows it contains, so an upload can never mark anything removed. The review screen says so in those words rather than rendering the zero (§5 T1).",
           "grain": "metadata",
           "engine": {
             "consumed_by": null,
@@ -5134,7 +5134,7 @@
           },
           "surfaces": [],
           "resolution": null,
-          "note": null,
+          "note": "WP 3.3's `ingest_apply_run` wrote the count of rows HELD BACK by an error finding into this column — two unrelated facts in one place, and the one that was there was not the one the column is documented to hold. PLAN.md §4 D64. WP 3.4 gave the held-back count its own column, `rows_held`.",
           "engine_requirement": null
         },
         {
@@ -5488,6 +5488,68 @@
           "surfaces": [],
           "resolution": null,
           "note": "NO DEFAULT, deliberately. The column is backfilled to 'orbit-mrp' for the runs that existed and the default is then dropped, so the next writer must state its source. A default here would record a CSV upload as a connector sync and nobody would be told, which is the §5 T1 failure — a value with no provenance — inside the table that exists to record provenance.",
+          "engine_requirement": null
+        },
+        {
+          "name": "rows_held",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000001_diff_before_promotion.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Staged rows carrying an `error` finding. They are never promoted and they stay in tier 1 with their reason attached, which is what makes a partial upload reviewable instead of a failure.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "rows_superseded",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000001_diff_before_promotion.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Staged rows that a LATER line of the same file repeats on the natural key. The promotion collapses them (`DISTINCT ON`, so one statement cannot affect one row twice) and each one carries a `superseded_by_later_line` finding naming the line that beat it — the one case where the uploader's own file disagreed with itself.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Counted separately from the three diff states, not inside them, so the five numbers partition the run exactly: new + changed + unchanged + superseded + held = rows staged. A review screen whose categories do not add up to the file is a screen that has lost rows.",
           "engine_requirement": null
         }
       ],
@@ -7577,8 +7639,8 @@
         {
           "name": "diff_state",
           "type": "text",
-          "nullable": false,
-          "default": "'new'",
+          "nullable": true,
+          "default": null,
           "primary_key": false,
           "unique": false,
           "references": null,
@@ -7587,21 +7649,14 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "new, changed, unchanged or removed_upstream — the same vocabulary the three connector staging tables use, so WP 3.4's one review component serves both sources.",
+          "meaning": "What this row is relative to the CURRENT tier-2 table — new, changed or unchanged — computed by `ingest_diff_run` at landing, again when the review screen is opened and again inside `ingest_apply_run` immediately before the upsert. NULL means the diff has not been computed for this row: a row held back by an `error` finding may have failed on a key field and so has nothing to compare. The CHECK also admits `removed_upstream`, which is the same vocabulary the three connector staging tables use so that one review component serves both sources; nothing writing THIS table ever sets it.",
           "grain": "level",
           "engine": {
             "consumed_by": null,
             "transform": null,
             "missing_default": null
           },
-          "substitutions": [
-            {
-              "when": "nothing has computed a diff yet",
-              "value": "new",
-              "provenance": "default",
-              "visible_as": null
-            }
-          ],
+          "substitutions": [],
           "ingest": {
             "csv_header": null,
             "required": false,
@@ -7609,7 +7664,7 @@
           },
           "surfaces": [],
           "resolution": null,
-          "note": "DEFAULTS TO `new` AND NOTHING COMPUTES IT YET. WP 3.4 computes the real diff; until it does, every CSV row says `new` because that is what an uncompared row is. Stated here rather than left for a reader to infer from a uniform column.",
+          "note": "NULL IS \"NOT COMPUTED\", AND IT REPLACED A DEFAULT THAT WAS AN ANSWER. Until WP 3.4 this column was `NOT NULL DEFAULT 'new'` and no code path wrote it — `20260916000019` does not mention it once — so every staged row claimed `new`, including the rows the upsert UPDATED, and a review screen reading it would have rendered \"340 new\" for 340 unchanged rows with a number and no hedge. PLAN.md §4 D62. A file run never writes `removed_upstream`: a connector PULL is a statement about the whole source and a FILE is not — nothing about one upload says it is the complete set of a project's rows, so an absent row means the file does not mention it, and `ingest_runs.rows_removed` is 0 for every file run.",
           "engine_requirement": null
         },
         {
@@ -18611,5 +18666,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "fc67c7bde328"
+  "contract_version": "57ad4b32bb9f"
 }
