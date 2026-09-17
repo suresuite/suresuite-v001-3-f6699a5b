@@ -78,7 +78,24 @@ R12 mutation-tested both ways.
 
 ---
 
-## CI on PR #222
+## ⚠ READ FIRST — `main` IS RED, and this branch fixes it
+
+PR #222 **merged** at `0ca07da` — two commits pushed to the branch after that
+point were not in it, so `main`'s `contract:check` **exits 1** with six R12
+failures (D86). The gate is right; the repair just missed the train.
+
+**`claude/busy-thompson-9p8zb9` is green and carries the fix.** It needs to go
+back into `main`. I did not open a PR for it — say the word and I will.
+
+A second red on `main` is **not mine** (D87): `browser-wheels` fails because
+PR #221 changed `scsim/io/project_map.py` without regenerating the committed
+browser wheels. One command fixes it — `scripts/build_engine_wheels.sh` — but it
+cannot be run from here: it imports `scsim` to stamp `engine_version`, that needs
+`pydantic`, and the egress proxy denies PyPI. Regenerating without it writes
+`"engine_version": "unknown"` into the manifest, which is a product regression
+bought for a green check, so I reverted it rather than push that.
+
+## CI on PR #222 (merged)
 
 `contract`, `migrations run` and `audit` (bundle) are **green**. Two reds, both
 diagnosed:
