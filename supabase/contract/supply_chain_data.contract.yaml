@@ -17,6 +17,38 @@ natural_key_unique:
     columns: [id]
     name: "supply_chain_data_pkey"
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc combine_project_into_supply_chain"
+    grain: table
+    evidence: "src/pages/DataManager.tsx:650"
+    confirmed: true
+  - page: "FirmLevelNetwork.tsx"
+    via: "rpc get_prediction_stats"
+    grain: table
+    evidence: "src/components/MLPrediction.tsx:54"
+    confirmed: true
+  - page: "ProcessLevelNetwork.tsx"
+    via: "rpc get_prediction_stats"
+    grain: table
+    evidence: "src/components/MLPrediction.tsx:54"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "rpc assign_material_supplier"
+    grain: table
+    evidence: "src/components/policies/StagePolicyTable.tsx:206"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc assign_material_supplier"
+    grain: table
+    evidence: "src/components/sim/PreRunValidationPanel.tsx:70"
+    confirmed: true
+
 governance:
   read: null
   write: null
@@ -439,3 +471,49 @@ fields:
     resolution: null
     note: >-
       ETL bookkeeping; not an engine input and not analyzer output.
+  computed_from_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote
+      `is_critical_node` and `critical_node_score` on this row. It describes THOSE
+      TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output,
+      whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means
+      the prediction predates WP 4.3 or was made through the deprecated
+      two-argument `analysis_mark_critical_nodes`, which cannot name its run;
+      NULL is the honest record and not a silent default (`declared-fallback`, I6).
+      This is the column invariant `input-hash` (I5) is about.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  computed_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WP 4.3 · when the run that wrote the criticality columns finished. It is
+      provenance, not staleness: staleness is `computed_from_hash <>
+      current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is
+      precisely what that rule replaces (§4 D12).
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null

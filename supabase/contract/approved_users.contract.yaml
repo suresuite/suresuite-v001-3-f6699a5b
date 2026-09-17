@@ -18,6 +18,109 @@ natural_key_unique:
     columns: [email]
     name: approved_users_email_key
 
+surfaces:
+  - page: "Auth.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "DataManager.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "DeveloperApi.tsx"
+    via: "rpc list_api_keys"
+    grain: table
+    evidence: "src/pages/DeveloperApi.tsx:261"
+    confirmed: true
+  - page: "FirmLevelNetwork.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "Forbidden.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "GettingStarted.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "InteractiveNetworkSpace.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "Landing.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "NotFound.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "ProcessLevelNetwork.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "ProductLevelNetwork.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "Profile.tsx"
+    via: "rpc change_own_password"
+    grain: table
+    evidence: "src/pages/Profile.tsx:110"
+    confirmed: true
+  - page: "ProjectIntelligence.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "ProjectPolicies.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: shell
+    evidence: "src/hooks/useAuth.tsx:82"
+    confirmed: true
+    note: >-
+      every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
+
 governance:
   read: null
   write: super_admin
@@ -130,7 +233,112 @@ fields:
           every comparison that reads it, so accounts that fall to the default
           share one tenant with each other without any surface saying so.
     ingest: {csv_header: null, required: false, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "Auth.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "DataManager.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "DeveloperApi.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "FirmLevelNetwork.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "Forbidden.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "GettingStarted.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "InteractiveNetworkSpace.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "Landing.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "NotFound.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "ProcessLevelNetwork.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "ProductLevelNetwork.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "Profile.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "ProjectIntelligence.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: shell
+        evidence: "src/hooks/useAuth.tsx:82"
+        confirmed: true
+        note: >-
+          named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
     resolution: null
     note: >-
       Half of D13. A displayable, editable, non-unique string used as a join key.

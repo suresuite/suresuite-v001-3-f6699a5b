@@ -38,33 +38,100 @@ natural_key_intended: [project_id, analysis_kind, input_hash, params_hash, code_
 # Adding a kind: add a row below. No migration.
 analysis_kinds:
   network_metrics:
-    computed_by: "calculate-network-science-metrics (WP 4.3 migrates it)"
+    computed_by: "calculate-network-science-metrics (migrated in WP 4.3)"
+    code_version: "network_metrics@wp43.1"
     entity_type: node
     params:
       weighted:
         type: boolean
         default: true
         meaning: "Weight edges by `relative_revenue` rather than treating the graph as unweighted."
+      topology_digest:
+        type: string
+        default: null
+        meaning: >-
+          `public.network_topology_hash(project)` — a digest of the six columns
+          `get_network_nodes_for_prominence` and `get_network_edges_for_prominence`
+          return. IT IS AN INPUT TRAVELLING IN A PARAMETER AND THAT IS DECLARED
+          HERE RATHER THAN HIDDEN: `current_graph_hash` covers eleven tier-2 tables
+          and NOT `network_nodes`/`network_edges`, so without this the key cannot
+          tell two different graphs apart and a re-uploaded network is served the
+          previous graph's centralities as a hit. It belongs in `hash_network`;
+          moving it there is a `schema_version` bump and a bump is unsafe until
+          D70 lands, so WP 4.4 moves it and deletes this entry.
   prominence:
-    computed_by: "calculate-node-prominence (WP 4.3 migrates it)"
-    entity_type: node
-    params: {}
-  critical_nodes:
-    computed_by: "predict-critical-nodes (WP 4.3 migrates it)"
+    computed_by: "calculate-node-prominence (migrated in WP 4.3)"
+    code_version: "prominence@wp43.1"
     entity_type: node
     params:
-      threshold:
-        type: number
+      config:
+        type: object
         default: null
-        meaning: "Score above which a node is reported critical. Null means the analyzer's own default, which WP 4.3 must make explicit — an undeclared default is `declared-fallback` (I6) broken."
-  project_ai_health:
-    computed_by: "project-ai-health (WP 4.3 migrates it)"
-    entity_type: project
-    params: {}
+        meaning: >-
+          The caller's `ProminenceConfig` — the four weights and the two caps. It
+          is part of the key because two configs produce two different scores over
+          one graph. `null` means the analyzer's `defaultConfig`, which the
+          function fills in before the digest is taken, so a stored run always
+          records the config it actually used rather than the word "default".
+      topology_digest:
+        type: string
+        default: null
+        meaning: "See `network_metrics.topology_digest` — the same digest, for the same reason."
+  critical_nodes:
+    computed_by: "predict-critical-nodes (migrated in WP 4.3)"
+    code_version: "critical_nodes@wp43.1"
+    entity_type: supply_chain_row
+    params:
+      plant_name:
+        type: string
+        default: null
+        meaning: >-
+          The plant filter the request carried, or null for every row of the
+          project. It is part of the key because two plants of one project are two
+          different analyses over two different row sets. NOTE that `plant_name` is
+          NOT project-scoped, which is why the function derives the project from
+          the rows it loaded and refuses a set spanning two.
+    note: >-
+      NO `topology_digest`, and the absence is a statement: this analyzer reads
+      `supply_chain_data`, which is `combine-project`'s output over the eleven
+      tier-2 tables `current_graph_hash` already covers. Its inputs ARE in the
+      anchor. The `threshold` parameter this block used to declare DOES NOT EXIST
+      — `predictCriticalNodes` takes no threshold and the entry was authored from
+      the plan rather than from the code. Removed in WP 4.3 rather than carried:
+      an undeclared default is `declared-fallback` (I6) broken, and a DECLARED
+      parameter that no code reads is the same defect pointing the other way.
   combine_etl:
-    computed_by: "combine-project (WP 4.3 migrates it, as §11 names it)"
+    computed_by: "combine-project (migrated in WP 4.3, as §11 names it)"
+    code_version: "combine_etl@wp43.1"
     entity_type: project
     params: {}
+    note: >-
+      REGISTERED BUT NEVER SKIPPED. `combine_etl`'s output is rows in
+      `supply_chain_data`, not entries in `analysis_results`, so "already computed"
+      means "those rows are still there" — which the store cannot see, and a row
+      deleted by hand would make a hit skip an ETL the project needs. WP 4.3
+      records the run for its identity; WP 4.4 owns staleness and is the package
+      that may turn a hit into a skip.
+
+# `project_ai_health` WAS LISTED HERE AND IT IS NOT AN ANALYSIS. WP 4.2 authored
+# the row from §11's list of "the four analyzers"; WP 4.3 read the function. It
+# probes the reachability of the configured AI providers by iterating
+# `MODEL_REGISTRY` — it takes no `project_id`, writes no table, is invoked by
+# nothing in `src/`, and has no world it could hash. There is nothing to migrate
+# and nothing to store, so the kind is removed rather than left as a catalog
+# entry nothing will ever write. §11's WP 4.3 is corrected in the same commit.
+
+surfaces:
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/components/trust/useProjectFreshness.ts:24"
+    confirmed: true
 
 governance:
   read: null

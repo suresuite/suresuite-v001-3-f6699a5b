@@ -61,6 +61,26 @@ Tier G rather than a data tier: `projects` holds no measured quantity. It is the
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | rpc list_projects | `src/pages/DataManager.tsx:199` | yes |
+| `DeveloperApi.tsx` | rpc list_projects | `src/pages/DeveloperApi.tsx:263` | yes |
+| `FirmLevelNetwork.tsx` | rpc list_projects | `src/pages/FirmLevelNetwork.tsx:244` | yes |
+| `InteractiveNetworkSpace.tsx` | rpc list_projects | `src/pages/InteractiveNetworkSpace.tsx:353` | yes |
+| `ProcessLevelNetwork.tsx` | rpc list_projects | `src/pages/ProcessLevelNetwork.tsx:248` | yes |
+| `ProductLevelNetwork.tsx` | rpc list_projects | `src/pages/ProductLevelNetwork.tsx:206` | yes |
+| `ProjectIntelligence.tsx` | rpc list_projects | `src/pages/ProjectIntelligence.tsx:187` | yes |
+| `ProjectPolicies.tsx` | rpc list_projects | `src/hooks/useProjects.ts:24` | yes |
+| `SimulationLab.tsx` | rpc list_projects | `src/hooks/useProjects.ts:24` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -290,7 +310,11 @@ First day of the horizon the project simulates.
 | Added by | `20250828000823_c0efd8c6-4b46-444d-bb81-b5b76c988c4f.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]`, `[object Object]`, `[object Object]` |
+
+**Rendered on** `FirmLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProcessLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProductLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1).
 
@@ -306,7 +330,11 @@ Last day of the horizon the project simulates.
 | Added by | `20250828000823_c0efd8c6-4b46-444d-bb81-b5b76c988c4f.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]`, `[object Object]`, `[object Object]` |
+
+**Rendered on** `FirmLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProcessLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProductLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > As `simulation_start` — the run request is what the engine actually reads.
 
@@ -416,6 +444,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `98389a09bead`, engine `0.2.3`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

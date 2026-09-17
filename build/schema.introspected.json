@@ -1,19 +1,19 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 324,
-  "migrations_applied": 321,
+  "migrations_found": 326,
+  "migrations_applied": 323,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260917000006_analysis_store.sql",
+  "last_migration": "20260917000008_one_staleness_rule.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 264,
+    "functions": 272,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 33,
+    "dynamic_ddl_statements": 36,
     "rls_indeterminate_tables": 4,
     "orphans": 0,
     "aborted_migrations": 3
@@ -10023,6 +10023,30 @@
           "unique": false,
           "references": null,
           "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql"
+        },
+        {
+          "name": "computed_from_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
+        },
+        {
+          "name": "computed_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
         }
       ],
       "constraints": [
@@ -10070,6 +10094,18 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260712110000_network_metrics_check_performance.sql"
+        },
+        {
+          "name": "network_nodes_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "uid"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260917000007_analyzer_provenance.sql"
         }
       ],
       "rls": {
@@ -10120,6 +10156,14 @@
             "id"
           ],
           "name": "network_nodes_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "uid"
+          ],
+          "name": "network_nodes_natural_key"
         }
       ]
     },
@@ -10259,6 +10303,30 @@
           "unique": false,
           "references": null,
           "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        },
+        {
+          "name": "computed_from_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
+        },
+        {
+          "name": "computed_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
         }
       ],
       "constraints": [
@@ -10533,6 +10601,30 @@
           "unique": false,
           "references": null,
           "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+        },
+        {
+          "name": "computed_from_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
+        },
+        {
+          "name": "computed_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
         }
       ],
       "constraints": [
@@ -11790,6 +11882,18 @@
           "unique": false,
           "references": null,
           "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
+        },
+        {
+          "name": "seeded_from_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000008_one_staleness_rule.sql"
         }
       ],
       "constraints": [
@@ -18116,6 +18220,30 @@
           "unique": false,
           "references": null,
           "added_by": "20250925150727_13bdb56c-13dc-4bfe-94b7-eb51f213f2e3.sql"
+        },
+        {
+          "name": "computed_from_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
+        },
+        {
+          "name": "computed_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql"
         }
       ],
       "constraints": [
@@ -20362,6 +20490,20 @@
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
+      "name": "analysis_apply_node_metrics",
+      "signature": "analysis_apply_node_metrics(uuid, jsonb, uuid)",
+      "args": [
+        "_run_id uuid",
+        "_metrics jsonb",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260917000007_analyzer_provenance.sql"
+    },
+    {
       "name": "analysis_complete_run",
       "signature": "analysis_complete_run(uuid, jsonb, jsonb, jsonb, uuid)",
       "args": [
@@ -20409,16 +20551,30 @@
     },
     {
       "name": "analysis_mark_critical_nodes",
-      "signature": "analysis_mark_critical_nodes(uuid, jsonb)",
+      "signature": "analysis_mark_critical_nodes(uuid, jsonb, uuid)",
       "args": [
         "_actor_user_id uuid",
-        "_scores jsonb"
+        "_scores jsonb",
+        "_run_id uuid"
       ],
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
+      "defined_by": "20260917000007_analyzer_provenance.sql"
+    },
+    {
+      "name": "analysis_mark_critical_nodes",
+      "signature": "analysis_mark_critical_nodes(uuid, jsonb)",
+      "args": [
+        "_actor_user_id uuid",
+        "_scores jsonb"
+      ],
+      "returns": "jsonb LANGUAGE sql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "DEPRECATED by WP 4.3 — the three-argument form takes `_run_id` and stamps ",
+      "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
       "name": "analysis_results_are_immutable",
@@ -20649,8 +20805,8 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20250925164454_6e5c1ace-b337-4746-9cd7-6b65e95fe3d1.sql"
+      "comment": "WP 4.4 · it has never invoked an analysis — it ran ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "auto_calculate_prominence_on_deep_tier_completion",
@@ -20659,8 +20815,8 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20250906093350_3dc9ce28-27a5-4caf-9ebc-50ae428be2a9.sql"
+      "comment": "WP 4.3 · STATEMENT-level since this package. It was FOR EACH ROW, so a bulk ",
+      "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
       "name": "auto_combine_on_completion",
@@ -20895,8 +21051,8 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "comment": "WP 4.4 · takes an optional per-row `seeded` boolean and stamps ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "bulk_upsert_products",
@@ -21625,8 +21781,8 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260715000001_agent_proposals.sql"
+      "comment": "WP 4.4 · TTL ONLY since this package (§4 D70). It expired grounding drift too, ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "expire_chat_plans",
@@ -21639,6 +21795,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
+    },
+    {
+      "name": "freshness_of",
+      "signature": "freshness_of(text, uuid)",
+      "args": [
+        "_recorded_hash text",
+        "_project_id uuid"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · THE staleness rule. Every freshness question in this database ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "get_baseline_simulation_results",
@@ -22395,6 +22564,19 @@
       "defined_by": "20260916000018_natural_key_unique.sql"
     },
     {
+      "name": "is_stale",
+      "signature": "is_stale(text, uuid)",
+      "args": [
+        "_recorded_hash text",
+        "_project_id uuid"
+      ],
+      "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · `freshness_of() <> 'fresh'`, for a caller that can only branch two ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
+    },
+    {
       "name": "is_super_admin",
       "signature": "is_super_admin(uuid)",
       "args": [
@@ -22642,6 +22824,18 @@
       "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
     },
     {
+      "name": "network_topology_hash",
+      "signature": "network_topology_hash(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.3 · A digest of exactly what `get_network_nodes_for_prominence` and ",
+      "defined_by": "20260917000007_analyzer_provenance.sql"
+    },
+    {
       "name": "normalize_node_location_fields",
       "signature": "normalize_node_location_fields()",
       "args": [],
@@ -22665,6 +22859,18 @@
       "defined_by": "20260916000011_org_identity_uuid_only.sql"
     },
     {
+      "name": "project_freshness",
+      "signature": "project_freshness(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · everything the freshness badge and the Trust Report's per-table ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
+    },
+    {
       "name": "project_owner_membership",
       "signature": "project_owner_membership()",
       "args": [],
@@ -22685,6 +22891,18 @@
       "volatility": "IMMUTABLE",
       "comment": "Total order on project_role. The ONE place the ordering is written: ",
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
+    },
+    {
+      "name": "proposal_grounding_state",
+      "signature": "proposal_grounding_state(public.proposals)",
+      "args": [
+        "p public.proposals"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · a PostgREST computed column. `fresh` / `stale` / `unknown` from the ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "prune_ai_chat_events",
@@ -22825,6 +23043,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000002_agent_telemetry.sql"
+    },
+    {
+      "name": "refresh_node_list_for_project",
+      "signature": "refresh_node_list_for_project(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "p_actor_user_id uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "WP 4.3 · `refresh_node_list_for_project` with the actor the trigger needs. ",
+      "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -23162,9 +23393,9 @@
       ],
       "returns": "TABLE( needs_recalculation boolean, reason text, last_calculated timestamp with time zone, data_last_modified timestamp with time zone )",
       "security_definer": true,
-      "volatility": null,
-      "comment": "DEPRECATED by WP 4.2 (§4 D12) — do not extend, do not add callers. Staleness ",
-      "defined_by": "20260712110000_network_metrics_check_performance.sql"
+      "volatility": "STABLE",
+      "comment": "DEPRECATED (WP 4.2, §4 D12) and REIMPLEMENTED on the one staleness rule ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "snapshot_dataset",
@@ -24038,6 +24269,32 @@
       "mentions": [
         "ingest"
       ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260917000007_analyzer_provenance.sql",
+      "statement": "BEGIN FOREACH t IN ARRAY ARRAY['network_nodes','network_edges','network_summary','node_list'] LOOP EXECUTE format('DROP TRIGGER IF EXISTS audit_%1$s_insert ON public.%1$I', t)",
+      "mentions": [
+        "network_edges",
+        "network_nodes",
+        "network_summary",
+        "node_list"
+      ],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260917000007_analyzer_provenance.sql",
+      "statement": "EXECUTE format('DROP TRIGGER IF EXISTS audit_%1$s_update ON public.%1$I', t)",
+      "mentions": [],
+      "touches_rls": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20260917000007_analyzer_provenance.sql",
+      "statement": "EXECUTE format('DROP TRIGGER IF EXISTS audit_%1$s_delete ON public.%1$I', t)",
+      "mentions": [],
       "touches_rls": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     }

@@ -16,6 +16,33 @@ natural_key_unique:
     columns: [id]
     name: "dataset_versions_pkey"
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc record_model_validation"
+    grain: table
+    evidence: "src/hooks/useModelValidation.tsx:398"
+    confirmed: true
+  - page: "DeveloperApi.tsx"
+    via: "rpc list_dataset_versions"
+    grain: table
+    evidence: "src/pages/DeveloperApi.tsx:311"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "rpc record_model_validation"
+    grain: table
+    evidence: "src/hooks/useModelValidation.tsx:398"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc record_model_validation"
+    grain: table
+    evidence: "src/hooks/useModelValidation.tsx:398"
+    confirmed: true
+
 governance:
   read: null
   write: null
@@ -56,7 +83,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        confirmed: true
     resolution: null
   project_id:
     type: "uuid"
@@ -92,7 +124,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        confirmed: true
     resolution: null
     note: >-
       Display only. Not read by the engine and deliberately not part of the hash —
@@ -114,7 +151,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        confirmed: true
     resolution: null
     note: >-
       `schema_version: 2` since WP 4.1 (`20260917000002`), and the shape changed
@@ -147,7 +189,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        confirmed: true
     resolution: null
     note: >-
       D11 and D67 CLOSED by WP 4.1: the snapshot now covers `bom_multi_level`
@@ -182,7 +229,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        confirmed: true
     resolution: null
     note: >-
       NULL on every version frozen before WP 4.1 and NOT BACKFILLABLE: a v1
@@ -208,7 +260,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        confirmed: true
     resolution: null
     note: >-
       All three source tables hold ZERO rows in production (§15), so this column
@@ -275,5 +332,10 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        confirmed: true
     resolution: null

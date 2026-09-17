@@ -20,6 +20,13 @@ natural_key_unique:
     columns: [id]
     name: ingest_staged_rows_pkey
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/useIngestRun.tsx:63"
+    confirmed: true
+
 governance:
   read: null
   write: null
@@ -63,7 +70,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: true, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "DataManager.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/ingest/RowProvenance.tsx:51"
+        confirmed: true
     resolution: null
   source_kind:
     type: text
@@ -130,7 +142,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: true, validate: "integer > 1"}
-    surfaces: []
+    surfaces:
+      - page: "DataManager.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/ingest/RowProvenance.tsx:51"
+        confirmed: true
     resolution: null
     note: >-
       This is the anchor WP 3.4's review screen clicks through to and WP 3.3's

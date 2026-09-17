@@ -37,33 +37,49 @@
 # §15 measured the six this package owns at zero of six on 2026-09-17; R11 reports
 # the number for all of them on every run.
 
-deferred:
-  - wp: "4.3"
-    why: >-
-      Analysis output, and the four tables D56's decision is about. WP 4.2 built
-      the store (`analysis_runs` + `analysis_results`) and DECIDED what these are:
-      `network_nodes` and `node_list` are BOTH — each carries columns a user
-      uploaded beside columns an analysis wrote, which is D19 stated precisely in
-      one table and is why "what tier is it" has no answer while the table is one
-      thing. So the answer is a SPLIT, not a tier, and WP 4.3 executes it because
-      the computed half has nowhere to go until the analyzers dual-write into
-      `analysis_results`. Two things must land before the input half can be
-      described: D72 (`network_nodes` has no unique key on `(project_id, uid)`, so
-      an upsert that names one fails every time it runs) and the second
-      `schema_version` bump that describing it would force, because WP 4.1's
-      coverage rule folds a described tier-2 input table into `hash_network` the
-      moment its sidecar exists. §4 D56 carries the enumerated blast radius —
-      every writer, every reader, every RPC — so this package inherits it rather
-      than rediscovering it.
-    tables: [network_nodes, network_edges, network_summary, node_list]
-    audited:
-      network_nodes: false
-      network_edges: false
-      network_summary: false
-      node_list: false
+# ── PAGES THAT READ NO PROJECT DATA (WP 5.1) ────────────────────────────────
+#
+# R12's second half: every page in `src/pages` appears in a `surfaces` entry or
+# is named here. A page in neither is a page nobody has decided about — the same
+# silence R11 took away from the deferral list above.
+#
+# "No project data" is precise: each of these reaches tables ONLY through modules
+# the app shell mounts everywhere (`useAuth`, `useCapabilities`, the supabase
+# client), which `analyse-surfaces.mjs` classifies as `grain: shell` and which do
+# not count as lineage. `approved_users` is reachable from thirteen pages that
+# way, including a 404 page, and calling that a surface is true about the imports
+# and false about the product.
+#
+# Each entry says WHY, because "reads nothing" is a claim that goes stale the
+# moment somebody adds a query.
+pages_without_project_data:
+  - About.tsx                # static marketing copy; no query of any kind
+  - Auth.tsx                 # sign-in; reaches approved_users only through useAuth
+  - Forbidden.tsx            # 403 interstitial; renders a message and a link
+  - GettingStarted.tsx       # static onboarding copy
+  - Landing.tsx              # unauthenticated landing page
+  - NotFound.tsx             # 404 interstitial
+  - OrbitMrpCallback.tsx     # OAuth callback; posts a code to an edge function
+                             # and redirects. It touches `project_erp_links`
+                             # through `erp-sync-orbit-mrp`, which is an EDGE
+                             # FUNCTION — a hop the static analyser cannot follow
+                             # and deliberately does not guess at (see §16).
 
-  - wp: "4.4"
+deferred:
+  - wp: "6.3"
     why: >-
+      MOVED FROM WP 4.4 BY WP 4.4 ITSELF, and the reason is a correction rather
+      than a deferral. This row said the table's subject is "whether a card has
+      gone stale, which is the one staleness rule WP 4.4 lands" — and WP 4.4
+      landed that rule without needing to DESCRIBE the table, because the rule is
+      a function over a hash column and `model_validations` already carries four
+      of them. What the table actually needs is the thing WP 6.3 builds: it binds
+      a verdict to a dataset, a policy, a scenario and an engine fingerprint,
+      which IS invariant `result-binding` (I8) and IS the A5 Reproducibility
+      Record. Describing it in a staleness package would have put it in the
+      contract under a package that had no reason to think about what its columns
+      mean. §15 measured 0 active cards, so nothing is waiting on it.
+      Original note follows.
       `model_validations` is a VALIDATION CARD, not analysis output — it already
       carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint`
       and its whole subject is whether a card has gone stale, which is the one
@@ -88,12 +104,19 @@ deferred:
     audited:
       external_evidence: false
 
-  - wp: "4.4"
+  - wp: "6.3"
     why: >-
       Runs and results (tier 5). Invariant `result-binding` is the claim these
       tables have to satisfy — every result binds dataset + policy + scenario +
-      engine version — and WP 4.1/4.4 are where the binding is completed and the
-      staleness rules land.
+      engine version.
+      MOVED FROM WP 4.4 BY WP 4.4 ITSELF. This row read "WP 4.1/4.4 are where the
+      binding is completed", and neither package was ever scoped to complete it:
+      §11's WP 4.1 is the graph hash and §11's WP 4.4 is staleness plus the Trust
+      Report. Ten tables were waiting on a sentence no work item behind them ever
+      agreed to. WP 6.3 ships the A5 Reproducibility Record — "dataset, policy,
+      scenario, engine and analysis versions plus declared limits" — which is
+      `result-binding` stated as a deliverable, so the tables and the invariant
+      now wait on the same package. See §16 · WP 4.4 · J.
       NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED
       shadowed definition (`20250914113723` re-declares what `20250913085427`
       created, and the two disagree about `job_id`). The introspector records the

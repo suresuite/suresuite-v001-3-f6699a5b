@@ -21,6 +21,13 @@ natural_key_unique:
     columns: [id]
     name: project_erp_links_pkey
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/useErpConnections.tsx:57"
+    confirmed: true
+
 governance:
   read: null
   write: null

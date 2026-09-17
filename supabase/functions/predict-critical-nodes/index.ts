@@ -1,6 +1,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
+import { completeRun, failRun, getOrStart } from "../_shared/analysisStore.ts";
+
+/** WP 4.3 · part of the store's key. Bump when the prediction changes. */
+const CODE_VERSION = 'critical_nodes@wp43.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +42,27 @@ serve(async (req) => {
 
     console.log(`Processing ${supplyChainData.length} records for prediction`);
 
+    // ── WP 4.3 · WHICH PROJECT IS THIS? ──────────────────────────────────
+    //
+    // This function filters by `plant_name`, which is NOT scoped to a project —
+    // `20260917000003` says so in its own header, which is why
+    // `analysis_mark_critical_nodes` derives the project from the SCORED ROWS
+    // and refuses a set spanning two. A run has to name a project before the
+    // scoring happens, so the same question is answered here, from the rows
+    // actually loaded, and answered the same way: one project or nothing.
+    const projectIds = [...new Set(
+      (supplyChainData ?? []).map((r: { project_id?: string }) => r.project_id).filter(Boolean),
+    )];
+    if (projectIds.length > 1) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `plant_name '${plant_name}' spans ${projectIds.length} projects. One call `
+             + `scores under one project's authority or it scores nothing.`,
+        projects: projectIds.length,
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const project_id = projectIds[0] as string | undefined;
+
     // ── Process ALL data at once (no batching) so graph metrics are global ──
     const predictions = await predictCriticalNodes(supplyChainData);
 
@@ -63,15 +88,73 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: marked, error: markError } = await supabase.rpc('analysis_mark_critical_nodes', {
-      _actor_user_id: uploaded_by,
-      _scores: predictions.map((p) => ({ id: p.id, is_critical: p.is_critical, score: p.score })),
-    });
-    if (markError) {
-      console.error('analysis_mark_critical_nodes failed', markError);
-      throw markError;
+    // ── WP 4.3 · the run, so the scores can say which world produced them ─
+    //
+    // NO TOPOLOGY DIGEST HERE, and the absence is a statement rather than an
+    // omission: this analyzer reads `supply_chain_data`, which is
+    // `combine-project`'s ETL output over the eleven tier-2 tables
+    // `current_graph_hash` already covers. Its inputs ARE in the anchor. The two
+    // centrality analyzers read `network_nodes`/`network_edges`, which are not —
+    // see `20260917000007`'s header.
+    const run = project_id
+      ? await getOrStart(supabase, {
+          projectId: project_id,
+          analysisKind: 'critical_nodes',
+          params: { plant_name: plant_name ?? null },
+          codeVersion: CODE_VERSION,
+          actorUserId: uploaded_by,
+        })
+      : null;
+
+    if (run?.cacheHit) {
+      console.log(`critical_nodes: cache hit on run ${run.runId}`);
+      return new Response(JSON.stringify({
+        success: true, cache_hit: true, run_id: run.runId,
+        input_hash: run.inputHash, code_version: run.codeVersion,
+        rows_updated: (run.rowCounts as { rows?: number } | undefined)?.rows ?? 0,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const rowsUpdated = Number((marked as { rows_updated?: number } | null)?.rows_updated ?? 0);
+
+    let rowsUpdated = 0;
+    try {
+      const { data: marked, error: markError } = await supabase.rpc('analysis_mark_critical_nodes', {
+        _actor_user_id: uploaded_by,
+        _scores: predictions.map((p) => ({ id: p.id, is_critical: p.is_critical, score: p.score })),
+        _run_id: run?.runId ?? null,
+      });
+      if (markError) {
+        console.error('analysis_mark_critical_nodes failed', markError);
+        throw markError;
+      }
+      rowsUpdated = Number((marked as { rows_updated?: number } | null)?.rows_updated ?? 0);
+
+      if (run) {
+        await completeRun(
+          supabase, run.runId, uploaded_by,
+          predictions.map((p) => ({
+            entity_type: 'supply_chain_row',
+            entity_id: String(p.id),
+            metrics: { is_critical: p.is_critical, criticality_score: p.score },
+          })),
+          { rows: rowsUpdated, scored: predictions.length },
+          // T3 · the run states its own limit. A row scored but not written was
+          // deleted between the read and the write; a count with no source is
+          // the defect §5 T1 names.
+          rowsUpdated === predictions.length ? [] : [{
+            code: 'scored_but_not_written',
+            scored: predictions.length,
+            written: rowsUpdated,
+            meaning: 'rows were scored that no longer existed when the write ran',
+          }],
+        );
+      }
+    } catch (writeError) {
+      if (run) {
+        await failRun(supabase, run.runId, uploaded_by,
+          [{ code: 'write_failed', message: String(writeError) }]);
+      }
+      throw writeError;
+    }
 
     // The number reported is the one the STATEMENT wrote, not the number of
     // predictions computed. They differ when a scored row was deleted between
@@ -82,6 +165,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        cache_hit: false,
+        run_id: run?.runId ?? null,
+        input_hash: run?.inputHash ?? null,
+        code_version: run?.codeVersion ?? CODE_VERSION,
         message: `Predicted ${predictions.length} records and updated ${rowsUpdated}`,
         predictions: predictions.length,
         rows_updated: rowsUpdated

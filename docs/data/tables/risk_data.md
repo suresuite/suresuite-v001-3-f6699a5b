@@ -70,6 +70,19 @@ partially or get corrected — the write fails.
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `FirmLevelNetwork.tsx` | table read | `src/pages/FirmLevelNetwork.tsx:303` | yes |
+| `ProductLevelNetwork.tsx` | table read | `src/pages/ProductLevelNetwork.tsx:521` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -115,7 +128,11 @@ The country the risk class applies to, spelled as the network pages spell it —
 | Added by | `20260915000003_risk_data.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | must equal upper(btrim(country)) — CHECK risk_data_country_normalized |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]`, `[object Object]` |
+
+**Rendered on** `FirmLevelNetwork.tsx` (`src/pages/FirmLevelNetwork.tsx:303`), `ProductLevelNetwork.tsx` (`src/pages/ProductLevelNetwork.tsx:521`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `risk_class`
 
@@ -129,7 +146,7 @@ The publisher's risk grade for the country, in the five-value vocabulary the map
 | Added by | `20260915000003_risk_data.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | one of Very Low / Low / Medium / High / Very High — CHECK risk_data_risk_class_known |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]`, `[object Object]` |
 
 **Substitutions** — every point where a value you did not supply can stand in
 for one you did.
@@ -137,6 +154,10 @@ for one you did.
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
 | no row exists for the node's country | the map renders the node grey and labels it "Unknown" | `default` | RiskDataNotice — the page says the dimension is missing rather than shading it away |
+
+**Rendered on** `FirmLevelNetwork.tsx` (`src/pages/FirmLevelNetwork.tsx:303`), `ProductLevelNetwork.tsx` (`src/pages/ProductLevelNetwork.tsx:521`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > NOT TRACED into the engine, and that is correct: country risk shades the network map, it is not a simulation input. `scsim` has no country concept — disruption targets are suppliers, plants and lanes (blueprint §2.3 G11). A later package that wants country risk to DRIVE anything must add it to the engine first, not read this column from the mapper. 'Unknown' is deliberately not a storable value: it is what the absence of a row looks like, and storing it would turn "we have no figure" into a figure (§5 T1; the same over-claim as D17).
 
@@ -232,6 +253,6 @@ When the row was last modified. Server-stamped.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `98389a09bead`, engine `0.2.3`,
 sidecar `supabase/contract/risk_data.contract.yaml`, table created by `20260915000003_risk_data.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

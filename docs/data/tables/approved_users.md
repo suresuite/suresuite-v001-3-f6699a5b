@@ -53,6 +53,41 @@ READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies and t
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:261` | yes |
+| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:110` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
+<details><summary>13 app-shell read(s) — not lineage</summary>
+
+* `Auth.tsx` — `src/hooks/useAuth.tsx:82`
+* `DataManager.tsx` — `src/hooks/useAuth.tsx:82`
+* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
+* `Forbidden.tsx` — `src/hooks/useAuth.tsx:82`
+* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:82`
+* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:82`
+* `Landing.tsx` — `src/hooks/useAuth.tsx:82`
+* `NotFound.tsx` — `src/hooks/useAuth.tsx:82`
+* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
+* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
+* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:82`
+* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:82`
+* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:82`
+
+These reach the table only through modules the shell mounts on every page.
+Listing them as surfaces would be true about the imports and false about
+the product.
+
+</details>
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -196,7 +231,7 @@ The user's tenant, as a string. This is the value `get_current_user_org()` retur
 | Added by | `20250820163748_54a1961f-1d26-48da-b9c9-91ec8a53f511.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]`, `[object Object]` |
 
 **Substitutions** — every point where a value you did not supply can stand in
 for one you did.
@@ -337,6 +372,6 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `98389a09bead`, engine `0.2.3`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

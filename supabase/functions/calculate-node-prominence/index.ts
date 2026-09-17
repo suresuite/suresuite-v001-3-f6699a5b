@@ -2,6 +2,18 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  applyNodeMetrics, completeRun, failRun, getOrStart, topologyDigest,
+} from "../_shared/analysisStore.ts";
+
+/**
+ * WP 4.3 · THE CODE VERSION IS PART OF THE KEY, SO IT IS A CONSTANT AND NOT A
+ * TIMESTAMP. Bump it whenever `calculateNodeProminence` changes what it
+ * computes — two `code_version`s coexist under one input hash by design
+ * (WP 4.2 §11), so a bump makes the next request a MISS rather than serving an
+ * answer the current code would not produce.
+ */
+const CODE_VERSION = 'prominence@wp43.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,13 +64,62 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { project_id, config = defaultConfig } = await req.json();
+    const { project_id, uploaded_by, config = defaultConfig } = await req.json();
 
     if (!project_id) {
       return new Response(JSON.stringify({ error: 'Project ID is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // WP 4.3 · G4. The write below is a tier-3 write and it goes through an RPC
+    // that takes the actor, so a call that cannot name one is refused here
+    // rather than producing a row saying `actor_known: false`. Same stance
+    // `predict-critical-nodes` took in WP 4.1.
+    if (!uploaded_by) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'uploaded_by is required: a tier-3 write must name its actor (invariant audit-actor)',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // WP 4.3 · claim the key BEFORE reading the graph, so the digest and the
+    // read describe the same moment as closely as one process can manage.
+    const digest = await topologyDigest(supabaseClient, project_id);
+    const run = await getOrStart(supabaseClient, {
+      projectId: project_id,
+      analysisKind: 'prominence',
+      params: { config, topology_digest: digest },
+      codeVersion: CODE_VERSION,
+      actorUserId: uploaded_by,
+    });
+
+    // A HIT IS AN ANSWER, NOT A SHORTCUT. The entity rows already carry this
+    // run's numbers and its `computed_from_hash`, because the run that wrote
+    // `analysis_results` wrote them in the same transaction — so returning here
+    // is returning the stored answer, not skipping the work.
+    if (run.cacheHit) {
+      console.log(`prominence: cache hit on run ${run.runId} (input ${run.inputHash.slice(0, 12)})`);
+      return new Response(JSON.stringify({
+        success: true,
+        cache_hit: true,
+        run_id: run.runId,
+        input_hash: run.inputHash,
+        code_version: run.codeVersion,
+        updated_count: (run.rowCounts as { nodes?: number } | undefined)?.nodes ?? 0,
+        config_used: config,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Another request won the key and is still computing. Saying so beats
+    // racing it: two processes writing the same entity rows is how a partial
+    // result becomes a permanent one.
+    if (run.claimedByOther && run.status === 'running') {
+      return new Response(JSON.stringify({
+        success: true, cache_hit: false, in_progress: true, run_id: run.runId,
+        message: 'another request is already computing this exact analysis',
+      }), { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     console.log(`🔄 Calculating prominence for project: ${project_id}`);
@@ -103,35 +164,52 @@ serve(async (req) => {
       };
     });
 
-    // Batch update all nodes with their prominence values
-    console.log(`🔄 Updating ${prominenceUpdates.length} nodes with prominence values...`);
-    
-    const updatePromises = prominenceUpdates.map(async (update, index) => {
-      const result = await supabaseClient
-        .from('network_nodes')
-        .update({
-          prominence: update.prominence,
-          prominence_updated_at: update.prominence_updated_at
-        })
-        .eq('id', update.id);
-      
-      if (result.error) {
-        console.error(`❌ Error updating node ${update.uid} (${update.id}):`, result.error);
-      } else if (index < 3) { // Log first few updates for debugging
-        console.log(`✅ Updated node ${update.uid} with prominence ${update.prominence.toFixed(3)}`);
-      }
-      
-      return result;
-    });
+    // ── WP 4.3 · THE DUAL-WRITE ──────────────────────────────────────────
+    //
+    // WHAT STOOD HERE was one `.update()` PER NODE, all fired in parallel. Since
+    // WP 2.3 each of those statements writes its own audit row saying
+    // `actor_known: false`, because a service-role PostgREST call cannot set the
+    // GUC the trigger reads (D36) — §15 measured 1 385 nodes in one project, so
+    // one prominence run wrote 1 385 rows into the log that statement grain
+    // exists to keep readable. It also swallowed every failure into a console
+    // line and returned `success: true` over a partial write.
+    //
+    // Now: ONE statement, naming the actor, stamping `computed_from_hash` from
+    // the run (I5) — and the same numbers into `analysis_results`, so WP 5.3 can
+    // drop the columns without changing what the product reports.
+    let updatedCount = 0;
+    try {
+      updatedCount = await applyNodeMetrics(
+        supabaseClient, run.runId, uploaded_by,
+        prominenceUpdates.map(u => ({ uid: u.uid, prominence: u.prominence })),
+      );
 
-    const updateResults = await Promise.all(updatePromises);
-    const failedUpdates = updateResults.filter(r => r.error);
-    
-    if (failedUpdates.length > 0) {
-      console.error(`❌ ${failedUpdates.length} updates failed out of ${updateResults.length}`);
-    } else {
-      console.log(`✅ All ${updateResults.length} prominence updates completed successfully`);
+      await completeRun(
+        supabaseClient, run.runId, uploaded_by,
+        prominenceUpdates.map(u => ({
+          entity_type: 'node',
+          entity_id: u.uid,
+          metrics: { prominence: u.prominence },
+        })),
+        { nodes: updatedCount, nodes_scored: prominenceUpdates.length },
+        // T3 · the computation publishes its own blind spot. A scored node with
+        // no row in `network_nodes` is a real state (the graph came from the
+        // fallback derivation) and it is reported rather than logged.
+        updatedCount === prominenceUpdates.length ? [] : [{
+          code: 'nodes_scored_but_not_stored',
+          scored: prominenceUpdates.length,
+          stored: updatedCount,
+          meaning: 'prominence was computed for nodes that have no network_nodes row',
+        }],
+      );
+    } catch (writeError) {
+      // The run must record that it died, or its `running` row owns the key
+      // forever and the next request waits on an analysis nobody is running.
+      await failRun(supabaseClient, run.runId, uploaded_by,
+        [{ code: 'write_failed', message: String(writeError) }]);
+      throw writeError;
     }
+    console.log(`✅ prominence run ${run.runId}: ${updatedCount} node(s) written to both destinations`);
 
     // Calculate statistics
     const prominenceValues = prominenceUpdates.map(u => u.prominence);
@@ -152,7 +230,11 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      updated_count: prominenceUpdates.length,
+      cache_hit: false,
+      run_id: run.runId,
+      input_hash: run.inputHash,
+      code_version: run.codeVersion,
+      updated_count: updatedCount,
       statistics: stats,
       config_used: config
     }), {

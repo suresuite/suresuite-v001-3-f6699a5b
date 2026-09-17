@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-39 of 81 tables are covered,
-456 columns in all. A table that is not here is listed
+43 of 81 tables are covered,
+536 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -31,12 +31,16 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`ingest_staged_rows`](ingest_staged_rows.md) | 1 | `data-ingestion` | 11 | One row of one uploaded file, in one run: the cells as received beside what validation made of them, and the findings that explain the difference. The unit a reviewer reads when a number looks wrong — and the only place in the system where the left-hand side of a parse survives. |
 | [`materials`](materials.md) | 2 | `data-ingestion` | 16 | One material in one project: the economics the simulation reads for it. The precision path — the CSV lanes carry prices too, and where this row is silent the engine derives the value from them rather than treating it as missing. |
 | [`multi_tier_supply_chain`](multi_tier_supply_chain.md) | 2 | `data-ingestion` | 9 | One directed firm-to-firm relationship in a project's multi-tier network: who supplies whom, at what depth, and in what capacity. An EDGE between two firm identifiers — not a party, and not a material flow: nothing here says what moves along it or how much. |
+| [`network_edges`](network_edges.md) | 3 | `analysis` | 15 | One directed relationship between two firms in one project's deep-tier graph. EVERY column is uploaded — nothing computes this table, which is why it gains no `computed_from_hash` in WP 4.3 although it sits in `graphHashCoverage.test.ts`'s DERIVED_AND_OUT list by name. |
+| [`network_nodes`](network_nodes.md) | 3 | `analysis` | 30 | One firm in one project's deep-tier network graph, identified by `uid`. THE TABLE IS TWO THINGS AND THAT IS §4 D56: nine columns a user uploaded and eight an analysis wrote. WP 4.3 gives the computed half a second home in `analysis_results`; WP 5.3 drops it from here, and what is left is a tier-2 input table. |
+| [`network_summary`](network_summary.md) | 3 | `analysis` | 13 | One rolled-up description of one project's deep-tier graph: node and edge counts and a per-depth breakdown. Every value column is derived. |
+| [`node_list`](node_list.md) | 3 | `analysis` | 19 | One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others. |
 | [`org_capabilities`](org_capabilities.md) | G | `platform` | 5 | One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default. |
 | [`organization_members`](organization_members.md) | G | `platform` | 5 | One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for. |
 | [`organizations`](organizations.md) | G | `platform` | 8 | One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold. |
 | [`outbound_logistics`](outbound_logistics.md) | 2 | `data-ingestion` | 13 | One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed). |
 | [`policy_defaults`](policy_defaults.md) | 4 | `policy-ui` | 15 | One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against. |
-| [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 9 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
+| [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 10 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
 | [`products`](products.md) | 2 | `data-ingestion` | 18 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
 | [`project_erp_links`](project_erp_links.md) | G | `data-ingestion` | 15 | One authorized link between one project and one company in one external system: project ownership proved on this side, company membership proved on that side by the linking user's own OAuth consent. One link is one credential and one project — never shared, so revoking one project's link cannot be bypassed by a sibling. |
 | [`project_members`](project_members.md) | G | `platform` | 8 | One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between "in the organization" (sees every project) and "not in it" (sees none). |
@@ -45,7 +49,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`risk_data`](risk_data.md) | reference | `reference-data` | 9 | One country's current risk class, as one named publisher graded it in one named edition. NOT project-scoped: two projects sourcing from the same country see the same row, which is the point — a per-project copy drifts. |
 | [`role_capabilities`](role_capabilities.md) | G | `platform` | 5 | One grant or denial, for one role and one capability. The OUTERMOST layer: what a role gets before any org, project or user says otherwise. |
 | [`suppliers`](suppliers.md) | 2 | `data-ingestion` | 12 | One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials. |
-| [`supply_chain_data`](supply_chain_data.md) | 3 | `etl` | 20 | One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild. |
+| [`supply_chain_data`](supply_chain_data.md) | 3 | `etl` | 22 | One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild. |
 | [`supply_chain_data_multi_tier`](supply_chain_data_multi_tier.md) | 3 | `etl` | 15 | One edge of the DEEP supply graph — tier-2 and tier-3 suppliers behind the direct ones. Computed by the same ETL, read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4). |
 | [`tier2_suppliers`](tier2_suppliers.md) | 2 | `data-ingestion` | 15 | One tier-2 supply relationship: a direct supplier of this project's plant and the supplier BEHIND it, for one material. The row is an EDGE, not a party — the same supplier appears in as many rows as it has upstream sources. |
 | [`tier3_suppliers`](tier3_suppliers.md) | 2 | `data-ingestion` | 15 | One tier-3 supply relationship: a tier-2 supplier and the supplier BEHIND it, for one material. The row is an EDGE, not a party; the schema is the same as `tier2_suppliers` because the fact is the same fact one hop further out. |
@@ -54,4 +58,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`.*
+*Generated from data contract `98389a09bead`, engine `0.2.3`.*

@@ -55,6 +55,18 @@ One FOR ALL policy — `has_project_access(project_id)` — so reading and writi
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | table read | `src/hooks/useErpConnections.tsx:57` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -310,6 +322,6 @@ Whether the schedule is live. Two fields rather than one because a paused schedu
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `98389a09bead`, engine `0.2.3`,
 sidecar `supabase/contract/project_erp_links.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

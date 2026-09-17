@@ -211,8 +211,10 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
     try {
       console.log('🔄 Recalculating prominence for project:', globalSelectedProjectId);
       
+      // WP 4.3 · the analyzer writes tier 3 through an RPC that takes the
+      // actor, so the actor travels with the request (invariant audit-actor).
       const { data, error } = await supabase.functions.invoke('calculate-node-prominence', {
-        body: { project_id: globalSelectedProjectId }
+        body: { project_id: globalSelectedProjectId, uploaded_by: user?.id }
       });
 
       if (error) throw error;

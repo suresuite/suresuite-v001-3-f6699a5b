@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import {
+  applyNodeMetrics, completeRun, failRun, getOrStart, topologyDigest,
+} from "../_shared/analysisStore.ts";
+
+/** WP 4.3 · part of the store's key. Bump when the metrics change. */
+const CODE_VERSION = 'network_metrics@wp43.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,13 +37,46 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { project_id } = await req.json();
+    const { project_id, uploaded_by } = await req.json();
 
     if (!project_id) {
       return new Response(
         JSON.stringify({ error: 'Project ID is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // WP 4.3 · G4 — a tier-3 write names its actor or does not happen.
+    if (!uploaded_by) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'uploaded_by is required: a tier-3 write must name its actor (invariant audit-actor)',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const digest = await topologyDigest(supabase, project_id);
+    const run = await getOrStart(supabase, {
+      projectId: project_id,
+      analysisKind: 'network_metrics',
+      params: { weighted: true, topology_digest: digest },
+      codeVersion: CODE_VERSION,
+      actorUserId: uploaded_by,
+    });
+
+    if (run.cacheHit) {
+      console.log(`network_metrics: cache hit on run ${run.runId}`);
+      return new Response(JSON.stringify({
+        success: true, cache_hit: true, run_id: run.runId,
+        input_hash: run.inputHash, code_version: run.codeVersion,
+        nodes_updated: (run.rowCounts as { nodes?: number } | undefined)?.nodes ?? 0,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (run.claimedByOther && run.status === 'running') {
+      return new Response(JSON.stringify({
+        success: true, cache_hit: false, in_progress: true, run_id: run.runId,
+        message: 'another request is already computing this exact analysis',
+      }), { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     console.log(`Calculating network science metrics for project: ${project_id}`);
@@ -70,6 +109,7 @@ serve(async (req) => {
 
     let effectiveNodes = nodes as Node[];
     let effectiveEdges = edges as Edge[];
+    const fallbackWarnings: Array<Record<string, unknown>> = [];
 
     // Fallback: if no deep-tier nodes/edges exist, derive graph from supply_chain_data
     if ((effectiveNodes?.length ?? 0) === 0 || (effectiveEdges?.length ?? 0) === 0) {
@@ -110,11 +150,30 @@ serve(async (req) => {
             name: n.name,
             plant_name: n.plant_name,
           }));
+          // §4 D72 · THIS UPSERT NAMES A CONSTRAINT THAT DOES NOT EXIST.
+          // `network_nodes` has no unique index on `(project_id, uid)`, so
+          // PostgREST's `on_conflict` is rejected and this call has failed on
+          // EVERY run since it was written — logged, then carried on, and the
+          // metrics below were then written against nodes that were never
+          // stored. The index is not created in WP 4.3 because nothing has
+          // COUNTED the duplicates that would block it (see
+          // `20260917000007`'s header); what changes here is that the failure
+          // is no longer swallowed. It becomes a declared warning on the run,
+          // which is T3 — a computation publishes the limits of its own result.
           const { error: upsertErr } = await supabase
             .from('network_nodes')
             .upsert(upsertRows, { onConflict: 'project_id,uid' });
           if (upsertErr) {
-            console.error('Failed to upsert network_nodes for fallback:', upsertErr);
+            console.error('Failed to upsert network_nodes for fallback (D72):', upsertErr);
+            fallbackWarnings.push({
+              code: 'fallback_nodes_not_stored',
+              defect: 'D72',
+              attempted: upsertRows.length,
+              message: upsertErr.message ?? String(upsertErr),
+              meaning: 'network_nodes has no unique index on (project_id, uid), so the '
+                + 'derived fallback graph could not be stored; metrics below describe '
+                + 'nodes that may have no row to be written onto',
+            });
           } else {
             console.log(`Upserted ${upsertRows.length} nodes into network_nodes (fallback).`);
           }
@@ -125,33 +184,70 @@ serve(async (req) => {
     // Calculate network science metrics for each node using effective graph
     const metrics = calculateNetworkMetrics(effectiveNodes || [], effectiveEdges || []);
 
-    // Update nodes with calculated metrics
+    // ── WP 4.3 · THE DUAL-WRITE ──────────────────────────────────────────
+    //
+    // One `.update()` per node stood here, in a serial loop — one statement and
+    // one `actor_known: false` audit row each (D36). One statement now, naming
+    // the actor, stamping the run's `input_hash` onto every row it writes (I5),
+    // and the same numbers into `analysis_results` so WP 5.3 can drop the
+    // columns without changing what the product reports.
+    const entries = Object.entries(metrics);
     let updatedCount = 0;
-    for (const [nodeUid, nodeMetrics] of Object.entries(metrics)) {
-      const { error: updateError } = await supabase
-        .from('network_nodes')
-        .update({
-          degree_centrality: nodeMetrics.degree_centrality,
-          weighted_degree_centrality: nodeMetrics.weighted_degree_centrality,
-          eigenvector_centrality: nodeMetrics.eigenvector_centrality,
-          betweenness_centrality: nodeMetrics.betweenness_centrality,
-          closeness_centrality: nodeMetrics.closeness_centrality,
-          prominence: nodeMetrics.prominence,
-          network_metrics_updated_at: new Date().toISOString()
-        })
-        .eq('project_id', project_id)
-        .eq('uid', nodeUid);
+    try {
+      updatedCount = await applyNodeMetrics(
+        supabase, run.runId, uploaded_by,
+        entries.map(([uid, m]) => ({
+          uid,
+          prominence: m.prominence,
+          degree_centrality: m.degree_centrality,
+          weighted_degree_centrality: m.weighted_degree_centrality,
+          eigenvector_centrality: m.eigenvector_centrality,
+          betweenness_centrality: m.betweenness_centrality,
+          closeness_centrality: m.closeness_centrality,
+        })),
+      );
 
-      if (updateError) {
-        console.error(`Error updating node ${nodeUid}:`, updateError);
-      } else {
-        updatedCount++;
+      const warnings = [...fallbackWarnings];
+      if (updatedCount !== entries.length) {
+        warnings.push({
+          code: 'nodes_scored_but_not_stored',
+          scored: entries.length,
+          stored: updatedCount,
+          meaning: 'metrics were computed for nodes that have no network_nodes row',
+        });
       }
+
+      await completeRun(
+        supabase, run.runId, uploaded_by,
+        entries.map(([uid, m]) => ({
+          entity_type: 'node',
+          entity_id: uid,
+          metrics: {
+            prominence: m.prominence,
+            degree_centrality: m.degree_centrality,
+            weighted_degree_centrality: m.weighted_degree_centrality,
+            eigenvector_centrality: m.eigenvector_centrality,
+            betweenness_centrality: m.betweenness_centrality,
+            closeness_centrality: m.closeness_centrality,
+          },
+        })),
+        { nodes: updatedCount, nodes_scored: entries.length, edges: effectiveEdges.length },
+        warnings,
+      );
+    } catch (writeError) {
+      await failRun(supabase, run.runId, uploaded_by,
+        [{ code: 'write_failed', message: String(writeError) }]);
+      throw writeError;
     }
 
     return new Response(
       JSON.stringify({
         success: true,
+        cache_hit: false,
+        run_id: run.runId,
+        input_hash: run.inputHash,
+        code_version: run.codeVersion,
+        warnings: fallbackWarnings,
         nodes_processed: nodes.length,
         edges_processed: edges.length,
         nodes_updated: updatedCount,

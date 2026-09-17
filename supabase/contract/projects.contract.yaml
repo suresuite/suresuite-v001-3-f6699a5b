@@ -20,6 +20,53 @@ natural_key_unique:
     name: uq_modeler_project
 natural_key_intended: [organization_id, name]
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/pages/DataManager.tsx:199"
+    confirmed: true
+  - page: "DeveloperApi.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/pages/DeveloperApi.tsx:263"
+    confirmed: true
+  - page: "FirmLevelNetwork.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/pages/FirmLevelNetwork.tsx:244"
+    confirmed: true
+  - page: "InteractiveNetworkSpace.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/pages/InteractiveNetworkSpace.tsx:353"
+    confirmed: true
+  - page: "ProcessLevelNetwork.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/pages/ProcessLevelNetwork.tsx:248"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:206"
+    confirmed: true
+  - page: "ProjectIntelligence.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/pages/ProjectIntelligence.tsx:187"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/hooks/useProjects.ts:24"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc list_projects"
+    grain: table
+    evidence: "src/hooks/useProjects.ts:24"
+    confirmed: true
+
 governance:
   read: null
   write: data_editing
@@ -286,7 +333,22 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "FirmLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/DisruptionDialog.tsx:254"
+        confirmed: true
+      - page: "ProcessLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/DisruptionDialog.tsx:254"
+        confirmed: true
+      - page: "ProductLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/DisruptionDialog.tsx:254"
+        confirmed: true
     resolution: null
     note: >-
       NOT TRACED into `scsim` from this column: the worker takes the horizon from
@@ -301,7 +363,22 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "FirmLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/DisruptionDialog.tsx:254"
+        confirmed: true
+      - page: "ProcessLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/DisruptionDialog.tsx:254"
+        confirmed: true
+      - page: "ProductLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/DisruptionDialog.tsx:254"
+        confirmed: true
     resolution: null
     note: As `simulation_start` — the run request is what the engine actually reads.
   completed:

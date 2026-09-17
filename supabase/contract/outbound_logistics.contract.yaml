@@ -34,6 +34,23 @@ natural_key_unique:
 # supplier/material.
 natural_key_intended: [project_id, plant_name, customer_id, product_id]
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc get_project_dataset_status"
+    grain: table
+    evidence: "src/pages/DataManager.tsx:429"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "rpc ensure_item_masters"
+    grain: table
+    evidence: "src/hooks/useItemMasters.tsx:194"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc ensure_item_masters"
+    grain: table
+    evidence: "src/hooks/useItemMasters.tsx:194"
+    confirmed: true
+
 governance:
   read: null
   write: "data_editing"

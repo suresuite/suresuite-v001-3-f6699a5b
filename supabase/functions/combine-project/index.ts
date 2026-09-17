@@ -1,4 +1,9 @@
 // @ts-nocheck
+import { completeRun, failRun, getOrStart } from "../_shared/analysisStore.ts";
+import type { RunHandle, StoreClient } from "../_shared/analysisStore.ts";
+
+/** WP 4.3 · part of the store's key. Bump when the ETL changes what it writes. */
+const COMBINE_CODE_VERSION = 'combine_etl@wp43.1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import { weeklyVolume, weeklyVolumeTotalsBy, volumeShare, unitSubstitutions } from '../_shared/laneVolumes.ts';
 import { sameOrganization } from '../_shared/orgIdentity.ts';
@@ -447,6 +452,54 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
   }
 }
 
+/**
+ * WP 4.3 · the run around the ETL.
+ *
+ * NEVER FATAL. `combine-project` is on the critical path of every upload, and a
+ * store that cannot be reached must not stop a user combining their project —
+ * the honest consequence of a failure here is an ETL run with no provenance,
+ * which is exactly the state that existed before this package and is strictly
+ * better than a broken upload. It is logged, not swallowed silently.
+ */
+async function startCombineRun(supabase: StoreClient, project_id: string, user_id: string): Promise<RunHandle | null> {
+  try {
+    return await getOrStart(supabase, {
+      projectId: project_id,
+      analysisKind: 'combine_etl',
+      params: {},
+      codeVersion: COMBINE_CODE_VERSION,
+      actorUserId: user_id,
+    });
+  } catch (e) {
+    console.warn('[combine-project] could not register a combine_etl run:', e);
+    return null;
+  }
+}
+
+async function finishCombineRun(
+  supabase: StoreClient, run: RunHandle | null, user_id: string,
+  etlResult: Record<string, unknown>,
+) {
+  // A HIT IS NOT COMPLETED AGAIN. WP 4.2 refuses a second `analysis_complete_run`
+  // on a finished run — the answer is frozen — so re-completing would raise on a
+  // path that has already succeeded.
+  if (!run || run.cacheHit) return;
+  try {
+    await completeRun(
+      supabase, run.runId, user_id,
+      [],   // the output is `supply_chain_data`, not per-entity metric rows
+      {
+        total_records: etlResult.total_records ?? 0,
+        scd: etlResult.scd_breakdown ?? {},
+        multi_tier: etlResult.multi_tier_breakdown ?? {},
+      },
+      ((etlResult.warnings as unknown[]) ?? []).map((w: unknown) => ({ code: 'etl_warning', message: String(w) })),
+    );
+  } catch (e) {
+    console.warn('[combine-project] could not complete the combine_etl run:', e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -459,13 +512,36 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
+    // ── WP 4.3 · `combine_etl` — an analysis in everything but name (§11) ──
+    //
+    // IT REGISTERS A RUN AND IT DOES NOT SKIP ON A HIT, and the second half is a
+    // deliberate limit on this package rather than an oversight. `combine_etl`'s
+    // OUTPUT is `supply_chain_data` — rows in a table, not entries in
+    // `analysis_results` — so "already computed" here means "those rows are
+    // still there", which the store cannot see. A row deleted by hand would
+    // make a hit skip an ETL the project genuinely needs. What the run DOES buy
+    // today is identity: the ETL's output can finally be attributed to the
+    // world and the code that produced it. WP 4.4 owns staleness and is the
+    // package that may turn a hit into a skip.
+    const combineRun = await startCombineRun(supabase, project_id, user_id);
+
     if (sync === true) {
       const etlResult = await runETLLogic(supabase, project_id, user_id, user_email);
       if (!etlResult.success) {
+        if (combineRun && !combineRun.cacheHit) {
+          await failRun(supabase, combineRun.runId, user_id,
+            [{ code: 'etl_failed', message: etlResult.error }]);
+        }
         return new Response(JSON.stringify({ success: false, error: etlResult.error }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+      await finishCombineRun(supabase, combineRun, user_id, etlResult);
 
-      await supabase.rpc('refresh_node_list_for_project', { p_project_id: project_id });
+      // WP 4.3 · the two-argument overload names the actor, so the `node_list`
+      // writes audit as a person rather than as `actor_known: false`. The actor
+      // has been a parameter of this function all along; nothing told the
+      // trigger (same shape as `assign_material_supplier`, WP 3.3).
+      await supabase.rpc('refresh_node_list_for_project',
+        { p_project_id: project_id, p_actor_user_id: user_id });
       return new Response(JSON.stringify({ success: true, message: 'Combine completed', project_id, warnings: etlResult.warnings ?? [], total_records: etlResult.total_records, scd_breakdown: etlResult.scd_breakdown, multi_tier_breakdown: etlResult.multi_tier_breakdown }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -474,9 +550,20 @@ Deno.serve(async (req) => {
       try {
         const etlResult = await runETLLogic(supabase, project_id, user_id, user_email);
         for (const w of etlResult.warnings ?? []) console.warn(`[combine-project] ${w}`);
-        if (etlResult.success) await supabase.rpc('refresh_node_list_for_project', { p_project_id: project_id });
+        if (etlResult.success) {
+          await finishCombineRun(supabase, combineRun, user_id, etlResult);
+          await supabase.rpc('refresh_node_list_for_project',
+            { p_project_id: project_id, p_actor_user_id: user_id });
+        } else if (combineRun && !combineRun.cacheHit) {
+          await failRun(supabase, combineRun.runId, user_id,
+            [{ code: 'etl_failed', message: etlResult.error }]);
+        }
       } catch (error) {
         console.error(`[combine-project] Background task failed:`, error);
+        if (combineRun && !combineRun.cacheHit) {
+          await failRun(supabase, combineRun.runId, user_id,
+            [{ code: 'etl_threw', message: String(error) }]);
+        }
       }
     };
 

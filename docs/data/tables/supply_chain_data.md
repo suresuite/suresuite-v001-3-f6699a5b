@@ -48,6 +48,23 @@ Written by the `combine-project` edge function, never by a page. Invariant I2: p
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | rpc combine_project_into_supply_chain | `src/pages/DataManager.tsx:650` | yes |
+| `FirmLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
+| `ProcessLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:237` | yes |
+| `ProjectPolicies.tsx` | rpc assign_material_supplier | `src/components/policies/StagePolicyTable.tsx:206` | yes |
+| `SimulationLab.tsx` | rpc assign_material_supplier | `src/components/sim/PreRunValidationPanel.tsx:70` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -75,6 +92,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `is_zero_flow_filtered` | — | `boolean` | — | — | Whether this edge was hidden for carrying no flow in either direction. |
 | `zero_flow_filter_applied_at` | — | `timestamp with time zone` | — | — | When the zero-flow filter last ran over this edge. |
 | `zero_flow_filter_reason` | — | `text` | — | — | Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow. |
+| `computed_from_hash` | — | `text` | — | — | WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about. |
+| `computed_at` | — | `timestamp with time zone` | — | — | WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12). |
 
 ## Each column in full
 
@@ -388,6 +407,34 @@ Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow.
 
 > ETL bookkeeping; not an engine input and not analyzer output.
 
+### `computed_from_hash`
+
+WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260917000007_analyzer_provenance.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `computed_at`
+
+WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).
+
+| | |
+|---|---|
+| Type | `timestamp with time zone` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260917000007_analyzer_provenance.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -406,6 +453,6 @@ Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `98389a09bead`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
