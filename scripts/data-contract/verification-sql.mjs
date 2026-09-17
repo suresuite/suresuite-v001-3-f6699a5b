@@ -591,6 +591,101 @@ async function graphHashBlastRadius() {
     );
   });
 
+  // DID THE MIGRATION ACTUALLY LAND? Nothing above can say.
+  //
+  // Read the after-run against the before-run and every WP 4.1 count is
+  // IDENTICAL — which is the correct result for the data and says nothing about
+  // the deploy. The counts are about rows; the migration changed FUNCTIONS and
+  // added two COLUMNS, and the schema probe compares RELATIONS, not columns. So
+  // a failed deploy and a successful one produced the same report, and the
+  // "after" would have been a measurement of nothing.
+  //
+  // These three are the difference, read off production rather than off a green
+  // workflow badge.
+  section("WP 4.1 — did the bump actually reach production?");
+
+  const landed = await tryQ(`
+    select (select count(*)::int from information_schema.columns
+             where table_schema = 'public' and table_name = 'dataset_versions'
+               and column_name in ('hash_inputs','hash_network'))              as domain_columns,
+           (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+             where n.nspname = 'public'
+               and p.proname in ('current_hash_inputs','current_hash_network',
+                                 '_dataset_domain_hashes','_dataset_graph_hash',
+                                 'ingest_legacy_upsert_lane','mrp_apply_staged_products',
+                                 'etl_replace_supply_chain','analysis_mark_critical_nodes',
+                                 'assert_writer_may_act'))                     as wp41_functions`);
+  report("the two columns and the nine functions this package adds", landed, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    const ok = Number(r.domain_columns) === 2 && Number(r.wp41_functions) === 9;
+    if (!ok) {
+      gateFailures.push(
+        `WP 4.1's migrations are NOT fully present in production: ${r.domain_columns ?? "?"}/2 ` +
+        `domain columns and ${r.wp41_functions ?? "?"}/9 functions. Every count above is ` +
+        `therefore a measurement of the PRE-migration database wearing an after-run's label.`,
+      );
+      out("- **NOT LANDED.** See the GATE section at the end of this report.");
+      return;
+    }
+    out("- Landed: both domain columns and all nine functions are present.");
+  });
+
+  // The snapshot is v2 AND the hash moved. Two separate claims: the function
+  // could be replaced and still return a v1-shaped object if a later definition
+  // shadowed it, and the shape could be right while the composite was not
+  // recomputed. `schema_version` is read from the live snapshot, not asserted.
+  const shape = await tryQ(`
+    select p.id::text as project_id,
+           public._build_dataset_snapshot(p.id) -> 'schema_version'          as schema_version,
+           (public._build_dataset_snapshot(p.id) ? 'inputs')                 as has_inputs,
+           (public._build_dataset_snapshot(p.id) ? 'network')                as has_network,
+           (public.current_hash_inputs(p.id) is not null)                    as inputs_hash,
+           (public.current_hash_network(p.id) is not null)                   as network_hash
+      from public.projects p order by p.created_at limit 5`);
+  report("the live snapshot's own shape, on real projects", shape, (rows) => {
+    if (!rows?.length) { out("- No project to build a snapshot for."); return; }
+    out(...table(rows));
+    const bad = rows.filter((r) => String(r.schema_version) !== "2" || r.has_inputs !== true);
+    if (bad.length) {
+      gateFailures.push(
+        `WP 4.1: ${bad.length} project(s) still build a snapshot that is not v2. ` +
+        `\`_build_dataset_snapshot\` was not replaced, or a later definition shadows it.`,
+      );
+      out("- **NOT v2.** See the GATE section.");
+    } else {
+      out("- Every project builds a v2 snapshot with both domains, and both domain hashes compute.");
+    }
+  });
+
+  // THE DIRTY READ, WHICH IS THE BUMP'S WHOLE VISIBLE EFFECT. Every stored
+  // version predates v2, so no stored `graph_hash` may still equal its
+  // project's current one. A match would mean the deploy did not take.
+  const dirty = await tryQ(`
+    select count(*)::int as versions,
+           count(*) filter (where v.graph_hash = public.current_graph_hash(v.project_id))::int
+             as still_matching_current,
+           count(*) filter (where v.hash_inputs is null)::int as without_domain_hashes
+      from public.dataset_versions v`);
+  report("every pre-bump version now reads dirty (§16 · WP 4.1 · C)", dirty, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    if (Number(r.versions) > 0 && Number(r.still_matching_current) > 0) {
+      gateFailures.push(
+        `WP 4.1: ${r.still_matching_current} stored dataset version(s) still match ` +
+        `current_graph_hash. Every one was frozen under v1 and a v1 hash cannot equal a v2 ` +
+        `hash, so either the bump did not deploy or the composite is not versioned.`,
+      );
+      out("- **THE BUMP DID NOT TAKE.** See the GATE section.");
+      return;
+    }
+    out(
+      `- All ${r.versions ?? 0} version(s) read dirty against the live project, and ` +
+        `${r.without_domain_hashes ?? 0} carry no domain hashes — correct and not backfillable: ` +
+        "a v1 snapshot has no `network` domain. The next freeze on each project writes all three.",
+    );
+  });
+
   section("WP 4.1 — D36's six PostgREST writers, as the audit log holds them");
 
   const unattributed = await tryQ(`
