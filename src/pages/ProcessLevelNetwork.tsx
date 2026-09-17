@@ -140,32 +140,38 @@ interface NetworkVisualizationProps {
 }
 
 function getNodeColor(nodeType: string, level: number, maxLevel: number): string {
-  // 1. Suppliers (Outer edge)
-  if (level === maxLevel && level > 0) {
-    return '#22c55e';
-  }
-  
-  // 2. Customers and Products
-  if (level === -1) return '#fb923c'; 
-  if (level === 0) return '#3b82f6';
-  
-  // 3. Dynamic Material Shading
+  // Color from nodeType directly wherever it's authoritative — nodeType is
+  // now dataSource-aware (a row explicitly tagged "inbound" is always a
+  // supplier), while `level` alone is not: some projects' multi-tier
+  // pipeline never tiers inbound rows past level 1, so a supplier and a
+  // material can share the exact same level and be indistinguishable by
+  // level comparison alone.
+  if (nodeType === 'supplier') return '#22c55e';
+  if (nodeType === 'customer') return '#fb923c';
+  if (nodeType === 'product') return '#3b82f6';
+
+  // Remaining nodes are materials — keep the existing dynamic shading by depth
   if (level > 0 && level < maxLevel) {
-    // Total number of material levels in this specific network
-    const materialLevelsCount = Math.max(1, maxLevel - 1); 
-    
-    // Start at 65% lightness (lighter) and step down to 35% (darker)
-    // The exact step size changes depending on how many levels exist!
+    const materialLevelsCount = Math.max(1, maxLevel - 1);
     const lightnessStep = (80 - 20) / materialLevelsCount;
     const calculatedLightness = 80 - (level * lightnessStep);
-    
     return `hsl(48, 96%, ${calculatedLightness}%)`;
   }
-  
+
+  // A material sitting at the deepest available level (no shallower tier to
+  // shade against) still gets a material color, not the fallback gray.
+  if (level > 0) return 'hsl(48, 96%, 50%)';
+
   return '#6b7280';
 }
 
 function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from' | 'to'): 'customer' | 'product' | 'material' | 'supplier' {
+  // Inbound rows are always structurally suppliers, regardless of what
+  // BOM-depth level got computed for them upstream. Some projects' multi-tier
+  // pipeline never tiers deep enough to assign inbound rows level 5 — without
+  // this override those rows silently collapse into "material".
+  if (dataSource === 'inbound') return 'supplier';  
+  
   // Level -1: Customers (to_location in outbound with level 0)
   if (level === -1) return 'customer';
   
@@ -213,6 +219,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
   const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
   const [loading, setLoading] = useState(false);
   const [levelCounts, setLevelCounts] = useState<Record<number, number>>({});
+  const [legendGroups, setLegendGroups] = useState<Array<{ key: string; label: string; count: number; color: string }>>([]);
   const [allNodes, setAllNodes] = useState<Node<NodeData>[]>([]);
   const [allEdges, setAllEdges] = useState<Edge[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -271,6 +278,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       setAllNodes([]);
       setAllEdges([]);
       setLevelCounts({});
+      setLegendGroups([]);
         setSelectedNode(null);
         setFocusedNode(null);
         setMaxLevel(0);
@@ -298,11 +306,13 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         setAllNodes([]);
         setAllEdges([]);
         setLevelCounts({});
+        setLegendGroups([]);
         setSelectedNode(null);
         setFocusedNode(null);
         setMaxLevel(0);
         
         toast.info('No process network data available. Please upload and combine your project datasets.');
+        
         return;
       }
 
@@ -352,7 +362,8 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           }
         }
         
-        if (nodeId && !nodeMap[nodeId]) {
+        const dedupKey = `${nodeId}::${record.level}::${record.data_source}`;
+        if (nodeId && !nodeMap[dedupKey]) {
           const level = record.level;
           const nodeType = getNodeTypeFromLevel(level, record.data_source, 'from');
           
@@ -510,6 +521,30 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       const currentMaxLevel = Math.max(...Object.keys(levelNodeCounts).map(Number));
       setLevelCounts(levelNodeCounts);
       setMaxLevel(currentMaxLevel);
+
+      // Build the sidebar legend from nodeType, not raw level — a level can
+      // hold a mix of nodeTypes (e.g. inbound suppliers this project's
+      // multi-tier pipeline never tiered past level 1), which grouping by
+      // level alone would silently merge into one mislabeled bucket.
+      const legendGroupMap: Record<string, { label: string; count: number; color: string; sortKey: number }> = {};
+      Object.values(nodeMap).forEach((n) => {
+        const key = n.nodeType === 'material' ? `material-${n.level}` : n.nodeType;
+        if (!legendGroupMap[key]) {
+          legendGroupMap[key] = {
+            label: n.nodeType === 'material' ? getDisplayNodeType(n.level) : n.nodeType,
+            count: 0,
+            color: getNodeColor(n.nodeType, n.level, currentMaxLevel),
+            // Suppliers first, then materials deepest→shallowest, then product, then customer —
+            // mirrors the graph's own left-to-right flow.
+            sortKey: n.nodeType === 'supplier' ? 10000
+              : n.nodeType === 'material' ? 1000 + n.level
+              : n.nodeType === 'product' ? -1000
+              : -2000,
+          };
+        }
+        legendGroupMap[key].count++;
+      });
+      setLegendGroups(Object.values(legendGroupMap).sort((a, b) => b.sortKey - a.sortKey));
       
       // Extract Level 1 nodes for filtering
       const level1NodeIds = Object.entries(nodeMap)
@@ -530,31 +565,55 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
       // Create visual layout using clean group-based approach
       const nodeList: Node<NodeData>[] = [];
-      const columnX = 100; // Fixed position at 100px
       const rowGap = 60; // Fixed consistent row gap
       const startY = 100;
 
-      // Custom level spacing function implementing specific distances
-      const calculateLevelXPosition = (level: number): number => {
-        switch (level) {
-          case 6: return 100;                      // Start at 100px
-          case 5: return 100;                      // Level 6 + 0px = 100px
-          case 4: return 500;                      // Level 5 + 400px = 500px
-          case 3: return 900;                      // Level 4 + 400px = 900px
-          case 2: return 1150;                     // Level 3 + 250px = 1150px
-          case 1: return 1400;                     // Level 2 + 250px = 1400px
-          case 0: return 1500;                     // Level 1 + 100px = 1500px
-          case -1: return 1600;                    // Level 0 + 100px = 1600px
-          default: 
-            // For any other levels, place them proportionally
-            if (level > 6) return 100 - (level - 6) * 100;
-            if (level < -1) return 1600 + (Math.abs(level) - 1) * 100;
-            return 1500; // Fallback
-        }
-      };
-
       // Sort levels for left-to-right positioning (Level 6 → Level -1)
       const sortedLevels = Object.keys(nodesByLevel).map(Number).sort((a, b) => b - a);
+
+      // Adaptive spacing: measure each present level's real horizontal
+      // footprint (based on how many nodes/sub-columns it actually needs)
+      // instead of assuming a fixed slot per absolute level number.
+      const baseColumnPadding = 150;
+      const totalNodesForSizing = Object.keys(nodeMap).length;
+      const baseNodeSizeForSizing = Math.max(50 - Math.log(totalNodesForSizing) * 3, 30);
+      const genericSpacing = baseNodeSizeForSizing * 1.2;
+
+      const levelFootprints: Record<number, number> = {};
+      sortedLevels.forEach((level) => {
+        const levelNodes = nodesByLevel[level];
+
+        if (level === 1) {
+          const level1Set = new Set(levelNodes);
+          const receivesFromLevel1 = new Set<string>();
+          Object.values(edgeMap).forEach(edge => {
+            if (level1Set.has(edge.source as string) && level1Set.has(edge.target as string)) {
+              receivesFromLevel1.add(edge.target as string);
+            }
+          });
+          const colACount = levelNodes.filter(id => !receivesFromLevel1.has(id)).length;
+          const colBCount = levelNodes.filter(id => receivesFromLevel1.has(id)).length;
+          const colASubCount = colACount >= 20 ? Math.ceil(colACount / 20) : (colACount > 0 ? 1 : 0);
+          const colBSubCount = colBCount >= 20 ? Math.ceil(colBCount / 20) : (colBCount > 0 ? 1 : 0);
+          const totalSubCols = Math.max(colASubCount + colBSubCount, 1);
+          levelFootprints[level] = (totalSubCols - 1) * genericSpacing + baseNodeSizeForSizing;
+        } else {
+          const count = levelNodes.length;
+          const subgroupCount = count >= 20 ? Math.ceil(count / 20) : 1;
+          levelFootprints[level] = (subgroupCount - 1) * genericSpacing + baseNodeSizeForSizing;
+        }
+      });
+
+      const levelXPositions: Record<number, number> = {};
+      let rightEdge = 100;
+      sortedLevels.forEach((level) => {
+        const width = levelFootprints[level];
+        const center = rightEdge + width / 2;
+        levelXPositions[level] = center;
+        rightEdge = center + width / 2 + baseColumnPadding;
+      });
+
+      const calculateLevelXPosition = (level: number): number => levelXPositions[level] ?? 100;
       
       sortedLevels.forEach((level) => {
         const levelNodes = nodesByLevel[level];
@@ -583,44 +642,69 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           const colA = levelNodes.filter(id => !receivesFromLevel1.has(id));
           const colB = levelNodes.filter(id => receivesFromLevel1.has(id));
           const spacing = baseNodeSize * 1.2;
-          const columns = [colA, colB];
-          const offsets = [-(spacing / 2), (spacing / 2)];
 
-          columns.forEach((colNodes, ci) => {
-            const yOffset = -((colNodes.length - 1) * rowGap) / 2;
-            colNodes.forEach((nodeId, i) => {
-              const nodeData = nodeMap[nodeId];
-              const isDisconnected = !nodeData.isConnected && nodeData.dataSource !== 'bridge';
-              const hasLowConfidence = nodeData.mappingConfidence && nodeData.mappingConfidence < 0.8;
+          // Same 20-per-column rule the generic levels use, applied to each
+          // side — so a single-level BOM with hundreds of level-1 nodes
+          // spreads into many columns instead of 2 absurdly tall ones.
+          const subdivide = (colNodes: string[]) => {
+            const subCount = colNodes.length >= 20 ? Math.ceil(colNodes.length / 20) : (colNodes.length > 0 ? 1 : 0);
+            const subs: string[][] = Array.from({ length: subCount }, () => []);
+            colNodes.forEach((id, idx) => subs[idx % subCount].push(id));
+            return subs;
+          };
 
-              nodeList.push({
-                id: nodeId,
-                position: {
-                  x: x + offsets[ci],
-                  y: startY + yOffset + i * rowGap,
-                },
-                data: nodeData,
-                style: {
-                  background: isDisconnected ? '#6b7280' : getNodeColor(nodeData.nodeType, nodeData.level, currentMaxLevel),
-                  color: 'white',
-                  width: baseNodeSize,
-                  height: baseNodeSize * 0.7,
-                  fontSize: 10,
-                  fontWeight: 'normal',
-                  borderRadius: 8,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  border: isDisconnected ? '2px solid #ef4444' :
-                          hasLowConfidence ? '2px solid #f59e0b' :
-                          '1px solid rgba(255,255,255,0.3)',
-                  boxShadow: isDisconnected ? '0 2px 8px rgba(239, 68, 68, 0.4)' : 'none',
-                  opacity: isDisconnected ? 0.7 : 1,
-                },
-                type: 'default',
-                sourcePosition: Position.Right,
-                targetPosition: Position.Left,
+          const colASubs = subdivide(colA);
+          const colBSubs = subdivide(colB);
+
+          // Combine colA (left) and colB (right) into ONE centered sequence,
+          // the same way the generic subgroup logic centers its subcolumns —
+          // instead of centering colA and colB independently around x. colB
+          // is usually much larger than colA (most materials receive an edge
+          // from a supplier or another material, both level 1), so centering
+          // them separately made the real rightward extent exceed what the
+          // footprint calculation reserved, letting materials bleed into the
+          // next level's column.
+          const allSubs = [...colASubs, ...colBSubs];
+          const totalSubCols = allSubs.length;
+          const allOffsets = allSubs.map((_, i) => (i - (totalSubCols - 1) / 2) * spacing);
+
+          ([[allSubs, allOffsets]] as [string[][], number[]][]).forEach(([subs, offsets]) => {
+            subs.forEach((subIds, si) => {
+              const yOffset = -((subIds.length - 1) * rowGap) / 2;
+              subIds.forEach((nodeId, i) => {
+                const nodeData = nodeMap[nodeId];
+                const isDisconnected = !nodeData.isConnected && nodeData.dataSource !== 'bridge';
+                const hasLowConfidence = nodeData.mappingConfidence && nodeData.mappingConfidence < 0.8;
+
+                nodeList.push({
+                  id: nodeId,
+                  position: {
+                    x: x + offsets[si],
+                    y: startY + yOffset + i * rowGap,
+                  },
+                  data: nodeData,
+                  style: {
+                    background: isDisconnected ? '#6b7280' : getNodeColor(nodeData.nodeType, nodeData.level, currentMaxLevel),
+                    color: 'white',
+                    width: baseNodeSize,
+                    height: baseNodeSize * 0.7,
+                    fontSize: 10,
+                    fontWeight: 'normal',
+                    borderRadius: 8,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    border: isDisconnected ? '2px solid #ef4444' :
+                            hasLowConfidence ? '2px solid #f59e0b' :
+                            '1px solid rgba(255,255,255,0.3)',
+                    boxShadow: isDisconnected ? '0 2px 8px rgba(239, 68, 68, 0.4)' : 'none',
+                    opacity: isDisconnected ? 0.7 : 1,
+                  },
+                  type: 'default',
+                  sourcePosition: Position.Right,
+                  targetPosition: Position.Left,
+                });
               });
             });
           });
@@ -766,6 +850,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       setAllNodes([]);
       setAllEdges([]);
       setLevelCounts({});
+      setLegendGroups([]);
       setSelectedNode(null);
       setFocusedNode(null);
       setMaxLevel(0);
@@ -1530,11 +1615,11 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                     </div>
                     <div className="flex justify-between">
                       <span>Flow Volume:</span>
-                      <span className="font-medium">{selectedNode.data.flowVolume.toFixed(1)}</span>
+                      <span className="font-medium">{selectedNode.data.flowVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Consumption Rate:</span>
-                      <span className="font-medium">{selectedNode.data.consumptionRate?.toFixed(2) || '0.00'}</span>
+                      <span className="font-medium">{selectedNode.data.consumptionRate?.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Chain Position:</span>
@@ -1582,22 +1667,20 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                 <CardTitle className="text-base">Process Levels</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {Object.entries(levelCounts)
-                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                  .map(([level, count]) => (
-                    <div key={level} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-4 h-4 rounded"
-                          style={{ backgroundColor: getNodeColor('material', parseInt(level), maxLevel) }}
-                        />
-                        <span className="text-sm capitalize">
-                          {getDisplayNodeType(parseInt(level))}
-                        </span>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">{count}</Badge>
+                {legendGroups.map((g) => (
+                  <div key={g.key} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-4 h-4 rounded"
+                        style={{ backgroundColor: g.color }}
+                      />
+                      <span className="text-sm capitalize">
+                        {g.label}
+                      </span>
                     </div>
-                  ))}
+                    <Badge variant="secondary" className="text-xs">{g.count}</Badge>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
