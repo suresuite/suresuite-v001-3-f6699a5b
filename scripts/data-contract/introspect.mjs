@@ -365,6 +365,11 @@ function apply(schema, stmt, migration, guarded = false) {
       returns: returns ? squash(returns[1]) : null,
       security_definer: /\bSECURITY\s+DEFINER\b/i.test(s),
       volatility: /\b(IMMUTABLE|STABLE|VOLATILE)\b/i.exec(s)?.[1]?.toUpperCase() ?? null,
+      // A COMMENT survives a later CREATE OR REPLACE in PostgreSQL, so it must
+      // survive one here too — otherwise replacing a function silently erases a
+      // comment another migration set, and the artifact stops describing the
+      // database (WP 4.2, D73).
+      comment: schema.functions.get(sig)?.comment ?? null,
       defined_by: migration,
     });
     return;
@@ -462,6 +467,23 @@ function apply(schema, stmt, migration, guarded = false) {
     const id = readQualifiedName(s, m[0].length);
     const text = /\bIS\s+'((?:[^']|'')*)'/i.exec(s)?.[1]?.replace(/''/g, "'") ?? null;
     if (m[1].toUpperCase() === "TABLE") { const t = id && schema.table(id.name); if (t) t.comment = text; }
+    // FUNCTION comments were parsed and thrown away, so the artifact could not
+    // reproduce them and `--since HEAD` built a base whose functions had lost
+    // their documentation. That is D52's class — the artifact disagreeing with
+    // what the migration did — and WP 4.2's rehearsal is what walked into it
+    // (D73). Matched on the signature when the statement spells the arguments,
+    // and on the bare name otherwise, which is what `COMMENT ON FUNCTION f` is
+    // allowed to say when `f` is not overloaded.
+    if (m[1].toUpperCase() === "FUNCTION" && id) {
+      const args = parenBody(s, id.end);
+      const argList = args ? splitTopLevel(args.body).map((a) => squash(a)).filter(Boolean) : null;
+      const sig = argList ? `${id.name}(${argList.map(argType).join(", ")})` : null;
+      if (sig && schema.functions.has(sig)) {
+        schema.functions.get(sig).comment = text;
+      } else {
+        for (const fn of schema.functions.values()) if (fn.name === id.name) fn.comment = text;
+      }
+    }
     return;
   }
 

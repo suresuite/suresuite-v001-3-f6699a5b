@@ -19883,6 +19883,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -19895,6 +19896,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -19907,6 +19909,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -19918,6 +19921,7 @@
       "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
@@ -19929,6 +19933,7 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260612000001_policy_version_snapshots.sql"
     },
     {
@@ -19940,6 +19945,7 @@
       "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
@@ -19952,6 +19958,7 @@
       "returns": "void LANGUAGE plpgsql AS",
       "security_definer": false,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -19961,6 +19968,7 @@
       "returns": "trigger LANGUAGE plpgsql AS",
       "security_definer": false,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
@@ -19972,6 +19980,7 @@
       "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path TO",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
@@ -19983,6 +19992,7 @@
       "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
@@ -19994,6 +20004,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
@@ -20003,6 +20014,7 @@
       "returns": "trigger LANGUAGE plpgsql AS",
       "security_definer": false,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
@@ -20016,6 +20028,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
@@ -20032,6 +20045,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20046,6 +20060,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20063,6 +20078,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20076,6 +20092,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20088,6 +20105,7 @@
       "returns": "TABLE ( id uuid, name text, slug text, status text, created_at timestamptz, members bigint, projects bigint, cost_mtd numeric)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20100,6 +20118,7 @@
       "returns": "TABLE ( id uuid, name text, organization_id uuid, organization text, modeler_id uuid, owner_name text, owner_email text, plant_name text, supply_chain_model text, bom_level text, data_type text, completed boolean, simulation_start date, simulation_end date, created_at timestamptz, updated_at timestamptz)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20112,6 +20131,7 @@
       "returns": "TABLE (id uuid, name text, email text, role text, organization_id uuid, is_active boolean)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20126,6 +20146,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20140,6 +20161,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20156,6 +20178,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
@@ -20170,6 +20193,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20184,6 +20208,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20202,6 +20227,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
@@ -20218,6 +20244,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
@@ -20232,6 +20259,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20247,6 +20275,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20261,6 +20290,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20281,6 +20311,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
@@ -20296,6 +20327,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
@@ -20312,6 +20344,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
@@ -20325,6 +20358,7 @@
       "returns": "boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20340,6 +20374,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
@@ -20353,6 +20388,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
@@ -20368,6 +20404,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
@@ -20380,6 +20417,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
     },
     {
@@ -20389,6 +20427,7 @@
       "returns": "trigger LANGUAGE plpgsql AS",
       "security_definer": false,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
@@ -20398,6 +20437,7 @@
       "returns": "trigger LANGUAGE plpgsql AS",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": null,
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
@@ -20410,6 +20450,7 @@
       "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -20421,6 +20462,7 @@
       "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -20433,6 +20475,7 @@
       "returns": "TABLE ( api_key_id uuid, requests_24h bigint, requests_30d bigint, errors_30d bigint, last_request_at timestamptz )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -20452,6 +20495,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -20471,6 +20515,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260716000001_apply_policy_bundle.sql"
     },
     {
@@ -20483,6 +20528,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
@@ -20494,6 +20540,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000003_project_memory.sql"
     },
     {
@@ -20507,6 +20554,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000005_writer_preamble_actor_only.sql"
     },
     {
@@ -20523,6 +20571,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260728000001_cartographer_product_level.sql"
     },
     {
@@ -20538,6 +20587,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260916000021_actor_on_remaining_paths.sql"
     },
     {
@@ -20553,6 +20603,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260728000001_cartographer_product_level.sql"
     },
     {
@@ -20562,6 +20613,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": "Statement-level audit for every tier 2/3/4 write. One row per STATEMENT with a ",
       "defined_by": "20260916000001_data_plane_audit.sql"
     },
     {
@@ -20574,6 +20626,7 @@
       "returns": "TABLE(user_id uuid, user_name text, user_role text)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820152955_871d761b-f2b9-44cb-9a68-9ca70b6016d4.sql"
     },
     {
@@ -20586,6 +20639,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250816070054_897b16c0-c4a3-43c6-9c3c-34ec7cdb20fe.sql"
     },
     {
@@ -20595,6 +20649,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250925164454_6e5c1ace-b337-4746-9cd7-6b65e95fe3d1.sql"
     },
     {
@@ -20604,6 +20659,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250906093350_3dc9ce28-27a5-4caf-9ebc-50ae428be2a9.sql"
     },
     {
@@ -20613,6 +20669,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
     },
     {
@@ -20622,6 +20679,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
     },
     {
@@ -20634,6 +20692,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260722000001_chat_bulk_thread_actions.sql"
     },
     {
@@ -20647,6 +20706,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20660,6 +20720,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20673,6 +20734,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20686,6 +20748,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20701,6 +20764,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20716,6 +20780,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20731,6 +20796,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250905160724_8fa65aa0-2b2c-4652-aee8-82b53ecc9d2a.sql"
     },
     {
@@ -20744,6 +20810,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20758,6 +20825,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20772,6 +20840,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20785,6 +20854,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260722000001_chat_bulk_thread_actions.sql"
     },
     {
@@ -20799,6 +20869,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260722000001_chat_bulk_thread_actions.sql"
     },
     {
@@ -20811,6 +20882,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260702000001_item_master_write_rpcs.sql"
     },
     {
@@ -20823,6 +20895,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260609040000_consolidated_safe.sql"
     },
     {
@@ -20835,6 +20908,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712000001_product_demand_bounds.sql"
     },
     {
@@ -20847,6 +20921,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260702000001_item_master_write_rpcs.sql"
     },
     {
@@ -20859,6 +20934,7 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
@@ -20870,6 +20946,7 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260905000001_grant_ga_agent_capabilities.sql"
     },
     {
@@ -20882,6 +20959,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
     },
     {
@@ -20893,6 +20971,7 @@
       "returns": "uuid LANGUAGE sql IMMUTABLE AS",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": null,
       "defined_by": "20260717000002_chat_quick_thread_id_sha256.sql"
     },
     {
@@ -20905,6 +20984,7 @@
       "returns": "text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
     },
     {
@@ -20914,6 +20994,7 @@
       "returns": "INTEGER AS",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
     },
     {
@@ -20925,6 +21006,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260609040000_consolidated_safe.sql"
     },
     {
@@ -20938,6 +21020,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -20963,6 +21046,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
@@ -20981,6 +21065,7 @@
       "returns": "TABLE (id uuid, key_prefix text, plaintext_key text)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -20994,6 +21079,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -21003,6 +21089,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260609040000_consolidated_safe.sql"
     },
     {
@@ -21024,6 +21111,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
     },
     {
@@ -21047,6 +21135,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250828005114_4c7e88dc-9c73-4538-ab14-fe93b22d07dc.sql"
     },
     {
@@ -21068,6 +21157,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
     },
     {
@@ -21087,6 +21177,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21107,6 +21198,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250923105656_9e8bac4c-e86d-470c-8d9c-4081bea56395.sql"
     },
     {
@@ -21127,6 +21219,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql"
     },
     {
@@ -21146,6 +21239,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250828002252_f68f9689-a9ff-4fcd-a6f6-2cae7a3c3a5f.sql"
     },
     {
@@ -21163,6 +21257,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250915000000_add_bom_level_to_projects.sql"
     },
     {
@@ -21179,6 +21274,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820220456_55139542-4086-4daa-9dbf-314f29f22708.sql"
     },
     {
@@ -21194,6 +21290,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820175710_6a691ced-c936-440f-a101-67861d562557.sql"
     },
     {
@@ -21212,6 +21309,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21232,6 +21330,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
@@ -21243,6 +21342,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
@@ -21254,6 +21354,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
@@ -21265,6 +21366,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
@@ -21274,6 +21376,7 @@
       "returns": "boolean LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260709000002_super_admin_phase1.sql"
     },
     {
@@ -21285,6 +21388,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260612000001_policy_version_snapshots.sql"
     },
     {
@@ -21298,6 +21402,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21310,6 +21415,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -21322,6 +21428,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -21335,6 +21442,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21349,6 +21457,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260609040000_consolidated_safe.sql"
     },
     {
@@ -21360,6 +21469,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000005_policy_version_notes_delete.sql"
     },
     {
@@ -21374,6 +21484,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21387,6 +21498,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21400,6 +21512,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21413,6 +21526,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21425,6 +21539,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
@@ -21434,6 +21549,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260829120000_erp_connector_phase1_2.sql"
     },
     {
@@ -21447,6 +21563,7 @@
       "returns": "numeric LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": "A duration of `value` `unit`s expressed in weeks. Mirrors project_map.py::_duration_to_weeks.",
       "defined_by": "20260915000001_one_unit_table.sql"
     },
     {
@@ -21459,6 +21576,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": "The highest project role this user currently holds on this project, from ",
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
@@ -21468,6 +21586,7 @@
       "returns": "TRIGGER AS",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql"
     },
     {
@@ -21479,6 +21598,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260614000001_item_master.sql"
     },
     {
@@ -21493,6 +21613,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
     },
     {
@@ -21504,6 +21625,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
@@ -21515,6 +21637,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
@@ -21528,6 +21651,7 @@
       "returns": "TABLE(id uuid, project_id uuid, plant_name text, status text, scenario_ids uuid[], started_at timestamp with time zone, completed_at timestamp with time zone, metrics jsonb, result_data jsonb, created_at timestamp with time zone, updated_at timestamp with time zone, created_by uuid, organization text)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250919092205_dba25b4b-8edd-4fd8-b280-7774fe5349fb.sql"
     },
     {
@@ -21540,6 +21664,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
@@ -21549,6 +21674,7 @@
       "returns": "TABLE(user_id uuid, user_email text, user_role text)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820171202_4cb25033-30a4-4fdd-9ffe-3153e0ff4c58.sql"
     },
     {
@@ -21558,6 +21684,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820170403_a64f741a-c7b6-487d-9467-701e97492d9d.sql"
     },
     {
@@ -21569,6 +21696,7 @@
       "returns": "uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21578,6 +21706,7 @@
       "returns": "text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820170403_a64f741a-c7b6-487d-9467-701e97492d9d.sql"
     },
     {
@@ -21591,6 +21720,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21605,6 +21735,7 @@
       "returns": "TABLE(id uuid, scenario_name text, description text, status disruption_status, created_at timestamp with time zone, disruption_start date, disruption_end date, targets jsonb, effects jsonb)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250828015348_a49307e5-e2eb-43cc-ab20-ab2945f3d6f8.sql"
     },
     {
@@ -21616,6 +21747,7 @@
       "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260905000001_grant_ga_agent_capabilities.sql"
     },
     {
@@ -21627,6 +21759,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260829120000_erp_connector_phase1_2.sql"
     },
     {
@@ -21640,6 +21773,7 @@
       "returns": "TABLE( simulation_id uuid, scenario_id uuid, scenario_name text, scenario_description text, scenario_effects jsonb, status text, started_at timestamp with time zone, completed_at timestamp with time zone, metrics jsonb )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250919092742_f9c6610d-b93e-4d9c-ab48-00b3710f84b9.sql"
     },
     {
@@ -21653,6 +21787,7 @@
       "returns": "TABLE( project_id uuid, plant_name text, node_id text, node_name text, node_type text, level integer, from_location text, to_location text, material_consumption_rate numeric, weighted numeric, data_source text, connection_type text, is_connected boolean, mapping_confidence numeric )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250909180009_25583ea9-9d69-45bf-b8b9-25ee8045d86f.sql"
     },
     {
@@ -21662,6 +21797,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260726000002_model_capability_matrix.sql"
     },
     {
@@ -21675,6 +21811,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, from_location text, to_location text, level integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, data_source text, data_source_group text, path_root text, uploaded_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21686,6 +21823,7 @@
       "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
@@ -21695,6 +21833,7 @@
       "returns": "TABLE( id uuid, email text, name text, display_name text, phone text, avatar_url text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
     },
     {
@@ -21706,6 +21845,7 @@
       "returns": "TABLE( src_uid text, dst_uid text, relative_revenue numeric )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250905151344_237ea916-c720-4461-8a70-ae509b4f72ee.sql"
     },
     {
@@ -21720,6 +21860,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, src_uid text, dst_uid text, relation_type text, relative_revenue numeric, relative_revenue_percentage numeric, depth integer, direction text, uploaded_by uuid, created_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250904124537_d3482583-9bcd-4aba-a926-655d073e1b37.sql"
     },
     {
@@ -21733,6 +21874,7 @@
       "returns": "TABLE( id uuid, uid text, name text, revenue numeric, degree_centrality numeric, weighted_degree_centrality numeric, eigenvector_centrality numeric, betweenness_centrality numeric, closeness_centrality numeric, prominence numeric, connection_count bigint )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql"
     },
     {
@@ -21744,6 +21886,7 @@
       "returns": "TABLE( id uuid, uid text, revenue numeric, name text )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250905151344_237ea916-c720-4461-8a70-ae509b4f72ee.sql"
     },
     {
@@ -21758,6 +21901,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, uid text, name text, industry text, website text, traded_as text, number_of_employees integer, revenue numeric, depth integer, lat numeric, long numeric, is_seed boolean, uploaded_by uuid, created_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone, country text )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250904124537_d3482583-9bcd-4aba-a926-655d073e1b37.sql"
     },
     {
@@ -21772,6 +21916,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, nodes_count integer, edges_count integer, tiers_data jsonb, uploaded_by uuid, created_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250904124537_d3482583-9bcd-4aba-a926-655d073e1b37.sql"
     },
     {
@@ -21786,6 +21931,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, node_id text, node_type text, node_group text, description_text text, location_text text, longitude numeric, latitude numeric, is_critical_node boolean, critical_node_score numeric, prediction_timestamp timestamptz, created_by uuid, organization text, created_at timestamptz, updated_at timestamptz )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
     },
     {
@@ -21799,6 +21945,7 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
@@ -21810,6 +21957,7 @@
       "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000005_policy_version_notes_delete.sql"
     },
     {
@@ -21823,6 +21971,7 @@
       "returns": "TABLE( total_count bigint, critical_count bigint, non_critical_count bigint, last_prediction_timestamp timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250822031816_1e1e3bf7-279c-4eaf-b1d5-54df228b3daa.sql"
     },
     {
@@ -21836,6 +21985,7 @@
       "returns": "TABLE( node_id text, node_type text, node_level integer, parent_id text, consumption_rate numeric, flow_volume numeric, is_final_product boolean, metadata jsonb )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250908205603_52d496fa-7d22-4100-99bd-6c979582ea0b.sql"
     },
     {
@@ -21849,6 +21999,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, material_id text, higher_level_component_id text, level integer, consumption_rate numeric, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250907141246_b8b4cc3c-17ba-4c09-8cf6-08c17c456692.sql"
     },
     {
@@ -21862,6 +22013,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21875,6 +22027,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21886,6 +22039,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250903074413_f4dc85a7-e8b2-401e-a31b-35c0986b29ea.sql"
     },
     {
@@ -21899,6 +22053,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21911,6 +22066,7 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
@@ -21924,6 +22080,7 @@
       "returns": "TABLE( simulation_id uuid, scenario_id uuid, scenario_name text, scenario_description text, scenario_effects jsonb, status text, started_at timestamp with time zone, completed_at timestamp with time zone, metrics jsonb )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21933,6 +22090,7 @@
       "returns": "TABLE( id uuid, email text, name text, role text, organization text, created_at timestamptz, updated_at timestamptz )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250826015629_1f7e7b79-174e-45ac-bb52-21cbf97da25f.sql"
     },
     {
@@ -21946,6 +22104,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, status text, scenario_ids uuid[], started_at timestamptz, completed_at timestamptz, metrics jsonb, result_data jsonb, created_by uuid, organization text, created_at timestamptz, updated_at timestamptz )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -21961,6 +22120,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, data_source text, from_location text, to_location text, level integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, path_root text, organization text, uploaded_by uuid, created_at timestamptz, updated_at timestamptz )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250909200609_130a2cbf-bd6b-4485-b263-98202ce9c0d7.sql"
     },
     {
@@ -21974,6 +22134,7 @@
       "returns": "TABLE( id uuid, project_id uuid, plant_name text, data_source text, from_location text, to_location text, level integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, path_root text, organization text, uploaded_by uuid, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250909193139_fcec2e35-2771-4faa-b148-14bba20ebcac.sql"
     },
     {
@@ -21988,6 +22149,7 @@
       "returns": "TABLE( id uuid, project_id uuid, data_source text, plant_name text, from_location text, to_location text, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, uploaded_by uuid, organization text, is_critical_node boolean, critical_node_score numeric, prediction_timestamp timestamp with time zone, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250822032653_727ffd3c-7465-4551-a594-4a2a859158a1.sql"
     },
     {
@@ -22001,6 +22163,7 @@
       "returns": "TABLE(plant_name text)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250822031646_cff10a60-2ce9-495a-aee1-c19b59c2e384.sql"
     },
     {
@@ -22014,6 +22177,7 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
@@ -22030,6 +22194,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
@@ -22041,6 +22206,7 @@
       "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260829120000_erp_connector_phase1_2.sql"
     },
     {
@@ -22055,6 +22221,7 @@
       "returns": "TABLE(status integer, headers jsonb, body text)",
       "security_definer": false,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250906085716_505f5184-dd04-49ed-808e-adc94786249a.sql"
     },
     {
@@ -22067,6 +22234,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -22076,6 +22244,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
     },
     {
@@ -22088,6 +22257,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": "Phase 3 / WP 3.4 — promotes a staged run's clean rows into their tier-2 ",
       "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
@@ -22101,6 +22271,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": "Phase 3 / WP 3.3 — collapses each natural-key group of a tier-2 table to one ",
       "defined_by": "20260916000017_dedup_natural_keys.sql"
     },
     {
@@ -22113,6 +22284,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": "Phase 3 / WP 3.4 — classifies every staged row of a run against the CURRENT ",
       "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
@@ -22122,6 +22294,7 @@
       "returns": "trigger LANGUAGE plpgsql SET search_path",
       "security_definer": false,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260916000013_ingest_files_tier0.sql"
     },
     {
@@ -22146,6 +22319,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": "Phase 3 / WP 3.2 — opens an ingestion run, lands the tier-0 file manifest and ",
       "defined_by": "20260916000015_ingest_landing.sql"
     },
     {
@@ -22160,6 +22334,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000004_lane_upsert_column_list.sql"
     },
     {
@@ -22171,6 +22346,7 @@
       "returns": "TABLE (column_name text, unit_column text, conversion text, canonical text)",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": "Phase 3 / WP 3.3 — the unit conversions ingest_apply_run applies as it ",
       "defined_by": "20260916000019_promotion_upsert.sql"
     },
     {
@@ -22191,6 +22367,7 @@
       "returns": null,
       "security_definer": false,
       "volatility": "STABLE",
+      "comment": "Phase 3 / WP 3.4 — the columns a promotion of this run into this target ",
       "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
@@ -22202,6 +22379,7 @@
       "returns": "boolean LANGUAGE sql IMMUTABLE SET search_path",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": null,
       "defined_by": "20260916000020_item_masters_land.sql"
     },
     {
@@ -22213,6 +22391,7 @@
       "returns": "text[] LANGUAGE plpgsql STABLE SET search_path",
       "security_definer": false,
       "volatility": "STABLE",
+      "comment": "Phase 3 / WP 3.3 — the columns a promotion upserts on, read from pg_index ",
       "defined_by": "20260916000018_natural_key_unique.sql"
     },
     {
@@ -22224,6 +22403,7 @@
       "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260709000002_super_admin_phase1.sql"
     },
     {
@@ -22236,6 +22416,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
@@ -22248,6 +22429,7 @@
       "returns": "TABLE ( id uuid, key_prefix text, org_id uuid, org_name text, name text, note text, scopes text[], project_ids uuid[], env text, status text, expires_at timestamptz, last_used_at timestamptz, revoked_at timestamptz, rotated_from uuid, created_at timestamptz, created_by_email text )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -22257,6 +22439,7 @@
       "returns": "TABLE( id uuid, email text, name text, role text, organization text, created_at timestamptz, updated_at timestamptz )",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250826015629_1f7e7b79-174e-45ac-bb52-21cbf97da25f.sql"
     },
     {
@@ -22268,6 +22451,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -22280,6 +22464,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -22292,6 +22477,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
@@ -22303,6 +22489,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -22314,6 +22501,7 @@
       "returns": "TABLE ( id uuid, label text, graph_hash text, author_email text, created_at timestamptz )",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260703000001_dataset_versions.sql"
     },
     {
@@ -22325,6 +22513,7 @@
       "returns": "TABLE ( id uuid, policy_version_id uuid, policy_hash text, dataset_version_id uuid, graph_hash text, scenario_hash text, engine_fingerprint text, adopted_warmup_days integer, warmup_method text, recommended_replications integer, verdict text, basis text, status text, evidence_run_id uuid, author_email text, validated_at timestamptz )",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
@@ -22336,6 +22525,7 @@
       "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint )",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260711000005_policy_version_notes_delete.sql"
     },
     {
@@ -22348,6 +22538,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -22360,6 +22551,7 @@
       "returns": "SETOF",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
@@ -22375,6 +22567,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260709000002_super_admin_phase1.sql"
     },
     {
@@ -22392,6 +22585,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260916000001_data_plane_audit.sql"
     },
     {
@@ -22404,6 +22598,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
@@ -22416,6 +22611,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
@@ -22429,6 +22625,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -22441,6 +22638,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
     },
     {
@@ -22450,6 +22648,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250830232755_57126f90-ac86-4211-982f-d7a6fb93822f.sql"
     },
     {
@@ -22462,6 +22661,7 @@
       "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": "Is this organization the caller's? UUID only, since Phase 3 / WP 3.0 (D29): ",
       "defined_by": "20260916000011_org_identity_uuid_only.sql"
     },
     {
@@ -22471,6 +22671,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": "Phase 3 / WP 3.4 (§4 D61) — makes a new project's modeler an owner in ",
       "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
@@ -22482,6 +22683,7 @@
       "returns": "integer LANGUAGE sql IMMUTABLE AS",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": "Total order on project_role. The ONE place the ordering is written: ",
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
@@ -22493,6 +22695,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000002_agent_telemetry.sql"
     },
     {
@@ -22506,6 +22709,7 @@
       "returns": "numeric LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": "A rate quoted per `unit` expressed per week. Mirrors grading.ts::rateToWeekly.",
       "defined_by": "20260915000001_one_unit_table.sql"
     },
     {
@@ -22519,6 +22723,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -22530,6 +22735,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712100000_arc_write_performance.sql"
     },
     {
@@ -22545,6 +22751,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260721000001_chat_modes_and_ui_events.sql"
     },
     {
@@ -22559,6 +22766,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260916000001_data_plane_audit.sql"
     },
     {
@@ -22576,6 +22784,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260727000001_network_cartographer.sql"
     },
     {
@@ -22601,6 +22810,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
@@ -22613,6 +22823,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000002_agent_telemetry.sql"
     },
     {
@@ -22624,6 +22835,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
     },
     {
@@ -22635,6 +22847,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260612000001_policy_version_snapshots.sql"
     },
     {
@@ -22650,6 +22863,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
@@ -22663,6 +22877,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -22674,6 +22889,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
@@ -22686,6 +22902,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
@@ -22700,6 +22917,7 @@
       "returns": "TABLE (id uuid, key_prefix text, plaintext_key text)",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
@@ -22716,6 +22934,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260609040000_consolidated_safe.sql"
     },
     {
@@ -22733,6 +22952,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000003_project_memory.sql"
     },
     {
@@ -22744,6 +22964,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
@@ -22757,6 +22978,7 @@
       "returns": "TABLE ( thread_id uuid, thread_title text, project_id uuid, message_id uuid, seq integer, role text, snippet text, created_at timestamptz )",
       "security_definer": true,
       "volatility": "STABLE",
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -22772,6 +22994,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -22784,6 +23007,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER AS",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820165722_f8ee2517-1470-4e38-a627-7e918c418d31.sql"
     },
     {
@@ -22793,6 +23017,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250826203443_05dec1d0-3e20-44a3-88b4-74134fad2692.sql"
     },
     {
@@ -22806,6 +23031,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
@@ -22815,6 +23041,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
     },
     {
@@ -22824,6 +23051,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250904112621_dfba6c03-18a7-41f8-8dbb-19bbf779cbf3.sql"
     },
     {
@@ -22833,6 +23061,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
     },
     {
@@ -22842,6 +23071,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -22851,6 +23081,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
     },
     {
@@ -22860,6 +23091,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
     },
     {
@@ -22869,6 +23101,7 @@
       "returns": "TRIGGER AS",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250901131316_bf4c8950-b6cf-450c-97e0-15015e9a111a.sql"
     },
     {
@@ -22878,6 +23111,7 @@
       "returns": "TRIGGER AS",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
     },
     {
@@ -22887,6 +23121,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250820172632_f215db17-4e25-4c7c-bd78-8f23536a4c1f.sql"
     },
     {
@@ -22901,6 +23136,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260717000001_chat_store.sql"
     },
     {
@@ -22915,6 +23151,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260718000001_stage1_agent_rights_and_summary.sql"
     },
     {
@@ -22926,6 +23163,7 @@
       "returns": "TABLE( needs_recalculation boolean, reason text, last_calculated timestamp with time zone, data_last_modified timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
+      "comment": "DEPRECATED by WP 4.2 (§4 D12) — do not extend, do not add callers. Staleness ",
       "defined_by": "20260712110000_network_metrics_check_performance.sql"
     },
     {
@@ -22940,6 +23178,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
@@ -22957,6 +23196,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000005_policy_version_notes_delete.sql"
     },
     {
@@ -22969,6 +23209,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
@@ -22980,6 +23221,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
@@ -22989,6 +23231,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260609040000_consolidated_safe.sql"
     },
     {
@@ -23000,6 +23243,7 @@
       "returns": "numeric LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": "Days in one period of `unit`, or NULL when the unit is unrecognised. Generated ",
       "defined_by": "20260915000001_one_unit_table.sql"
     },
     {
@@ -23013,6 +23257,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
     },
     {
@@ -23025,6 +23270,7 @@
       "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260711000005_policy_version_notes_delete.sql"
     },
     {
@@ -23034,6 +23280,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250908063902_b102cbb5-f431-40da-a4d8-167da46216b6.sql"
     },
     {
@@ -23047,6 +23294,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -23056,6 +23304,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260712100000_arc_write_performance.sql"
     },
     {
@@ -23076,6 +23325,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250906113204_aa42c052-0d52-4c76-a6d1-806beb3af9cc.sql"
     },
     {
@@ -23096,6 +23346,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql"
     },
     {
@@ -23115,6 +23366,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250828002252_f68f9689-a9ff-4fcd-a6f6-2cae7a3c3a5f.sql"
     },
     {
@@ -23132,6 +23384,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250915000000_add_bom_level_to_projects.sql"
     },
     {
@@ -23148,6 +23401,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250901000000_add_project_management_functions.sql"
     },
     {
@@ -23160,6 +23414,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260729000001_disruption_sentinel.sql"
     },
     {
@@ -23174,6 +23429,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -23183,6 +23439,7 @@
       "returns": "TRIGGER AS",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql"
     },
     {
@@ -23192,6 +23449,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250826015711_453735a3-da4a-499f-824e-8683893c6654.sql"
     },
     {
@@ -23206,6 +23464,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
@@ -23218,6 +23477,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
@@ -23237,6 +23497,7 @@
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20260721000001_chat_modes_and_ui_events.sql"
     },
     {
@@ -23246,6 +23507,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
     },
     {
@@ -23258,6 +23520,7 @@
       "returns": "boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
+      "comment": null,
       "defined_by": "20250912064535_8c1d1c9a-0cdc-438d-a79c-3efdee64e2a2.sql"
     },
     {
@@ -23267,6 +23530,7 @@
       "returns": "bigint LANGUAGE sql IMMUTABLE AS",
       "security_definer": false,
       "volatility": "IMMUTABLE",
+      "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     }
   ],

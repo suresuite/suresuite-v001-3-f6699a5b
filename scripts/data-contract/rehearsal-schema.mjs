@@ -324,7 +324,23 @@ function emitFunctions(artifact, root, warn) {
       for (const s of match) out.push(asReplace(s, "FUNCTION") + ";");
     }
   }
-  return dedupeKeepLast(out);
+  const emitted = dedupeKeepLast(out);
+
+  // THE COMMENTS, AFTER EVERY BODY (D73). A `COMMENT ON FUNCTION` may live in a
+  // different migration from the `CREATE`, so it cannot be replayed from the
+  // defining file the way the body is — it is carried in the artifact and
+  // emitted here, once every function exists. Without this the reconstructed
+  // base had functions with no documentation, and an assertion about a
+  // deprecation comment failed in `--since HEAD` alone: the mode that builds
+  // the shape `main` meets after the merge, which is the mode D52 was added for.
+  for (const fn of artifact.functions || []) {
+    if (!fn.comment) continue;
+    const args = (fn.args || []).join(", ");
+    emitted.push(
+      `COMMENT ON FUNCTION public.${fn.name}(${args}) IS '${String(fn.comment).replace(/'/g, "''")}';`,
+    );
+  }
+  return emitted;
 }
 
 function emitViews(artifact, root, warn) {
