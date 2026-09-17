@@ -1538,7 +1538,7 @@ condition rather than outright.
 
 ## 11. Phase 4 — Trust anchor and analysis store
 
-### WP 4.1 — Complete and compose `graph_hash` ✅ *(D11, D36, D67, D68 closed; D69, D70, D71 found — done `20260917000002`–`20260917000003`)*
+### WP 4.1 — Complete and compose `graph_hash` ✅ *(D11, D36, D67, D68 closed; D69, D70, D71 found — done `20260917000002`–`20260917000004`)*
 
 Add `bom_multi_level` and the network tables to `_build_dataset_snapshot`; split into
 `hash_inputs` / `hash_network` plus a composite `graph_hash` (keep the name and its
@@ -7041,7 +7041,7 @@ part nothing can rehearse — whether the diff told them something they could ac
 
 ---
 
-### WP 4.1 — Complete and compose `graph_hash` · 2026-09-17 · `20260917000002`–`20260917000003`
+### WP 4.1 — Complete and compose `graph_hash` · 2026-09-17 · `20260917000002`–`20260917000004`
 
 #### A · The failing test, and it is the whole of D11 in one message
 
@@ -7281,6 +7281,28 @@ edit that puts `.from('supply_chain_data').insert(...)` back is `no-tier-skip` a
 `analysis_mark_critical_nodes` used it. The rehearsal said so; nothing static would
 have. That is the third package running in which the rehearsal found a defect in
 the migration rather than in the schema.
+
+#### G2 · A correction to an APPLIED migration is a new migration, not an edit
+
+Caught between the deploy and the after-run, and worth a paragraph because the
+near-miss is silent by construction.
+
+`ingest_legacy_upsert_lane` built its quoted column list and then SPLIT IT BACK
+on `', '` to derive the value list and the `DO UPDATE SET` fragment — a fact it
+already held, re-derived from a weaker source, and a split that would mis-parse
+any identifier needing a quoted spelling. The fix was written as an edit to
+`20260917000003` and reverted, because by then `supabase-migrations.yml` had
+already deployed it (§4 D31: no branch filter, so a branch push deploys).
+**Supabase tracks applied migrations by version, so re-pushing an edited
+`20260917000003` would have been SKIPPED** — leaving the file and production
+disagreeing about what the function contains, with nothing in the repository
+able to notice. The schema probe compares TABLES, `contract:rehearse` runs the
+file rather than production, and an artifact generated from the edited file
+would have agreed with the file and been wrong about the database.
+
+It is `20260917000004` instead, which says so in its own header. Note what did
+NOT catch this: `rehearsal/110` §7a passes identically either way, because the
+two derivations produce the same statement. It needed reading.
 
 #### H · Two shapes of `snapshot` live forever, and the export had to learn both
 

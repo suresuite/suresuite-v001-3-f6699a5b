@@ -239,6 +239,6 @@ SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `
 
 ---
 
-*Generated from data contract `b18df39b8bf9`, engine `0.2.3`,
+*Generated from data contract `fc87b2b0ddbf`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
