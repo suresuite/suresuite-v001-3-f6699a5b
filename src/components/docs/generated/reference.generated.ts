@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 535;
+export const REFERENCE_COLUMN_COUNT = 536;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -6838,6 +6838,22 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the patch was created. Server-set.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "seeded_from_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.4 · the `current_graph_hash` of the moment this override was SEEDED from project data. NULL means a person TYPED it, and the NULL is meaningful rather than missing: a seeded override is a COPY of a number the dataset held, and a typed one is a DECISION. A copy goes stale when the dataset moves; a decision does not, and marking it stale would tell the engine to distrust the one number somebody actually chose. Written by `bulk_upsert_policy_overrides`, which reads the hash from the project ITSELF rather than taking one from the caller — a caller that can supply provenance can supply the wrong provenance. ON CONFLICT it is overwritten, so typing over a seeded override clears it. Freshness is COMPUTED from it by `freshness_of` and never written back (§4 D70). **THE ENGINE READS OVERRIDES, NOT THE GRID**, so a stale value here is a simulation-correctness problem rather than a display one.",
         "primaryKey": false,
         "unique": false,
         "references": null,

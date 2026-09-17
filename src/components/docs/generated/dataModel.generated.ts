@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "ee1a27bc7429";
+export const CONTRACT_VERSION = "a655b1abda28";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260917000007_analyzer_provenance.sql";
+export const LAST_MIGRATION = "20260917000008_one_staleness_rule.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 43,
-  "columnsDescribed": 535,
+  "columnsDescribed": 536,
   "tablesUndescribed": 38
 } as const;
 
@@ -231,7 +231,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "policy_overrides",
         "grain": "One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family.",
-        "columns": 9,
+        "columns": 10,
         "owner": "policy-ui"
       }
     ]
@@ -342,58 +342,6 @@ export const TIERS: GlanceTier[] = [
 
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
-  {
-    "wp": "4.4",
-    "why": "`model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",
-    "tables": [
-      {
-        "table": "model_validations",
-        "columns": 24
-      }
-    ]
-  },
-  {
-    "wp": "4.4",
-    "why": "Runs and results (tier 5). Invariant `result-binding` is the claim these tables have to satisfy — every result binds dataset + policy + scenario + engine version — and WP 4.1/4.4 are where the binding is completed and the staleness rules land. NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED shadowed definition (`20250914113723` re-declares what `20250913085427` created, and the two disagree about `job_id`). The introspector records the disagreement rather than picking a winner. Resolve it BEFORE writing the sidecar — a field entry for a column whose type depends on which CREATE TABLE won is a guess with a schema around it.",
-    "tables": [
-      {
-        "table": "experiments",
-        "columns": 10
-      },
-      {
-        "table": "run_item_series",
-        "columns": 7
-      },
-      {
-        "table": "run_replications",
-        "columns": 12
-      },
-      {
-        "table": "simulation_cache",
-        "columns": 13
-      },
-      {
-        "table": "simulation_job_magnitudes",
-        "columns": 13
-      },
-      {
-        "table": "simulation_jobs",
-        "columns": 25
-      },
-      {
-        "table": "simulation_performance_metrics",
-        "columns": 14
-      },
-      {
-        "table": "simulation_results",
-        "columns": 13
-      },
-      {
-        "table": "simulation_runs",
-        "columns": 24
-      }
-    ]
-  },
   {
     "wp": "5.2",
     "why": "Outside the data spine. These are the AI and public-API control planes: they carry no simulation input, no engine-read field and no user-uploaded value, so a data-contract sidecar would describe machinery rather than the user's data. PLAN.md §6.3 documents them in the manual's sections 14 and 15 instead, and lists several of them explicitly as internal-only. If one ever starts carrying a value a simulation reads, it moves into the contract — that is the test, not the table's age.",
@@ -521,6 +469,58 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "scenarios",
         "columns": 22
+      }
+    ]
+  },
+  {
+    "wp": "6.3",
+    "why": "MOVED FROM WP 4.4 BY WP 4.4 ITSELF, and the reason is a correction rather than a deferral. This row said the table's subject is \"whether a card has gone stale, which is the one staleness rule WP 4.4 lands\" — and WP 4.4 landed that rule without needing to DESCRIBE the table, because the rule is a function over a hash column and `model_validations` already carries four of them. What the table actually needs is the thing WP 6.3 builds: it binds a verdict to a dataset, a policy, a scenario and an engine fingerprint, which IS invariant `result-binding` (I8) and IS the A5 Reproducibility Record. Describing it in a staleness package would have put it in the contract under a package that had no reason to think about what its columns mean. §15 measured 0 active cards, so nothing is waiting on it. Original note follows. `model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",
+    "tables": [
+      {
+        "table": "model_validations",
+        "columns": 24
+      }
+    ]
+  },
+  {
+    "wp": "6.3",
+    "why": "Runs and results (tier 5). Invariant `result-binding` is the claim these tables have to satisfy — every result binds dataset + policy + scenario + engine version. MOVED FROM WP 4.4 BY WP 4.4 ITSELF. This row read \"WP 4.1/4.4 are where the binding is completed\", and neither package was ever scoped to complete it: §11's WP 4.1 is the graph hash and §11's WP 4.4 is staleness plus the Trust Report. Ten tables were waiting on a sentence no work item behind them ever agreed to. WP 6.3 ships the A5 Reproducibility Record — \"dataset, policy, scenario, engine and analysis versions plus declared limits\" — which is `result-binding` stated as a deliverable, so the tables and the invariant now wait on the same package. See §16 · WP 4.4 · J. NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED shadowed definition (`20250914113723` re-declares what `20250913085427` created, and the two disagree about `job_id`). The introspector records the disagreement rather than picking a winner. Resolve it BEFORE writing the sidecar — a field entry for a column whose type depends on which CREATE TABLE won is a guess with a schema around it.",
+    "tables": [
+      {
+        "table": "experiments",
+        "columns": 10
+      },
+      {
+        "table": "run_item_series",
+        "columns": 7
+      },
+      {
+        "table": "run_replications",
+        "columns": 12
+      },
+      {
+        "table": "simulation_cache",
+        "columns": 13
+      },
+      {
+        "table": "simulation_job_magnitudes",
+        "columns": 13
+      },
+      {
+        "table": "simulation_jobs",
+        "columns": 25
+      },
+      {
+        "table": "simulation_performance_metrics",
+        "columns": 14
+      },
+      {
+        "table": "simulation_results",
+        "columns": 13
+      },
+      {
+        "table": "simulation_runs",
+        "columns": 24
       }
     ]
   }

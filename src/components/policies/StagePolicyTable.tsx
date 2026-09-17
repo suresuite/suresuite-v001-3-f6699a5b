@@ -887,7 +887,12 @@ export function StagePolicyTable({
       if (!silent) toast.info("Nothing to persist", TOAST);
       return;
     }
-    await bulkUpsertOverrides(toUpsert);
+    // WP 4.4 · SEEDED. These values are copies of numbers the project's data had
+    // at this moment, not decisions somebody made, so the RPC stamps
+    // `seeded_from_hash` and a later re-upload reports them stale. The engine
+    // reads overrides rather than the grid, so that flag is what stops a run
+    // silently using a number the project no longer holds.
+    await bulkUpsertOverrides(toUpsert, { seeded: true });
     setDrafts({});
     setPrefillSettled(true);
     if (!silent)

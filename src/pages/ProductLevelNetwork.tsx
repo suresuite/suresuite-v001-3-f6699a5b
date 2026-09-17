@@ -221,19 +221,32 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
     
     setNetworkMetricsLoading(true);
     try {
-      // Check if recalculation is needed using smart cache validation
+      // WP 4.4 · THE ONE STALENESS RULE, asked directly.
+      //
+      // This called `should_recalculate_network_metrics`, which compared
+      // `last_data_time > last_calc_time` — whether a CLOCK moved, which an
+      // UPDATE writing the same value answers yes to and a restored backup
+      // answers no to (§4 D12). `project_freshness` asks the one question worth
+      // asking: does every computed row name the dataset now loaded?
+      //
+      // `unknown` is treated as "recompute", which is `is_stale`'s collapse and
+      // the only safe direction for a branch that can go two ways — but the
+      // BADGE beside this view shows the third state, because telling a user a
+      // number is out of date when nothing can say is T1 answered with a guess.
       if (!forceRecalculate) {
-        const { data: cacheStatus, error: cacheError } = await supabase.rpc('should_recalculate_network_metrics', {
+        const { data: freshness, error: cacheError } = await supabase.rpc('project_freshness', {
           p_project_id: projectId
         });
 
         if (cacheError) {
-          console.error('Error checking cache status:', cacheError);
-        } else if (cacheStatus && cacheStatus.length > 0) {
-          const status = cacheStatus[0];
-          console.log('Cache status:', status);
-          
-          if (!status.needs_recalculation) {
+          console.error('Error checking freshness:', cacheError);
+        } else if (freshness) {
+          const nodes = (freshness as { tables?: Record<string, { rows?: number; fresh?: number }> })
+            .tables?.network_nodes;
+          const allFresh = (nodes?.rows ?? 0) > 0 && (nodes?.fresh ?? 0) === (nodes?.rows ?? 0);
+          console.log('Freshness:', nodes);
+
+          if (allFresh) {
             // Fetch existing cached metrics
             const { data, error } = await supabase.rpc('get_network_metrics_for_materials', {
               p_project_id: projectId,
@@ -250,11 +263,17 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             if (data && data.length > 0) {
               setNetworkMetrics(data);
               setMetricsMetadata({
-                lastCalculated: status.last_calculated,
-                dataLastModified: status.data_last_modified,
-                reason: status.reason
+                lastCalculated: nodes?.computed_at ?? null,
+                // WP 4.4 · deliberately null. "When did the data last change" is
+                // the question §4 D12 says is the wrong one, and there is no
+                // honest value for it — inventing one would be a fabricated
+                // source (T1). The hash below is the answer that replaces it.
+                dataLastModified: null,
+                reason: `every computed row names the dataset now loaded (${
+                  (freshness as { graph_hash_short?: string }).graph_hash_short ?? 'hash unknown'
+                })`
               });
-              toast.success(`Loaded cached metrics (${status.reason})`);
+              toast.success('Loaded stored metrics — they name the dataset now loaded');
               return;
             }
           }

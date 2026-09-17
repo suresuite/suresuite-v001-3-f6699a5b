@@ -53,7 +53,7 @@ interface UsePoliciesResult {
   ) => Promise<void>;
   clearActivePreset: () => Promise<void>;
   upsertOverride: (row: OverrideRow) => Promise<void>;
-  bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
+  bulkUpsertOverrides: (rows: OverrideRow[], opts?: { seeded?: boolean }) => Promise<void>;
   deleteOverride: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
   saveSnapshot: (label?: string, notes?: string) => Promise<string | null>;
   /** 6.D — edit a version's free-text notes (distinct from its label). */
@@ -258,6 +258,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       const sb = supabase as any;
       const { error } = await sb.rpc("bulk_upsert_policy_overrides", {
         p_project_id: projectId,
+        // WP 4.4 · no `seeded` flag. This path is a person editing a cell, so
+        // the override is a DECISION and carries no `seeded_from_hash` — it does
+        // not go stale when the dataset moves. The seeding path sets the flag.
         p_rows: JSON.stringify([{ scope: row.scope, target_key: row.target_key, family: row.family, patch: row.patch }]),
       });
       if (error) {
@@ -277,15 +280,23 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   );
 
   const bulkUpsertOverrides = useCallback(
-    async (rows: OverrideRow[]) => {
+    async (rows: OverrideRow[], opts?: { seeded?: boolean }) => {
       if (!projectId || rows.length === 0) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
+      // WP 4.4 · `seeded` says these values were COPIED from project data rather
+      // than decided by a person. The RPC stamps `seeded_from_hash` from the
+      // project's own `current_graph_hash` — the client never sends a hash,
+      // because a caller that supplies provenance can supply the wrong
+      // provenance. A seeded override goes stale when the dataset moves; a typed
+      // one does not, and THE ENGINE READS OVERRIDES, so the difference decides
+      // what a simulation computes.
       const payload = rows.map((r) => ({
         scope: r.scope,
         target_key: r.target_key,
         family: r.family,
         patch: r.patch,
+        seeded: opts?.seeded === true,
       }));
       const { error } = await sb.rpc("bulk_upsert_policy_overrides", {
         p_project_id: projectId,

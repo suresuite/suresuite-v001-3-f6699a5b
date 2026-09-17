@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 43 of 81 tables are covered,
-535 columns in all. A table that is not here is listed
+536 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -40,7 +40,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`organizations`](organizations.md) | G | `platform` | 8 | One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold. |
 | [`outbound_logistics`](outbound_logistics.md) | 2 | `data-ingestion` | 13 | One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed). |
 | [`policy_defaults`](policy_defaults.md) | 4 | `policy-ui` | 15 | One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against. |
-| [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 9 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
+| [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 10 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
 | [`products`](products.md) | 2 | `data-ingestion` | 18 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
 | [`project_erp_links`](project_erp_links.md) | G | `data-ingestion` | 15 | One authorized link between one project and one company in one external system: project ownership proved on this side, company membership proved on that side by the linking user's own OAuth consent. One link is one credential and one project — never shared, so revoking one project's link cannot be bypassed by a sibling. |
 | [`project_members`](project_members.md) | G | `platform` | 8 | One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between "in the organization" (sees every project) and "not in it" (sees none). |
@@ -58,4 +58,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `ee1a27bc7429`, engine `0.2.3`.*
+*Generated from data contract `a655b1abda28`, engine `0.2.3`.*

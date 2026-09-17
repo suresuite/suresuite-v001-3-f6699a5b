@@ -84,6 +84,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `updated_by` | — | `uuid` | — | — | Who last wrote this patch. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the patch last changed. Server-set. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the patch was created. Server-set. |
+| `seeded_from_hash` | — | `text` | — | — | WP 4.4 · the `current_graph_hash` of the moment this override was SEEDED from project data. NULL means a person TYPED it, and the NULL is meaningful rather than missing: a seeded override is a COPY of a number the dataset held, and a typed one is a DECISION. A copy goes stale when the dataset moves; a decision does not, and marking it stale would tell the engine to distrust the one number somebody actually chose. Written by `bulk_upsert_policy_overrides`, which reads the hash from the project ITSELF rather than taking one from the caller — a caller that can supply provenance can supply the wrong provenance. ON CONFLICT it is overwritten, so typing over a seeded override clears it. Freshness is COMPUTED from it by `freshness_of` and never written back (§4 D70). **THE ENGINE READS OVERRIDES, NOT THE GRID**, so a stale value here is a simulation-correctness problem rather than a display one. |
 
 ## Each column in full
 
@@ -223,6 +224,22 @@ When the patch was created. Server-set.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `seeded_from_hash`
+
+WP 4.4 · the `current_graph_hash` of the moment this override was SEEDED from project data. NULL means a person TYPED it, and the NULL is meaningful rather than missing: a seeded override is a COPY of a number the dataset held, and a typed one is a DECISION. A copy goes stale when the dataset moves; a decision does not, and marking it stale would tell the engine to distrust the one number somebody actually chose. Written by `bulk_upsert_policy_overrides`, which reads the hash from the project ITSELF rather than taking one from the caller — a caller that can supply provenance can supply the wrong provenance. ON CONFLICT it is overwritten, so typing over a seeded override clears it. Freshness is COMPUTED from it by `freshness_of` and never written back (§4 D70). **THE ENGINE READS OVERRIDES, NOT THE GRID**, so a stale value here is a simulation-correctness problem rather than a display one.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260917000008_one_staleness_rule.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> Provenance, not an engine input: it records where the patch beside it came from. The PATCH is what the engine reads.
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -232,6 +249,6 @@ When the patch was created. Server-set.
 
 ---
 
-*Generated from data contract `ee1a27bc7429`, engine `0.2.3`,
+*Generated from data contract `a655b1abda28`, engine `0.2.3`,
 sidecar `supabase/contract/policy_overrides.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 325,
-  "migrations_applied": 322,
+  "migrations_found": 326,
+  "migrations_applied": 323,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260917000007_analyzer_provenance.sql",
+  "last_migration": "20260917000008_one_staleness_rule.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 268,
+    "functions": 272,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -11882,6 +11882,18 @@
           "unique": false,
           "references": null,
           "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
+        },
+        {
+          "name": "seeded_from_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000008_one_staleness_rule.sql"
         }
       ],
       "constraints": [
@@ -20793,8 +20805,8 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20250925164454_6e5c1ace-b337-4746-9cd7-6b65e95fe3d1.sql"
+      "comment": "WP 4.4 · it has never invoked an analysis — it ran ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "auto_calculate_prominence_on_deep_tier_completion",
@@ -21039,8 +21051,8 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "comment": "WP 4.4 · takes an optional per-row `seeded` boolean and stamps ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "bulk_upsert_products",
@@ -21769,8 +21781,8 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260715000001_agent_proposals.sql"
+      "comment": "WP 4.4 · TTL ONLY since this package (§4 D70). It expired grounding drift too, ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "expire_chat_plans",
@@ -21783,6 +21795,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
+    },
+    {
+      "name": "freshness_of",
+      "signature": "freshness_of(text, uuid)",
+      "args": [
+        "_recorded_hash text",
+        "_project_id uuid"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · THE staleness rule. Every freshness question in this database ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "get_baseline_simulation_results",
@@ -22539,6 +22564,19 @@
       "defined_by": "20260916000018_natural_key_unique.sql"
     },
     {
+      "name": "is_stale",
+      "signature": "is_stale(text, uuid)",
+      "args": [
+        "_recorded_hash text",
+        "_project_id uuid"
+      ],
+      "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · `freshness_of() <> 'fresh'`, for a caller that can only branch two ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
+    },
+    {
       "name": "is_super_admin",
       "signature": "is_super_admin(uuid)",
       "args": [
@@ -22821,6 +22859,18 @@
       "defined_by": "20260916000011_org_identity_uuid_only.sql"
     },
     {
+      "name": "project_freshness",
+      "signature": "project_freshness(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · everything the freshness badge and the Trust Report's per-table ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
+    },
+    {
       "name": "project_owner_membership",
       "signature": "project_owner_membership()",
       "args": [],
@@ -22841,6 +22891,18 @@
       "volatility": "IMMUTABLE",
       "comment": "Total order on project_role. The ONE place the ordering is written: ",
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
+    },
+    {
+      "name": "proposal_grounding_state",
+      "signature": "proposal_grounding_state(public.proposals)",
+      "args": [
+        "p public.proposals"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 4.4 · a PostgREST computed column. `fresh` / `stale` / `unknown` from the ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "prune_ai_chat_events",
@@ -23331,9 +23393,9 @@
       ],
       "returns": "TABLE( needs_recalculation boolean, reason text, last_calculated timestamp with time zone, data_last_modified timestamp with time zone )",
       "security_definer": true,
-      "volatility": null,
-      "comment": "DEPRECATED by WP 4.2 (§4 D12) — do not extend, do not add callers. Staleness ",
-      "defined_by": "20260712110000_network_metrics_check_performance.sql"
+      "volatility": "STABLE",
+      "comment": "DEPRECATED (WP 4.2, §4 D12) and REIMPLEMENTED on the one staleness rule ",
+      "defined_by": "20260917000008_one_staleness_rule.sql"
     },
     {
       "name": "snapshot_dataset",

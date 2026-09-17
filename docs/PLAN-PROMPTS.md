@@ -557,10 +557,13 @@ semantics silently; investigate before Phase 5.
 Implement WP 4.4 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· THREE ad-hoc staleness mechanisms exist and none consults graph_hash:
-  should_recalculate_network_metrics (timestamps), prominence-recalc-on-upload
-  (event-triggered), and StagePolicyTable's autoSeedMarkerRef (a useRef).
-  All three must go.
+· CORRECTED BY WP 4.4 (§4 D81): there were TWO, not three.
+  should_recalculate_network_metrics (timestamps) and prominence-recalc-on-upload
+  (event-triggered, already made statement-level by WP 4.3). The third,
+  "StagePolicyTable's autoSeedMarkerRef", DOES NOT EXIST — the nearest identifier
+  is `autoSeededRef`, a Set of `${projectId}::${stageKey}` re-entry markers whose
+  own comment records the bug that made it a Set. It is not staleness logic and
+  deleting it reintroduces that bug. Verify every "already verified" line.
 · getEffectiveValue (resolveEffective.ts:82) checks dataRow[field] BEFORE the
   override bundle. So re-uploads already refresh fields that live on the row
   (material_price, primary_source) but NOT fields that don't (type, basis,
