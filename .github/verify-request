@@ -29,4 +29,37 @@
 # READ THE REPORT, NOT THE EXIT CODE. The runner is tolerant: WP 3.4 shipped a
 # probe that ordered by a column that does not exist, printed QUERY FAILED, and
 # exited 0.
-WP 4.1 graph_hash blast radius — after
+WP 4.2 analysis store — BEFORE
+#
+# WP 4.2's before-run. NO MIGRATION IS IN THIS PUSH, which is the whole point:
+# the trigger has three doors (this file, the workflow, and the runner script)
+# and this push changes only the runner, so nothing races a deploy. WP 4.1 lost
+# zero runs by sending its probes first; five were lost across the three
+# packages before it.
+#
+# TWO THINGS NOTHING HAS EVER MEASURED, and they are the reason for this run:
+#
+#   1. The four DERIVED tables' row counts — `node_list`, `network_nodes`,
+#      `network_edges`, `network_summary`. WP 4.1's probes did not touch them
+#      (§16 · WP 4.1 · I lists them as deferred and stops), so "how big is the
+#      smear" has never had a number, only D19's adjective. Counted in total
+#      and PER PROJECT, because the largest project here is the seeded one and
+#      reading it alone reports a clean data layer that is not clean (D42).
+#
+#   2. How many rows carry a COMPUTED column with no input hash. No tier-3
+#      table has `computed_from_hash` yet — that is WP 4.3's — so the expected
+#      answer is "all of them", and the value of writing it down is that WP 4.3
+#      needs a before-number to show it moved.
+#
+# And D54 as a number: which of the SIX deferred tables this package owns
+# (`node_list`, `network_nodes`, `network_edges`, `network_summary`,
+# `model_validations`, `external_evidence`) carry an `audit_tier_write`
+# trigger. The expectation is zero of six — they are outside the contract,
+# therefore outside `dataPlaneAudit.test.ts`'s rule, therefore unattributable
+# with nothing to notice.
+#
+# EXPECTED: zero rows in all four tables. The CSV ingestion path has run zero
+# times in production and these analyses have produced nothing. Zero is a
+# finding, not a failed probe — it is the honest caveat stated as data, and it
+# is why no `analysis_runs` count from this package may ever be reported as
+# adoption.

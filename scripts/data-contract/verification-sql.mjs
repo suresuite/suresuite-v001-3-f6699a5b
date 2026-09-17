@@ -711,6 +711,119 @@ async function graphHashBlastRadius() {
   });
 }
 
+// ── WP 4.2: the smear, as a quantity ───────────────────────────────────────
+//
+// TWO THINGS NOTHING HAS EVER MEASURED, and they are this package's to measure
+// FIRST, before the store exists to change them.
+//
+//  1. The four DERIVED tables' row counts. WP 4.1's probes did not touch them
+//     (§16 · WP 4.1 · I lists them as deferred and stops), so "how big is the
+//     smear" has never had a number — only the adjective in D19.
+//  2. How many rows carry a COMPUTED column with no input hash. No tier-3 table
+//     has `computed_from_hash` yet (that is WP 4.3's), so today the answer is
+//     "every one of them" — and the point of writing it down as a count is that
+//     WP 4.3 needs a before-number to show it moved.
+//
+// EVERY project, never one (D42): the largest project here is the one
+// `seed-project.yml` seeds, and reading it alone reports a clean data layer.
+async function wp42Smear() {
+  section("WP 4.2 — the four DERIVED tables, and D19 as a quantity");
+
+  // `network_nodes` is the table D56 has deferred three times, and the reason
+  // is visible in its own column list: the INPUT half is what a user uploaded
+  // (`name`, `country`, `industry`, `revenue`, `lat`, `long`, `is_seed`), the
+  // COMPUTED half is what an analysis wrote. The counts are kept apart here
+  // because a single row count cannot tell those two apart, which is D19.
+  const derived = await tryQ(`
+    select 'node_list'       as tbl,
+           count(*)::int     as rows,
+           count(distinct project_id)::int as projects,
+           count(*) filter (where is_critical_node is not null
+                               or critical_node_score is not null
+                               or prediction_timestamp is not null)::int as rows_with_computed,
+           count(*) filter (where longitude is not null or latitude is not null)::int as rows_geocoded
+      from public.node_list
+    union all
+    select 'network_nodes', count(*)::int, count(distinct project_id)::int,
+           count(*) filter (where degree_centrality is not null
+                               or weighted_degree_centrality is not null
+                               or eigenvector_centrality is not null
+                               or betweenness_centrality is not null
+                               or closeness_centrality is not null
+                               or prominence is not null)::int,
+           count(*) filter (where lat is not null or long is not null)::int
+      from public.network_nodes
+    union all
+    select 'network_edges', count(*)::int, count(distinct project_id)::int, 0, 0
+      from public.network_edges
+    union all
+    select 'network_summary', count(*)::int, count(distinct project_id)::int,
+           count(*) filter (where nodes_count is not null or edges_count is not null
+                               or tiers_data is not null)::int, 0
+      from public.network_summary`);
+  report("the four tables WP 4.1 deferred, counted for the first time", derived, (rows) => {
+    if (!rows?.length) { out("- No rows returned."); return; }
+    out(...table(rows));
+    const total = rows.reduce((a, r) => a + Number(r.rows || 0), 0);
+    const computed = rows.reduce((a, r) => a + Number(r.rows_with_computed || 0), 0);
+    out("");
+    out(
+      `- **${total} row(s) across the four tables, ${computed} of them carrying at least one COMPUTED column ` +
+        `and NONE of them carrying an input hash** — no tier-3 table has \`computed_from_hash\` yet. That is D19 ` +
+        "as a number rather than an adjective, and it is WP 4.3's before-figure.",
+    );
+    if (total === 0) {
+      out(
+        "- **Zero rows is itself the finding**, and it is the honest caveat stated as data: the analyses this " +
+          "package caches have produced nothing in production, so every claim about a cache hit is a claim " +
+          "about `supabase/rehearsal/` fixtures and must not be reported as adoption.",
+      );
+    }
+  });
+
+  // Per project, because a total hides which projects are affected (D42).
+  const perProject = await tryQ(`
+    select p.name as project,
+           (select count(*)::int from public.node_list       t where t.project_id = p.id) as node_list,
+           (select count(*)::int from public.network_nodes   t where t.project_id = p.id) as network_nodes,
+           (select count(*)::int from public.network_edges   t where t.project_id = p.id) as network_edges,
+           (select count(*)::int from public.network_summary t where t.project_id = p.id) as network_summary,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.network_metrics_updated_at is not null)      as nodes_with_metrics
+      from public.projects p order by p.created_at`);
+  report("the same four, per project (D42 — never just the seeded one)", perProject, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+  });
+
+  // D54 AS A NUMBER. The rule this package adds is that a deferral must SAY
+  // whether the table is audited; this is the measurement that says what the
+  // coverage list has been deciding silently.
+  const deferredAudit = await tryQ(`
+    select c.relname::text as tbl,
+           count(t.tgname) filter (where not t.tgisinternal)::int as audit_triggers
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      left join pg_trigger t on t.tgrelid = c.oid
+                            and not t.tgisinternal
+                            and t.tgname like '%audit_tier_write%'
+     where n.nspname = 'public'
+       and c.relname in ('node_list','network_nodes','network_edges','network_summary',
+                         'model_validations','external_evidence')
+     group by 1 order by 1`);
+  report("D54 — the six DEFERRED tables this package owns, and their audit triggers", deferredAudit, (rows) => {
+    if (!rows?.length) { out("- None of the six exist in production."); return; }
+    out(...table(rows));
+    const unaudited = rows.filter((r) => Number(r.audit_triggers) === 0);
+    out("");
+    out(
+      `- **${unaudited.length} of ${rows.length} carry no \`audit_tier_write\` trigger.** They are outside the ` +
+        "contract, therefore outside `dataPlaneAudit.test.ts`'s rule, therefore their writes are unattributable " +
+        "with nothing to notice. That is D54 measured rather than described.",
+    );
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");
@@ -1158,6 +1271,7 @@ async function main() {
   await boundaryDecisions();
   await ingestTables();
   await graphHashBlastRadius();
+  await wp42Smear();
 
   const project = await pickProject();
   if (!project) {
