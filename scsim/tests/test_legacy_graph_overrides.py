@@ -76,3 +76,21 @@ def test_supported_overrides_not_noted():
     }
     result = from_legacy_graph(_graph(), policies, horizon_weeks=52, model_seeds=1)
     assert not any("holding_cost_pct not supported" in n for n in result.notes)
+
+
+def test_composite_plant_key_capacity_applied():
+    """The /policies plant grid writes "<plant>::<product>" (§4 D75).
+
+    _SUPPORTED_OVERRIDE_FIELDS promises capacity survives per target; before
+    the composite lookup it only did so for the bare "node:<product>" form,
+    which no live UI writer produces.
+    """
+    policies = {
+        "default": {
+            "production": {"capacity_units_per_day": 1000.0, "utilization_cap_pct": 85.0},
+        },
+        "node:Focal plant::prod1": {"production": {"capacity_units_per_day": 500.0}},
+    }
+    result = from_legacy_graph(_graph(), policies, horizon_weeks=52, model_seeds=1)
+    prod = next(p for p in result.scenario.network.products if p.id == "prod1")
+    assert prod.production_capacity == 500.0 * 7.0 * 0.85

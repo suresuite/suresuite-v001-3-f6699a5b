@@ -46,6 +46,24 @@ def _merged_policy(policies: dict, node_id: str, family: str) -> dict:
     return {**default, **override}
 
 
+def _merged_production(policies: dict, p_id: str) -> dict:
+    """``production`` patch for a product, from both target-key spellings.
+
+    The plant grid keys its rows ``node:<plant>::<product>``; this converter
+    only holds the product id, so the bare lookup above misses them and the
+    two fields :data:`_SUPPORTED_OVERRIDE_FIELDS` promises to apply are
+    dropped instead (§4 D75). Most specific wins, sorted for determinism.
+    """
+    merged = _merged_policy(policies, p_id, "production")
+    for key in sorted(k for k in policies if isinstance(k, str)):
+        if not key.startswith("node:") or "::" not in key:
+            continue
+        _owner, _, target = key[len("node:"):].partition("::")
+        if target and target == p_id:
+            merged = {**merged, **((policies.get(key) or {}).get("production") or {})}
+    return merged
+
+
 # Per-target override fields the conversion actually applies. scsim policy
 # parameters are global (scope "G"), so only fields materialised onto
 # per-entity objects (Material, Product) can vary by node; everything else
@@ -137,7 +155,7 @@ def from_legacy_graph(
 
     products = []
     for pid, d in prod_nodes:
-        prod_pol = _merged_policy(policies, pid, "production")
+        prod_pol = _merged_production(policies, pid)
         cap_day = float(prod_pol.get("capacity_units_per_day", d.get("capacity_units_per_day", 1000.0)))
         util = float(prod_pol.get("utilization_cap_pct", 85.0)) / 100.0
         weekly_demand = float(d.get("weekly_demand", 100.0))
