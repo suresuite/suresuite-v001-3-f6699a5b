@@ -2069,6 +2069,48 @@ SELECT (SELECT count(*) FROM projects) projects,
                             WHERE m.project_id = p.id AND m.user_id = p.modeler_id))
                                                      modeler_not_a_member,
        (SELECT count(*) FROM project_members)        memberships;
+
+-- WP 4.1 — THE BLAST RADIUS OF THE `schema_version` BUMP, counted before it is
+-- taken. `current_graph_hash` is granted to `anon` and its readers are not all
+-- displays: `expire_agent_proposals` UPDATEs `proposals.status` to `expired`
+-- with `status_reason = 'grounding_drift'` on the next `list_agent_proposals`
+-- call, and nothing reverses it. A v1 hash cannot equal a v2 hash, so the third
+-- count below is exactly the number of proposals the deploy expires.
+SELECT (SELECT count(*) FROM proposals) proposals,
+       (SELECT count(*) FROM proposals WHERE status IN ('draft','proposed','approved')) live,
+       (SELECT count(*) FROM proposals WHERE status IN ('draft','proposed','approved')
+          AND grounding ? 'graph_hash')                        live_grounded_on_graph_hash,
+       (SELECT count(*) FROM proposals WHERE status = 'expired') already_expired;
+
+-- …and the two readers that only DISPLAY, so their cost is reversible.
+SELECT (SELECT count(*) FROM model_validations WHERE status = 'active') active_cards,
+       (SELECT count(*) FROM model_validations c WHERE c.status = 'active'
+          AND c.graph_hash = current_graph_hash(c.project_id))  active_and_data_fresh_today,
+       (SELECT count(*) FROM project_memory WHERE grounding ? 'graph_hash') grounded_memories;
+
+-- WP 4.1 exit check — existing runs must still resolve their dataset version.
+SELECT count(*) runs,
+       count(*) FILTER (WHERE dataset_version_id IS NOT NULL) runs_bound_to_a_version,
+       count(*) FILTER (WHERE dataset_version_id IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM dataset_versions v WHERE v.id = dataset_version_id))
+                                                              runs_whose_version_is_gone
+FROM simulation_runs;
+
+-- WP 4.1 — the five tier-2 tables v1 did not hash. §11's settled decision says
+-- the last three hold ZERO rows; this is that claim measured rather than read.
+SELECT 'bom_multi_level' tbl, count(*) rows, count(DISTINCT project_id) projects FROM bom_multi_level
+UNION ALL SELECT 'customers',               count(*), count(DISTINCT project_id) FROM customers
+UNION ALL SELECT 'tier2_suppliers',         count(*), count(DISTINCT project_id) FROM tier2_suppliers
+UNION ALL SELECT 'tier3_suppliers',         count(*), count(DISTINCT project_id) FROM tier3_suppliers
+UNION ALL SELECT 'multi_tier_supply_chain', count(*), count(DISTINCT project_id) FROM multi_tier_supply_chain;
+
+-- D36 — the audit rows the six PostgREST writers leave, by table. `actor_known`
+-- is said IN the row rather than inferred from a NULL actor later, so the
+-- before/after difference is readable without joining anything.
+SELECT target_type, action, count(*) rows,
+       count(*) FILTER (WHERE coalesce((after->>'actor_known')::boolean, false)) actor_known,
+       count(*) FILTER (WHERE NOT coalesce((after->>'actor_known')::boolean, false)) actor_unknown
+FROM audit_logs WHERE plane = 'data' GROUP BY 1,2 ORDER BY 5 DESC, 1, 2;
 ```
 
 ---

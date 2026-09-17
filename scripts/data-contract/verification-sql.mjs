@@ -461,6 +461,161 @@ async function ingestTables() {
   });
 }
 
+// ── WP 4.1: the graph_hash blast radius, measured before the bump ──────────
+// `schema_version` is not a local change. `current_graph_hash` wraps
+// `_build_dataset_snapshot`, is granted to `anon`, and the readers below do
+// more than display: `expire_agent_proposals` WRITES `status='expired'` with
+// `status_reason='grounding_drift'` on the next read after the deploy, and
+// nothing un-expires a proposal when the hash comes back. So the bump's cost
+// is a number, and this is where the number comes from. Run BEFORE the
+// migration and again after.
+async function graphHashBlastRadius() {
+  section("WP 4.1 — what the `schema_version` bump costs, counted before it happens");
+
+  const versions = await tryQ(`
+    select (select count(*)::int from public.dataset_versions)                        as dataset_versions,
+           (select count(distinct project_id)::int from public.dataset_versions)      as projects_with_a_version,
+           (select count(distinct graph_hash)::int from public.dataset_versions)      as distinct_graph_hashes,
+           (select count(*)::int from public.projects)                                as projects`);
+  report("`dataset_versions` — what exists to be re-hashed", versions, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    out(
+      `- Every one of these ${r.dataset_versions ?? "?"} rows is IMMUTABLE and keeps its stored ` +
+        "`snapshot` and `graph_hash`. The bump does not rewrite them; it means the NEXT " +
+        "`snapshot_dataset` call inserts a new version instead of deduping against the latest, " +
+        "which is the intended behaviour and not the cost. The cost is below.",
+    );
+  });
+
+  const runs = await tryQ(`
+    select (select count(*)::int from public.simulation_runs)                                as runs,
+           (select count(*)::int from public.simulation_runs where dataset_version_id is not null) as runs_bound_to_a_version,
+           (select count(*)::int from public.simulation_runs where graph_hash is not null)   as runs_with_a_graph_hash,
+           (select count(*)::int from public.simulation_runs r
+              where r.dataset_version_id is not null
+                and not exists (select 1 from public.dataset_versions v where v.id = r.dataset_version_id))
+                                                                                            as runs_whose_version_is_gone`);
+  report("§11 exit check — do existing runs still resolve their `dataset_version_id`?", runs, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    out(
+      Number(r.runs_whose_version_is_gone) > 0
+        ? `- **${r.runs_whose_version_is_gone} run(s) point at a \`dataset_versions\` row that is gone.** The column is ` +
+          "`ON DELETE SET NULL`, so this can only be a row written outside the FK — investigate before the bump."
+        : "- Every bound run resolves its version. The bump cannot change this: `dataset_versions` rows are " +
+          "never updated and never deleted by any path this package touches, and the FK is `ON DELETE SET NULL`.",
+    );
+  });
+
+  // The reader that WRITES. This is the blast radius proper.
+  const props = await tryQ(`
+    select (select count(*)::int from public.proposals)                                   as proposals,
+           (select count(*)::int from public.proposals
+             where status in ('draft','proposed','approved'))                             as live,
+           (select count(*)::int from public.proposals
+             where status in ('draft','proposed','approved') and grounding ? 'graph_hash') as live_grounded_on_graph_hash,
+           (select count(*)::int from public.proposals
+             where status in ('draft','proposed','approved') and grounding ? 'graph_hash'
+               and grounding->>'graph_hash' = public.current_graph_hash(project_id))       as live_and_fresh_today,
+           (select count(*)::int from public.proposals where status = 'expired')           as already_expired`);
+  report(
+    "**the reader that writes** — `expire_agent_proposals` flips `status` to `expired`/`grounding_drift`",
+    props,
+    (rows) => {
+      out(...table(rows));
+      const r = rows[0] ?? {};
+      const n = Number(r.live_grounded_on_graph_hash ?? 0);
+      out(
+        n > 0
+          ? `- **${n} live proposal(s) carry a v1 \`graph_hash\` in \`grounding\`.** A v1 hash cannot equal a v2 ` +
+            "hash, so on the first `list_agent_proposals` call after the deploy every one of them is UPDATEd to " +
+            "`status='expired'`, `status_reason='grounding_drift'` — including any in `approved`. **Nothing " +
+            "un-expires a proposal**: the predicate is one-way and `supersede_agent_proposal` does not reverse it. " +
+            "This is the number the §11 decision has to be made against."
+          : "- No live proposal is grounded on a `graph_hash`, so the bump expires nothing. The write path exists " +
+            "and is unexercised; the decision costs nothing today and would cost `live_grounded_on_graph_hash` " +
+            "proposals on any day it is not zero.",
+      );
+    },
+  );
+
+  const cards = await tryQ(`
+    select (select count(*)::int from public.model_validations)                        as validation_cards,
+           (select count(*)::int from public.model_validations where status = 'active') as active_cards,
+           (select count(*)::int from public.model_validations c
+             where c.status = 'active'
+               and c.graph_hash = public.current_graph_hash(c.project_id))             as active_and_data_fresh_today`);
+  report("`model_validations` — cards that stop reading fresh", cards, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    out(
+      `- ${r.active_and_data_fresh_today ?? "?"} active card(s) match their project's hash today and will report ` +
+        '`drift: ["data"]` from the deploy onward. **This one is display-only and reversible** — the badge is ' +
+        "derived at read time (`useModelValidation`), no column is written, and re-validating clears it.",
+    );
+  });
+
+  const mem = await tryQ(`
+    select (select count(*)::int from public.project_memory)                       as memories,
+           (select count(*)::int from public.project_memory where grounding ? 'graph_hash') as grounded_on_graph_hash`);
+  report("`project_memory` — grounding shown as stale", mem, (rows) => {
+    out(...table(rows));
+    out("- Display-only and reversible, same as the cards: `useProjectMemory` compares at read time.");
+  });
+
+  section("WP 4.1 — the tables the hash starts covering, and the three that hold nothing");
+
+  const covered = await tryQ(`
+    select t.tbl, t.rows, t.projects
+      from (
+        select 'bom_multi_level'::text as tbl, count(*)::int as rows, count(distinct project_id)::int as projects from public.bom_multi_level
+        union all select 'customers',              count(*)::int, count(distinct project_id)::int from public.customers
+        union all select 'tier2_suppliers',        count(*)::int, count(distinct project_id)::int from public.tier2_suppliers
+        union all select 'tier3_suppliers',        count(*)::int, count(distinct project_id)::int from public.tier3_suppliers
+        union all select 'multi_tier_supply_chain',count(*)::int, count(distinct project_id)::int from public.multi_tier_supply_chain
+      ) t order by t.tbl`);
+  report("the five tier-2 tables v1 did not hash", covered, (rows) => {
+    out(...table(rows));
+    const net = (rows ?? []).filter((r) =>
+      ["tier2_suppliers", "tier3_suppliers", "multi_tier_supply_chain"].includes(r.tbl),
+    );
+    const netRows = net.reduce((a, r) => a + Number(r.rows || 0), 0);
+    out(
+      netRows === 0
+        ? "- **`hash_network`'s three tables hold ZERO rows in every project**, which is the settled decision's " +
+          "second clause measured rather than asserted. The half is free to add and is UNEXERCISED until " +
+          "somebody uploads one: a green test on it is not a working path."
+        : `- **\`hash_network\`'s three tables hold ${netRows} row(s)** — the settled decision recorded ZERO. ` +
+          "Re-read §11 before assuming the network half is unexercised.",
+    );
+  });
+
+  section("WP 4.1 — D36's six PostgREST writers, as the audit log holds them");
+
+  const unattributed = await tryQ(`
+    select a.target_type, a.action,
+           count(*)::int as rows,
+           count(*) filter (where coalesce((a.after->>'actor_known')::boolean, false))::int as actor_known,
+           count(*) filter (where not coalesce((a.after->>'actor_known')::boolean, false))::int as actor_unknown
+      from public.audit_logs a
+     where a.plane = 'data'
+     group by 1,2 order by 5 desc, 1, 2 limit 40`);
+  report("data-plane audit rows that name their actor, by table (D36)", unattributed, (rows) => {
+    if (!rows?.length) {
+      out("- The data plane holds no audit row at all, so D36 has nothing to measure yet: the six writers have not run since WP 2.3 created the triggers.");
+      return;
+    }
+    out(...table(rows));
+    const unknown = rows.reduce((a, r) => a + Number(r.actor_unknown || 0), 0);
+    out(
+      `- **${unknown} data-plane row(s) record \`actor_known: false\`.** That is honest and it is not attribution ` +
+        "(§2.1 `audit-actor`). This package moves the six PostgREST writes into RPCs that take the actor as a " +
+        "parameter; the after-run is how we find out whether the number moved for a path anyone actually ran.",
+    );
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");
@@ -907,6 +1062,7 @@ async function main() {
   await d29();
   await boundaryDecisions();
   await ingestTables();
+  await graphHashBlastRadius();
 
   const project = await pickProject();
   if (!project) {
