@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 322,
-  "migrations_applied": 319,
+  "migrations_found": 323,
+  "migrations_applied": 320,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260917000004_lane_upsert_column_list.sql",
+  "last_migration": "20260917000005_writer_preamble_actor_only.sql",
   "counts": {
     "tables": 79,
     "views": 7,
@@ -20008,7 +20008,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
+      "defined_by": "20260917000005_writer_preamble_actor_only.sql"
     },
     {
       "name": "assign_bom_line",

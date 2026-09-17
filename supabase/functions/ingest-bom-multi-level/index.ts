@@ -123,8 +123,13 @@ serve(async (req) => {
       //   * the natural key is no longer spelled here. `ingest_legacy_upsert_lane`
       //     reads the arbiter from `pg_index`, so there is ONE copy of the key
       //     and it cannot drift from the index `ON CONFLICT` infers from;
-      //   * the caller's PROJECT ROLE is enforced. A service-role key used to
-      //     make it irrelevant; the RPC refuses below `editor`;
+      //   * the RPC AUTHENTICATES and does not AUTHORIZE. An earlier draft
+      //     refused below project role `editor` and it came out: an
+      //     organization admin who is not a project member resolves to NULL
+      //     from `effective_project_role`, and `combine-project` has always
+      //     permitted that user — see `20260917000005`. This function keeps
+      //     the authorization it already had; making `min_project_role` the
+      //     one live answer is D66, and WP 6.2's;
       //   * `no-tier-skip` (I2) stops being a property of this file. While this
       //     function held a PostgREST client it was one `.upsert()` away from
       //     any tier-2 table in the schema. Now the set it can reach is a

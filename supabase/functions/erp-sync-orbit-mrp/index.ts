@@ -344,10 +344,11 @@ async function actionSync(admin: ReturnType<typeof createClient>, body: { link_i
       // two are different claims — `triggered_by` already records which of them
       // this run was.
       //
-      // If that person no longer holds `editor` on the project the RPC refuses,
-      // and the right outcome is a run left `staged` for a human to review, not
-      // a failed sync and not a silent unattributed write. So the refusal is
-      // caught and recorded rather than thrown.
+      // If the link carries no `linked_by_user_id` — an old row — the RPC
+      // refuses the NULL actor outright, and the right outcome is a run left
+      // `staged` for a human to review, not a failed sync and not a silent
+      // unattributed write. So the refusal is caught and recorded rather than
+      // thrown.
       try {
         await applyStagedRun(admin, run.id, link.linked_by_user_id ?? null);
       } catch (applyErr) {
@@ -387,13 +388,18 @@ async function applyStagedRun(admin: ReturnType<typeof createClient>, runId: str
   //   * it was a tier-1 → tier-2 promotion that never went through
   //     `ingest_apply_run`, so `no-tier-skip` (I2) held for the nine CSV
   //     datasets and not for this one;
-  //   * it answered to no project role: a service-role key made the caller's
-  //     role irrelevant on a path reached from the sync screen.
+  //   * and it upserted per row, so a statement-grain audit trigger wrote one
+  //     row per product.
   // `mrp_apply_staged_products` takes the actor as a parameter, sets
-  // `app.current_user_id` LOCAL, refuses below `editor`, and upserts in ONE
-  // statement — so the audit trigger writes one row naming the promoter rather
-  // than one row per product naming nobody. `supabase/rehearsal/110` §7b reads
-  // that row back.
+  // `app.current_user_id` LOCAL, and upserts in ONE statement — so the audit
+  // trigger writes one row naming the promoter rather than one row per product
+  // naming nobody. `supabase/rehearsal/110` §7b reads that row back.
+  //
+  // It does NOT check a project role, deliberately: `20260917000005` says why,
+  // and the short version is that the check would have refused an organization
+  // admin on `combine-project`'s live path. `actionApply` still gates on the
+  // caller being able to SELECT the run under RLS, which is the authorization
+  // this path already had.
   const { data, error } = await admin.rpc("mrp_apply_staged_products", {
     _run_id: runId,
     _actor_user_id: appliedByUserId,

@@ -391,16 +391,47 @@ BEGIN
       'made, so a row naming that user is the RPC NOT setting it.', v_editor, v_analyst;
   END IF;
 
-  -- The same RPC refuses an analyst. Not a disabled button — the RPC is
-  -- reachable without the bundle that draws one.
-  BEGIN
-    PERFORM public.ingest_legacy_upsert_lane(
-      v_project, v_analyst, 'inbound_logistics',
-      jsonb_build_array(jsonb_build_object('supplier_id','S9','material_id','M3','volume',1)));
-    RAISE EXCEPTION 'WP 4.1: an analyst wrote a tier-2 lane through the legacy RPC.';
-  EXCEPTION WHEN insufficient_privilege THEN
-    NULL;   -- the refusal this file exists to prove
-  END;
+  -- THE RPC AUTHENTICATES AND DOES NOT AUTHORIZE, and this assertion pins that
+  -- as a DECISION rather than leaving it as an absence somebody later reads as
+  -- an oversight (`20260917000005`).
+  --
+  -- An earlier draft refused below project role `editor` here. It came out: an
+  -- ORGANIZATION admin who is not a project member resolves to NULL from
+  -- `effective_project_role` — `is_super_admin` reads `role = 'super_admin'` —
+  -- while `combine-project` has always permitted exactly that user, so the gate
+  -- would have silently refused the ETL for a class of caller who can run it
+  -- today. §11 asks for no such check, and WP 3.3's precedent on the identical
+  -- fix (`assign_material_supplier`) added none.
+  --
+  -- So an analyst IS accepted here, deliberately, and each caller keeps the
+  -- authorization it already had. Making `min_project_role` the one live answer
+  -- is D66, and it is WP 6.2's per table. The day somebody adds a gate here,
+  -- this assertion fails and points at that decision instead of looking like a
+  -- hole they have just closed.
+  PERFORM set_config('app.current_user_id', v_owner::text, true);
+  v_res := public.ingest_legacy_upsert_lane(
+    v_project, v_analyst, 'inbound_logistics',
+    jsonb_build_array(jsonb_build_object('supplier_id','S9','material_id','M3','volume',1)));
+  IF (v_res ->> 'rows_written')::int <> 1 THEN
+    RAISE EXCEPTION
+      'WP 4.1: the legacy RPC refused an analyst, or wrote % rows instead of 1. The RPC '
+      'authenticates and does NOT authorize (`20260917000005`); if a role gate has been '
+      'added here, read that migration''s header before keeping it — it refuses an '
+      'organization admin on `combine-project`''s live path. (%)',
+      COALESCE(v_res ->> 'rows_written','(null)'), v_res;
+  END IF;
+
+  -- …and the row it just wrote names the ANALYST, not the owner the GUC held a
+  -- line ago. Same poison, same reason.
+  SELECT count(*) INTO v_n FROM public.audit_logs a
+   WHERE a.plane = 'data' AND a.target_type = 'inbound_logistics'
+     AND a.actor_user_id IS NOT DISTINCT FROM v_analyst
+     AND COALESCE((a.after ->> 'actor_known')::boolean, false);
+  IF v_n < 1 THEN
+    RAISE EXCEPTION
+      'WP 4.1: the analyst''s lane write wrote no audit row naming %. The GUC held % '
+      'when the call was made.', v_analyst, v_owner;
+  END IF;
 
   -- …and it refuses a target outside the whitelist rather than interpolating it
   -- into `format()`. A dynamic INSERT whose table name came from a caller is an

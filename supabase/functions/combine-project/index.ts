@@ -406,8 +406,10 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
 
     // ── the one write ────────────────────────────────────────────────────
     // Delete both tier-3 tables and insert everything, in one transaction, with
-    // the actor named. The RPC also enforces project role >= editor, which a
-    // service-role key made irrelevant on this path.
+    // the actor named. The RPC does NOT re-authorize: the check above — modeler
+    // or organization admin — remains this path's authorization, because a role
+    // gate in the RPC would have refused the admin half of it
+    // (`20260917000005`). D66 is the divergence; WP 6.2 owns it.
     const { data: etl, error: etlError } = await supabase.rpc('etl_replace_supply_chain', {
       _project_id: project_id,
       _actor_user_id: user_id,

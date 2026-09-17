@@ -185,6 +185,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `fc87b2b0ddbf`, engine `0.2.3`,
+*Generated from data contract `3da477ea5282`, engine `0.2.3`,
 sidecar `supabase/contract/user_ai_permissions.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
