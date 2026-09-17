@@ -7,14 +7,26 @@
 # `scripts/data-contract/verification-sql.mjs`. A push carrying a migration must
 # change NONE of them.
 #
-# WP 4.1 — BEFORE. Its own push, no migration in it.
-# measure: what the `schema_version` bump costs before it is taken —
-#      how many live `proposals` carry a v1 `graph_hash` and would be UPDATEd to
-#      `expired`/`grounding_drift` by the first read after the deploy (the one
-#      reader that writes); how many `model_validations` cards and
-#      `project_memory` rows go stale (display-only, reversible); whether every
-#      `simulation_runs.dataset_version_id` still resolves; the row counts of
-#      the five tier-2 tables v1 does not hash — including §11's settled claim
-#      that `hash_network`'s three hold ZERO; and D36's `actor_known: false`
-#      rows by table, so the after-run has a before to be a delta of.
-WP 4.1 graph_hash blast radius — before
+# WP 4.1 — AFTER. Its own push, no migration in it, sent only once
+# `Deploy Supabase Migrations` reported success for `20260917000005`.
+# compare against the before-run, which is §16 · WP 4.1 · C:
+#      the five tier-2 tables the hash now covers (bom_multi_level 792 in 2
+#      projects, customers 6 in 5, and the three `hash_network` tables at ZERO —
+#      the second is the claim §11 settled and the after-run re-measures);
+#      `proposals` live and grounded on a `graph_hash`, which was 0 before and
+#      is the count `expire_agent_proposals` would have written to `expired`
+#      one-way had it not been (D70);
+#      `model_validations` and `project_memory`, both 0, display-only either way;
+#      every `simulation_runs.dataset_version_id` still resolving — 17 of 17
+#      before, and §11's exit check says that must survive the bump;
+#      and D36's `actor_known: false` rows by table. 2 580 before, 2 575 of them
+#      `supply_chain_data` UPDATEs from `predict-critical-nodes`'s per-row loop.
+#      THE NUMBER IS NOT EXPECTED TO FALL. Nothing rewrites an audit row, and
+#      none of the six moved paths has been RUN since the deploy. A drop here
+#      would mean something deleted history; a rise means a path ran and the
+#      after-run says whether it named its actor.
+#
+# READ THE REPORT, NOT THE EXIT CODE. The runner is tolerant: WP 3.4 shipped a
+# probe that ordered by a column that does not exist, printed QUERY FAILED, and
+# exited 0.
+WP 4.1 graph_hash blast radius — after
