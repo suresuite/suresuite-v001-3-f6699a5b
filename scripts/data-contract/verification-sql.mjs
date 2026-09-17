@@ -417,7 +417,7 @@ async function ingestTables() {
            r.rows_new, r.rows_changed, r.rows_unchanged, r.rows_superseded, r.rows_held, r.rows_removed
       from public.ingest_runs r
      where exists (select 1 from public.ingest_staged_rows s where s.ingest_run_id = r.id)
-     order by r.started_at desc nulls last
+     order by r.created_at desc
      limit 25`);
   report("do a run's five counts add up to the rows it staged?", runCounts, (rows) => {
     if (!rows.length) {

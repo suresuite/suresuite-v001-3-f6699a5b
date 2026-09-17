@@ -553,8 +553,13 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
                    "or name one that exists.");
       }
     }
-    // A PHASE is an owner only while the phase still has a package left to run.
-    for (const ph of closedBy.match(/Phase\s*([0-9]+)/gi) ?? []) {
+    // A PHASE is an owner only while the phase still has a package left to run —
+    // and only when the cell names NO package at all. A cell that names one has
+    // an owner; the `Phase N` in it is prose (D36's cell cites "§16 · Phase 3's
+    // last package" and is owned by WP 4.1), and reading that as a second owner
+    // is the gate crying wolf, which gets it relaxed rather than fixed.
+    const namesAPackage = (closedBy.match(/WP\s*[0-9]+\.[0-9]+[a-z]?/gi) ?? []).length > 0;
+    for (const ph of namesAPackage ? [] : closedBy.match(/Phase\s*([0-9]+)/gi) ?? []) {
       const n = ph.replace(/Phase\s*/i, "");
       if (donePhases.has(n)) {
         orphaned += 1;
