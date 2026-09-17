@@ -395,3 +395,98 @@ def test_scenario_runs_end_to_end():
     res = from_project_data(_base(replications=2, horizon_days=560, warmup_mode="manual", warmup_days=70))
     out = run_scenario(res.scenario)
     assert "fill_rate" in out.aggregates
+
+
+# ── Plant-stage production overrides (§4 D75) ────────────────────────────────
+# The /policies plant grid keys every row "<focal plant>::<product>", so a
+# lookup keyed by the product alone never reached it: line capacity was stored
+# and never read. These pin both spellings and the master's precedence.
+
+def _plant_capacity_case(policies: dict, master: float | None) -> tuple:
+    d = _base()
+    d.products = [ProductRow(id="p1", sell_price=20.0, demand_mean=100.0,
+                             production_capacity=master)]
+    d.policies = policies
+    res = from_project_data(d)
+    return res.scenario.network.products[0], res.warnings
+
+
+def test_composite_plant_key_line_capacity_reaches_the_engine():
+    """node:<plant>::<product> — the spelling the grid actually writes."""
+    prod, warns = _plant_capacity_case(
+        {"node:Focal plant::p1": {"production": {
+            "capacity_units_per_day": 50.0, "utilization_cap_pct": 80.0}}},
+        master=None,
+    )
+    assert prod.production_capacity == pytest.approx(50.0 * 7.0 * 0.80)  # 280/wk
+    assert any(w.field == "production_capacity" and w.level == "info"
+               and "derived from production policy" in w.reason for w in warns)
+    assert not any("no capacity source" in w.reason for w in warns)
+
+
+def test_bare_product_key_line_capacity_still_works():
+    """node:<product> — no regression for any writer using the bare form."""
+    prod, _ = _plant_capacity_case(
+        {"node:p1": {"production": {
+            "capacity_units_per_day": 50.0, "utilization_cap_pct": 80.0}}},
+        master=None,
+    )
+    assert prod.production_capacity == pytest.approx(280.0)
+
+
+def test_composite_key_beats_bare_key_and_project_default():
+    """Most specific wins: default < node:<product> < node:<plant>::<product>."""
+    prod, _ = _plant_capacity_case(
+        {
+            "default": {"production": {"capacity_units_per_day": 10.0,
+                                       "utilization_cap_pct": 100.0}},
+            "node:p1": {"production": {"capacity_units_per_day": 20.0}},
+            "node:Focal plant::p1": {"production": {"capacity_units_per_day": 50.0}},
+        },
+        master=None,
+    )
+    assert prod.production_capacity == pytest.approx(50.0 * 7.0 * 1.0)  # 350/wk
+
+
+def test_master_capacity_shadows_line_capacity_and_says_so():
+    """products.production_capacity (units/wk) wins — but never silently."""
+    prod, warns = _plant_capacity_case(
+        {"node:Focal plant::p1": {"production": {"capacity_units_per_day": 50.0}}},
+        master=200.0,
+    )
+    assert prod.production_capacity == pytest.approx(200.0)
+    assert any(w.level == "info" and w.field == "production_capacity"
+               and "shadows" in w.reason for w in warns)
+
+
+def test_missing_utilization_cap_is_declared_not_silent():
+    prod, warns = _plant_capacity_case(
+        {"node:Focal plant::p1": {"production": {"capacity_units_per_day": 50.0}}},
+        master=None,
+    )
+    assert prod.production_capacity == pytest.approx(50.0 * 7.0 * 0.85)  # 297.5/wk
+    assert any(w.field == "utilization_cap_pct" and w.level == "info" for w in warns)
+
+
+def test_override_naming_nothing_in_the_project_warns():
+    """A key whose components name no entity joins nothing, in any family."""
+    _, warns = _plant_capacity_case(
+        {"node:Other plant::p_typo": {"production": {"capacity_units_per_day": 50.0}}},
+        master=200.0,
+    )
+    assert any(w.level == "warn" and w.field == "target_key"
+               and "p_typo" in w.reason for w in warns)
+
+
+def test_known_target_keys_do_not_warn_as_orphans():
+    """The four real spellings must not trip the orphan guard."""
+    _, warns = _plant_capacity_case(
+        {
+            "node:Focal plant::p1": {"production": {"capacity_units_per_day": 50.0}},
+            "node:s1::m1": {"sourcing": {"supply_share": 1.0}},
+            "node:c1::p1": {"fulfillment": {"backorder_cost_per_day": 5.0}},
+            "node:m1": {"inventory": {"holding_cost_pct": 0.25}},
+        },
+        master=200.0,
+    )
+    assert not any(w.field == "target_key" for w in warns)

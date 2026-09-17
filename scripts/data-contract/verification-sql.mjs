@@ -1068,6 +1068,189 @@ async function wp42Landed() {
   });
 }
 
+// ── WP 4.3: the two T3 tables nothing has counted, and the before-figures ──
+//
+// THREE THINGS NOTHING HAS EVER MEASURED, and every one of them is a number
+// WP 4.3 cannot take after it has acted:
+//
+//  1. `supply_chain_data` and `supply_chain_data_multi_tier` row counts. They
+//     are the two ETL outputs in the contract, they are the tier-3 tables that
+//     GAIN `computed_from_hash` here, and WP 5.3 needs today's figure as its
+//     own before-number. WP 4.1's probes did not touch them and WP 4.2's four
+//     derived tables are a different set — so "how many derived rows carry no
+//     input hash" has only ever been answered for the network group.
+//
+//  2. `analysis_runs` BY KIND. WP 4.2 shipped with the count at zero and said
+//     so in three places. This package is the first real caller, so the
+//     after-run is the first time a non-zero count means anything at all — and
+//     it means ANALYZERS RAN, never adoption (§16 · WP 4.2 · N).
+//
+//  3. `network_nodes.uid`'s NULLABILITY, read from production rather than from
+//     the migration. D72's row asserts `uid` is NULLABLE and the creating
+//     migration says `uid text NOT NULL`; D43's whole class is production
+//     disagreeing with the migrations, so the only way to know which is true of
+//     the database the index will be created on is to ask it.
+//
+// EVERY project, never one (D42).
+async function wp43Before() {
+  section("WP 4.3 — the T3 tables that gain `computed_from_hash`, counted before the dual-write");
+
+  const t3 = await tryQ(`
+    select 'supply_chain_data'            as tbl,
+           count(*)::int                  as rows,
+           count(distinct project_id)::int as projects,
+           0::int                         as rows_with_input_hash
+      from public.supply_chain_data
+    union all
+    select 'supply_chain_data_multi_tier', count(*)::int, count(distinct project_id)::int, 0::int
+      from public.supply_chain_data_multi_tier`);
+  report("the two ETL outputs in the contract, counted for the first time", t3, (rows) => {
+    if (!rows?.length) { out("- No rows returned."); return; }
+    out(...table(rows));
+    const total = rows.reduce((a, r) => a + Number(r.rows || 0), 0);
+    out("");
+    out(
+      `- **${total} row(s) across the two tables, NONE carrying an input hash** — neither table has a ` +
+        "`computed_from_hash` column before this package. `rows_with_input_hash` is a literal `0` and not a " +
+        "count, because there is no column to count: that is the honest spelling of a before-figure for a " +
+        "column that does not exist yet, and the after-run replaces the literal with a real count.",
+    );
+    out(
+      "- These two are `combine-project`'s output. They are what `analysis_kind='combine_etl'` will key, and " +
+        "they are WP 5.3's before-number as much as this package's.",
+    );
+  });
+
+  const t3PerProject = await tryQ(`
+    select p.name as project,
+           (select count(*)::int from public.supply_chain_data t            where t.project_id = p.id) as supply_chain_data,
+           (select count(*)::int from public.supply_chain_data_multi_tier t where t.project_id = p.id) as multi_tier
+      from public.projects p order by p.created_at`);
+  report("the same two, per project (D42 — never just the seeded one)", t3PerProject, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+  });
+
+  // WHICH PROJECT THE GAP CHECK CAN RUN AGAINST, and which field CLASSES have
+  // no real data in it. §11's gap check is a field-by-field numeric comparison
+  // old-vs-new, and a comparison that silently covers nothing is this plan's
+  // recurring failure mode — so the field classes are counted SEPARATELY and the
+  // report says which of them is empty rather than reporting a clean comparison
+  // over zero values.
+  const fieldClasses = await tryQ(`
+    select p.name as project,
+           (select count(*)::int from public.network_nodes t where t.project_id = p.id) as nn_rows,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.degree_centrality is not null)             as degree,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.weighted_degree_centrality is not null)    as weighted_degree,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.eigenvector_centrality is not null)        as eigenvector,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.betweenness_centrality is not null)        as betweenness,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.closeness_centrality is not null)          as closeness,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.prominence is not null)                    as prominence,
+           (select count(*)::int from public.node_list t
+             where t.project_id = p.id and t.is_critical_node is not null)              as is_critical_node,
+           (select count(*)::int from public.node_list t
+             where t.project_id = p.id and t.critical_node_score is not null)           as critical_node_score
+      from public.projects p order by p.created_at`);
+  report("**the gap check's own coverage** — which project has real values, per FIELD CLASS", fieldClasses, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+    const cols = ["degree", "weighted_degree", "eigenvector", "betweenness", "closeness",
+                  "prominence", "is_critical_node", "critical_node_score"];
+    const totals = Object.fromEntries(cols.map((c) => [c, rows.reduce((a, r) => a + Number(r[c] || 0), 0)]));
+    const empty = cols.filter((c) => totals[c] === 0);
+    out("");
+    out(`- Per-class totals across every project: ${cols.map((c) => `\`${c}\` ${totals[c]}`).join(", ")}.`);
+    out(
+      empty.length
+        ? `- **${empty.length} field class(es) have NO real value in ANY project**: ${empty.map((c) => `\`${c}\``).join(", ")}. ` +
+          "§11's gap check cannot compare them against `analysis_results` on real data, and the gap check must SAY " +
+          "so rather than reporting a comparison that covered nothing."
+        : "- Every field class has at least one real value somewhere, so the gap check can cover all of them.",
+    );
+  });
+
+  // `analysis_runs` BY KIND. Zero before; a non-zero after means the analyzers
+  // ran, which is not the same sentence as adoption.
+  const kinds = await tryQ(`
+    select coalesce(r.analysis_kind, '(none)') as analysis_kind,
+           count(*)::int                        as runs,
+           count(*) filter (where r.status = 'succeeded')::int as succeeded,
+           count(*) filter (where r.status = 'running')::int   as still_running,
+           count(*) filter (where r.status = 'failed')::int    as failed,
+           (select count(*)::int from public.analysis_results ar where ar.run_id in
+              (select id from public.analysis_runs r2 where r2.analysis_kind = r.analysis_kind)) as result_rows
+      from public.analysis_runs r group by r.analysis_kind order by 1`);
+  report("`analysis_runs` by kind — WP 4.2 shipped this at ZERO", kinds, (rows) => {
+    if (!rows?.length) {
+      out(
+        "- **No runs at all.** WP 4.2 said so in three places and this re-measures it: every claim about a " +
+          "cache hit is still a claim about `supabase/rehearsal/` fixtures. WP 4.3 is the first real caller, so " +
+          "the after-run is the first time a non-zero count here means anything — and what it will mean is " +
+          "**ANALYZERS RUN**, never adoption.",
+      );
+      return;
+    }
+    out(...table(rows));
+  });
+
+  // D72, RE-MEASURED, and the nullability read from the database.
+  //
+  // The re-measure matters because the earlier figure is four weeks stale the
+  // moment an analyzer runs. The nullability matters because D72's row and the
+  // creating migration DISAGREE, and only production can settle which schema the
+  // index will actually be created on (D43's class).
+  const uidShape = await tryQ(`
+    select a.attname::text                                  as column_name,
+           a.attnotnull                                     as not_null,
+           (select count(*)::int from public.network_nodes)  as rows,
+           (select count(*)::int from public.network_nodes where uid is null) as null_uid,
+           (select coalesce(sum(copies - 1), 0)::int from (
+              select count(*)::int as copies from public.network_nodes
+               group by project_id, uid having count(*) > 1) d)
+                                                            as rows_a_unique_index_would_reject,
+           (select count(*)::int from (
+              select 1 from public.network_nodes
+               group by project_id, uid having count(*) > 1) d)
+                                                            as duplicated_keys
+      from pg_attribute a
+      join pg_class c on c.oid = a.attrelid
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relname = 'network_nodes'
+       and a.attname in ('uid', 'project_id') and a.attnum > 0
+     order by a.attname`);
+  report("D72 — re-measured, with `uid`'s NULLABILITY read from production and not from the migration", uidShape, (rows) => {
+    if (!rows?.length) { out("- `network_nodes` does not exist in production."); return; }
+    out(...table(rows));
+    const uid = rows.find((r) => r.column_name === "uid") ?? {};
+    const reject = Number(uid.rows_a_unique_index_would_reject ?? 0);
+    const notNull = uid.not_null === true || String(uid.not_null) === "true";
+    out("");
+    out(
+      `- **${reject} row(s) across ${uid.duplicated_keys ?? "?"} duplicated key(s)** would be rejected by the ` +
+        "unique index `calculate-network-science-metrics` already names in its `onConflict`. " +
+        (reject === 0
+          ? "So the fix is ONE `CREATE UNIQUE INDEX` with no dedup migration and no rows lost."
+          : "**A dedup migration IS needed**, on D5's shape (most complete copy, then the later one), before the index."),
+    );
+    out(
+      `- \`uid\` is **${notNull ? "NOT NULL" : "NULLABLE"}** in production, and \`null_uid\` is ${uid.null_uid ?? "?"}. ` +
+        (notNull
+          ? "**D72's row says `uid` is NULLABLE and that is wrong** — the creating migration declares " +
+            "`uid text NOT NULL` and production agrees. The row's CONCLUSION still holds: the index is spelled " +
+            "`NULLS NOT DISTINCT` anyway, because nullability is a schema property a later `ALTER` can change and " +
+            "the spelling is a no-op while there are no NULLs (D5's half nobody writes down). What changes is that " +
+            "it is defensive against a future `DROP NOT NULL` rather than corrective of a present NULL."
+          : "So the `NULLS NOT DISTINCT` spelling is load-bearing today, exactly as D5 says."),
+    );
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");

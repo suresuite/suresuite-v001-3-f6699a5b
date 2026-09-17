@@ -8098,6 +8098,127 @@ untouched.
     the debt.
 
 ---
+
+### WP 6.2 (partial) — D75, the plant grid's production overrides · 2026-09-17
+
+Not a work package and recorded as one on purpose: a defect found from OUTSIDE the
+plan, by a user saying that changing the focal plant's capacity on /policies and
+re-running changed nothing. Everything below is what checking that sentence cost.
+
+#### A · The report was half right, and the half it got wrong is the interesting one
+
+The user's diagnosis was "the files aren't mapping the key right, so it falls back
+to a default of 1000 unit/day and fill rate is low". The key half is exactly right
+and is now D75. **The causal half cannot be true, and the plan already says why.**
+The terminal fallback is `max(2·demand, 1000)` units per WEEK, and the blueprint
+names it as the canonical G4 anti-pattern *because it is chosen so the constraint
+never binds*. A capacity that never binds cannot depress a fill rate — production
+is then material-limited, so a low fill rate is a BOM, supplier or lead-time story.
+
+This matters beyond correcting one user. **A silent fallback does not only lose the
+value, it invents a plausible explanation for whatever the user sees next**, and
+that explanation is unfalsifiable from the UI because the substitution is invisible
+(§5 T2). The user read `1000` off the grid — `columnSpecs.ts:202`'s
+`defaultWhenMissing`, a DISPLAY default that never reaches an engine — and attached
+it to a symptom it cannot produce. The fix below makes the mapping honest; it should
+NOT be reported as a fill-rate fix, and the next reader of this entry should resist
+the temptation, because nothing in this package measured aumovio's fill rate.
+
+#### B · Three readers, not one — and the third is the one the blueprint cites
+
+`project_map.py` was the expected site. Grepping the other two found the same bare
+lookup in `sim-worker/sim_worker/engine.py` (the legacy engine) and in
+`scsim/scsim/io/legacy_graph.py` — **which is the file G1 cites as evidence that
+capacity survives per-node**, via `_SUPPORTED_OVERRIDE_FIELDS`. So the document's
+proof that the thing works pointed at one of the three places it did not. The set
+is a whitelist of two fields, both of them the plant stage's, both unreachable.
+
+#### C · The same file already did it right, twice
+
+`project_map.py` parses `<owner>::<target>` correctly for P-S.2 sourcing and for
+P-P.9's priority fold. The production family is a gap in a pattern, not an
+unmet requirement — which is why the fix is small and why it went unnoticed for so
+long: every reader who checked "does this file handle composite keys" found that it
+does.
+
+#### D · The generic guard, because a user should not be the detector
+
+D75 was found by a person noticing a number did not move. That is the detection
+mechanism this plan exists to replace. The fix therefore ships a rule and not only
+a lookup: an override key whose components name no supplier, material, product or
+customer now raises one `warn` naming the keys. It is deliberately about the KEY
+and not about capacity — the next stage to invent a target-key spelling trips it on
+the first run, with no one reading a grid.
+
+It is a warning and not a gate, and that is a limitation worth stating rather than
+hiding: `from_project_data` has no way to refuse a run, and `declared-fallback`
+(I6) is satisfied by a DECLARED fallback, not by a reachable one. **The gate this
+class actually needs is §8.1's `data_requirements` manifest with a run BLOCKED on
+missing required data** — Phase A in the blueprint. Until that lands, every finding
+here is a line in `mapping_warnings` that a user has to open.
+
+#### E · The precedence, which is not a bug and had to stay
+
+Master `products.production_capacity` (units/week) wins over the grid's line
+capacity (units/day). Both are edited on the same row, two columns apart, in
+different time units. The contract says master wins and the sidecar documents it,
+so the fix does NOT reorder them — it makes the shadowing emit an `info`. The same
+for `utilization_cap_pct`, which defaulted to 85 even when the policy row existed
+and said nothing.
+
+**The unit collision is left standing and should be looked at by whoever owns the
+grid**: two capacity columns side by side, one weekly and one daily, is a data-entry
+trap that no mapping fix can close, and mis-entering it by a factor of seven WOULD
+depress a fill rate — unlike the default the report blamed.
+
+#### F · Gap check — what this found and did not fix
+
+- **`supabase/functions/_shared/grading.ts` grades capacity from
+  `defaults.production` ONLY.** `buildReducerCtx` computes one scalar
+  `policyCapacity` for every product from the project defaults; `GradingDataset`
+  never receives `policy_overrides` at all. The divergence PRE-DATES this fix (a
+  bare `node:<product>` override was already invisible to it) but this fix widens
+  it from a spelling no UI writes to the one the plant grid does — so the
+  preflight now under-reports exactly the case the user hit, telling them capacity
+  is defaulted when the engine will use their value. **→ affects WP 6.2**: it is a
+  threading change through five callers plus the validation-parity fixture, not a
+  line, and it belongs with D18/D69 rather than bolted onto a reader fix.
+- **The plant stage's `inventory` columns** (`type`, `reorder_point`,
+  `order_up_to`, `safety_stock_days`, the `fg_*` group) are written under the same
+  composite key, and NO engine reads inventory per product at all — `project_map.py`
+  resolves the inventory family per MATERIAL. So they are D75's class one step
+  worse, in the class of the seven unread bundle fields WP 0.1 found. Not a key
+  mismatch; a missing reader. **→ affects WP 6.2.**
+- **The three legacy `1000.0` literals** (`engine.py`, `legacy_graph.py`,
+  `sim-worker/sim_worker/policies.py`) are units/DAY and become 5 950 units/week,
+  while scsim's terminal default is 1 000 units/WEEK. **The same literal, six times
+  apart, and no contract declares any of the three** — `declared-fallback` holds for
+  the ENGINE REGISTRY's fallbacks only, which §16's own `declared-fallback` row
+  already says. G2 says engine selection is an env flag, so which one a run gets is
+  environment-dependent. **→ affects WP 6.2**, and it is a new finding: G4 scopes
+  the invented default to `project_map.py` and these three are unmentioned.
+- **`docs/data/field-mapping.md` §6 asserted that per-node capacity patches
+  survive.** Corrected in this commit to describe the key forms actually joined.
+  The blueprint's G1 row makes the same claim and is left alone: it is a row about
+  a gap that is still open, and its parenthetical is now wrong in a way that D75
+  records.
+
+#### G · What was verified, and what was not
+
+Twelve tests across the three readers, **each confirmed RED before the fix** by
+stashing the source and re-running — five in `test_project_map.py`, one in
+`test_legacy_graph_overrides.py`, two in `test_engine.py`, plus four
+no-regression guards that pass either way (the bare-key spelling, and the four real
+target-key spellings not tripping the orphan guard). scsim 222 passed, sim-worker
+85 passed.
+
+**Not verified: any live project.** No §15 run was taken, so the number of
+`policy_overrides` rows this makes live — across all projects, which is the rule
+D42 exists to enforce — is unknown. Whoever picks up WP 6.2 should measure it
+BEFORE assuming the fix is inert, because every such row is a value a user typed
+that has never once been read, and some of them will now bind.
+
+---
 ---
 
 ### WP 4.3 — Migrate the analyzers (dual-write) · 2026-09-17 · `20260917000007`
