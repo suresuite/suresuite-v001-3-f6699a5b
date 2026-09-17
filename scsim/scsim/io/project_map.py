@@ -299,6 +299,32 @@ def _merged_policy(policies: dict, node_id: str, family: str) -> dict:
     return {**default, **override}
 
 
+def _composite_patches(policies: dict, family: str, targets: set[str]) -> dict[str, dict]:
+    """Index ``node:<owner>::<target>`` patches of ``family`` by their target.
+
+    The policy grid's two-key stages write one override row per pair — the
+    plant stage as ``<plant>::<product>``, the supplier stage as
+    ``<supplier>::<material>`` (``src/lib/policies/columnSpecs.ts``). The
+    engine only ever holds the target id, so a lookup keyed by the target
+    alone has to reach those rows or they are stored and never read. Same
+    parse as :func:`_multi_sourcing_weights` and the P-P.9 priority fold.
+
+    Keys are visited in sorted order so a project carrying more than one
+    owner per target resolves deterministically (the model is single-plant).
+    """
+    out: dict[str, dict] = {}
+    for key in sorted(k for k in policies if isinstance(k, str)):
+        if not key.startswith("node:") or "::" not in key:
+            continue
+        _owner, _, target = key[len("node:"):].partition("::")
+        if not target or target not in targets:
+            continue
+        patch = (policies.get(key) or {}).get(family) or {}
+        if patch:
+            out.setdefault(target, {}).update(patch)
+    return out
+
+
 # Extended fulfillment strategies the UI offers (FulfillmentStrategy) that the
 # engine does not model — they collapse to MTO. Warned so the collapse is never silent.
 _MODE_COLLAPSED_TO_MTO = {"cto", "configure_to_order", "eto", "engineer_to_order"}
@@ -507,10 +533,16 @@ def from_project_data(data: ProjectData) -> MappingResult:
         materials.append(Material(id=mid, name=mid, cost=cheapest_cost.get(mid, 1.0)))
 
     # ── Products ──
+    # The plant grid keys its production overrides "<focal plant>::<product>",
+    # so the composite index is what makes a per-row line-capacity edit reach
+    # the engine at all; the bare "node:<product>" form still wins nothing and
+    # loses nothing (§4 D75).
+    prod_composite = _composite_patches(data.policies, "production", prod_ids)
     products: list[Product] = []
     product_modes: set[FulfillmentMode] = set()
     for p in data.products:
-        prod_pol = _merged_policy(data.policies, p.id, "production")
+        prod_pol = {**_merged_policy(data.policies, p.id, "production"),
+                    **prod_composite.get(p.id, {})}
         # price
         if p.sell_price and p.sell_price > 0:
             price = float(p.sell_price)
@@ -530,12 +562,23 @@ def from_project_data(data: ProjectData) -> MappingResult:
             if mean <= 0:
                 w.append(MappingWarning("warn", f"product:{p.id}", "demand_mean",
                                         "no master demand_mean and no outbound volume → 0"))
-        # capacity
+        # capacity — master (units/week) wins over the plant grid's line
+        # capacity (units/day); say so rather than dropping the edit silently.
+        line_cap = prod_pol.get("capacity_units_per_day")
         if p.production_capacity and p.production_capacity > 0:
             cap = float(p.production_capacity)
-        elif prod_pol.get("capacity_units_per_day"):
-            util = float(prod_pol.get("utilization_cap_pct", 85.0)) / 100.0
-            cap = float(prod_pol["capacity_units_per_day"]) * 7.0 * util
+            if line_cap:
+                w.append(MappingWarning("info", f"product:{p.id}", "production_capacity",
+                                        "master production_capacity (units/week) shadows the "
+                                        "plant grid's line capacity (units/day) — the line "
+                                        "capacity entry is not applied"))
+        elif line_cap:
+            util_raw = prod_pol.get("utilization_cap_pct")
+            if util_raw is None:
+                w.append(MappingWarning("info", f"product:{p.id}", "utilization_cap_pct",
+                                        "production policy sets no utilization cap → 85%"))
+            util = float(85.0 if util_raw is None else util_raw) / 100.0
+            cap = float(line_cap) * 7.0 * util
             w.append(MappingWarning("info", f"product:{p.id}", "production_capacity",
                                     "no master capacity → derived from production policy"))
         else:
@@ -586,6 +629,23 @@ def from_project_data(data: ProjectData) -> MappingResult:
     policies = _map_policies(data.policies, w, n_customers=len(customers),
                              sups_by_mat=sups_by_mat,
                              has_mts=(FulfillmentMode.MTS in product_modes))
+
+    # Every override the user typed should reach SOME entity. A key whose
+    # components name no supplier, material, product or customer joins
+    # nothing in any family — the shape of §4 D75, caught here generically
+    # so the next stage to invent a target-key spelling is not silent.
+    known = prod_ids | mat_ids | sup_ids | customers
+    orphan_keys = sorted(
+        k for k in data.policies
+        if isinstance(k, str) and k.startswith("node:")
+        and not (set(k[len("node:"):].split("::")) & known)
+    )
+    if orphan_keys:
+        shown = ", ".join(orphan_keys[:5]) + ("…" if len(orphan_keys) > 5 else "")
+        w.append(MappingWarning(
+            "warn", "policy:overrides", "target_key",
+            f"{len(orphan_keys)} policy override(s) name no supplier, material, "
+            f"product or customer in this project and were not applied: {shown}"))
 
     scenario = Scenario(name=sc.name or "scenario", network=network,
                         settings=settings, events=events, policies=policies)

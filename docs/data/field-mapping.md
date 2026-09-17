@@ -165,6 +165,16 @@ Note: scsim policy parameters are global (scope G), so per-node policy patches o
 fields materialized onto Material/Product (holding cost, capacity); other per-node patches fall back
 to the project default and are reported.
 
+**Which target-key spelling joins what.** The /policies grid writes two shapes and the
+mapper reads both, most specific last. A bare `node:<id>` addresses a material (inventory)
+or a product (production); a composite `node:<owner>::<target>` is keyed by its TARGET —
+`<plant>::<product>` for the plant stage, `<supplier>::<material>` for sourcing,
+`<customer>::<product>` for fulfillment. This paragraph previously claimed capacity
+survived per node without saying which spelling; the composite one did not, on any of the
+three readers, and every plant-grid row was inert as a result — see PLAN.md §4 D75 for the
+evidence and the limits. An override whose components name no entity in the project now
+raises a `warn` rather than vanishing.
+
 ---
 
 ## 7. Run → save → persist contract (worker is the sole writer)

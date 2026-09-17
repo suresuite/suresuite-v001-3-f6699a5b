@@ -516,3 +516,39 @@ def test_half_width_narrows_with_n():
     hw_small = half_width_95(xs_small)
     hw_large = half_width_95(xs_large)
     assert hw_large < hw_small
+
+
+def test_production_composite_plant_key_capacity_applied():
+    """The /policies plant grid keys rows "<plant>::<product>" (§4 D75).
+
+    The bare `node:<product>` lookup never matched it, so a line-capacity
+    edit was stored and never read — production ran on the project default.
+    """
+    import numpy as np
+    from sim_worker.engine import _production_policy
+
+    g = _make_simple_graph()
+    policies = _default_policies()
+    policies["node:Focal plant::prod1"] = {
+        "production": {"capacity_units_per_day": 20.0}
+    }
+    assert _production_policy(policies, "prod1")["capacity_units_per_day"] == 20.0
+
+    # Material is ample, so the weekly capacity 20 × 7 × 0.85 = 119 binds.
+    state = SCState(
+        I={"mat1": 10_000.0},
+        SR={"mat1": [0.0] * 60},
+        BO={"prod1": 0.0}, WIP={}, disruptions={},
+    )
+    rng = np.random.default_rng(0)
+    Q_p, _, _ = _production_step(g, state, policies, "prod1", 500.0, 1, rng)
+    assert Q_p == pytest.approx(20.0 * 7.0 * 0.85)
+
+
+def test_production_bare_product_key_still_wins():
+    """No regression for the bare `node:<product>` spelling."""
+    from sim_worker.engine import _production_policy
+
+    policies = _default_policies()
+    policies["node:prod1"] = {"production": {"capacity_units_per_day": 33.0}}
+    assert _production_policy(policies, "prod1")["capacity_units_per_day"] == 33.0

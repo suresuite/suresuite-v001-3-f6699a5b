@@ -256,6 +256,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D72** | **`calculate-network-science-metrics` upserts `network_nodes` on a unique constraint that does not exist, so the statement fails every time it runs and the function logs the error and carries on.** `calculate-network-science-metrics/index.ts:114-115` calls `.upsert(upsertRows, { onConflict: 'project_id,uid' })` on the fallback path — the one that derives a graph from `supply_chain_data` when the network tables are empty and has to create the node rows before metrics can be stored against them. **`network_nodes` has no unique index on `(project_id, uid)`**: its only uniqueness is the surrogate `network_nodes_pkey` on `id`. PostgREST passes `on_conflict` through to `ON CONFLICT (project_id, uid)`, which PostgreSQL rejects with `42P10` *there is no unique or exclusion constraint matching the ON CONFLICT specification* — **verified against a real PostgreSQL 16, not read off the source**. The handler is `console.error(...)` with no throw and no early return, so the function proceeds to its per-node `.update()` loop, which matches zero rows because the nodes were never created, and then reports success. A project whose nodes exist only via that fallback gets NO metrics and NO error anybody sees. **This is D5's class arriving in the deferred group**, and the reason `natural-key` (I4) being MET does not cover it is that I4 and `contract:check` R5 are scoped to tier-2 tables IN THE CONTRACT — `network_nodes` is deferred, so R5 has never looked at it, which is D54's qualifier doing damage in a second place. **Found by WP 4.2 enumerating D56's blast radius**: the split cannot give the input half a natural key it does not have | `calculate-network-science-metrics/index.ts:114-115` against `network_nodes`'s indexes (`network_nodes_pkey` only) | WP 4.3 *(it owns the analyzer and the split D56 hands it; the key must land BEFORE the input half can be described, and landing it follows the dedup-then-index shape the natural-key package already proved — deduplicate on `(project_id, uid)` first, then create the unique index, `NULLS NOT DISTINCT` if either column is nullable (see D5 for why a plain index constrains nothing when a key column is nullable). **MEASURED, 2026-09-17 (§15 run `35233002946`, every project): 1 385 rows, `rows_a_unique_index_would_reject` = 0 across 0 duplicated keys, `null_uid` = 0** — so the fix is ONE `CREATE UNIQUE INDEX`, with no dedup migration and no rows to lose, which is cheaper than D5's seven lanes and should be re-budgeted as such. `NULLS NOT DISTINCT` is still the right spelling: `uid` is NULLABLE, and nullability is a schema property a later `ALTER` can change, which is the half D5 says nobody writes down)* |
 | **D73** | **The introspected artifact parsed `COMMENT ON FUNCTION` and threw it away, so a base rebuilt from the artifact had functions with no documentation — and only `--since HEAD` could see it.** `introspect.mjs:460-465` matched `COMMENT ON (TABLE\|COLUMN\|VIEW\|FUNCTION\|…)` and recorded the text for TABLE alone; every other target fell through the same `return`. Function records carried no `comment` field, `rehearsal-schema.mjs`'s `emitFunctions` had nothing to emit, and the reconstructed base silently lost it. **This is D52's class exactly** — the artifact disagreeing with what the migration did — and it has D52's signature too: `contract:rehearse` and `--fixtures` were both GREEN, because they build the base from the BASE branch's artifact and then RUN the migration, so the comment is applied by the statement itself. Only the third mode, which executes the artifact THIS branch wrote, meets the shape `main` gets after the merge. **Found by WP 4.2's rehearsal §8**, which asserts that `should_recalculate_network_metrics` carries a comment naming D12: green in two modes, red in the third with "Comment is: (none)". A second, quieter half came with it — a `CREATE OR REPLACE FUNCTION` rebuilt the record from scratch and would have dropped a comment an EARLIER migration had set, although PostgreSQL preserves it across a replace; the artifact now carries it forward | `introspect.mjs:460-465` (the discarding `return`); `rehearsal-schema.mjs`'s `emitFunctions`; `supabase/rehearsal/120` §8 is the assertion that caught it | WP 4.2 ✅ *(the introspector records the comment against the signature when the statement spells the arguments and against the bare name otherwise; the emitter writes every `COMMENT ON FUNCTION` AFTER all bodies, because a comment may live in a different migration from its `CREATE` and so cannot be replayed from the defining file the way the body is. 16 functions carry one today. All three modes green)* |
 | **D74** | **Eleven of thirteen generated table pages published the OPPOSITE of the truth about the natural key — the very invariant the pages exist to report.** `generate.mjs`'s `renderKeys` emitted, for every table carrying `natural_key_intended`, the sentence *"the key this table's grain implies and the database does NOT enforce today. A statement about what is missing, never a claim about what is there."* **Unconditionally.** It was accurate when WP 1.4 wrote it and WP 3.3 made it false the day it created the seven unique indexes: `natural_key_intended` deliberately STAYS on a table whose key has landed, because `contract:check` R5's second half compares the landed columns against it, so the field is load-bearing and only the prose was wrong. Measured from the generated contract: **11 tables landed and published as missing** (`inbound_logistics`, `outbound_logistics`, `bom_single_level`, `bom_multi_level`, `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, `customers`, `delegation_grants`, and the two this package added), **2 genuinely missing** (`projects`, `risk_data`). **This is D40's class exactly** — a generated page stating a fact the schema had moved on from, GENERATED and CI-GATED so it would have stayed true-looking indefinitely (T5 working against the truth rather than for it), and a §5 T1 breach in the documentation a user consults to decide whether a re-upload will duplicate their rows. **Found by WP 4.2 reading the page its own new sidecar generated** and noticing it claimed the store's key was unenforced while `rehearsal/120` §9 was proving it enforced | `generate.mjs`'s `renderKeys`; the 13 pages under `docs/data/tables/` carrying `natural_key_intended` | WP 4.2 ✅ *(the sentence is now conditional on whether the intended columns match a LANDED unique index — it names the constraint and says a re-upload updates rather than duplicates, or keeps the old wording when the key really is missing. The field is untouched, so R5's comparison is untouched. `npm run contract:generate` rewrote all 13 pages)* |
+| **D75** | **The /policies plant grid writes a composite target key and all three engine readers looked up a bare one, so every per-row production override was stored and never read.** The plant stage keys each row `"<focal plant>::<product_id>"` (`columnSpecs.ts:231`, pushed at `StagePolicyTable.tsx:700`), which reaches the engine as the map key `node:<focal plant>::<product_id>`. All three readers asked for `node:<product_id>` — no plant component — so the lookup never matched, `_merged_policy` returned the project `default.production` block alone, **and the miss emitted nothing**: no `MappingWarning`, no note, no log line. The two fields the plant stage offers per row, `capacity_units_per_day` and `utilization_cap_pct`, were inert on every project. **The blueprint asserts the opposite** — G1 names capacity as one of only two per-node overrides that survive, citing `_SUPPORTED_OVERRIDE_FIELDS`, and the field-mapping contract repeats it; the claim was true of the intent and false of the code, which is why nobody re-read it. The same file already parsed the composite form correctly TWICE for other stages — `supplier::material` for P-S.2 and `<plant>::<product>` for P-P.9's priority fold — so the production family is the one that was left behind rather than a spelling nobody had met. **This is D69's class** (a UI-owned value that silently becomes an engine default), reached from the other end: D69 found a table nobody loaded, this found a key nobody matched. **Found by a user reporting that editing the focal plant's capacity changed nothing**, which is the symptom a silent fallback is guaranteed to produce and the reason `diff-before-decision`'s logic belongs on the mapping too | `src/lib/policies/columnSpecs.ts:231` against `scsim/scsim/io/project_map.py:296-299`, `sim-worker/sim_worker/engine.py:45-49` and `scsim/scsim/io/legacy_graph.py:43-46` — the three bare-key lookups | WP 6.2 ✅ *(a reader change in all three, the shape D69 is budgeted as: `_composite_patches` at `project_map.py:302` indexes composite patches by their target and the product loop merges them most-specific-last, `_production_policy` at `sim-worker/sim_worker/engine.py:52` and `_merged_production` at `legacy_graph.py:49` do the same for the two legacy paths. The precedence that made the report only half right is now VISIBLE rather than reordered: master `products.production_capacity` (units/week) still wins over the grid's line capacity (units/day) — the contract says it should — and shadowing it now emits an `info`, as does the `utilization_cap_pct` default of 85 that fired even when the policy row existed. **A generic guard came with it**, because a key spelling nobody matched should not need a user to report it: an override whose components name no supplier, material, product or customer now raises one `warn` naming the keys. Twelve tests across the three readers, each confirmed RED before the fix. **Two follow-ons are NOT closed and are logged in §16**: `_shared/grading.ts` grades capacity from `defaults.production` only — `GradingDataset` never receives overrides at all — so the preflight now under-reports exactly the case the user hit; and the plant stage's `inventory` columns are written under the same composite key with no per-product reader in any engine)* |
 
 ### 4.1 Code map — the data layer
 
@@ -7969,6 +7970,127 @@ untouched.
   - **`audit-actor` (G4) is still NOT met** and this package did not move it. D71's
     26 stand at 26; the two new writers were built attributed rather than added to
     the debt.
+
+---
+
+### WP 6.2 (partial) — D75, the plant grid's production overrides · 2026-09-17
+
+Not a work package and recorded as one on purpose: a defect found from OUTSIDE the
+plan, by a user saying that changing the focal plant's capacity on /policies and
+re-running changed nothing. Everything below is what checking that sentence cost.
+
+#### A · The report was half right, and the half it got wrong is the interesting one
+
+The user's diagnosis was "the files aren't mapping the key right, so it falls back
+to a default of 1000 unit/day and fill rate is low". The key half is exactly right
+and is now D75. **The causal half cannot be true, and the plan already says why.**
+The terminal fallback is `max(2·demand, 1000)` units per WEEK, and the blueprint
+names it as the canonical G4 anti-pattern *because it is chosen so the constraint
+never binds*. A capacity that never binds cannot depress a fill rate — production
+is then material-limited, so a low fill rate is a BOM, supplier or lead-time story.
+
+This matters beyond correcting one user. **A silent fallback does not only lose the
+value, it invents a plausible explanation for whatever the user sees next**, and
+that explanation is unfalsifiable from the UI because the substitution is invisible
+(§5 T2). The user read `1000` off the grid — `columnSpecs.ts:202`'s
+`defaultWhenMissing`, a DISPLAY default that never reaches an engine — and attached
+it to a symptom it cannot produce. The fix below makes the mapping honest; it should
+NOT be reported as a fill-rate fix, and the next reader of this entry should resist
+the temptation, because nothing in this package measured aumovio's fill rate.
+
+#### B · Three readers, not one — and the third is the one the blueprint cites
+
+`project_map.py` was the expected site. Grepping the other two found the same bare
+lookup in `sim-worker/sim_worker/engine.py` (the legacy engine) and in
+`scsim/scsim/io/legacy_graph.py` — **which is the file G1 cites as evidence that
+capacity survives per-node**, via `_SUPPORTED_OVERRIDE_FIELDS`. So the document's
+proof that the thing works pointed at one of the three places it did not. The set
+is a whitelist of two fields, both of them the plant stage's, both unreachable.
+
+#### C · The same file already did it right, twice
+
+`project_map.py` parses `<owner>::<target>` correctly for P-S.2 sourcing and for
+P-P.9's priority fold. The production family is a gap in a pattern, not an
+unmet requirement — which is why the fix is small and why it went unnoticed for so
+long: every reader who checked "does this file handle composite keys" found that it
+does.
+
+#### D · The generic guard, because a user should not be the detector
+
+D75 was found by a person noticing a number did not move. That is the detection
+mechanism this plan exists to replace. The fix therefore ships a rule and not only
+a lookup: an override key whose components name no supplier, material, product or
+customer now raises one `warn` naming the keys. It is deliberately about the KEY
+and not about capacity — the next stage to invent a target-key spelling trips it on
+the first run, with no one reading a grid.
+
+It is a warning and not a gate, and that is a limitation worth stating rather than
+hiding: `from_project_data` has no way to refuse a run, and `declared-fallback`
+(I6) is satisfied by a DECLARED fallback, not by a reachable one. **The gate this
+class actually needs is §8.1's `data_requirements` manifest with a run BLOCKED on
+missing required data** — Phase A in the blueprint. Until that lands, every finding
+here is a line in `mapping_warnings` that a user has to open.
+
+#### E · The precedence, which is not a bug and had to stay
+
+Master `products.production_capacity` (units/week) wins over the grid's line
+capacity (units/day). Both are edited on the same row, two columns apart, in
+different time units. The contract says master wins and the sidecar documents it,
+so the fix does NOT reorder them — it makes the shadowing emit an `info`. The same
+for `utilization_cap_pct`, which defaulted to 85 even when the policy row existed
+and said nothing.
+
+**The unit collision is left standing and should be looked at by whoever owns the
+grid**: two capacity columns side by side, one weekly and one daily, is a data-entry
+trap that no mapping fix can close, and mis-entering it by a factor of seven WOULD
+depress a fill rate — unlike the default the report blamed.
+
+#### F · Gap check — what this found and did not fix
+
+- **`supabase/functions/_shared/grading.ts` grades capacity from
+  `defaults.production` ONLY.** `buildReducerCtx` computes one scalar
+  `policyCapacity` for every product from the project defaults; `GradingDataset`
+  never receives `policy_overrides` at all. The divergence PRE-DATES this fix (a
+  bare `node:<product>` override was already invisible to it) but this fix widens
+  it from a spelling no UI writes to the one the plant grid does — so the
+  preflight now under-reports exactly the case the user hit, telling them capacity
+  is defaulted when the engine will use their value. **→ affects WP 6.2**: it is a
+  threading change through five callers plus the validation-parity fixture, not a
+  line, and it belongs with D18/D69 rather than bolted onto a reader fix.
+- **The plant stage's `inventory` columns** (`type`, `reorder_point`,
+  `order_up_to`, `safety_stock_days`, the `fg_*` group) are written under the same
+  composite key, and NO engine reads inventory per product at all — `project_map.py`
+  resolves the inventory family per MATERIAL. So they are D75's class one step
+  worse, in the class of the seven unread bundle fields WP 0.1 found. Not a key
+  mismatch; a missing reader. **→ affects WP 6.2.**
+- **The three legacy `1000.0` literals** (`engine.py`, `legacy_graph.py`,
+  `sim-worker/sim_worker/policies.py`) are units/DAY and become 5 950 units/week,
+  while scsim's terminal default is 1 000 units/WEEK. **The same literal, six times
+  apart, and no contract declares any of the three** — `declared-fallback` holds for
+  the ENGINE REGISTRY's fallbacks only, which §16's own `declared-fallback` row
+  already says. G2 says engine selection is an env flag, so which one a run gets is
+  environment-dependent. **→ affects WP 6.2**, and it is a new finding: G4 scopes
+  the invented default to `project_map.py` and these three are unmentioned.
+- **`docs/data/field-mapping.md` §6 asserted that per-node capacity patches
+  survive.** Corrected in this commit to describe the key forms actually joined.
+  The blueprint's G1 row makes the same claim and is left alone: it is a row about
+  a gap that is still open, and its parenthetical is now wrong in a way that D75
+  records.
+
+#### G · What was verified, and what was not
+
+Twelve tests across the three readers, **each confirmed RED before the fix** by
+stashing the source and re-running — five in `test_project_map.py`, one in
+`test_legacy_graph_overrides.py`, two in `test_engine.py`, plus four
+no-regression guards that pass either way (the bare-key spelling, and the four real
+target-key spellings not tripping the orphan guard). scsim 222 passed, sim-worker
+85 passed.
+
+**Not verified: any live project.** No §15 run was taken, so the number of
+`policy_overrides` rows this makes live — across all projects, which is the rule
+D42 exists to enforce — is unknown. Whoever picks up WP 6.2 should measure it
+BEFORE assuming the fix is inert, because every such row is a value a user typed
+that has never once been read, and some of them will now bind.
 
 ---
 ---
