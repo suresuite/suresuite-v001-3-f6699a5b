@@ -78,9 +78,29 @@ R12 mutation-tested both ways.
 
 ---
 
+## CI on PR #222
+
+`contract`, `migrations run` and `audit` (bundle) are **green**. Two reds, both
+diagnosed:
+
+- **`audit` (ui-audit.yml) — NOT this PR's.** `npm run audit:ui` exits 1 on
+  `origin/main` with identical findings; the only difference is two line numbers
+  shifting because my edits added lines above them. Mobile-UI spec debt across six
+  pages, none of which this branch authored. Commented once on the PR, not fixed —
+  fixing six unrelated pages would widen the branch.
+- **`verify` (verification-sql.yml) — was MINE, and is fixed** (`D84`). Both gate
+  lines were probes asserting premises that had expired, not database defects. See
+  below.
+
 ## Needs a decision when you wake up
 
-1. **READ THE §15 REPORT FIRST.** WP 5.1's push requested it (no migration, so the
+1. **READ THE §15 REPORT FIRST — and note it came back RED for two bad gates, now
+   fixed (D84).** Neither was a database defect: one probe counted `pg_proc` rows
+   where it meant function names (WP 4.3's deploy-window overload took it 9 → 10),
+   the other asserted "every stored version predates v2" and the one version that
+   matched was the post-bump one — the anchor working, reported as a failure.
+   The answers it was asked for are sound and sit on the `verification-results`
+   branch. WP 5.1's push requested it (no migration, so the
    three-door rule allows it) and it answers three things nothing has measured:
    how many derived rows carry no input hash (the size of what WP 5.3 cannot
    migrate), how many proposals a page-load expired for grounding drift (**D70's
