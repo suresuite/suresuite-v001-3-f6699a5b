@@ -824,6 +824,135 @@ async function wp42Smear() {
   });
 }
 
+// ── WP 4.2: did the store actually reach production? ───────────────────────
+//
+// WP 4.1's after-run could not tell a landed deploy from a failed one: every
+// count came back identical to the before-run, which was correct for the data
+// and is also exactly what a failed deploy prints, because the counts are about
+// ROWS and the migration changed FUNCTIONS and COLUMNS (§16 · WP 4.1 · K).
+//
+// WP 4.2's migration creates TABLES, so the schema probe would catch a total
+// failure — but not a PARTIAL one, and the counts below would again be the same
+// on both sides of it because nothing has called the store. These assertions are
+// therefore about the SCHEMA, not the data, and they push to `gateFailures` so a
+// half-landed deploy turns the run red instead of publishing a report that looks
+// like the previous one.
+async function wp42Landed() {
+  section("WP 4.2 — did the analysis store reach production?");
+
+  const landed = await tryQ(`
+    select (select count(*)::int from information_schema.tables
+             where table_schema = 'public'
+               and table_name in ('analysis_runs','analysis_results'))            as store_tables,
+           (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+             where n.nspname = 'public'
+               and p.proname in ('analysis_get_or_start','analysis_complete_run',
+                                 'analysis_fail_run','analysis_results_are_immutable',
+                                 'analysis_runs_identity_is_immutable'))          as store_functions,
+           (select count(*)::int from pg_index i join pg_class c on c.oid = i.indexrelid
+             where c.relname = 'analysis_runs_key_uniq'
+               and i.indisunique and i.indpred is not null)                       as partial_unique_key,
+           (select count(*)::int from pg_trigger t
+             where not t.tgisinternal
+               and t.tgname like 'audit_analysis_%')                              as audit_triggers`);
+  report("the two tables, five functions, the partial key and the six audit triggers", landed, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    const want = { store_tables: 2, store_functions: 5, partial_unique_key: 1, audit_triggers: 6 };
+    const bad = Object.entries(want).filter(([k, v]) => Number(r[k]) !== v);
+    if (bad.length) {
+      gateFailures.push(
+        `WP 4.2's migration is NOT fully present in production: ` +
+        bad.map(([k, v]) => `${k} ${r[k] ?? "?"}/${v}`).join(", ") +
+        `. Every WP 4.2 count in this report is therefore a measurement of the ` +
+        `PRE-migration database wearing an after-run's label (§16 · WP 4.1 · K).`,
+      );
+      out("- **NOT LANDED.** See the GATE section at the end of this report.");
+      return;
+    }
+    out("- Landed: both tables, all five functions, the partial unique key and all six audit triggers.");
+  });
+
+  // THE KEY IS PARTIAL, and that is the deviation from §11 this package had to
+  // make (§16 · WP 4.2 · I). A full index would let the first FAILED run own a
+  // cache key forever, so the shape is asserted rather than assumed — a later
+  // migration that "tidied" it into a plain unique index would be silent.
+  const keydef = await tryQ(`
+    select pg_get_indexdef(i.indexrelid) as definition
+      from pg_index i join pg_class c on c.oid = i.indexrelid
+     where c.relname = 'analysis_runs_key_uniq'`);
+  report("the key index, as production actually holds it", keydef, (rows) => {
+    if (!rows?.length) { out("- The key index does not exist."); return; }
+    out(...table(rows));
+    if (!/WHERE .*status/i.test(String(rows[0].definition))) {
+      gateFailures.push(
+        "WP 4.2: `analysis_runs_key_uniq` is not partial in production. A failed run " +
+        "then owns its cache key permanently and that analysis can never be retried " +
+        "on that input (§11's flat key, and why this package deviated from it).",
+      );
+    }
+  });
+
+  // NOT ADOPTION, AND THIS REPORT MUST NOT BE READ AS IF IT WERE. Nothing has
+  // called the store outside a rehearsal; the row count is expected to be zero
+  // and zero is the honest answer rather than a failure.
+  const usage = await tryQ(`
+    select (select count(*)::int from public.analysis_runs)                        as runs,
+           (select count(*)::int from public.analysis_results)                     as results,
+           (select count(distinct project_id)::int from public.analysis_runs)      as projects,
+           (select count(*)::int from public.analysis_runs where actor_user_id is null) as runs_with_no_actor`);
+  report("what the store holds (expected: nothing — this is NOT adoption)", usage, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    if (Number(r.runs) === 0) {
+      out(
+        "- Zero runs, as expected. The analyzers do not call the store until WP 4.3 " +
+          "dual-writes, so every claim this package makes about a cache hit is a claim " +
+          "about `supabase/rehearsal/` fixtures. **A future non-zero count here is not " +
+          "adoption either until an analyzer is the caller.**",
+      );
+    }
+    if (Number(r.runs_with_no_actor) > 0) {
+      gateFailures.push(
+        `WP 4.2: ${r.runs_with_no_actor} run(s) carry no actor, which the NOT NULL ` +
+        "column should make impossible. `audit-actor` (G4) is failing in a new place.",
+      );
+    }
+  });
+
+  // D72's BEFORE-NUMBER, which WP 4.3 needs and cannot take after it has acted.
+  // `calculate-network-science-metrics` upserts `network_nodes` on
+  // `(project_id, uid)` and that index does not exist, so the statement fails
+  // every time it runs. Before the index can be created the duplicates have to be
+  // counted — exactly the way D5's before-number was taken for the seven lanes.
+  const d72 = await tryQ(`
+    select count(*)::int as rows,
+           count(*) filter (where uid is null)::int as null_uid,
+           (select coalesce(sum(copies - 1), 0)::int from (
+              select count(*)::int as copies from public.network_nodes
+               group by project_id, uid having count(*) > 1) d)
+             as rows_a_unique_index_would_reject,
+           (select count(*)::int from (
+              select 1 from public.network_nodes
+               group by project_id, uid having count(*) > 1) d)
+             as duplicated_keys
+      from public.network_nodes`);
+  report("D72 — `network_nodes (project_id, uid)` before any index is attempted", d72, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    out("");
+    out(
+      `- **${r.rows_a_unique_index_would_reject ?? "?"} row(s) across ` +
+        `${r.duplicated_keys ?? "?"} duplicated key(s)** would be rejected by the unique index ` +
+        "`calculate-network-science-metrics:115` already names in its `onConflict`. " +
+        "Until it exists that upsert raises `42P10` on every run, the handler logs and " +
+        "carries on, and the per-node update loop then matches nothing (D72). " +
+        `\`null_uid\` is ${r.null_uid ?? "?"} — a nullable key column means the index must be ` +
+        "`NULLS NOT DISTINCT` or it constrains every row except those (D5).",
+    );
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");
@@ -1272,6 +1401,7 @@ async function main() {
   await ingestTables();
   await graphHashBlastRadius();
   await wp42Smear();
+  await wp42Landed();
 
   const project = await pickProject();
   if (!project) {
