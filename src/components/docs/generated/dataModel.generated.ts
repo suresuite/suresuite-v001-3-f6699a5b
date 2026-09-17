@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "a29fd67bde88";
+export const CONTRACT_VERSION = "ee1a27bc7429";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260917000006_analysis_store.sql";
+export const LAST_MIGRATION = "20260917000007_analyzer_provenance.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
-  "tablesDescribed": 39,
-  "columnsDescribed": 456,
-  "tablesUndescribed": 42
+  "tablesDescribed": 43,
+  "columnsDescribed": 535,
+  "tablesUndescribed": 38
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -181,9 +181,33 @@ export const TIERS: GlanceTier[] = [
         "owner": "platform"
       },
       {
+        "table": "network_edges",
+        "grain": "One directed relationship between two firms in one project's deep-tier graph. EVERY column is uploaded — nothing computes this table, which is why it gains no `computed_from_hash` in WP 4.3 although it sits in `graphHashCoverage.test.ts`'s DERIVED_AND_OUT list by name.",
+        "columns": 15,
+        "owner": "analysis"
+      },
+      {
+        "table": "network_nodes",
+        "grain": "One firm in one project's deep-tier network graph, identified by `uid`. THE TABLE IS TWO THINGS AND THAT IS §4 D56: nine columns a user uploaded and eight an analysis wrote. WP 4.3 gives the computed half a second home in `analysis_results`; WP 5.3 drops it from here, and what is left is a tier-2 input table.",
+        "columns": 30,
+        "owner": "analysis"
+      },
+      {
+        "table": "network_summary",
+        "grain": "One rolled-up description of one project's deep-tier graph: node and edge counts and a per-depth breakdown. Every value column is derived.",
+        "columns": 13,
+        "owner": "analysis"
+      },
+      {
+        "table": "node_list",
+        "grain": "One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others.",
+        "columns": 19,
+        "owner": "analysis"
+      },
+      {
         "table": "supply_chain_data",
         "grain": "One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild.",
-        "columns": 20,
+        "columns": 22,
         "owner": "etl"
       },
       {
@@ -318,28 +342,6 @@ export const TIERS: GlanceTier[] = [
 
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
-  {
-    "wp": "4.3",
-    "why": "Analysis output, and the four tables D56's decision is about. WP 4.2 built the store (`analysis_runs` + `analysis_results`) and DECIDED what these are: `network_nodes` and `node_list` are BOTH — each carries columns a user uploaded beside columns an analysis wrote, which is D19 stated precisely in one table and is why \"what tier is it\" has no answer while the table is one thing. So the answer is a SPLIT, not a tier, and WP 4.3 executes it because the computed half has nowhere to go until the analyzers dual-write into `analysis_results`. Two things must land before the input half can be described: D72 (`network_nodes` has no unique key on `(project_id, uid)`, so an upsert that names one fails every time it runs) and the second `schema_version` bump that describing it would force, because WP 4.1's coverage rule folds a described tier-2 input table into `hash_network` the moment its sidecar exists. §4 D56 carries the enumerated blast radius — every writer, every reader, every RPC — so this package inherits it rather than rediscovering it.",
-    "tables": [
-      {
-        "table": "network_edges",
-        "columns": 15
-      },
-      {
-        "table": "network_nodes",
-        "columns": 28
-      },
-      {
-        "table": "network_summary",
-        "columns": 11
-      },
-      {
-        "table": "node_list",
-        "columns": 17
-      }
-    ]
-  },
   {
     "wp": "4.4",
     "why": "`model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",

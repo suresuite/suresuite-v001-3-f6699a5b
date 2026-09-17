@@ -227,17 +227,31 @@ describe("export is a governed action — the first check there has ever been", 
  * discovering it needs two months late.
  */
 describe("the actor reaches the trigger — a ratchet on the class D36 was one slice of", () => {
-  /** Known, measured, and owned by WP 6.2. Shrinking this list is the work. */
+  /**
+   * Known, measured, and owned by WP 6.2. Shrinking this list is the work.
+   *
+   * WP 4.3 SHRANK IT BY TEN WITHOUT WRITING A LINE OF SQL, and that is a
+   * correction rather than an achievement: the ten below all call
+   * `set_current_user_context`, which has set `app.current_user_id` LOCAL since
+   * 2025-08-20, and the scan above could not follow the call. They were never
+   * unattributed. See the comment on `guc` — and §4 D71, corrected in the same
+   * commit, because "26 write, TWO attribute" was this scan's reading and the
+   * honest figures are 31 writers (four more tables are described now) of which
+   * 15 attribute.
+   *
+   *   bulk_insert_bom_multi_level · bulk_insert_bom_single_level
+   *   bulk_insert_inbound_logistics · bulk_insert_multi_tier_supply_chain
+   *   bulk_insert_outbound_logistics · bulk_insert_tier2_suppliers
+   *   bulk_insert_tier3_suppliers · combine_project_into_supply_chain
+   *   delete_project · delete_project_dataset
+   */
   const UNATTRIBUTED = [
     "analysis_mark_critical_nodes", "apply_policy_bundle", "assign_bom_line",
-    "assign_outbound_customer", "bulk_insert_bom_multi_level",
-    "bulk_insert_bom_single_level", "bulk_insert_inbound_logistics",
-    "bulk_insert_multi_tier_supply_chain", "bulk_insert_outbound_logistics",
-    "bulk_insert_tier2_suppliers", "bulk_insert_tier3_suppliers",
+    "assign_outbound_customer",
     "bulk_upsert_materials", "bulk_upsert_policy_overrides", "bulk_upsert_products",
-    "bulk_upsert_suppliers", "clear_policy_preset", "combine_project_into_supply_chain",
-    "create_default_policy_defaults", "delete_policy_override", "delete_project",
-    "delete_project_dataset", "ensure_item_masters", "etl_replace_supply_chain",
+    "bulk_upsert_suppliers", "clear_policy_preset",
+    "create_default_policy_defaults", "delete_policy_override",
+    "ensure_item_masters", "etl_replace_supply_chain",
     "mrp_apply_staged_products", "restore_policy_version", "save_policy_defaults",
   ];
 
@@ -267,8 +281,34 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
       if (!writes) continue;
       out.push({
         name,
+        // WP 4.3 · `set_current_user_context` JOINS `assert_writer_may_act` HERE,
+        // AND THE REASON IS A CORRECTION RATHER THAN AN ACCOMMODATION.
+        //
+        // Describing the four deep-tier tables (WP 4.3) brought five more
+        // writers into the scan's scope — `bulk_insert_network_nodes`,
+        // `..._edges`, `..._summary`, `rebuild_node_list`,
+        // `upload_node_list_data` — and every one of them opens with
+        // `PERFORM public.set_current_user_context(p_user_id, p_user_email)`,
+        // whose body is `set_config('app.current_user_id', user_id::text, true)`
+        // (`20250820165722`). They have named their actor since 2025-08-20. The
+        // scan could not see it because a text scan cannot follow a call, which
+        // is the same limitation `VIA_SHARED_PREAMBLE` was written for one
+        // package earlier.
+        //
+        // SO D71's HEADLINE NUMBER OVER-COUNTS. "26 SECURITY DEFINER functions
+        // write a tier-2/3/4 table and TWO set `app.current_user_id`" was
+        // measured with this scan, and the second figure counts the two that set
+        // the GUC IN THEIR OWN BODY rather than the ones that attribute. §4 D71
+        // and §16 are corrected in the same commit.
+        //
+        // Special-casing a helper is only honest if something PROVES it, so
+        // `supabase/rehearsal/130` §10 performs a `bulk_insert_network_nodes`
+        // with `app.current_user_id` deliberately POISONED first and reads the
+        // audit row back. Widening a scan without that is how a ratchet starts
+        // lying about its own method.
         guc: /set_config\s*\(\s*'app\.current_user_id'/i.test(body)
-          || /assert_writer_may_act/.test(body),
+          || /assert_writer_may_act/.test(body)
+          || /set_current_user_context/.test(body),
         actor: /_actor|_user_id|p_user_id|_by_user/i.test(body),
       });
     }

@@ -38,30 +38,6 @@
 # the number for all of them on every run.
 
 deferred:
-  - wp: "4.3"
-    why: >-
-      Analysis output, and the four tables D56's decision is about. WP 4.2 built
-      the store (`analysis_runs` + `analysis_results`) and DECIDED what these are:
-      `network_nodes` and `node_list` are BOTH — each carries columns a user
-      uploaded beside columns an analysis wrote, which is D19 stated precisely in
-      one table and is why "what tier is it" has no answer while the table is one
-      thing. So the answer is a SPLIT, not a tier, and WP 4.3 executes it because
-      the computed half has nowhere to go until the analyzers dual-write into
-      `analysis_results`. Two things must land before the input half can be
-      described: D72 (`network_nodes` has no unique key on `(project_id, uid)`, so
-      an upsert that names one fails every time it runs) and the second
-      `schema_version` bump that describing it would force, because WP 4.1's
-      coverage rule folds a described tier-2 input table into `hash_network` the
-      moment its sidecar exists. §4 D56 carries the enumerated blast radius —
-      every writer, every reader, every RPC — so this package inherits it rather
-      than rediscovering it.
-    tables: [network_nodes, network_edges, network_summary, node_list]
-    audited:
-      network_nodes: false
-      network_edges: false
-      network_summary: false
-      node_list: false
-
   - wp: "4.4"
     why: >-
       `model_validations` is a VALIDATION CARD, not analysis output — it already

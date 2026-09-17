@@ -421,8 +421,10 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
         }
       };
 
+      // WP 4.3 · the analyzer writes tier 3 through an RPC that takes the
+      // actor, so the actor travels with the request (invariant audit-actor).
       const { error: calcError } = await supabase.functions.invoke('calculate-network-science-metrics', {
-        body: { project_id: projectId }
+        body: { project_id: projectId, uploaded_by: user?.id }
       });
 
       if (calcError) {

@@ -1,0 +1,510 @@
+# AUTHORED — the data contract's sidecar for `node_list`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# WP 1.4 renders from the two together.
+#
+# WP 4.3 · §11. Described for the first time here. It was deferred through WP 3.1,
+# 3.2 and 4.2 because "what tier is it" had no answer while the table was one
+# thing — see §4 D56, which decided that `network_nodes` and `node_list` are BOTH
+# and that the answer is a SPLIT rather than a tier. Tier 3 is the honest label
+# TODAY: what these tables are FOR is analysis output, the anchor already treats
+# them as derived (`graphHashCoverage.test.ts`'s DERIVED_AND_OUT), and calling the
+# uploaded half tier 2 before WP 5.3 drops the computed columns would fold an
+# analysis's own output into the identity of its inputs.
+table: node_list
+tier: "3"
+schema_name: public
+grain: >-
+  One node of one project's supply chain, derived from `supply_chain_data`
+  by `refresh_node_list_for_project`. Like `network_nodes` it is two things
+  (D56): the derivation and the geocoder write some columns, the criticality
+  prediction others.
+owner: analysis
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "node_list_pkey"
+  - source: "table constraint 20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+    columns: [project_id, node_id]
+    name: "node_list_unique_per_project"
+
+natural_key_intended: [project_id, node_id]
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: true
+  rls_enabled: true
+  note: >-
+    Read follows project reachability. Written by `refresh_node_list_for_project`, which
+    took only a project id until WP 4.3 gave it a two-argument overload that names the
+    actor — `combine-project` had the actor all along and nothing told the trigger, the
+    same shape as `assign_material_supplier` in WP 3.3. Also written by
+    `geocode-locations` through PostgREST, which is D36's class and is NOT closed here.
+    `audited: true` as of WP 4.3.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. Carries no meaning: what identifies a
+      row here is the natural key, not this.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this row belongs to. Referenced by uuid and never by a
+      displayable name (`uuid-identity`, G1); cascades on project
+      delete.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  plant_name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The plant label the row was uploaded under. NOT a project scope —
+      a plant name is not unique across projects, which is the ambiguity
+      `analysis_mark_critical_nodes` had to work around by deriving the
+      project from the rows it was given.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  node_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The node's identifier within the project, derived by
+      `refresh_node_list_for_project` from `supply_chain_data`. Natural
+      key with `project_id`.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  node_type:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Supplier, plant, customer — the echelon the node sits in, derived
+      by the refresh.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  node_group:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Grouping label for the node, derived by the refresh.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  description_text:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Free-text description carried through from the source row.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  location_text:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The location string the source row carried. `geocode-locations`
+      reads it to produce `latitude`/`longitude`.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  longitude:
+    type: "numeric"
+    unit: null
+    unit_source: none
+    meaning: >-
+      ANALYSIS OUTPUT — written by `geocode-locations` from
+      `location_text`, NOT uploaded. It carries no provenance of its
+      own: the geocoder is not yet a registered analysis kind, so
+      `computed_from_hash` on this row describes the CRITICALITY columns
+      only. Named for WP 4.4.
+    grain: level
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Analyzer output. Not an engine input — and deliberately outside
+      `graph_hash` too, since folding a result into the identity of its
+      own inputs is what `input-hash` (I5) exists to prevent.
+  latitude:
+    type: "numeric"
+    unit: null
+    unit_source: none
+    meaning: >-
+      ANALYSIS OUTPUT — see `longitude`.
+    grain: level
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Analyzer output. Not an engine input — and deliberately outside
+      `graph_hash` too, since folding a result into the identity of its
+      own inputs is what `input-hash` (I5) exists to prevent.
+  is_critical_node:
+    type: "boolean"
+    unit: null
+    unit_source: none
+    meaning: >-
+      ANALYSIS OUTPUT — the critical-node prediction. NOTE that the LIVE
+      writer of this prediction is `analysis_mark_critical_nodes`, which
+      writes `supply_chain_data`, not this table; these columns are the
+      older destination and §15 has never measured whether anything
+      still fills them.
+    grain: level
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Analyzer output. Not an engine input — and deliberately outside
+      `graph_hash` too, since folding a result into the identity of its
+      own inputs is what `input-hash` (I5) exists to prevent.
+  critical_node_score:
+    type: "numeric"
+    unit: null
+    unit_source: none
+    meaning: >-
+      ANALYSIS OUTPUT — the prediction score. See `is_critical_node` on
+      which destination is live.
+    grain: level
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Analyzer output. Not an engine input — and deliberately outside
+      `graph_hash` too, since folding a result into the identity of its
+      own inputs is what `input-hash` (I5) exists to prevent.
+  prediction_timestamp:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the prediction columns were last written. Superseded by
+      `computed_at`.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  created_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who created the row, as the uploader asserted it. This
+      application authenticates against `approved_users` rather than
+      Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint,
+      not proof of identity (D28).
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  organization:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Legacy organization display string, defaulted to `default_org`. A
+      DISPLAY name and never a join key (`uuid-identity`, G1): the live
+      predicate is `org_is_current_user_org`, uuid-only since WP 3.0
+      (D29).
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Row insert time, maintained by the database.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Row update time, maintained by the database. When a row was
+      TOUCHED is not what it SAYS, which is why `input-hash` (I5) is
+      anchored on `computed_from_hash` and not on this (§4 D12).
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      The engine reads the tier-2 dataset through `datamap.py` and never
+      the deep-tier graph, so no column of this table reaches it. The
+      two centrality ANALYZERS do read some of them — `meaning` says
+      which.
+  computed_from_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this
+      row's computed columns — the world the number came from. NULL
+      means "written before WP 4.3, provenance unknown", which is a
+      reportable state and not a silent default (`declared-fallback`,
+      I6). This is the column invariant `input-hash` (I5) is about.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Provenance. Not an engine input; it describes where a number came
+      from.
+  computed_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      WP 4.3 · when the run that wrote the computed columns finished. It
+      is provenance, not staleness: staleness is `computed_from_hash <>
+      current_graph_hash()`, which is WP 4.4's one rule, and a timestamp
+      comparison is the thing that rule replaces (§4 D12).
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+    note: >-
+      Provenance. Not an engine input; it describes where a number came
+      from.

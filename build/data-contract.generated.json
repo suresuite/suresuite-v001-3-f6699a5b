@@ -5,11 +5,11 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 324,
-      "migrations_applied": 321,
-      "last_migration": "20260917000006_analysis_store.sql"
+      "migrations_found": 325,
+      "migrations_applied": 322,
+      "last_migration": "20260917000007_analyzer_provenance.sql"
     },
-    "sidecars": 39,
+    "sidecars": 43,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
@@ -17,8 +17,8 @@
   },
   "counts": {
     "tables_in_schema": 81,
-    "tables_covered": 39,
-    "columns_covered": 456,
+    "tables_covered": 43,
+    "columns_covered": 535,
     "check_constraints": 19,
     "engine_requirements": 7,
     "orphans": 0,
@@ -9814,6 +9814,2863 @@
       ],
       "note": "DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES. The deferral that pointed here called these \"the other inbound datasets, each with its own bespoke upload path\". `tier2_suppliers` and `tier3_suppliers` are that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either: `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every occurrence is in migrations — created 2025-08-20, carried through RLS rewrites since, most recently by `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS NULL FOR THAT REASON: there is no CSV to name a column of. It is described here rather than deferred again because a deferral is a promise that someone will look, and five packages of looking have now established what there is to see. DROPPING IT IS NOT THIS PACKAGE'S CALL — a table is not removed by the package that happened to notice. WP 3.2's gap check added the count to §15 so that the package which does decide is deciding against a number, AND THE NUMBER IS ZERO: run `35143830532`, 2026-09-16, reports 0 rows across 0 projects. So it is not a table whose data nobody reads; it is a table with no data, no reader and no writer. Recorded here and as D58 rather than acted on."
     },
+    "network_edges": {
+      "table": "network_edges",
+      "schema_name": "public",
+      "tier": "3",
+      "tier_name": "derived — a pure function of tier 2",
+      "grain": "One directed relationship between two firms in one project's deep-tier graph. EVERY column is uploaded — nothing computes this table, which is why it gains no `computed_from_hash` in WP 4.3 although it sits in `graphHashCoverage.test.ts`'s DERIVED_AND_OUT list by name.",
+      "owner": "analysis",
+      "created_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+      "sidecar": "supabase/contract/network_edges.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "network_edges_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Read follows project reachability. No user-facing write policy; uploads go through `bulk_insert_network_edges`, which takes the actor. `audited: true` as of WP 4.3 (`20260917000007`); it was deferred and therefore unaudited before that (D54)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Network edges: project access delete",
+            "command": "DELETE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network edges: project access insert",
+            "command": "INSERT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network edges: project access update",
+            "command": "UPDATE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network edges: project access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_edges.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "network_edges_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_network_edges_project_id",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user the upload named. Same client-asserted caveat as `created_by` (D28).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row insert time, maintained by the database.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "src_uid",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Source node `uid`. Part of the natural key with `project_id` and `dst_uid`; READ BY THE PROMINENCE ANALYSIS, so it is digested by `network_topology_hash`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "dst_uid",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Destination node `uid`. Part of the natural key; digested by `network_topology_hash`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "relation_type",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the edge represents (supplier, customer, …), as uploaded.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "relative_revenue",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The share of revenue this relationship carries, as uploaded. READ BY THE PROMINENCE ANALYSIS as the edge weight, so it is digested by `network_topology_hash` — changing it changes every centrality in the project.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "relative_revenue_percentage",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The same share expressed as a percentage. Uploaded, and read by no analysis — a second spelling of one fact, which is the shape `single-source` (I1) exists to refuse. Named for the WP 6.2 sweep.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "depth",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Tier distance of the edge from the seed, as uploaded.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "direction",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Upstream or downstream relative to the seed, as uploaded.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        }
+      ],
+      "note": null
+    },
+    "network_nodes": {
+      "table": "network_nodes",
+      "schema_name": "public",
+      "tier": "3",
+      "tier_name": "derived — a pure function of tier 2",
+      "grain": "One firm in one project's deep-tier network graph, identified by `uid`. THE TABLE IS TWO THINGS AND THAT IS §4 D56: nine columns a user uploaded and eight an analysis wrote. WP 4.3 gives the computed half a second home in `analysis_results`; WP 5.3 drops it from here, and what is left is a tier-2 input table.",
+      "owner": "analysis",
+      "created_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+      "sidecar": "supabase/contract/network_nodes.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "network_nodes_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "uid"
+          ],
+          "name": "network_nodes_natural_key"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "uid"
+      ],
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Read follows project reachability (`has_project_access`), uuid-only since WP 3.0. `write: null` is a STATEMENT and not an omission: there is no user-facing write policy. Uploads go through `bulk_insert_network_nodes`, which takes the actor and sets `app.current_user_id` through `set_current_user_context`; the analysis half goes through `analysis_apply_node_metrics` (WP 4.3), which takes the actor and stamps the run's `input_hash`. `audited: true` as of WP 4.3 — the three `audit_tier_write` triggers land in `20260917000007`, and until then this table was deferred in `coverage.yaml`, which is to say OUTSIDE the audit rule with nothing to notice (D54)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Network nodes: project access delete",
+            "command": "DELETE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network nodes: project access insert",
+            "command": "INSERT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network nodes: project access update",
+            "command": "UPDATE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network nodes: project access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_nodes.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "network_nodes_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_network_nodes_prominence",
+          "unique": false,
+          "columns": [
+            "prominence"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250905140016_b6e8e382-459a-4cbc-be12-cd46c578a61d.sql"
+        },
+        {
+          "name": "idx_network_nodes_project_id",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
+        },
+        {
+          "name": "idx_network_nodes_project",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260712110000_network_metrics_check_performance.sql"
+        },
+        {
+          "name": "network_nodes_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "uid"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260917000007_analyzer_provenance.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user the upload named. Same client-asserted caveat as `created_by` (D28).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row insert time, maintained by the database.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "uid",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The node's identifier within the project's graph, as the uploaded CSV gave it. It is the natural key with `project_id`, and `network_nodes_natural_key` has enforced that since WP 4.3 — before which there was NO unique index behind it and `calculate- network-science-metrics`'s fallback upsert named a conflict target PostgreSQL rejected with 42P10 on every run (§4 D72). NULLS NOT DISTINCT, because `uid` is nullable and a plain index would constrain every row except the null ones (D5).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "depth",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Tier distance from the seed firm: 0 is the seed, 1 its direct partners, and so on. Uploaded, not computed.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Display name of the firm. Cosmetic — a rename must never invalidate a run, which is why `graphHashCoverage.test.ts` excludes `name` from the anchor.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Country of the firm, as uploaded. Joined to `risk_data` by country for the network risk views.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "industry",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Industry label of the firm, as uploaded.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "website",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Firm website, as uploaded. Display only.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "traded_as",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Ticker or trading symbol, as uploaded. Display only.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "number_of_employees",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Headcount, as uploaded. Read by no analysis and by no engine mapping today — same class as D18, and a candidate for the WP 6.2 sweep.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "revenue",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Firm revenue, as uploaded. READ BY THE PROMINENCE ANALYSIS (`get_network_nodes_for_prominence` returns it), so it is one of the six columns `network_topology_hash` digests.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "lat",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Latitude, as uploaded. Display only — the map reads `node_list`, not this table.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "long",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Longitude, as uploaded. Display only.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "is_seed",
+          "type": "boolean",
+          "nullable": true,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "True for the focal firm the deep-tier crawl started from.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "prominence",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250905140016_b6e8e382-459a-4cbc-be12-cd46c578a61d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — `calculate-node-prominence`'s composite score. Dual-written into `analysis_results` since WP 4.3, so it can be read with the run, the input hash and the code version that produced it. WP 5.3 drops the column once every reader has moved.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "prominence_updated_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250905140016_b6e8e382-459a-4cbc-be12-cd46c578a61d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When `prominence` was last written. Superseded by the run: `computed_at` and `computed_from_hash` say the same thing and more. Dropped with the column in WP 5.3.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "degree_centrality",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — `calculate-network-science-metrics`. Dual- written into `analysis_results` since WP 4.3.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "weighted_degree_centrality",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — degree weighted by `relative_revenue`. Dual- written since WP 4.3.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "eigenvector_centrality",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — dual-written since WP 4.3.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "betweenness_centrality",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — dual-written since WP 4.3.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "closeness_centrality",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — dual-written since WP 4.3.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "network_metrics_updated_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the five centralities were last written. Superseded by `computed_at`; dropped with the columns in WP 5.3.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_from_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means \"written before WP 4.3, provenance unknown\", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Provenance. Not an engine input; it describes where a number came from.",
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Provenance. Not an engine input; it describes where a number came from.",
+          "engine_requirement": null
+        }
+      ],
+      "note": null
+    },
+    "network_summary": {
+      "table": "network_summary",
+      "schema_name": "public",
+      "tier": "3",
+      "tier_name": "derived — a pure function of tier 2",
+      "grain": "One rolled-up description of one project's deep-tier graph: node and edge counts and a per-depth breakdown. Every value column is derived.",
+      "owner": "analysis",
+      "created_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+      "sidecar": "supabase/contract/network_summary.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "network_summary_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Read follows project reachability. `bulk_insert_network_summary` exists and HAS NO CALLER AT ALL — §4 D56 records it, and §15 has never counted the table's rows. Described here rather than deferred a fourth time, because a table nothing writes still carries RLS policies that every governance rewrite has had to maintain. `audited: true` as of WP 4.3."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Network summary: project access delete",
+            "command": "DELETE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network summary: project access insert",
+            "command": "INSERT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network summary: project access update",
+            "command": "UPDATE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Network summary: project access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM projects p WHERE p.id = network_summary.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "network_summary_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user the upload named. Same client-asserted caveat as `created_by` (D28).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row insert time, maintained by the database.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "nodes_count",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — the node count of the project's graph.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "edges_count",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — the edge count of the project's graph.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "tiers_data",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — per-depth breakdown of the graph, as jsonb.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_from_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means \"written before WP 4.3, provenance unknown\", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Provenance. Not an engine input; it describes where a number came from.",
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Provenance. Not an engine input; it describes where a number came from.",
+          "engine_requirement": null
+        }
+      ],
+      "note": null
+    },
+    "node_list": {
+      "table": "node_list",
+      "schema_name": "public",
+      "tier": "3",
+      "tier_name": "derived — a pure function of tier 2",
+      "grain": "One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others.",
+      "owner": "analysis",
+      "created_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+      "sidecar": "supabase/contract/node_list.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "node_id"
+          ],
+          "name": "node_list_unique_per_project"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "node_list_pkey"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "node_id"
+      ],
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Read follows project reachability. Written by `refresh_node_list_for_project`, which took only a project id until WP 4.3 gave it a two-argument overload that names the actor — `combine-project` had the actor all along and nothing told the trigger, the same shape as `assign_material_supplier` in WP 3.3. Also written by `geocode-locations` through PostgREST, which is D36's class and is NOT closed here. `audited: true` as of WP 4.3."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Node list: project access delete",
+            "command": "DELETE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Node list: project access insert",
+            "command": "INSERT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Node list: project access update",
+            "command": "UPDATE",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND ( p.modeler_id = public.get_current_user_id() OR ( SELECT user_role FROM public.get_current_approved_user() LIMIT 1 ) = 'admin' ) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Node list: project access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = node_list.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "node_list_unique_per_project",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "node_id"
+          ],
+          "definition": "UNIQUE (project_id, node_id)",
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+        },
+        {
+          "name": "node_list_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+        },
+        {
+          "name": "fk_node_list_project",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_node_list_project",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+        },
+        {
+          "name": "idx_node_list_project_plant",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "plant_name"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql"
+        },
+        {
+          "name": "idx_node_list_project_id",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "node_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The node's identifier within the project, derived by `refresh_node_list_for_project` from `supply_chain_data`. Natural key with `project_id`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "node_type",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Supplier, plant, customer — the echelon the node sits in, derived by the refresh.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "node_group",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Grouping label for the node, derived by the refresh.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "description_text",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Free-text description carried through from the source row.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "location_text",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The location string the source row carried. `geocode-locations` reads it to produce `latitude`/`longitude`.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "longitude",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — written by `geocode-locations` from `location_text`, NOT uploaded. It carries no provenance of its own: the geocoder is not yet a registered analysis kind, so `computed_from_hash` on this row describes the CRITICALITY columns only. Named for WP 4.4.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "latitude",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — see `longitude`.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "is_critical_node",
+          "type": "boolean",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — the critical-node prediction. NOTE that the LIVE writer of this prediction is `analysis_mark_critical_nodes`, which writes `supply_chain_data`, not this table; these columns are the older destination and §15 has never measured whether anything still fills them.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "critical_node_score",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "ANALYSIS OUTPUT — the prediction score. See `is_critical_node` on which destination is live.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Analyzer output. Not an engine input — and deliberately outside `graph_hash` too, since folding a result into the identity of its own inputs is what `input-hash` (I5) exists to prevent.",
+          "engine_requirement": null
+        },
+        {
+          "name": "prediction_timestamp",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the prediction columns were last written. Superseded by `computed_at`.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row insert time, maintained by the database.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.",
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_from_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means \"written before WP 4.3, provenance unknown\", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Provenance. Not an engine input; it describes where a number came from.",
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Provenance. Not an engine input; it describes where a number came from.",
+          "engine_requirement": null
+        }
+      ],
+      "note": null
+    },
     "org_capabilities": {
       "table": "org_capabilities",
       "schema_name": "public",
@@ -17124,6 +19981,68 @@
           "resolution": null,
           "note": "ETL bookkeeping; not an engine input and not analyzer output.",
           "engine_requirement": null
+        },
+        {
+          "name": "computed_from_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000007_analyzer_provenance.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
         }
       ],
       "note": null
@@ -19622,5 +22541,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "a29fd67bde88"
+  "contract_version": "ee1a27bc7429"
 }
