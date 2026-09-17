@@ -7419,15 +7419,63 @@ WP 4.2's.
     package described no new table, only two new columns.
   - `check:docs` green. No new TypeScript errors: 66 before, 66 after, identical
     per file.
+  - **Three §15 runs, none lost to the deploy race** (five were lost across the
+    three packages before this one): the before-run in its own push ahead of any
+    migration, the after-run once `Deploy Supabase Migrations` reported success,
+    and a third after reading the second found that it could not distinguish a
+    landed deploy from a failed one (section K).
 
-#### K · §15, before and after
+#### K · §15, before and after — and the after-run could not tell whether the deploy landed
 
 The before-run is section C's table and it is the reason the decision could be
-made rather than reasoned about. The after-run went out in its own push, after
-`Deploy Supabase Migrations` reported success — the rule has three doors and five
-runs have been lost through them; this package changed `verification-sql.mjs` in
-the FIRST push, with no migration in it, precisely so the migration push could
-change none of the three.
+made rather than reasoned about. It went out FIRST, in a push with no migration
+in it, precisely so the three migration pushes could change none of the
+trigger's three doors. **Zero runs lost to the race in this package**, against
+five across the three before it.
+
+**And then reading the after-run found a defect in this package's own probes.**
+Every WP 4.1 count came back IDENTICAL to the before-run:
+
+| | before | after |
+|---|---|---|
+| live `proposals` grounded on a `graph_hash` | 0 | 0 |
+| active `model_validations` cards | 0 | 0 |
+| `project_memory` rows grounded on a hash | 0 | 0 |
+| `simulation_runs` bound / gone | 17 / **0** | 17 / **0** |
+| `bom_multi_level` · `customers` | 792 in 2 · 6 in 5 | unchanged |
+| `hash_network`'s three tables | **0 · 0 · 0** | unchanged |
+| data-plane rows with `actor_known: false` | 2 580 | 2 580 |
+
+That is the CORRECT result for the data — nothing has run the moved paths and
+nothing rewrites an audit row — and it is also exactly what a FAILED deploy
+would have printed. The counts are about ROWS; the migrations changed FUNCTIONS
+and added two COLUMNS, and §15's schema probe compares RELATIONS. **So the
+after-run was a measurement of nothing wearing an after-run's label, and nothing
+in the report would ever have said so.** Same lesson as WP 3.4's QUERY-FAILED
+probe, arriving from the other side: there the report said something the exit
+code hid, here the report said nothing and looked complete.
+
+Three probes close it, each a different claim, all three pushed to
+`gateFailures` so a half-landed deploy turns the run red rather than publishing
+a report that resembles the last one. Their result, on production:
+
+```
+domain_columns  2/2        wp41_functions  9/9
+five projects   schema_version 2, inputs ✓ network ✓, both domain hashes compute
+dataset_versions  6 versions · 0 still matching current_graph_hash · 6 without domain hashes
+```
+
+**`0 still matching` is the bump's whole visible effect as a number.** All six
+versions were frozen under v1, a v1 hash cannot equal a v2 hash, and every one
+now reads dirty against its live project. The six NULL domain hashes are correct
+and not backfillable — a v1 snapshot has no `network` domain — and the next
+freeze on each project writes all three.
+
+**The one number that did not move and should not have:** 2 580 `actor_known:
+false` rows, 2 575 of them `supply_chain_data` UPDATEs. Nothing rewrites an
+audit row, and none of the six moved paths has run since the deploy. A DROP here
+would have meant something deleted history. The after-run for D36 is the first
+time somebody clicks the ETL button, and this package cannot produce it.
 
 #### L · THE HONEST CAVEAT, and it has two halves now
 
