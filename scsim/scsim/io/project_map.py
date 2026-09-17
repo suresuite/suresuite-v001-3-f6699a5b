@@ -293,9 +293,44 @@ def base_data_requirements() -> tuple:
 
 # ── Policy & demand helpers ───────────────────────────────────────────────────
 
-def _merged_policy(policies: dict, node_id: str, family: str) -> dict:
+def _merged_policy(
+    policies: dict, node_id: str, family: str,
+    *, plant_scoped: bool = False,
+    warnings: Optional[list["MappingWarning"]] = None,
+) -> dict:
+    """Family patch of the default merged with a node-level override.
+
+    Most callers key overrides by the bare entity id ("node:<id>"). Some
+    families (currently: production) are written by the UI as
+    "node:<plant name>::<entity id>", since a project may have more than one
+    plant. When `plant_scoped` is set, a compound key is matched by its LAST
+    "::"-segment against `node_id` — the plant name itself is never
+    consulted, so this works for any plant name or count of plants. If more
+    than one compound key resolves to the same node_id (the same product
+    overridden under two different plants), the first match wins and — when
+    `warnings` is supplied — a MappingWarning records the ambiguity instead
+    of silently picking one.
+    """
     default = (policies.get("default") or {}).get(family) or {}
     override = (policies.get(f"node:{node_id}") or {}).get(family) or {}
+    if not override and plant_scoped:
+        matches: list[tuple[str, dict]] = []
+        for key, families in policies.items():
+            if not isinstance(key, str) or not key.startswith("node:") or "::" not in key:
+                continue
+            _prefix, _, suffix = key[len("node:"):].rpartition("::")
+            if suffix == node_id:
+                candidate = (families or {}).get(family) or {}
+                if candidate:
+                    matches.append((key, candidate))
+        if matches:
+            override = matches[0][1]
+            if len(matches) > 1 and warnings is not None:
+                other_keys = ", ".join(k for k, _ in matches[1:])
+                warnings.append(MappingWarning(
+                    "warn", f"{family}:{node_id}", "target_key",
+                    f"multiple plant-scoped {family!r} overrides match {node_id!r} "
+                    f"({matches[0][0]!r} used; ignored: {other_keys})"))
     return {**default, **override}
 
 
@@ -510,7 +545,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
     products: list[Product] = []
     product_modes: set[FulfillmentMode] = set()
     for p in data.products:
-        prod_pol = _merged_policy(data.policies, p.id, "production")
+        prod_pol = _merged_policy(data.policies, p.id, "production", plant_scoped=True, warnings=w)
         # price
         if p.sell_price and p.sell_price > 0:
             price = float(p.sell_price)
