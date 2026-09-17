@@ -112,21 +112,154 @@ export interface RegistryLike {
  * parameter whose only proof of being read is a string literal in a Python file
  * has no declared contract at all.
  */
+export interface EngineSources {
+  /** `scsim/scsim/io/project_map.py` — the strategic engine's bundle mapper. */
+  projectMap: string;
+  /**
+   * `sim-worker/sim_worker/*.py`, keyed by path so a citation carries a LINE.
+   * NOT a door: the legacy engine is FROZEN (§3, "never add capability to it"),
+   * so a field only it reads has no future and must not be reported as reaching
+   * the engine. It is read here so a break can say WHICH shape it is.
+   */
+  legacyEngine: Record<string, string>;
+  /**
+   * `src/`, keyed by path — so an app-level routing decision (a field the
+   * PRODUCT reads and the engine deliberately excludes) is distinguishable from
+   * a field nothing reads at all. They are not the same defect.
+   */
+  appSrc: Record<string, string>;
+}
+
 export interface EngineDoors {
   /** `table.column` → level, from the registry's data requirements. */
   dataRequirements: Map<string, string>;
   /** Declared policy parameter names, from every policy's `params_schema`. */
   params: Set<string>;
-  /** Source text of `project_map.py`, for door 3. */
-  projectMapSrc: string;
+  /** The source texts doors 3 and the break CLASSIFIER read. */
+  src: EngineSources;
 }
 
-export function engineDoors(registry: RegistryLike, projectMapSrc: string): EngineDoors {
+export function engineDoors(registry: RegistryLike, src: EngineSources): EngineDoors {
   const params = new Set<string>();
   for (const p of registry.policies ?? []) {
     for (const k of Object.keys(p.params_schema?.properties ?? {})) params.add(k);
   }
-  return { dataRequirements: engineReads(registry), params, projectMapSrc };
+  return { dataRequirements: engineReads(registry), params, src };
+}
+
+/**
+ * DOOR 3 IS A READ, NOT A MENTION — and the first draft accepted a mention.
+ *
+ * `order_up_to` passed door 3 on this line:
+ *
+ *     w.append(MappingWarning("info", "policy:inventory_control", "order_up_to",
+ *              "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)"))
+ *
+ * — a warning whose TEXT says the engine drops the field. The scan reported it as
+ * reaching the engine on the strength of the string that says it does not, so the
+ * chain resolved and the ratchet was one name short. A door must therefore be a
+ * dict READ (`inv.get("f")` / `families["f"]`), which is how `project_map.py`
+ * consumes a bundle key, and never a bare quoted occurrence.
+ */
+function readsKey(src: string, field: string): boolean {
+  return new RegExp(`\\.get\\(\\s*["']${field}["']|\\[\\s*["']${field}["']\\s*\\]`).test(src);
+}
+
+/** Where a field is read across a set of files, as `path:line` citations. */
+function citeReads(files: Record<string, string>, field: string, limit = 2): string[] {
+  const out: string[] = [];
+  for (const [path, text] of Object.entries(files)) {
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length && out.length < limit; i++) {
+      if (readsKey(lines[i], field)) out.push(`${path}:${i + 1}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * A field that passes no door is not automatically a dead field, and calling all
+ * of them dead is the over-claim this classifier exists to stop. Five shapes,
+ * and the remedy differs for every one:
+ *
+ *   legacy-only   read by the FROZEN engine and by no scsim mapping. Not dead —
+ *                 but it has no future either, because §3 forbids adding
+ *                 capability to the engine that reads it.
+ *   app-routing   the PRODUCT reads it to decide something, and `project_map.py`
+ *                 excludes it on purpose. Correct as it stands; what is missing
+ *                 is a declaration saying so.
+ *   overridden    stored and editable while the engine COMPUTES the same
+ *                 quantity and never consults the field. The worst of the five,
+ *                 because the cell accepts a number and the run ignores it.
+ *   no-target     the chain's storage hop points at a column that does not exist.
+ *   unread        read by nothing, anywhere. Only this one is §4 D18's shape.
+ */
+export type BreakClass = "legacy-only" | "app-routing" | "overridden" | "no-target" | "unread";
+
+export function classifyBreak(
+  field: string,
+  doors: EngineDoors,
+): { klass: BreakClass; evidence: string[] } {
+  const legacy = citeReads(doors.src.legacyEngine, field);
+  const app = citeAppReads(doors.src.appSrc, field);
+  // `project_map.py` naming a field OUTSIDE a read is the mapper saying it knows
+  // the field and drops it — either an exclusion note or a "replaced by" warning.
+  const namedNotRead =
+    new RegExp(`["']${field}["']|\\b${field}\\b`).test(doors.src.projectMap) &&
+    !readsKey(doors.src.projectMap, field);
+
+  if (legacy.length) return { klass: "legacy-only", evidence: legacy };
+  if (namedNotRead && app.length) return { klass: "app-routing", evidence: app };
+
+  // DECLARED AND NEVER CONSULTED. `reorder_point: float = 50` is a field of the
+  // legacy `InventoryPolicy` schema, so the value is accepted, validated and
+  // carried all the way into the run — and `engine.py` computes
+  // `RP = avg_lt * avg_d + ss` for itself and never reads it. A declaration is
+  // not a read, which is why `readsKey` above does not match it and why this
+  // has to be its own test.
+  const declared = citeDeclarations(doors.src.legacyEngine, field);
+  if (declared.length) return { klass: "overridden", evidence: declared };
+  if (namedNotRead) return { klass: "overridden", evidence: ["scsim/scsim/io/project_map.py"] };
+  // NO EVIDENCE, DELIBERATELY. The app citations `citeAppReads` collects are
+  // RENDERS, not consumers — `material_price` is on screen, which is the whole of
+  // §4 D18 — and attaching them to this sentence made it cite the grid as proof
+  // that nothing reads the field. An absence has no `file:line`.
+  return { klass: "unread", evidence: [] };
+}
+
+/**
+ * The app reads a field in TypeScript shapes `readsKey` cannot see —
+ * `getEffective(rowKey, r, "primary_source")`, `col.field === "sourcing_firm"`,
+ * an object key in a row literal. `readsKey` is Python-shaped (`.get("f")`), and
+ * pointing it at `src/` returned nothing, which classified both routing hints as
+ * `overridden` — a WRONGER answer than the one WP 6.1 gave. So the app scan is a
+ * quoted-or-identifier match, which is loose; it is confined to the three
+ * modules that actually resolve a policy cell, and it only ever decides between
+ * two BREAK classes — never whether a chain resolves.
+ */
+function citeAppReads(files: Record<string, string>, field: string, limit = 2): string[] {
+  const out: string[] = [];
+  const re = new RegExp(`["']${field}["']|\\b${field}\\s*[:,)]`);
+  for (const [path, text] of Object.entries(files)) {
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length && out.length < limit; i++) {
+      if (re.test(lines[i])) out.push(`${path}:${i + 1}`);
+    }
+  }
+  return out;
+}
+
+/** A pydantic/dataclass FIELD declaration — `name: type = default`. */
+function citeDeclarations(files: Record<string, string>, field: string, limit = 2): string[] {
+  const out: string[] = [];
+  const decl = new RegExp(`^\\s*${field}\\s*:\\s*\\S`);
+  for (const [path, text] of Object.entries(files)) {
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length && out.length < limit; i++) {
+      if (decl.test(lines[i])) out.push(`${path}:${i + 1}`);
+    }
+  }
+  return out;
 }
 
 /** Which door, if any, this field goes through — in descending strength. */
@@ -146,18 +279,17 @@ export function engineDoorFor(field: string, doors: EngineDoors): Hop | null {
       evidence: null,
     };
   }
-  // Door 3. A bare word would match a comment or an unrelated identifier, so the
-  // scan requires the field as a QUOTED key, which is how `project_map.py` reads
-  // a bundle.
-  const quoted = new RegExp(`["']${field}["']`);
-  if (quoted.test(doors.projectMapSrc)) {
+  // Door 3 — a READ in `project_map.py`, not a mention of the name. See
+  // `readsKey` for the `order_up_to` warning that made the difference matter.
+  const cite = citeReads({ "scsim/scsim/io/project_map.py": doors.src.projectMap }, field, 1);
+  if (cite.length) {
     return {
       kind: "engine",
       detail:
         "read by `project_map.py` as a bundle key — and by NOTHING that declares it. " +
         "The registry neither requires it as data nor declares it as a parameter, so " +
-        "the only evidence it reaches the engine is a string literal (WP 6.1).",
-      evidence: "scsim/scsim/io/project_map.py",
+        "the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
+      evidence: cite[0],
     };
   }
   return null;
@@ -177,6 +309,37 @@ export function engineReads(registry: RegistryLike): Map<string, string> {
   for (const p of registry.policies ?? []) for (const r of p.data_requirements ?? []) add(r);
   return out;
 }
+
+/**
+ * One sentence per shape, written so a reader can act on it without opening this
+ * file. The test asserts every break is longer than 40 characters precisely so
+ * these cannot degrade back into "reaches no engine field".
+ */
+const BREAK_REASON: Record<BreakClass, string> = {
+  "legacy-only":
+    "reaches NO scsim field, and is read only by the FROZEN legacy engine " +
+    "(`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field " +
+    "is editable, stored and hashed into `policy_hash` while the strategic engine " +
+    "ignores it — and no catalog policy is planned that would change that.",
+  "app-routing":
+    "is an APPLICATION routing decision, not an engine parameter: `project_map.py` " +
+    "excludes it deliberately and the product reads it to decide a lane. The chain " +
+    "is unwritable only because nothing DECLARES that, so a reader cannot tell it " +
+    "apart from a field the engine forgot.",
+  overridden:
+    "is accepted, stored and hashed while the engine COMPUTES the same quantity and " +
+    "never consults it — the grid takes a number that changes no run. The worst of " +
+    "the five shapes, because the cell looks exactly like one that works.",
+  "no-target":
+    "the contract has no such column, so the chain has no storage hop: the value " +
+    "falls silently through the resolver to the policy bundle while the column " +
+    "header claims it is item-master data.",
+  unread:
+    "is read by NO consumer anywhere — not scsim, not the frozen legacy engine, " +
+    "and by nothing in the product beyond the grid that renders it. Editable, " +
+    "stored, versioned and hashed into `policy_hash`, and the only thing that ever " +
+    "happens to the value is that it is shown back. This is §4 D18's exact shape.",
+};
 
 /**
  * Build the chain for one grid column.
@@ -205,10 +368,7 @@ export function chainFor(
     const { table, field } = spec.master;
     const col = contract.tables[table]?.columns?.find((c) => c.name === field);
     if (!col) {
-      breaks.push(
-        `master-backed by \`${table}.${field}\`, and the contract has no such column — ` +
-          `either the spec names a column that does not exist, or the table is not described`,
-      );
+      breaks.push(`is master-backed by \`${table}.${field}\` and ${BREAK_REASON["no-target"]}`);
     } else {
       hops.push({
         kind: "db",
@@ -267,14 +427,11 @@ export function chainFor(
         evidence: null,
       });
     } else if (!spec.readOnly) {
-      // The chain that stops before the engine. This is the shape D18 is, and
-      // the WP 0.1 gap check found seven more of it.
-      breaks.push(
-        `reaches no engine field through ANY of the three doors — not the registry's ` +
-          `\`data_requirements\`, not a policy's \`params_schema\`, and not a quoted key ` +
-          `in \`project_map.py\`. The spec has no \`engineStatus\` and is not read-only, ` +
-          `so it is editable, stored, and hashed into \`policy_hash\` — and read by nothing.`,
-      );
+      // The chain that stops before the engine — and WHICH WAY it stops decides
+      // the remedy. WP 6.2 re-derived this after the WP 6.1 scan proved too
+      // narrow in one direction and too loose in the other (§4 D90, D91).
+      const { klass, evidence } = classifyBreak(spec.field, doors);
+      breaks.push(`${BREAK_REASON[klass]}${evidence.length ? ` Evidence: ${evidence.join(", ")}.` : ""}`);
     }
   }
 
@@ -285,9 +442,9 @@ export function chainFor(
 export function allChains(
   contract: ContractLike,
   registry: RegistryLike,
-  projectMapSrc: string,
+  src: EngineSources,
 ): Chain[] {
-  const doors = engineDoors(registry, projectMapSrc);
+  const doors = engineDoors(registry, src);
   const out: Chain[] = [];
   for (const [stage, spec] of Object.entries(STAGE_TABLE_SPEC)) {
     for (const col of spec.cols as ColSpec[]) {

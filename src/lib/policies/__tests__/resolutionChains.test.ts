@@ -1,5 +1,6 @@
 /**
  * WP 6.1 — EVERY GRID FIELD'S CHAIN, AND THE LIST OF THE ONES THAT BREAK.
+ * WP 6.2 — …AND THE SCAN THAT PRODUCED IT WAS WRONG IN BOTH DIRECTIONS (§4 D91).
  *
  * §13: "For every grid field: CSV column → DB column → RPC → hook →
  * substitution → engine field → unit at each hop. Pin with parity fixtures in
@@ -18,7 +19,7 @@
  * a ratchet. The list may SHRINK and may not GROW, and a name that stops
  * breaking must leave it, so it cannot record debt that has already been paid.
  *
- * ── THREE OVER-CLAIMS THIS SUITE CAUGHT IN ITSELF ─────────────────────────
+ * ── FIVE OVER-CLAIMS THIS SUITE CAUGHT IN ITSELF ──────────────────────────
  *
  * Recorded because each one would have shipped a confident list of false
  * findings, which is the failure WP 5.1's D82/D83 are and the thing this plan
@@ -34,6 +35,15 @@
  *            id. They differ on purpose for a master-backed column:
  *            `materials.cost` is rendered as `material_cost`, and both it and
  *            `materials.moq` were reported as invisible while on screen.
+ *    9 → 11  (WP 6.2) door 3 read `project_map.py` ALONE and accepted any
+ *            QUOTED occurrence. Too narrow — the legacy engine and the product
+ *            were invisible, so six breaks said "read by nothing" about fields
+ *            that are read. Too loose — `order_up_to` passed on the text of the
+ *            warning that says it is dropped.
+ *
+ * Every one of the five is the same failure: a scan whose result was believed
+ * because it was produced by code. The count is the cheapest thing to check and
+ * it caught all five.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -53,8 +63,32 @@ const contract = JSON.parse(
 const registry = JSON.parse(
   readFileSync(join(ROOT, "supabase", "functions", "_shared", "registry.generated.json"), "utf8"),
 );
-const projectMap = readFileSync(join(ROOT, "scsim", "scsim", "io", "project_map.py"), "utf8");
-const chains = allChains(contract, registry, projectMap);
+
+/**
+ * THE SOURCES THE CLASSIFIER READS. WP 6.1 passed `project_map.py` alone, and
+ * that single omission is §4 D91: four of its nine breaks said "read by nothing"
+ * about fields the legacy engine reads, and one field that IS dead passed as
+ * live. A scan is only as honest as the tree it is pointed at.
+ */
+const read = (...p: string[]) => readFileSync(join(ROOT, ...p), "utf8");
+const legacyEngine = Object.fromEntries(
+  ["engine.py", "policies.py", "datamap.py", "worker.py", "scsim_bridge.py"].map((f) => [
+    `sim-worker/sim_worker/${f}`,
+    read("sim-worker", "sim_worker", f),
+  ]),
+);
+const appSrc = Object.fromEntries(
+  [
+    ["src/hooks/useStageRows.tsx", ["src", "hooks", "useStageRows.tsx"]],
+    ["src/components/policies/StagePolicyTable.tsx", ["src", "components", "policies", "StagePolicyTable.tsx"]],
+    ["src/lib/policies/resolveEffective.ts", ["src", "lib", "policies", "resolveEffective.ts"]],
+  ].map(([label, parts]) => [label as string, read(...(parts as string[]))]),
+);
+const chains = allChains(contract, registry, {
+  projectMap: read("scsim", "scsim", "io", "project_map.py"),
+  legacyEngine,
+  appSrc,
+});
 
 describe("WP 6.1 · the chains resolve", () => {
   it("there are chains at all — an empty set is a green suite that checks nothing", () => {
@@ -133,22 +167,61 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
   /**
    * Known, computed, and owned by WP 6.2. Shrinking this list is the work.
    *
-   * Seven are the class the WP 0.1 gap check named — "stored, versioned and
-   * hashed into `policy_hash` but rendered by no column and read by no engine
-   * mapping", pointing the other way: rendered, editable, hashed, and read by
-   * nothing. `material_price` is §4 D18 itself.
+   * ── IT GREW FROM NINE TO ELEVEN, AND THAT IS THE CORRECTION, NOT A REGRESSION
    *
-   * `plant.initial_on_hand` is different and NEW (§4 D89): it is master-backed
-   * by `products.initial_on_hand`, and `products` has no such column —
-   * `materials` does, and the supplier stage uses it correctly two lines away.
+   * A ratchet may shrink and may not grow, and this one grew. No code got worse:
+   * WP 6.1's scan was wrong in BOTH directions and WP 6.2 re-derived it (§4 D91).
+   * The rule the growth would protect — "no NEW chain may break" — is about a
+   * commit that breaks a chain, and these two were broken before the scan could
+   * see them. Recording that here rather than quietly re-basing the list is the
+   * same move `dataPlaneAudit.test.ts`'s writer ratchet made when ITS scan
+   * widened (§4 D71: "Corrected figures … 31 writers, 15 attributing, 16 not").
+   *
+   *   too LOOSE   `order_up_to` passed door 3 on a `MappingWarning` whose text
+   *               says the engine replaces it with coverage-κ. A mention is not
+   *               a read; the scan accepted the string that says the field is
+   *               dropped as proof it is consumed. Both stages join the list.
+   *   too NARROW  door 3 read `project_map.py` ALONE, so four fields were
+   *               reported "read by nothing" while the legacy engine reads them,
+   *               and two routing hints were reported the same way while the
+   *               PRODUCT reads them. Every one of the nine still breaks — what
+   *               changed is the sentence, and every sentence now names a
+   *               different remedy.
+   *
+   * THE ELEVEN, BY SHAPE (`classifyBreak`):
+   *
+   *   unread       supplier.material_price — §4 D18 itself, and the ONLY one
+   *                where "read by nothing" was literally true.
+   *   overridden   plant/supplier.reorder_point — declared in the legacy
+   *                `InventoryPolicy` schema and consulted by neither engine:
+   *                `engine.py:320` computes `RP = avg_lt · avg_d + ss` itself.
+   *                The grid accepts a number that changes no run.
+   *   legacy-only  plant/supplier.{order_up_to, review_period_days} — read at
+   *                `engine.py:332,323` and by no scsim mapping. §3 freezes that
+   *                engine, so these have no route to the strategic one.
+   *   app-routing  customer.{primary_source, sourcing_firm},
+   *                supplier.primary_source — `project_map.py:826` excludes them
+   *                deliberately ("firm-routing hints, never engine params") and
+   *                the product reads them. Correct as built; what is missing is
+   *                a declaration, so a reader can tell them from a dead field.
+   *   no-target    plant.initial_on_hand — §4 D89. STILL HERE ON PURPOSE. This
+   *                commit removed the `master:` pointer at
+   *                `products.initial_on_hand` (no such column), which fixes the
+   *                DISPLAY — the Parameter Sheet no longer says "reaches engine ·
+   *                from item master" — and leaves the field bundle-backed and
+   *                read by nothing. Fixing the lie is not wiring the field, so
+   *                the name stays and `classifyBreak` now reports it under
+   *                whichever shape it really is.
    */
   const KNOWN_BREAKS = [
     "customer.primary_source",
     "customer.sourcing_firm",
     "plant.initial_on_hand",
+    "plant.order_up_to",
     "plant.reorder_point",
     "plant.review_period_days",
     "supplier.material_price",
+    "supplier.order_up_to",
     "supplier.primary_source",
     "supplier.reorder_point",
     "supplier.review_period_days",

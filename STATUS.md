@@ -3,11 +3,61 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed**
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slice 1**
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 1) — The engine scan, corrected · no migration
+
+WP 6.2 owns sixteen defects and is being landed in slices. This one is the
+prerequisite: **the concrete list WP 6.2 was told to start from was wrong.**
+
+WP 6.1 handed over nine broken chains and the rule "a fix is a name leaving
+`KNOWN_BREAKS`". Checking the count before believing it — five for five now —
+found its engine scan wrong in both directions:
+
+- **too loose** — `order_up_to` passed because `project_map.py:865` names it in a
+  warning whose text says the engine *replaces* it. The scan read the string that
+  says the field is dropped as proof it is consumed.
+- **too narrow** — the scan read `project_map.py` alone, so six breaks said "read
+  by nothing" about fields the legacy engine or the product reads.
+
+**Nine became eleven. No name left the list.** The growth is recorded in the test
+as a correction rather than hidden by re-basing the ratchet. What changed is the
+sentence: `classifyBreak` sorts the eleven into five shapes with `file:line`
+evidence apiece, and each shape names a different remedy. The one worth reading
+twice is `reorder_point` — declared in the legacy schema and consulted by
+*neither* engine, because `engine.py:320` computes `RP` for itself. The grid
+takes the user's number and drops it, and nothing had named that.
+
+**Two lies fixed, not just recorded:**
+
+- **D89 (display half).** `plant.initial_on_hand` claimed
+  `master: products.initial_on_hand`; `products` has no such column, so the cell
+  fell through to the bundle while the Parameter Sheet said *"reaches engine ·
+  from item master"*. Pointer deleted; `masterPointersResolve.test.ts` is a
+  **gate** (empty on arrival, mutation-tested both ways). The field is still read
+  by nothing and stays on the ratchet — fixing a lie is not wiring a field.
+- **D92 (new).** The sheet told users `reorder_point` *"activates with engine
+  catalog — planned"*. Nothing is planned; that string was a hard-coded fallback
+  every caller treated as a milestone. `FieldEngineStatus` gains `stored-only`,
+  and the sheet now says *"stored only · no engine consumer, none planned"*.
+
+**Needs a human — not blocked, but not mine to decide:**
+
+- **`products.initial_on_hand`** was *not* added, and cost is not the reason:
+  `scsim/scsim/core/context.py:150` builds on-hand from `net.materials` only, so
+  there is no finished-goods initial inventory in the strategic engine for the
+  column to feed. Schema change **and** engine capability.
+- **Nine of the eleven need a product decision, not a fix** — remove the column,
+  wire the field, or leave it badged. The badge now tells the truth, which makes
+  deferring honest rather than silent.
+
+**Verified:** `contract:check` ✓ (R6 caught an ambiguous `engine.py` citation —
+qualified) · 352 tests ✓ · `check:docs` ✓ · build ✓ · eslint 336/116 and
+`audit:ui` 8 findings, both unchanged from `HEAD`.
 
 ### WP 4.3 — Migrate the analyzers (dual-write) · `20260917000007`
 

@@ -270,8 +270,10 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D86** | **`main` went red on a gate this plan introduced, because the fix for it was pushed after the PR had already been merged.** PR #222 merged at `0ca07da`. Two commits pushed to the same branch afterwards — the §15 probe repair (D84) and the R12 lineage repair — were not in it, so `main`'s `contract:check` exits 1 with six R12 failures: PR #221's rewrite of `ProcessLevelNetwork.tsx` moved three table reads (`bom_multi_level` :1104, `supply_chain_data_multi_tier` :1105, `projects` :248) and the re-pointed evidence never landed. **The gate is behaving correctly and the base branch is broken by it**, which is a distinction worth keeping: R12 found a real staleness on the merge commit, and the repair simply missed the train. **The lesson is about CONCURRENCY, not about R12**: two agents on one plan, one branch merged by a third party mid-flight, and a gate keyed on line numbers in files the other agent rewrites. Any evidence-carrying gate has this property — §4's citations (R6) would have done the same | `origin/main` at `d51543d`: `npm run contract:check` exits 1 | *(fixed on `claude/busy-thompson-9p8zb9` and awaiting a merge — the repair is `node scripts/data-contract/analyse-surfaces.mjs && … --write && npm run contract:generate`, which is idempotent since the same session made it so)* |
 | **D87** | **The committed browser-engine wheels are stale against `scsim`, and the drift gate says so on `main`.** `scripts/build_engine_wheels.sh --check` fails: the wheel's `project_map.py` still calls `_policy(policies, "node", p_id, "production")` where the source now calls `_production_policy(policies, p_id)` — PR #221's plant-stage override work changed the Python and did not regenerate `public/engine/`. The wheels are committed on purpose so the Vercel build stays pure-Vite, so a stale wheel means **the browser engine runs different code from the worker engine**, which is `single-source` (I1) across a boundary no test crosses. Regeneration is one command and CI names it. **It could not be done from a work-package session**: `build_engine_wheels.sh` derives `engine_version` by importing `scsim`, that import needs `pydantic`, and the egress proxy denies PyPI — so a regeneration here writes `"engine_version": "unknown"` into a manifest whose own docstring says the version "is embedded in every result". A green check bought by regressing that field is the trade §5 exists to refuse | `scripts/build_engine_wheels.sh --check` against `scsim/scsim/io/project_map.py`; `public/engine/manifest.json` | WP 6.2 *(with the rest of PR #221's package; whoever runs it needs an environment with `pip install ./scsim` available, which CI has and a work-package session does not)* |
 | **D88** | **WP 5.3 cannot drop the entity columns, and the number is 8 577 of 8 577.** §11's WP 5.3 is "pages read `analysis_results`; drop entity columns", and §15 run `35280849096` measured what that would cost: `network_nodes` 1 385 rows, `node_list` 1 747, `supply_chain_data` 5 445, `network_summary` 0 — **every one of the 8 577 carrying `computed_from_hash IS NULL`** — against `analysis_runs` = 0 and `analysis_results` = 0. The store is EMPTY in production. So the migration has no source: switching a reader to `analysis_results` shows nothing for every project, and dropping the columns destroys 8 577 values with nothing to replace them. **Neither half of the package's name is executable today, and the reason is not a defect in the design**: WP 4.3 shipped the dual-write, and an analyzer fills the store only when somebody RUNS an analysis. The precondition is adoption, not code. **A backfill cannot substitute**: a row written before WP 4.3 has no input hash and one cannot be invented — inventing it is precisely the fabricated provenance `declared-fallback` (I6) forbids, and a `computed_from_hash` that is confidently wrong is worse than the NULL it replaced | §15 run `35280849096`, sections "WP 4.3 / 4.4 — provenance coverage" and "WP 4.2 — did the analysis store reach production" | WP 6.3 *(re-homed with the rest of the result-binding group. The unblocking condition is a NUMBER and belongs in §15's standing report rather than in a package's prose: `analysis_results` non-zero for a project, and `computed_from_hash IS NULL` falling. Until then the entity columns stay and the readers dual-read — prefer the store, fall back to the column, and say which at the point of display (T2))* |
-| **D89** | **The plant stage's `initial_on_hand` is master-backed by `products.initial_on_hand`, and `products` has no such column.** `columnSpecs.ts:216-218` declares `master: { table: "products", field: "initial_on_hand", idFrom: "product_id" }`. The `products` table has eighteen columns and that is not one of them — **`materials` does have it**, and the supplier stage uses it correctly fifty lines earlier (`:164-165`), which is what makes this a copy rather than a misunderstanding. The consequence is silent by construction: `masterValueFor` returns undefined for a column that does not exist, so the cell falls through the resolver to `derivedValueFor` and then to the policy bundle, and the user sees a number that came from the bundle while the column header says it is item-master data. **Found by WP 6.1's chain resolver, which could not write the chain down** — the DB hop has no target — and it is the only one of the nine breaks that is a pointer at nothing rather than a value nothing reads | `src/lib/policies/columnSpecs.ts:216-218` against `products`'s introspected columns | WP 6.2 *(two ways out and they are not equivalent: add the column to `products` — it is a real engine input for a finished-goods buffer — or drop the `master:` block so the cell is honestly bundle-backed. The first is a schema change and the second is a one-line deletion, and choosing by cost rather than by what the number MEANS is how D17's class starts)* |
-| **D90** | **Nothing declares which policy-bundle keys the engine reads; `project_map.py` is the only evidence for nine of them.** WP 6.1 traced every grid field to the engine and found three doors: the registry's `data_requirements` (`table.column` the engine needs from the dataset), a policy's `params_schema` (80 declared parameters), and — for everything else — **a quoted string in `project_map.py`**. Door 3 is not a contract: it is a text scan over a Python file, it is the only proof those fields reach the engine at all, and `single-source` (I1) says a data fact is authored once, in a place a generator can read. §3's standing law says "the registry export is the single source of truth for policy schemas (§6.2)" — and these keys are outside it, so the law is true of the schemas that exist and silent about the ones that do not. **The measurement is the finding**: of 38 grid fields, the registry declares the engine hop for 29 and a string literal is the only evidence for the rest | `scsim/scsim/io/project_map.py` against `supabase/functions/_shared/registry.generated.json`'s `params_schema` blocks; `src/lib/policies/resolutionChains.ts`'s three doors | WP 6.2 *(the fix is in `scsim`, not here: a bundle key the engine reads belongs in a policy's `params_schema`, which `registry_export.py` already generates. Until then `resolutionChains.test.ts` accepts door 3 and SAYS it is the weakest of the three, so the next reader is not told these nine are as well-declared as the other 29)* |
+| **D89** | **The plant stage's `initial_on_hand` is master-backed by `products.initial_on_hand`, and `products` has no such column.** `columnSpecs.ts:216-218` declares `master: { table: "products", field: "initial_on_hand", idFrom: "product_id" }`. The `products` table has eighteen columns and that is not one of them — **`materials` does have it**, and the supplier stage uses it correctly fifty lines earlier (`:164-165`), which is what makes this a copy rather than a misunderstanding. The consequence is silent by construction: `masterValueFor` returns undefined for a column that does not exist, so the cell falls through the resolver to `derivedValueFor` and then to the policy bundle, and the user sees a number that came from the bundle while the column header says it is item-master data. **Found by WP 6.1's chain resolver, which could not write the chain down** — the DB hop has no target — and it is the only one of the nine breaks that is a pointer at nothing rather than a value nothing reads  **DISPLAY HALF CLOSED, WP 6.2**: the pointer is deleted, so the sheet no longer attributes the cell to the item master, and `masterPointersResolve.test.ts` is a GATE (empty on arrival, mutation-tested both ways) that fails the next copied pointer on the commit that writes it. **The field is still read by nothing** and stays on `resolutionChains.test.ts`'s ratchet: fixing the lie is not wiring the field. The second way out — add `products.initial_on_hand` — was NOT taken, and the reason is that it is not a one-sided cost: `scsim/scsim/core/context.py:150` builds on-hand from `net.materials` ONLY, so there is no finished-goods initial inventory in the strategic engine for the column to feed. Adding it is a schema change AND an engine capability, and it needs a human | `src/lib/policies/columnSpecs.ts` (the `plant` stage's `initial_on_hand`, pointer removed) against `products`'s introspected columns; `src/lib/policies/__tests__/masterPointersResolve.test.ts` | WP 6.2 *(the display lie is closed; the field's own fate is the finished-goods-inventory question above)* |
+| **D90** | **Nothing declares which policy-bundle keys the engine reads; `project_map.py` is the only evidence for nine of them.** WP 6.1 traced every grid field to the engine and found three doors: the registry's `data_requirements` (`table.column` the engine needs from the dataset), a policy's `params_schema` (80 declared parameters), and — for everything else — **a quoted string in `project_map.py`**. Door 3 is not a contract: it is a text scan over a Python file, it is the only proof those fields reach the engine at all, and `single-source` (I1) says a data fact is authored once, in a place a generator can read. §3's standing law says "the registry export is the single source of truth for policy schemas (§6.2)" — and these keys are outside it, so the law is true of the schemas that exist and silent about the ones that do not. **The measurement is the finding**: of 38 grid fields, the registry declares the engine hop for 29 and a string literal is the only evidence for the rest. **THE COUNT WAS WRONG AND D91 IS WHY** — door 3 also accepted a string literal that says the engine DROPS the field, so one of the nine was not reaching the engine at all. The finding stands and is if anything sharper: door 3 is not merely the weakest evidence, it was evidence in the wrong direction | `scsim/scsim/io/project_map.py` against `supabase/functions/_shared/registry.generated.json`'s `params_schema` blocks; `src/lib/policies/resolutionChains.ts`'s three doors | WP 6.2 *(the fix is in `scsim`, not here: a bundle key the engine reads belongs in a policy's `params_schema`, which `registry_export.py` already generates. Until then `resolutionChains.test.ts` accepts door 3 and SAYS it is the weakest of the three, so the next reader is not told these nine are as well-declared as the other 29)* |
+| **D91** | **WP 6.1's engine scan was wrong in BOTH directions, and the ratchet it produced was two names short.** Door 3 — "the field appears as a quoted key in `project_map.py`" — was the only evidence for nine grid fields, and WP 6.2 re-derived it against the whole engine tree. **Too loose**: `order_up_to` passed door 3 on `project_map.py:865`, a `MappingWarning` whose own text is "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)" — the scan accepted the string that says the field is dropped as proof it is consumed, and both stages' `order_up_to` were reported as resolving. A door is now a dict READ (`.get("f")` / `["f"]`), never a mention. **Too narrow**: door 3 read `project_map.py` ALONE, so six of the nine breaks said "read by nothing" about fields that are read — `review_period_days` at `sim-worker/sim_worker/engine.py:323` and `order_up_to` at `:332` by the FROZEN legacy engine, and `primary_source`/`sourcing_firm` by the product itself, which `project_map.py:826` excludes on purpose ("firm-routing hints, never engine params"). **Every one of the nine still breaks** — what changed is the sentence, and `classifyBreak` now sorts them into five shapes with a different remedy each: `unread` (1 — `material_price`, §4 D18, the only one where "read by nothing" was literally true), `overridden` (2 — `reorder_point`, declared in the legacy `InventoryPolicy` schema at `policies.py:41` and consulted by NEITHER engine, because `sim-worker/sim_worker/engine.py:320` computes `RP = avg_lt · avg_d + ss` itself), `legacy-only` (4), `app-routing` (3), `no-target` (1 — D89). **The fifth over-claim this suite has caught in itself**, after 28→11, 11→9, 7→0 and WP 5.1's D82/D83 — and the cheapest check caught all five, which is the lesson worth keeping: a list produced by code is believed because code produced it | `src/lib/policies/resolutionChains.ts`'s `readsKey`/`classifyBreak` against `scsim/scsim/io/project_map.py:826,865`, `sim-worker/sim_worker/engine.py:320,323,332` and `sim-worker/sim_worker/policies.py:41` | **CLOSED (WP 6.2)** — the scan is corrected, the eleven are classified with `file:line` evidence apiece, and the ratchet records the growth as a correction rather than re-basing to hide it |
+| **D92** | **The Parameter Sheet promised a milestone that does not exist, for eight of the eleven.** `fieldStatus.ts::milestoneFor` returned the literal string `"engine catalog — planned"` for any policy family with no row in `PENDING_FAMILY_POLICY`, and every caller treated that string as a milestone — so `ParameterSheet.tsx:74` rendered, of `reorder_point`, **"stored only · activates with engine catalog — planned"**. Nothing is planned. `inventory` and `sourcing` are not in that table, and D91 establishes what those fields actually are: computed and never read, read only by the frozen engine, or read by nothing at all. None is waiting for a policy. The remaining branch said "stored only · not consumed yet", where the word *yet* carries the same promise more quietly. This is T2 at the point of display — the product was inventing a future to avoid saying a field does nothing — and it is `declared-fallback` (I6) pointing at the UI: a substitution absent from the contract may not exist in code, and "we will consume this later" is a substitution for an answer | `src/lib/policies/fieldStatus.ts::milestoneFor`; `src/components/policies/ParameterSheet.tsx:73-75` | **CLOSED (WP 6.2)** — `FieldEngineStatus` gains `stored-only`, `milestoneFor` returns `null` rather than a sentence, and the sheet says "stored only · no engine consumer, none planned" |
 
 ### 4.1 Code map — the data layer
 
@@ -9249,3 +9251,111 @@ clean, because §15 told the reader to measure one project and the largest proje
 the one the seeder creates. Sweeping all seven found 96 duplicate keys, 376 null
 volumes and 27 integer `time_unit` values. **The instrument was there, the
 instruction was wrong, and nothing between them would ever have said so.**
+
+### WP 6.2 (slice 1) — The engine scan, corrected · 2026-09-17 · no migration
+
+**What the previous package promised.** WP 6.1 closed with a countable hand-off:
+nine broken chains ratcheted in `resolutionChains.test.ts`, "a fix is a name
+leaving `KNOWN_BREAKS`". WP 6.2 was to start from that list.
+
+**What this one found: the list was wrong, in both directions.** The loop rule
+this plan has repeated since WP 5.1 — *sanity-check the count before believing
+it* — is what caught it, and it is now five for five.
+
+Door 3 of WP 6.1's engine scan was "the field appears as a quoted key in
+`project_map.py`". Checked against the whole engine tree:
+
+- **Too loose.** `order_up_to` passed on `project_map.py:865`:
+
+  ```python
+  w.append(MappingWarning("info", "policy:inventory_control", "order_up_to",
+           "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)"))
+  ```
+
+  The scan accepted the string that says the engine DROPS the field as proof it
+  consumes it. Both stages' `order_up_to` were reported as resolving and are not.
+- **Too narrow.** Door 3 read `project_map.py` and nothing else, so six of the
+  nine breaks said "read by nothing" about fields that are read —
+  `review_period_days` at `sim-worker/sim_worker/engine.py:323` and
+  `order_up_to` at `sim-worker/sim_worker/engine.py:332`, and `primary_source`/`sourcing_firm` by the product, which
+  `project_map.py:826` excludes on purpose ("firm-routing hints, never engine
+  params").
+
+**No name left the list.** Nine became eleven. The ratchet grew, which its own
+rule forbids, and the growth is recorded in the test rather than hidden by
+re-basing — the move `dataPlaneAudit.test.ts` made when its writer scan widened
+(D71). The "may not grow" rule is about a commit that breaks a chain; these two
+were broken before the scan could see them.
+
+**What changed is the sentence, and every sentence now names a remedy.**
+`classifyBreak` sorts the eleven into five shapes with `file:line` apiece:
+
+| shape | n | what it means |
+|---|---|---|
+| `unread` | 1 | `material_price` — read by nothing anywhere. D18, and the only one where WP 6.1's wording was literally true |
+| `overridden` | 2 | `reorder_point` — declared in the legacy `InventoryPolicy` (`policies.py:41`) and consulted by NEITHER engine: `sim-worker/sim_worker/engine.py:320` computes `RP = avg_lt · avg_d + ss` itself. The grid accepts a number that changes no run |
+| `legacy-only` | 4 | `order_up_to`, `review_period_days` — read at `sim-worker/sim_worker/engine.py:332,323` and by no scsim mapping. §3 freezes that engine, so there is no route to the strategic one |
+| `app-routing` | 3 | `primary_source`, `sourcing_firm` — correct as built; what is missing is a declaration saying so |
+| `no-target` | 1 | `plant.initial_on_hand` — D89 |
+
+`reorder_point` is the one worth reading twice. It is not a field waiting to be
+wired; it is a field the engine computes for itself while the grid takes the
+user's number and drops it. That is a worse defect than D18's and nothing had
+named it.
+
+**Two things were fixed rather than recorded.**
+
+- **D89's display half.** `plant.initial_on_hand` declared
+  `master: { table: "products", field: "initial_on_hand" }` — a copy of the
+  supplier stage's correct `materials.initial_on_hand` — and `products` has no
+  such column. `masterValueFor` returns `undefined` for a column that does not
+  exist, indistinguishably from a master row with no value, so the cell fell
+  through to the policy bundle while the Parameter Sheet said **"reaches engine ·
+  from item master"**. A displayed value whose stated source is not its source:
+  T1, plainly. The pointer is deleted and
+  `masterPointersResolve.test.ts` is a **GATE** — empty on arrival, so a gate was
+  affordable — mutation-tested both ways (restore the pointer → red; break a join
+  key → red). The field is still read by nothing and stays on the ratchet:
+  fixing a lie is not wiring a field.
+
+  The other way out, adding `products.initial_on_hand`, was **not** taken and the
+  reason is not cost. `scsim/scsim/core/context.py:150` builds on-hand from
+  `net.materials` only, so there is no finished-goods initial inventory in the
+  strategic engine for the column to feed. That is a schema change *and* an
+  engine capability, and it needs a human.
+
+- **D92, which this package found while reading the first.**
+  `fieldStatus.ts::milestoneFor` returned the literal `"engine catalog — planned"`
+  for any family absent from `PENDING_FAMILY_POLICY`, and every caller treated it
+  as a milestone. So the sheet said, of `reorder_point`: **"stored only ·
+  activates with engine catalog — planned"**. Nothing is planned — `inventory`
+  and `sourcing` are not in that table, and D91 says what those fields are. The
+  other branch read "not consumed yet", where *yet* carries the same promise more
+  quietly. `FieldEngineStatus` gains `stored-only`, `milestoneFor` returns `null`
+  instead of a sentence, and the sheet now says **"stored only · no engine
+  consumer, none planned"**. The product was inventing a future to avoid telling
+  a user a field does nothing.
+
+**Gap check.** Three findings, none of them this slice's to fix:
+
+1. **`SCSIM_VISIBLE_FIELDS` is a fourth authority for the same fact.**
+   `schemas.ts:426` hand-lists which fields scsim consumes; `resolutionChains.ts`
+   computes it from the registry and `project_map.py`. They agree today, and
+   nothing checks that they do — `single-source` (I1). The cheap gate is a test
+   that the two derivations match; it is not written here because the honest
+   version needs the corrected doors to be stable for more than one commit.
+2. **`readsKey` is Python-shaped and `citeAppReads` is not.** The app scan is a
+   quoted-or-identifier match over three curated modules, which is loose. It is
+   confined to choosing between two BREAK classes and never decides whether a
+   chain resolves, and the code says so — but a scan this plan has now been
+   burned by five times should not be believed further than that.
+3. **Nine of the eleven need a decision, not a fix.** `legacy-only`,
+   `overridden` and `unread` all end the same way: a field that is editable,
+   stored, versioned and hashed into `policy_hash` while changing no result.
+   Remove the column, wire the field, or badge it — and that is a product call
+   per field. The badge now tells the truth (D92), which makes deferring the
+   other two honest rather than silent.
+
+**Still open in WP 6.2**, untouched by this slice: D17, D18, D23, D24, D26, D34,
+D47, D48, D49, D51, D53, D58, D59, D66, D69, D71, D85, D87, and the
+`StagePolicyTable.tsx:1208-1276` / `resolveEffective.ts` de-duplication.

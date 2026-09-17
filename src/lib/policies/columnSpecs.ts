@@ -213,10 +213,18 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200, vectorGroup: "invParams" }),
       col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0, vectorGroup: "invParams" }),
       col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1, vectorGroup: "invParams" }),
-      col("initial_on_hand", "inventory", {
-        visibleWhen: plantNeedsInventory,
-        master: { table: "products", field: "initial_on_hand", idFrom: "product_id" },
-      }),
+      // NO `master:` BLOCK, AND ITS ABSENCE IS THE FIX (§4 D89). This column was
+      // declared `master: { table: "products", field: "initial_on_hand" }` — a
+      // copy of the supplier stage's correct `materials.initial_on_hand` fifty
+      // lines above — and `products` has no such column. `masterValueFor`
+      // returns undefined for a column that does not exist, so every cell fell
+      // through to the policy bundle while the Parameter Sheet said "reaches
+      // engine · from item master". `masterPointersResolve.test.ts` is now a GATE
+      // on that class, so the next such copy fails on the commit that makes it.
+      // Restoring the pointer means adding the column AND a scsim reader for it:
+      // `context.py:150` builds on-hand from `net.materials` only, so there is no
+      // finished-goods initial inventory in the strategic engine to feed (§16).
+      col("initial_on_hand", "inventory", { visibleWhen: plantNeedsInventory }),
       col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 7 }),
       col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
       col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
