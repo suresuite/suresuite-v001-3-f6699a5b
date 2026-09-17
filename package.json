@@ -23,6 +23,7 @@
     "contract:generate": "node scripts/data-contract/generate.mjs",
     "contract:check": "node scripts/data-contract/check.mjs",
     "contract:rehearse": "node scripts/data-contract/rehearse-migrations.mjs",
+    "contract:concurrency": "node scripts/data-contract/wp42-concurrency.mjs",
     "verify:sql": "node scripts/data-contract/verification-sql.mjs"
   },
   "dependencies": {

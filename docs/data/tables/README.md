@@ -5,13 +5,15 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-37 of 79 tables are covered,
-434 columns in all. A table that is not here is listed
+39 of 81 tables are covered,
+456 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
 | Table | Tier | Owner | Columns | One row is |
 |---|---|---|---|---|
+| [`analysis_results`](analysis_results.md) | 3 | `analysis` | 6 | One entity's metrics from one run. `metrics` is jsonb rather than a column per measure on purpose: the set of measures is the analysis's business and adding one must not be a migration — which is the same argument the open `analysis_kind` enum makes, applied to the output side. |
+| [`analysis_runs`](analysis_runs.md) | 3 | `analysis` | 16 | One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved. |
 | [`approved_users`](approved_users.md) | G | `platform` | 16 | One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one. |
 | [`audit_logs`](audit_logs.md) | G | `platform` | 11 | One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused. |
 | [`bom_multi_level`](bom_multi_level.md) | 2 | `data-ingestion` | 11 | One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed). |
@@ -52,4 +54,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `3da477ea5282`, engine `0.2.3`.*
+*Generated from data contract `a29fd67bde88`, engine `0.2.3`.*

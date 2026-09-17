@@ -20,9 +20,9 @@ DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since W
 | `id` | column PRIMARY KEY | `tier2_suppliers_pkey` |
 | `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` | UNIQUE index | `tier2_suppliers_natural_key` |
 
-**Intended natural key:** `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `plant_name` + `supplier_id` + `upstream_supplier_id` + `material_id` — the key this table's grain implies, and the
+database ENFORCES it: `tier2_suppliers_natural_key`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Constraints
 
@@ -304,6 +304,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `3da477ea5282`, engine `0.2.3`,
+*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
 sidecar `supabase/contract/tier2_suppliers.contract.yaml`, table created by `20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

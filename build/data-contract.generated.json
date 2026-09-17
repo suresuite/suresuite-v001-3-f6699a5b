@@ -5,26 +5,920 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 323,
-      "migrations_applied": 320,
-      "last_migration": "20260917000005_writer_preamble_actor_only.sql"
+      "migrations_found": 324,
+      "migrations_applied": 321,
+      "last_migration": "20260917000006_analysis_store.sql"
     },
-    "sidecars": 37,
+    "sidecars": 39,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 79,
-    "tables_covered": 37,
-    "columns_covered": 434,
+    "tables_in_schema": 81,
+    "tables_covered": 39,
+    "columns_covered": 456,
     "check_constraints": 19,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
   },
   "tables": {
+    "analysis_results": {
+      "table": "analysis_results",
+      "schema_name": "public",
+      "tier": "3",
+      "tier_name": "derived — a pure function of tier 2",
+      "grain": "One entity's metrics from one run. `metrics` is jsonb rather than a column per measure on purpose: the set of measures is the analysis's business and adding one must not be a migration — which is the same argument the open `analysis_kind` enum makes, applied to the output side.",
+      "owner": "analysis",
+      "created_by": "20260917000006_analysis_store.sql",
+      "sidecar": "supabase/contract/analysis_results.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "analysis_results_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "run_id",
+            "entity_type",
+            "entity_id"
+          ],
+          "name": "analysis_results_entity_uniq"
+        }
+      ],
+      "natural_key_intended": [
+        "run_id",
+        "entity_type",
+        "entity_id"
+      ],
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Read follows the parent run's project reachability. No write policy and no user-facing write path: rows arrive only through `analysis_complete_run`. APPEND-ONLY AS A PROPERTY OF THE SCHEMA — `analysis_results_are_immutable` refuses every UPDATE, because a result that can be rewritten makes its run's key a lie: the key says these inputs and this code produced this answer. DELETE is not refused, and that is deliberate rather than an omission: rows cascade from `analysis_runs` and thence from `projects`, and refusing DELETE would make deleting an analysed project fail. Deleting a project is retention, not mutation of a result."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "analysis_results_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.analysis_runs r WHERE r.id = analysis_results.run_id AND public.has_project_access(r.project_id))",
+            "with_check": "EXISTS ( SELECT 1 FROM public.analysis_runs r WHERE r.id = analysis_results.run_id AND public.has_project_access(r.project_id))",
+            "added_by": "20260917000006_analysis_store.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "analysis_results_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "analysis_results_entity_uniq",
+          "unique": true,
+          "columns": [
+            "run_id",
+            "entity_type",
+            "entity_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate row identifier. Carries no meaning.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "analysis_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The run that computed this. Every result reaches its dataset, its parameters and its code version through here — which is what makes a stored metric reproducible (T4) instead of a number with no provenance.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "entity_type",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What kind of thing the metrics are about — `node`, `project`, and whatever a later `analysis_kind` declares. Shape-checked only, for the same reason `analysis_kind` is: the catalog belongs in the contract, not in a CHECK.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The entity's own id within the project, as the analysis names it (a node `uid`, a project id). TEXT because the analyses disagree about what an entity is and forcing one type here would force a migration the first time a new kind lands.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "metrics",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What was computed for this entity. jsonb so a new measure is not a migration. IMMUTABLE — see the governance note; recomputing means a NEW run, which is the point of the key.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row insert time, maintained by the database.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null
+    },
+    "analysis_runs": {
+      "table": "analysis_runs",
+      "schema_name": "public",
+      "tier": "3",
+      "tier_name": "derived — a pure function of tier 2",
+      "grain": "One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved.",
+      "owner": "analysis",
+      "created_by": "20260917000006_analysis_store.sql",
+      "sidecar": "supabase/contract/analysis_runs.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "analysis_runs_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "project_id",
+            "analysis_kind",
+            "input_hash",
+            "params_hash",
+            "code_version"
+          ],
+          "name": "analysis_runs_key_uniq",
+          "predicate": "status <> 'failed'"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "analysis_kind",
+        "input_hash",
+        "params_hash",
+        "code_version"
+      ],
+      "ingest_dataset": null,
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Read follows project reachability (`has_project_access`), uuid-only since WP 3.0. `write: null` is a STATEMENT, not an omission: there is no user-facing write path and there must not be one. Every write goes through `analysis_get_or_start`, `analysis_complete_run` and `analysis_fail_run`, each of which takes the actor as a PARAMETER and routes it through `assert_writer_may_act` — so the audit trigger names a person rather than recording `actor_known: false` (G4). There is deliberately NO write policy on this table, which makes `no-tier-skip` (I2) a property of the schema here rather than of today's callers. The RPCs AUTHENTICATE and do not AUTHORIZE: `20260917000005` removed a role gate from the shared preamble after it was found to refuse an organization admin on a live path, and making `min_project_role` load-bearing is D66 and WP 6.2's."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "analysis_runs_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20260917000006_analysis_store.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "analysis_runs_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "analysis_runs_key_uniq",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "analysis_kind",
+            "input_hash",
+            "params_hash",
+            "code_version"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "status <> 'failed'",
+          "partial": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_runs_project_kind_idx",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "analysis_kind",
+            "started_at DESC"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260917000006_analysis_store.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate row identifier. Carries no meaning — the IDENTITY of a run is the five-column natural key, not this.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this analysis ran for. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete, which is retention rather than mutation of a result.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "analysis_kind",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WHICH analysis ran. Open enum — the CHECK constrains the shape to a lowercase identifier and the catalog of values is the `analysis_kinds` block above, so a new kind costs a sidecar edit and not a migration.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "input_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WP 4.1's `current_graph_hash(project_id)` at the moment the run was claimed: the world this answer is about. This is the anchor invariant `input-hash` (I5) is about — and I5 is NOT met by this table alone, because I5 is about the DERIVED ROW carrying it. WP 4.3 stamps the same value onto the tier-3 rows the analyzers already write.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "params_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "SHA-256 of `params` as canonical `jsonb` text. Over jsonb and never over the text a caller sent, because jsonb normalises key order and duplicate keys — so the same parameters written two ways are one cache key rather than two.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "code_version",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WHICH code produced the answer. Part of the key so that a changed analyzer does not serve its predecessor's numbers, and so two versions can coexist on one input hash and be compared (§11's fourth exit check).",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "params",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The parameters as sent, beside the hash of them, so a run can be read without reversing a digest. Immutable: re-pointing a stored run at different parameters would re-attribute an answer to a question it never answered.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "default": "'running'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "`running`, `succeeded` or `failed`. Only a `succeeded` run is ever served as a hit — a `running` row is a claim somebody else is still working on and holds no results, and handing it back would render an empty analysis as a complete one. `failed` sits OUTSIDE the unique index on purpose (see `natural_key_unique`): otherwise the first crash would own that cache key forever and the analysis could never be retried on that input.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the key was claimed. Part of the run's frozen identity, not of its state.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the run reached `succeeded` or `failed`. Null while running.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "duration_ms",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Wall-clock milliseconds from claim to finish. Reporting only — nothing keys on it, and a staleness rule that compared it to anything would be the timestamp comparison D12 is about.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Nothing reads it, deliberately. It is here so a slow analysis is VISIBLE rather than inferred from two timestamps, and the moment anything keys on it we are back to asking whether a clock moved instead of whether the data changed — which is exactly D12.",
+          "engine_requirement": null
+        },
+        {
+          "name": "row_counts",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the run produced, by entity type. Reporting and the Trust Report's input (A3); WP 4.4 assembles it.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "warnings",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The run's own account of its blind spots, carried with the result rather than left in a log — transparency commitment T3, which says every report states the known limits of its own computation.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "actor_user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": null
+          },
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot exist — the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Row insert time, maintained by the database.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260917000006_analysis_store.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identity_is_immutable`; only status, finish and reporting columns move, which is the line between what a run IS and what it is DOING.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null
+    },
     "approved_users": {
       "table": "approved_users",
       "schema_name": "public",
@@ -18728,5 +19622,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "3da477ea5282"
+  "contract_version": "a29fd67bde88"
 }

@@ -16,15 +16,77 @@
 # Deferring is a commitment, not an excuse. Every entry names a work package that
 # already exists in PLAN.md; if a package is renumbered or dropped, this file
 # moves with it in the same commit.
+#
+# AND EVERY DEFERRAL MUST SAY WHETHER THE TABLE IS AUDITED (D54, WP 4.2).
+#
+# `dataPlaneAudit.test.ts` requires the three `audit_tier_write` triggers on every
+# tier-2/3/4 table IN THE CONTRACT. A table deferred here is outside the contract,
+# therefore outside that rule, therefore its writes are unattributable WITH
+# NOTHING TO NOTICE — and the decision about which tables those are was being made
+# by this file, silently, by omission. WP 3.2 hit it from the other side: it
+# described three tables and the audit gate went red in the same session, which is
+# the gate working and is only possible for a table somebody had already chosen to
+# describe.
+#
+# So each group carries an `audited:` map naming EVERY table in it, and
+# `contract:check` R11 fails when a table is missing from it or when the
+# declaration disagrees with the triggers the migrations actually create. The
+# point is not the boolean. The point is that `false` now has to be TYPED by a
+# person, next to the work package that owns fixing it.
+#
+# §15 measured the six this package owns at zero of six on 2026-09-17; R11 reports
+# the number for all of them on every run.
 
 deferred:
-  - wp: "4.2"
+  - wp: "4.3"
     why: >-
-      Analysis output. D19 — results smeared onto entity columns with no identity
-      or version — is exactly what these tables are, and WP 4.2 moves them into
-      `analysis_results`. Documenting the smear as though it were the design
-      would make the contract an argument for keeping it.
-    tables: [network_nodes, network_edges, network_summary, node_list, model_validations, external_evidence]
+      Analysis output, and the four tables D56's decision is about. WP 4.2 built
+      the store (`analysis_runs` + `analysis_results`) and DECIDED what these are:
+      `network_nodes` and `node_list` are BOTH — each carries columns a user
+      uploaded beside columns an analysis wrote, which is D19 stated precisely in
+      one table and is why "what tier is it" has no answer while the table is one
+      thing. So the answer is a SPLIT, not a tier, and WP 4.3 executes it because
+      the computed half has nowhere to go until the analyzers dual-write into
+      `analysis_results`. Two things must land before the input half can be
+      described: D72 (`network_nodes` has no unique key on `(project_id, uid)`, so
+      an upsert that names one fails every time it runs) and the second
+      `schema_version` bump that describing it would force, because WP 4.1's
+      coverage rule folds a described tier-2 input table into `hash_network` the
+      moment its sidecar exists. §4 D56 carries the enumerated blast radius —
+      every writer, every reader, every RPC — so this package inherits it rather
+      than rediscovering it.
+    tables: [network_nodes, network_edges, network_summary, node_list]
+    audited:
+      network_nodes: false
+      network_edges: false
+      network_summary: false
+      node_list: false
+
+  - wp: "4.4"
+    why: >-
+      `model_validations` is a VALIDATION CARD, not analysis output — it already
+      carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint`
+      and its whole subject is whether a card has gone stale, which is the one
+      staleness rule WP 4.4 lands ("stale iff `computed_from_hash <>
+      current_graph_hash()`") and the Trust Report that reads it. It was grouped
+      with the network tables by WP 1.4 on the strength of the word "validation";
+      WP 4.2 moved it when the D56 decision made the network group specific.
+      §15 measured 0 active cards, so nothing is waiting on it.
+    tables: [model_validations]
+    audited:
+      model_validations: false
+
+  - wp: "6.1"
+    why: >-
+      `external_evidence` is the AGENT's evidence store — retrieved URLs, content
+      hashes and confidence behind a proposal — and it belongs with the decision
+      plane rather than with analysis output. Same regrouping as
+      `model_validations` above: it was in the WP 4.2 bucket because nobody had
+      looked at it, which is exactly what D54 says a deferral list does when it is
+      allowed to decide by omission.
+    tables: [external_evidence]
+    audited:
+      external_evidence: false
 
   - wp: "4.4"
     why: >-
@@ -48,6 +110,16 @@ deferred:
       - simulation_cache
       - simulation_performance_metrics
       - experiments
+    audited:
+      simulation_runs: false
+      simulation_results: false
+      run_replications: false
+      run_item_series: false
+      simulation_jobs: false
+      simulation_job_magnitudes: false
+      simulation_cache: false
+      simulation_performance_metrics: false
+      experiments: false
 
   - wp: "6.1"
     why: >-
@@ -66,6 +138,17 @@ deferred:
       - disruption_scenario_effects
       - disruption_scenario_settings
       - recovery_playbooks
+    audited:
+      policy_versions: false
+      policy_presets: false
+      scenarios: false
+      scenario_templates: false
+      disruption_scenarios: false
+      disruption_scenario_profiles: false
+      disruption_scenario_targets: false
+      disruption_scenario_effects: false
+      disruption_scenario_settings: false
+      recovery_playbooks: false
 
   - wp: "5.2"
     why: >-
@@ -94,3 +177,21 @@ deferred:
       - project_memory
       - proposals
       - user_files
+    audited:
+      ai_budgets: false
+      ai_chat_events: false
+      ai_model_capabilities: false
+      ai_models: false
+      ai_providers: false
+      ai_usage_logs: false
+      api_idempotency: false
+      api_keys: false
+      api_rate_limits: false
+      api_request_logs: false
+      chat_folders: false
+      chat_messages: false
+      chat_plans: false
+      chat_threads: false
+      project_memory: false
+      proposals: false
+      user_files: false

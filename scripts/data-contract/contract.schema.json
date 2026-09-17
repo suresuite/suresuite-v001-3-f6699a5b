@@ -56,14 +56,15 @@
       "description": "What ONE ROW is, in the user's terms. Not the primary key \u2014 the thing."
     },
     "owner": {
-      "description": "Which part of the system is responsible for the rows being correct.",
+      "description": "Which part of the system is responsible for the rows being correct. `analysis` (WP 4.2) is the analyses that produce derived metrics \u2014 distinct from `etl`, which is `combine-project`'s graph build, and from `engine`, which is the simulation. It was added rather than folding the analysis store into `etl`, because labelling the owner wrongly in the table that exists to end mislabelled provenance (D19) would be a poor trade for one enum value.",
       "enum": [
         "data-ingestion",
         "etl",
         "policy-ui",
         "engine",
         "platform",
-        "reference-data"
+        "reference-data",
+        "analysis"
       ]
     },
     "natural_key_unique": {
@@ -195,6 +196,32 @@
     },
     "note": {
       "type": "string"
+    },
+    "analysis_kinds": {
+      "type": "object",
+      "description": "WP 4.2 \u00b7 \u00a711's OPEN ENUM with its params schema. `analysis_kind` is a TEXT column whose CHECK constrains the shape only, so a new kind costs a sidecar edit and not an `ALTER TYPE`, a migration and a deploy. The catalog of kinds is a data fact and `single-source` (I1) says a data fact is authored exactly once \u2014 here.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "computed_by",
+          "entity_type",
+          "params"
+        ],
+        "properties": {
+          "computed_by": {
+            "type": "string",
+            "description": "The analyzer that produces this kind."
+          },
+          "entity_type": {
+            "type": "string",
+            "description": "What `analysis_results.entity_type` carries for this kind."
+          },
+          "params": {
+            "type": "object",
+            "description": "Each parameter's type, default and meaning. A default declared nowhere is `declared-fallback` (I6) broken."
+          }
+        }
+      }
     }
   },
   "definitions": {

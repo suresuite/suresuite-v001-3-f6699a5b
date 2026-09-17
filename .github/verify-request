@@ -29,4 +29,85 @@
 # READ THE REPORT, NOT THE EXIT CODE. The runner is tolerant: WP 3.4 shipped a
 # probe that ordered by a column that does not exist, printed QUERY FAILED, and
 # exited 0.
-WP 4.1 graph_hash blast radius — after
+WP 4.2 analysis store — AFTER
+#
+# WP 4.2's before-run. NO MIGRATION IS IN THIS PUSH, which is the whole point:
+# the trigger has three doors (this file, the workflow, and the runner script)
+# and this push changes only the runner, so nothing races a deploy. WP 4.1 lost
+# zero runs by sending its probes first; five were lost across the three
+# packages before it.
+#
+# TWO THINGS NOTHING HAS EVER MEASURED, and they are the reason for this run:
+#
+#   1. The four DERIVED tables' row counts — `node_list`, `network_nodes`,
+#      `network_edges`, `network_summary`. WP 4.1's probes did not touch them
+#      (§16 · WP 4.1 · I lists them as deferred and stops), so "how big is the
+#      smear" has never had a number, only D19's adjective. Counted in total
+#      and PER PROJECT, because the largest project here is the seeded one and
+#      reading it alone reports a clean data layer that is not clean (D42).
+#
+#   2. How many rows carry a COMPUTED column with no input hash. No tier-3
+#      table has `computed_from_hash` yet — that is WP 4.3's — so the expected
+#      answer is "all of them", and the value of writing it down is that WP 4.3
+#      needs a before-number to show it moved.
+#
+# And D54 as a number: which of the SIX deferred tables this package owns
+# (`node_list`, `network_nodes`, `network_edges`, `network_summary`,
+# `model_validations`, `external_evidence`) carry an `audit_tier_write`
+# trigger. The expectation is zero of six — they are outside the contract,
+# therefore outside `dataPlaneAudit.test.ts`'s rule, therefore unattributable
+# with nothing to notice.
+#
+# EXPECTED: zero rows in all four tables. The CSV ingestion path has run zero
+# times in production and these analyses have produced nothing. Zero is a
+# finding, not a failed probe — it is the honest caveat stated as data, and it
+# is why no `analysis_runs` count from this package may ever be reported as
+# adoption.
+
+#
+# ── THE AFTER-RUN ──────────────────────────────────────────────────────────
+#
+# `Deploy Supabase Migrations` run 35232718946 reported SUCCESS before this was
+# touched. No migration is in this push, so nothing races it.
+#
+# AND THE BEFORE-RUN'S STATED EXPECTATION WAS WRONG, which reading the report
+# rather than the exit code is what says. It predicted zero rows in all four
+# tables. Production holds 5 261: `node_list` 1 747 across SEVEN projects,
+# `network_nodes` 1 385 (all with a computed column), `network_edges` 2 129,
+# `network_summary` 0. The CSV path has indeed run zero times — but these tables
+# are not fed by it. They are fed by the bulk RPCs and the analyzers, which HAVE
+# run. The smear is real, sizeable and in production, while the cache in front of
+# it is exercised only by fixtures. Both halves are true; neither may be dropped.
+#
+# WHAT THIS RUN ADDS, and why each is a claim the before-run could not make:
+#
+#   1. DID THE STORE LAND? Two tables, five functions, the PARTIAL unique key and
+#      six audit triggers, counted from `information_schema` and `pg_catalog`.
+#      WP 4.1's after-run could not distinguish a landed deploy from a failed one
+#      because every count it took was about ROWS while the migration changed
+#      FUNCTIONS (§16 · WP 4.1 · K). These push to `gateFailures`, so a
+#      half-landed deploy turns the run RED rather than publishing a report that
+#      looks like the last one.
+#
+#   2. IS THE KEY STILL PARTIAL? `WHERE status <> 'failed'` is this package's one
+#      deviation from §11 (§16 · WP 4.2 · I): a full index lets the first FAILED
+#      run own a cache key forever. The index definition is read back, so a later
+#      migration that "tidies" it would not be silent.
+#
+#   3. D72'S BEFORE-NUMBER, which WP 4.3 needs and cannot take after it has acted.
+#      `calculate-network-science-metrics:115` upserts `network_nodes` on
+#      `(project_id, uid)` and that unique index DOES NOT EXIST, so the statement
+#      raises 42P10 every time it runs, the handler logs and carries on, and the
+#      per-node update loop then matches nothing. Before the index can be created
+#      the duplicates must be counted — exactly how D5's before-number was taken
+#      for the seven lanes — and `null_uid` decides whether it must be
+#      `NULLS NOT DISTINCT`.
+#
+# EXPECTED: store_tables 2, store_functions 5, partial_unique_key 1,
+# audit_triggers 6, and ZERO rows in `analysis_runs`. **Zero is not a failure and
+# a future non-zero count is NOT adoption** until an analyzer is the caller — no
+# `analysis_runs` count from this package may ever be reported as usage.
+#
+# READ THE REPORT, NOT THE EXIT CODE. The runner is tolerant: WP 3.4 shipped a
+# probe that ordered by a column that does not exist, printed QUERY FAILED, and
+# exited 0.

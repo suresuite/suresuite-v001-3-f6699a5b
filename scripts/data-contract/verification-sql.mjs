@@ -711,6 +711,248 @@ async function graphHashBlastRadius() {
   });
 }
 
+// ── WP 4.2: the smear, as a quantity ───────────────────────────────────────
+//
+// TWO THINGS NOTHING HAS EVER MEASURED, and they are this package's to measure
+// FIRST, before the store exists to change them.
+//
+//  1. The four DERIVED tables' row counts. WP 4.1's probes did not touch them
+//     (§16 · WP 4.1 · I lists them as deferred and stops), so "how big is the
+//     smear" has never had a number — only the adjective in D19.
+//  2. How many rows carry a COMPUTED column with no input hash. No tier-3 table
+//     has `computed_from_hash` yet (that is WP 4.3's), so today the answer is
+//     "every one of them" — and the point of writing it down as a count is that
+//     WP 4.3 needs a before-number to show it moved.
+//
+// EVERY project, never one (D42): the largest project here is the one
+// `seed-project.yml` seeds, and reading it alone reports a clean data layer.
+async function wp42Smear() {
+  section("WP 4.2 — the four DERIVED tables, and D19 as a quantity");
+
+  // `network_nodes` is the table D56 has deferred three times, and the reason
+  // is visible in its own column list: the INPUT half is what a user uploaded
+  // (`name`, `country`, `industry`, `revenue`, `lat`, `long`, `is_seed`), the
+  // COMPUTED half is what an analysis wrote. The counts are kept apart here
+  // because a single row count cannot tell those two apart, which is D19.
+  const derived = await tryQ(`
+    select 'node_list'       as tbl,
+           count(*)::int     as rows,
+           count(distinct project_id)::int as projects,
+           count(*) filter (where is_critical_node is not null
+                               or critical_node_score is not null
+                               or prediction_timestamp is not null)::int as rows_with_computed,
+           count(*) filter (where longitude is not null or latitude is not null)::int as rows_geocoded
+      from public.node_list
+    union all
+    select 'network_nodes', count(*)::int, count(distinct project_id)::int,
+           count(*) filter (where degree_centrality is not null
+                               or weighted_degree_centrality is not null
+                               or eigenvector_centrality is not null
+                               or betweenness_centrality is not null
+                               or closeness_centrality is not null
+                               or prominence is not null)::int,
+           count(*) filter (where lat is not null or long is not null)::int
+      from public.network_nodes
+    union all
+    select 'network_edges', count(*)::int, count(distinct project_id)::int, 0, 0
+      from public.network_edges
+    union all
+    select 'network_summary', count(*)::int, count(distinct project_id)::int,
+           count(*) filter (where nodes_count is not null or edges_count is not null
+                               or tiers_data is not null)::int, 0
+      from public.network_summary`);
+  report("the four tables WP 4.1 deferred, counted for the first time", derived, (rows) => {
+    if (!rows?.length) { out("- No rows returned."); return; }
+    out(...table(rows));
+    const total = rows.reduce((a, r) => a + Number(r.rows || 0), 0);
+    const computed = rows.reduce((a, r) => a + Number(r.rows_with_computed || 0), 0);
+    out("");
+    out(
+      `- **${total} row(s) across the four tables, ${computed} of them carrying at least one COMPUTED column ` +
+        `and NONE of them carrying an input hash** — no tier-3 table has \`computed_from_hash\` yet. That is D19 ` +
+        "as a number rather than an adjective, and it is WP 4.3's before-figure.",
+    );
+    if (total === 0) {
+      out(
+        "- **Zero rows is itself the finding**, and it is the honest caveat stated as data: the analyses this " +
+          "package caches have produced nothing in production, so every claim about a cache hit is a claim " +
+          "about `supabase/rehearsal/` fixtures and must not be reported as adoption.",
+      );
+    }
+  });
+
+  // Per project, because a total hides which projects are affected (D42).
+  const perProject = await tryQ(`
+    select p.name as project,
+           (select count(*)::int from public.node_list       t where t.project_id = p.id) as node_list,
+           (select count(*)::int from public.network_nodes   t where t.project_id = p.id) as network_nodes,
+           (select count(*)::int from public.network_edges   t where t.project_id = p.id) as network_edges,
+           (select count(*)::int from public.network_summary t where t.project_id = p.id) as network_summary,
+           (select count(*)::int from public.network_nodes t
+             where t.project_id = p.id and t.network_metrics_updated_at is not null)      as nodes_with_metrics
+      from public.projects p order by p.created_at`);
+  report("the same four, per project (D42 — never just the seeded one)", perProject, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+  });
+
+  // D54 AS A NUMBER. The rule this package adds is that a deferral must SAY
+  // whether the table is audited; this is the measurement that says what the
+  // coverage list has been deciding silently.
+  const deferredAudit = await tryQ(`
+    select c.relname::text as tbl,
+           count(t.tgname) filter (where not t.tgisinternal)::int as audit_triggers
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      left join pg_trigger t on t.tgrelid = c.oid
+                            and not t.tgisinternal
+                            and t.tgname like '%audit_tier_write%'
+     where n.nspname = 'public'
+       and c.relname in ('node_list','network_nodes','network_edges','network_summary',
+                         'model_validations','external_evidence')
+     group by 1 order by 1`);
+  report("D54 — the six DEFERRED tables this package owns, and their audit triggers", deferredAudit, (rows) => {
+    if (!rows?.length) { out("- None of the six exist in production."); return; }
+    out(...table(rows));
+    const unaudited = rows.filter((r) => Number(r.audit_triggers) === 0);
+    out("");
+    out(
+      `- **${unaudited.length} of ${rows.length} carry no \`audit_tier_write\` trigger.** They are outside the ` +
+        "contract, therefore outside `dataPlaneAudit.test.ts`'s rule, therefore their writes are unattributable " +
+        "with nothing to notice. That is D54 measured rather than described.",
+    );
+  });
+}
+
+// ── WP 4.2: did the store actually reach production? ───────────────────────
+//
+// WP 4.1's after-run could not tell a landed deploy from a failed one: every
+// count came back identical to the before-run, which was correct for the data
+// and is also exactly what a failed deploy prints, because the counts are about
+// ROWS and the migration changed FUNCTIONS and COLUMNS (§16 · WP 4.1 · K).
+//
+// WP 4.2's migration creates TABLES, so the schema probe would catch a total
+// failure — but not a PARTIAL one, and the counts below would again be the same
+// on both sides of it because nothing has called the store. These assertions are
+// therefore about the SCHEMA, not the data, and they push to `gateFailures` so a
+// half-landed deploy turns the run red instead of publishing a report that looks
+// like the previous one.
+async function wp42Landed() {
+  section("WP 4.2 — did the analysis store reach production?");
+
+  const landed = await tryQ(`
+    select (select count(*)::int from information_schema.tables
+             where table_schema = 'public'
+               and table_name in ('analysis_runs','analysis_results'))            as store_tables,
+           (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+             where n.nspname = 'public'
+               and p.proname in ('analysis_get_or_start','analysis_complete_run',
+                                 'analysis_fail_run','analysis_results_are_immutable',
+                                 'analysis_runs_identity_is_immutable'))          as store_functions,
+           (select count(*)::int from pg_index i join pg_class c on c.oid = i.indexrelid
+             where c.relname = 'analysis_runs_key_uniq'
+               and i.indisunique and i.indpred is not null)                       as partial_unique_key,
+           (select count(*)::int from pg_trigger t
+             where not t.tgisinternal
+               and t.tgname like 'audit_analysis_%')                              as audit_triggers`);
+  report("the two tables, five functions, the partial key and the six audit triggers", landed, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    const want = { store_tables: 2, store_functions: 5, partial_unique_key: 1, audit_triggers: 6 };
+    const bad = Object.entries(want).filter(([k, v]) => Number(r[k]) !== v);
+    if (bad.length) {
+      gateFailures.push(
+        `WP 4.2's migration is NOT fully present in production: ` +
+        bad.map(([k, v]) => `${k} ${r[k] ?? "?"}/${v}`).join(", ") +
+        `. Every WP 4.2 count in this report is therefore a measurement of the ` +
+        `PRE-migration database wearing an after-run's label (§16 · WP 4.1 · K).`,
+      );
+      out("- **NOT LANDED.** See the GATE section at the end of this report.");
+      return;
+    }
+    out("- Landed: both tables, all five functions, the partial unique key and all six audit triggers.");
+  });
+
+  // THE KEY IS PARTIAL, and that is the deviation from §11 this package had to
+  // make (§16 · WP 4.2 · I). A full index would let the first FAILED run own a
+  // cache key forever, so the shape is asserted rather than assumed — a later
+  // migration that "tidied" it into a plain unique index would be silent.
+  const keydef = await tryQ(`
+    select pg_get_indexdef(i.indexrelid) as definition
+      from pg_index i join pg_class c on c.oid = i.indexrelid
+     where c.relname = 'analysis_runs_key_uniq'`);
+  report("the key index, as production actually holds it", keydef, (rows) => {
+    if (!rows?.length) { out("- The key index does not exist."); return; }
+    out(...table(rows));
+    if (!/WHERE .*status/i.test(String(rows[0].definition))) {
+      gateFailures.push(
+        "WP 4.2: `analysis_runs_key_uniq` is not partial in production. A failed run " +
+        "then owns its cache key permanently and that analysis can never be retried " +
+        "on that input (§11's flat key, and why this package deviated from it).",
+      );
+    }
+  });
+
+  // NOT ADOPTION, AND THIS REPORT MUST NOT BE READ AS IF IT WERE. Nothing has
+  // called the store outside a rehearsal; the row count is expected to be zero
+  // and zero is the honest answer rather than a failure.
+  const usage = await tryQ(`
+    select (select count(*)::int from public.analysis_runs)                        as runs,
+           (select count(*)::int from public.analysis_results)                     as results,
+           (select count(distinct project_id)::int from public.analysis_runs)      as projects,
+           (select count(*)::int from public.analysis_runs where actor_user_id is null) as runs_with_no_actor`);
+  report("what the store holds (expected: nothing — this is NOT adoption)", usage, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    if (Number(r.runs) === 0) {
+      out(
+        "- Zero runs, as expected. The analyzers do not call the store until WP 4.3 " +
+          "dual-writes, so every claim this package makes about a cache hit is a claim " +
+          "about `supabase/rehearsal/` fixtures. **A future non-zero count here is not " +
+          "adoption either until an analyzer is the caller.**",
+      );
+    }
+    if (Number(r.runs_with_no_actor) > 0) {
+      gateFailures.push(
+        `WP 4.2: ${r.runs_with_no_actor} run(s) carry no actor, which the NOT NULL ` +
+        "column should make impossible. `audit-actor` (G4) is failing in a new place.",
+      );
+    }
+  });
+
+  // D72's BEFORE-NUMBER, which WP 4.3 needs and cannot take after it has acted.
+  // `calculate-network-science-metrics` upserts `network_nodes` on
+  // `(project_id, uid)` and that index does not exist, so the statement fails
+  // every time it runs. Before the index can be created the duplicates have to be
+  // counted — exactly the way D5's before-number was taken for the seven lanes.
+  const d72 = await tryQ(`
+    select count(*)::int as rows,
+           count(*) filter (where uid is null)::int as null_uid,
+           (select coalesce(sum(copies - 1), 0)::int from (
+              select count(*)::int as copies from public.network_nodes
+               group by project_id, uid having count(*) > 1) d)
+             as rows_a_unique_index_would_reject,
+           (select count(*)::int from (
+              select 1 from public.network_nodes
+               group by project_id, uid having count(*) > 1) d)
+             as duplicated_keys
+      from public.network_nodes`);
+  report("D72 — `network_nodes (project_id, uid)` before any index is attempted", d72, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    out("");
+    out(
+      `- **${r.rows_a_unique_index_would_reject ?? "?"} row(s) across ` +
+        `${r.duplicated_keys ?? "?"} duplicated key(s)** would be rejected by the unique index ` +
+        "`calculate-network-science-metrics:115` already names in its `onConflict`. " +
+        "Until it exists that upsert raises `42P10` on every run, the handler logs and " +
+        "carries on, and the per-node update loop then matches nothing (D72). " +
+        `\`null_uid\` is ${r.null_uid ?? "?"} — a nullable key column means the index must be ` +
+        "`NULLS NOT DISTINCT` or it constrains every row except those (D5).",
+    );
+  });
+}
+
 // ── D29: is organizations.name unique in practice? ─────────────────────────
 async function d29() {
   section("D29 — `organizations.name` collisions (the dual read's text branch)");
@@ -1158,6 +1400,8 @@ async function main() {
   await boundaryDecisions();
   await ingestTables();
   await graphHashBlastRadius();
+  await wp42Smear();
+  await wp42Landed();
 
   const project = await pickProject();
   if (!project) {

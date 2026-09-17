@@ -20,9 +20,9 @@ DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES.
 | `id` | column PRIMARY KEY | `multi_tier_supply_chain_pkey` |
 | `project_id` + `plant_name` + `from_firm_id` + `to_firm_id` | UNIQUE index | `multi_tier_supply_chain_natural_key` |
 
-**Intended natural key:** `project_id` + `plant_name` + `from_firm_id` + `to_firm_id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `project_id` + `plant_name` + `from_firm_id` + `to_firm_id` — the key this table's grain implies, and the
+database ENFORCES it: `multi_tier_supply_chain_natural_key`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Governance
 
@@ -204,6 +204,6 @@ When the row was last written. Server-stamped by trigger.
 
 ---
 
-*Generated from data contract `3da477ea5282`, engine `0.2.3`,
+*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
 sidecar `supabase/contract/multi_tier_supply_chain.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -1,0 +1,162 @@
+# AUTHORED — the data contract's sidecar for `analysis_results`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+#
+# WP 4.2 · §11. What one run computed, one row per entity. This is the shape D19
+# says the centralities should have had all along: a metric that belongs to a RUN,
+# and therefore to an input hash and a code version, rather than a column sitting
+# on `network_nodes` beside the `country` a user typed.
+table: analysis_results
+tier: "3"
+schema_name: public
+grain: >-
+  One entity's metrics from one run. `metrics` is jsonb rather than a column per
+  measure on purpose: the set of measures is the analysis's business and adding
+  one must not be a migration — which is the same argument the open `analysis_kind`
+  enum makes, applied to the output side.
+owner: analysis
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "analysis_results_pkey"
+  - source: "unique index 20260917000006_analysis_store.sql"
+    columns: [run_id, entity_type, entity_id]
+    name: "analysis_results_entity_uniq"
+
+natural_key_intended: [run_id, entity_type, entity_id]
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: true
+  rls_enabled: true
+  note: >-
+    Read follows the parent run's project reachability. No write policy and no
+    user-facing write path: rows arrive only through `analysis_complete_run`.
+    APPEND-ONLY AS A PROPERTY OF THE SCHEMA — `analysis_results_are_immutable`
+    refuses every UPDATE, because a result that can be rewritten makes its run's
+    key a lie: the key says these inputs and this code produced this answer.
+    DELETE is not refused, and that is deliberate rather than an omission: rows
+    cascade from `analysis_runs` and thence from `projects`, and refusing DELETE
+    would make deleting an analysed project fail. Deleting a project is retention,
+    not mutation of a result.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate row identifier. Carries no meaning.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  run_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run that computed this. Every result reaches its dataset, its parameters
+      and its code version through here — which is what makes a stored metric
+      reproducible (T4) instead of a number with no provenance.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  entity_type:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What kind of thing the metrics are about — `node`, `project`, and whatever a
+      later `analysis_kind` declares. Shape-checked only, for the same reason
+      `analysis_kind` is: the catalog belongs in the contract, not in a CHECK.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  entity_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The entity's own id within the project, as the analysis names it (a node `uid`,
+      a project id). TEXT because the analyses disagree about what an entity is and
+      forcing one type here would force a migration the first time a new kind lands.
+    grain: identifier
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  metrics:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What was computed for this entity. jsonb so a new measure is not a migration.
+      IMMUTABLE — see the governance note; recomputing means a NEW run, which is the
+      point of the key.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Row insert time, maintained by the database.
+    grain: metadata
+    engine:
+      consumed_by: null
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: null
+    surfaces: []
+    resolution: null

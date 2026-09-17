@@ -372,12 +372,37 @@ function renderKeys(t) {
     out.push("");
   }
   if (t.natural_key_intended) {
-    out.push(
-      `**Intended natural key:** ${t.natural_key_intended.map((c) => `\`${c}\``).join(" + ")} — the key this`,
-      `table's grain implies and the database does NOT enforce today. A statement about`,
-      `what is missing, never a claim about what is there.`,
-      "",
+    // IS IT LANDED? The sentence used to say "the database does NOT enforce
+    // today" unconditionally, and WP 3.3 made that false for seven tables the
+    // day it created their unique indexes — so eleven of thirteen generated
+    // pages published the OPPOSITE of the truth about the very invariant
+    // `natural-key` (I4) is. That is D40's class exactly: a generated page
+    // stating a fact the schema had moved on from, CI-gated so it would have
+    // stayed true-looking indefinitely (D74).
+    //
+    // `natural_key_intended` stays on a table whose key HAS landed on purpose —
+    // `contract:check` R5 compares the landed columns against it, so removing it
+    // would remove the comparison. What was wrong is the prose, not the field.
+    const want = JSON.stringify([...t.natural_key_intended].sort());
+    const landed = (t.natural_key_unique || []).find(
+      (k) => JSON.stringify([...k.columns].sort()) === want,
     );
+    const key = t.natural_key_intended.map((c) => `\`${c}\``).join(" + ");
+    if (landed) {
+      out.push(
+        `**Natural key:** ${key} — the key this table's grain implies, and the`,
+        `database ENFORCES it: ${code(landed.name)}. A re-upload of the same row updates`,
+        `it rather than duplicating it.`,
+        "",
+      );
+    } else {
+      out.push(
+        `**Intended natural key:** ${key} — the key this`,
+        `table's grain implies and the database does NOT enforce today. A statement about`,
+        `what is missing, never a claim about what is there.`,
+        "",
+      );
+    }
   }
   return out;
 }

@@ -19,9 +19,9 @@ Expiry and revocation are both applied inside `effective_project_role()` rather 
 |---|---|---|
 | `id` | column PRIMARY KEY | `delegation_grants_pkey` |
 
-**Intended natural key:** `id` — the key this
-table's grain implies and the database does NOT enforce today. A statement about
-what is missing, never a claim about what is there.
+**Natural key:** `id` — the key this table's grain implies, and the
+database ENFORCES it: `delegation_grants_pkey`. A re-upload of the same row updates
+it rather than duplicating it.
 
 ## Constraints
 
@@ -209,6 +209,6 @@ When the grant was made. Server-stamped.
 
 ---
 
-*Generated from data contract `3da477ea5282`, engine `0.2.3`,
+*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
 sidecar `supabase/contract/delegation_grants.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
