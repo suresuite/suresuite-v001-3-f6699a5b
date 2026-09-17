@@ -3,7 +3,7 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **3 packages closed**
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **4 packages closed**
 
 ---
 
@@ -78,6 +78,32 @@ R12 mutation-tested both ways.
 
 ---
 
+### WP 5.3 — The anchor sees the graph; the drop is blocked · `20260917000009`
+
+**The package could not do what its name says, and §15 is why.** "Pages read
+`analysis_results`; drop entity columns" needs a non-empty store. The run measured
+**8 577 of 8 577** derived rows carrying no input hash, against **0 runs and 0
+results**. Switching readers shows nothing; dropping the columns destroys 8 577
+values with no replacement. A backfill can't substitute — those rows have no hash,
+and inventing one is fabricated provenance. **D88**, re-homed to WP 6.3 with the
+unblocking condition stated as a §15 number rather than as prose. Not a design
+defect: the dual-write is correct and shipped; the precondition is that somebody
+*runs* an analysis.
+
+**What it did ship is D75 closed.** The deep-tier topology is now in
+`hash_network` — exactly the six columns the prominence RPCs return,
+`schema_version` 2 → 3, against a measured blast radius of zero and as the first
+bump after D70 made a hash change reversible. The fold is **by column** because
+D88 closed the tier route, and the coverage rule moved from "these four tables are
+excluded" to "no computed column is hashed" — what the invariant actually says.
+
+Its gap check found `graphHashCoverage.test.ts` passing 24 assertions about a
+migration the database no longer runs (it read one file by name). Live definition
+now.
+
+**Verified:** `contract:check` ✓ · 337 tests ✓ · eslint at baseline · build ✓ · 15
+rehearsals green in both modes · mutation-tested.
+
 ## ⚠ READ FIRST — `main` IS RED, and this branch fixes it
 
 PR #222 **merged** at `0ca07da` — two commits pushed to the branch after that
@@ -148,13 +174,12 @@ diagnosed:
 
 | # | Package | State |
 |---|---|---|
-| 1 | **WP 5.3** — pages read `analysis_results`; drop entity columns | unblocked · also owns D75's real fix |
-| 2 | WP 6.1 — resolution chains, pinned | not started |
-| 3 | WP 6.2 — fix the divergences | not started · budget shrank after D78 |
-| 4 | WP 6.3 — vocabulary, value chain, reproducibility record | **re-scoped**: now owns `result-binding` + 11 table sidecars |
+| 1 | **WP 6.1** — resolution chains, pinned | not started |
+| 2 | WP 6.2 — fix the divergences | not started · budget shrank after D78 |
+| 3 | WP 6.3 — vocabulary, value chain, reproducibility record | **re-scoped**: now owns `result-binding` + 11 table sidecars |
 | — | WP 5.2b–g — the manual | 14 of 80 pages live |
 | — | D57 — `reference.generated.ts` does not typecheck | unowned, one line, pick up anywhere |
 
 ## Blocked
 
-Nothing. WP 5.3 can start immediately.
+Nothing. WP 6.1 can start immediately.

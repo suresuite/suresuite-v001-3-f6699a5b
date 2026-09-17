@@ -296,8 +296,17 @@ BEGIN
   -- shape is unchanged because the deployed frontend still calls it, so what
   -- has to be asserted is the ANSWER, not the signature.
 
-  INSERT INTO public.network_nodes (project_id, plant_name, uid, name, computed_from_hash, computed_at)
-    VALUES (v_project, 'WP44P', 'N1', 'Node one', public.current_graph_hash(v_project), now());
+  -- THE STAMP IS TAKEN AFTER THE INSERT, and WP 5.3 is why. `network_nodes` is
+  -- IN the anchor since `20260917000009` (D75), so inserting a node MOVES
+  -- `current_graph_hash` — and a fixture that reads the hash in the same
+  -- statement stamps the row with the value from before its own insert. The row
+  -- then reads stale the instant it is written, and §6 failed on a fixture
+  -- rather than on the rule it is testing.
+  INSERT INTO public.network_nodes (project_id, plant_name, uid, name)
+    VALUES (v_project, 'WP44P', 'N1', 'Node one');
+  UPDATE public.network_nodes
+     SET computed_from_hash = public.current_graph_hash(v_project), computed_at = now()
+   WHERE project_id = v_project AND uid = 'N1';
 
   SELECT needs_recalculation, data_last_modified INTO v_needs, v_dlm
     FROM public.should_recalculate_network_metrics(v_project);

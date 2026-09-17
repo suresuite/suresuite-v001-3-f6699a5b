@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 326,
-      "migrations_applied": 323,
-      "last_migration": "20260917000008_one_staleness_rule.sql"
+      "migrations_found": 327,
+      "migrations_applied": 324,
+      "last_migration": "20260917000009_topology_in_the_anchor.sql"
     },
     "sidecars": 43,
     "registry": {
@@ -23594,5 +23594,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "823ef1e96ce0"
+  "contract_version": "8c5abde195a5"
 }

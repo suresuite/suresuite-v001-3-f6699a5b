@@ -157,9 +157,17 @@ BEGIN
       COALESCE(left(public.current_graph_hash(v_project), 12), '(null)');
   END IF;
 
+  -- THE VERSION IS READ, NOT HARDCODED, and WP 5.3 is why. This said
+  -- `to_jsonb(2)` and went red the moment the composite became v3 — with a
+  -- message claiming "the two domain columns and the composite are not
+  -- describing the same snapshot", which was false: they were, at a version the
+  -- assertion refused to believe in. The CLAIM here is that the composite
+  -- DECOMPOSES into its two domain hashes plus whatever version it carries, and
+  -- that claim is version-agnostic. Same lesson as §4 D84 — a check encoding
+  -- "the world is currently in state X" is a gate with an expiry date.
   SELECT encode(extensions.digest(
            jsonb_build_object(
-             'schema_version', to_jsonb(2),
+             'schema_version', (public._build_dataset_snapshot(v_project)) -> 'schema_version',
              'hash_inputs',  v.hash_inputs,
              'hash_network', v.hash_network)::text, 'sha256'), 'hex')
     INTO v_h1
