@@ -30,6 +30,23 @@ natural_key_unique:
     name: "network_nodes_natural_key"
 
 natural_key_intended: [project_id, uid]
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc get_project_dataset_status"
+    grain: table
+    evidence: "src/pages/DataManager.tsx:429"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/components/trust/useProjectFreshness.ts:24"
+    confirmed: true
+
 governance:
   read: null
   write: null

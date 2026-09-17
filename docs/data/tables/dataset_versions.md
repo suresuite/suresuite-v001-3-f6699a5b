@@ -51,6 +51,22 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:398` | yes |
+| `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:311` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:237` | yes |
+| `ProjectPolicies.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:398` | yes |
+| `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:398` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -83,7 +99,11 @@ Surrogate identifier for the version. Referenced by runs.
 | Added by | `20260703000001_dataset_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:100`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `project_id`
 
@@ -113,7 +133,11 @@ A human-chosen name for this version, so a user can say which one they mean.
 | Added by | `20260703000001_dataset_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:100`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > Display only. Not read by the engine and deliberately not part of the hash — renaming a version must not change its identity.
 
@@ -130,7 +154,11 @@ The frozen tier-2 rows themselves, as JSON. What the run actually ran against, n
 | Read by the engine | `sim-command -> the dataset a run is pinned to` |
 | Transform | built by _build_dataset_snapshot from the project's tier-2 tables |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:100`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > `schema_version: 2` since WP 4.1 (`20260917000002`), and the shape changed with it: the tables now sit under two keys, `inputs` (what a SIMULATION reads) and `network` (what the multi-tier ANALYSES read), where v1 held them at the top level. A row written before that migration still holds the v1 shape and always will — nothing rewrites a frozen version — so any reader of this column handles both. `verifiableExports.ts` does. The rule for WHAT is in it changed too, and that is the point: v1 mirrored `datamap.py` by hand and missed three things as the engine moved on (D11, D67). v2 hashes every VALUE column of every tier-2 input table — everything but the surrogate `id`, `project_id`, the audit timestamps, the ingestion provenance and the cosmetic `name` — and `graphHashCoverage.test.ts` fails when a tier-2 value column is missing from it.
 
@@ -147,7 +175,11 @@ The fingerprint of the snapshot. Two runs with the same graph_hash saw the same 
 | Read by the engine | `sim-command and the run-identity reuse check -> simulation_runs.graph_hash` |
 | Transform | hashed from the snapshot by _build_dataset_snapshot |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:100`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > D11 and D67 CLOSED by WP 4.1: the snapshot now covers `bom_multi_level` (which `datamap.py` PREFERS over the single-level table), `lead_time_unit`, `demand_min`/`demand_max` and `customers`, and every row ordering is the table's UNIQUE natural key rather than a hand-picked prefix, so the same data cannot hash two ways (D68). Equal hashes now prove equal inputs for every tier-2 table the contract describes; what they still do not cover is the four DERIVED network tables, which are WP 4.2's and deliberately out — a derived artifact inside the identity of its own inputs is the confusion I5 exists to prevent. COMPOSITE since WP 4.1: SHA-256 over `{schema_version, hash_inputs, hash_network}`, so it decomposes into the two columns beside it and `supabase/rehearsal/110` fails if it stops doing so. The name and the place in `simulation_runs` are unchanged on purpose (§11) — a rename is a migration across every reader.
 
@@ -195,7 +227,11 @@ When the version was frozen. Server-set.
 | Added by | `20260703000001_dataset_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:100`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `hash_inputs`
 
@@ -210,7 +246,11 @@ SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULAT
 | Read by the engine | `current_hash_inputs() -> staleness display; not read by the engine` |
 | Transform | sha256 over snapshot->'inputs', computed inside snapshot_dataset |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:100`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > NULL on every version frozen before WP 4.1 and NOT BACKFILLABLE: a v1 snapshot has no `inputs` key and the rows it was built from have moved on. A NULL here means "this version predates the split", never "this version has no inputs", and a reader that treats the two as the same is reporting an absence as a fact.
 
@@ -227,7 +267,11 @@ SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `
 | Read by the engine | `current_hash_network() -> staleness display; not read by the engine` |
 | Transform | sha256 over snapshot->'network', computed inside snapshot_dataset |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:100`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > All three source tables hold ZERO rows in production (§15), so this column is the digest of an empty domain on every project today and the half is UNEXERCISED outside `supabase/rehearsal/110`. A green test on it is not a working path. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.
 
@@ -239,6 +283,6 @@ SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `
 
 ---
 
-*Generated from data contract `a655b1abda28`, engine `0.2.3`,
+*Generated from data contract `98389a09bead`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

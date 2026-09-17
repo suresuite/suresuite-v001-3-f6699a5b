@@ -21,6 +21,7 @@
     "contract:units": "node scripts/data-contract/gen-unit-sql.mjs",
     "contract:capabilities": "node scripts/data-contract/gen-capabilities.mjs",
     "contract:generate": "node scripts/data-contract/generate.mjs",
+    "contract:surfaces": "node scripts/data-contract/analyse-surfaces.mjs",
     "contract:check": "node scripts/data-contract/check.mjs",
     "contract:rehearse": "node scripts/data-contract/rehearse-migrations.mjs",
     "contract:concurrency": "node scripts/data-contract/wp42-concurrency.mjs",

@@ -25,6 +25,18 @@ natural_key_unique:
 # and Phase 7+ (PLAN.md §2, §14).
 natural_key_intended: [country, vintage]
 
+surfaces:
+  - page: "FirmLevelNetwork.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/pages/FirmLevelNetwork.tsx:303"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:521"
+    confirmed: true
+
 governance:
   read: null
   write: null
@@ -67,7 +79,17 @@ fields:
       csv_header: null
       required: false
       validate: must equal upper(btrim(country)) — CHECK risk_data_country_normalized
-    surfaces: []
+    surfaces:
+      - page: "FirmLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/FirmLevelNetwork.tsx:303"
+        confirmed: true
+      - page: "ProductLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/ProductLevelNetwork.tsx:521"
+        confirmed: true
     resolution: null
   risk_class:
     type: text
@@ -91,7 +113,17 @@ fields:
       csv_header: null
       required: false
       validate: one of Very Low / Low / Medium / High / Very High — CHECK risk_data_risk_class_known
-    surfaces: []
+    surfaces:
+      - page: "FirmLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/FirmLevelNetwork.tsx:303"
+        confirmed: true
+      - page: "ProductLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/ProductLevelNetwork.tsx:521"
+        confirmed: true
     resolution: null
     note: >-
       NOT TRACED into the engine, and that is correct: country risk shades the

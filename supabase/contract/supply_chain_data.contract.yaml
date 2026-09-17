@@ -17,6 +17,38 @@ natural_key_unique:
     columns: [id]
     name: "supply_chain_data_pkey"
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc combine_project_into_supply_chain"
+    grain: table
+    evidence: "src/pages/DataManager.tsx:650"
+    confirmed: true
+  - page: "FirmLevelNetwork.tsx"
+    via: "rpc get_prediction_stats"
+    grain: table
+    evidence: "src/components/MLPrediction.tsx:54"
+    confirmed: true
+  - page: "ProcessLevelNetwork.tsx"
+    via: "rpc get_prediction_stats"
+    grain: table
+    evidence: "src/components/MLPrediction.tsx:54"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "rpc assign_material_supplier"
+    grain: table
+    evidence: "src/components/policies/StagePolicyTable.tsx:206"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc assign_material_supplier"
+    grain: table
+    evidence: "src/components/sim/PreRunValidationPanel.tsx:70"
+    confirmed: true
+
 governance:
   read: null
   write: null

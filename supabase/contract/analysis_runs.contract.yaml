@@ -121,6 +121,18 @@ analysis_kinds:
 # and nothing to store, so the kind is removed rather than left as a catalog
 # entry nothing will ever write. §11's WP 4.3 is corrected in the same commit.
 
+surfaces:
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/components/trust/useProjectFreshness.ts:24"
+    confirmed: true
+
 governance:
   read: null
   write: null

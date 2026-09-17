@@ -20,6 +20,13 @@ natural_key_unique:
     columns: [id]
     name: ingest_files_pkey
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/useIngestRun.tsx:62"
+    confirmed: true
+
 governance:
   read: null
   write: null
@@ -110,7 +117,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: true, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "DataManager.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/ingest/RowProvenance.tsx:65"
+        confirmed: true
     resolution: null
   storage_bucket:
     type: text
@@ -180,7 +192,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: true, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "DataManager.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/ingest/RowProvenance.tsx:65"
+        confirmed: true
     resolution: null
     note: >-
       CHECK-constrained on SHAPE (`^[0-9a-f]{64}$`) rather than on content,

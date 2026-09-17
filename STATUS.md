@@ -3,7 +3,7 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged)
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **3 packages closed**
 
 ---
 
@@ -46,18 +46,48 @@ centralities as a hit.
 (336 errors, unchanged) · build ✓ · `contract:rehearse` plain + `--fixtures` ✓,
 14 behavioural files, both new rehearsals mutation-tested.
 
+### WP 5.1 — Surfaces (lineage) block · no migration
+
+`surfaces` is filled: **129 entries across 23 tables and 10 pages**, every one
+carrying a `path:line` that `contract:check` **R12** re-opens on each run.
+**Found:** D82, D83.
+
+- **The section's own scope was too narrow.** It says to scan `src/pages/*.tsx`;
+  seventeen pages contain eight direct table reads between them. The analyser is
+  a module graph plus an RPC→table hop.
+- **Three grades, never blurred** — `column` (an explicit `select` names it),
+  `table` (the page reads the table by this path), `shell` (reached only through
+  modules ≥80% of pages import — auth plumbing, not lineage).
+- **D82** — the first run reported `NotFound.tsx` as a surface for user data.
+  True about imports, false about the product. Fixing table grain alone left four
+  pages still carrying *column* lineage, because `useAuth` names `organization`
+  in an explicit select: strong evidence about a shell module is still shell.
+- **D83** — a bare column-name scan produced 979 field-page pairs and **zero** for
+  the table the policy grid plainly renders. Column grain is now only what a
+  `.from(t).select(...)` names.
+- **The gap check is R12's second half**: 17 of 17 pages either carry a non-shell
+  entry or are declared in `coverage.yaml` with a reason.
+
+**This push has no migration, so it carries the §15 probes the last two owed** —
+`computed_from_hash IS NULL` per table, proposals expired for grounding drift
+(D70's realised damage), `live_grounded_on_graph_hash` before WP 5.3's bump, and
+whether D72's index reached production. `.github/verify-request` is touched.
+
+**Verified:** `contract:check` ✓ · 336 tests ✓ · lint at baseline · build ✓ ·
+R12 mutation-tested both ways.
+
 ---
 
 ## Needs a decision when you wake up
 
-1. **Two §15 runs are owed and were deliberately not taken.** Both pushes carry
-   migrations, and the three-door rule forbids touching `.github/verify-request`,
-   `verification-sql.yml` or `verification-sql.mjs` alongside one. Once
-   `Deploy Supabase Migrations` is green, a second push should add probes for:
-   `computed_from_hash IS NULL` per derived table (the size of what WP 5.3 cannot
-   migrate); proposals already expired for `grounding_drift` (**D70's realised,
-   unrecoverable damage** — the prior status is not in the row); and
-   `live_grounded_on_graph_hash` before WP 5.3 takes the D75 bump.
+1. **READ THE §15 REPORT FIRST.** WP 5.1's push requested it (no migration, so the
+   three-door rule allows it) and it answers three things nothing has measured:
+   how many derived rows carry no input hash (the size of what WP 5.3 cannot
+   migrate), how many proposals a page-load expired for grounding drift (**D70's
+   realised damage — unrecoverable, so the number is all there is**), and what
+   WP 5.3's hash bump would land on. It publishes to the `verification-results`
+   branch. If it reports a WP 4.3/4.4 object missing, that is a deploy race, not
+   a finding — re-run it.
 
 2. **R8 caught an owner ten tables had been waiting on.** Marking WP 4.4 done
    turned the gate red in twelve places: the tier-5 run/result group and the
@@ -81,14 +111,13 @@ centralities as a hit.
 
 | # | Package | State |
 |---|---|---|
-| 1 | **WP 5.1** — surfaces (lineage) block | next |
-| 2 | WP 5.3 — pages read `analysis_results`; drop entity columns | unblocked · also owns D75's real fix |
-| 3 | WP 6.1 — resolution chains, pinned | not started |
-| 4 | WP 6.2 — fix the divergences | not started · budget shrank after D78 |
-| 5 | WP 6.3 — vocabulary, value chain, reproducibility record | **re-scoped**: now owns `result-binding` + 11 table sidecars |
+| 1 | **WP 5.3** — pages read `analysis_results`; drop entity columns | unblocked · also owns D75's real fix |
+| 2 | WP 6.1 — resolution chains, pinned | not started |
+| 3 | WP 6.2 — fix the divergences | not started · budget shrank after D78 |
+| 4 | WP 6.3 — vocabulary, value chain, reproducibility record | **re-scoped**: now owns `result-binding` + 11 table sidecars |
 | — | WP 5.2b–g — the manual | 14 of 80 pages live |
 | — | D57 — `reference.generated.ts` does not typecheck | unowned, one line, pick up anywhere |
 
 ## Blocked
 
-Nothing. WP 5.1 can start immediately.
+Nothing. WP 5.3 can start immediately.

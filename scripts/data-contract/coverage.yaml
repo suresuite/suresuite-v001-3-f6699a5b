@@ -37,6 +37,34 @@
 # §15 measured the six this package owns at zero of six on 2026-09-17; R11 reports
 # the number for all of them on every run.
 
+# ── PAGES THAT READ NO PROJECT DATA (WP 5.1) ────────────────────────────────
+#
+# R12's second half: every page in `src/pages` appears in a `surfaces` entry or
+# is named here. A page in neither is a page nobody has decided about — the same
+# silence R11 took away from the deferral list above.
+#
+# "No project data" is precise: each of these reaches tables ONLY through modules
+# the app shell mounts everywhere (`useAuth`, `useCapabilities`, the supabase
+# client), which `analyse-surfaces.mjs` classifies as `grain: shell` and which do
+# not count as lineage. `approved_users` is reachable from thirteen pages that
+# way, including a 404 page, and calling that a surface is true about the imports
+# and false about the product.
+#
+# Each entry says WHY, because "reads nothing" is a claim that goes stale the
+# moment somebody adds a query.
+pages_without_project_data:
+  - About.tsx                # static marketing copy; no query of any kind
+  - Auth.tsx                 # sign-in; reaches approved_users only through useAuth
+  - Forbidden.tsx            # 403 interstitial; renders a message and a link
+  - GettingStarted.tsx       # static onboarding copy
+  - Landing.tsx              # unauthenticated landing page
+  - NotFound.tsx             # 404 interstitial
+  - OrbitMrpCallback.tsx     # OAuth callback; posts a code to an edge function
+                             # and redirects. It touches `project_erp_links`
+                             # through `erp-sync-orbit-mrp`, which is an EDGE
+                             # FUNCTION — a hop the static analyser cannot follow
+                             # and deliberately does not guess at (see §16).
+
 deferred:
   - wp: "6.3"
     why: >-

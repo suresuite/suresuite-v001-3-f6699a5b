@@ -58,6 +58,7 @@
         "entity_id"
       ],
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -342,6 +343,22 @@
         "code_version"
       ],
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:237",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -946,6 +963,126 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "Auth.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "DataManager.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "DeveloperApi.tsx",
+          "via": "rpc list_api_keys",
+          "grain": "table",
+          "evidence": "src/pages/DeveloperApi.tsx:261",
+          "confirmed": true
+        },
+        {
+          "page": "FirmLevelNetwork.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "Forbidden.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "GettingStarted.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "InteractiveNetworkSpace.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "Landing.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "NotFound.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "ProcessLevelNetwork.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "Profile.tsx",
+          "via": "rpc change_own_password",
+          "grain": "table",
+          "evidence": "src/pages/Profile.tsx:110",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectIntelligence.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "shell",
+          "evidence": "src/hooks/useAuth.tsx:82",
+          "confirmed": true,
+          "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
+        }
+      ],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -1273,7 +1410,128 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "Auth.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "DataManager.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "DeveloperApi.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "FirmLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "Forbidden.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "GettingStarted.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "InteractiveNetworkSpace.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "Landing.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "NotFound.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "ProcessLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "ProductLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "Profile.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "ProjectIntelligence.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            },
+            {
+              "page": "SimulationLab.tsx",
+              "via": "table read",
+              "grain": "shell",
+              "evidence": "src/hooks/useAuth.tsx:82",
+              "confirmed": true,
+              "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
+            }
+          ],
           "resolution": null,
           "note": "Half of D13. A displayable, editable, non-unique string used as a join key. It is kept, not dropped: `organization_id` is nullable and the rows D27 left unstamped have nothing else to authorize on. Every live comparison now goes through `org_is_current_user_org(uuid, text)`, so when §15 confirms the backfill at 100 % the text branch is removed from one function body rather than from 107 call sites.",
           "engine_requirement": null
@@ -1562,6 +1820,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -2050,6 +2309,36 @@
           "plant_name"
         ]
       },
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_project_dataset_status",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:429",
+          "confirmed": true
+        },
+        {
+          "page": "ProcessLevelNetwork.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:1104",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/lib/policies/projectLanes.ts:48",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/lib/policies/projectLanes.ts:48",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -2334,7 +2623,15 @@
               "blank": "reject"
             }
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProcessLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:1104",
+              "confirmed": true
+            }
+          ],
           "resolution": {
             "default_mode": "asserted",
             "assertable_by": [
@@ -2612,6 +2909,29 @@
           "plant_name"
         ]
       },
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_project_dataset_status",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:429",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc ensure_item_masters",
+          "grain": "table",
+          "evidence": "src/hooks/useItemMasters.tsx:194",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc ensure_item_masters",
+          "grain": "table",
+          "evidence": "src/hooks/useItemMasters.tsx:194",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -3105,6 +3425,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -3394,6 +3715,7 @@
         "customer_id"
       ],
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": "project_member",
         "write": "project_modeler_or_admin",
@@ -3710,6 +4032,43 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc record_model_validation",
+          "grain": "table",
+          "evidence": "src/hooks/useModelValidation.tsx:398",
+          "confirmed": true
+        },
+        {
+          "page": "DeveloperApi.tsx",
+          "via": "rpc list_dataset_versions",
+          "grain": "table",
+          "evidence": "src/pages/DeveloperApi.tsx:311",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:237",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc record_model_validation",
+          "grain": "table",
+          "evidence": "src/hooks/useModelValidation.tsx:398",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc record_model_validation",
+          "grain": "table",
+          "evidence": "src/hooks/useModelValidation.tsx:398",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -3800,7 +4159,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -3868,7 +4235,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "Display only. Not read by the engine and deliberately not part of the hash — renaming a version must not change its identity.",
           "engine_requirement": null
@@ -3899,7 +4274,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "`schema_version: 2` since WP 4.1 (`20260917000002`), and the shape changed with it: the tables now sit under two keys, `inputs` (what a SIMULATION reads) and `network` (what the multi-tier ANALYSES read), where v1 held them at the top level. A row written before that migration still holds the v1 shape and always will — nothing rewrites a frozen version — so any reader of this column handles both. `verifiableExports.ts` does. The rule for WHAT is in it changed too, and that is the point: v1 mirrored `datamap.py` by hand and missed three things as the engine moved on (D11, D67). v2 hashes every VALUE column of every tier-2 input table — everything but the surrogate `id`, `project_id`, the audit timestamps, the ingestion provenance and the cosmetic `name` — and `graphHashCoverage.test.ts` fails when a tier-2 value column is missing from it.",
           "engine_requirement": null
@@ -3930,7 +4313,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "D11 and D67 CLOSED by WP 4.1: the snapshot now covers `bom_multi_level` (which `datamap.py` PREFERS over the single-level table), `lead_time_unit`, `demand_min`/`demand_max` and `customers`, and every row ordering is the table's UNIQUE natural key rather than a hand-picked prefix, so the same data cannot hash two ways (D68). Equal hashes now prove equal inputs for every tier-2 table the contract describes; what they still do not cover is the four DERIVED network tables, which are WP 4.2's and deliberately out — a derived artifact inside the identity of its own inputs is the confusion I5 exists to prevent. COMPOSITE since WP 4.1: SHA-256 over `{schema_version, hash_inputs, hash_network}`, so it decomposes into the two columns beside it and `supabase/rehearsal/110` fails if it stops doing so. The name and the place in `simulation_runs` are unchanged on purpose (§11) — a rename is a migration across every reader.",
           "engine_requirement": null
@@ -4023,7 +4414,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -4054,7 +4453,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "NULL on every version frozen before WP 4.1 and NOT BACKFILLABLE: a v1 snapshot has no `inputs` key and the rows it was built from have moved on. A NULL here means \"this version predates the split\", never \"this version has no inputs\", and a reader that treats the two as the same is reporting an absence as a fact.",
           "engine_requirement": null
@@ -4085,7 +4492,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProjectPolicies.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "All three source tables hold ZERO rows in production (§15), so this column is the digest of an empty domain on every project today and the half is UNEXERCISED outside `supabase/rehearsal/110`. A green test on it is not a working path. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.",
           "engine_requirement": null
@@ -4115,6 +4530,7 @@
         "id"
       ],
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -4514,6 +4930,29 @@
           "plant_name"
         ]
       },
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_project_dataset_status",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:429",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc ensure_item_masters",
+          "grain": "table",
+          "evidence": "src/hooks/useItemMasters.tsx:194",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc ensure_item_masters",
+          "grain": "table",
+          "evidence": "src/hooks/useItemMasters.tsx:194",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -5252,6 +5691,15 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useIngestRun.tsx:62",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -5449,7 +5897,15 @@
             "required": true,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "DataManager.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/ingest/RowProvenance.tsx:65",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -5604,7 +6060,15 @@
             "required": true,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "DataManager.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/ingest/RowProvenance.tsx:65",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "CHECK-constrained on SHAPE (`^[0-9a-f]{64}$`) rather than on content, because a truncated or upper-cased hash compares unequal to itself and would break every lineage claim built on it — quietly, and much later. It is also the dedup signal: 'you have uploaded these bytes before' is a question asked by hash, not by filename, and the index exists for it.",
           "engine_requirement": null
@@ -5700,6 +6164,22 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useErpConnections.tsx:65",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/components/trust/TrustReportPanel.tsx:36",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -5797,7 +6277,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "SimulationLab.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:36",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -5964,7 +6452,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "SimulationLab.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:36",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -6274,7 +6770,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "SimulationLab.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:36",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -6311,7 +6815,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "SimulationLab.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:36",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -6441,7 +6953,15 @@
             "required": true,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "SimulationLab.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:36",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "NO DEFAULT, deliberately. The column is backfilled to 'orbit-mrp' for the runs that existed and the default is then dropped, so the next writer must state its source. A default here would record a CSV upload as a connector sync and nobody would be told, which is the §5 T1 failure — a value with no provenance — inside the table that exists to record provenance.",
           "engine_requirement": null
@@ -6531,6 +7051,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -7034,6 +7555,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -7506,6 +8028,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -8204,6 +8727,15 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useIngestRun.tsx:63",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -8370,7 +8902,15 @@
             "required": true,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "DataManager.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/ingest/RowProvenance.tsx:51",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -8494,7 +9034,15 @@
             "required": true,
             "validate": "integer > 1"
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "DataManager.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/ingest/RowProvenance.tsx:51",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "This is the anchor WP 3.4's review screen clicks through to and WP 3.3's tier-2 `source_row_id` points at. It is also why a rejected row is KEPT rather than dropped: \"row 42 is why\" needs row 42 to exist somewhere.",
           "engine_requirement": null
@@ -8684,6 +9232,7 @@
           "project_id"
         ]
       },
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -9444,6 +9993,29 @@
         "to_firm_id"
       ],
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc delete_project_dataset",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:712",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc get_project_datasets",
+          "grain": "table",
+          "evidence": "src/lib/policies/projectLanes.ts:82",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc get_project_datasets",
+          "grain": "table",
+          "evidence": "src/lib/policies/projectLanes.ts:82",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -9834,6 +10406,22 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_project_dataset_status",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:429",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc get_network_metrics_for_materials",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:251",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -10406,6 +10994,29 @@
         "uid"
       ],
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_project_dataset_status",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:429",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:237",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -11466,6 +12077,29 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_deep_tier_datasets",
+          "grain": "table",
+          "evidence": "src/components/ProjectDataViewer.tsx:110",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:237",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -11964,6 +12598,36 @@
         "node_id"
       ],
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_node_list",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:441",
+          "confirmed": true
+        },
+        {
+          "page": "FirmLevelNetwork.tsx",
+          "via": "rpc get_node_list",
+          "grain": "table",
+          "evidence": "src/components/MapView.tsx:355",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:237",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -12692,6 +13356,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -12942,6 +13607,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -13201,6 +13867,15 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DeveloperApi.tsx",
+          "via": "rpc list_api_keys",
+          "grain": "table",
+          "evidence": "src/pages/DeveloperApi.tsx:261",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -13555,6 +14230,29 @@
           "plant_name"
         ]
       },
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc get_project_dataset_status",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:429",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc ensure_item_masters",
+          "grain": "table",
+          "evidence": "src/hooks/useItemMasters.tsx:194",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc ensure_item_masters",
+          "grain": "table",
+          "evidence": "src/hooks/useItemMasters.tsx:194",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -14185,6 +14883,29 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "ProjectIntelligence.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/usePolicies.tsx:141",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/usePolicies.tsx:141",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/usePolicies.tsx:141",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -14769,6 +15490,36 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:237",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectIntelligence.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/usePolicies.tsx:142",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/usePolicies.tsx:142",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/usePolicies.tsx:142",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -15231,6 +15982,7 @@
           "project_id"
         ]
       },
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -16130,6 +16882,15 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useErpConnections.tsx:57",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -16696,6 +17457,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -17030,6 +17792,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -17270,6 +18033,71 @@
         "name"
       ],
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:199",
+          "confirmed": true
+        },
+        {
+          "page": "DeveloperApi.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/pages/DeveloperApi.tsx:263",
+          "confirmed": true
+        },
+        {
+          "page": "FirmLevelNetwork.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:244",
+          "confirmed": true
+        },
+        {
+          "page": "InteractiveNetworkSpace.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:353",
+          "confirmed": true
+        },
+        {
+          "page": "ProcessLevelNetwork.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:248",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:206",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectIntelligence.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/pages/ProjectIntelligence.tsx:187",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/hooks/useProjects.ts:24",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc list_projects",
+          "grain": "table",
+          "evidence": "src/hooks/useProjects.ts:24",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -17756,7 +18584,29 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "FirmLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "confirmed": true
+            },
+            {
+              "page": "ProcessLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "confirmed": true
+            },
+            {
+              "page": "ProductLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1).",
           "engine_requirement": null
@@ -17787,7 +18637,29 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "FirmLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "confirmed": true
+            },
+            {
+              "page": "ProcessLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "confirmed": true
+            },
+            {
+              "page": "ProductLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "As `simulation_start` — the run request is what the engine actually reads.",
           "engine_requirement": null
@@ -18024,6 +18896,22 @@
         "vintage"
       ],
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "FirmLevelNetwork.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:521",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -18156,7 +19044,22 @@
             "required": false,
             "validate": "must equal upper(btrim(country)) — CHECK risk_data_country_normalized"
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "FirmLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+              "confirmed": true
+            },
+            {
+              "page": "ProductLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:521",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -18194,7 +19097,22 @@
             "required": false,
             "validate": "one of Very Low / Low / Medium / High / Very High — CHECK risk_data_risk_class_known"
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "FirmLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+              "confirmed": true
+            },
+            {
+              "page": "ProductLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:521",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": "NOT TRACED into the engine, and that is correct: country risk shades the network map, it is not a simulation input. `scsim` has no country concept — disruption targets are suppliers, plants and lanes (blueprint §2.3 G11). A later package that wants country risk to DRIVE anything must add it to the engine first, not read this column from the mapper. 'Unknown' is deliberately not a storable value: it is what the absence of a row looks like, and storing it would turn \"we have no figure\" into a figure (§5 T1; the same over-claim as D17).",
           "engine_requirement": null
@@ -18409,6 +19327,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -18652,6 +19571,7 @@
           "project_id"
         ]
       },
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "data_editing",
@@ -19179,6 +20099,50 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc combine_project_into_supply_chain",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:650",
+          "confirmed": true
+        },
+        {
+          "page": "FirmLevelNetwork.tsx",
+          "via": "rpc get_prediction_stats",
+          "grain": "table",
+          "evidence": "src/components/MLPrediction.tsx:54",
+          "confirmed": true
+        },
+        {
+          "page": "ProcessLevelNetwork.tsx",
+          "via": "rpc get_prediction_stats",
+          "grain": "table",
+          "evidence": "src/components/MLPrediction.tsx:54",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc project_freshness",
+          "grain": "table",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:237",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc assign_material_supplier",
+          "grain": "table",
+          "evidence": "src/components/policies/StagePolicyTable.tsx:206",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "rpc assign_material_supplier",
+          "grain": "table",
+          "evidence": "src/components/sim/PreRunValidationPanel.tsx:70",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -20098,6 +21062,36 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc combine_project_into_supply_chain",
+          "grain": "table",
+          "evidence": "src/pages/DataManager.tsx:650",
+          "confirmed": true
+        },
+        {
+          "page": "InteractiveNetworkSpace.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:369",
+          "confirmed": true
+        },
+        {
+          "page": "ProcessLevelNetwork.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:1105",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "rpc get_supply_chain_data_multi_tier",
+          "grain": "table",
+          "evidence": "src/hooks/useProjectContext.tsx:49",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -20291,7 +21285,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "InteractiveNetworkSpace.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/InteractiveNetworkSpace.tsx:369",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -20384,7 +21386,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProcessLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:1105",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -20570,7 +21580,15 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [],
+          "surfaces": [
+            {
+              "page": "ProcessLevelNetwork.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:1105",
+              "confirmed": true
+            }
+          ],
           "resolution": null,
           "note": null,
           "engine_requirement": null
@@ -20777,6 +21795,7 @@
           "plant_name"
         ]
       },
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -21403,6 +22422,7 @@
           "plant_name"
         ]
       },
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": null,
@@ -22005,6 +23025,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -22347,6 +23368,7 @@
       ],
       "natural_key_intended": null,
       "ingest_dataset": null,
+      "surfaces": [],
       "governance": {
         "read": null,
         "write": "super_admin",
@@ -22572,5 +23594,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "a655b1abda28"
+  "contract_version": "98389a09bead"
 }

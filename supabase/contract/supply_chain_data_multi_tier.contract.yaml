@@ -17,6 +17,28 @@ natural_key_unique:
     columns: [id]
     name: "supply_chain_data_multi_tier_pkey"
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc combine_project_into_supply_chain"
+    grain: table
+    evidence: "src/pages/DataManager.tsx:650"
+    confirmed: true
+  - page: "InteractiveNetworkSpace.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/pages/InteractiveNetworkSpace.tsx:369"
+    confirmed: true
+  - page: "ProcessLevelNetwork.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/pages/ProcessLevelNetwork.tsx:1105"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "rpc get_supply_chain_data_multi_tier"
+    grain: table
+    evidence: "src/hooks/useProjectContext.tsx:49"
+    confirmed: true
+
 governance:
   read: null
   write: null
@@ -55,7 +77,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "InteractiveNetworkSpace.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/InteractiveNetworkSpace.tsx:369"
+        confirmed: true
     resolution: null
   project_id:
     type: "uuid"
@@ -109,7 +136,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProcessLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/ProcessLevelNetwork.tsx:1105"
+        confirmed: true
     resolution: null
   from_location:
     type: "text"
@@ -222,7 +254,12 @@ fields:
       csv_header: null
       required: false
       validate: null
-    surfaces: []
+    surfaces:
+      - page: "ProcessLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/ProcessLevelNetwork.tsx:1105"
+        confirmed: true
     resolution: null
   path_root:
     type: "text"

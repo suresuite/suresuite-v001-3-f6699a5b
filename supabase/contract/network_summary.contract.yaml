@@ -22,6 +22,23 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "network_summary_pkey"
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc get_deep_tier_datasets"
+    grain: table
+    evidence: "src/components/ProjectDataViewer.tsx:110"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "rpc project_freshness"
+    grain: table
+    evidence: "src/components/trust/useProjectFreshness.ts:24"
+    confirmed: true
+
 governance:
   read: null
   write: null

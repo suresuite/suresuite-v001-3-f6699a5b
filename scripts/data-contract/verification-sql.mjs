@@ -837,6 +837,121 @@ async function wp42Smear() {
 // therefore about the SCHEMA, not the data, and they push to `gateFailures` so a
 // half-landed deploy turns the run red instead of publishing a report that looks
 // like the previous one.
+/**
+ * WP 4.3 + WP 4.4 — THE THREE COUNTS TWO PACKAGES OWED AND NEITHER COULD TAKE.
+ *
+ * Both carried a migration, and a push with a migration must not touch any of
+ * the three doors that fire `verification-sql.yml` (§4 D31, and the fourth loss
+ * that added the third door). WP 5.1 changes no schema, so it can carry them.
+ *
+ * MEASURE EVERY PROJECT. §4 D42: the largest project here is the one the seeder
+ * creates, and reading it alone reports a clean data layer that is not clean.
+ */
+async function wp43and44Counts() {
+  section("WP 4.3 / 4.4 — provenance coverage, and D70's realised damage");
+
+  // 1 · I5 as a quantity. `computed_from_hash IS NULL` is the size of what
+  // WP 5.3 cannot migrate: a row that cannot say which data produced it.
+  const prov = await tryQ(`
+    select 'network_nodes' as tbl,
+           count(*)::int as rows,
+           count(*) filter (where computed_from_hash is null)::int as no_provenance,
+           count(distinct project_id)::int as projects
+      from public.network_nodes
+    union all
+    select 'node_list', count(*)::int,
+           count(*) filter (where computed_from_hash is null)::int,
+           count(distinct project_id)::int
+      from public.node_list
+    union all
+    select 'supply_chain_data', count(*)::int,
+           count(*) filter (where computed_from_hash is null)::int,
+           count(distinct project_id)::int
+      from public.supply_chain_data
+    union all
+    select 'network_summary', count(*)::int,
+           count(*) filter (where computed_from_hash is null)::int,
+           count(distinct project_id)::int
+      from public.network_summary
+     order by 1`);
+  report("`computed_from_hash IS NULL` per derived table — I5 as a number", prov, (rows) => {
+    out(...table(rows));
+    const total = rows.reduce((n, r) => n + Number(r.rows ?? 0), 0);
+    const none = rows.reduce((n, r) => n + Number(r.no_provenance ?? 0), 0);
+    out(
+      `- **${none} of ${total}** derived row(s) carry NO input hash. Those are rows`,
+      `  written before WP 4.3, and nothing can say whether they are current — the`,
+      `  freshness badge reports them as \`unknown\`, which is not the same as stale.`,
+      `- This is the size of what WP 5.3 cannot migrate: dropping the entity columns`,
+      `  loses these values with no \`analysis_results\` row to replace them.`,
+    );
+  });
+
+  // 2 · D70's realised damage. UNRECOVERABLE by construction — `expired`
+  // overwrote the prior status and the row does not record it — so the only
+  // honest thing left is to know the number.
+  const drift = await tryQ(`
+    select count(*)::int as expired_for_drift,
+           count(distinct project_id)::int as projects,
+           min(updated_at) as earliest,
+           max(updated_at) as latest
+      from public.proposals
+     where status = 'expired' and status_reason = 'grounding_drift'`);
+  report("proposals a READ expired for grounding drift (§4 D70)", drift, (rows) => {
+    out(...table(rows));
+    const n = Number(rows[0]?.expired_for_drift ?? 0);
+    if (n === 0) {
+      out("- **Zero.** D70 was closed before it cost anything, which is what WP 4.1's");
+      out("  measure-before-the-bump discipline bought.");
+    } else {
+      out(
+        `- **${n} proposal(s) were expired by somebody opening a page**, not by any`,
+        `  decision. Each said \`draft\`, \`proposed\` or \`approved\` and \`expired\``,
+        `  overwrote it; the row does not record which, so THEY CANNOT BE RESTORED.`,
+        `  The number is the point: it is the realised cost of D70 and it can only`,
+        `  ever grow smaller by somebody re-authoring those proposals by hand.`,
+      );
+    }
+  });
+
+  // 3 · what a `schema_version` bump would cost TODAY. WP 5.3 folds the network
+  // topology into `hash_network` (D75) and WP 4.1's rule is to count first.
+  const bump = await tryQ(`
+    select count(*)::int as live_grounded_on_graph_hash,
+           count(distinct project_id)::int as projects
+      from public.proposals
+     where status in ('draft','proposed','approved')
+       and grounding ? 'graph_hash'`);
+  report("what WP 5.3's hash bump would land on (D75) — count before, not after", bump, (rows) => {
+    out(...table(rows));
+    const n = Number(rows[0]?.live_grounded_on_graph_hash ?? 0);
+    out(
+      n === 0
+        ? "- **Zero.** WP 5.3 can take the bump for the same reason WP 4.1 could."
+        : `- **${n} live proposal(s)** are grounded on a graph hash. Since WP 4.4 a bump `
+          + `no longer EXPIRES them — drift is computed now — so they will read as `
+          + `\`stale\` and come back if the hash does. That is the whole value of D70 `
+          + `being closed before this bump rather than after it.`,
+    );
+  });
+
+  // 4 · D72's index, re-measured against the constraint that now exists.
+  const key = await tryQ(`
+    select (select count(*)::int from pg_index i join pg_class c on c.oid = i.indexrelid
+             where c.relname = 'network_nodes_natural_key' and i.indisunique) as key_present,
+           (select count(*)::int from public.network_nodes where uid is null)  as null_uid`);
+  report("D72's `(project_id, uid)` key, after the fact", key, (rows) => {
+    out(...table(rows));
+    if (Number(rows[0]?.key_present ?? 0) !== 1) {
+      gateFailures.push(
+        "WP 4.3's `network_nodes_natural_key` is NOT in production, so " +
+        "`calculate-network-science-metrics`'s fallback upsert is still failing with " +
+        "42P10 on every run (§4 D72).",
+      );
+    }
+  });
+}
+
 async function wp42Landed() {
   section("WP 4.2 — did the analysis store reach production?");
 
@@ -1402,6 +1517,7 @@ async function main() {
   await graphHashBlastRadius();
   await wp42Smear();
   await wp42Landed();
+  await wp43and44Counts();
 
   const project = await pickProject();
   if (!project) {

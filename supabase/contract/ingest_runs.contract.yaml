@@ -17,6 +17,18 @@ natural_key_unique:
     columns: [id]
     name: erp_sync_runs_pkey
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/useErpConnections.tsx:65"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/components/trust/TrustReportPanel.tsx:36"
+    confirmed: true
+
 governance:
   read: null
   write: null
@@ -55,7 +67,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/trust/TrustReportPanel.tsx:36"
+        confirmed: true
     resolution: null
   project_id:
     type: uuid
@@ -105,7 +122,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: true, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/trust/TrustReportPanel.tsx:36"
+        confirmed: true
     resolution: null
     note: >-
       NO DEFAULT, deliberately. The column is backfilled to 'orbit-mrp' for
@@ -178,7 +200,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/trust/TrustReportPanel.tsx:36"
+        confirmed: true
     resolution: null
   rows_new:
     type: integer
@@ -366,7 +393,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/trust/TrustReportPanel.tsx:36"
+        confirmed: true
     resolution: null
   applied_by_user_id:
     type: uuid
@@ -381,7 +413,12 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
-    surfaces: []
+    surfaces:
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/trust/TrustReportPanel.tsx:36"
+        confirmed: true
     resolution: null
   error_detail:
     type: text

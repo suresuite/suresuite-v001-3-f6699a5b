@@ -16,6 +16,23 @@ natural_key_unique:
     columns: [project_id]
     name: "policy_defaults_pkey"
 
+surfaces:
+  - page: "ProjectIntelligence.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/usePolicies.tsx:141"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/usePolicies.tsx:141"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/usePolicies.tsx:141"
+    confirmed: true
+
 governance:
   read: null
   write: "data_editing"

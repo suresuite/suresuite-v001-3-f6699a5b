@@ -53,6 +53,21 @@ Read follows project reachability. Written by `refresh_node_list_for_project`, w
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | rpc get_node_list | `src/pages/DataManager.tsx:441` | yes |
+| `FirmLevelNetwork.tsx` | rpc get_node_list | `src/components/MapView.tsx:355` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:237` | yes |
+| `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:24` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -396,6 +411,6 @@ WP 4.3 · when the run that wrote the computed columns finished. It is provenanc
 
 ---
 
-*Generated from data contract `a655b1abda28`, engine `0.2.3`,
+*Generated from data contract `98389a09bead`, engine `0.2.3`,
 sidecar `supabase/contract/node_list.contract.yaml`, table created by `20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
