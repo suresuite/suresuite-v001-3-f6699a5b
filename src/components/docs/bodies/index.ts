@@ -42,6 +42,20 @@ import DeepTierEdges from "./DeepTierEdges";
 import MultiTierSuppliers from "./MultiTierSuppliers";
 import UnitsAndTimePeriods from "./UnitsAndTimePeriods";
 
+// 5 · Policies, 6 · Verification (WP 5.2c)
+import HowPoliciesWork from "./HowPoliciesWork";
+import SupplierStage from "./SupplierStage";
+import PlantStage from "./PlantStage";
+import CustomerStage from "./CustomerStage";
+import PolicyTypes from "./PolicyTypes";
+import PolicyCatalog from "./PolicyCatalog";
+import WhereANumberCameFrom from "./WhereANumberCameFrom";
+import WhenAValueIsMissing from "./WhenAValueIsMissing";
+import PolicyVersionsAndPresets from "./PolicyVersionsAndPresets";
+import VerifyYourInputs from "./VerifyYourInputs";
+import DataTrustReport from "./DataTrustReport";
+import ModelValidation from "./ModelValidation";
+
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
   "what-suresuite-is": WhatSureSuiteIs,
@@ -70,6 +84,22 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "deep-tier-edges": DeepTierEdges,
   "multi-tier-suppliers": MultiTierSuppliers,
   "units-and-time-periods": UnitsAndTimePeriods,
+
+  // 5 · Policies
+  "how-policies-work": HowPoliciesWork,
+  "supplier-stage": SupplierStage,
+  "plant-stage": PlantStage,
+  "customer-stage": CustomerStage,
+  "policy-types": PolicyTypes,
+  "policy-catalog": PolicyCatalog,
+  "where-a-number-came-from": WhereANumberCameFrom,
+  "when-a-value-is-missing": WhenAValueIsMissing,
+  "policy-versions-and-presets": PolicyVersionsAndPresets,
+
+  // 6 · Verification
+  "verify-your-inputs": VerifyYourInputs,
+  "data-trust-report": DataTrustReport,
+  "model-validation": ModelValidation,
 
   // 15 · Reference
   "all-tables": AllTables,
