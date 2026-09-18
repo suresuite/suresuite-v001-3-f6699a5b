@@ -230,6 +230,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D96** | **The uuid backfill was verified once and nothing kept it true — found while closing D47, and it is load-bearing for D29 too.** `approved_users.organization_id` is nullable, has no default, and until `20260918000001` no trigger stamped it. §15's 14-of-14 measurement is what let D29 remove the text branch from `org_is_current_user_org`, the predicate 59 project-scoped policies call — so from that migration onward **an account arriving without the uuid could read no project at all**, silently, with nothing in the system to say why. D47's trigger closes the write path for `approved_users`, which fixes the cause for both. **What is still not gated is the general shape**: a `NOT NULL` constraint would make it structural, and adding one needs a FRESH §15 read rather than the 2026-09-16 number — because the lesson this row exists to record is that a measurement is not an invariant, and reusing a stale one to prove it safe would be the same mistake twice. Two further reads are unowned: whether any path inserts `approved_users` bypassing the trigger (a `COPY`, a restore), and whether the same one-off-backfill shape exists on the other uuid columns D27 introduced | `approved_users.organization_id`'s nullability in `build/schema.introspected.json`; `supabase/migrations/20260918000001_org_row_uuid_only.sql` (the trigger); §15 run `35064364537` | WP 6.2 |
 | **D97** | **Two more migrations aborted in production and nothing has ever said so — found by closing D49, and they are D48's class rather than D49's.** `20250909153130` opens with `CREATE INDEX IF NOT EXISTS idx_supply_chain_data_multi_tier_material_id ON supply_chain_data_multi_tier(material_id)`, and that table has never had the column in any definition. `IF NOT EXISTS` guards the index NAME, so PostgreSQL raises 42703 and the file's transaction rolls back — its other four statements (two `supply_chain_data` indexes and a `get_integrated_process_network_data` redefinition) never ran either. `20250909153231`, 61 seconds later, re-issues exactly those four and omits the two impossible lines: a retry, the same signature as `20250820145017`/`145652`. `20250914113723` is the second: it indexes `simulation_jobs(job_id)` against a table whose live definition (`20250913085427`) has no such column — its own `CREATE TABLE IF NOT EXISTS` declaring one is a no-op — and **34 seconds later** `20250914113757` runs `ALTER TABLE simulation_jobs ADD COLUMN job_id TEXT`. Both were invisible because the abort detector keys ONLY on the corroboration test (which of two `CREATE TABLE`s the later INSERTs agree with), and a file that creates no table is invisible to it. Closed by recording a rejected statement as a second kind of abort — **and the ORDER between the two kinds is load-bearing**: read the rejected-statement evidence before the corroboration test has settled and `20260916000018`, the whole of `natural-key` (I4), is accused, because `inbound_logistics` still carries aborted `20250820145017`'s `plant_id` at that point | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql`; `20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql`; `introspect.mjs`'s `schema.impossible` and `build()`'s abort fixed point | WP 6.2 ✅ *(slice 9)* |
 | **D99** | **The abort detector's first version could only see a `CREATE INDEX`, and D48 is the same mechanism on a second statement kind.** `schema.impossible` was built by slice 9 as a list precisely so a second detector could join it, and slice 10's is `firstNonDefaultAfterDefault`: an input parameter with no default that follows one with a default, which PostgreSQL refuses with 42P13. The class is not closed. `ADD CONSTRAINT … FOREIGN KEY` to a missing column, an `ALTER COLUMN TYPE` that cannot cast and a `CREATE POLICY` naming an absent column each abort their file and each is still recorded as applied; 16 historical definitions do not replay and nothing asks which of THEM sit in a file whose other statements the artifact believes. **Two of the rule's guards were removed rather than kept**: parenthesis depth and string-literal skipping, because a mutation deleting each produced a byte-identical artifact and a green suite — in a parameter DECLARATION a `DEFAULT` or `=` inside parentheses or quotes can only belong to a default expression, whose parameter is already defaulted, so neither guard could change an answer. Every line that remains has a mutation case | `scripts/data-contract/sql-lex.mjs` (`firstNonDefaultAfterDefault`); `introspect.mjs`'s `schema.impossible`; `src/lib/policies/__tests__/introspectorRejectedStatements.test.ts` | WP 6.2 *(partial — two detectors of an open class)* |
+| **D100** | **`live-sql.mjs` says "this repo never overloads" and the repo overloads nine names — and a signature-qualified `DROP FUNCTION` deleted every overload from the live map.** The function map is keyed by NAME, with that claim as its justification. `create_project` carries SIX live overloads, `update_project` five, `create_disruption_scenario_v2` two. The keying alone means a rule reads the LAST `CREATE` and no other; the `DROP` branch was worse, deleting the whole name whatever signature the statement gave — so **five live functions were absent from the map entirely**: `create_disruption_scenario_v2`, which writes four tier-4 tables, plus `get_network_nodes`, `get_network_edges`, `get_network_summary` and `net.http_post`. Every rule scoped to `liveDefinitions().functions` was blind to them, `dataPlaneAudit.test.ts`'s writer scan included — so the answer to "does every `SECURITY DEFINER` writer name its actor" was being given about 253 of 257 functions. **The invariant does not move**: both `create_disruption_scenario_v2` overloads attribute through `set_current_user_context`, and the three network functions are read-only. But "happens to" is not a gate. Found by WP 6.4 describing the disruption plane and asking which writers it had brought into scope — WP 4.3's lesson, applied on purpose for the first time rather than after the fact | `scripts/data-contract/live-sql.mjs` (the `functions` map and its `DROP FUNCTION` branch); `20250902084748`–`20250902084844` (five signature-qualified drops) | WP 6.4 ✅ *(the DROP now compares signatures, so the map holds 257 of 257 and `dataPlaneAudit.test.ts` gates it by name. The COLLAPSING half is NOT fixed and is stated instead: one body per name, nine names affected, pinned by a second assertion so the number cannot grow quietly)* |
 | **D98** | **Three CHECK constraints production has were absent from every rehearsed database, and four rehearsal files were asserting over rows production would REFUSE.** D59 said an inline CHECK costs twice; this is the second cost, measured. With the CHECKs restored, `030` inserted `user_files.kind = 'report'` (the vocabulary is `report_xlsx`/`report_pdf`/`export_csv`/`upload`), `110` inserted `ingest_runs.triggered_by = 'schedule'` (`manual`/`scheduled`), `170` inserted an EMAIL into the same column — `triggered_by` is HOW a run started, not WHO started it — and `140` inserted `'{}'::jsonb` into `proposals.provenance`, which is TEXT from a fixed vocabulary and sits next to two jsonb columns. Every one of those rows is one production cannot hold, so every assertion downstream of them was made about a database that could not exist. **No live writer is affected** — `ingest_land_file` writes `'manual'` — so the fix is the four fixture rows, not the constraints. The class is not closed: nothing stops the next rehearsal from seeding a row a CHECK would refuse; what changed is that the rehearsed database now refuses it | `supabase/rehearsal/030`, `110`, `140`, `170` (the four inserts, each now carrying the reason above it) | WP 6.2 ✅ *(slice 9)* |
 | D48 | **A migration aborted in production in 2025 and nothing has ever said so — and it was THREE migrations, not one.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. **The row's cited sibling `20250827190942` DOES NOT EXIST.** The retry is `20250827171106`, **84 seconds** later, which re-issues the same four tables, triggers, policies and RPC and carries the literal comment `-- FIXED: Put all parameters with defaults at the end` — so the migration's own author knew, and only the contract did not. A whole-history scan then found two more: `20250904122241` and `20250904122347` each declare `get_network_nodes`, `get_network_edges` and `get_network_summary` with `p_user_id` after a defaulted `p_plant_name`, the second repeating the first's error exactly as `20250820145155` repeats `20250820145017`'s; `20250904124537` is the definition that works. **The END STATE is fine and the ATTRIBUTION was not**: aborting `20250827170942` re-homes all four `disruption_scenario_*` tables onto the retry, so a reader sent to a file that never ran is now sent to the one that did (§5 T1). **And the open half is answered.** There were never three overloads to choose between — one was a phantom. Of the two that exist, the single call site `DisruptionDialog.tsx:195` sends `p_disruption_start` and `p_disruption_end`, and PostgREST resolves an RPC by NAMED arguments, so it reaches `20250828005114`'s 13-parameter definition. `20250827171106`'s 11-parameter one is live and unreached; dropping it is a migration and is left to whoever wants it. Found by D31's rehearsal; the two extra files and the wrong citation found by WP 6.2 slice 10 | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql`; `20250904122241_b65404b9-d4ee-4c58-9518-7a1578f74af8.sql`; `20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql`; `sql-lex.mjs`'s `firstNonDefaultAfterDefault` | WP 6.2 ✅ *(slice 10)* |
 | D49 | **The introspector records three indexes on columns the tables no longer have — and that is TWO defects with two different causes, not one.** `idx_supply_chain_data_plant` is recorded `ON supply_chain_data (plant)`, and `20250822025432` RENAMEd `plant` to `plant_name`; Postgres renames an index's column reference with the column, so production's index is on `plant_name` and the artifact's is on a column that does not exist. **That cause is right for exactly ONE of the three.** `supply_chain_data_multi_tier` has NEVER had `material_id` or `higher_level_component_id` in any definition — they are `bom_multi_level`'s columns — so no rename can have produced them. `CREATE INDEX IF NOT EXISTS` guards the index NAME, not the column: PostgreSQL raises 42703, and `20250909153130` therefore ABORTED in production, 61 seconds before `20250909153231` re-issued its other four statements without those two lines. That half is D97, and it is D48's class. The rename half is fixed by following a column RENAME into indexes, index predicates and constraints (`renameIdentifier` in `sql-lex.mjs`), which is the same fix as the `RENAME TO` branch that closed D52. `introspectorDependents.test.ts` gates both halves with no database; `supabase/rehearsal/180` §3 and §4 prove them against a real one. Found by D31's rehearsal; the second cause found by WP 6.2 slice 9 | `build/schema.introspected.json` `tables[].indexes`; `20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql` (the RENAME); `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` (the two impossible ones) | WP 6.2 ✅ *(slice 9)* |
@@ -10425,5 +10426,109 @@ all three rehearse modes green (20 assertion files) · `contract:check` ✓ ·
    write an unattributed row. The function-side gate cannot see it. A lint rule
    or a scan asserting that every `.rpc()` naming one of the fourteen passes
    `_actor_user_id` would close the loop, and it is not written.
+
+**Still open in WP 6.2:** D18, D34, D51, D58, D66, D87, D94, D95, D96, D99.
+
+### WP 6.4 (slice 13) — The disruption plane, described and audited · 2026-09-18 · `20260918000004`
+
+**What slice 12 promised.** Nothing about WP 6.4 — its gap check pointed at the
+client-side actor gate. This package was taken because it is the largest
+un-decided work left: **38 of 81 tables deferred, and all 38 unaudited** (D54).
+
+**Five tables described**: `disruption_scenarios` and the
+`disruption_scenario_profiles`/`_targets`/`_effects`/`_settings` group. 43 → 48
+described, 38 → 33 deferred, 22 → 27 audited by trigger.
+
+**What the sidecars had to say out loud.** Writing them is where the reading
+happens, and four things came out of it that no gate would have asked:
+
+1. **TWO DISRUPTION MODELS ARE LIVE AT ONCE AND NEITHER READS THE OTHER.**
+   `disruption_scenarios` is the 2025-08-26 shape — one row per node, capacity
+   and delay inline. The profile group is the 2025-08-27 redesign of the same
+   idea. Nothing migrated the rows and nothing deprecates either, so a project
+   can hold disruptions in both and a reader of one sees half the picture.
+2. **`_targets` has a discriminator and no validation.** `target_type` decides
+   whether `node_ids` or `edge_list` is meaningful, and nothing stops a `node`
+   target carrying an `edge_list`. `_effects` has exactly this shape AND a
+   `validate_disruption_effect` trigger that enforces it — so the gap is
+   visible only when the two are read side by side.
+3. **`_settings.key` is free text with no vocabulary.** `natural_key` (I4) is
+   satisfied — `(profile_id, key)` is unique — but uniqueness over an open set
+   means a typo creates a setting rather than failing.
+4. **`disruption_scenarios.time_delay_days` carries its unit in the column
+   NAME**, the opposite of the tier-2 `lead_time`/`lead_time_unit` convention
+   that `normalize-at-promotion` (I3) governs. Defensible for a decision, and
+   worth stating, because a reader who has learned the tier-2 rule will look for
+   a companion column that does not exist.
+
+**The rehearsal proves the cascade, which is what the package buys.** A profile
+DELETE cascades into three child tables, so ONE statement by a person removes
+rows from four — and until these sidecars existed, three of the four were
+deferred and therefore unaudited, so the cascade recorded a quarter of what it
+did. `rehearsal/220` §3 deletes a profile and requires an audit row from each of
+the four, each naming the actor.
+
+**── THE PART WORTH READING: THE WRITER SCAN WAS ANSWERING ABOUT 253 OF 257 ──**
+
+WP 4.3's lesson is that describing a table brings its WRITERS inside the audit
+rule, and measures what that costs. Applied here on purpose rather than after
+the fact: five `SECURITY DEFINER` writers came into scope and all five
+attribute, so the gate stayed green.
+
+**Except `create_disruption_scenario_v2` was not among them, and it writes four
+of these tables.** It is not in `liveDefinitions().functions` at all.
+
+`live-sql.mjs` keys that map by NAME, justified by a comment reading *"args
+ignored: this repo never overloads"*. **The repo overloads nine names** —
+`create_project` six times, `update_project` five. And its `DROP FUNCTION`
+branch deleted the whole name whatever signature the statement gave, so the five
+signature-qualified drops in `20250902084748`–`20250902084844` removed
+`create_disruption_scenario_v2` outright. Four more went the same way:
+`get_network_nodes`, `_edges`, `_summary` and `net.http_post`.
+
+So every rule scoped to that map was blind to five live functions, and the
+question *"does every `SECURITY DEFINER` writer name its actor?"* was being
+answered about **253 of 257**. That is D78's shape on a different axis: the scan
+could not see what it was not looking at.
+
+**The invariant does not move** — both `create_disruption_scenario_v2` overloads
+attribute through `set_current_user_context`, and the three network functions
+are read-only. But "happens to" is not a gate. The DROP now compares signatures
+(257 of 257), and `dataPlaneAudit.test.ts` asserts the map's coverage against
+the artifact by name. **The collapsing half is NOT fixed and is stated instead**:
+one body per name, nine names affected, pinned by a second assertion so the
+number cannot grow quietly.
+
+**A rehearsal assertion failed for its own reason first.** §3's actor check
+compared `action = 'DELETE'`; `audit_tier_write` writes `lower(TG_OP)`. Red for
+the wrong reason is still red, and worth the two minutes to tell apart.
+
+**Four mutations, all caught, and the third was redone.** Removing a DELETE
+trigger → §1; removing a table's three triggers → §1; row grain instead of
+statement grain → caught by PostgreSQL itself (`new_rows` does not exist), which
+proves the database refuses it but leaves §2 unproven — so a fourth mutation
+added a SECOND statement-grain trigger on the same event, and §2 caught the
+duplicate row.
+
+**Verified:** all three rehearse modes green (21 assertion files) ·
+`contract:check` ✓ (R1 48/33/81, R9 27 audited) · 412 tests ✓ (was 410) ·
+`build` ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **Six tables remain on WP 6.4 and they are the harder six.**
+   `policy_versions`, `policy_presets`, `scenarios`, `scenario_templates`,
+   `recovery_playbooks`, `external_evidence`. Unlike the disruption group these
+   have live client writers — `scenarios` alone has 24 `from()` call sites — so
+   describing them brings a much larger writer surface into the audit rule.
+2. **The two disruption models need a decision, not a description.** This slice
+   could name that both are live; it cannot choose. Deprecating either is a
+   product call and a migration, and it belongs with whoever owns the
+   disruption feature.
+3. **`create_disruption_scenario_v2`'s unreached overload is still there.**
+   Slice 10 established that the 11-parameter definition serves no call site and
+   that `20260610000001` grants the name to `anon`. Now that its tables are
+   described, dropping it is a smaller decision than it was — but it is still a
+   migration and still nobody's yet.
 
 **Still open in WP 6.2:** D18, D34, D51, D58, D66, D87, D94, D95, D96, D99.

@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "4211665e245a";
+export const CONTRACT_VERSION = "ae0c31529221";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260918000003_actor_on_the_remaining_nine.sql";
+export const LAST_MIGRATION = "20260918000004_disruption_plane_audited.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
-  "tablesDescribed": 43,
-  "columnsDescribed": 536,
-  "tablesUndescribed": 38
+  "tablesDescribed": 48,
+  "columnsDescribed": 590,
+  "tablesUndescribed": 33
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -222,6 +222,36 @@ export const TIERS: GlanceTier[] = [
     "tier": "4",
     "name": "decisions — policies, overrides, scenarios",
     "tables": [
+      {
+        "table": "disruption_scenario_effects",
+        "grain": "One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in.",
+        "columns": 9,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenario_profiles",
+        "grain": "One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row.",
+        "columns": 13,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenario_settings",
+        "grain": "One simulation setting for one profile, as a key and a JSONB value. HOW the disruption is simulated, as against what it hits (`_targets`) and what it does (`_effects`).",
+        "columns": 8,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenario_targets",
+        "grain": "One target set for one profile: WHAT the disruption hits. Either a list of nodes or a list of edges, decided by `target_type`.",
+        "columns": 10,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenarios",
+        "grain": "One disruption applied to one node of one project: a capacity cut, a delay, or both. The ORIGINAL disruption shape, superseded in design by the `disruption_scenario_*` profile/target/effect/setting split but never migrated — both are live and neither reads the other.",
+        "columns": 14,
+        "owner": "policy-ui"
+      },
       {
         "table": "policy_defaults",
         "grain": "One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against.",
@@ -482,26 +512,6 @@ export const UNDESCRIBED: UndescribedGroup[] = [
     "wp": "6.4",
     "why": "Decisions (tier 4) beyond the two policy tables the contract already covers. MOVED FROM WP 6.1 BY WP 6.1 ITSELF, with `external_evidence` above. This row's own reasoning is what gave it away: \"WP 6.1 pins the resolution chains … the scenario and disruption tables are the surface those chains resolve against\". Being the surface a package READS is not the same as being a package's deliverable, and §13's WP 6.1 never claimed them — it traced 38 grid fields and described no table at all. Ten tables sat behind a sentence that reads like a plan and is an association. WP 6.4 owns them with `external_evidence`: together they are the DECISION PLANE — what a person or an agent chose, and what a result must bind to under `result-binding` (I8). See §14 · WP 6.4.",
     "tables": [
-      {
-        "table": "disruption_scenario_effects",
-        "columns": 9
-      },
-      {
-        "table": "disruption_scenario_profiles",
-        "columns": 13
-      },
-      {
-        "table": "disruption_scenario_settings",
-        "columns": 8
-      },
-      {
-        "table": "disruption_scenario_targets",
-        "columns": 10
-      },
-      {
-        "table": "disruption_scenarios",
-        "columns": 14
-      },
       {
         "table": "policy_presets",
         "columns": 9

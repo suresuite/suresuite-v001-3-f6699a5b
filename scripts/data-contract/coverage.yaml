@@ -175,22 +175,12 @@ deferred:
       - policy_presets
       - scenarios
       - scenario_templates
-      - disruption_scenarios
-      - disruption_scenario_profiles
-      - disruption_scenario_targets
-      - disruption_scenario_effects
-      - disruption_scenario_settings
       - recovery_playbooks
     audited:
       policy_versions: false
       policy_presets: false
       scenarios: false
       scenario_templates: false
-      disruption_scenarios: false
-      disruption_scenario_profiles: false
-      disruption_scenario_targets: false
-      disruption_scenario_effects: false
-      disruption_scenario_settings: false
       recovery_playbooks: false
 
   - wp: "5.2"
