@@ -4,15 +4,31 @@ on:
   push:
     paths:
       - "src/**"
+      # index.html IS a real input, not an inheritance from the deleted
+      # mobile-verify.yml: audit-adaptive-ui.mjs:319 reads it directly for the
+      # viewport rule — `env(safe-area-inset-*)` resolves to 0 on iOS when
+      # index.html lacks `viewport-fit=cover`, and NO other rule reads that
+      # file. Without this path an edit dropping the meta tag would change the
+      # audit's answer with nothing running the audit.
+      - "index.html"
       - "scripts/audit-adaptive-ui.mjs"
       - "scripts/adaptive-ui-baseline.json"
       - ".github/workflows/ui-audit.yml"
-  pull_request:
-    paths:
-      - "src/**"
-      - "scripts/audit-adaptive-ui.mjs"
-      - "scripts/adaptive-ui-baseline.json"
   workflow_dispatch:
+
+# ONE RUN PER COMMIT — 2026-09-18. `pull_request:` removed; the unfiltered
+# `push:` above is kept and is what reports on a pull request (checks attach to
+# the SHA). Every commit on a PR branch used to run this gate TWICE, once per
+# event, for one answer. Coverage is unchanged: same gate, same paths, same
+# commits. Every pull request in this repository is same-repo (`claude/*`
+# branches) — IF FORK PRs EVER BECOME EXPECTED, `pull_request:` MUST COME BACK,
+# because a fork's push raises no event here.
+#
+# `concurrency` cancels a superseded run on the same ref: pushing three times in
+# a minute now pays for the last commit, not all three.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # The mechanical half of docs/mobile-ui-spec.md — emoji in product copy, bare
 # `1fr` tracks, `shrink-0` on unbounded text, sub-44px touch targets, a second
@@ -24,9 +40,41 @@ on:
 # backlog can shrink and can never grow. Fix a file, re-run with
 # --update-baseline to record the smaller number, and commit that.
 
+# ── mobile-verify.yml IS GONE, AND THIS JOB IS WHAT IT RAN (2026-09-18) ──────
+#
+# `mobile-verify.yml` ("mobile handoff conformance") ran `audit-adaptive-ui.mjs`
+# — this exact script, against this exact baseline. Its own header said so:
+# "This makes the job a second run of ui-audit.yml's gate" and "a duplicated
+# green gate is better than a permanently red one". It ran ~200 times in 30
+# days and asserted nothing this job does not.
+#
+# It became a duplicate rather than being born one. It used to be the DESIGN
+# half of the mobile handoff, running `handoff/verify-repo.mjs` over
+# `handoff/PAGES.md`'s per-surface copy decks. That checker and its book were
+# deleted with the whole `handoff/` directory in `e0bb85c`, so the job failed
+# MODULE_NOT_FOUND on every PR touching `src/**` — the G7 breakage. Repointing
+# it here was the resolution G7 records, and the duplicate was the stopgap.
+#
+# TO RESTORE THE COPY-DECK GATE — the coverage that actually went missing, and
+# it went missing in `e0bb85c`, not here:
+#
+#     git show e0bb85c^:handoff/verify-repo.mjs   # the checker
+#     git show e0bb85c^:handoff/PAGES.md          # the per-surface copy decks
+#
+# Restore both, then give them their own workflow. Do NOT re-create
+# `mobile-verify.yml` pointed at `audit-adaptive-ui.mjs`: that is the
+# duplicate, not the gate.
+#
+# Its path filter carried two paths this one lacked. `index.html` is now in the
+# filter above and it is load-bearing (see the note there). `handoff/**` is
+# deliberately NOT: the directory does not exist in the tree, and a filter on an
+# absent path matches nothing — it would be a comment pretending to be a
+# trigger. Add it back in the same commit that restores the directory.
+
 jobs:
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # measured ~20s; no install, one node script
     steps:
       - uses: actions/checkout@v4
 

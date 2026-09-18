@@ -48,6 +48,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # This job runs an npm install (one package, --no-save), so the npm
+          # cache is worth keying on the lockfile.
+          cache: npm
           node-version: 22
 
       # Only the realtime client is needed — not the app's full node_modules.

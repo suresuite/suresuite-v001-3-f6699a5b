@@ -11,16 +11,21 @@ on:
       - "scripts/build_engine_wheels.sh"
       - "public/engine/**"
       - ".github/workflows/scsim-tests.yml"
-  pull_request:
-    paths:
-      - "scsim/**"
-      - "sim-worker/**"
-      - "src/lib/policies/registry.generated.json"
-      - "supabase/functions/_shared/**"
-      - "scripts/check_registry_bridge.mjs"
-      - "scripts/build_engine_wheels.sh"
-      - "public/engine/**"
   workflow_dispatch:
+
+# ONE RUN PER COMMIT — 2026-09-18. `pull_request:` removed; the unfiltered
+# `push:` above is kept and is what reports on a pull request (checks attach to
+# the SHA). Every commit on a PR branch used to run this gate TWICE, once per
+# event, for one answer. Coverage is unchanged: same gate, same paths, same
+# commits. Every pull request in this repository is same-repo (`claude/*`
+# branches) — IF FORK PRs EVER BECOME EXPECTED, `pull_request:` MUST COME BACK,
+# because a fork's push raises no event here.
+#
+# `concurrency` cancels a superseded run on the same ref: pushing three times in
+# a minute now pays for the last commit, not all three.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # The repo-root `scsim/` SERVICE directory shadows the installed `scsim`
 # PACKAGE as a PEP-420 namespace package when Python runs with the repo root
@@ -29,8 +34,33 @@ on:
 # every Python step so each suite also picks up its own pytest config.
 
 jobs:
+  # ── FOUR JOBS BECAME TWO — 2026-09-18 ───────────────────────────────────────
+  #
+  # `browser-wheels` and `grading` used to be separate `ubuntu-latest` jobs. Each
+  # was ~12–32 seconds of work behind ~20–30 seconds of runner setup, and Actions
+  # bills per job ROUNDED UP TO THE MINUTE: the four jobs of a ~50-second run cost
+  # 4 billable minutes. Folding the two smallest into this job costs 2 of those
+  # back per run with nothing dropped — same commands, same working directories,
+  # same assertions.
+  #
+  # `browser-wheels` merges cleanly because it needed exactly this job's setup:
+  # `setup-python` + an installed `scsim` (it took `pip install ./scsim`; the
+  # `[dev]` extra below is a superset). `grading` brings its own toolchain, so
+  # `setup-deno` joins the two actions already here.
+  #
+  # WHAT THE SPLIT ACTUALLY BOUGHT, AND HOW IT IS KEPT: separate jobs report
+  # independently, so one red gate never hid another. In one job a failing step
+  # would stop the rest — so every INDEPENDENT gate below carries
+  # `if: ${{ !cancelled() }}` and still runs and still reports when an earlier one
+  # fails. A run with three broken gates names all three, as before.
+  #
+  # `sim-worker` stays its own job on purpose: it installs
+  # `sim-worker/requirements.txt` into the same interpreter, and merging it would
+  # put the worker's pins and `scsim[dev]`'s in one resolution where neither suite
+  # is testing the environment it ships with.
   scsim:
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # measured ~50s
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +68,11 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
+      # For the grading contract tests, folded in from the old `grading` job.
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Install scsim
         run: pip install "./scsim[dev]"
@@ -47,22 +82,46 @@ jobs:
         working-directory: scsim
 
       - name: Docs CI gate — generated reference pages must match the registry
+        if: ${{ !cancelled() }}
         run: python scripts/gen_docs.py --check
         working-directory: scsim
 
       - name: Registry payload builds
+        if: ${{ !cancelled() }}
         run: python -m scsim.io.registry_export > /tmp/registry.json
         working-directory: scsim
 
       - name: Frontend registry snapshot in sync with the engine (§6.2 gate)
+        if: ${{ !cancelled() }}
         run: python scripts/gen_frontend_registry.py --check
         working-directory: scsim
 
       - name: Frontend policy bridge consistent with the engine (§6.2 gate)
+        if: ${{ !cancelled() }}
         run: node scripts/check_registry_bridge.mjs
+
+      # ── was the `browser-wheels` job ──────────────────────────────────────
+      # The browser engine runs pre-built pure-Python wheels committed under
+      # public/engine/ (Pyodide loads them client-side). This gate fails if those
+      # committed wheels' source has drifted from the current scsim/sim-worker
+      # code — same regenerate-and-diff discipline as the registry snapshots
+      # above. The install step above is the one it used to do for itself.
+      - name: Committed browser-engine wheels in sync with the engine
+        if: ${{ !cancelled() }}
+        run: bash scripts/build_engine_wheels.sh --check
+
+      # ── was the `grading` job ─────────────────────────────────────────────
+      # The shared grading module (§8.2) — the ONE grader the browser and the
+      # sim-command gate both import. Locked to the golden parity fixture; the
+      # sim-worker job below asserts the engine half of the same contract.
+      - name: Grader contract tests (golden fixture + gate semantics)
+        if: ${{ !cancelled() }}
+        run: deno test --allow-read grading_test.ts env_test.ts
+        working-directory: supabase/functions/_shared
 
   sim-worker:
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # measured ~30s
     steps:
       - uses: actions/checkout@v4
 
@@ -79,39 +138,3 @@ jobs:
       - name: Worker test suite (legacy engine + scsim bridge + validation parity)
         run: python -m pytest tests -q
         working-directory: sim-worker
-
-  # The browser engine runs pre-built pure-Python wheels committed under
-  # public/engine/ (Pyodide loads them client-side). This gate fails if those
-  # committed wheels' source has drifted from the current scsim/sim-worker code
-  # — same regenerate-and-diff discipline as the registry snapshots above.
-  browser-wheels:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install scsim (build backend picks it up for version stamp)
-        run: pip install ./scsim
-
-      - name: Committed browser-engine wheels in sync with the engine
-        run: bash scripts/build_engine_wheels.sh --check
-
-  # The shared grading module (§8.2) — the ONE grader the browser and the
-  # sim-command gate both import. Locked to the golden parity fixture; the
-  # sim-worker job above asserts the engine half of the same contract.
-  grading:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-
-      - name: Grader contract tests (golden fixture + gate semantics)
-        run: deno test --allow-read grading_test.ts env_test.ts
-        working-directory: supabase/functions/_shared

@@ -44,9 +44,20 @@ on:
       - '.github/workflows/ai-agent-eval.yml'
   workflow_dispatch:
 
+# NOT a push+pull_request double fire, deliberately left alone — `push` here is
+# `branches: [main]`, so a PR-branch commit raises exactly one run
+# (`pull_request`) and a merge raises exactly one (`push`). Removing
+# `pull_request` would leave feature branches with NO agent-eval run at all.
+#
+# Cancellation added 2026-09-18: a superseded commit's run is dropped.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   eval:
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # measured ~40s incl. the throwaway Postgres cluster
     steps:
       - uses: actions/checkout@v4
 

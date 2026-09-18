@@ -21,6 +21,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Caps a hung `supabase functions deploy`. Deliberately NO `concurrency`
+    # cancellation: this workflow writes function secrets and then deploys, and
+    # cancelling between the two leaves the deployment half-configured.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
