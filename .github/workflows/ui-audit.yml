@@ -7,12 +7,21 @@ on:
       - "scripts/audit-adaptive-ui.mjs"
       - "scripts/adaptive-ui-baseline.json"
       - ".github/workflows/ui-audit.yml"
-  pull_request:
-    paths:
-      - "src/**"
-      - "scripts/audit-adaptive-ui.mjs"
-      - "scripts/adaptive-ui-baseline.json"
   workflow_dispatch:
+
+# ONE RUN PER COMMIT — 2026-09-18. `pull_request:` removed; the unfiltered
+# `push:` above is kept and is what reports on a pull request (checks attach to
+# the SHA). Every commit on a PR branch used to run this gate TWICE, once per
+# event, for one answer. Coverage is unchanged: same gate, same paths, same
+# commits. Every pull request in this repository is same-repo (`claude/*`
+# branches) — IF FORK PRs EVER BECOME EXPECTED, `pull_request:` MUST COME BACK,
+# because a fork's push raises no event here.
+#
+# `concurrency` cancels a superseded run on the same ref: pushing three times in
+# a minute now pays for the last commit, not all three.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # The mechanical half of docs/mobile-ui-spec.md — emoji in product copy, bare
 # `1fr` tracks, `shrink-0` on unbounded text, sub-44px touch targets, a second
@@ -27,6 +36,7 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # measured ~20s; no install, one node script
     steps:
       - uses: actions/checkout@v4
 
