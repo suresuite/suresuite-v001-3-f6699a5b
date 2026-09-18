@@ -10,4 +10,4 @@
 # READ THE REPORT, NOT THE EXIT CODE. The runner is tolerant: WP 3.4 shipped a
 # probe that ordered by a column that does not exist, printed QUERY FAILED, and
 # exited 0.
-WP 5.1 — the counts WP 4.3 and WP 4.4 owed (no migration in this push)
+WP 6.3 precondition — D88's unblocking condition: analysis_runs / analysis_results and computed_from_hash IS NULL per derived table, after the 20260918000002-4 deploy (run 35343683145, success). No migration in this push.
