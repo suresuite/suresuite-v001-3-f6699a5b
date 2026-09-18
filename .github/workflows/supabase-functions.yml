@@ -10,6 +10,16 @@ on:
       - 'supabase/functions/report-render/**'
       - 'supabase/functions/sim-command/**'
       - 'supabase/functions/api/**'
+      # The four analysis functions (D105). They were absent from this list AND
+      # from the deploy steps below since the workflow was first committed, so
+      # every change to them since — WP 4.1's actor RPCs, WP 4.3's dual-write —
+      # landed in the repo and never in production. `_shared/**` covers the
+      # store module they import, which is why run #47 fired for WP 4.3's
+      # branch and still deployed none of them.
+      - 'supabase/functions/calculate-network-science-metrics/**'
+      - 'supabase/functions/calculate-node-prominence/**'
+      - 'supabase/functions/predict-critical-nodes/**'
+      - 'supabase/functions/combine-project/**'
       - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
@@ -175,5 +185,47 @@ jobs:
       # and fails closed on auth/authz/quota.
       - name: Deploy api gateway
         run: supabase functions deploy api --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── The four analysis functions (D105) ────────────────────────────────
+      #
+      # NEVER DEPLOYED BY THIS WORKFLOW UNTIL NOW, and not once in its history —
+      # `git log -S` over this file finds no commit that ever added a step for
+      # any of them. Each one is `analysisStore.ts`'s caller: `getOrStart` opens
+      # an `analysis_runs` row, `applyNodeMetrics` writes the metrics WITH the
+      # run's `input_hash`, `completeRun` closes it. That is the whole of
+      # WP 4.3's dual-write and the whole of what `input-hash` (I5) needs.
+      #
+      # §15 is what made it visible and it took three packages to read: the
+      # store held 0 runs and 0 results while 9 016 of 9 016 derived rows
+      # carried no input hash, and every report read that as "nobody has run an
+      # analysis yet". A user ran one. The code that answered was the version
+      # deployed before any of this existed — it computes the same centralities,
+      # writes them straight onto `network_nodes`, opens no run and stamps no
+      # hash. An undeployed function does not fail; it succeeds as its old self,
+      # which is why nothing anywhere went red.
+      #
+      # `verify_jwt` for each is declared in `supabase/config.toml`, which the
+      # deploy reads — `calculate-node-prominence` is `false` because a database
+      # trigger reaches it through `pg_net` with no user JWT; the other three are
+      # browser-invoked with the anon key and stay on.
+      - name: Deploy calculate-network-science-metrics
+        run: supabase functions deploy calculate-network-science-metrics --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy calculate-node-prominence
+        run: supabase functions deploy calculate-node-prominence --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy predict-critical-nodes
+        run: supabase functions deploy predict-critical-nodes --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy combine-project
+        run: supabase functions deploy combine-project --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
