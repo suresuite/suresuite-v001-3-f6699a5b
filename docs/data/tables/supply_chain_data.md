@@ -440,7 +440,7 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
 | `idx_supply_chain_data_uploaded_by` | `uploaded_by` | no | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
-| `idx_supply_chain_data_plant` | `plant` | no | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
+| `idx_supply_chain_data_plant` | `plant_name` | no | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
 | `idx_supply_chain_data_project_id` | `project_id` | no | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
 | `idx_supply_chain_data_data_source` | `data_source` | no | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
 | `idx_scd_project_id` | `project_id` | no | `20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql` |
@@ -453,6 +453,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
+*Generated from data contract `1e21e0fe7084`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

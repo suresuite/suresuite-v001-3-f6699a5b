@@ -502,6 +502,79 @@ function apply(schema, stmt, migration, guarded = false) {
   note(schema, migration, s, "unrecognised DDL");
 }
 
+
+/**
+ * A COLUMN RENAME FOLLOWS THE COLUMN INTO EVERYTHING THAT NAMES IT (§4 D49).
+ *
+ * Postgres tracks a dependent object by attribute number, so an index, a
+ * constraint or a foreign key follows its column through `RENAME COLUMN`
+ * without being restated. This artifact records them by NAME, so unless they
+ * are rewritten here it describes a database that cannot be built — and every
+ * gate that compares the artifact against the MIGRATIONS stays green, because
+ * the migrations do say what the artifact says.
+ *
+ * `idx_supply_chain_data_plant` is the recorded case: `20250822025432` renamed
+ * `plant` to `plant_name`, and the artifact still indexed `plant`.
+ * `rehearsal-schema.mjs` cannot apply that index and skips it with a warning.
+ *
+ * ── THIS IS THE FOURTH INSTANCE OF ONE BUG, AND THE FIRST FIXED AS A CLASS ──
+ *
+ * The introspector is incomplete about DEPENDENT objects, once per kind of
+ * dependency:
+ *
+ *   D52  a TABLE rename not followed into foreign keys        — fixed in WP 3.1
+ *   D53  the schema qualifier dropped from a REFERENCES        — fixed in WP 6.2
+ *   D59  an inline CHECK never recorded at all                 — walked around
+ *   D49  a COLUMN rename not followed into indexes             — here
+ *
+ * Each was found by a rehearsal warning and filed as its own defect. Fixing the
+ * fourth one narrowly would have left the shape unnamed for whoever finds the
+ * fifth, so this handles every dependent object a column rename can touch —
+ * indexes, this table's own constraint text, and the TARGET column list of a
+ * foreign key in any other table — rather than only the one D49 measured.
+ */
+function renameColumnEverywhere(schema, table, from, to) {
+  const word = new RegExp(`(^|[^A-Za-z0-9_])"?${from}"?($|[^A-Za-z0-9_])`, "g");
+  const swap = (text) => text.replace(word, (_m, a, b) => `${a}${to}${b}`);
+
+  for (const idx of table.indexes ?? []) {
+    idx.columns = (idx.columns ?? []).map((c) => (c === from ? to : c));
+    if (typeof idx.predicate === "string" && idx.predicate) idx.predicate = swap(idx.predicate);
+  }
+
+  // This table's own constraint TEXT — `UNIQUE (plant)`, `CHECK (plant > 0)`.
+  // The referenced-table half of a foreign key is left alone: that names a
+  // column of a DIFFERENT table, which this rename did not touch.
+  for (const c of table.constraints ?? []) {
+    if (typeof c.definition !== "string") continue;
+    const refAt = c.definition.search(/\bREFERENCES\b/i);
+    if (refAt === -1) {
+      c.definition = swap(c.definition);
+    } else {
+      c.definition = swap(c.definition.slice(0, refAt)) + c.definition.slice(refAt);
+    }
+    if (Array.isArray(c.columns)) c.columns = c.columns.map((x) => (x === from ? to : x));
+  }
+
+  // And every foreign key ELSEWHERE that points AT the renamed column.
+  for (const other of schema.tables.values()) {
+    for (const oc of other.columns ?? []) {
+      if (oc.references?.table !== table.name) continue;
+      if (Array.isArray(oc.references.columns)) {
+        oc.references.columns = oc.references.columns.map((x) => (x === from ? to : x));
+      }
+    }
+    if (other === table) continue;
+    for (const c of other.constraints ?? []) {
+      if (c.kind !== "FOREIGN KEY" || typeof c.definition !== "string") continue;
+      const refAt = c.definition.search(new RegExp(`\\bREFERENCES\\s+(?:public\\.)?"?${table.name}"?`, "i"));
+      if (refAt === -1) continue;
+      c.definition = c.definition.slice(0, refAt) + swap(c.definition.slice(refAt));
+    }
+  }
+}
+
+
 function applyAlter(schema, t, action, migration, whole) {
   const a = squash(action);
   let m;
@@ -523,7 +596,10 @@ function applyAlter(schema, t, action, migration, whole) {
     const toAt = /\bTO\s+/i.exec(a.slice(from.end));
     const to = toAt && readQualifiedName(a, from.end + toAt.index + toAt[0].length);
     const col = from && t.columns.find((c) => c.name === from.name);
-    if (col && to) { col.name = to.name; col.quoted = to.quoted; col.renamed_by = migration; }
+    if (col && to) {
+      col.name = to.name; col.quoted = to.quoted; col.renamed_by = migration;
+      renameColumnEverywhere(schema, t, from.name, to.name);
+    }
     return;
   }
   if ((m = /^RENAME\s+TO\s+/i.exec(a))) {
@@ -969,6 +1045,47 @@ function build() {
   for (const t of tables) {
     if (t.rls.indeterminate_from) t.rls.indeterminate_from = [...new Set(t.rls.indeterminate_from)].sort();
   }
+  // ── AN INDEX ON A COLUMN THE TABLE DOES NOT HAVE CANNOT EXIST (§4 D49) ────
+  //
+  // `CREATE INDEX … ON supply_chain_data_multi_tier(material_id)` is in
+  // `20250909153130`. That table was created the previous day with no such
+  // column and no migration has ever added one, so the statement raised
+  // `42703` in production — `IF NOT EXISTS` guards the INDEX existing, not the
+  // column. A static replay cannot execute a statement to learn it is invalid,
+  // so the artifact recorded the index anyway and `rehearsal-schema.mjs` skipped
+  // it with a warning on every run.
+  //
+  // D49 filed this as the introspector failing to follow a column RENAME, which
+  // is true of `idx_supply_chain_data_plant` and false of these two: this table
+  // has never been renamed and has no `material_id` to rename. They are §4 D48's
+  // class — a statement that aborted in production and nothing ever said so.
+  //
+  // Dropping them is what makes the artifact match the database. Only a BARE
+  // identifier is checked: `created_at DESC` carries a sort direction and
+  // `md5(triple::text)` is an expression, and neither is a column name.
+  const bareCol = /^"?([A-Za-z_][A-Za-z_0-9$]*)"?$/;
+  const droppedIndexes = [];
+  for (const t of tables) {
+    const have = new Set((t.columns ?? []).map((c) => c.name));
+    t.indexes = (t.indexes ?? []).filter((idx) => {
+      const missing = (idx.columns ?? [])
+        .map((c) => bareCol.exec(String(c))?.[1])
+        .filter((c) => c && !have.has(c));
+      if (missing.length === 0) return true;
+      droppedIndexes.push({
+        table: t.name,
+        index: idx.name,
+        missing_columns: [...new Set(missing)],
+        added_by: idx.added_by ?? null,
+        why:
+          "the index names a column the table does not have, so the statement " +
+          "raised 42703 when it ran and the index is not in the database",
+      });
+      return false;
+    });
+  }
+  schema.invalid_indexes = droppedIndexes;
+
   for (const v of schema.views.keys()) known.add(v);
 
   const codeRefs = findCodeTableRefs();
@@ -996,6 +1113,7 @@ function build() {
       rls_indeterminate_tables: tables.filter((t) => t.rls.determinate === false).length,
       orphans: orphans.length,
       aborted_migrations: schema.aborted_migrations.length,
+      invalid_indexes: (schema.invalid_indexes ?? []).length,
     },
     tables: tables.map((t) => ({
       ...t,
@@ -1018,6 +1136,8 @@ function build() {
       }))
       .sort((a, b) => a.table.localeCompare(b.table)),
     unparsed: schema.unparsed,
+    // NOT SILENT, for the same reason `unparsed` is not (§4 D49, D48).
+    invalid_indexes: schema.invalid_indexes ?? [],
     dynamic_ddl: schema.dynamic,
   };
 }
@@ -1064,6 +1184,7 @@ console.log(
   `✓ ${relative(ROOT, OUT)} — ${result.counts.tables} tables, ${result.counts.functions} functions, ` +
   `${result.counts.shadowed_definitions} shadowed definitions, ${result.counts.aborted_migrations} aborted, ` +
   `${result.counts.orphans} orphans, ` +
+  `${result.counts.invalid_indexes} invalid index(es), ` +
   `${result.counts.unparsed_statements} unparsed, ` +
   `${result.counts.dynamic_ddl_statements} dynamic (${result.counts.rls_indeterminate_tables} tables' RLS indeterminate)`,
 );

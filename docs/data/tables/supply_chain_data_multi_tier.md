@@ -325,14 +325,12 @@ When the edge was last recomputed. Server-set.
 | `idx_scmt_project_source` | `project_id`, `data_source` | no | `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql` |
 | `idx_scmt_paths` | `project_id`, `path_root`, `level` | no | `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql` |
 | `idx_scmt_from_to` | `project_id`, `from_location`, `to_location` | no | `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql` |
-| `idx_supply_chain_data_multi_tier_material_id` | `material_id` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
-| `idx_supply_chain_data_multi_tier_higher_level_component_id` | `higher_level_component_id` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
 | `idx_supply_chain_data_multi_tier_project_level` | `project_id`, `level` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
 | `idx_supply_chain_data_multi_tier_from_location` | `from_location` | no | `20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql` |
 | `idx_supply_chain_data_multi_tier_to_location` | `to_location` | no | `20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql` |
 
 ---
 
-*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
+*Generated from data contract `1e21e0fe7084`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -16,7 +16,8 @@
     "dynamic_ddl_statements": 36,
     "rls_indeterminate_tables": 4,
     "orphans": 0,
-    "aborted_migrations": 3
+    "aborted_migrations": 3,
+    "invalid_indexes": 2
   },
   "tables": [
     {
@@ -18398,7 +18399,7 @@
           "name": "idx_supply_chain_data_plant",
           "unique": false,
           "columns": [
-            "plant"
+            "plant_name"
           ],
           "nulls_not_distinct": false,
           "predicate": null,
@@ -18810,28 +18811,6 @@
           "predicate": null,
           "partial": false,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
-        },
-        {
-          "name": "idx_supply_chain_data_multi_tier_material_id",
-          "unique": false,
-          "columns": [
-            "material_id"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": null,
-          "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
-        },
-        {
-          "name": "idx_supply_chain_data_multi_tier_higher_level_component_id",
-          "unique": false,
-          "columns": [
-            "higher_level_component_id"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": null,
-          "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
         },
         {
           "name": "idx_supply_chain_data_multi_tier_project_level",
@@ -24080,6 +24059,26 @@
   "orphans": [],
   "phantom_tables": [],
   "unparsed": [],
+  "invalid_indexes": [
+    {
+      "table": "supply_chain_data_multi_tier",
+      "index": "idx_supply_chain_data_multi_tier_material_id",
+      "missing_columns": [
+        "material_id"
+      ],
+      "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql",
+      "why": "the index names a column the table does not have, so the statement raised 42703 when it ran and the index is not in the database"
+    },
+    {
+      "table": "supply_chain_data_multi_tier",
+      "index": "idx_supply_chain_data_multi_tier_higher_level_component_id",
+      "missing_columns": [
+        "higher_level_component_id"
+      ],
+      "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql",
+      "why": "the index names a column the table does not have, so the statement raised 42703 when it ran and the index is not in the database"
+    }
+  ],
   "dynamic_ddl": [
     {
       "migration": "20260609010118_e03bff33-fd91-4376-8a39-06a9950e15d3.sql",

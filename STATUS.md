@@ -3,11 +3,47 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–8** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–9** · PR #223 MERGED · PR #223 merged as `f555409`
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 9) — The dependent-object class, fixed as a class · no migration
+
+**PR #223 merged** (`f555409`) — thirteen commits on `main`, and `main`'s
+data-contract gate is **green again**: D86's six R12 failures, red since the #222
+merge, are cleared. Branch restarted from the new `main`.
+
+**D49 closed — and its stated cause is wrong for two of its three instances.**
+
+`idx_supply_chain_data_plant` is the rename case as described, and the fix is now
+written for the class: a `RENAME COLUMN` follows its column into indexes, index
+predicates, the table's own constraint text, and the target column list of any
+foreign key elsewhere.
+
+The two on `supply_chain_data_multi_tier` were **never renamed and never
+existed** — table created 2025-09-08 without those columns, indexes written
+2025-09-09, columns never added. `CREATE INDEX IF NOT EXISTS` guards the *index*,
+not the *column*, so those statements raised `42703` and the indexes are not in
+the database. That's **D48's** class, not D52's. Following D49's stated cause
+would have sent two thirds of the fix to the wrong place.
+
+The introspector now refuses to record an impossible index and lists it under
+`invalid_indexes` with the migration that wrote it. All three rehearsal
+skip-warnings gone, all three modes.
+
+**Slice 8's lesson applied rather than promised:** the gate was built and both
+mutations caught *before* calling the fix done (3 red each way).
+
+**Verified:** all three rehearse modes green · `contract:check` ✓ · 386 tests ✓ ·
+build ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Worth your attention (gap check):** `20250909153130` probably aborted
+*entirely* — a failed statement aborts its transaction, so that file's third
+index is equally absent from production even though its columns exist. The
+artifact still records it and nothing local can tell. **§15's schema probe is the
+instrument that would settle it.**
 
 ### WP 6.2 (slice 8) — Nine foreign keys that never existed · no migration
 

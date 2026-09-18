@@ -20286,7 +20286,7 @@
           "name": "idx_supply_chain_data_plant",
           "unique": false,
           "columns": [
-            "plant"
+            "plant_name"
           ],
           "nulls_not_distinct": false,
           "predicate": null,
@@ -21251,28 +21251,6 @@
           "predicate": null,
           "partial": false,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
-        },
-        {
-          "name": "idx_supply_chain_data_multi_tier_material_id",
-          "unique": false,
-          "columns": [
-            "material_id"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": null,
-          "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
-        },
-        {
-          "name": "idx_supply_chain_data_multi_tier_higher_level_component_id",
-          "unique": false,
-          "columns": [
-            "higher_level_component_id"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": null,
-          "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
         },
         {
           "name": "idx_supply_chain_data_multi_tier_project_level",
@@ -23652,5 +23630,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "7bd2a0fd8e4f"
+  "contract_version": "1e21e0fe7084"
 }
