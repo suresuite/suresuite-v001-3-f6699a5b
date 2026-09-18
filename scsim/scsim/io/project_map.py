@@ -154,11 +154,20 @@ class OutboundArc:
 class CustomerRow:
     """``customers`` row — the table the mapper never read (§4 D69).
 
-    ``ProjectData.customers`` is a list of IDS and stays that way: the id set is
-    the union of this table and the customer ids found on outbound arcs, and a
-    customer can legitimately appear only on an arc. This carries the ATTRIBUTES
-    for the ids the table does describe, so the two are additive rather than one
-    replacing the other.
+    ``ProjectData.customers`` is a list of IDS and stays that way. This carries
+    the ATTRIBUTES for those ids and NOTHING ELSE — in particular it does not
+    decide WHICH customers exist.
+
+    That separation was not the first draft's, and CI is what settled it. The
+    draft also unioned these rows into the id set, so a row naming a customer the
+    graph does not trade with became a `Customer` entity with no demand — and, as
+    a side effect, `unmatched` below compared against a set that already
+    contained every row, so it could never fire and
+    `test_a_row_naming_an_id_with_no_demand_is_reported_not_silent` failed. Which
+    customers exist is decided by the outbound arcs exactly as it was before D69;
+    widening it is a behaviour change beyond the defect, and one that would have
+    put demand-less customers into `len(net.customers)`, which P-C.2's own
+    feasibility check reads.
 
     ``sla_fill_floor_pct`` is deliberately absent: the column exists on the table
     and ``Customer`` has no field for it, so there is nothing to carry it into.
@@ -541,7 +550,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
     out_price_num: dict[str, float] = {}
     out_price_den: dict[str, float] = {}
     out_demand: dict[str, float] = {}
-    customers: set[str] = set(data.customers) | {c.id for c in data.customer_rows if c.id}
+    customers: set[str] = set(data.customers)
     cust_share: dict[tuple[str, str], float] = {}  # (product, customer) → weekly volume
     for o in data.outbound:
         customers.add(o.customer_id)
@@ -928,8 +937,9 @@ def _build_customers(
     if defaulted and by_id:
         w.append(MappingWarning(
             "info", "customers", "segment",
-            f"the `customers` table describes {len(by_id)} customer(s) but not "
-            f"{len(defaulted)} other(s), which keep the engine defaults "
+            f"the `customers` table describes {len(ids) - len(defaulted)} of this "
+            f"project's customers but not {len(defaulted)} other(s), which keep "
+            f"the engine defaults "
             f"(segment=default, priority_weight=1.0): {defaulted[:5]}"))
     return out
 

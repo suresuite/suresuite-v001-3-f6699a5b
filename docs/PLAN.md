@@ -9711,10 +9711,27 @@ somebody is actively maintaining rather than a baseline nobody chose. Pinned
 both ways in `test_customer_attributes.py`: silent when the table is absent,
 reported when coverage is partial.
 
-Worth recording as a pattern rather than an incident: **the unverifiable change
-was caught by an existing gate within four minutes of the push**, and the gate's
-verdict was correct against the draft's reasoning. The `scsim` suite is the
-verifier a work-package session cannot be.
+**And a SECOND bug, in the package's own new test, which the same run caught.**
+`test_a_row_naming_an_id_with_no_demand_is_reported_not_silent` failed: the GHOST
+warning never fired. The draft had also unioned the table's rows into the
+customer ID SET — so a row naming a customer the graph does not trade with became
+a `Customer` entity, and `unmatched` compared against a set that already
+contained every row and could never find one.
+
+Two changes that each looked right and contradicted each other. The id set is now
+left exactly as it was before D69 — **the table attributes customers, it does not
+decide which ones exist** — which is both the minimal fix and the correct one:
+widening it would have put demand-less customers into `len(net.customers)`, which
+P-C.2's own feasibility check reads.
+
+Worth recording as a pattern rather than an incident. **Two bugs, in a change
+that was reviewed, linted, type-checked and reasoned through — and neither was
+findable without executing it.** Both were in BRANCHING, which is why the fix
+came with a local harness: `_build_customers`'s body is now exercised against
+stub `Customer`/`MappingWarning` classes, no `pydantic` required, over the four
+cases that matter (no table, partial, ghost row, full). That harness is the
+thing to reach for next time a work-package session has to touch Python: it
+cannot run the engine, but it can run a function.
 
 **Still open in WP 6.2:** D18, D34, D47, D48, D49, D51, D53, D58, D59, D66, D71,
 D85, D87, D94, D95.
